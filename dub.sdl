@@ -1,0 +1,32 @@
+name "alicedbg"
+description "Native debugger in a TUI"
+homepage "http://github.com/dd86k/alicedbg"
+authors "dd86k <dd@dax.moe>"
+copyright "Copyright © 2019, dd86k"
+license "BSD 3-clause"
+version "0.0.0"
+
+# TODO: Headless version (with json exception?)
+
+#targetPath "bin"
+
+buildType "debugv" {
+	buildOptions "betterC" platform="dmd"
+	buildOptions "betterC" platform="ldc"
+	dflags "-v"
+}
+
+buildType "debug" {
+	buildOptions "betterC" platform="dmd"
+	buildOptions "betterC" platform="ldc"
+}
+
+buildType "release" {
+	buildOptions "betterC" platform="dmd"
+	buildOptions "betterC" platform="ldc"
+}
+
+buildType "release-nobounds" {
+	buildOptions "betterC" platform="dmd"
+	buildOptions "betterC" platform="ldc"
+}

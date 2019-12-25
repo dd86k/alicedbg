@@ -1,0 +1,20 @@
+# Project
+.vscode/
+.dub/
+__dummy.html
+bin/
+docs/
+examples/
+/alicedbg
+alicedbg.so
+alicedbg.dylib
+alicedbg.dll
+alicedbg.a
+alicedbg.lib
+alicedbg-test-*
+*.exe
+*.o
+*.obj
+*.lst
+*.json
+NOTES
