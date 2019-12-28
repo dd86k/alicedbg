@@ -91,19 +91,19 @@ int dbg_file(const(char) *cmd) {
 /**
  * Attach the debugger to a process ID.
  * (Windows) Uses DebugActiveProcess
- * (Posix) Uses ptrace::PTRACE_ATTACH
+ * (Posix) Uses ptrace(PTRACE_SEIZE)
  * Params:
  * 	pid = Process ID
- * Returns: Zero on success; Otherwise an error occured
+ * Returns: Zero on success; Otherwise an error (Windows) Returns GetLastError
  */
 int dbg_attach(int pid) {
 	version (Windows) {
-		//TODO: DebugActiveProcess
-		//if (DebugActiveProcess(pid) == FALSE)
-		//	return GetLastError();
+		if (DebugActiveProcess(pid) == FALSE)
+			return GetLastError();
 	} else
 	version (Posix) {
-		//TODO: ptrace PTRACE_ATTACH
+		if (ptrace(PTRACE_SEIZE, pid, null, null) == -1)
+			return 2;
 	}
 	return 0;
 }
