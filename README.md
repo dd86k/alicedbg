@@ -6,6 +6,8 @@ This exists because I wanted an easy-to-use debugger with an non-interactive
 mode (catch, print, exit) and and interactive mode (for lengthy sessions)
 available anywhere and anytime, even via SSH.
 
+More details to come.
+
 # Usage
 
 ## Getting started

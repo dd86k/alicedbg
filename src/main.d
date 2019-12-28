@@ -186,28 +186,34 @@ int main(int argc, const(char) **argv) {
 			}
 			continue;
 		}
-		/*if (strcmp(arg, "hexdump") == 0) {
+		/*if (strcmp(arg, "disasmdump") == 0) {
 			
 		}*/
+		// Choose demangle settings for symbols
 		/*if (strcmp(arg, "demangle") == 0) {
 			
 		}*/
+		// Choose debugging backend, currently unsupported and only
+		// embedded option is available
 		/*if (strcmp(arg, "backend") == 0) {
 			
 		}*/
 	}
 
+	int e = void;
 	switch (opt.debugtype) {
 	case CLIDebug.file:
-		if (dbg_file(opt.file)) {
-			puts("dbg: Could not load file");
-			return 2;
+		e = dbg_file(opt.file);
+		if (e) {
+			printf("dbg: Could not load file (%X)\n");
+			return e;
 		}
 		break;
 	case CLIDebug.pid:
-		if (dbg_attach(opt.pid)) {
-			puts("dbg: Could not attach to pid");
-			return 2;
+		e = dbg_attach(opt.pid);
+		if (e) {
+			printf("dbg: Could not attach to pid (%X)\n");
+			return e;
 		}
 		break;
 	default:
