@@ -15,8 +15,8 @@ extern (C):
  */
 int disasm_x86(ref disasm_params_t p) {
 	int e;
-	prefix_reg = PrefixReg.None;
-	prefix_address = prefix_operand = false;
+	x86_prefreg = PrefixReg.None;
+	x86_prefix_address = x86_prefix_operand = false;
 	const int INCLUDE_MACHINECODE = p.include & DISASM_INCLUDE_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_INCLUDE_MNEMONICS;
 
@@ -85,7 +85,7 @@ L_CONTINUE:
 		pretty_modrm(p);
 		break;
 	case 0x26:	// ES:
-		prefix_reg = PrefixReg.ES;
+		x86_prefreg = PrefixReg.ES;
 		goto L_CONTINUE;
 	case 0x27:	// DAA
 		if (INCLUDE_MNEMONICS)
@@ -102,10 +102,10 @@ L_CONTINUE:
 		pretty_modrm(p);
 		break;
 	case 0x2E:	// CS:
-		prefix_reg = PrefixReg.CS;
+		x86_prefreg = PrefixReg.CS;
 		goto L_CONTINUE;
 	case 0x36:	// SS:
-		prefix_reg = PrefixReg.SS;
+		x86_prefreg = PrefixReg.SS;
 		goto L_CONTINUE;
 	case 0x37:	// AAA
 		if (INCLUDE_MNEMONICS)
@@ -117,7 +117,7 @@ L_CONTINUE:
 		pretty_modrm(p);
 		break;
 	case 0x3E:	// DS:
-		prefix_reg = PrefixReg.DS;
+		x86_prefreg = PrefixReg.DS;
 		goto L_CONTINUE;
 	case 0x40:	// INC EAX
 		if (INCLUDE_MNEMONICS)
@@ -268,16 +268,16 @@ L_CONTINUE:
 		}
 		break;
 	case 0x64:	// FS:
-		prefix_reg = PrefixReg.FS;
+		x86_prefreg = PrefixReg.FS;
 		goto L_CONTINUE;
 	case 0x65:	// GS:
-		prefix_reg = PrefixReg.GS;
+		x86_prefreg = PrefixReg.GS;
 		goto L_CONTINUE;
 	case 0x66:	// PREFIX: OPERAND SIZE
-		prefix_operand = true;
+		x86_prefix_operand = true;
 		goto L_CONTINUE;
 	case 0x67:	// PREFIX: ADDRESS SIZE
-		prefix_address = true;
+		x86_prefix_address = true;
 		goto L_CONTINUE;
 	case 0x81:	// GRP1 REG32, IMM32
 		ubyte modrm = *p.addru8;
@@ -300,7 +300,7 @@ L_CONTINUE:
 			mcaddf(p, "%02X %08X", modrm, v);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "%s %s, %u",
-				f, modrm_reg(modrm, b & 1, prefix_operand), v);
+				f, modrm_reg(modrm, b & 1, x86_prefix_operand), v);
 		break;
 	case 0x80:	// GRP1 REG8, IMM8
 	case 0x82:	// GRP1 REG8, IMM8
@@ -325,7 +325,7 @@ L_CONTINUE:
 			mcaddf(p, "%02X %02X", modrm, v);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "%s %s, %u",
-				f, modrm_reg(modrm, b & 1, prefix_operand), v);
+				f, modrm_reg(modrm, b & 1, x86_prefix_operand), v);
 		break;
 	case 0x89:	// MOV REG32, R/M32
 		if (INCLUDE_MNEMONICS)
@@ -346,7 +346,7 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			with (PrefixReg)
-			switch (prefix_reg) {
+			switch (x86_prefreg) {
 			case CS: f = "MOV AL, [CS:%d]"; break;
 			case DS: f = "MOV AL, [DS:%d]"; break;
 			case ES: f = "MOV AL, [ES:%d]"; break;
@@ -367,7 +367,7 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			with (PrefixReg)
-			switch (prefix_reg) {
+			switch (x86_prefreg) {
 			case CS: f = "MOV EAX, [CS:%d]"; break;
 			case DS: f = "MOV EAX, [DS:%d]"; break;
 			case ES: f = "MOV EAX, [ES:%d]"; break;
@@ -388,7 +388,7 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			with (PrefixReg)
-			switch (prefix_reg) {
+			switch (x86_prefreg) {
 			case CS: f = "MOV [CS:%d], AL"; break;
 			case DS: f = "MOV [DS:%d], AL"; break;
 			case ES: f = "MOV [ES:%d], AL"; break;
@@ -409,7 +409,7 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			with (PrefixReg)
-			switch (prefix_reg) {
+			switch (x86_prefreg) {
 			case CS: f = "MOV [CS:%d], EAX"; break;
 			case DS: f = "MOV [DS:%d], EAX"; break;
 			case ES: f = "MOV [ES:%d], EAX"; break;
@@ -512,7 +512,7 @@ L_CONTINUE:
 		default:
 		}
 		uint v = void;
-		if (prefix_operand) {
+		if (x86_prefix_operand) {
 			v = *p.addru16;
 			p.addrv += 2;
 		} else {
@@ -622,10 +622,9 @@ enum PrefixReg : ubyte {
 	SS
 }
 
-__gshared uint x86_opmode;
-__gshared bool prefix_operand;
-__gshared bool prefix_address;
-__gshared PrefixReg prefix_reg;
+__gshared bool x86_prefix_operand;
+__gshared bool x86_prefix_address;
+__gshared PrefixReg x86_prefreg;
 
 int mapb2(ref disasm_params_t params) {
 	const ubyte b = *params.addru8;
@@ -750,7 +749,7 @@ L_REG:
 
 const(char) *segstr() {
 	with (PrefixReg)
-	switch (prefix_reg) {
+	switch (x86_prefreg) {
 	case CS: return "CS:";
 	case DS: return "DS:";
 	case ES: return "ES:";
@@ -806,7 +805,7 @@ const(char) *modrm_rm(ubyte modrm) {
 	switch (modrm & RM_RM) {
 	case RM_RM_000:
 		with (PrefixReg)
-		switch (prefix_reg) {
+		switch (x86_prefreg) {
 		case CS: return "CS:EAX";
 		case DS: return "DS:EAX";
 		case ES: return "ES:EAX";
@@ -818,7 +817,7 @@ const(char) *modrm_rm(ubyte modrm) {
 		return "EAX";
 	case RM_RM_001:
 		with (PrefixReg)
-		switch (prefix_reg) {
+		switch (x86_prefreg) {
 		case CS: return "CS:ECX";
 		case DS: return "DS:ECX";
 		case ES: return "ES:ECX";
@@ -830,7 +829,7 @@ const(char) *modrm_rm(ubyte modrm) {
 		return "ECX";
 	case RM_RM_010:
 		with (PrefixReg)
-		switch (prefix_reg) {
+		switch (x86_prefreg) {
 		case CS: return "CS:EDX";
 		case DS: return "DS:EDX";
 		case ES: return "ES:EDX";
@@ -842,7 +841,7 @@ const(char) *modrm_rm(ubyte modrm) {
 		return "EDX";
 	case RM_RM_011:
 		with (PrefixReg)
-		switch (prefix_reg) {
+		switch (x86_prefreg) {
 		case CS: return "CS:EBX";
 		case DS: return "DS:EBX";
 		case ES: return "ES:EBX";
@@ -854,7 +853,7 @@ const(char) *modrm_rm(ubyte modrm) {
 		return "EBX";
 	case RM_RM_100:
 		with (PrefixReg)
-		switch (prefix_reg) {
+		switch (x86_prefreg) {
 		case CS: return "CS:ESP";
 		case DS: return "DS:ESP";
 		case ES: return "ES:ESP";
@@ -866,7 +865,7 @@ const(char) *modrm_rm(ubyte modrm) {
 		return "ESP";
 	case RM_RM_101:
 		with (PrefixReg)
-		switch (prefix_reg) {
+		switch (x86_prefreg) {
 		case CS: return "CS:EBP";
 		case DS: return "DS:EBP";
 		case ES: return "ES:EBP";
@@ -878,7 +877,7 @@ const(char) *modrm_rm(ubyte modrm) {
 		return "EBP";
 	case RM_RM_110:
 		with (PrefixReg)
-		switch (prefix_reg) {
+		switch (x86_prefreg) {
 		case CS: return "CS:ESI";
 		case DS: return "DS:ESI";
 		case ES: return "ES:ESI";
@@ -890,7 +889,7 @@ const(char) *modrm_rm(ubyte modrm) {
 		return "ESI";
 	case RM_RM_111:
 		with (PrefixReg)
-		switch (prefix_reg) {
+		switch (x86_prefreg) {
 		case CS: return "CS:EDI";
 		case DS: return "DS:EDI";
 		case ES: return "ES:EDI";

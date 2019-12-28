@@ -15,8 +15,8 @@ extern (C):
  */
 int disasm_x86_64(ref disasm_params_t p) {
 	int e = DisasmError.None;
-	prefix_reg = PrefixReg.None;
-	prefix_address = prefix_operand = false;
+	x64_prefreg = PrefixReg.None;
+	x64_pre_ad = x64_pre_op = false;
 	const int INCLUDE_MACHINECODE = p.include & DISASM_INCLUDE_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_INCLUDE_MNEMONICS;
 	
@@ -49,7 +49,6 @@ enum PrefixReg : ubyte {
 	SS
 }
 
-__gshared uint x86_opmode;
-__gshared bool prefix_operand;
-__gshared bool prefix_address;
-__gshared PrefixReg prefix_reg;
+__gshared bool x64_pre_op;	/// OPERAND prefix (66H)
+__gshared bool x64_pre_ad;	/// ADDRESS prefix (67H)
+__gshared PrefixReg x64_prefreg;	/// Preferred segment register prefix
