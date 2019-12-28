@@ -12,7 +12,7 @@ extern (C):
 /// Starts plain UI
 int ui_loop() {
 	dbg_sethandle(&except);
-	return dbg_continue;
+	return dbg_loop;
 }
 
 private:
@@ -25,11 +25,11 @@ int except(exception_t *e) {
 	"*************\n"~
 	"PID=%u  TID=%u\n"~
 	"%s (%X) at %zX\n"~
-	"%s=%016X\n",
+	"%s=%016X\n"
+	,
 	e.pid, e.tid,
 	e.type.typestr, e.oscode, e.addrv,
-	e.registers[0].name,
-	e.registers[0].u64
+	e.registers[0].name, e.registers[0].u64
 	);
 	return DebuggerAction.proceed;
 }

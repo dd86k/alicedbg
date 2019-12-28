@@ -5,12 +5,13 @@ module os.posix.seh;
 
 version (Posix):
 
+import debugger.exception : exception_t;
+
 import core.sys.posix.signal;
 import core.sys.posix.ucontext;
 import core.stdc.stdio : printf;
 import core.stdc.stdlib : exit;
 //import os.setjmp;
-import os.seh : exception_t;
 
 extern (C):
 __gshared:
@@ -20,10 +21,9 @@ __gshared:
 /// 
 public int seh_init(void function(exception_t*) f) {
 	sigaction_t sa;
+	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_SIGINFO;
-//	sigemptyset(&sa.sa_mask);
-	sa.sa_sigaction = &_e_handler;
-
+	sa.sa_sigaction = &pe_sigaction;
 	if (sigaction(SIGSEGV, &sa, cast(sigaction_t*)0) == -1 ||
 		sigaction(SIGTRAP, &sa, cast(sigaction_t*)0) == -1 ||
 		sigaction(SIGFPE, &sa, cast(sigaction_t*)0) == -1 ||
@@ -31,7 +31,7 @@ public int seh_init(void function(exception_t*) f) {
 		return 1;
 	}
 
-	externhandler = f;
+	//externhandler = f;
 	//TODO: Set externhandler
 
 	return 0;
@@ -42,7 +42,8 @@ private:
 void function(exception_t*) externhandler;
 
 /// See http://man7.org/linux/man-pages/man2/sigaction.2.html
-void _e_handler(int sig, siginfo_t *si, ucontext_t *ctx) {
+void pe_sigaction(int sig, siginfo_t *si, void *p) {
+	ucontext_t *ctx = cast(ucontext_t*)p;
 	mcontext_t m = ctx.uc_mcontext;
 
 	version (X86)
@@ -56,7 +57,7 @@ void _e_handler(int sig, siginfo_t *si, ucontext_t *ctx) {
 	"EAX=%08X  EBX=%08X  ECX=%08X  EDX=%08X\n" ~
 	"EDI=%08X  ESI=%08X  EBP=%08X  ESP=%08X\n" ~
 	"CS=%04X  DS=%04X  ES=%04X  FS=%04X  GS=%04X  SS=%04X\n",
-	sig, cast(uint)si.si_addr,
+	sig, cast(uint)si._sifields._sigfault.si_addr,
 	m.gregs[REG_EIP], m.gregs[REG_EFL],
 	m.gregs[REG_EAX], m.gregs[REG_EBX], m.gregs[REG_ECX], m.gregs[REG_EDX],
 	m.gregs[REG_EDI], m.gregs[REG_ESI], m.gregs[REG_EBP], m.gregs[REG_ESP],
@@ -77,7 +78,7 @@ void _e_handler(int sig, siginfo_t *si, ucontext_t *ctx) {
 	" R8=%016lX   R9=%016lX  R10=%016lX  R11=%016lX\n" ~
 	"R12=%016lX  R13=%016lX  R14=%016lX  R15=%016lX\n" ~
 	"CS=%04X  GS=%04X  FS=%04X\n",
-	sig, cast(ulong)si.si_addr,
+	sig, cast(ulong)si._sifields._sigfault.si_addr,
 	m.gregs[REG_RIP], m.gregs[REG_EFL],
 	m.gregs[REG_RAX], m.gregs[REG_RBX], m.gregs[REG_RCX], m.gregs[REG_RDX],
 	m.gregs[REG_RDI], m.gregs[REG_RSI], m.gregs[REG_RBP], m.gregs[REG_RSP],

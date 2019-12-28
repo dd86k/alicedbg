@@ -23,6 +23,14 @@ private HANDLE hthread; /// Saved thread handle, DEBUG_INFO doesn't contain one
 private HANDLE hprocess; /// 
 } else
 version (Posix) {
+private import debugger.sys.ptrace;
+private import core.sys.posix.signal, core.sys.posix.sys.wait;
+private import core.sys.linux.unistd;
+import debugger.sys.user : user;
+private enum __WALL = 0x40000000;
+// temp
+import core.stdc.stdio, core.stdc.stdlib;
+private pid_t hprocess;
 }
 
 /// Actions that a user function handler may return
@@ -39,8 +47,8 @@ int function(exception_t*) user_function;
 /**
  * Load executable image to debug, its starting argument, and starting folder.
  * This does not start the process.
- * (Windows) This calls CreateProcessA with DEBUG_ONLY_THIS_PROCESS.
- * (Posix) 
+ * (Windows) Uses CreateProcessA with DEBUG_ONLY_THIS_PROCESS.
+ * (Posix) Uses fork(2), ptrace(PTRACE_TRACEME), and execl(2)
  * Params:
  * 	cmd = Command
  * Returns: Zero on success; Otherwise an error occured
@@ -68,16 +76,22 @@ int dbg_file(const(char) *cmd) {
 		hprocess = pi.hProcess;
 	} else
 	version (Posix) {
-		// fork
-		// execve
+		hprocess = fork();
+		if (hprocess == -1)
+			return 1;
+		if (hprocess == 0) {
+			if (ptrace(PTRACE_TRACEME, 0, null, null))
+				return 2;
+			exit(execl(cmd, null, null));
+		}
 	}
 	return 0;
 }
 
 /**
  * Attach the debugger to a process ID.
- * (Windows) This uses DebugActiveProcess
- * (Posix)
+ * (Windows) Uses DebugActiveProcess
+ * (Posix) Uses ptrace::PTRACE_ATTACH
  * Params:
  * 	pid = Process ID
  * Returns: Zero on success; Otherwise an error occured
@@ -85,6 +99,8 @@ int dbg_file(const(char) *cmd) {
 int dbg_attach(int pid) {
 	version (Windows) {
 		//TODO: DebugActiveProcess
+		//if (DebugActiveProcess(pid) == FALSE)
+		//	return GetLastError();
 	} else
 	version (Posix) {
 		//TODO: ptrace PTRACE_ATTACH
@@ -107,23 +123,22 @@ int dbg_sethandle(int function(exception_t *) f) {
  * event occurs. When an exception occurs, the exception_t structure is
  * populated with debugging information.
  * (Windows) Uses WaitForDebugEvent, filters for EXCEPTION_DEBUG_EVENT
- * (Otherwise executes ContinueDebugEvent), calls user function, and longjmp.
- * (Posix) Uses ptrace(2)
+ * (Otherwise executes ContinueDebugEvent)
+ * (Posix) Uses ptrace(2) and waitid(2)
  * Returns: Zero on success; Otherwise an error occured
  */
-int dbg_continue() {
+int dbg_loop() {
+	exception_t e = void;
 	version (Windows) {
 		DEBUG_EVENT de = void;
 L_DEBUG_LOOP:
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
 			return 3;
 
-		exception_t e = void;
-
 		// Filter necessary, may add EXIT_PROCESS_DEBUG_EVENT later
 		switch (de.dwDebugEventCode) {
 		case EXCEPTION_DEBUG_EVENT:
-			prep_exception_debug(e, de.Exception);
+			prep_ex_debug(e, de.Exception);
 			break;
 		case EXIT_PROCESS_DEBUG_EVENT: return 0;
 		default:
@@ -137,7 +152,7 @@ L_DEBUG_LOOP:
 		CONTEXT c = void;
 		c.ContextFlags = CONTEXT_ALL;
 		GetThreadContext(hthread, &c);
-		prep_exception_context(e, c);
+		prep_ex_context(e, c);
 
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
@@ -146,11 +161,13 @@ L_DEBUG_LOOP:
 			return 0;
 		case step:
 			version (X86) {
-				//--c.Eip;
+				if (de.Exception.dwFirstChance)
+					--c.Eip;
 				c.EFlags |= 0x100;	// Trap Flag, enable single-stepping
 			} else
 			version (X86_64) {
-				//--c.Rip;
+				if (de.Exception.dwFirstChance)
+					--c.Rip;
 				c.EFlags |= 0x100;	// Trap Flag, enable single-stepping
 			}
 			FlushInstructionCache(hprocess, null, 0);
@@ -162,18 +179,35 @@ L_DEBUG_LOOP:
 		}
 	} else
 	version (Posix) {
+		siginfo_t sig = void;
 L_DEBUG_LOOP:
-		// ptrace(2)
-		// waitpid(2)
+		// Linux examples use __WALL and is supposed to imply (but does
+		// not include) WEXITED | WSTOPPED but does not act like it
+		// waitid(2) returns 0 or -1 so it's pointless to verify its value
+		int id = waitid(idtype_t.P_ALL, 0, &sig, WEXITED | WSTOPPED);
+		if (id == -1)
+			return 3;
+		if (sig._sifields._sigchld.si_status == SIGCONT)
+			goto L_DEBUG_LOOP;
+		
+		prep_ex_sig(e, sig);
+		
+		user u;
+		ptrace(PTRACE_GETREGS, hprocess, null, &u);
+		prep_ex_regs(e, u);
+		
+		e.pid = sig._sifields._kill.si_pid;
 		
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
 		case exit: //TODO: Close handles/process
+			ptrace(PTRACE_KILL, hprocess, null, null);
 			return 0;
 		case step:
-		
-			goto case;
+			ptrace(PTRACE_SINGLESTEP, hprocess, null, null);
+			goto L_DEBUG_LOOP;
 		case proceed:
+			ptrace(PTRACE_CONT, hprocess, null, null);
 			goto L_DEBUG_LOOP;
 		}
 	}
@@ -187,35 +221,53 @@ private:
 //
 
 version (Windows) {
-int prep_exception_debug(ref exception_t e, ref EXCEPTION_DEBUG_INFO di) {
+int prep_ex_debug(ref exception_t e, ref EXCEPTION_DEBUG_INFO di) {
 	e.addr = di.ExceptionRecord.ExceptionAddress;
 	e.oscode = di.ExceptionRecord.ExceptionCode;
 	switch (e.oscode) {
 	case EXCEPTION_IN_PAGE_ERROR:
 	case EXCEPTION_ACCESS_VIOLATION:
-		e.type = di.ExceptionRecord.ExceptionCode.codetype(
-			cast(uint)
-			di.ExceptionRecord.ExceptionInformation[0]);
+		e.type = codetype(di.ExceptionRecord.ExceptionCode,
+			cast(uint)di.ExceptionRecord.ExceptionInformation[0]);
 		break;
 	default:
-		e.type = di.ExceptionRecord.ExceptionCode.codetype;
+		e.type = codetype(di.ExceptionRecord.ExceptionCode);
 	}
 	return 0;
 }
-int prep_exception_context(ref exception_t e, ref CONTEXT c) {
+int prep_ex_context(ref exception_t e, ref CONTEXT c) {
 	version (X86) {
 		e.registers[0].name = "EAX";
 		e.registers[0].u32 = c.Eax;
+		e.registers[0].type = RegisterType.U32;
 	} else
 	version (X86_64) {
 		e.registers[0].name = "RAX";
 		e.registers[0].u64 = c.Rax;
+		e.registers[0].type = RegisterType.U64;
 	}
 	return 0;
 }
-} // version Windows
-
+} else // version Windows
 version (Posix) {
-int prep_ex_debug(ref exception_t e, ref sigaction_t sa) {
+int prep_ex_sig(ref exception_t e, ref siginfo_t si) {
+	e.tid = 0;
+	e.addr = si._sifields._sigfault.si_addr;
+	e.oscode = si._sifields._sigchld.si_status;
+	e.type = codetype(si._sifields._sigchld.si_status, si.si_code);
+	return 0;
+}
+int prep_ex_regs(ref exception_t e, ref user u) {
+	version (X86) {
+		e.registers[0].name = "EAX";
+		e.registers[0].u32 = u.regs.eax;
+		e.registers[0].type = RegisterType.U32;
+	} else
+	version (X86_64) {
+		e.registers[0].name = "RAX";
+		e.registers[0].u64 = u.regs.rax;
+		e.registers[0].type = RegisterType.U64;
+	}
+	return 0;
 }
 } // version Posix

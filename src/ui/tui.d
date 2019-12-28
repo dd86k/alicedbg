@@ -23,7 +23,7 @@ int ui_tui() {
 		return e;
 	}
 	dbg_sethandle(&tui_event_ex);
-	return dbg_continue;
+	return dbg_loop;
 }
 
 private:

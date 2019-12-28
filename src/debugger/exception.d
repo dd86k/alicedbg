@@ -14,6 +14,8 @@ version (Windows) {
 	import core.sys.windows.winbase;
 } else
 version (Posix) {
+	version (linux)
+		import core.sys.posix.signal;
 	import core.sys.posix.signal;
 }
 
@@ -55,6 +57,7 @@ enum ExceptionType {
 	// OS specific-ish
 	Disposition,	/// OS reports invalid disposition to exception handler
 	NoContinue,	/// Debugger tried to continue on after non-continuable error
+//	OSError,	/// OS error (WaitForDebugEvent returned FALSE or waitid returned -1)
 }
 
 /// Filtered exception structure after goinng through the platform-dependant
@@ -155,6 +158,85 @@ ExceptionType codetype(uint code, uint subcode = 0) {
 		default:	return Unknown;
 		}
 	} else {
+		with (ExceptionType)
+		switch (code) {
+		case SIGILL:
+			/*
+			switch (subcode) {
+			case ILL_ILLOPC: opcode
+			case ILL_ILLOPN: operand
+			case ILL_ILLADR: address mode
+			case ILL_ILLTRP: trap
+			case ILL_PRVOPC: priv code
+			case ILL_PRVREG: priv register
+			case ILL_COPROC: co-processor error
+			case ILL_BADSTK: internal stack error.
+			}*/
+			return Illegal;
+		case SIGFPE:
+			switch (subcode) {
+			case FPE_INTDIV: return FPUDivZero;
+			case FPE_INTOVF: return FPUOverflow;
+			case FPE_FLTDIV: return FPUDivZero;
+			case FPE_FLTOVF: return FPUOverflow;
+			case FPE_FLTUND: return FPUUnderflow;
+			case FPE_FLTRES: return FPUInexact;
+			case FPE_FLTINV: return FPUIllegal;
+			case FPE_FLTSUB: return FPUDenormal;
+			default: return FPUIllegal;
+			}
+		case SIGSEGV:
+			switch (subcode) {
+			case SEGV_MAPERR: return Fault;
+			case SEGV_ACCERR: return Fault;
+			//case SEGV_BNDERR: return BoundExceeded;
+			//case SEGV_PKUERR: return 
+			default: return Fault;
+			}
+		case SIGBUS:
+			switch (subcode) {
+			case BUS_ADRALN: return Misalignment;
+			case BUS_ADRERR: return Unknown;
+			case BUS_OBJERR: return Unknown;
+			//case BUS_MCEERR_AR:
+			//case BUS_MCEERR_AO:
+			default: return Unknown;
+			}
+		case SIGTRAP:
+			// Getting 4 instead of 1? Odd
+			/*switch (subcode) {
+			case TRAP_BRKPT: return Breakpoint;
+			case TRAP_TRACE:
+			case TRAP_DTRACE:
+			case TRAP_RWATCH:
+			case TRAP_WWATCH:
+			case TRAP_XWATCH:
+			default: return Breakpoint;
+			}*/
+			return Breakpoint;
+		case SIGCHLD:
+			switch (subcode) {
+			case CLD_EXITED: return Exit;
+			case CLD_KILLED: return Unknown;
+			case CLD_DUMPED: return Unknown;
+			case CLD_TRAPPED: return Unknown;
+			case CLD_STOPPED: return Unknown;
+			case CLD_CONTINUED: return Unknown;
+			default: return Unknown;
+			}
+		case /*SIGIO, */SIGPOLL:
+			switch (subcode) {
+			case POLL_IN: return Unknown;
+			case POLL_OUT: return Unknown;
+			case POLL_MSG: return Unknown;
+			case POLL_ERR: return Unknown;
+			case POLL_PRI: return Unknown;
+			case POLL_HUP: return Unknown;
+			default: return Unknown;
+			}
+		case SIGSYS: return Unknown;	// SYS_SECCOMP
+		default: return Unknown;
+		}
 	}
 }
 
@@ -166,6 +248,9 @@ ExceptionType codetype(uint code, uint subcode = 0) {
  * Returns: String
  */
 const(char) *typestr(ExceptionType code) {
+	// A final switch is preferred over an array as the final switch will
+	// verify, at compile-time, if all enum members are used, and we do
+	// not need the extra performance
 	with (ExceptionType)
 	final switch (code) {
 	case Unknown:	return "UNKNOWN";

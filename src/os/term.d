@@ -31,6 +31,7 @@ version (Posix) {
 	private import core.sys.posix.ucontext;
 	private enum TERM_ATTR = ~ICANON & ~ECHO;
 	private termios old_tio = void, new_tio = void;
+	private enum SIGWINCH = 28;
 //	alias CONCHAR = char;
 }
 
@@ -117,7 +118,7 @@ void term_event_resize(void function(ushort,ushort) f) {
 	version (Posix) {
 		//TODO: SIGWINCH : Signal Window change
 		sigaction_t sa;
-		sa.sa_handler = __term_resize;
+		sa.sa_handler = &__term_resize;
 		sigaction(SIGWINCH, &sa, cast(sigaction_t*)0);
 	}
 }
@@ -210,7 +211,7 @@ void term_clear() {
 		}
 	} else version (Posix) {
 		WindowSize ws = void;
-		term_wsize(&ws);
+		term_wsize(ws);
 		//TODO: write 'default' attribute character
 		printf("\033[0;0H%*s\033[0;0H", ws.height * ws.width, cast(char*)"");
 	}
@@ -374,7 +375,7 @@ void term_read(ref InputInfo ii) {
 
 		uint c = getchar;
 
-		with (ii)
+		with (ii.key)
 		switch (c) {
 		case '\n', 'M': // \n (RETURN) or M (ENTER)
 			keyCode = Key.Enter;
@@ -418,7 +419,7 @@ void term_read(ref InputInfo ii) {
 		}
 
 _READKEY_DEFAULT:
-		k.keyCode = cast(ushort)c;
+		ii.key.keyCode = cast(ushort)c;
 
 _READKEY_END:
 		tcsetattr(STDIN_FILENO,TCSANOW, &old_tio);

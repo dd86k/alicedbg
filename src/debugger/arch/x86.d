@@ -14,7 +14,7 @@ extern (C):
  * Returns: DisasmError
  */
 int disasm_x86(ref disasm_params_t p) {
-	int e = DisasmError.None;
+	int e;
 	prefix_reg = PrefixReg.None;
 	prefix_address = prefix_operand = false;
 	const int INCLUDE_MACHINECODE = p.include & DISASM_INCLUDE_MACHINECODE;
