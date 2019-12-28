@@ -17,16 +17,24 @@ enum DisasmError {
 
 /// Disassembler ABI
 enum DisasmABI : ubyte {
-	Auto,	/// Automatic (depends on compiled platform)
+	Auto,	/// Automatic (platform-dependant)
 	x86,	/// x86
 	x86_64,	/// AMD64
-	ARM,	/// (Not implemented) ARM and AArch64
+	ARM,	/// (Not implemented) ARM
+	ARM64,	/// (Not implemented) AArch64
 }
 
 version (X86)
 	enum DISASM_DEFAULT_ABI = DisasmABI.x86;	/// Platform default ABI
-else version (X86_64)
+else
+version (X86_64)
 	enum DISASM_DEFAULT_ABI = DisasmABI.x86_64;	/// Platform default ABI
+else
+version (ARM)
+	enum DISASM_DEFAULT_ABI = DisasmABI.ARM;	/// Platform default ABI
+else
+version (AArch64)
+	enum DISASM_DEFAULT_ABI = DisasmABI.ARM64;	/// Platform default ABI
 else
 	enum DISASM_DEFAULT_ABI = DisasmABI.Auto;	/// Platform default ABI
 
@@ -51,17 +59,17 @@ enum DisasmDemangle : ubyte {
 //
 
 enum
-	DISASM_INCLUDE_MACHINECODE	= 0b0000_0001,	/// Include machine code
-	DISASM_INCLUDE_MNEMONICS	= 0b0000_0010,	/// Include instruction mnemonics
-	DISASM_INCLUDE_SYMBOLS	= 0b0000_0100,	/// (Not implemented) Include symbols
-	DISASM_INCLUDE_SOURCE	= 0b0000_1000;	/// (Not implemented) Include source code
+	DISASM_I_MACHINECODE	= 0b0000_0001,	/// Include machine code
+	DISASM_I_MNEMONICS	= 0b0000_0010,	/// Include instruction mnemonics
+	DISASM_I_SYMBOLS	= 0b0000_0100,	/// (Not implemented) Include symbols
+	DISASM_I_SOURCE	= 0b0000_1000;	/// (Not implemented) Include source code
 
 //
 // Options
 //
 
 /// Disassembler flag: Go backwards instead of forward. More expensive to calculate!
-enum DISASM_OPT_BACKWARD	= 0x0002;
+enum DISASM_O_BACKWARD	= 0x0002;
 
 //
 //
@@ -110,7 +118,7 @@ struct disasm_params_t { align(1):
 	ubyte abi;
 	/// Assembler style. See DisasmStyle enums for more details.
 	ubyte style;
-	/// Operation mode. See DISASM_INCLUDE_* flags. If unset, calculate
+	/// Operation mode. See DISASM_I_* flags. If unset, calculate
 	/// and modify address pointer only.
 	ubyte include;
 	///
@@ -136,7 +144,7 @@ struct disasm_params_t { align(1):
 	/// - (x) (Not implemented) D (https://dlang.org/spec/abi.html)
 	ubyte demangle;
 	///
-	/// Settings flags
+	/// Settings flags. See DISASM_O_* flags.
 	///
 	/// Bit x: If set, clear output character buffer
 	/// Bit x: If set, uppercase disassembled instructions
@@ -172,8 +180,6 @@ int disasm_line(ref disasm_params_t p) {
 
 //
 // Disasm internals/utilities
-//
-// They're public for arch.* modules to use only.
 //
 // NOTE: The include checking is not done in these functions for performance
 //       reasons (pushing 3+ values into stack just a bit to be checked is

@@ -17,8 +17,8 @@ int disasm_x86(ref disasm_params_t p) {
 	int e;
 	x86_prefreg = PrefixReg.None;
 	x86_prefix_address = x86_prefix_operand = false;
-	const int INCLUDE_MACHINECODE = p.include & DISASM_INCLUDE_MACHINECODE;
-	const int INCLUDE_MNEMONICS = p.include & DISASM_INCLUDE_MNEMONICS;
+	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
+	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
 
 L_CONTINUE:
 	ubyte b = *p.addru8;
@@ -60,16 +60,44 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "POP ES");
 		break;
+	case 0x08:	// OR R/M8, REG8
+	case 0x09:	// OR R/M32, REG32
+	case 0x0A:	// OR REG8, R/M8
+	case 0x0B:	// OR REG32, R/M32
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "OR ");
+		pretty_modrm(p);
+		break;
+	case 0x0C:	// OR AL, IMM8
+		byte v = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "OR EAX, %d", v);
+		break;
 	case 0x0D:	// OR EAX, IMM32
-		int i = *p.addri32;
+		int v = *p.addri32;
 		p.addrv += 4;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", i);
+			mcaddf(p, "%08X", v);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "OR EAX, %d", i);
+			mnaddf(p, "OR EAX, %d", v);
+		break;
+	case 0x0E:
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "PUSH CS");
 		break;
 	case 0x0F:
 		e = mapb2(p);
+		break;
+	case 0x10:	// ADC R/M8, REG8
+	case 0x11:	// ADC R/M32, REG32
+	case 0x12:	// ADC REG8, R/M8
+	case 0x13:	// ADC REG32, R/M32
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "ADC ");
+		pretty_modrm(p);
 		break;
 	case 0x16:	// PUSH SS
 		if (INCLUDE_MNEMONICS)
@@ -674,8 +702,8 @@ enum : ubyte {
 }
 
 void pretty_modrm(ref disasm_params_t p) {
-	const int INCLUDE_MACHINECODE = p.include & DISASM_INCLUDE_MACHINECODE;
-	const int INCLUDE_MNEMONICS = p.include & DISASM_INCLUDE_MNEMONICS;
+	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
+	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
 	ubyte op = *(p.addru8 - 1);
 	int direction = op & 2;	// If set, direction is towards REG
 	//int wide = op & 1;	// If set, WIDE operation is in effect
