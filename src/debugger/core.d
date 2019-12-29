@@ -9,16 +9,7 @@ __gshared:
 version (Windows) {
 import core.sys.windows.windows;
 //SymInitialize, GetFileNameFromHandle, SymGetModuleInfo64,
-//StackWalk64, SymGetSymFromAddr64
-//SymFromName
-//EXIT_PROCESS_DEBUG_EVENT -> TerminateProcess
-//HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\AeDebug
-//HKLM\SOFTWARE\Wow6432Node\Microsoft\Windows NT\CurrentVersion\AeDebug
-/*
-lcContext.Eip--;
-lcContext.EFlags |= 0x100; // Set trap flag, which raises "single-step" exception
-SetThreadContext(m_cProcessInfo.hThread,&lcContext);
-*/
+//StackWalk64, SymGetSymFromAddr64, SymFromName
 private HANDLE hthread; /// Saved thread handle, DEBUG_INFO doesn't contain one
 private HANDLE hprocess; /// 
 } else
@@ -197,6 +188,7 @@ L_DEBUG_LOOP:
 		prep_ex_regs(e, u);
 		
 		e.pid = sig._sifields._kill.si_pid;
+		e.tid = 0;
 		
 		with (DebuggerAction)
 		final switch (user_function(&e)) {

@@ -113,9 +113,9 @@ int cshow(CLIHelp h) {
 	final switch (h) {
 	case CLIHelp.ui:
 		puts(
-		"Available UIs:\n"~
-		"- tui (default): Text UI with full debugging experience.\n"~
-		"- loop: Loops on exceptions, no user input."
+		"Available UIs (default=tui)\n"~
+		"tui ..... Text UI with full debugging experience.\n"~
+		"loop .... Continues on exceptions, no user input."
 		);
 	break;
 	}
@@ -140,7 +140,7 @@ int main(int argc, const(char) **argv) {
 			return cversion;
 		if (strcmp(arg, "-license") == 0)
 			return clicense;
-		if (strcmp(arg, "file") == 0) {
+		if (strcmp(arg, "exec") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: file argument missing");
 				return EXIT_FAILURE;
@@ -150,11 +150,11 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 		/*
-		if (strcmp(arg, "filecmd") == 0) {
+		if (strcmp(arg, "execarg") == 0) {
 			
 		}
 		// Starting directory for file
-		if (strcmp(arg, "filedir") == 0) {
+		if (strcmp(arg, "execdir") == 0) {
 			
 		}*/
 		if (strcmp(arg, "pid") == 0) {
@@ -210,7 +210,7 @@ int main(int argc, const(char) **argv) {
 	case CLIDebug.file:
 		e = dbg_file(opt.file);
 		if (e) {
-			printf("dbg: Could not load file (%X)\n", e);
+			printf("dbg: Could not load executable (%X)\n", e);
 			return e;
 		}
 		break;
@@ -222,7 +222,7 @@ int main(int argc, const(char) **argv) {
 		}
 		break;
 	default:
-		puts("cli: No file nor pid were specified");
+		puts("cli: No file nor pid were specified.");
 		return EXIT_FAILURE;
 	}
 
