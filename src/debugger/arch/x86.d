@@ -149,11 +149,11 @@ L_CONTINUE:
 		break;
 	case 0x1E:	// PUSH DS
 		if (INCLUDE_MNEMONICS)
-			mnadd("PUSH DS");
+			mnadd(p, "PUSH DS");
 		break;
 	case 0x1F:	// POP DS
 		if (INCLUDE_MNEMONICS)
-			mnadd("POP DS");
+			mnadd(p, "POP DS");
 		break;
 	case 0x20:	// AND R/M8, REG8
 	case 0x21:	// AND R/M32, REG32
@@ -428,7 +428,7 @@ L_CONTINUE:
 		break;
 	case 0x63:	// ARPL R/M16, REG16
 		if (INCLUDE_MNEMONICS)
-			mnadd("ARPL ");
+			mnadd(p, "ARPL ");
 		pretty_modrm(p);
 		break;
 	case 0x64:	// FS:
@@ -447,7 +447,7 @@ L_CONTINUE:
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH %d", *p.addri32);
+			mnaddf(p, "PUSH %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0x69:	// IMUL REG32, R/M32, IMM32
@@ -464,7 +464,7 @@ L_CONTINUE:
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH %d", *p.addri8);
+			mnaddf(p, "PUSH %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x6B:	// IMUL REG32, R/M32, IMM8
@@ -725,7 +725,7 @@ L_CONTINUE:
 		break;
 	case 0x90:	// NOP
 		if (INCLUDE_MNEMONICS)
-			mnadd("NOP");
+			mnadd(p, "NOP");
 		break;
 	case 0x91:	// XCHG ECX, EAX
 		if (INCLUDE_MNEMONICS)

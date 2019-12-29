@@ -186,6 +186,11 @@ int main(int argc, const(char) **argv) {
 			}
 			continue;
 		}
+		// Set machine architecture, affects disassembly
+		/*if (strcmp(arg, "march") == 0) {
+			
+		}*/
+		// 
 		/*if (strcmp(arg, "disasmdump") == 0) {
 			
 		}*/
@@ -205,14 +210,14 @@ int main(int argc, const(char) **argv) {
 	case CLIDebug.file:
 		e = dbg_file(opt.file);
 		if (e) {
-			printf("dbg: Could not load file (%X)\n");
+			printf("dbg: Could not load file (%X)\n", e);
 			return e;
 		}
 		break;
 	case CLIDebug.pid:
 		e = dbg_attach(opt.pid);
 		if (e) {
-			printf("dbg: Could not attach to pid (%X)\n");
+			printf("dbg: Could not attach to pid (%X)\n", e);
 			return e;
 		}
 		break;

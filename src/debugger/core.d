@@ -70,7 +70,7 @@ int dbg_file(const(char) *cmd) {
 			FALSE, DEBUG_ONLY_THIS_PROCESS,
 			null, null,
 			&si, &pi) == 0) {
-			return 1;
+			return GetLastError();
 		}
 		hthread = pi.hThread;
 		hprocess = pi.hProcess;
