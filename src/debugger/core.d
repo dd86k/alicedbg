@@ -200,7 +200,7 @@ L_DEBUG_LOOP:
 		
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
-		case exit: //TODO: Close handles/process
+		case exit:
 			ptrace(PTRACE_KILL, hprocess, null, null);
 			return 0;
 		case step:

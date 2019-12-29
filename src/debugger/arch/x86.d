@@ -99,6 +99,22 @@ L_CONTINUE:
 			mnadd(p, "ADC ");
 		pretty_modrm(p);
 		break;
+	case 0x14:	// ADC AL, IMM8
+		byte v = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "ADC EAX, %d", v);
+		break;
+	case 0x15:	// ADC EAX, IMM32
+		int v = *p.addri32;
+		p.addrv += 4;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%08X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "ADC EAX, %d", v);
+		break;
 	case 0x16:	// PUSH SS
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "PUSH SS");
@@ -107,10 +123,61 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "POP SS");
 		break;
+	case 0x18:	// SBB R/M8, REG8
+	case 0x19:	// SBB R/M32, REG32
+	case 0x1A:	// SBB REG8, R/M8
+	case 0x1B:	// SBB REG32, R/M32
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "SBB ");
+		pretty_modrm(p);
+		break;
+	case 0x1C:	// SBB AL, IMM8
+		byte v = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "SBB EAX, %d", v);
+		break;
+	case 0x1D:	// SBB EAX, IMM32
+		int v = *p.addri32;
+		p.addrv += 4;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%08X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "SBB EAX, %d", v);
+		break;
+	case 0x1E:	// PUSH DS
+		if (INCLUDE_MNEMONICS)
+			mnadd("PUSH DS");
+		break;
+	case 0x1F:	// POP DS
+		if (INCLUDE_MNEMONICS)
+			mnadd("POP DS");
+		break;
+	case 0x20:	// AND R/M8, REG8
 	case 0x21:	// AND R/M32, REG32
+	case 0x22:	// AND REG8, R/M8
+	case 0x23:	// AND REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "AND ");
 		pretty_modrm(p);
+		break;
+	case 0x24:	// AND AL, IMM8
+		byte v = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "AND EAX, %d", v);
+		break;
+	case 0x25:	// AND EAX, IMM8
+		int v = *p.addri32;
+		p.addrv += 4;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%08X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "AND EAX, %d", v);
 		break;
 	case 0x26:	// ES:
 		x86_prefreg = PrefixReg.ES;
@@ -119,19 +186,61 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "DAA");
 		break;
+	case 0x28:	// SUB R/M8, REG8
+	case 0x29:	// SUB R/M32, REG32
 	case 0x2A:	// SUB REG8, R/M8
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "SUB ");
-		pretty_modrm(p);
-		break;
 	case 0x2B:	// SUB REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "SUB ");
 		pretty_modrm(p);
 		break;
+	case 0x2C:	// AND AL, IMM8
+		byte v = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "AND EAX, %d", v);
+		break;
+	case 0x2D:	// AND EAX, IMM8
+		int v = *p.addri32;
+		p.addrv += 4;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%08X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "AND EAX, %d", v);
+		break;
 	case 0x2E:	// CS:
 		x86_prefreg = PrefixReg.CS;
 		goto L_CONTINUE;
+	case 0x2F:	// DAS
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "DAA");
+		break;
+	case 0x30:	// XOR R/M8, REG8
+	case 0x31:	// XOR R/M32, REG32
+	case 0x32:	// XOR REG8, R/M8
+	case 0x33:	// XOR REG32, R/M32
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "XOR ");
+		pretty_modrm(p);
+		break;
+	case 0x34:	// XOR AL, IMM8
+		byte v = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "XOR EAX, %d", v);
+		break;
+	case 0x35:	// XOR EAX, IMM8
+		int v = *p.addri32;
+		p.addrv += 4;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%08X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "XOR EAX, %d", v);
+		break;
 	case 0x36:	// SS:
 		x86_prefreg = PrefixReg.SS;
 		goto L_CONTINUE;
@@ -139,14 +248,37 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "AAA");
 		break;
-	case 0x33:	// XOR REGv, R/Mv
+	case 0x38:	// CMP R/M8, REG8
+	case 0x39:	// CMP R/M32, REG32
+	case 0x3A:	// CMP REG8, R/M8
+	case 0x3B:	// CMP REG32, R/M32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XOR ");
+			mnadd(p, "CMP ");
 		pretty_modrm(p);
+		break;
+	case 0x3C:	// CMP AL, IMM8
+		byte v = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "CMP EAX, %d", v);
+		break;
+	case 0x3D:	// CMP EAX, IMM8
+		int v = *p.addri32;
+		p.addrv += 4;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%08X", v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "CMP EAX, %d", v);
 		break;
 	case 0x3E:	// DS:
 		x86_prefreg = PrefixReg.DS;
 		goto L_CONTINUE;
+	case 0x3F:	// AAS
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "AAS");
+		break;
 	case 0x40:	// INC EAX
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "INC EAX");
@@ -291,9 +423,13 @@ L_CONTINUE:
 		p.addrv += 8;
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X %08X %08X", modrm, a1, a2);
-		if (INCLUDE_MNEMONICS) {
+		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "BOUND %s, %s %u %u", modrm_reg(modrm), segstr, a1, a2);
-		}
+		break;
+	case 0x63:	// ARPL R/M16, REG16
+		if (INCLUDE_MNEMONICS)
+			mnadd("ARPL ");
+		pretty_modrm(p);
 		break;
 	case 0x64:	// FS:
 		x86_prefreg = PrefixReg.FS;
@@ -307,6 +443,168 @@ L_CONTINUE:
 	case 0x67:	// PREFIX: ADDRESS SIZE
 		x86_prefix_address = true;
 		goto L_CONTINUE;
+	case 0x68:	// PUSH IMM32
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%08X", *p.addru32);
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "PUSH %d", *p.addri32);
+		p.addrv += 4;
+		break;
+	case 0x69:	// IMUL REG32, R/M32, IMM32
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "IMUL");
+		pretty_modrm(p);
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, " %08X", *p.addru32);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, " %d", *p.addri32);
+		p.addrv += 4;
+		break;
+	case 0x6A:	// PUSH IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "PUSH %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x6B:	// IMUL REG32, R/M32, IMM8
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "IMUL");
+		pretty_modrm(p);
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, " %02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, " %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x6C:	// INSB
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "INSB");
+		break;
+	case 0x6D:	// INSD
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "INSD");
+		break;
+	case 0x6E:	// OUTSB
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "OUTSB");
+		break;
+	case 0x6F:	// OUTSD
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "OUTSD");
+		break;
+	case 0x70:	// JO
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JO %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x71:	// JNO
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JNO %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x72:	// JB
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JB %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x73:	// JNB
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JNB %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x74:	// JZ
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JZ %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x75:	// JNZ
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JNZ %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x76:	// JBE
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JBE %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x77:	// JNBE
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JNBE %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x78:	// JS
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JS %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x79:	// JNS
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JNS %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x7A:	// JP
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JP %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x7B:	// JNP
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JNP %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x7C:	// JL
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JL %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x7D:	// JNL
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JNL %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x7E:	// JLE
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JLE %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0x7F:	// JNLE
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mcaddf(p, "JNLE %d", *p.addri8);
+		++p.addrv;
+		break;
 	case 0x81:	// GRP1 REG32, IMM32
 		ubyte modrm = *p.addru8;
 		++p.addrv;
@@ -355,15 +653,123 @@ L_CONTINUE:
 			mnaddf(p, "%s %s, %u",
 				f, modrm_reg(modrm, b & 1, x86_prefix_operand), v);
 		break;
-	case 0x89:	// MOV REG32, R/M32
+	case 0x84:	// TEST R/M8, REG8
+	case 0x85:	// TEST R/M32, REG32
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "TEST ");
+		pretty_modrm(p);
+		break;
+	case 0x86:	// XCHG R/M8, REG8
+	case 0x87:	// XCHG R/M32, REG32
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "XCHG ");
+		pretty_modrm(p);
+		break;
+	case 0x88:	// MOV R/M8, REG8
+	case 0x89:	// MOV R/M32, REG32
+	case 0x8A:	// MOV REG8, R/M8
+	case 0x8B:	// MOV REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "MOV ");
 		pretty_modrm(p);
 		break;
-	case 0x8B:	// MOV R/M32, REG32
+	case 0x8C:	// MOV REG32, SREG16
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", modrm);
+		if (INCLUDE_MNEMONICS) {
+			const(char) *f = void;
+			switch (modrm & RM_REG) {
+			case RM_REG_000: f = "ES"; break;
+			case RM_REG_001: f = "CS"; break;
+			case RM_REG_010: f = "SS"; break;
+			case RM_REG_011: f = "DS"; break;
+			case RM_REG_100: f = "FS"; break;
+			case RM_REG_101: f = "GS"; break;
+			default: f = "SEGREG?"; break;
+			}
+			mnaddf(p, "MOV %s, %s", modrm_reg(modrm), f);
+		}
+		break;
+	case 0x8D:	//TODO: LEA REG32, MEM32
+		break;
+	case 0x8E:	// MOV SREG16, REG16
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", modrm);
+		if (INCLUDE_MNEMONICS) {
+			const(char) *f = void;
+			switch (modrm & RM_REG) {
+			case RM_REG_000: f = "ES"; break;
+			case RM_REG_001: f = "CS"; break;
+			case RM_REG_010: f = "SS"; break;
+			case RM_REG_011: f = "DS"; break;
+			case RM_REG_100: f = "FS"; break;
+			case RM_REG_101: f = "GS"; break;
+			default: f = "SEGREG?"; break;
+			}
+			mnaddf(p, "MOV %s, %s", f, modrm_reg(modrm, 0, 1));
+		}
+		break;
+	case 0x8F:	// GRP1A (POP) REG32
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (modrm & RM_RM) // Invalid
+			break;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02", modrm);
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "MOV ");
-		pretty_modrm(p);
+			mnaddf(p, "POP %s", modrm_reg(modrm));
+		break;
+	case 0x90:	// NOP
+		if (INCLUDE_MNEMONICS)
+			mnadd("NOP");
+		break;
+	case 0x91:	// XCHG ECX, EAX
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "XCHG ECX, EAX");
+		break;
+	case 0x92:	// XCHG EDX, EAX
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "XCHG EDX, EAX");
+		break;
+	case 0x93:	// XCHG EBX, EAX
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "XCHG EBX, EAX");
+		break;
+	case 0x94:	// XCHG ESP, EAX
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "XCHG ESP, EAX");
+		break;
+	case 0x95:	// XCHG EBP, EAX
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "XCHG EBP, EAX");
+		break;
+	case 0x96:	// XCHG ESI, EAX
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "XCHG ESI, EAX");
+		break;
+	case 0x97:	// XCHG EDI, EAX
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "XCHG EDI, EAX");
+		break;
+	case 0x98:	// CBW
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "CBW");
+		break;
+	case 0x99:	// CBD
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "CBD");
+		break;
+	case 0x9A:	//TODO: CALL (FAR)
+		//if (INCLUDE_MNEMONICS)
+		//	mnadd(p, "CALL ");
+		break;
+	case 0x9B:	// WAIT/FWAIT
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "WAIT");
 		break;
 	case 0xA0:	// MOV AL, MEM8
 		int i = *p.addri32;
