@@ -11,6 +11,8 @@
  */
 module debugger.sys.user;
 
+version (Posix):
+
 version (X86) {
 	struct user_fpregs_struct {
 		int cwd;
