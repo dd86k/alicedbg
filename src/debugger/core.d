@@ -1,6 +1,7 @@
 module debugger.core;
 
 import core.stdc.string : memset;
+import core.stdc.errno : errno;
 import debugger.exception;
 
 extern (C):
@@ -69,10 +70,10 @@ int dbg_file(const(char) *cmd) {
 	version (Posix) {
 		hprocess = fork();
 		if (hprocess == -1)
-			return 1;
+			return errno;
 		if (hprocess == 0) {
 			if (ptrace(PTRACE_TRACEME, 0, null, null))
-				return 2;
+				return errno;
 			exit(execl(cmd, null, null));
 		}
 	}
@@ -94,7 +95,7 @@ int dbg_attach(int pid) {
 	} else
 	version (Posix) {
 		if (ptrace(PTRACE_SEIZE, pid, null, null) == -1)
-			return 2;
+			return errno;
 	}
 	return 0;
 }
