@@ -152,13 +152,13 @@ L_DEBUG_LOOP:
 			return 0;
 		case step:
 			version (X86) {
-				if (de.Exception.dwFirstChance)
-					--c.Eip;
+			//	if (de.Exception.dwFirstChance)
+			//		--c.Eip;
 				c.EFlags |= 0x100;	// Trap Flag, enable single-stepping
 			} else
 			version (X86_64) {
-				if (de.Exception.dwFirstChance)
-					--c.Rip;
+			//	if (de.Exception.dwFirstChance)
+			//		--c.Rip;
 				c.EFlags |= 0x100;	// Trap Flag, enable single-stepping
 			}
 			FlushInstructionCache(hprocess, null, 0);
