@@ -481,112 +481,112 @@ L_CONTINUE:
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JO %d", *p.addri8);
+			mnaddf(p, "JO %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x71:	// JNO
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JNO %d", *p.addri8);
+			mnaddf(p, "JNO %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x72:	// JB
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JB %d", *p.addri8);
+			mnaddf(p, "JB %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x73:	// JNB
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JNB %d", *p.addri8);
+			mnaddf(p, "JNB %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x74:	// JZ
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JZ %d", *p.addri8);
+			mnaddf(p, "JZ %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x75:	// JNZ
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JNZ %d", *p.addri8);
+			mnaddf(p, "JNZ %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x76:	// JBE
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JBE %d", *p.addri8);
+			mnaddf(p, "JBE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x77:	// JNBE
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JNBE %d", *p.addri8);
+			mnaddf(p, "JNBE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x78:	// JS
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JS %d", *p.addri8);
+			mnaddf(p, "JS %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x79:	// JNS
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JNS %d", *p.addri8);
+			mnaddf(p, "JNS %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7A:	// JP
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JP %d", *p.addri8);
+			mnaddf(p, "JP %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7B:	// JNP
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JNP %d", *p.addri8);
+			mnaddf(p, "JNP %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7C:	// JL
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JL %d", *p.addri8);
+			mnaddf(p, "JL %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7D:	// JNL
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JNL %d", *p.addri8);
+			mnaddf(p, "JNL %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7E:	// JLE
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JLE %d", *p.addri8);
+			mnaddf(p, "JLE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7F:	// JNLE
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mcaddf(p, "JNLE %d", *p.addri8);
+			mnaddf(p, "JNLE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x81:	// GRP1 REG32, IMM32
