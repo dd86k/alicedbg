@@ -127,7 +127,6 @@ L_DEBUG_LOOP:
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
 			return 3;
 
-		// Filter necessary, may add EXIT_PROCESS_DEBUG_EVENT later
 		switch (de.dwDebugEventCode) {
 		case EXCEPTION_DEBUG_EVENT:
 			prep_ex_debug(e, de.Exception);
@@ -179,18 +178,22 @@ L_DEBUG_LOOP:
 		int id = waitid(idtype_t.P_ALL, 0, &sig, WEXITED | WSTOPPED);
 		if (id == -1)
 			return 3;
-		if (sig._sifields._sigchld.si_status == SIGCONT)
-			goto L_DEBUG_LOOP;
-		
+
+		// Filter uninteresting events
+		switch (sig._sifields._sigchld.si_status) {
+		case SIGCONT: goto L_DEBUG_LOOP;
+		default:
+		}
+
 		prep_ex_sig(e, sig);
-		
+
 		user u;
 		ptrace(PTRACE_GETREGS, hprocess, null, &u);
 		prep_ex_regs(e, u);
-		
+
 		e.pid = sig._sifields._kill.si_pid;
 		e.tid = 0;
-		
+
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
 		case exit:
