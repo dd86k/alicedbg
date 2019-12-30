@@ -66,6 +66,10 @@ L_READKEY:
 			tui_status("Proceeding...");
 			term_flush;
 			return DebuggerAction.step;
+		case C:
+			tui_status("Proceeding...");
+			term_flush;
+			return DebuggerAction.proceed;
 		default: goto L_READKEY;
 		}
 	default: goto L_READKEY;
