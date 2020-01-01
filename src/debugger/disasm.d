@@ -116,11 +116,11 @@ else
 // Include bits
 //
 
-enum
-	DISASM_I_MACHINECODE	= 0b0000_0001,	/// Include machine code
-	DISASM_I_MNEMONICS	= 0b0000_0010,	/// Include instruction mnemonics
-	DISASM_I_SYMBOLS	= 0b0000_0100,	/// (Not implemented) Include symbols
-	DISASM_I_SOURCE	= 0b0000_1000;	/// (Not implemented) Include source code
+enum DISASM_I_MACHINECODE	= 0b0000_0001;	/// Include machine code
+enum DISASM_I_MNEMONICS	= 0b0000_0010;	/// Include instruction mnemonics
+enum DISASM_I_SYMBOLS	= 0b0000_0100;	/// (Not implemented) Include symbols
+enum DISASM_I_SOURCE	= 0b0000_1000;	/// (Not implemented) Include source code
+enum DISASM_I_EVERYTHING	= 0xFF;	/// Include everything
 
 //
 // Option bits
