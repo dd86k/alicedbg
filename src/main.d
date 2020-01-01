@@ -1,8 +1,7 @@
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
-import consts;
-//import misc.ddc;
 import core.stdc.stdio;
+import consts;
 import ui.loop : ui_loop;
 import ui.tui : ui_tui;
 import debugger.core;
@@ -34,7 +33,7 @@ struct cliopt_t {
 	CLIDebug debugtype;
 	union {
 		ushort pid;
-		const(char) *file;	/// Plus cmd
+		const(char) *file;
 	}
 }
 
@@ -190,10 +189,51 @@ int main(int argc, const(char) **argv) {
 		/*if (strcmp(arg, "march") == 0) {
 			
 		}*/
+		// Disassemble file
 		// 
-		/*if (strcmp(arg, "disasmdump") == 0) {
-			
-		}*/
+		if (strcmp(arg, "disasmdump") == 0) {
+			import debugger.disasm;
+			import core.stdc.config : c_long;
+			import core.stdc.stdlib : malloc;
+
+			if (argi + 1 >= argc) {
+				puts("cli: path argument missing");
+				return EXIT_FAILURE;
+			}
+
+			FILE *f = fopen(argv[argi + 1], "rb");
+
+			if (f == null) {
+				puts("cli: could not open file");
+				return EXIT_FAILURE;
+			}
+
+			if (fseek(f, 0, SEEK_END)) {
+				puts("cli: could not seek file");
+				return EXIT_FAILURE;
+			}
+			c_long fl = ftell(f);
+			fseek(f, 0, SEEK_SET); // rewind is broken
+
+			ubyte *m = cast(ubyte*)malloc(fl);
+			if (fread(m, fl, 1, f) == 0) {
+				puts("cli: could not read file");
+				return EXIT_FAILURE;
+			}
+
+			disasm_params_t p;
+			p.include = DISASM_I_EVERYTHING;
+			p.addru8 = m;
+			for (c_long fi; fi < fl; fi += p.addrv - p.thisaddr) {
+				if (disasm_line(p)) continue;
+				printf("%08X %-20s %-20s\n",
+					cast(uint)fi,
+					cast(char*)p.mcbuf,
+					cast(char*)p.mnbuf);
+			}
+
+			return EXIT_SUCCESS;
+		}
 		// Choose demangle settings for symbols
 		/*if (strcmp(arg, "demangle") == 0) {
 			

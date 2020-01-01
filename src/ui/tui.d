@@ -82,7 +82,7 @@ int tui_event_ex(exception_t *e) {
 	term_clear;
 	// disasm settings
 	disasm_params_t params;
-	params.include |= DISASM_I_MACHINECODE | DISASM_I_MNEMONICS;
+	params.include = DISASM_I_EVERYTHING;
 	params.addrv = e.addrv;
 	// locals
 	const uint h = tui_size.height / 2;
