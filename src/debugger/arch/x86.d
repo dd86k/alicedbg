@@ -676,7 +676,10 @@ L_CONTINUE:
 			mnaddf(p, "MOV %s, %s", modrm_reg(modrm), f);
 		}
 		break;
-	case 0x8D:	//TODO: LEA REG32, MEM32
+	case 0x8D:	// LEA REG32, MEM32
+		if (INCLUDE_MNEMONICS)
+			mcadd(p, "LEA ");
+		pretty_modrm(p);
 		break;
 	case 0x8E:	// MOV SREG16, REG16
 		ubyte modrm = *p.addru8;
@@ -750,19 +753,24 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "CBD");
 		break;
-	case 0x9A:	//TODO: CALL (FAR)
-		//if (INCLUDE_MNEMONICS)
-		//	mnadd(p, "CALL ");
+	case 0x9A:	// CALL (FAR)
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%08X", *p.addru32);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "CALL %d", *p.addri32);
+		p.addrv += 4;
 		break;
 	case 0x9B:	// WAIT/FWAIT
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "WAIT");
 		break;
-	case 0x9C:	//TODO: PUSHF/D/Q
-	
+	case 0x9C:	// PUSHF/D/Q
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "PUSHFD");
 		break;
-	case 0x9D:	//TODO: POPF/D/Q
-	
+	case 0x9D:	// POPF/D/Q
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "POPFD");
 		break;
 	case 0x9E:	// SAHF
 		if (INCLUDE_MACHINECODE)
@@ -1031,6 +1039,19 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "RET");
 		break;
+	case 0xC4:	// LES REG, MEM
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "LES ");
+		pretty_modrm(p);
+		break;
+	case 0xC5:	// LDS REG, MEM
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "LDS ");
+		pretty_modrm(p);
+		break;
+	case 0xC6:	//TODO: GRP11(1A) - MOV MEM8, IMM8
+	
+		break;
 	case 0xC7:	// GRP11(1A) - MOV MEM32, IMM32
 		ubyte modrm = *p.addru8;
 		if (INCLUDE_MACHINECODE)
@@ -1061,9 +1082,8 @@ L_CONTINUE:
 			}
 			break;
 		case RM_MOD_01:
-			byte m = *p.addri8;
 			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%X ", m & 0xFF);
+				mcaddf(p, "%X ", *p.addru8);
 			if (INCLUDE_MNEMONICS) {
 				switch (modrm & RM_RM) {
 				case RM_RM_000: r = "[EAX%s%d]"; break;
@@ -1076,13 +1096,12 @@ L_CONTINUE:
 				case RM_RM_111: r = "[EDI%s%d]"; break;
 				default: // never
 				}
-				mnaddf(p, r, m >= 0 ? cast(char*)"+" : "", m);
+				mnaddf(p, r, *p.addri8 >= 0 ? cast(char*)"+" : "", *p.addri8);
 			}
 			break;
 		case RM_MOD_10:
-			int m = *p.addri32;
 			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%X ", m);
+				mcaddf(p, "%X ", *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				switch (modrm & RM_RM) {
 				case RM_RM_000: r = "[EAX%s%d]"; break;
@@ -1095,7 +1114,7 @@ L_CONTINUE:
 				case RM_RM_111: r = "[EDI%s%d]"; break;
 				default: // never
 				}
-				mnaddf(p, r, m >= 0 ? cast(char*)"+" : "", m);
+				mnaddf(p, r, *p.addri8 >= 0 ? cast(char*)"+" : "", *p.addri32);
 			}
 			p.addrv += 4;
 			break;
@@ -1126,13 +1145,34 @@ L_CONTINUE:
 			p.addrv += 4;
 		}
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%X", *p.addru32);
+			mcaddf(p, "%X", v);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, ", %08X", *p.addru32);
+			mnaddf(p, ", %X", v);
 		break;
-	case 0xCC:
+	case 0xC8:	//TODO: ENTER IMM16, IMM8
+	
+		break;
+	case 0xC9:	//TODO: LEAVE
+	
+		break;
+	case 0xCC:	// INT 3
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "INT 3");
+		break;
+	case 0xCD:	// INT IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "INT %u", *p.addru8);
+		++p.addrv;
+		break;
+	case 0xCE:	// INTO
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "INTO");
+		break;
+	case 0xCF:	// IRET
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "IRET");
 		break;
 	case 0xE8:	// CALL IMM32
 		if (INCLUDE_MACHINECODE)
@@ -1141,7 +1181,7 @@ L_CONTINUE:
 			mnaddf(p, "CALL %d", *p.addri32);
 		p.addrv += 4;
 		break;
-	case 0xEB:	// JMP i8
+	case 0xEB:	// JMP IMM8
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X ", *p.addru8);
 		if (INCLUDE_MNEMONICS)
@@ -1154,9 +1194,9 @@ L_CONTINUE:
 		goto L_CONTINUE;
 	default:
 	}
-	
+
 	with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
-	
+
 	return e;
 }
 

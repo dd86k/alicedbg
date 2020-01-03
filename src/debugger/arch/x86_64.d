@@ -39,33 +39,33 @@ L_CONTINUE:
 
 private:
 
-int mapb2(ref disasm_params_t params) {
+int x86_64_mapb2(ref disasm_params_t params) {
 	const ubyte b = *params.addru8;
 	
 	
 	return DisasmError.None;
 }
 
-int mapb3_38h(ref disasm_params_t params) {
+int x86_64_mapb3_38h(ref disasm_params_t params) {
 	
 	
 	return DisasmError.None;
 }
 
-int mapb3_3ah(ref disasm_params_t params) {
+int x86_64_mapb3_3ah(ref disasm_params_t params) {
 	
 	
 	return DisasmError.None;
 }
 
 // 1-byte VEX (0xC5)
-int map2_vex1(ref disasm_params_t params) {
+int x86_64_map2_vex1(ref disasm_params_t params) {
 	
 	return DisasmError.None;
 }
 
 // 2-byte VEX (0xC4)
-int map2_vex2(ref disasm_params_t params) {
+int x86_64_map2_vex2(ref disasm_params_t params) {
 	
 	return DisasmError.None;
 }
