@@ -962,56 +962,56 @@ L_CONTINUE:
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EAX, %08X", *p.addru32);
+			mnaddf(p, "MOV EAX, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xB9:	// MOV ECX, IMM32
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV ECX, %08X", *p.addru32);
+			mnaddf(p, "MOV ECX, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBA:	// MOV EDX, IMM32
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EDX, %08X", *p.addru32);
+			mnaddf(p, "MOV EDX, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBB:	// MOV EBX, IMM32
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EBX, %08X", *p.addru32);
+			mnaddf(p, "MOV EBX, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBC:	// MOV ESP, IMM32
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV ESP, %08X", *p.addru32);
+			mnaddf(p, "MOV ESP, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBD:	// MOV EBP, IMM32
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EBP, %08X", *p.addru32);
+			mnaddf(p, "MOV EBP, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBE:	// MOV ESI, IMM32
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV ESI, %08X", *p.addru32);
+			mnaddf(p, "MOV ESI, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBF:	// MOV EDI, IMM32
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EDI, %08X", *p.addru32);
+			mnaddf(p, "MOV EDI, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xC0:	//TODO: GRP2 R/M8, IMM8
