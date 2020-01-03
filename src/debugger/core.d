@@ -8,21 +8,21 @@ extern (C):
 __gshared:
 
 version (Windows) {
-import core.sys.windows.windows;
-//SymInitialize, GetFileNameFromHandle, SymGetModuleInfo64,
-//StackWalk64, SymGetSymFromAddr64, SymFromName
-private HANDLE hthread; /// Saved thread handle, DEBUG_INFO doesn't contain one
-private HANDLE hprocess; /// 
+	import core.sys.windows.windows;
+	//SymInitialize, GetFileNameFromHandle, SymGetModuleInfo64,
+	//StackWalk64, SymGetSymFromAddr64, SymFromName
+	private HANDLE hthread; /// Saved thread handle, DEBUG_INFO doesn't contain one
+	private HANDLE hprocess; /// 
 } else
 version (Posix) {
-private import debugger.sys.ptrace;
-private import core.sys.posix.signal, core.sys.posix.sys.wait;
-private import core.sys.linux.unistd;
-import debugger.sys.user : user;
-private enum __WALL = 0x40000000;
-// temp
-import core.stdc.stdio, core.stdc.stdlib;
-private pid_t hprocess;
+	private import debugger.sys.ptrace;
+	private import core.sys.posix.signal, core.sys.posix.sys.wait;
+	private import core.sys.linux.unistd;
+	import debugger.sys.user : user;
+	private enum __WALL = 0x40000000;
+	// temp
+	import core.stdc.stdio, core.stdc.stdlib;
+	private pid_t hprocess;
 }
 
 /// Actions that a user function handler may return
@@ -47,8 +47,6 @@ int function(exception_t*) user_function;
  */
 int dbg_file(const(char) *cmd) {
 	version (Windows) {
-		// LoadLibrary or LoadLibraryEx or CreateProcess+ResumeThread
-		// if ResumeThread alone doesn't work, try DEBUG_PROCESS+WaitForDebugEvent
 		STARTUPINFOA si = void;
 		PROCESS_INFORMATION pi = void;
 		memset(&si, 0, si.sizeof);
@@ -84,8 +82,7 @@ int dbg_file(const(char) *cmd) {
  * Attach the debugger to a process ID.
  * (Windows) Uses DebugActiveProcess
  * (Posix) Uses ptrace(PTRACE_SEIZE)
- * Params:
- * 	pid = Process ID
+ * Params: pid = Process ID
  * Returns: Zero on success; Otherwise an error (Windows) Returns GetLastError
  */
 int dbg_attach(int pid) {
@@ -114,12 +111,15 @@ int dbg_sethandle(int function(exception_t *) f) {
  * Continues the execution of the thread (and/or process) until a new debug
  * event occurs. When an exception occurs, the exception_t structure is
  * populated with debugging information.
- * (Windows) Uses WaitForDebugEvent, filters for EXCEPTION_DEBUG_EVENT
- * (Otherwise executes ContinueDebugEvent)
- * (Posix) Uses ptrace(2) and waitid(2)
+ * (Windows) Uses WaitForDebugEvent, filters any but EXCEPTION_DEBUG_EVENT, and
+ * ContinueDebugEvent
+ * (Posix) Uses ptrace(2), filters SIGCONT, and waitid(2)
  * Returns: Zero on success; Otherwise an error occured
  */
 int dbg_loop() {
+	if (user_function == null)
+		return 4;
+
 	exception_t e = void;
 	version (Windows) {
 		DEBUG_EVENT de = void;
@@ -127,6 +127,7 @@ L_DEBUG_LOOP:
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
 			return 3;
 
+		// Filter interesting events
 		switch (de.dwDebugEventCode) {
 		case EXCEPTION_DEBUG_EVENT:
 			prep_ex_debug(e, de.Exception);
@@ -175,11 +176,10 @@ L_DEBUG_LOOP:
 		// Linux examples use __WALL and is supposed to imply (but does
 		// not include) WEXITED | WSTOPPED but does not act like it
 		// waitid(2) returns 0 or -1 so it's pointless to verify its value
-		int id = waitid(idtype_t.P_ALL, 0, &sig, WEXITED | WSTOPPED);
-		if (id == -1)
+		if (waitid(idtype_t.P_ALL, 0, &sig, WEXITED | WSTOPPED) == -1)
 			return 3;
 
-		// Filter uninteresting events
+		// Filter uninteresting events/signals
 		switch (sig._sifields._sigchld.si_status) {
 		case SIGCONT: goto L_DEBUG_LOOP;
 		default:
@@ -212,8 +212,7 @@ L_DEBUG_LOOP:
 private:
 
 //
-// Exception preparing functions
-// OS specific
+// Exception preparing functions (OS specific)
 //
 
 version (Windows) {
