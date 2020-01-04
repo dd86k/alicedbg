@@ -14,7 +14,6 @@ extern (C):
  * Returns: DisasmError
  */
 int disasm_x86(ref disasm_params_t p) {
-	int e;
 	x86_prefreg = PrefixReg.None;
 	x86_prefix_address = x86_prefix_operand = false;
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
@@ -1149,11 +1148,28 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, ", %X", v);
 		break;
-	case 0xC8:	//TODO: ENTER IMM16, IMM8
-	
+	case 0xC8:	// ENTER IMM16, IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%04X %02X", *p.addru16, *(p.addru8 + 2));
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "ENTER %d %d", *p.addri16, *(p.addri8 + 2));
+		p.addrv += 3;
 		break;
-	case 0xC9:	//TODO: LEAVE
-	
+	case 0xC9:	// LEAVE
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "LEAVE");
+		break;
+	case 0xCA:	// RET (far) IMM16
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%04X", *p.addru16);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "RET %d %d", *p.addri16);
+		p.addrv += 2;
+		break;
+	case 0xCB:	// RET (far)
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "RET");
+		p.addrv += 2;
 		break;
 	case 0xCC:	// INT 3
 		if (INCLUDE_MNEMONICS)
@@ -1173,6 +1189,37 @@ L_CONTINUE:
 	case 0xCF:	// IRET
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "IRET");
+		break;
+	case 0xD0:	//TODO: GRP2 REG8, 1
+		break;
+	case 0xD1:	//TODO: GRP2 REG32, 1
+		break;
+	case 0xD2:	//TODO: GRP2 REG8, CL
+		break;
+	case 0xD3:	//TODO: GRP2 REG32, CL
+		break;
+	case 0xD4:	// AAM IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "AAM %u", *p.addru8);
+		++p.addrv;
+		break;
+	case 0xD5:	// AAD IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "AAD %u", *p.addru8);
+		++p.addrv;
+		break;
+	case 0xD6:	// (UNUSED)
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "??");
+		p.error = DisasmError.Illegal;
+		break;
+	case 0xD7:	// XLAT
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "XLAT");
 		break;
 	case 0xE8:	// CALL IMM32
 		if (INCLUDE_MACHINECODE)
@@ -1197,7 +1244,7 @@ L_CONTINUE:
 
 	with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
 
-	return e;
+	return p.error;
 }
 
 private:
@@ -1216,23 +1263,17 @@ __gshared bool x86_prefix_operand;
 __gshared bool x86_prefix_address;
 __gshared PrefixReg x86_prefreg;
 
-int mapb2(ref disasm_params_t params) {
+void mapb2(ref disasm_params_t params) {
 	const ubyte b = *params.addru8;
 	
-	
-	return DisasmError.None;
 }
 
-int mapb3_38h(ref disasm_params_t params) {
+void mapb3_38h(ref disasm_params_t params) {
 	
-	
-	return DisasmError.None;
 }
 
-int mapb3_3ah(ref disasm_params_t params) {
+void mapb3_3ah(ref disasm_params_t params) {
 	
-	
-	return DisasmError.None;
 }
 
 enum : ubyte {

@@ -63,6 +63,7 @@ enum DisasmError {
 	None,	/// Nothing to report, you can continue
 	NoAuto,	/// Automatic mode is unavailable for compiled platform
 	NoABI,	/// Invalid ABI was selected
+	Illegal,	/// Illegal/invalid opcode
 }
 
 /// Disassembler ABI
@@ -143,6 +144,7 @@ int disasm_line(ref disasm_params_t p) {
 		p.abi = DISASM_DEFAULT_ABI;
 	}
 
+	p.error = DisasmError.None;
 	p.thisaddr = p.addrv;
 
 	with (DisasmABI)
