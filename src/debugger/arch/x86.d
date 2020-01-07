@@ -8,14 +8,37 @@ import utils.str;
 
 extern (C):
 
+package
+struct x86_internals_t {
+	union {
+		int group1;
+		int lock;
+		int rep;
+		int repne;
+		int repe;
+	}
+	union {
+		int group2;
+		int segreg;
+	}
+	union {
+		int group3;
+		int prefix_operand;
+	}
+	union {
+		int group4;
+		int prefix_address;
+	}
+}
+
 /**
  * x86 disassembler.
  * Params: p = Disassembler parameters
  * Returns: DisasmError
  */
 int disasm_x86(ref disasm_params_t p) {
-	x86_prefreg = PrefixReg.None;
-	x86_prefix_address = x86_prefix_operand = false;
+	with (p.x86)
+	group1 = group2 = group3 = group4 = 0;
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
 
@@ -84,7 +107,7 @@ L_CONTINUE:
 			mnadd(p, "PUSH CS");
 		break;
 	case 0x0F:
-		e = mapb2(p);
+		mapb2(p);
 		break;
 	case 0x10:	// ADC R/M8, REG8
 	case 0x11:	// ADC R/M32, REG32
@@ -169,7 +192,7 @@ L_CONTINUE:
 		p.addrv += 4;
 		break;
 	case 0x26:	// ES:
-		x86_prefreg = PrefixReg.ES;
+		p.x86.segreg = PrefixReg.ES;
 		goto L_CONTINUE;
 	case 0x27:	// DAA
 		if (INCLUDE_MNEMONICS)
@@ -198,7 +221,7 @@ L_CONTINUE:
 		p.addrv += 4;
 		break;
 	case 0x2E:	// CS:
-		x86_prefreg = PrefixReg.CS;
+		p.x86.segreg = PrefixReg.CS;
 		goto L_CONTINUE;
 	case 0x2F:	// DAS
 		if (INCLUDE_MNEMONICS)
@@ -227,7 +250,7 @@ L_CONTINUE:
 		p.addrv += 4;
 		break;
 	case 0x36:	// SS:
-		x86_prefreg = PrefixReg.SS;
+		p.x86.segreg = PrefixReg.SS;
 		goto L_CONTINUE;
 	case 0x37:	// AAA
 		if (INCLUDE_MNEMONICS)
@@ -256,7 +279,7 @@ L_CONTINUE:
 		p.addrv += 4;
 		break;
 	case 0x3E:	// DS:
-		x86_prefreg = PrefixReg.DS;
+		p.x86.segreg = PrefixReg.DS;
 		goto L_CONTINUE;
 	case 0x3F:	// AAS
 		if (INCLUDE_MNEMONICS)
@@ -406,7 +429,9 @@ L_CONTINUE:
 				modrm, *p.addru32, *(p.addru32 + 1));
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "BOUND %s, %s %u %u",
-				modrm_reg(modrm), segstr, *p.addru32, *(p.addru32 + 1));
+				modrm_reg(modrm, b & 1, p.x86.prefix_operand),
+				segstr(p.x86.segreg),
+				*p.addru32, *(p.addru32 + 1));
 		p.addrv += 8;
 		break;
 	case 0x63:	// ARPL R/M16, REG16
@@ -415,16 +440,16 @@ L_CONTINUE:
 		pretty_modrm(p);
 		break;
 	case 0x64:	// FS:
-		x86_prefreg = PrefixReg.FS;
+		p.x86.segreg = PrefixReg.FS;
 		goto L_CONTINUE;
 	case 0x65:	// GS:
-		x86_prefreg = PrefixReg.GS;
+		p.x86.segreg = PrefixReg.GS;
 		goto L_CONTINUE;
 	case 0x66:	// PREFIX: OPERAND SIZE
-		x86_prefix_operand = true;
+		p.x86.prefix_operand = true;
 		goto L_CONTINUE;
 	case 0x67:	// PREFIX: ADDRESS SIZE
-		x86_prefix_address = true;
+		p.x86.prefix_address = true;
 		goto L_CONTINUE;
 	case 0x68:	// PUSH IMM32
 		if (INCLUDE_MACHINECODE)
@@ -607,7 +632,7 @@ L_CONTINUE:
 			default: // impossible
 			}
 			mnaddf(p, "%s %s, %u",
-				f, modrm_reg(modrm, b & 1, x86_prefix_operand), *p.addru32);
+				f, modrm_reg(modrm, b & 1, p.x86.prefix_operand), *p.addru32);
 		}
 		p.addrv += 4;
 		break;
@@ -632,7 +657,7 @@ L_CONTINUE:
 			default: // impossible
 			}
 			mnaddf(p, "%s %s, %u",
-				f, modrm_reg(modrm, b & 1, x86_prefix_operand), *p.addru8);
+				f, modrm_reg(modrm, b & 1, p.x86.prefix_operand), *p.addru8);
 		}
 		++p.addrv;
 		break;
@@ -785,7 +810,7 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			with (PrefixReg)
-			switch (x86_prefreg) {
+			switch (p.x86.segreg) {
 			case CS: f = "MOV AL, [CS:%d]"; break;
 			case DS: f = "MOV AL, [DS:%d]"; break;
 			case ES: f = "MOV AL, [ES:%d]"; break;
@@ -804,7 +829,7 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			with (PrefixReg)
-			switch (x86_prefreg) {
+			switch (p.x86.segreg) {
 			case CS: f = "MOV EAX, [CS:%d]"; break;
 			case DS: f = "MOV EAX, [DS:%d]"; break;
 			case ES: f = "MOV EAX, [ES:%d]"; break;
@@ -823,7 +848,7 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			with (PrefixReg)
-			switch (x86_prefreg) {
+			switch (p.x86.segreg) {
 			case CS: f = "MOV [CS:%d], AL"; break;
 			case DS: f = "MOV [DS:%d], AL"; break;
 			case ES: f = "MOV [ES:%d], AL"; break;
@@ -842,7 +867,7 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			with (PrefixReg)
-			switch (x86_prefreg) {
+			switch (p.x86.segreg) {
 			case CS: f = "MOV [CS:%d], EAX"; break;
 			case DS: f = "MOV [DS:%d], EAX"; break;
 			case ES: f = "MOV [ES:%d], EAX"; break;
@@ -1136,7 +1161,7 @@ L_CONTINUE:
 		default:
 		}
 		uint v = void;
-		if (x86_prefix_operand) {
+		if (p.x86.prefix_operand) {
 			v = *p.addru16;
 			p.addrv += 2;
 		} else {
@@ -1221,6 +1246,100 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "XLAT");
 		break;
+	case 0xD8:	// ESCAPE D8
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", modrm);
+		if (INCLUDE_MNEMONICS == 0)
+			break;
+		const(char) *f = void;
+		if (modrm > 0xBF) {
+			ubyte modrmv = modrm & 0xF;
+			switch (modrm & 0xF0) {
+			case 0xC: // FADD/FMUL
+				if (modrmv < 0x8) { // FADD
+					f = "FADD ST(0),ST(%u)";
+				} else { // FMUL
+					modrmv -= 8;
+					f = "FMUL ST(0),ST(%u)";
+				}
+				break;
+			case 0xD: // FCOM/FCOMP
+				if (modrmv < 0x8) { // FCOM
+					f = modrmv == 2 ?
+						"FCOM ST(0),T(%u)" :
+						"FCOM ST(0),ST(%u)";
+				} else { // FCOMP
+					modrmv -= 8;
+					f = modrmv == 2 ?
+						"FCOMP ST(0),T(%u)" :
+						"FCOMP ST(0),ST(%u)";
+				}
+				break;
+			case 0xE: // FSUB/FSUBR
+				if ((modrm & 0xF) < 0x8) { // FSUB
+					f = "FSUB ST(0),ST(%u)";
+				} else { // FSUBR
+					modrmv -= 8;
+					f = "FSUBR ST(0),ST(%u)";
+				}
+				break;
+			case 0xF: // FDIV/FDIVR
+				if ((modrm & 0xF) < 0x8) { // FDIV
+					f = "FDIV ST(0),ST(%u)";
+				} else { // FDIVR
+					modrmv -= 8;
+					f = "FDIVR ST(0),ST(%u)";
+				}
+				break;
+			default:
+			}
+			mnaddf(p, f, modrmv);
+		} else {
+			switch (modrm & RM_RM) {
+			case RM_RM_000: // FADD
+			
+				break;
+			case RM_RM_001: // FMUL
+			
+				break;
+			case RM_RM_010: // FCOM
+			
+				break;
+			case RM_RM_011: // FCOMP
+			
+				break;
+			case RM_RM_100: // FSUB
+			
+				break;
+			case RM_RM_101: // FSUBR
+			
+				break;
+			case RM_RM_110: // FDIV
+			
+				break;
+			case RM_RM_111: // FDIVR
+			
+				break;
+			default: // never
+			}
+		}
+		break;
+	case 0xD9:	// ESCAPE D9
+		break;
+	case 0xDA:	// ESCAPE DA
+		break;
+	case 0xDB:	// ESCAPE DB
+		break;
+	case 0xDC:	// ESCAPE DC
+		break;
+	case 0xDD:	// ESCAPE DD
+		break;
+	case 0xDE:	// ESCAPE DE
+		break;
+	case 0xDF:	// ESCAPE DF
+		break;
 	case 0xE8:	// CALL IMM32
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
@@ -1239,17 +1358,19 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "LOCK ");
 		goto L_CONTINUE;
+	case 0xF1:	// INT1
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "INT 1");
+		break;
 	default:
 	}
-
-	with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
 
 	return p.error;
 }
 
 private:
 
-enum PrefixReg : ubyte {
+enum PrefixReg {
 	None,
 	CS,
 	DS,
@@ -1258,10 +1379,6 @@ enum PrefixReg : ubyte {
 	GS,
 	SS
 }
-
-__gshared bool x86_prefix_operand;
-__gshared bool x86_prefix_address;
-__gshared PrefixReg x86_prefreg;
 
 void mapb2(ref disasm_params_t params) {
 	const ubyte b = *params.addru8;
@@ -1308,12 +1425,11 @@ void pretty_modrm(ref disasm_params_t p) {
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
 	ubyte op = *(p.addru8 - 1);
-	int direction = op & 2;	// If set, direction is towards REG
-	//int wide = op & 1;	// If set, WIDE operation is in effect
+	int direction = op & 2;	// If set, direction is to REG
+	int wide = op & 1;	// If set, WIDE operation is in effect
 	ubyte modrm = *p.addru8;
 	++p.addrv;
 	const(char) *c = ", ";
-	const(char) *f = void;
 
 	if (INCLUDE_MACHINECODE)
 		mcaddf(p, "%02X ", modrm);
@@ -1322,16 +1438,17 @@ void pretty_modrm(ref disasm_params_t p) {
 		goto L_REG;
 
 L_RM:
+	const(char) *str = modrm_rm(modrm, wide, p.x86.prefix_operand, p.x86.segreg);
 	switch (modrm & RM_MOD) {
 	case RM_MOD_00:	// Memory Mode, no displacement
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "[%s]", modrm_rm(modrm));
+			mnaddf(p, "[%s]", str);
 		break;
 	case RM_MOD_01:	// Memory Mode, 8-bit displacement
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "[%s%s%d]", modrm_rm(modrm),
+			mnaddf(p, "[%s%s%d]", str,
 				(*p.addri8) >=0 ? cast(char*)"+" : "", *p.addri8);
 		++p.addrv;
 		break;
@@ -1339,37 +1456,25 @@ L_RM:
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "[%s%s%d]", modrm_rm(modrm),
+			mnaddf(p, "[%s%s%d]", str,
 				(*p.addri32) >=0 ? cast(char*)"+" : "", *p.addri32);
 		p.addrv += 4;
 		break;
 	case RM_MOD_11:	// Register mode
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, modrm_rm(modrm));
+			mnadd(p, str);
 		break;
 	default: // Never reached
 	}
 	
 	if (direction)
 		return;
-	else {
+	else
 		mnadd(p, c);
-	}
 
 L_REG:
 	if (INCLUDE_MNEMONICS) {
-		switch (modrm & RM_REG) {
-		case RM_REG_000: f = "EAX"; break;
-		case RM_REG_001: f = "ECX"; break;
-		case RM_REG_010: f = "EDX"; break;
-		case RM_REG_011: f = "EBX"; break;
-		case RM_REG_100: f = "ESP"; break;
-		case RM_REG_101: f = "EBP"; break;
-		case RM_REG_110: f = "ESI"; break;
-		case RM_REG_111: f = "EDI"; break;
-		default: // Never reached
-		}
-		mnadd(p, f);
+		mnadd(p, modrm_reg(modrm, wide, p.x86.prefix_operand));
 
 		if (direction) {
 			mnadd(p, c);
@@ -1378,158 +1483,73 @@ L_REG:
 	}
 }
 
-const(char) *segstr() {
+const(char) *segstr(int segreg) {
 	with (PrefixReg)
-	switch (x86_prefreg) {
+	switch (segreg) {
 	case CS: return "CS:";
 	case DS: return "DS:";
 	case ES: return "ES:";
 	case FS: return "FS:";
 	case GS: return "GS:";
 	case SS: return "SS:";
-	default: return "";
+	default: return null;
 	}
 }
 
-const(char) *modrm_reg(ubyte modrm, ubyte wide = 1, ubyte prefix = 0) {
+const(char) *modrm_reg(ubyte modrm, int wide = 1, int operandsize = 0) {
 	if (wide)
-	switch (modrm & RM_REG) {
-	case RM_REG_000: return "EAX";
-	case RM_REG_001: return "ECX";
-	case RM_REG_010: return "EDX";
-	case RM_REG_011: return "EBX";
-	case RM_REG_100: return "ESP";
-	case RM_REG_101: return "EBP";
-	case RM_REG_110: return "ESI";
-	case RM_REG_111: return "EDI";
-	default: return "REG??";
-	}
+		switch (modrm & RM_REG) {
+		case RM_REG_000: return "EAX";
+		case RM_REG_001: return "ECX";
+		case RM_REG_010: return "EDX";
+		case RM_REG_011: return "EBX";
+		case RM_REG_100: return "ESP";
+		case RM_REG_101: return "EBP";
+		case RM_REG_110: return "ESI";
+		case RM_REG_111: return "EDI";
+		default:
+		}
 	else {
-		if (prefix)
-		switch (modrm & RM_REG) {
-		case RM_REG_000: return "AX";
-		case RM_REG_001: return "CX";
-		case RM_REG_010: return "DX";
-		case RM_REG_011: return "BX";
-		case RM_REG_100: return "SP";
-		case RM_REG_101: return "BP";
-		case RM_REG_110: return "SI";
-		case RM_REG_111: return "DI";
-		default: return "REG??";
-		}
+		if (operandsize)
+			switch (modrm & RM_REG) {
+			case RM_REG_000: return "AX";
+			case RM_REG_001: return "CX";
+			case RM_REG_010: return "DX";
+			case RM_REG_011: return "BX";
+			case RM_REG_100: return "SP";
+			case RM_REG_101: return "BP";
+			case RM_REG_110: return "SI";
+			case RM_REG_111: return "DI";
+			default:
+			}
 		else
-		switch (modrm & RM_REG) {
-		case RM_REG_000: return "AL";
-		case RM_REG_001: return "CL";
-		case RM_REG_010: return "DL";
-		case RM_REG_011: return "BL";
-		case RM_REG_100: return "AH";
-		case RM_REG_101: return "CH";
-		case RM_REG_110: return "DH";
-		case RM_REG_111: return "DL";
-		default: return "REG??";
-		}
+			switch (modrm & RM_REG) {
+			case RM_REG_000: return "AL";
+			case RM_REG_001: return "CL";
+			case RM_REG_010: return "DL";
+			case RM_REG_011: return "BL";
+			case RM_REG_100: return "AH";
+			case RM_REG_101: return "CH";
+			case RM_REG_110: return "DH";
+			case RM_REG_111: return "DL";
+			default:
+			}
 	}
+	return null;
 }
 
-const(char) *modrm_rm(ubyte modrm) {
-	switch (modrm & RM_RM) {
-	case RM_RM_000:
-		with (PrefixReg)
-		switch (x86_prefreg) {
-		case CS: return "CS:EAX";
-		case DS: return "DS:EAX";
-		case ES: return "ES:EAX";
-		case FS: return "FS:EAX";
-		case GS: return "GS:EAX";
-		case SS: return "SS:EAX";
-		default:
-		}
-		return "EAX";
-	case RM_RM_001:
-		with (PrefixReg)
-		switch (x86_prefreg) {
-		case CS: return "CS:ECX";
-		case DS: return "DS:ECX";
-		case ES: return "ES:ECX";
-		case FS: return "FS:ECX";
-		case GS: return "GS:ECX";
-		case SS: return "SS:ECX";
-		default:
-		}
-		return "ECX";
-	case RM_RM_010:
-		with (PrefixReg)
-		switch (x86_prefreg) {
-		case CS: return "CS:EDX";
-		case DS: return "DS:EDX";
-		case ES: return "ES:EDX";
-		case FS: return "FS:EDX";
-		case GS: return "GS:EDX";
-		case SS: return "SS:EDX";
-		default:
-		}
-		return "EDX";
-	case RM_RM_011:
-		with (PrefixReg)
-		switch (x86_prefreg) {
-		case CS: return "CS:EBX";
-		case DS: return "DS:EBX";
-		case ES: return "ES:EBX";
-		case FS: return "FS:EBX";
-		case GS: return "GS:EBX";
-		case SS: return "SS:EBX";
-		default:
-		}
-		return "EBX";
-	case RM_RM_100:
-		with (PrefixReg)
-		switch (x86_prefreg) {
-		case CS: return "CS:ESP";
-		case DS: return "DS:ESP";
-		case ES: return "ES:ESP";
-		case FS: return "FS:ESP";
-		case GS: return "GS:ESP";
-		case SS: return "SS:ESP";
-		default:
-		}
-		return "ESP";
-	case RM_RM_101:
-		with (PrefixReg)
-		switch (x86_prefreg) {
-		case CS: return "CS:EBP";
-		case DS: return "DS:EBP";
-		case ES: return "ES:EBP";
-		case FS: return "FS:EBP";
-		case GS: return "GS:EBP";
-		case SS: return "SS:EBP";
-		default:
-		}
-		return "EBP";
-	case RM_RM_110:
-		with (PrefixReg)
-		switch (x86_prefreg) {
-		case CS: return "CS:ESI";
-		case DS: return "DS:ESI";
-		case ES: return "ES:ESI";
-		case FS: return "FS:ESI";
-		case GS: return "GS:ESI";
-		case SS: return "SS:ESI";
-		default:
-		}
-		return "ESI";
-	case RM_RM_111:
-		with (PrefixReg)
-		switch (x86_prefreg) {
-		case CS: return "CS:EDI";
-		case DS: return "DS:EDI";
-		case ES: return "ES:EDI";
-		case FS: return "FS:EDI";
-		case GS: return "GS:EDI";
-		case SS: return "SS:EDI";
-		default:
-		}
-		return "EDI";
-	default: return null; // Never happens
-	}
+const(char) *modrm_rm(ubyte modrm, int wide = 1, int operandsize = 0, int segreg = 0) {
+	enum BUFL = 8;
+	__gshared char [BUFL]buf = void;
+	size_t bufi;
+
+	const(char) *r = segstr(segreg);
+	if (r) stradd(cast(char*)buf, r, bufi, BUFL);
+
+	r = modrm_reg(modrm, wide, operandsize);
+	bufi = stradd(cast(char*)buf, r, bufi, BUFL);
+
+	buf[bufi] = 0;
+
+	return cast(char*)buf;
 }

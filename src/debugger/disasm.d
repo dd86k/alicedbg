@@ -1,6 +1,7 @@
 module debugger.disasm;
 
 import debugger.arch;
+private import debugger.arch.x86 : x86_internals_t;
 
 extern (C):
 
@@ -51,6 +52,7 @@ struct disasm_params_t { align(1):
 	ubyte demangle;
 	/// Settings flags. See DISASM_O_* flags.
 	ushort options;
+	x86_internals_t x86;	/// Used internally
 }
 pragma(msg, "* disasm_params_t.sizeof: ", disasm_params_t.sizeof);
 
@@ -121,6 +123,7 @@ enum DISASM_I_MACHINECODE	= 0b0000_0001;	/// Include machine code
 enum DISASM_I_MNEMONICS	= 0b0000_0010;	/// Include instruction mnemonics
 enum DISASM_I_SYMBOLS	= 0b0000_0100;	/// (Not implemented) Include symbols
 enum DISASM_I_SOURCE	= 0b0000_1000;	/// (Not implemented) Include source code
+enum DISASM_I_COMMENTS	= 0b0001_0000;	/// (Not implemented) Include inlined comments
 enum DISASM_I_EVERYTHING	= 0xFF;	/// Include everything
 
 //
@@ -149,10 +152,14 @@ int disasm_line(ref disasm_params_t p) {
 
 	with (DisasmABI)
 	switch (p.abi) {
-	case x86: return disasm_x86(p);
-	case x86_64: return disasm_x86_64(p);
+	case x86: disasm_x86(p); break;
+	case x86_64: disasm_x86_64(p); break;
 	default: return DisasmError.NoABI;
 	}
+
+	with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
+
+	return p.error;
 }
 
 //
