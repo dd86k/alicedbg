@@ -1544,10 +1544,10 @@ const(char) *modrm_rm(ubyte modrm, int wide = 1, int operandsize = 0, int segreg
 	size_t bufi;
 
 	const(char) *r = segstr(segreg);
-	if (r) stradd(cast(char*)buf, r, bufi, BUFL);
+	if (r) stradd(cast(char*)buf, BUFL, bufi, r);
 
 	r = modrm_reg(modrm, wide, operandsize);
-	bufi = stradd(cast(char*)buf, r, bufi, BUFL);
+	bufi = stradd(cast(char*)buf, BUFL, bufi, r);
 
 	buf[bufi] = 0;
 

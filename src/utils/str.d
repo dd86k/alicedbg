@@ -11,36 +11,49 @@ extern (C):
 /**
  * Append a constant string to an existing buffer.
  * Params:
- * 	a = Existing character buffer
- * 	b = String constant to add
- * 	ia = Buffer index
- * 	s = Buffer size
- * Returns: New buffer index
+ * 	buf  = Existing character buffer
+ * 	size = Buffer size
+ * 	bufi = Buffer index
+ * 	str  = String data
+ * Returns: Updated buffer index
  */
-size_t stradd(char *a, const(char) *b, size_t ia, size_t s) {
-	size_t ib;
-	while (b[ib] && ia < s) {
-		a[ia] = b[ib];
-		++ib; ++ia;
+size_t stradd(char *buf, size_t size, size_t bufi, const(char) *str) {
+	size_t stri;
+	while (str[stri] && bufi < size) {
+		buf[bufi] = str[stri];
+		++stri; ++bufi;
 	}
-	return ia;
+	return bufi;
 }
 
 /**
- * Append a formatted string to an existing buffer, calls vsnprintf and then
- * stradd.
+ * Append a formatted string to an existing buffer, calls straddva and stradd.
  * Params:
- * 	a = Existing character buffer
- * 	ia = Buffer index
- * 	s = Buffer size
+ * 	buf  = Existing character buffer
+ * 	size = Buffer size
+ * 	bufi = Buffer index
  * 	f = String format, respects printf format
  * 	... = Additional objects to be formatted
- * Returns: New buffer index
+ * Returns: Updated buffer index
  */
-size_t straddf(char *a, size_t ia, size_t s, const(char) *f, ...) {
-	char [128]b = void;
+size_t straddf(char *buf, size_t size, size_t bufi, const(char) *f, ...) {
 	va_list va;
 	va_start(va, f);
+	return straddva(buf, size, bufi, f, va);
+}
+
+/**
+ * Append va_list to buffer. Uses an internal 128-character buffer for vsnprintf.
+ * Params:
+ * 	buf  = Existing character buffer
+ * 	size = Buffer size
+ * 	bufi = Buffer index
+ * 	f = String format, respects printf format
+ * 	va = Argument list
+ * Returns: Updated buffer index
+ */
+size_t straddva(char *buf, size_t size, size_t bufi, const(char) *f, ref va_list va) {
+	char [128]b = void;
 	vsnprintf(cast(char*)b, 128, f, va);
-	return stradd(a, cast(char*)b, ia, s);
+	return stradd(buf, size, bufi, cast(char*)b);
 }

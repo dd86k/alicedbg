@@ -171,35 +171,32 @@ int disasm_line(ref disasm_params_t p) {
 //
 
 package:
+private import core.stdc.stdarg;
 
 void mcadd(ref disasm_params_t params, const(char) *str) {
 	import utils.str : stradd;
 	with (params)
-	mcbufi = stradd(cast(char*)mcbuf, str, mcbufi, DISASM_BUF_SIZE);
+	mcbufi = stradd(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, str);
 }
 
 void mcaddf(ref disasm_params_t params, const(char) *f, ...) {
-	import core.stdc.stdarg : va_list, va_start;
-	import core.stdc.stdio : vsnprintf;
+	import utils.str : straddva;
 	va_list va;
 	va_start(va, f);
-	char [DISASM_BUF_SIZE]buf;
-	vsnprintf(cast(char*)buf, DISASM_BUF_SIZE, f, va);
-	mcadd(params, cast(char*)buf);
+	with (params)
+	mcbufi = straddva(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, f, va);
 }
 
 void mnadd(ref disasm_params_t params, const(char) *str) {
 	import utils.str : stradd;
 	with (params)
-	mnbufi = stradd(cast(char*)mnbuf, str, mnbufi, DISASM_BUF_SIZE);
+	mnbufi = stradd(cast(char*)mnbuf, DISASM_BUF_SIZE, mnbufi, str);
 }
 
 void mnaddf(ref disasm_params_t params, const(char) *f, ...) {
-	import core.stdc.stdarg : va_list, va_start;
-	import core.stdc.stdio : vsnprintf;
+	import utils.str : straddva;
 	va_list va;
 	va_start(va, f);
-	char [DISASM_BUF_SIZE]buf;
-	vsnprintf(cast(char*)buf, DISASM_BUF_SIZE, f, va);
-	mnadd(params, cast(char*)buf);
+	with (params)
+	mnbufi = straddva(cast(char*)mnbuf, DISASM_BUF_SIZE, mnbufi, f, va);
 }
