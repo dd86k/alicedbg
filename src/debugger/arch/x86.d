@@ -1438,33 +1438,38 @@ void pretty_modrm(ref disasm_params_t p) {
 		goto L_REG;
 
 L_RM:
-	const(char) *str = modrm_rm(modrm, wide, p.x86.prefix_operand, p.x86.segreg);
-	switch (modrm & RM_MOD) {
-	case RM_MOD_00:	// Memory Mode, no displacement
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "[%s]", str);
-		break;
-	case RM_MOD_01:	// Memory Mode, 8-bit displacement
-		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "[%s%s%d]", str,
-				(*p.addri8) >=0 ? cast(char*)"+" : "", *p.addri8);
-		++p.addrv;
-		break;
-	case RM_MOD_10:	// Memory Mode, 32-bit displacement
-		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "[%s%s%d]", str,
-				(*p.addri32) >=0 ? cast(char*)"+" : "", *p.addri32);
-		p.addrv += 4;
-		break;
-	case RM_MOD_11:	// Register mode
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, str);
-		break;
-	default: // Never reached
+	if ((modrm & RM_RM) == RM_RM_100 &&
+		(modrm & RM_MOD) != RM_MOD_11) { // SIB mode
+		pretty_sib(p, modrm);
+	} else { // ModR/M mode
+		const(char) *str = modrm_rm(modrm >> 3, wide, p.x86.prefix_operand, p.x86.segreg);
+		switch (modrm & RM_MOD) {
+		case RM_MOD_00:	// Memory Mode, no displacement
+			if (INCLUDE_MNEMONICS)
+				mnaddf(p, "[%s]", str);
+			break;
+		case RM_MOD_01:	// Memory Mode, 8-bit displacement
+			if (INCLUDE_MACHINECODE)
+				mcaddf(p, "%02X", *p.addru8);
+			if (INCLUDE_MNEMONICS)
+				mnaddf(p, "[%s%s%d]", str,
+					(*p.addri8) >=0 ? cast(char*)"+" : "", *p.addri8);
+			++p.addrv;
+			break;
+		case RM_MOD_10:	// Memory Mode, 32-bit displacement
+			if (INCLUDE_MACHINECODE)
+				mcaddf(p, "%08X", *p.addru32);
+			if (INCLUDE_MNEMONICS)
+				mnaddf(p, "[%s%s%d]", str,
+					(*p.addri32) >=0 ? cast(char*)"+" : "", *p.addri32);
+			p.addrv += 4;
+			break;
+		case RM_MOD_11:	// Register mode
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, str);
+			break;
+		default: // Never reached
+		}
 	}
 	
 	if (direction)
@@ -1481,6 +1486,81 @@ L_REG:
 			goto L_RM;
 		}
 	}
+}
+
+void pretty_sib(ref disasm_params_t p, ubyte modrm) {
+	ubyte sib = *p.addru8;
+	++p.addrv;
+	int scale = sibscale(sib);
+
+	if (p.include & DISASM_I_MACHINECODE)
+		mcaddf(p, "%02X ", sib);
+
+	const(char) *base = void;
+	const(char) *index = void;
+	switch (modrm & RM_MOD) { // Mode
+	case RM_MOD_00:
+		if ((sib & RM_REG) == RM_REG_101) { // INDEX * SCALE + D32
+			if (p.include & DISASM_I_MACHINECODE)
+				mcaddf(p, "%08X", *p.addru32);
+			if (p.include & DISASM_I_MNEMONICS) {
+				if ((sib & RM_RM) == RM_RM_100) {
+					mnaddf(p, "[%d]", *p.addru32);
+				} else {
+					mnaddf(p, "[%s*%d+%d]",
+						modrm_reg(sib >> 3), scale, *p.addru32);
+				}
+			}
+			p.addrv += 4;
+		} else { // BASE32 + INDEX * SCALE
+			if (p.include & DISASM_I_MNEMONICS) {
+				base = modrm_reg(sib); // Reg
+				if ((sib & RM_RM) == RM_RM_100) {
+					mnaddf(p, "[%s]", base);
+				} else {
+					mnaddf(p, "[%s+%s*%d]",
+						base, modrm_reg(sib >> 3), scale);
+				}
+			}
+		}
+		return;
+	case RM_MOD_01:
+		if ((sib & RM_RM) == RM_RM_100) { // B32 + D8
+			if (p.include & DISASM_I_MNEMONICS)
+				mnaddf(p, "[%s+%d]", modrm_reg(sib), *p.addru8);
+			++p.addrv;
+		} else { // BASE8 + INDEX * SCALE + DISP32
+			if (p.include & DISASM_I_MNEMONICS) {
+				base = modrm_reg(sib, 0, 0); // Reg
+				index = modrm_reg(sib >> 3); // RM
+				mnaddf(p, "[%s+%s*%d+%d]",
+					base, index, scale, *p.addru32);
+			}
+			p.addrv += 4;
+		}
+		break;
+	case RM_MOD_10:
+		if (p.include & DISASM_I_MACHINECODE)
+			mcaddf(p, "%08X", *p.addru32);
+		if (p.include & DISASM_I_MNEMONICS) {
+			if ((sib & RM_RM) == RM_RM_100) { // BASE32 + DISP32
+				mnaddf(p, "[%s+%d]", modrm_reg(sib), *p.addru32);
+			} else { // BASE32 + INDEX * SCALE + DISP32
+				base = modrm_reg(sib); // Reg
+				index = modrm_reg(sib >> 3); // RM
+				mnaddf(p, "[%s+%s*%d+%d]",
+					base, index, scale, *p.addru32);
+			}
+		}
+		p.addrv += 4;
+		break;
+	default: // never
+	}
+}
+
+int sibscale(ubyte sib) { // felt lazy
+	__gshared ubyte []scale = [ 1, 2, 4, 8 ];
+	return scale[sib >> 6];
 }
 
 const(char) *segstr(int segreg) {
@@ -1546,7 +1626,7 @@ const(char) *modrm_rm(ubyte modrm, int wide = 1, int operandsize = 0, int segreg
 	const(char) *r = segstr(segreg);
 	if (r) stradd(cast(char*)buf, BUFL, bufi, r);
 
-	r = modrm_reg(modrm, wide, operandsize);
+	r = modrm_reg(modrm >> 3, wide, operandsize);
 	bufi = stradd(cast(char*)buf, BUFL, bufi, r);
 
 	buf[bufi] = 0;
