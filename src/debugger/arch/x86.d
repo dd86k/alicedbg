@@ -1493,13 +1493,19 @@ L_REG:
 void pretty_sib(ref disasm_params_t p, ubyte modrm) {
 	ubyte sib = *p.addru8;
 	++p.addrv;
-	int scale = sibscale(sib);
+	uint scale = void; // I'm lazy
+	switch (scale & 0b11_000_000) {
+	case 0: scale = 1; break;
+	case 0b01_000_000: scale = 2; break;
+	case 0b10_000_000: scale = 4; break;
+	case 0b11_000_000: scale = 8; break;
+	default: // never
+	}
 
 	if (p.include & DISASM_I_MACHINECODE)
 		mcaddf(p, "%02X ", sib);
 
-	const(char) *base = void;
-	const(char) *index = void;
+	const(char)* base = void, index = void;
 	switch (modrm & RM_MOD) { // Mode
 	case RM_MOD_00:
 		if ((sib & RM_REG) == RM_REG_101) { // INDEX * SCALE + D32
@@ -1509,7 +1515,7 @@ void pretty_sib(ref disasm_params_t p, ubyte modrm) {
 				if ((sib & RM_RM) == RM_RM_100) {
 					mnaddf(p, "[%d]", *p.addru32);
 				} else {
-					mnaddf(p, "[%s*%d+%d]",
+					mnaddf(p, "[%s*%u+%d]",
 						modrm_reg(p, sib >> 3), scale, *p.addru32);
 				}
 			}
@@ -1520,7 +1526,7 @@ void pretty_sib(ref disasm_params_t p, ubyte modrm) {
 				if ((sib & RM_RM) == RM_RM_100) {
 					mnaddf(p, "[%s]", base);
 				} else {
-					mnaddf(p, "[%s+%s*%d]",
+					mnaddf(p, "[%s+%s*%u]",
 						base, modrm_reg(p, sib >> 3), scale);
 				}
 			}
@@ -1535,7 +1541,7 @@ void pretty_sib(ref disasm_params_t p, ubyte modrm) {
 			if (p.include & DISASM_I_MNEMONICS) {
 				base = modrm_reg(p, sib, 0); // Reg
 				index = modrm_reg(p, sib >> 3); // RM
-				mnaddf(p, "[%s+%s*%d+%d]",
+				mnaddf(p, "[%s+%s*%u+%d]",
 					base, index, scale, *p.addru32);
 			}
 			p.addrv += 4;
@@ -1550,7 +1556,7 @@ void pretty_sib(ref disasm_params_t p, ubyte modrm) {
 			} else { // BASE32 + INDEX * SCALE + DISP32
 				base = modrm_reg(p, sib); // Reg
 				index = modrm_reg(p, sib >> 3); // RM
-				mnaddf(p, "[%s+%s*%d+%d]",
+				mnaddf(p, "[%s+%s*%u+%d]",
 					base, index, scale, *p.addru32);
 			}
 		}
@@ -1558,11 +1564,6 @@ void pretty_sib(ref disasm_params_t p, ubyte modrm) {
 		break;
 	default: // never
 	}
-}
-
-int sibscale(ubyte sib) { // felt lazy
-	__gshared ubyte []scale = [ 1, 2, 4, 8 ];
-	return scale[sib >> 6];
 }
 
 const(char) *segstr(int segreg) {
@@ -1628,7 +1629,7 @@ const(char) *modrm_rm(ref disasm_params_t p, ubyte modrm) {
 	const(char) *r = segstr(p.x86.segreg);
 	if (r) stradd(cast(char*)buf, BUFL, bufi, r);
 
-	r = modrm_reg(p, modrm >> 3, 1);
+	r = modrm_reg(p, cast(ubyte)(modrm << 3), 1); // 32-bit mode
 	bufi = stradd(cast(char*)buf, BUFL, bufi, r);
 
 	buf[bufi] = 0;
