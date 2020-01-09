@@ -57,10 +57,10 @@ int chelp() {
 int cversion() {
 	import ver = std.compiler;
 	printf(
-	"alicedbg-"~__ABI__~" v"~PROJECT_VERSION~"  ("~__TIMESTAMP__~")\n"~
+	"alicedbg-"~__ABI__~" "~PROJECT_VERSION~"-"~__TYPE__~"  ("~__TIMESTAMP__~")\n"~
 	"License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
 	"Home: https://git.dd86k.space/alicedbg\n"~
-	"Compiler: "~__VENDOR__~" v%u.%03u, "~
+	"Compiler: "~__VENDOR__~" %u.%03u, "~
 		__traits(getTargetInfo, "objectFormat")~" obj format, "~
 		__traits(getTargetInfo, "floatAbi")~" float abi\n"~
 	"CRT: "~__CRT__~" ("~__traits(getTargetInfo,"cppRuntimeLibrary")~") on "~__OS__~"\n",
@@ -113,8 +113,9 @@ int cshow(CLIHelp h) {
 	case CLIHelp.ui:
 		puts(
 		"Available UIs (default=tui)\n"~
-		"tui ..... Text UI with full debugging experience.\n"~
-		"loop .... Continues on exceptions, no user input."
+		"tui ....... Text UI with full debugging experience.\n"~
+		"loop ...... Continues on exceptions, no user input.\n"
+//		"tcp-json .. (Planned) JSON API server via TCP.\n"
 		);
 	break;
 	}
@@ -145,7 +146,7 @@ int main(int argc, const(char) **argv) {
 				return EXIT_FAILURE;
 			}
 			opt.debugtype = CLIDebug.file;
-			opt.file = argv[argi + 1];
+			opt.file = argv[++argi];
 			continue;
 		}
 		/*
@@ -162,7 +163,7 @@ int main(int argc, const(char) **argv) {
 				return EXIT_FAILURE;
 			}
 			opt.debugtype = CLIDebug.pid;
-			const(char) *id = argv[argi + 1];
+			const(char) *id = argv[++argi];
 			opt.pid = cast(ushort)strtol(id, &id, 10);
 			continue;
 		}
@@ -171,7 +172,7 @@ int main(int argc, const(char) **argv) {
 				puts("cli: ui argument missing");
 				return EXIT_FAILURE;
 			}
-			const(char) *ui = argv[argi + 1];
+			const(char) *ui = argv[++argi];
 			if (strcmp(ui, "tui") == 0)
 				opt.ui = CLIUI.tui;
 			else if (strcmp(ui, "loop") == 0)
@@ -192,7 +193,8 @@ int main(int argc, const(char) **argv) {
 		// Disassemble file
 		// 
 		if (strcmp(arg, "disasmdump") == 0) {
-			import debugger.disasm;
+			import debugger.disasm : disasm_line, disasm_params_t,
+				DISASM_I_MACHINECODE, DISASM_I_MNEMONICS;
 			import core.stdc.config : c_long;
 			import core.stdc.stdlib : malloc;
 
@@ -201,7 +203,7 @@ int main(int argc, const(char) **argv) {
 				return EXIT_FAILURE;
 			}
 
-			FILE *f = fopen(argv[argi + 1], "rb");
+			FILE *f = fopen(argv[++argi], "rb");
 
 			if (f == null) {
 				puts("cli: could not open file");
@@ -222,14 +224,12 @@ int main(int argc, const(char) **argv) {
 			}
 
 			disasm_params_t p;
-			p.include = DISASM_I_EVERYTHING;
+			p.include = DISASM_I_MACHINECODE | DISASM_I_MNEMONICS;
 			p.addru8 = m;
 			for (c_long fi; fi < fl; fi += p.addrv - p.thisaddr) {
 				if (disasm_line(p)) continue;
 				printf("%08X %-20s %-20s\n",
-					cast(uint)fi,
-					cast(char*)p.mcbuf,
-					cast(char*)p.mnbuf);
+					cast(uint)fi, &p.mcbuf, &p.mnbuf);
 			}
 
 			return EXIT_SUCCESS;
