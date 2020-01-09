@@ -429,7 +429,7 @@ L_CONTINUE:
 				modrm, *p.addru32, *(p.addru32 + 1));
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "BOUND %s, %s %u %u",
-				modrm_reg(modrm, b & 1, p.x86.prefix_operand),
+				modrm_reg(p, modrm, b & 1),
 				segstr(p.x86.segreg),
 				*p.addru32, *(p.addru32 + 1));
 		p.addrv += 8;
@@ -632,7 +632,7 @@ L_CONTINUE:
 			default: // impossible
 			}
 			mnaddf(p, "%s %s, %u",
-				f, modrm_reg(modrm, b & 1, p.x86.prefix_operand), *p.addru32);
+				f, modrm_reg(p, modrm, b & 1), *p.addru32);
 		}
 		p.addrv += 4;
 		break;
@@ -657,7 +657,7 @@ L_CONTINUE:
 			default: // impossible
 			}
 			mnaddf(p, "%s %s, %u",
-				f, modrm_reg(modrm, b & 1, p.x86.prefix_operand), *p.addru8);
+				f, modrm_reg(p, modrm, b & 1), *p.addru8);
 		}
 		++p.addrv;
 		break;
@@ -697,7 +697,7 @@ L_CONTINUE:
 			case RM_REG_101: f = "GS"; break;
 			default: f = "SEGREG?"; break;
 			}
-			mnaddf(p, "MOV %s, %s", modrm_reg(modrm), f);
+			mnaddf(p, "MOV %s, %s", modrm_reg(p, modrm), f);
 		}
 		break;
 	case 0x8D:	// LEA REG32, MEM32
@@ -721,7 +721,8 @@ L_CONTINUE:
 			case RM_REG_101: f = "GS"; break;
 			default: f = "SEGREG?"; break;
 			}
-			mnaddf(p, "MOV %s, %s", f, modrm_reg(modrm, 0, 1));
+			p.x86.prefix_operand = 1;
+			mnaddf(p, "MOV %s, %s", f, modrm_reg(p, modrm, 0));
 		}
 		break;
 	case 0x8F:	// GRP1A (POP) REG32
@@ -735,7 +736,7 @@ L_CONTINUE:
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02", modrm);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "POP %s", modrm_reg(modrm));
+			mnaddf(p, "POP %s", modrm_reg(p, modrm));
 		break;
 	case 0x90:	// NOP
 		if (INCLUDE_MNEMONICS)
@@ -1442,7 +1443,8 @@ L_RM:
 		(modrm & RM_MOD) != RM_MOD_11) { // SIB mode
 		pretty_sib(p, modrm);
 	} else { // ModR/M mode
-		const(char) *str = modrm_rm(modrm >> 3, wide, p.x86.prefix_operand, p.x86.segreg);
+		//int mod11 = (modrm & RM_MOD) == RM_MOD_11 ? wide : 1;
+		const(char) *str = modrm_rm(p, modrm);
 		switch (modrm & RM_MOD) {
 		case RM_MOD_00:	// Memory Mode, no displacement
 			if (INCLUDE_MNEMONICS)
@@ -1479,7 +1481,7 @@ L_RM:
 
 L_REG:
 	if (INCLUDE_MNEMONICS) {
-		mnadd(p, modrm_reg(modrm, wide, p.x86.prefix_operand));
+		mnadd(p, modrm_reg(p, modrm, wide));
 
 		if (direction) {
 			mnadd(p, c);
@@ -1508,18 +1510,18 @@ void pretty_sib(ref disasm_params_t p, ubyte modrm) {
 					mnaddf(p, "[%d]", *p.addru32);
 				} else {
 					mnaddf(p, "[%s*%d+%d]",
-						modrm_reg(sib >> 3), scale, *p.addru32);
+						modrm_reg(p, sib >> 3), scale, *p.addru32);
 				}
 			}
 			p.addrv += 4;
 		} else { // BASE32 + INDEX * SCALE
 			if (p.include & DISASM_I_MNEMONICS) {
-				base = modrm_reg(sib); // Reg
+				base = modrm_reg(p, sib); // Reg
 				if ((sib & RM_RM) == RM_RM_100) {
 					mnaddf(p, "[%s]", base);
 				} else {
 					mnaddf(p, "[%s+%s*%d]",
-						base, modrm_reg(sib >> 3), scale);
+						base, modrm_reg(p, sib >> 3), scale);
 				}
 			}
 		}
@@ -1527,12 +1529,12 @@ void pretty_sib(ref disasm_params_t p, ubyte modrm) {
 	case RM_MOD_01:
 		if ((sib & RM_RM) == RM_RM_100) { // B32 + D8
 			if (p.include & DISASM_I_MNEMONICS)
-				mnaddf(p, "[%s+%d]", modrm_reg(sib), *p.addru8);
+				mnaddf(p, "[%s+%d]", modrm_reg(p, sib), *p.addru8);
 			++p.addrv;
 		} else { // BASE8 + INDEX * SCALE + DISP32
 			if (p.include & DISASM_I_MNEMONICS) {
-				base = modrm_reg(sib, 0, 0); // Reg
-				index = modrm_reg(sib >> 3); // RM
+				base = modrm_reg(p, sib, 0); // Reg
+				index = modrm_reg(p, sib >> 3); // RM
 				mnaddf(p, "[%s+%s*%d+%d]",
 					base, index, scale, *p.addru32);
 			}
@@ -1544,10 +1546,10 @@ void pretty_sib(ref disasm_params_t p, ubyte modrm) {
 			mcaddf(p, "%08X", *p.addru32);
 		if (p.include & DISASM_I_MNEMONICS) {
 			if ((sib & RM_RM) == RM_RM_100) { // BASE32 + DISP32
-				mnaddf(p, "[%s+%d]", modrm_reg(sib), *p.addru32);
+				mnaddf(p, "[%s+%d]", modrm_reg(p, sib), *p.addru32);
 			} else { // BASE32 + INDEX * SCALE + DISP32
-				base = modrm_reg(sib); // Reg
-				index = modrm_reg(sib >> 3); // RM
+				base = modrm_reg(p, sib); // Reg
+				index = modrm_reg(p, sib >> 3); // RM
 				mnaddf(p, "[%s+%s*%d+%d]",
 					base, index, scale, *p.addru32);
 			}
@@ -1576,7 +1578,7 @@ const(char) *segstr(int segreg) {
 	}
 }
 
-const(char) *modrm_reg(ubyte modrm, int wide = 1, int operandsize = 0) {
+const(char) *modrm_reg(ref disasm_params_t p, ubyte modrm, int wide = 1) {
 	if (wide)
 		switch (modrm & RM_REG) {
 		case RM_REG_000: return "EAX";
@@ -1590,7 +1592,7 @@ const(char) *modrm_reg(ubyte modrm, int wide = 1, int operandsize = 0) {
 		default:
 		}
 	else {
-		if (operandsize)
+		if (p.x86.prefix_operand)
 			switch (modrm & RM_REG) {
 			case RM_REG_000: return "AX";
 			case RM_REG_001: return "CX";
@@ -1618,15 +1620,15 @@ const(char) *modrm_reg(ubyte modrm, int wide = 1, int operandsize = 0) {
 	return null;
 }
 
-const(char) *modrm_rm(ubyte modrm, int wide = 1, int operandsize = 0, int segreg = 0) {
-	enum BUFL = 8;
+const(char) *modrm_rm(ref disasm_params_t p, ubyte modrm) {
+	enum BUFL = 16;
 	__gshared char [BUFL]buf = void;
 	size_t bufi;
 
-	const(char) *r = segstr(segreg);
+	const(char) *r = segstr(p.x86.segreg);
 	if (r) stradd(cast(char*)buf, BUFL, bufi, r);
 
-	r = modrm_reg(modrm >> 3, wide, operandsize);
+	r = modrm_reg(p, modrm >> 3, 1);
 	bufi = stradd(cast(char*)buf, BUFL, bufi, r);
 
 	buf[bufi] = 0;
