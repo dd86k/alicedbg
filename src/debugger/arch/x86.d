@@ -1088,76 +1088,29 @@ L_CONTINUE:
 			} else
 				mnadd(p, "MOV ");
 		}
-		const(char) *r = void;
+		const(char) *rm = modrm_rm(p, modrm, 1);
 		switch (modrm & RM_MOD) {
 		case RM_MOD_00:
-			if (INCLUDE_MNEMONICS) {
-				switch (modrm & RM_RM) {
-				case RM_RM_000: r = "[EAX]"; break;
-				case RM_RM_001: r = "[ECX]"; break;
-				case RM_RM_010: r = "[EDX]"; break;
-				case RM_RM_011: r = "[EBX]"; break;
-				case RM_RM_100: r = "[ESP]"; break;
-				case RM_RM_101: r = "[EBP]"; break;
-				case RM_RM_110: r = "[ESI]"; break;
-				case RM_RM_111: r = "[EDI]"; break;
-				default: // never
-				}
-				mnadd(p, r);
-			}
+			if (INCLUDE_MNEMONICS)
+				mnaddf(p, "[%s]", rm);
 			break;
 		case RM_MOD_01:
 			if (INCLUDE_MACHINECODE)
 				mcaddf(p, "%X ", *p.addru8);
-			if (INCLUDE_MNEMONICS) {
-				switch (modrm & RM_RM) {
-				case RM_RM_000: r = "[EAX%s%d]"; break;
-				case RM_RM_001: r = "[ECX%s%d]"; break;
-				case RM_RM_010: r = "[EDX%s%d]"; break;
-				case RM_RM_011: r = "[EBX%s%d]"; break;
-				case RM_RM_100: r = "[ESP%s%d]"; break;
-				case RM_RM_101: r = "[EBP%s%d]"; break;
-				case RM_RM_110: r = "[ESI%s%d]"; break;
-				case RM_RM_111: r = "[EDI%s%d]"; break;
-				default: // never
-				}
-				mnaddf(p, r, *p.addri8 >= 0 ? cast(char*)"+" : "", *p.addri8);
-			}
+			if (INCLUDE_MNEMONICS)
+				mnaddf(p, "[%s%+d]", rm, *p.addri8);
+			++p.addrv;
 			break;
 		case RM_MOD_10:
 			if (INCLUDE_MACHINECODE)
 				mcaddf(p, "%X ", *p.addru32);
-			if (INCLUDE_MNEMONICS) {
-				switch (modrm & RM_RM) {
-				case RM_RM_000: r = "[EAX%s%d]"; break;
-				case RM_RM_001: r = "[ECX%s%d]"; break;
-				case RM_RM_010: r = "[EDX%s%d]"; break;
-				case RM_RM_011: r = "[EBX%s%d]"; break;
-				case RM_RM_100: r = "[ESP%s%d]"; break;
-				case RM_RM_101: r = "[EBP%s%d]"; break;
-				case RM_RM_110: r = "[ESI%s%d]"; break;
-				case RM_RM_111: r = "[EDI%s%d]"; break;
-				default: // never
-				}
-				mnaddf(p, r, *p.addri8 >= 0 ? cast(char*)"+" : "", *p.addri32);
-			}
+			if (INCLUDE_MNEMONICS)
+				mnaddf(p, "[%s%+d]", rm, *p.addri32);
 			p.addrv += 4;
 			break;
 		case RM_MOD_11:
-			if (INCLUDE_MNEMONICS) {
-				switch (modrm & RM_RM) {
-				case RM_RM_000: r = "EAX"; break;
-				case RM_RM_001: r = "ECX"; break;
-				case RM_RM_010: r = "EDX"; break;
-				case RM_RM_011: r = "EBX"; break;
-				case RM_RM_100: r = "ESP"; break;
-				case RM_RM_101: r = "EBP"; break;
-				case RM_RM_110: r = "ESI"; break;
-				case RM_RM_111: r = "EDI"; break;
-				default: // never
-				}
-				mnadd(p, r);
-			}
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, rm);
 			break;
 		default:
 		}
@@ -1454,16 +1407,14 @@ L_RM:
 			if (INCLUDE_MACHINECODE)
 				mcaddf(p, "%02X", *p.addru8);
 			if (INCLUDE_MNEMONICS)
-				mnaddf(p, "[%s%s%d]", str,
-					(*p.addri8) >=0 ? cast(char*)"+" : "", *p.addri8);
+				mnaddf(p, "[%s%+d]", str, *p.addri8);
 			++p.addrv;
 			break;
 		case RM_MOD_10:	// Memory Mode, 32-bit displacement
 			if (INCLUDE_MACHINECODE)
 				mcaddf(p, "%08X", *p.addru32);
 			if (INCLUDE_MNEMONICS)
-				mnaddf(p, "[%s%s%d]", str,
-					(*p.addri32) >=0 ? cast(char*)"+" : "", *p.addri32);
+				mnaddf(p, "[%s%+d]", str, *p.addri32);
 			p.addrv += 4;
 			break;
 		case RM_MOD_11:	// Register mode
