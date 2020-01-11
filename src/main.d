@@ -9,52 +9,38 @@ import debugger.core;
 extern (C):
 private:
 
-enum CLIUI {
+enum CLIInterface {
 	tui,
 	loop,
 	interpreter,
 	json,
 }
 
-enum CLIDebug {
+enum CLIDebugMode {
 	undecided,
 	file,
 	pid
 }
 
 /// "sub-help" screen for cshow
-enum CLIHelp {
+enum CLIPage {
+	main,
+	license,
 	ui,
 }
 
 /// CLI options
 struct cliopt_t {
-	CLIUI ui;
-	CLIDebug debugtype;
+	CLIInterface ui;
+	CLIDebugMode debugtype;
 	union {
 		ushort pid;
 		const(char) *file;
 	}
 }
 
-/// Help page
-int chelp() {
-	printf(
-	"alicedbg debugger\n"~
-	"Usage:\n"~
-	"  alicedbg {-pid ID|-file EXEC} [OPTIONS...]\n"~
-	"  alicedbg {--help|--version|--license}\n"~
-	"\n"~
-	"OPTIONS\n"~
-	"	-file      debugger: Load executable file\n"~
-	"	-pid       debugger: Attach to process id\n"~
-	"	-ui        Choose UI (see -ui ? for a list of UIs)\n"
-	);
-	return 0;
-}
-
 /// Version page
-int cversion() {
+int cliver() {
 	import ver = std.compiler;
 	printf(
 	"alicedbg-"~__ABI__~" "~PROJECT_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
@@ -71,9 +57,32 @@ int cversion() {
 	return 0;
 }
 
-/// License page
-int clicense() {
-	puts(
+/// "sub-help" pages, such as -ui ? and the rest
+int clipage(CLIPage h) {
+	const(char) *r = void;
+	final switch (h) {
+	case CLIPage.main:
+		r =
+		"alicedbg debugger\n"~
+		"Usage:\n"~
+		"  alicedbg {-pid ID|-exec FILE} [OPTIONS...]\n"~
+		"  alicedbg {--help|--version|--license}\n"~
+		"\n"~
+		"OPTIONS\n"~
+		"	-file      debugger: Load executable file\n"~
+		"	-pid       debugger: Attach to process id\n"~
+		"	-ui        Choose user interface (see -ui ?)\n";
+		break;
+	case CLIPage.ui:
+		r =
+		"Available UIs (default=tui)\n"~
+		"tui ....... Text UI with full debugging experience.\n"~
+		"loop ...... Print exceptions, continues automatically, no user input.\n"
+//		"tcp-json .. (Planned) JSON API server via TCP.\n"
+		;
+	break;
+	case CLIPage.license:
+		r =
 `BSD 3-Clause License
 
 Copyright (c) 2019, dd86k
@@ -102,29 +111,16 @@ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`
-	);
-	return 0;
-}
-
-/// "sub-help" pages, such as -ui ? and the rest
-int cshow(CLIHelp h) {
-	final switch (h) {
-	case CLIHelp.ui:
-		puts(
-		"Available UIs (default=tui)\n"~
-		"tui ....... Text UI with full debugging experience.\n"~
-		"loop ...... Continues on exceptions, no user input.\n"
-//		"tcp-json .. (Planned) JSON API server via TCP.\n"
-		);
-	break;
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
+		break;
 	}
+	puts(r);
 	return 0;
 }
 
 int main(int argc, const(char) **argv) {
 	if (argc <= 1)
-		return chelp;
+		return clipage(CLIPage.main);
 
 	cliopt_t opt;	/// Defaults to .init
 
@@ -133,19 +129,19 @@ int main(int argc, const(char) **argv) {
 		if (argv[argi][0] != '-') continue;
 
 		const(char) *arg = argv[argi] + 1;
-		if (strcmp(arg, "-help") == 0)
-			return chelp;
-		if (strcmp(arg, "-version") == 0 ||
-			strcmp(arg, "version") == 0)
-			return cversion;
+		if (strcmp(arg, "-help") == 0 || strcmp(arg, "help") == 0)
+			return clipage(CLIPage.main);
+		if (strcmp(arg, "-version") == 0 || strcmp(arg, "version") == 0)
+			return cliver;
 		if (strcmp(arg, "-license") == 0)
-			return clicense;
+			return clipage(CLIPage.license);
+
 		if (strcmp(arg, "exec") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: file argument missing");
 				return EXIT_FAILURE;
 			}
-			opt.debugtype = CLIDebug.file;
+			opt.debugtype = CLIDebugMode.file;
 			opt.file = argv[++argi];
 			continue;
 		}
@@ -157,16 +153,18 @@ int main(int argc, const(char) **argv) {
 		if (strcmp(arg, "execdir") == 0) {
 			
 		}*/
+
 		if (strcmp(arg, "pid") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: pid argument missing");
 				return EXIT_FAILURE;
 			}
-			opt.debugtype = CLIDebug.pid;
+			opt.debugtype = CLIDebugMode.pid;
 			const(char) *id = argv[++argi];
 			opt.pid = cast(ushort)strtol(id, &id, 10);
 			continue;
 		}
+
 		if (strcmp(arg, "ui") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: ui argument missing");
@@ -174,11 +172,11 @@ int main(int argc, const(char) **argv) {
 			}
 			const(char) *ui = argv[++argi];
 			if (strcmp(ui, "tui") == 0)
-				opt.ui = CLIUI.tui;
+				opt.ui = CLIInterface.tui;
 			else if (strcmp(ui, "loop") == 0)
-				opt.ui = CLIUI.loop;
+				opt.ui = CLIInterface.loop;
 			else if (strcmp(ui, "?") == 0)
-				return cshow(CLIHelp.ui);
+				return clipage(CLIPage.ui);
 			else {
 				printf("cli: ui \"%s\" not found, query \"-ui ?\" for a list\n",
 					ui);
@@ -186,6 +184,7 @@ int main(int argc, const(char) **argv) {
 			}
 			continue;
 		}
+
 		// Set machine architecture, affects disassembly
 		/*if (strcmp(arg, "march") == 0) {
 			
@@ -228,7 +227,7 @@ int main(int argc, const(char) **argv) {
 			p.addru8 = m;
 			for (c_long fi; fi < fl; fi += p.addrv - p.thisaddr) {
 				if (disasm_line(p)) continue;
-				printf("%08X %-20s %-20s\n",
+				printf("%08X %-30s %-30s\n",
 					cast(uint)fi, &p.mcbuf, &p.mnbuf);
 			}
 
@@ -247,14 +246,14 @@ int main(int argc, const(char) **argv) {
 
 	int e = void;
 	switch (opt.debugtype) {
-	case CLIDebug.file:
+	case CLIDebugMode.file:
 		e = dbg_file(opt.file);
 		if (e) {
 			printf("dbg: Could not load executable (%X)\n", e);
 			return e;
 		}
 		break;
-	case CLIDebug.pid:
+	case CLIDebugMode.pid:
 		e = dbg_attach(opt.pid);
 		if (e) {
 			printf("dbg: Could not attach to pid (%X)\n", e);
@@ -266,7 +265,7 @@ int main(int argc, const(char) **argv) {
 		return EXIT_FAILURE;
 	}
 
-	with (CLIUI)
+	with (CLIInterface)
 	switch (opt.ui) {
 	case loop: return ui_loop;
 	case tui: return ui_tui;
