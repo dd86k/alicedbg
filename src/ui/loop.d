@@ -5,7 +5,7 @@ module ui.loop;
 
 //import misc.ddc;
 import core.stdc.stdio;
-import debugger.exception, debugger.core;
+import debugger.exception, debugger.core, debugger.disasm;
 
 extern (C):
 
@@ -17,19 +17,23 @@ int ui_loop() {
 
 private:
 
+__gshared uint en;
 int except(exception_t *e) {
+	disasm_params_t p;
+	p.include = DISASM_I_MACHINECODE | DISASM_I_MNEMONICS;
+	p.addr = e.addr;
+	disasm_line(p);
 	printf(
-	"\n"~
-	"*************\n"~
-	"* EXCEPTION *\n"~
-	"*************\n"~
+	"* EXCEPTION #%d\n"~
 	"PID=%u  TID=%u\n"~
 	"%s (%X) at %zX\n"~
-	"%s=%016X\n"
+	"Code: %s (%s)\n"~
+	"\n"
 	,
+	en++,
 	e.pid, e.tid,
 	e.type.typestr, e.oscode, e.addrv,
-	e.registers[0].name, e.registers[0].u64
+	&p.mcbuf, &p.mnbuf
 	);
 	return DebuggerAction.proceed;
 }
