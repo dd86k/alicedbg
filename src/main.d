@@ -57,7 +57,7 @@ int chelp() {
 int cversion() {
 	import ver = std.compiler;
 	printf(
-	"alicedbg-"~__ABI__~" "~PROJECT_VERSION~"-"~__TYPE__~"  ("~__TIMESTAMP__~")\n"~
+	"alicedbg-"~__ABI__~" "~PROJECT_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
 	"License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
 	"Home: https://git.dd86k.space/alicedbg\n"~
 	"Compiler: "~__VENDOR__~" %u.%03u, "~

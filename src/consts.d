@@ -5,8 +5,8 @@ enum PROJECT_VERSION = "0.0.0";
 /// stringbuilder buffer size (and maximum size)
 enum STRINGBUILDER_SIZE = 256;
 
-debug enum __TYPE__ = "debug";	/// Build type
-else  enum __TYPE__ = "release";	/// Build type
+debug enum __BUILDTYPE__ = "debug";	/// Build type
+else  enum __BUILDTYPE__ = "release";	/// Build type
 
 //
 // PLATFORM_ABI string
