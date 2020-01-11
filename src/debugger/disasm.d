@@ -167,15 +167,15 @@ int disasm_line(ref disasm_params_t p) {
 
 	with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
 
-	if (p.options | DISASM_O_MACHLOWERCASE)
+	if (p.options & DISASM_O_MACHLOWERCASE)
 		strlcase(cast(char*)p.mcbuf, DISASM_BUF_SIZE);
-	if (p.options | DISASM_O_INTRLOWERCASE)
+	if (p.options & DISASM_O_INTRLOWERCASE)
 		strlcase(cast(char*)p.mnbuf, DISASM_BUF_SIZE);
 
 	return p.error;
 }
 
-//TODO: ushort disasm_options(const(char)*) -- Interpret value to O value
+//TODO: ushort disasm_optstr(const(char)*) -- Interpret string value for disasm option
 
 //
 // Disasm internals/utilities

@@ -18,10 +18,9 @@ version (Posix) {
 	private import debugger.sys.ptrace;
 	private import core.sys.posix.signal, core.sys.posix.sys.wait;
 	private import core.sys.linux.unistd;
+	import core.stdc.stdio, core.stdc.stdlib;
 	import debugger.sys.user : user;
 	private enum __WALL = 0x40000000;
-	// temp
-	import core.stdc.stdio, core.stdc.stdlib;
 	private pid_t hprocess;
 }
 
@@ -174,7 +173,7 @@ L_DEBUG_LOOP:
 		siginfo_t sig = void;
 L_DEBUG_LOOP:
 		// Linux examples use __WALL and is supposed to imply (but does
-		// not include) WEXITED | WSTOPPED but does not act like it
+		// not include) WEXITED | WSTOPPED but does not act like it.
 		// waitid(2) returns 0 or -1 so it's pointless to verify its value
 		if (waitid(idtype_t.P_ALL, 0, &sig, WEXITED | WSTOPPED) == -1)
 			return 3;
