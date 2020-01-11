@@ -1525,12 +1525,12 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	ubyte sib = *p.addru8;
 	++p.addrv;
 	uint scale = void; // I'm lazy
-	switch (scale & SIB_SCALE) {
+	switch (sib & SIB_SCALE) {
 	case SIB_SCALE_00: scale = 1; break;
 	case SIB_SCALE_01: scale = 2; break;
 	case SIB_SCALE_10: scale = 4; break;
 	case SIB_SCALE_11: scale = 8; break;
-	default: scale = 0; // Never, but would indicate error
+	default: // Never happened
 	}
 
 	if (INCLUDE_MACHINECODE)
