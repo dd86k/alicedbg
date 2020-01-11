@@ -57,3 +57,16 @@ size_t straddva(char *buf, size_t size, size_t bufi, const(char) *f, ref va_list
 	vsnprintf(cast(char*)b, 128, f, va);
 	return stradd(buf, size, bufi, cast(char*)b);
 }
+
+/**
+ * Lower case string buffer ('A' to 'Z' only).
+ * Params:
+ * 	buf  = String buffer
+ * 	size = Buffer size
+ */
+void strlcase(char *buf, size_t size) {
+	for (size_t i; buf[i] && i < size; ++i) {
+		if (buf[i] >= 0x41 && buf[i] <= 0x5A)
+			buf[i] += 32;
+	}
+}

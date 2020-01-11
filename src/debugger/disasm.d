@@ -1,6 +1,7 @@
 module debugger.disasm;
 
 import debugger.arch;
+import utils.str;
 private import debugger.arch.x86 : x86_internals_t;
 
 extern (C):
@@ -130,8 +131,15 @@ enum DISASM_I_EVERYTHING	= 0xFF;	/// Include everything
 // Option bits
 //
 
-/// Disassembler flag: Go backwards instead of forward. More expensive to calculate!
+/// Diasm option: Go backwards instead of forward. More expensive to calculate!
 enum DISASM_O_BACKWARD	= 0x0002;
+/// Diasm option: Lower-case machine code instructions
+enum DISASM_O_MACHLOWERCASE	= 0x0004;
+/// Diasm option: Lower-case mnemonics instructions
+enum DISASM_O_INTRLOWERCASE	= 0x0008;
+
+/// Diasm option: Lower-case machine code instructions and mnemonics instructions
+enum DISASM_O_LOWERCASE	= DISASM_O_MACHLOWERCASE | DISASM_O_INTRLOWERCASE;
 
 /**
  * Disassemble from a memory pointer given in params. The caller must ensure
@@ -159,8 +167,15 @@ int disasm_line(ref disasm_params_t p) {
 
 	with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
 
+	if (p.options | DISASM_O_MACHLOWERCASE)
+		strlcase(cast(char*)p.mcbuf, DISASM_BUF_SIZE);
+	if (p.options | DISASM_O_INTRLOWERCASE)
+		strlcase(cast(char*)p.mnbuf, DISASM_BUF_SIZE);
+
 	return p.error;
 }
+
+//TODO: ushort disasm_options(const(char)*) -- Interpret value to O value
 
 //
 // Disasm internals/utilities
@@ -174,13 +189,11 @@ package:
 private import core.stdc.stdarg;
 
 void mcadd(ref disasm_params_t params, const(char) *str) {
-	import utils.str : stradd;
 	with (params)
 	mcbufi = stradd(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, str);
 }
 
 void mcaddf(ref disasm_params_t params, const(char) *f, ...) {
-	import utils.str : straddva;
 	va_list va;
 	va_start(va, f);
 	with (params)
@@ -188,13 +201,11 @@ void mcaddf(ref disasm_params_t params, const(char) *f, ...) {
 }
 
 void mnadd(ref disasm_params_t params, const(char) *str) {
-	import utils.str : stradd;
 	with (params)
 	mnbufi = stradd(cast(char*)mnbuf, DISASM_BUF_SIZE, mnbufi, str);
 }
 
 void mnaddf(ref disasm_params_t params, const(char) *f, ...) {
-	import utils.str : straddva;
 	va_list va;
 	va_start(va, f);
 	with (params)
