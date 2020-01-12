@@ -226,7 +226,7 @@ int main(int argc, const(char) **argv) {
 			p.include = DISASM_I_MACHINECODE | DISASM_I_MNEMONICS;
 			p.addru8 = m;
 			for (c_long fi; fi < fl; fi += p.addrv - p.thisaddr) {
-				if (disasm_line(p)) continue;
+				disasm_line(p);
 				printf("%08X %-30s %-30s\n",
 					cast(uint)fi, &p.mcbuf, &p.mnbuf);
 			}

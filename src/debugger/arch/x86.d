@@ -1174,7 +1174,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", modrm);
+			mcaddf(p, "%02X ", modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1190,14 +1190,10 @@ L_CONTINUE:
 					break;
 				case 0xD0: // FCOM/FCOMP
 					if (modrmv < 0x8) { // FCOM
-						f = modrmv == 2 ?
-							"FCOM ST(0),T(%u)" :
-							"FCOM ST(0),ST(%u)";
+						f = "FCOM ST(0),ST(%u)";
 					} else { // FCOMP
 						modrmv -= 8;
-						f = modrmv == 2 ?
-							"FCOMP ST(0),T(%u)" :
-							"FCOMP ST(0),ST(%u)";
+						f = "FCOMP ST(0),ST(%u)";
 					}
 					break;
 				case 0xE0: // FSUB/FSUBR
@@ -1225,29 +1221,29 @@ L_CONTINUE:
 				mcaddf(p, "%08X", *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
-				switch (modrm & RM_RM) {
-				case RM_RM_000: // FADD
+				switch (modrm & RM_REG) {
+				case RM_REG_000: // FADD
 					f = "FADD DWORD PTR [%s%u]";
 					break;
-				case RM_RM_001: // FMUL
+				case RM_REG_001: // FMUL
 					f = "FMUL DWORD PTR [%s%u]";
 					break;
-				case RM_RM_010: // FCOM
+				case RM_REG_010: // FCOM
 					f = "FCOM DWORD PTR [%s%u]";
 					break;
-				case RM_RM_011: // FCOMP
+				case RM_REG_011: // FCOMP
 					f = "FCOMP DWORD PTR [%s%u]";
 					break;
-				case RM_RM_100: // FSUB
+				case RM_REG_100: // FSUB
 					f = "FSUB DWORD PTR [%s%u]";
 					break;
-				case RM_RM_101: // FSUBR
+				case RM_REG_101: // FSUBR
 					f = "FSUBR DWORD PTR [%s%u]";
 					break;
-				case RM_RM_110: // FDIV
+				case RM_REG_110: // FDIV
 					f = "FDIV DWORD PTR [%s%u]";
 					break;
-				case RM_RM_111: // FDIVR
+				case RM_REG_111: // FDIVR
 					f = "FDIVR DWORD PTR [%s%u]";
 					break;
 				default: // never
@@ -1261,7 +1257,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", modrm);
+			mcaddf(p, "%02X ", modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1335,30 +1331,30 @@ L_CONTINUE:
 				mcaddf(p, "%08X", *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
-				switch (modrm & RM_RM) {
-				case RM_RM_000: // FLD
+				switch (modrm & RM_REG) {
+				case RM_REG_000: // FLD
 					mnaddf(p, "FLD DWORD PTR [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_001: // Reserved
+				case RM_REG_001: // Reserved
 					mnadd(p, UNKNOWN_OP);
 					p.error = DisasmError.Illegal;
 					break;
-				case RM_RM_010: // FST
+				case RM_REG_010: // FST
 					mnaddf(p, "FST DWORD PTR [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_011: // FSTP
+				case RM_REG_011: // FSTP
 					mnaddf(p, "FSTP DWORD PTR [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_100: // FLDENV
+				case RM_REG_100: // FLDENV
 					mnaddf(p, "FLDENV [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_101: // FLDCW
+				case RM_REG_101: // FLDCW
 					mnaddf(p, "FLDCW WORD PTR [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_110: // FSTENV
+				case RM_REG_110: // FSTENV
 					mnaddf(p, "FSTENV [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_111: // FSTCW
+				case RM_REG_111: // FSTCW
 					mnaddf(p, "FSTCW WORD PTR [%s%u]", seg, *p.addru32);
 					break;
 				default: // never
@@ -1371,7 +1367,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", modrm);
+			mcaddf(p, "%02X ", modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1416,29 +1412,29 @@ L_CONTINUE:
 				mcaddf(p, "%08X", *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
-				switch (modrm & RM_RM) {
-				case RM_RM_000: // FIADD
+				switch (modrm & RM_REG) {
+				case RM_REG_000: // FIADD
 					f = "FIADD DWORD PTR [%s%u]";
 					break;
-				case RM_RM_001: // FIMUL
+				case RM_REG_001: // FIMUL
 					f = "FIMUL DWORD PTR [%s%u]";
 					break;
-				case RM_RM_010: // FICOM
+				case RM_REG_010: // FICOM
 					f = "FICOM DWORD PTR [%s%u]";
 					break;
-				case RM_RM_011: // FICOMP
+				case RM_REG_011: // FICOMP
 					f = "FICOMP DWORD PTR [%s%u]";
 					break;
-				case RM_RM_100: // FISUB
+				case RM_REG_100: // FISUB
 					f = "FISUB DWORD PTR [%s%u]";
 					break;
-				case RM_RM_101: // FISUBR
+				case RM_REG_101: // FISUBR
 					f = "FISUBR DWORD PTR [%s%u]";
 					break;
-				case RM_RM_110: // FIDIV
+				case RM_REG_110: // FIDIV
 					f = "FIDIV DWORD PTR [%s%u]";
 					break;
-				case RM_RM_111: // FIDIVR
+				case RM_REG_111: // FIDIVR
 					f = "FIDIVR DWORD PTR [%s%u]";
 					break;
 				default: // never
@@ -1452,7 +1448,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", modrm);
+			mcaddf(p, "%02X ", modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1509,29 +1505,29 @@ L_CONTINUE:
 				mcaddf(p, "%08X", *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
-				switch (modrm & RM_RM) {
-				case RM_RM_000: // FIADD
+				switch (modrm & RM_REG) {
+				case RM_REG_000: // FIADD
 					f = "FIADD DWORD PTR [%s%u]";
 					break;
-				case RM_RM_001: // FIMUL
+				case RM_REG_001: // FIMUL
 					f = "FIMUL DWORD PTR [%s%u]";
 					break;
-				case RM_RM_010: // FICOM
+				case RM_REG_010: // FICOM
 					f = "FICOM DWORD PTR [%s%u]";
 					break;
-				case RM_RM_011: // FICOMP
+				case RM_REG_011: // FICOMP
 					f = "FICOMP DWORD PTR [%s%u]";
 					break;
-				case RM_RM_100: // FISUB
+				case RM_REG_100: // FISUB
 					f = "FISUB DWORD PTR [%s%u]";
 					break;
-				case RM_RM_101: // FISUBR
+				case RM_REG_101: // FISUBR
 					f = "FISUBR DWORD PTR [%s%u]";
 					break;
-				case RM_RM_110: // FIDIV
+				case RM_REG_110: // FIDIV
 					f = "FIDIV DWORD PTR [%s%u]";
 					break;
-				case RM_RM_111: // FIDIVR
+				case RM_REG_111: // FIDIVR
 					f = "FIDIVR DWORD PTR [%s%u]";
 					break;
 				default: // never
@@ -1545,7 +1541,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", modrm);
+			mcaddf(p, "%02X ", modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1553,10 +1549,10 @@ L_CONTINUE:
 				switch (modrm & 0xF0) {
 				case 0xC0: // FADD/FMUL
 					if (modrmv < 0x8) { // FADD
-						f = "FADD ST(0),ST(%u)";
+						f = "FADD ST(%u),ST(0)";
 					} else { // FMUL
 						modrmv -= 8;
-						f = "FMUL ST(0),ST(%u)";
+						f = "FMUL ST(%u),ST(0)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
@@ -1566,18 +1562,19 @@ L_CONTINUE:
 					break;
 				case 0xE0: // FSUBR/FSUB
 					if (modrmv < 0x8) { // FSUBR
-						f = "FSUBR ST(0),ST(%u)";
+						f = "FSUBR ST(%u),ST(0)";
 					} else { // FSUB
 						modrmv -= 8;
-						f = "FSUB ST(0),ST(%u)";
+						f = "FSUB ST(%u),ST(0)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
 				case 0xF0: // FDIVR/FDIV
 					if (modrmv < 0x8) { // FDIVR
-						f = "FDIVR ST(0),ST(%u)";
+						f = "FDIVR ST(%u),ST(0)";
 					} else { // FDIV
-						f = "FDIV ST(0),ST(%u)";
+						modrmv -= 8;
+						f = "FDIV ST(%u),ST(0)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
@@ -1589,29 +1586,29 @@ L_CONTINUE:
 				mcaddf(p, "%08X", *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
-				switch (modrm & RM_RM) {
-				case RM_RM_000: // FADD
+				switch (modrm & RM_REG) {
+				case RM_REG_000: // FADD
 					f = "FADD QWORD PTR [%s%u]";
 					break;
-				case RM_RM_001: // FMUL
+				case RM_REG_001: // FMUL
 					f = "FMUL QDWORD PTR [%s%u]";
 					break;
-				case RM_RM_010: // FCOM
+				case RM_REG_010: // FCOM
 					f = "FCOM QWORD PTR [%s%u]";
 					break;
-				case RM_RM_011: // FCOMP
+				case RM_REG_011: // FCOMP
 					f = "FCOMP QWORD PTR [%s%u]";
 					break;
-				case RM_RM_100: // FSUB
+				case RM_REG_100: // FSUB
 					f = "FSUB QWORD PTR [%s%u]";
 					break;
-				case RM_RM_101: // FSUBR
+				case RM_REG_101: // FSUBR
 					f = "FSUBR QWORD PTR [%s%u]";
 					break;
-				case RM_RM_110: // FDIV
+				case RM_REG_110: // FDIV
 					f = "FDIV QWORD PTR [%s%u]";
 					break;
-				case RM_RM_111: // FDIVR
+				case RM_REG_111: // FDIVR
 					f = "FDIVR QWORD PTR [%s%u]";
 					break;
 				default: // never
@@ -1625,7 +1622,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", modrm);
+			mcaddf(p, "%02X ", modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1633,7 +1630,7 @@ L_CONTINUE:
 				switch (modrm & 0xF0) {
 				case 0xC0: // FFREE/Reserved
 					if (modrmv < 0x8) { // FFREE
-						mnaddf(p, "FFREE ST(0),ST(%u)", modrmv);
+						mnaddf(p, "FFREE ST(%u)", modrmv);
 					} else { // Reserved
 						mnadd(p, UNKNOWN_OP);
 						p.error = DisasmError.Illegal;
@@ -1641,18 +1638,19 @@ L_CONTINUE:
 					break;
 				case 0xD0: // FST/FSTP
 					if (modrmv < 0x8) { // FST
-						f = "FST ST(0),ST(%u)";
+						f = "FST ST(%u)";
 					} else { // FSTP
-						f = "FSTP ST(0),ST(%u)";
+						modrmv -= 8;
+						f = "FSTP ST(%u)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
 				case 0xE0: // FUCOM/FUCOMP
 					if (modrmv < 0x8) { // FUCOM
-						f = "FUCOM ST(0),ST(%u)";
+						f = "FUCOM ST(%u),ST(0)";
 					} else { // FUCOMP
 						modrmv -= 8;
-						f = "FUCOMP ST(0),ST(%u)";
+						f = "FUCOMP ST(%u)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
@@ -1668,26 +1666,26 @@ L_CONTINUE:
 				mcaddf(p, "%08X", *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
-				switch (modrm & RM_RM) {
-				case RM_RM_000: // FLD
+				switch (modrm & RM_REG) {
+				case RM_REG_000: // FLD
 					mnaddf(p, "FLD QWORD PTR [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_001: // FISTTP
+				case RM_REG_001: // FISTTP
 					mnaddf(p, "FISTTP QDWORD PTR [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_010: // FST
+				case RM_REG_010: // FST
 					mnaddf(p, "FST QWORD PTR [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_011: // FSTP
+				case RM_REG_011: // FSTP
 					mnaddf(p, "FSTP QWORD PTR [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_100: // FRSTOR
+				case RM_REG_100: // FRSTOR
 					mnaddf(p, "FRSTOR [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_110: // FSAVE
+				case RM_REG_110: // FSAVE
 					mnaddf(p, "FSAVE [%s%u]", seg, *p.addru32);
 					break;
-				case RM_RM_111: // FSTSW
+				case RM_REG_111: // FSTSW
 					mnaddf(p, "FSTSW WORD PTR [%s%u]", seg, *p.addru32);
 					break;
 				default:
@@ -1699,8 +1697,162 @@ L_CONTINUE:
 		}
 		break;
 	case 0xDE:	// ESCAPE DE
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X ", modrm);
+		const(char) *f = void, seg = void;
+		if (modrm > 0xBF) { // operand is FP
+			if (INCLUDE_MNEMONICS) {
+				ubyte modrmv = modrm & 0xF;
+				switch (modrm & 0xF0) {
+				case 0xC0: // FADDP/FMULP
+					if (modrmv < 0x8) { // FADDP
+						f = "FADDP ST(%u),ST(0)";
+					} else { // FMULP
+						modrmv -= 8;
+						f = "FMULP ST(%u),ST(0)";
+					}
+					mnaddf(p, f, modrmv);
+					break;
+				case 0xD0: // Reserved/FCOMPP*
+					if (modrmv == 9)
+						f = "FCOMPP";
+					else {
+						f = UNKNOWN_OP;
+						p.error = DisasmError.Illegal;
+					}
+					mnadd(p, f);
+					break;
+				case 0xE0: // FSUBRP/FSUBP
+					if (modrmv < 0x8) { // FSUBP
+						f = "FSUBRP ST(%u),ST(0)";
+					} else { // FSUBP
+						modrmv -= 8;
+						f = "FUCOMP ST(%u),ST(0)";
+					}
+					mnaddf(p, f, modrmv);
+					break;
+				case 0xF0: // FDIVRP/FDIVP
+					if (modrmv < 0x8) { // FDIVRP
+						f = "FDIVRP ST(%u),ST(0)";
+					} else { // FDIVP
+						modrmv -= 8;
+						f = "FDIVP ST(%u),ST(0)";
+					}
+					mnaddf(p, f, modrmv);
+					break;
+				default:
+				}
+			}
+		} else { // operand is memory pointer
+			if (INCLUDE_MACHINECODE)
+				mcaddf(p, "%08X", *p.addru32);
+			if (INCLUDE_MNEMONICS) {
+				seg = x86_segstr(p.x86.segreg);
+				switch (modrm & RM_REG) {
+				case RM_REG_000: // FIADD
+					f = "FIADD WORD PTR [%s%u]";
+					break;
+				case RM_REG_001: // FIMUL
+					f = "FIMUL DWORD PTR [%s%u]";
+					break;
+				case RM_REG_010: // FICOM
+					f = "FICOM WORD PTR [%s%u]";
+					break;
+				case RM_REG_011: // FICOMP
+					f = "FICOMP WORD PTR [%s%u]";
+					break;
+				case RM_REG_100: // FISUB
+					f = "FISUB WORD PTR [%s%u]";
+					break;
+				case RM_REG_101: // FISUBR
+					f = "FISUBR WORD PTR [%s%u]";
+					break;
+				case RM_REG_110: // FIDIV
+					f = "FIDIV WORD PTR [%s%u]";
+					break;
+				case RM_REG_111: // FIDIVR
+					f = "FIDIVR WORD PTR [%s%u]";
+					break;
+				default: // never
+				}
+				mnaddf(p, f, seg, *p.addru32);
+			}
+			p.addrv += 4;
+		}
 		break;
 	case 0xDF:	// ESCAPE DF
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X ", modrm);
+		const(char) *f = void, seg = void;
+		if (modrm > 0xBF) { // operand is FP
+			if (INCLUDE_MNEMONICS) {
+				ubyte modrmv = modrm & 0xF;
+				switch (modrm & 0xF0) {
+				case 0xE0: // FSTSW*/FUCOMIP
+					if (modrmv < 0x8) { // FSUBP
+						if (modrmv) {
+							mnadd(p, UNKNOWN_OP);
+							p.error = DisasmError.Illegal;
+						} else
+							mnadd(p, "FSTSW AX");
+					} else { // FUCOMIP
+						modrmv -= 8;
+						mnaddf(p, "FUCOMIP ST(0),ST(%u)", modrmv);
+					}
+					break;
+				case 0xF0: // FCOMIP/Reserved
+					if (modrmv < 0x8) { // FCOMIP
+						mnaddf(p, "FCOMIP ST(0),ST(%u)", modrmv);
+					} else { // Reserved
+						mnadd(p, UNKNOWN_OP);
+						p.error = DisasmError.Illegal;
+					}
+					break;
+				default:
+					mnadd(p, UNKNOWN_OP);
+					p.error = DisasmError.Illegal;
+				}
+			}
+		} else { // operand is memory pointer
+			if (INCLUDE_MACHINECODE)
+				mcaddf(p, "%08X", *p.addru32);
+			if (INCLUDE_MNEMONICS) {
+				seg = x86_segstr(p.x86.segreg);
+				switch (modrm & RM_REG) {
+				case RM_REG_000: // FILD
+					f = "FILD WORD PTR [%s%u]";
+					break;
+				case RM_REG_001: // FISTTP
+					f = "FISTTP DWORD PTR [%s%u]";
+					break;
+				case RM_REG_010: // FIST
+					f = "FIST WORD PTR [%s%u]";
+					break;
+				case RM_REG_011: // FISTP
+					f = "FISTP WORD PTR [%s%u]";
+					break;
+				case RM_REG_100: // FBLD
+					f = "FBLD [%s%u]";
+					break;
+				case RM_REG_101: // FILD
+					f = "FILD QWORD PTR [%s%u]";
+					break;
+				case RM_REG_110: // FBSTP
+					f = "FBSTP [%s%u]";
+					break;
+				case RM_REG_111: // FISTP
+					f = "FISTP QWORD PTR [%s%u]";
+					break;
+				default: // never
+				}
+				mnaddf(p, f, seg, *p.addru32);
+			}
+			p.addrv += 4;
+		}
 		break;
 	case 0xE8:	// CALL IMM32
 		if (INCLUDE_MACHINECODE)
