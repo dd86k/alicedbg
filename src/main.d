@@ -85,7 +85,7 @@ int clipage(CLIPage h) {
 		r =
 `BSD 3-Clause License
 
-Copyright (c) 2019, dd86k
+Copyright (c) 2019-2020, dd86k
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
