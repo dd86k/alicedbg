@@ -1161,11 +1161,6 @@ L_CONTINUE:
 			mnaddf(p, "AAD %u", *p.addru8);
 		++p.addrv;
 		break;
-	case 0xD6:	// (UNUSED)
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, UNKNOWN_OP);
-		p.error = DisasmError.Illegal;
-		break;
 	case 0xD7:	// XLAT
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "XLAT");
@@ -1854,12 +1849,76 @@ L_CONTINUE:
 			p.addrv += 4;
 		}
 		break;
+	case 0xE0:	// LOOPNE IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "LOOPNE %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0xE1:	// LOOPE IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "LOOPE %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0xE2:	// LOOP IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "LOOP %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0xE3:	// JECXZ IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "JECXZ %d", *p.addri8);
+		++p.addrv;
+		break;
+	case 0xE4:	// IN AL, IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "IN AL,%u", *p.addru8);
+		++p.addrv;
+		break;
+	case 0xE5:	// IN EAX, IMM8
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "IN EAX,%u", *p.addru8);
+		++p.addrv;
+		break;
+	case 0xE6:	// OUT IMM8,AL
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "OUT %u,AL", *p.addru8);
+		++p.addrv;
+		break;
+	case 0xE7:	// OUT IMM8,EAX
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "OUT %u,EAX", *p.addri8);
+		++p.addrv;
+		break;
 	case 0xE8:	// CALL IMM32
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "CALL %d", *p.addri32);
 		p.addrv += 4;
+		break;
+	case 0xE9:	// JMP NEAR IMM32
+		const(char) *f = void;
+		uint v = x86_mmfu32v(p, f);
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, f, v);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "JMP NEAR %d", v);
 		break;
 	case 0xEB:	// JMP IMM8
 		if (INCLUDE_MACHINECODE)
@@ -1876,7 +1935,58 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "INT 1");
 		break;
+	case 0xF2:	// REPNE
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "REPNE ");
+		goto L_CONTINUE;
+	case 0xF3:	// REP
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "REP ");
+		goto L_CONTINUE;
+	case 0xF4:	// HLT
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "HLT");
+		break;
+	case 0xF5:	// CMC
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "CMC");
+		break;
+	case 0xF6:	//TODO: GRP 3 R/M8
+		break;
+	case 0xF7:	//TODO: GRP 3 R/M32
+		break;
+	case 0xF8:	// CLC
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "CLC");
+		break;
+	case 0xF9:	// STC
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "STC");
+		break;
+	case 0xFA:	// CLI
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "CLI");
+		break;
+	case 0xFB:	// STI
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "STI");
+		break;
+	case 0xFC:	// CLD
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "CLD");
+		break;
+	case 0xFD:	// STD
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "STD");
+		break;
+	case 0xFE:	//TODO: GRP 4
+		break;
+	case 0xFF:	//TODO: GRP 5
+		break;
 	default:
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, UNKNOWN_OP);
+		p.error = DisasmError.Illegal;
 	}
 
 	return p.error;
@@ -1888,19 +1998,17 @@ L_CONTINUE:
 /// Params: p = disassembler structure
 /// Returns: 32-bit or 16-bit value
 package
-uint x86_mmfu32v(ref disasm_params_t p, const(char) *f) {
-	size_t j = void;
+uint x86_mmfu32v(ref disasm_params_t p, ref const(char) *f) {
 	uint v = void;
 	if (p.x86.prefix_operand) {
 		f = "%04X";
 		v = *p.addru16;
-		j = 2;
+		p.addrv += 2;
 	} else {
 		f = "%08X";
 		v = *p.addru32;
-		j = 4;
+		p.addrv += 4;
 	}
-	p.addrv += j;
 	return v;
 }
 
