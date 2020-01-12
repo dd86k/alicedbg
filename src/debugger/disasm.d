@@ -188,6 +188,8 @@ int disasm_line(ref disasm_params_t p) {
 package:
 private import core.stdc.stdarg;
 
+immutable const(char) *UNKNOWN_OP = "??";
+
 void mcadd(ref disasm_params_t params, const(char) *str) {
 	with (params)
 	mcbufi = stradd(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, str);

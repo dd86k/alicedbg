@@ -730,7 +730,8 @@ L_CONTINUE:
 		++p.addrv;
 		if (modrm & RM_RM) { // Invalid
 			if (INCLUDE_MNEMONICS)
-				mnadd(p, "??");
+				mnadd(p, UNKNOWN_OP);
+			p.error = DisasmError.Illegal;
 			break;
 		}
 		if (INCLUDE_MACHINECODE)
@@ -1081,13 +1082,13 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%X ", modrm);
-		if (INCLUDE_MNEMONICS) {
-			if (modrm & RM_REG) {
-				mnadd(p, "??");
-				break;
-			} else
-				mnadd(p, "MOV ");
-		}
+		if (modrm & RM_REG) {
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, UNKNOWN_OP);
+			p.error = DisasmError.Illegal;
+			break;
+		} else if (INCLUDE_MNEMONICS)
+			mnadd(p, "MOV ");
 		x86_modrm_rm(p, modrm, 1);
 		const(char) *f = void;
 		uint v = x86_mmfu32v(p, f);
@@ -1162,7 +1163,7 @@ L_CONTINUE:
 		break;
 	case 0xD6:	// (UNUSED)
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "??");
+			mnadd(p, UNKNOWN_OP);
 		p.error = DisasmError.Illegal;
 		break;
 	case 0xD7:	// XLAT
@@ -1174,82 +1175,195 @@ L_CONTINUE:
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%02X", modrm);
-		if (INCLUDE_MNEMONICS == 0)
-			break;
 		const(char) *f = void;
-		if (modrm > 0xBF) {
-			ubyte modrmv = modrm & 0xF;
-			switch (modrm & 0xF0) {
-			case 0xC: // FADD/FMUL
-				if (modrmv < 0x8) { // FADD
-					f = "FADD ST(0),ST(%u)";
-				} else { // FMUL
-					modrmv -= 8;
-					f = "FMUL ST(0),ST(%u)";
+		if (modrm > 0xBF) { // operand is FP
+			if (INCLUDE_MNEMONICS) {
+				ubyte modrmv = modrm & 0xF;
+				switch (modrm & 0xF0) {
+				case 0xC0: // FADD/FMUL
+					if (modrmv < 0x8) { // FADD
+						f = "FADD ST(0),ST(%u)";
+					} else { // FMUL
+						modrmv -= 8;
+						f = "FMUL ST(0),ST(%u)";
+					}
+					break;
+				case 0xD0: // FCOM/FCOMP
+					if (modrmv < 0x8) { // FCOM
+						f = modrmv == 2 ?
+							"FCOM ST(0),T(%u)" :
+							"FCOM ST(0),ST(%u)";
+					} else { // FCOMP
+						modrmv -= 8;
+						f = modrmv == 2 ?
+							"FCOMP ST(0),T(%u)" :
+							"FCOMP ST(0),ST(%u)";
+					}
+					break;
+				case 0xE0: // FSUB/FSUBR
+					if (modrmv < 0x8) { // FSUB
+						f = "FSUB ST(0),ST(%u)";
+					} else { // FSUBR
+						modrmv -= 8;
+						f = "FSUBR ST(0),ST(%u)";
+					}
+					break;
+				case 0xF0: // FDIV/FDIVR
+					if (modrmv < 0x8) { // FDIV
+						f = "FDIV ST(0),ST(%u)";
+					} else { // FDIVR
+						modrmv -= 8;
+						f = "FDIVR ST(0),ST(%u)";
+					}
+					break;
+				default:
 				}
-				break;
-			case 0xD: // FCOM/FCOMP
-				if (modrmv < 0x8) { // FCOM
-					f = modrmv == 2 ?
-						"FCOM ST(0),T(%u)" :
-						"FCOM ST(0),ST(%u)";
-				} else { // FCOMP
-					modrmv -= 8;
-					f = modrmv == 2 ?
-						"FCOMP ST(0),T(%u)" :
-						"FCOMP ST(0),ST(%u)";
-				}
-				break;
-			case 0xE: // FSUB/FSUBR
-				if ((modrm & 0xF) < 0x8) { // FSUB
-					f = "FSUB ST(0),ST(%u)";
-				} else { // FSUBR
-					modrmv -= 8;
-					f = "FSUBR ST(0),ST(%u)";
-				}
-				break;
-			case 0xF: // FDIV/FDIVR
-				if ((modrm & 0xF) < 0x8) { // FDIV
-					f = "FDIV ST(0),ST(%u)";
-				} else { // FDIVR
-					modrmv -= 8;
-					f = "FDIVR ST(0),ST(%u)";
-				}
-				break;
-			default:
+				mnaddf(p, f, modrmv);
 			}
-			mnaddf(p, f, modrmv);
-		} else {
-			switch (modrm & RM_RM) {
-			case RM_RM_000: // FADD
-			
-				break;
-			case RM_RM_001: // FMUL
-			
-				break;
-			case RM_RM_010: // FCOM
-			
-				break;
-			case RM_RM_011: // FCOMP
-			
-				break;
-			case RM_RM_100: // FSUB
-			
-				break;
-			case RM_RM_101: // FSUBR
-			
-				break;
-			case RM_RM_110: // FDIV
-			
-				break;
-			case RM_RM_111: // FDIVR
-			
-				break;
-			default: // never
+		} else { // operand is memory pointer
+			if (INCLUDE_MACHINECODE)
+				mcaddf(p, "%08X", *p.addru32);
+			if (INCLUDE_MNEMONICS) {
+				switch (modrm & RM_RM) {
+				case RM_RM_000: // FADD
+					f = "FADD DWORD PTR [%u]";
+					break;
+				case RM_RM_001: // FMUL
+					f = "FMUL DWORD PTR [%u]";
+					break;
+				case RM_RM_010: // FCOM
+					f = "FCOM DWORD PTR [%u]";
+					break;
+				case RM_RM_011: // FCOMP
+					f = "FCOMP DWORD PTR [%u]";
+					break;
+				case RM_RM_100: // FSUB
+					f = "FSUB DWORD PTR [%u]";
+					break;
+				case RM_RM_101: // FSUBR
+					f = "FSUBR DWORD PTR [%u]";
+					break;
+				case RM_RM_110: // FDIV
+					f = "FDIV DWORD PTR [%u]";
+					break;
+				case RM_RM_111: // FDIVR
+					f = "FDIVR DWORD PTR [%u]";
+					break;
+				default: // never
+				}
+				mnaddf(p, f, *p.addru32);
 			}
+			p.addrv += 4;
 		}
 		break;
 	case 0xD9:	// ESCAPE D9
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", modrm);
+		const(char) *f = void;
+		if (modrm > 0xBF) { // operand is FP
+			if (INCLUDE_MNEMONICS) {
+				ubyte modrmv = modrm & 0xF;
+				switch (modrm & 0xF0) {
+				case 0xC0: // FLD/FXCH
+					if (modrmv < 0x8) { // FADD
+						f = "FLD ST(0),ST(%u)";
+					} else { // FMUL
+						modrmv -= 8;
+						f = "FXCH ST(0),ST(%u)";
+					}
+					mnaddf(p, f, modrmv);
+					break;
+				case 0xD0: // FNOP/Reserved
+					if (modrmv == 0)
+						mnadd(p, "FNOP");
+					else {
+						mnadd(p, UNKNOWN_OP);
+						p.error = DisasmError.Illegal;
+					}
+					break;
+				case 0xE0:
+					switch (modrmv) {
+					case 0: f = "FCHS"; break;
+					case 1: f = "FABS"; break;
+					case 4: f = "FTST"; break;
+					case 5: f = "FXAM"; break;
+					case 8: f = "FLD1"; break;
+					case 9: f = "FLDL2T"; break;
+					case 0xA: f = "FLDL2E"; break;
+					case 0xB: f = "FLDPI"; break;
+					case 0xC: f = "FLDLG2"; break;
+					case 0xD: f = "FLDLN2"; break;
+					case 0xE: f = "FLDZ"; break;
+					case 2,3,6,7,0xF:
+						f = UNKNOWN_OP;
+						p.error = DisasmError.Illegal;
+						break;
+					default: // never
+					}
+					mnadd(p, f);
+					break;
+				case 0xF0:
+					switch (modrmv) {
+					case 0: f = "F2XM1"; break;
+					case 1: f = "FYL2X"; break;
+					case 2: f = "FPTAN"; break;
+					case 3: f = "FPATAN"; break;
+					case 4: f = "FXTRACT"; break;
+					case 5: f = "FPREM1"; break;
+					case 6: f = "FDECSTP"; break;
+					case 7: f = "FINCSTP"; break;
+					case 8: f = "FPREM"; break;
+					case 9: f = "FYL2XP1"; break;
+					case 0xA: f = "FSQRT"; break;
+					case 0xB: f = "FSINCOS"; break;
+					case 0xC: f = "FRNDINT"; break;
+					case 0xD: f = "FSCALE"; break;
+					case 0xE: f = "FSIN"; break;
+					case 0xF: f = "FCOS"; break;
+					default: // never
+					}
+					mnadd(p, f);
+					break;
+				default:
+				}
+			}
+		} else { // operand is memory pointer
+			if (INCLUDE_MACHINECODE)
+				mcaddf(p, "%08X", *p.addru32);
+			if (INCLUDE_MNEMONICS) {
+				switch (modrm & RM_RM) {
+				case RM_RM_000: // FLD
+					mnaddf(p, "FLD DWORD PTR [%u]", *p.addru32);
+					break;
+				case RM_RM_001: // Reserved
+					mnadd(p, UNKNOWN_OP);
+					p.error = DisasmError.Illegal;
+					break;
+				case RM_RM_010: // FST
+					mnaddf(p, "FST DWORD PTR [%u]", *p.addru32);
+					break;
+				case RM_RM_011: // FSTP
+					mnaddf(p, "FSTP DWORD PTR [%u]", *p.addru32);
+					break;
+				case RM_RM_100: // FLDENV
+					mnaddf(p, "FLDENV [%u]", *p.addru32);
+					break;
+				case RM_RM_101: // FLDCW
+					mnaddf(p, "FLDCW WORD PTR [%u]", *p.addru32);
+					break;
+				case RM_RM_110: // FSTENV
+					mnaddf(p, "FSTENV [%u]", *p.addru32);
+					break;
+				case RM_RM_111: // FSTCW
+					mnaddf(p, "FSTCW WORD PTR [%u]", *p.addru32);
+					break;
+				default: // never
+				}
+			}
+			p.addrv += 4;
+		}
 		break;
 	case 0xDA:	// ESCAPE DA
 		break;
