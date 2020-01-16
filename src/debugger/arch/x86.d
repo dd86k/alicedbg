@@ -49,7 +49,7 @@ L_CONTINUE:
 	if (INCLUDE_MACHINECODE)
 		mcaddf(p, "%02X ", b);
 
-	switch (b) {
+	main: switch (b) {
 	case 0x00:	// ADD R/M8, REG8
 	case 0x01:	// ADD R/M32, REG32
 	case 0x02:	// ADD REG8, R/M8
@@ -1098,10 +1098,11 @@ L_CONTINUE:
 			mnaddf(p, ", %d", v);
 		break;
 	case 0xC8:	// ENTER IMM16, IMM8
+		ubyte v = *(p.addru8 + 2);
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%04X %02X", *p.addru16, *(p.addru8 + 2));
+			mcaddf(p, "%04X %02X", *p.addru16, v);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "ENTER %d %d", *p.addri16, *(p.addri8 + 2));
+			mnaddf(p, "ENTER %d %d", *p.addri16, v);
 		p.addrv += 3;
 		break;
 	case 0xC9:	// LEAVE
@@ -1979,9 +1980,84 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "STD");
 		break;
-	case 0xFE:	//TODO: GRP 4
+	case 0xFE:	// GRP 4
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X ", modrm);
+		switch (modrm & RM_REG) {
+		case RM_REG_000: // INC R/M8
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "INC BYTE PTR ");
+			x86_modrm_rm(p, modrm);
+			break;
+		case RM_REG_001: // DEC R/M8
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "DEC BYTE PTR ");
+			x86_modrm_rm(p, modrm);
+			break;
+		default:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, UNKNOWN_OP);
+			p.error = DisasmError.Illegal;
+		}
 		break;
-	case 0xFF:	//TODO: GRP 5
+	case 0xFF:	// GRP 5
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X ", modrm);
+		switch (modrm & RM_REG) {
+		case RM_REG_000: // INC R/M32
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, p.x86.prefix_operand ?
+					"INC WORD PTR " : "INC DWORD PTR ");
+			x86_modrm_rm(p, modrm);
+			break;
+		case RM_REG_001: // DEC R/M32
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, p.x86.prefix_operand ?
+					"DEC WORD PTR " : "DEC DWORD PTR ");
+			x86_modrm_rm(p, modrm);
+			break;
+		case RM_REG_010: // CALL NEAR R/M32
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "CALL NEAR ");
+			x86_modrm_rm(p, modrm);
+			break;
+		case RM_REG_011: // CALL FAR M16:M32
+			ushort v1 = *p.addru16;
+			p.addrv += 2;
+			if (INCLUDE_MACHINECODE)
+				mcaddf(p, "%04X %08", v1, *p.addru32);
+			if (INCLUDE_MNEMONICS)
+				mnaddf(p, "CALL FAR [%d:%d]", v1, *p.addru32);
+			p.addrv += 4;
+			break;
+		case RM_REG_100: // JMP NEAR R/M32
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "CALL NEAR ");
+			x86_modrm_rm(p, modrm);
+			break;
+		case RM_REG_101: // JMP FAR M16:M32
+			ushort v1 = *p.addru16;
+			p.addrv += 2;
+			if (INCLUDE_MACHINECODE)
+				mcaddf(p, "%04X %08", v1, *p.addru32);
+			if (INCLUDE_MNEMONICS)
+				mnaddf(p, "JMP FAR [%d:%d]", v1, *p.addru32);
+			p.addrv += 4;
+			break;
+		case RM_REG_110: // PUSH R/M32
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "PUSH ");
+			x86_modrm_rm(p, modrm);
+			break;
+		default:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, UNKNOWN_OP);
+			p.error = DisasmError.Illegal;
+		}
 		break;
 	default:
 		if (INCLUDE_MNEMONICS)
@@ -2001,11 +2077,11 @@ package
 uint x86_mmfu32v(ref disasm_params_t p, ref const(char) *f) {
 	uint v = void;
 	if (p.x86.prefix_operand) {
-		f = "%04X";
+		f = "%04X ";
 		v = *p.addru16;
 		p.addrv += 2;
 	} else {
-		f = "%08X";
+		f = "%08X ";
 		v = *p.addru32;
 		p.addrv += 4;
 	}
@@ -2182,6 +2258,7 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, ubyte modrm, int wide = 1) {
 void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int wide = 1) {
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
+	//01 110 000
 	// SIB mode
 	if ((modrm & RM_RM) == RM_RM_100 && (modrm & RM_MOD) != RM_MOD_11) {
 		x86_sib(p, modrm);
