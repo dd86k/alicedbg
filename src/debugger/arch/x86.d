@@ -47,7 +47,7 @@ L_CONTINUE:
 	++p.addrv;
 
 	if (INCLUDE_MACHINECODE)
-		mcaddu8(p, b);
+		mcaddx8(p, b);
 
 	main: switch (b) {
 	case 0x00:	// ADD R/M8, REG8
@@ -60,14 +60,14 @@ L_CONTINUE:
 		break;
 	case 0x04:	// ADD AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MACHINECODE)
 			mnaddf(p, "ADD AL, %u", *p.addru8);
 		++p.addrv;
 		break;
 	case 0x05:	// ADD EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MACHINECODE)
 			mnaddf(p, "ADD EAX, %u", *p.addru32);
 		p.addrv += 4;
@@ -90,14 +90,14 @@ L_CONTINUE:
 		break;
 	case 0x0C:	// OR AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "OR EAX, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0x0D:	// OR EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "OR EAX, %d", *p.addri32);
 		p.addrv += 4;
@@ -119,14 +119,14 @@ L_CONTINUE:
 		break;
 	case 0x14:	// ADC AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "ADC EAX, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0x15:	// ADC EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "ADC EAX, %d", *p.addri32);
 		p.addrv += 4;
@@ -149,14 +149,14 @@ L_CONTINUE:
 		break;
 	case 0x1C:	// SBB AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "SBB EAX, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0x1D:	// SBB EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "SBB EAX, %d", *p.addri32);
 		p.addrv += 4;
@@ -179,14 +179,14 @@ L_CONTINUE:
 		break;
 	case 0x24:	// AND AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "AND EAX, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0x25:	// AND EAX, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "AND EAX, %d", *p.addri32);
 		p.addrv += 4;
@@ -208,14 +208,14 @@ L_CONTINUE:
 		break;
 	case 0x2C:	// AND AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "AND EAX, %d", *p.addru8);
 		++p.addrv;
 		break;
-	case 0x2D:	// AND EAX, IMM8
+	case 0x2D:	// AND EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "AND EAX, %d", *p.addri32);
 		p.addrv += 4;
@@ -237,14 +237,14 @@ L_CONTINUE:
 		break;
 	case 0x34:	// XOR AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "XOR EAX, %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x35:	// XOR EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "XOR EAX, %d", *p.addri32);
 		p.addrv += 4;
@@ -266,14 +266,14 @@ L_CONTINUE:
 		break;
 	case 0x3C:	// CMP AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "CMP EAX, %d", *p.addri8);
 		++p.addrv;
 		break;
-	case 0x3D:	// CMP EAX, IMM8
+	case 0x3D:	// CMP EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "CMP EAX, %d", *p.addri32);
 		p.addrv += 4;
@@ -453,7 +453,7 @@ L_CONTINUE:
 		goto L_CONTINUE;
 	case 0x68:	// PUSH IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "PUSH %d", *p.addri32);
 		p.addrv += 4;
@@ -463,14 +463,14 @@ L_CONTINUE:
 			mnadd(p, "IMUL");
 		x86_modrm(p);
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, " %08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, " %d", *p.addri32);
+			mnaddf(p, ", %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0x6A:	// PUSH IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "PUSH %d", *p.addri8);
 		++p.addrv;
@@ -480,9 +480,9 @@ L_CONTINUE:
 			mnadd(p, "IMUL");
 		x86_modrm(p);
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, " %02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, " %d", *p.addri8);
+			mnaddf(p, ", %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x6C:	// INSB
@@ -503,112 +503,112 @@ L_CONTINUE:
 		break;
 	case 0x70:	// JO
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JO %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x71:	// JNO
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JNO %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x72:	// JB
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JB %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x73:	// JNB
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JNB %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x74:	// JZ
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JZ %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x75:	// JNZ
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JNZ %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x76:	// JBE
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JBE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x77:	// JNBE
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JNBE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x78:	// JS
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JS %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x79:	// JNS
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JNS %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7A:	// JP
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JP %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7B:	// JNP
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JNP %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7C:	// JL
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JL %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7D:	// JNL
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JNL %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7E:	// JLE
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JLE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0x7F:	// JNLE
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JNLE %d", *p.addri8);
 		++p.addrv;
@@ -685,7 +685,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", modrm);
+			mcaddx8(p, modrm);
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			switch (modrm & RM_REG) {
@@ -709,7 +709,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", modrm);
+			mcaddx8(p, modrm);
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			switch (modrm & RM_REG) {
@@ -735,7 +735,7 @@ L_CONTINUE:
 			break;
 		}
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02", modrm);
+			mcaddx8(p, modrm);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "POP %s", x86_modrm_reg(p, modrm));
 		break;
@@ -781,7 +781,7 @@ L_CONTINUE:
 		break;
 	case 0x9A:	// CALL (FAR)
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "CALL %d", *p.addri32);
 		p.addrv += 4;
@@ -808,78 +808,34 @@ L_CONTINUE:
 		break;
 	case 0xA0:	// MOV AL, MEM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			const(char) *f = void;
-			with (PrefixReg)
-			switch (p.x86.segreg) {
-			case CS: f = "MOV AL, [CS:%d]"; break;
-			case DS: f = "MOV AL, [DS:%d]"; break;
-			case ES: f = "MOV AL, [ES:%d]"; break;
-			case FS: f = "MOV AL, [FS:%d]"; break;
-			case GS: f = "MOV AL, [GS:%d]"; break;
-			case SS: f = "MOV AL, [SS:%d]"; break;
-			default: f = "MOV AL, [%d]"; break;
-			}
-			mnaddf(p, f, *p.addri32);
-		}
+			mcaddx32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) 
+			mnaddf(p, "MOV AL, [%s%d]",
+				x86_segstr(p.x86.segreg), *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xA1:	// MOV EAX, MEM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			const(char) *f = void;
-			with (PrefixReg)
-			switch (p.x86.segreg) {
-			case CS: f = "MOV EAX, [CS:%d]"; break;
-			case DS: f = "MOV EAX, [DS:%d]"; break;
-			case ES: f = "MOV EAX, [ES:%d]"; break;
-			case FS: f = "MOV EAX, [FS:%d]"; break;
-			case GS: f = "MOV EAX, [GS:%d]"; break;
-			case SS: f = "MOV EAX, [SS:%d]"; break;
-			default: f = "MOV EAX, [%d]"; break;
-			}
-			mnaddf(p, f, *p.addri32);
-		}
+			mcaddx32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "MOV EAX, [%s%d]",
+				x86_segstr(p.x86.segreg), *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xA2:	// MOV MEM8, AL
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			const(char) *f = void;
-			with (PrefixReg)
-			switch (p.x86.segreg) {
-			case CS: f = "MOV [CS:%d], AL"; break;
-			case DS: f = "MOV [DS:%d], AL"; break;
-			case ES: f = "MOV [ES:%d], AL"; break;
-			case FS: f = "MOV [FS:%d], AL"; break;
-			case GS: f = "MOV [GS:%d], AL"; break;
-			case SS: f = "MOV [SS:%d], AL"; break;
-			default: f = "MOV [%d], AL"; break;
-			}
-			mnaddf(p, f, *p.addri32);
-		}
+			mcaddx32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "MOV [%s%d], AL",
+				x86_segstr(p.x86.segreg), *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xA3:	// MOV MEM32, EAX
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			const(char) *f = void;
-			with (PrefixReg)
-			switch (p.x86.segreg) {
-			case CS: f = "MOV [CS:%d], EAX"; break;
-			case DS: f = "MOV [DS:%d], EAX"; break;
-			case ES: f = "MOV [ES:%d], EAX"; break;
-			case FS: f = "MOV [FS:%d], EAX"; break;
-			case GS: f = "MOV [GS:%d], EAX"; break;
-			case SS: f = "MOV [SS:%d], EAX"; break;
-			default: f = "MOV [%d], EAX"; break;
-			}
-			mnaddf(p, f, *p.addri32);
-		}
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "MOV [%s%d], EAX",
+				x86_segstr(p.x86.segreg), *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xA4:	// MOVSB ES:EDI, DS:ESI
@@ -900,14 +856,14 @@ L_CONTINUE:
 		break;
 	case 0xA8:	// TEST AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "TEST AL, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xA9:	// TEST EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "TEST EAX, %d", *p.addru32);
 		p.addrv += 4;
@@ -938,112 +894,112 @@ L_CONTINUE:
 		break;
 	case 0xB0:	// MOV AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV AL, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xB1:	// MOV DL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV DL, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xB2:	// MOV CL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV CL, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xB3:	// MOV BL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV BL, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xB4:	// MOV AH, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV AH, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xB5:	// MOV CH, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV CH, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xB6:	// MOV DH, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV DH, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xB7:	// MOV BH, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV BH, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xB8:	// MOV EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV EAX, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xB9:	// MOV ECX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV ECX, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBA:	// MOV EDX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV EDX, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBB:	// MOV EBX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV EBX, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBC:	// MOV ESP, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV ESP, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBD:	// MOV EBP, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV EBP, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBE:	// MOV ESI, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV ESI, %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0xBF:	// MOV EDI, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "MOV EDI, %d", *p.addri32);
 		p.addrv += 4;
@@ -1052,6 +1008,8 @@ L_CONTINUE:
 	case 0xC1:	// GRP2 R/M32, IMM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddx8(p, modrm);
 		const(char) *a = void;
 		switch (modrm & RM_REG) {
 		case RM_REG_000: a = "ROR "; break;
@@ -1071,11 +1029,11 @@ L_CONTINUE:
 			mnadd(p, a);
 		x86_modrm_rm(p, modrm, b & 1);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "%02X", *p.addru8);
+			mnaddf(p, ", %d", *p.addru8);
 		break;
 	case 0xC2:	// RET IMM16
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%04X", *p.addru16);
+			mcaddx16(p, *p.addru16);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "RET %d", *p.addri16);
 		p.addrv += 2;
@@ -1097,7 +1055,7 @@ L_CONTINUE:
 	case 0xC6:	// GRP11(1A) - MOV MEM8, IMM8
 		ubyte modrm = *p.addru8;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%X ", modrm);
+			mcaddx8(p, modrm);
 		if (modrm & RM_REG) {
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, UNKNOWN_OP);
@@ -1108,7 +1066,7 @@ L_CONTINUE:
 			mnadd(p, "MOV BYTE PTR ");
 		x86_modrm_rm(p, modrm, 1);
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, ", %d", *p.addru8);
 		++p.addrv;
@@ -1116,7 +1074,7 @@ L_CONTINUE:
 	case 0xC7:	// GRP11(1A) - MOV MEM32, IMM32
 		ubyte modrm = *p.addru8;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%X ", modrm);
+			mcaddx8(p, modrm);
 		if (modrm & RM_REG) {
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, UNKNOWN_OP);
@@ -1149,7 +1107,7 @@ L_CONTINUE:
 		break;
 	case 0xCA:	// RET (far) IMM16
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%04X", *p.addru16);
+			mcaddx16(p, *p.addru16);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "RET %d %d", *p.addri16);
 		p.addrv += 2;
@@ -1165,7 +1123,7 @@ L_CONTINUE:
 		break;
 	case 0xCD:	// INT IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "INT %u", *p.addru8);
 		++p.addrv;
@@ -1185,7 +1143,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", modrm);
+			mcaddx8(p, modrm);
 		const(char) *m = void;
 		switch (modrm & RM_REG) {
 		case RM_REG_000: m = "ROL "; break;
@@ -1209,14 +1167,14 @@ L_CONTINUE:
 		break;
 	case 0xD4:	// AAM IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "AAM %u", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xD5:	// AAD IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "AAD %u", *p.addru8);
 		++p.addrv;
@@ -1229,7 +1187,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1273,7 +1231,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%08X", *p.addru32);
+				mcaddx32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1312,7 +1270,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1383,7 +1341,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%08X", *p.addru32);
+				mcaddx32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1422,7 +1380,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1464,7 +1422,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%08X", *p.addru32);
+				mcaddx32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1503,7 +1461,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1557,7 +1515,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%08X", *p.addru32);
+				mcaddx32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1596,7 +1554,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1638,7 +1596,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%08X", *p.addru32);
+				mcaddx32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1677,7 +1635,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1718,7 +1676,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%08X", *p.addru32);
+				mcaddx32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1755,7 +1713,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1802,7 +1760,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%08X", *p.addru32);
+				mcaddx32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1841,7 +1799,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1874,7 +1832,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%08X", *p.addru32);
+				mcaddx32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1911,63 +1869,63 @@ L_CONTINUE:
 		break;
 	case 0xE0:	// LOOPNE IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "LOOPNE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE1:	// LOOPE IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "LOOPE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE2:	// LOOP IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "LOOP %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE3:	// JECXZ IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JECXZ %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE4:	// IN AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "IN AL,%u", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xE5:	// IN EAX, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "IN EAX,%u", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xE6:	// OUT IMM8,AL
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "OUT %u,AL", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xE7:	// OUT IMM8,EAX
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X", *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "OUT %u,EAX", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE8:	// CALL IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
+			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "CALL %d", *p.addri32);
 		p.addrv += 4;
@@ -1982,7 +1940,7 @@ L_CONTINUE:
 		break;
 	case 0xEB:	// JMP IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, *p.addru8);
+			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JMP %d", *p.addri8);
 		++p.addrv;
@@ -2017,14 +1975,14 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000:
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "TEST ");
 			x86_modrm_rm(p, modrm, w);
 			if (INCLUDE_MACHINECODE)
-				mcaddu8(p, *p.addru8);
+				mcaddx8(p, *p.addru8);
 			if (INCLUDE_MNEMONICS)
 				mnaddf(p, ", %d", *p.addru8);
 			++p.addrv;
@@ -2102,7 +2060,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // INC R/M8
 			if (INCLUDE_MNEMONICS)
@@ -2124,7 +2082,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddu8(p, modrm);
+			mcaddx8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // INC R/M32
 			if (INCLUDE_MNEMONICS)
@@ -2217,7 +2175,7 @@ L_CONTINUE:
 	++p.addrv;
 
 	if (INCLUDE_MACHINECODE)
-		mcaddu8(p, b);
+		mcaddx8(p, b);
 
 	switch (b) {
 	case 0x00: //TODO: GRP6
@@ -2337,7 +2295,7 @@ void x86_modrm(ref disasm_params_t p) {
 	const(char) *c = ", ";
 
 	if (INCLUDE_MACHINECODE)
-		mcaddu8(p, modrm);
+		mcaddx8(p, modrm);
 
 	if (direction)
 		goto L_REG;
@@ -2456,7 +2414,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	}
 
 	if (INCLUDE_MACHINECODE)
-		mcaddu8(p, sib);
+		mcaddx8(p, sib);
 
 	const(char)* base = void, index = void, seg = void;
 

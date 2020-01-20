@@ -190,13 +190,13 @@ private import core.stdc.stdarg;
 
 immutable const(char) *UNKNOWN_OP = "??";
 
-void mcaddu8(ref disasm_params_t p, ubyte v) {
+void mcaddx8(ref disasm_params_t p, ubyte v) {
 	mcaddf(p, "%02X ", v);
 }
-void mcaddu16(ref disasm_params_t p, ushort v) {
+void mcaddx16(ref disasm_params_t p, ushort v) {
 	mcaddf(p, "%04X ", v);
 }
-void mcaddu32(ref disasm_params_t p, uint v) {
+void mcaddx32(ref disasm_params_t p, uint v) {
 	mcaddf(p, "%08X ", v);
 }
 
