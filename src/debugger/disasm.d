@@ -190,26 +190,36 @@ private import core.stdc.stdarg;
 
 immutable const(char) *UNKNOWN_OP = "??";
 
-void mcadd(ref disasm_params_t params, const(char) *str) {
-	with (params)
+void mcaddu8(ref disasm_params_t p, ubyte v) {
+	mcaddf(p, "%02X ", v);
+}
+void mcaddu16(ref disasm_params_t p, ushort v) {
+	mcaddf(p, "%04X ", v);
+}
+void mcaddu32(ref disasm_params_t p, uint v) {
+	mcaddf(p, "%08X ", v);
+}
+
+void mcadd(ref disasm_params_t p, const(char) *str) {
+	with (p)
 	mcbufi = stradd(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, str);
 }
 
-void mcaddf(ref disasm_params_t params, const(char) *f, ...) {
+void mcaddf(ref disasm_params_t p, const(char) *f, ...) {
 	va_list va;
 	va_start(va, f);
-	with (params)
+	with (p)
 	mcbufi = straddva(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, f, va);
 }
 
-void mnadd(ref disasm_params_t params, const(char) *str) {
-	with (params)
+void mnadd(ref disasm_params_t p, const(char) *str) {
+	with (p)
 	mnbufi = stradd(cast(char*)mnbuf, DISASM_BUF_SIZE, mnbufi, str);
 }
 
-void mnaddf(ref disasm_params_t params, const(char) *f, ...) {
+void mnaddf(ref disasm_params_t p, const(char) *f, ...) {
 	va_list va;
 	va_start(va, f);
-	with (params)
+	with (p)
 	mnbufi = straddva(cast(char*)mnbuf, DISASM_BUF_SIZE, mnbufi, f, va);
 }

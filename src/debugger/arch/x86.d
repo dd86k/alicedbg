@@ -47,7 +47,7 @@ L_CONTINUE:
 	++p.addrv;
 
 	if (INCLUDE_MACHINECODE)
-		mcaddf(p, "%02X ", b);
+		mcaddu8(p, b);
 
 	main: switch (b) {
 	case 0x00:	// ADD R/M8, REG8
@@ -1048,11 +1048,30 @@ L_CONTINUE:
 			mnaddf(p, "MOV EDI, %d", *p.addri32);
 		p.addrv += 4;
 		break;
-	case 0xC0:	//TODO: GRP2 R/M8, IMM8
-	
-		break;
-	case 0xC1:	//TODO: GRP2 R/M32, IMM8
-	
+	case 0xC0:	// GRP2 R/M8, IMM8
+	case 0xC1:	// GRP2 R/M32, IMM8
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		const(char) *a = void;
+		switch (modrm & RM_REG) {
+		case RM_REG_000: a = "ROR "; break;
+		case RM_REG_001: a = "RCL "; break;
+		case RM_REG_010: a = "RCR "; break;
+		case RM_REG_011: a = "SHL "; break;
+		case RM_REG_100: a = "SHR "; break;
+		case RM_REG_101: a = "ROR "; break;
+		case RM_REG_111: a = "SAR "; break;
+		default:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, UNKNOWN_OP);
+			p.error = DisasmError.Illegal;
+			break main;
+		}
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, a);
+		x86_modrm_rm(p, modrm, b & 1);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, "%02X", *p.addru8);
 		break;
 	case 0xC2:	// RET IMM16
 		if (INCLUDE_MACHINECODE)
@@ -1075,8 +1094,24 @@ L_CONTINUE:
 			mnadd(p, "LDS ");
 		x86_modrm(p);
 		break;
-	case 0xC6:	//TODO: GRP11(1A) - MOV MEM8, IMM8
-	
+	case 0xC6:	// GRP11(1A) - MOV MEM8, IMM8
+		ubyte modrm = *p.addru8;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%X ", modrm);
+		if (modrm & RM_REG) {
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, UNKNOWN_OP);
+			p.error = DisasmError.Illegal;
+			break main;
+		}
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "MOV BYTE PTR ");
+		x86_modrm_rm(p, modrm, 1);
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", *p.addru8);
+		if (INCLUDE_MNEMONICS)
+			mnaddf(p, ", %d", *p.addru8);
+		++p.addrv;
 		break;
 	case 0xC7:	// GRP11(1A) - MOV MEM32, IMM32
 		ubyte modrm = *p.addru8;
@@ -1086,9 +1121,12 @@ L_CONTINUE:
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, UNKNOWN_OP);
 			p.error = DisasmError.Illegal;
-			break;
-		} else if (INCLUDE_MNEMONICS)
-			mnadd(p, "MOV ");
+			break main;
+		}
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, p.x86.prefix_operand ?
+				"MOV DWORD PTR " :
+				"MOV WORD PTR ");
 		x86_modrm_rm(p, modrm, 1);
 		const(char) *f = void;
 		uint v = x86_mmfu32v(p, f);
@@ -1140,13 +1178,34 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "IRET");
 		break;
-	case 0xD0:	//TODO: GRP2 REG8, 1
-		break;
-	case 0xD1:	//TODO: GRP2 REG32, 1
-		break;
-	case 0xD2:	//TODO: GRP2 REG8, CL
-		break;
-	case 0xD3:	//TODO: GRP2 REG32, CL
+	case 0xD0:	// GRP2 R/M8, 1
+	case 0xD1:	// GRP2 R/M32, 1
+	case 0xD2:	// GRP2 R/M8, CL
+	case 0xD3:	// GRP2 R/M32, CL
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddf(p, "%02X", modrm);
+		const(char) *m = void;
+		switch (modrm & RM_REG) {
+		case RM_REG_000: m = "ROL "; break;
+		case RM_REG_001: m = "ROR "; break;
+		case RM_REG_010: m = "RCL "; break;
+		case RM_REG_011: m = "RCR "; break;
+		case RM_REG_100: m = "SHL "; break;
+		case RM_REG_101: m = "SHR "; break;
+		case RM_REG_111: m = "ROL "; break;
+		default:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, UNKNOWN_OP);
+			p.error = DisasmError.Illegal;
+		}
+		if (INCLUDE_MNEMONICS) {
+			const(char) *a = b >= 0xD2 ? ", CL" : ", 1";
+			mnadd(p, m);
+			x86_modrm_rm(p, modrm, b & 1);
+			mnadd(p, a);
+		}
 		break;
 	case 0xD4:	// AAM IMM8
 		if (INCLUDE_MACHINECODE)
@@ -1170,7 +1229,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", modrm);
+			mcaddu8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1253,7 +1312,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", modrm);
+			mcaddu8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1363,7 +1422,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", modrm);
+			mcaddu8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1444,7 +1503,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", modrm);
+			mcaddu8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1537,7 +1596,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", modrm);
+			mcaddu8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1618,7 +1677,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", modrm);
+			mcaddu8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1696,7 +1755,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", modrm);
+			mcaddu8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1782,7 +1841,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", modrm);
+			mcaddu8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1923,7 +1982,7 @@ L_CONTINUE:
 		break;
 	case 0xEB:	// JMP IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", *p.addru8);
+			mcaddu8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JMP %d", *p.addri8);
 		++p.addrv;
@@ -1952,9 +2011,68 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "CMC");
 		break;
-	case 0xF6:	//TODO: GRP 3 R/M8
-		break;
-	case 0xF7:	//TODO: GRP 3 R/M32
+	case 0xF6:	// GRP 3 R/M8
+	case 0xF7:	// GRP 3 R/M32
+		int w = b & 1;
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddu8(p, modrm);
+		switch (modrm & RM_REG) {
+		case RM_REG_000:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "TEST ");
+			x86_modrm_rm(p, modrm, w);
+			if (INCLUDE_MACHINECODE)
+				mcaddu8(p, *p.addru8);
+			if (INCLUDE_MNEMONICS)
+				mnaddf(p, ", %d", *p.addru8);
+			++p.addrv;
+			break;
+		case RM_REG_010:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "NOT ");
+			x86_modrm_rm(p, modrm, w);
+			break;
+		case RM_REG_011:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "NEG ");
+			x86_modrm_rm(p, modrm, w);
+			break;
+		case RM_REG_100:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "MUL ");
+			x86_modrm_rm(p, modrm, w);
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, w ? ", EAX" : ", AL");
+			break;
+		case RM_REG_101:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "IMUL ");
+			x86_modrm_rm(p, modrm, w);
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, w ? ", EAX" : ", AL");
+			break;
+		case RM_REG_110:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "DIV ");
+			x86_modrm_rm(p, modrm, w);
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, w ? ", EAX" : ", AL");
+			break;
+		case RM_REG_111:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "IDIV ");
+			x86_modrm_rm(p, modrm, w);
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, w ? ", EAX" : ", AL");
+			break;
+		default:
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, UNKNOWN_OP);
+			p.error = DisasmError.Illegal;
+			break main;
+		}
 		break;
 	case 0xF8:	// CLC
 		if (INCLUDE_MNEMONICS)
@@ -1984,7 +2102,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", modrm);
+			mcaddu8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // INC R/M8
 			if (INCLUDE_MNEMONICS)
@@ -2006,7 +2124,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X ", modrm);
+			mcaddu8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // INC R/M32
 			if (INCLUDE_MNEMONICS)
@@ -2090,19 +2208,37 @@ uint x86_mmfu32v(ref disasm_params_t p, ref const(char) *f) {
 
 private:
 
-enum PrefixReg {
-	None,
-	CS,
-	DS,
-	ES,
-	FS,
-	GS,
-	SS
-}
+void x86_b2(ref disasm_params_t p) {
+	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
+	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
 
-void x86_b2(ref disasm_params_t params) {
-	const ubyte b = *params.addru8;
-	
+L_CONTINUE:
+	ubyte b = *p.addru8;
+	++p.addrv;
+
+	if (INCLUDE_MACHINECODE)
+		mcaddu8(p, b);
+
+	switch (b) {
+	case 0x00: //TODO: GRP6
+		break;
+	case 0x01: //TODO: GRP7
+		break;
+	case 0x02: //TODO: LAR REG32, R/M16
+		break;
+	case 0x03: //TODO: LSL REG32, R/M16
+		break;
+	case 0x06: //TODO: CLTS
+		break;
+	case 0xA2: // CPUID
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "CPUID");
+		break;
+	default:
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, UNKNOWN_OP);
+		p.error = DisasmError.Illegal;
+	}
 }
 
 void x86_b3_38h(ref disasm_params_t params) {
@@ -2111,6 +2247,16 @@ void x86_b3_38h(ref disasm_params_t params) {
 
 void x86_b3_3Ah(ref disasm_params_t params) {
 	
+}
+
+enum PrefixReg {
+	None,
+	CS,
+	DS,
+	ES,
+	FS,
+	GS,
+	SS
 }
 
 enum : ubyte {
@@ -2191,7 +2337,7 @@ void x86_modrm(ref disasm_params_t p) {
 	const(char) *c = ", ";
 
 	if (INCLUDE_MACHINECODE)
-		mcaddf(p, "%02X ", modrm);
+		mcaddu8(p, modrm);
 
 	if (direction)
 		goto L_REG;
@@ -2310,7 +2456,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	}
 
 	if (INCLUDE_MACHINECODE)
-		mcaddf(p, "%02X ", sib);
+		mcaddu8(p, sib);
 
 	const(char)* base = void, index = void, seg = void;
 
