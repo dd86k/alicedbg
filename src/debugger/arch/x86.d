@@ -2144,26 +2144,6 @@ L_CONTINUE:
 	return p.error;
 }
 
-/// Fetch 32/16-bit operand-variable value, depending on operand prefix, and
-/// provides the proper zero-padded strin format. This affects the memory
-/// pointer.
-/// Params: p = disassembler structure
-/// Returns: 32-bit or 16-bit value
-package
-uint x86_mmfu32v(ref disasm_params_t p, ref const(char) *f) {
-	uint v = void;
-	if (p.x86.prefix_operand) {
-		f = "%04X ";
-		v = *p.addru16;
-		p.addrv += 2;
-	} else {
-		f = "%08X ";
-		v = *p.addru32;
-		p.addrv += 4;
-	}
-	return v;
-}
-
 private:
 
 void x86_b2(ref disasm_params_t p) {
@@ -2271,6 +2251,26 @@ enum : ubyte {
 	SIB_BASE = RM_RM,	/// Base filter
 }
 
+/// Fetch 32/16-bit operand-variable value, depending on operand prefix, and
+/// provides the proper zero-padded strin format. This affects the memory
+/// pointer.
+/// Params: p = disassembler structure
+/// Returns: 32-bit or 16-bit value
+package
+uint x86_mmfu32v(ref disasm_params_t p, ref const(char) *f) {
+	uint v = void;
+	if (p.x86.prefix_operand) {
+		f = "%04X ";
+		v = *p.addru16;
+		p.addrv += 2;
+	} else {
+		f = "%08X ";
+		v = *p.addru32;
+		p.addrv += 4;
+	}
+	return v;
+}
+
 const(char) *x86_segstr(int segreg) {
 	with (PrefixReg)
 	switch (segreg) {
@@ -2362,7 +2362,6 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, ubyte modrm, int wide = 1) {
 void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int wide = 1) {
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
-	//01 110 000
 	// SIB mode
 	if ((modrm & RM_RM) == RM_RM_100 && (modrm & RM_MOD) != RM_MOD_11) {
 		x86_sib(p, modrm);
