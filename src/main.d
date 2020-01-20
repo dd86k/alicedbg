@@ -13,7 +13,7 @@ enum CLIInterface {
 	tui,
 	loop,
 	interpreter,
-	json,
+	tcp_json,
 }
 
 enum CLIDebugMode {
@@ -45,7 +45,7 @@ int cliver() {
 	printf(
 	"alicedbg-"~__ABI__~" "~PROJECT_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
 	"License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
-	"Home: https://git.dd86k.space/alicedbg\n"~
+	"Home: <https://git.dd86k.space/alicedbg>, <https://github.com/dd86k/alicedbg>\n"~
 	"Compiler: "~__VENDOR__~" %u.%03u, "~
 		__traits(getTargetInfo, "objectFormat")~" obj format, "~
 		__traits(getTargetInfo, "floatAbi")~" float abi\n"~
@@ -191,7 +191,8 @@ int main(int argc, const(char) **argv) {
 		}*/
 		// Disassemble file
 		// 
-		if (strcmp(arg, "disasmdump") == 0) {
+		if (strcmp(arg, "disasmdump") == 0 ||
+			strcmp(arg, "dd") == 0) {
 			import debugger.disasm : disasm_line, disasm_params_t,
 				DISASM_I_MACHINECODE, DISASM_I_MNEMONICS;
 			import core.stdc.config : c_long;
