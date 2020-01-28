@@ -1098,7 +1098,7 @@ L_CONTINUE:
 		}
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "MOV BYTE PTR ");
-		x86_modrm_rm(p, modrm, 1);
+		x86_modrm_rm(p, modrm, X86_MODRM_WIDE);
 		if (INCLUDE_MACHINECODE)
 			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
@@ -1119,7 +1119,7 @@ L_CONTINUE:
 			mnadd(p, p.x86.prefix_operand ?
 				"MOV DWORD PTR " :
 				"MOV WORD PTR ");
-		x86_modrm_rm(p, modrm, 1);
+		x86_modrm_rm(p, modrm, X86_MODRM_WIDE);
 		const(char) *f = void;
 		uint v = x86_mmfu32v(p, f);
 		if (INCLUDE_MACHINECODE)
@@ -1195,7 +1195,7 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *a = b >= 0xD2 ? ", CL" : ", 1";
 			mnadd(p, m);
-			x86_modrm_rm(p, modrm, b & 1);
+			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 			mnadd(p, a);
 		}
 		break;
@@ -2020,7 +2020,7 @@ L_CONTINUE:
 		break;
 	case 0xF6:	// GRP 3 R/M8
 	case 0xF7:	// GRP 3 R/M32
-		int w = b & 1;
+		int w = X86_OP_WIDE(b);
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
@@ -2199,7 +2199,6 @@ void x86_b2(ref disasm_params_t p) {
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
 
-L_CONTINUE:
 	ubyte b = *p.addru8;
 	++p.addrv;
 
@@ -2233,7 +2232,7 @@ L_CONTINUE:
 		if ((modrm & RM_REG) == RM_REG_001) {
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "PREFETCHW ");
-			x86_modrm_rm(p, modrm >> 3, X86_MODRM_WIDE);
+			x86_modrm_rm(p, modrm, X86_MODRM_WIDE);
 		} else {
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, UNKNOWN_OP);
@@ -2441,9 +2440,10 @@ void x86_modrm(ref disasm_params_t p, int width, int direction) {
 		goto L_REG;
 
 L_RM:
-	// Memory regs are only generic regs, so a quick hack
-	x86_modrm_rm(p, modrm,
-		width == X86_MODRM_NONE ? X86_MODRM_NONE : X86_MODRM_WIDE);
+	// Memory regs are only general registers
+	if (width > X86_MODRM_WIDE)
+		width = X86_MODRM_WIDE;
+	x86_modrm_rm(p, modrm, width);
 
 	if (direction) return;
 	else mnadd(p, c);
@@ -2531,7 +2531,7 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 			if ((modrm & RM_MOD) != RM_MOD_11)
 				width = X86_MODRM_WIDE;
 		const(char) *seg = x86_segstr(p.x86.segreg);
-		const(char) *reg = x86_modrm_reg(p, modrm, width);
+		const(char) *reg = x86_modrm_reg(p, cast(ubyte)(modrm << 3), width);
 		switch (modrm & RM_MOD) {
 		case RM_MOD_00:	// Memory Mode, no displacement
 			if (INCLUDE_MNEMONICS)
@@ -2566,14 +2566,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 
 	ubyte sib = *p.addru8;
 	++p.addrv;
-	uint scale = void; // I'm lazy
-	switch (sib & SIB_SCALE) {
-	case SIB_SCALE_00: scale = 1; break;
-	case SIB_SCALE_01: scale = 2; break;
-	case SIB_SCALE_10: scale = 4; break;
-	case SIB_SCALE_11: scale = 8; break;
-	default: // Never happened
-	}
+	int scale = 1 << (sib >> 6); // 2 ^ (0b11_000_000 >> 6)
 
 	if (INCLUDE_MACHINECODE)
 		mcaddx8(p, sib);
