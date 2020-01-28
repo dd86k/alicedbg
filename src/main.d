@@ -2,8 +2,8 @@ import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
 import consts;
-import ui.loop : ui_loop;
-import ui.tui : ui_tui;
+import ui.loop : loop_enter;
+import ui.tui : tui_enter;
 import debugger.core;
 
 extern (C):
@@ -12,8 +12,8 @@ private:
 enum CLIInterface {
 	tui,
 	loop,
-	interpreter,
-	tcp_json,
+//	interpreter,
+//	tcp_json,
 }
 
 enum CLIDebugMode {
@@ -44,7 +44,7 @@ int cliver() {
 	import ver = std.compiler;
 	printf(
 	"alicedbg-"~__ABI__~" "~PROJECT_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
-	"License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
+	"License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
 	"Home: <https://git.dd86k.space/alicedbg>, <https://github.com/dd86k/alicedbg>\n"~
 	"Compiler: "~__VENDOR__~" %u.%03u, "~
 		__traits(getTargetInfo, "objectFormat")~" obj format, "~
@@ -63,29 +63,29 @@ int clipage(CLIPage h) {
 	final switch (h) {
 	case CLIPage.main:
 		r =
-		"alicedbg debugger\n"~
+		"Aiming to be a simple debugger\n"~
 		"Usage:\n"~
 		"  alicedbg {-pid ID|-exec FILE} [OPTIONS...]\n"~
 		"  alicedbg {--help|--version|--license}\n"~
 		"\n"~
 		"OPTIONS\n"~
-		"	-file      debugger: Load executable file\n"~
+		"	-exec      debugger: Load executable file\n"~
 		"	-pid       debugger: Attach to process id\n"~
 		"	-ui        Choose user interface (see -ui ?)\n";
 		break;
 	case CLIPage.ui:
 		r =
 		"Available UIs (default=tui)\n"~
-		"tui ....... Text UI with full debugging experience.\n"~
+		"tui ....... (WIP) Text UI with full debugging experience.\n"~
 		"loop ...... Print exceptions, continues automatically, no user input.\n"
-//		"tcp-json .. (Planned) JSON API server via TCP.\n"
+//		"tcp-json .. (Experimental) JSON API server via TCP.\n"
 		;
 	break;
 	case CLIPage.license:
 		r =
 `BSD 3-Clause License
 
-Copyright (c) 2019-2020, dd86k
+Copyright (c) 2019-2020, dd86k <dd@dax.moe>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -136,6 +136,7 @@ int main(int argc, const(char) **argv) {
 		if (strcmp(arg, "-license") == 0)
 			return clipage(CLIPage.license);
 
+		// debugger: select file
 		if (strcmp(arg, "exec") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: file argument missing");
@@ -154,6 +155,7 @@ int main(int argc, const(char) **argv) {
 			
 		}*/
 
+		// debugger: select pid
 		if (strcmp(arg, "pid") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: pid argument missing");
@@ -189,10 +191,9 @@ int main(int argc, const(char) **argv) {
 		/*if (strcmp(arg, "march") == 0) {
 			
 		}*/
-		// Disassemble file
-		// 
-		if (strcmp(arg, "disasmdump") == 0 ||
-			strcmp(arg, "dd") == 0) {
+
+		// Binary file disassembly
+		if (strcmp(arg, "disasmdump") == 0 || strcmp(arg, "dd") == 0) {
 			import debugger.disasm : disasm_line, disasm_params_t,
 				DISASM_I_MACHINECODE, DISASM_I_MNEMONICS;
 			import core.stdc.config : c_long;
@@ -234,10 +235,12 @@ int main(int argc, const(char) **argv) {
 
 			return EXIT_SUCCESS;
 		}
+		
 		// Choose demangle settings for symbols
 		/*if (strcmp(arg, "demangle") == 0) {
 			
 		}*/
+		
 		// Choose debugging backend, currently unsupported and only
 		// embedded option is available
 		/*if (strcmp(arg, "backend") == 0) {
@@ -246,17 +249,17 @@ int main(int argc, const(char) **argv) {
 	}
 
 	int e = void;
+
+	with (CLIDebugMode)
 	switch (opt.debugtype) {
-	case CLIDebugMode.file:
-		e = dbg_file(opt.file);
-		if (e) {
+	case file:
+		if ((e = dbg_file(opt.file)) != 0) {
 			printf("dbg: Could not load executable (%X)\n", e);
 			return e;
 		}
 		break;
-	case CLIDebugMode.pid:
-		e = dbg_attach(opt.pid);
-		if (e) {
+	case pid:
+		if ((e = dbg_file(opt.file)) != 0) {
 			printf("dbg: Could not attach to pid (%X)\n", e);
 			return e;
 		}
@@ -267,11 +270,8 @@ int main(int argc, const(char) **argv) {
 	}
 
 	with (CLIInterface)
-	switch (opt.ui) {
-	case loop: return ui_loop;
-	case tui: return ui_tui;
-	default:
-		puts("cli: No ui specified, or ui not found");
-		return EXIT_FAILURE;
+	final switch (opt.ui) {
+	case loop: return loop_enter;
+	case tui: return tui_enter;
 	}
 }

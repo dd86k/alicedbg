@@ -10,15 +10,15 @@ import debugger.exception, debugger.core, debugger.disasm;
 extern (C):
 
 /// Starts plain UI
-int ui_loop() {
-	dbg_sethandle(&except);
+int loop_enter() {
+	dbg_sethandle(&loop_handler);
 	return dbg_loop;
 }
 
 private:
 
 __gshared uint en;
-int except(exception_t *e) {
+int loop_handler(exception_t *e) {
 	disasm_params_t p;
 	p.include = DISASM_I_MACHINECODE | DISASM_I_MNEMONICS;
 	p.addr = e.addr;

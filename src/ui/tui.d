@@ -10,7 +10,7 @@ __gshared:
 
 /// Initiate TUI and enter input loop
 /// Return: Error code
-int ui_tui() {
+int tui_enter() {
 	term_init;
 	term_wsize(tui_size);
 	if (tui_size.width < 80 || tui_size.height < 24) {
@@ -22,7 +22,7 @@ int ui_tui() {
 		printf("Could not initiate terminal buffer (%d)\n", e);
 		return e;
 	}
-	dbg_sethandle(&tui_event_ex);
+	dbg_sethandle(&tui_handler);
 	return dbg_loop;
 }
 
@@ -78,7 +78,7 @@ L_READKEY:
 
 /// Handle exception
 /// Params: e = Exception structure
-int tui_event_ex(exception_t *e) {
+int tui_handler(exception_t *e) {
 	term_clear;
 	// disasm settings
 	disasm_params_t params;
@@ -95,9 +95,9 @@ int tui_event_ex(exception_t *e) {
 	// forward
 	for (uint hi = h + 1; hi < ihmax; ++hi) {
 		term_pos(0, hi);
-		if (disasm_line(params) == DisasmError.None)
-			term_writef("  %zX %-20s %s",
-				params.thisaddr, &params.mcbuf, &params.mnbuf);
+		disasm_line(params);
+		term_writef("  %zX %-20s %s",
+			params.thisaddr, &params.mcbuf, &params.mnbuf);
 	}
 	// backward
 	//for (uint ih = h - 1; ih >= 0; ih) {
