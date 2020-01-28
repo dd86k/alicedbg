@@ -2233,7 +2233,7 @@ L_CONTINUE:
 		if ((modrm & RM_REG) == RM_REG_001) {
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "PREFETCHW ");
-			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
+			x86_modrm_rm(p, modrm >> 3, X86_MODRM_WIDE);
 		} else {
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, UNKNOWN_OP);
