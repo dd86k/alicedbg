@@ -56,7 +56,7 @@ L_CONTINUE:
 	case 0x03:	// ADD REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "ADD ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x04:	// ADD AL, IMM8
 		if (INCLUDE_MACHINECODE)
@@ -86,7 +86,7 @@ L_CONTINUE:
 	case 0x0B:	// OR REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "OR ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x0C:	// OR AL, IMM8
 		if (INCLUDE_MACHINECODE)
@@ -115,7 +115,7 @@ L_CONTINUE:
 	case 0x13:	// ADC REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "ADC ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x14:	// ADC AL, IMM8
 		if (INCLUDE_MACHINECODE)
@@ -145,7 +145,7 @@ L_CONTINUE:
 	case 0x1B:	// SBB REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "SBB ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x1C:	// SBB AL, IMM8
 		if (INCLUDE_MACHINECODE)
@@ -175,7 +175,7 @@ L_CONTINUE:
 	case 0x23:	// AND REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "AND ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x24:	// AND AL, IMM8
 		if (INCLUDE_MACHINECODE)
@@ -192,6 +192,10 @@ L_CONTINUE:
 		p.addrv += 4;
 		break;
 	case 0x26:	// ES:
+		if (p.x86.group2) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
 		p.x86.segreg = PrefixReg.ES;
 		goto L_CONTINUE;
 	case 0x27:	// DAA
@@ -204,7 +208,7 @@ L_CONTINUE:
 	case 0x2B:	// SUB REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "SUB ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x2C:	// AND AL, IMM8
 		if (INCLUDE_MACHINECODE)
@@ -221,6 +225,10 @@ L_CONTINUE:
 		p.addrv += 4;
 		break;
 	case 0x2E:	// CS:
+		if (p.x86.group2) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
 		p.x86.segreg = PrefixReg.CS;
 		goto L_CONTINUE;
 	case 0x2F:	// DAS
@@ -233,7 +241,7 @@ L_CONTINUE:
 	case 0x33:	// XOR REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "XOR ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x34:	// XOR AL, IMM8
 		if (INCLUDE_MACHINECODE)
@@ -250,6 +258,10 @@ L_CONTINUE:
 		p.addrv += 4;
 		break;
 	case 0x36:	// SS:
+		if (p.x86.group2) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
 		p.x86.segreg = PrefixReg.SS;
 		goto L_CONTINUE;
 	case 0x37:	// AAA
@@ -262,7 +274,7 @@ L_CONTINUE:
 	case 0x3B:	// CMP REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "CMP ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x3C:	// CMP AL, IMM8
 		if (INCLUDE_MACHINECODE)
@@ -279,6 +291,10 @@ L_CONTINUE:
 		p.addrv += 4;
 		break;
 	case 0x3E:	// DS:
+		if (p.x86.group2) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
 		p.x86.segreg = PrefixReg.DS;
 		goto L_CONTINUE;
 	case 0x3F:	// AAS
@@ -437,18 +453,34 @@ L_CONTINUE:
 	case 0x63:	// ARPL R/M16, REG16
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "ARPL ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x64:	// FS:
+		if (p.x86.group2) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
 		p.x86.segreg = PrefixReg.FS;
 		goto L_CONTINUE;
 	case 0x65:	// GS:
+		if (p.x86.group2) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
 		p.x86.segreg = PrefixReg.GS;
 		goto L_CONTINUE;
 	case 0x66:	// PREFIX: OPERAND SIZE
-		p.x86.prefix_operand = true;
+		if (p.x86.group3) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
+		p.x86.prefix_operand = 0x66;
 		goto L_CONTINUE;
 	case 0x67:	// PREFIX: ADDRESS SIZE
+		if (p.x86.group4) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
 		p.x86.prefix_address = true;
 		goto L_CONTINUE;
 	case 0x68:	// PUSH IMM32
@@ -461,7 +493,7 @@ L_CONTINUE:
 	case 0x69:	// IMUL REG32, R/M32, IMM32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "IMUL");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		if (INCLUDE_MACHINECODE)
 			mcaddx32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
@@ -478,7 +510,7 @@ L_CONTINUE:
 	case 0x6B:	// IMUL REG32, R/M32, IMM8
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "IMUL");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		if (INCLUDE_MACHINECODE)
 			mcaddx8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
@@ -665,13 +697,13 @@ L_CONTINUE:
 	case 0x85:	// TEST R/M32, REG32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "TEST ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x86:	// XCHG R/M8, REG8
 	case 0x87:	// XCHG R/M32, REG32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "XCHG ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x88:	// MOV R/M8, REG8
 	case 0x89:	// MOV R/M32, REG32
@@ -679,7 +711,7 @@ L_CONTINUE:
 	case 0x8B:	// MOV REG32, R/M32
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "MOV ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x8C:	// MOV REG32, SREG16
 		ubyte modrm = *p.addru8;
@@ -697,13 +729,14 @@ L_CONTINUE:
 			case RM_REG_101: f = "GS"; break;
 			default: f = "SEGREG?"; break;
 			}
-			mnaddf(p, "MOV %s, %s", x86_modrm_reg(p, modrm), f);
+			mnaddf(p, "MOV %s, %s",
+				x86_modrm_reg(p, modrm, X86_OP_WIDE(b)), f);
 		}
 		break;
 	case 0x8D:	// LEA REG32, MEM32
 		if (INCLUDE_MNEMONICS)
 			mcadd(p, "LEA ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x8E:	// MOV SREG16, REG16
 		ubyte modrm = *p.addru8;
@@ -737,7 +770,8 @@ L_CONTINUE:
 		if (INCLUDE_MACHINECODE)
 			mcaddx8(p, modrm);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "POP %s", x86_modrm_reg(p, modrm));
+			mnaddf(p, "POP %s",
+				x86_modrm_reg(p, modrm, X86_OP_WIDE(b)));
 		break;
 	case 0x90:	// NOP
 		if (INCLUDE_MNEMONICS)
@@ -1045,12 +1079,12 @@ L_CONTINUE:
 	case 0xC4:	// LES REG, MEM
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "LES ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0xC5:	// LDS REG, MEM
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "LDS ");
-		x86_modrm(p);
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0xC6:	// GRP11(1A) - MOV MEM8, IMM8
 		ubyte modrm = *p.addru8;
@@ -1946,6 +1980,11 @@ L_CONTINUE:
 		++p.addrv;
 		break;
 	case 0xF0:	// LOCK
+		if (p.x86.group1) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
+		p.x86.lock = 0xF0;
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "LOCK ");
 		goto L_CONTINUE;
@@ -1954,10 +1993,20 @@ L_CONTINUE:
 			mnadd(p, "INT 1");
 		break;
 	case 0xF2:	// REPNE
+		if (p.x86.group1) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
+		p.x86.repne = 0xF2;
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "REPNE ");
 		goto L_CONTINUE;
 	case 0xF3:	// REP
+		if (p.x86.group1) {
+			p.error = DisasmError.Illegal;
+			break;
+		}
+		p.x86.rep = 0xF3;
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "REP ");
 		goto L_CONTINUE;
@@ -2065,12 +2114,12 @@ L_CONTINUE:
 		case RM_REG_000: // INC R/M8
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "INC BYTE PTR ");
-			x86_modrm_rm(p, modrm);
+			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 			break;
 		case RM_REG_001: // DEC R/M8
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "DEC BYTE PTR ");
-			x86_modrm_rm(p, modrm);
+			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 			break;
 		default:
 			if (INCLUDE_MNEMONICS)
@@ -2088,18 +2137,18 @@ L_CONTINUE:
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, p.x86.prefix_operand ?
 					"INC WORD PTR " : "INC DWORD PTR ");
-			x86_modrm_rm(p, modrm);
+			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 			break;
 		case RM_REG_001: // DEC R/M32
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, p.x86.prefix_operand ?
 					"DEC WORD PTR " : "DEC DWORD PTR ");
-			x86_modrm_rm(p, modrm);
+			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 			break;
 		case RM_REG_010: // CALL NEAR R/M32
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "CALL NEAR ");
-			x86_modrm_rm(p, modrm);
+			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 			break;
 		case RM_REG_011: // CALL FAR M16:M32
 			ushort v1 = *p.addru16;
@@ -2113,7 +2162,7 @@ L_CONTINUE:
 		case RM_REG_100: // JMP NEAR R/M32
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "CALL NEAR ");
-			x86_modrm_rm(p, modrm);
+			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 			break;
 		case RM_REG_101: // JMP FAR M16:M32
 			ushort v1 = *p.addru16;
@@ -2127,7 +2176,7 @@ L_CONTINUE:
 		case RM_REG_110: // PUSH R/M32
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "PUSH ");
-			x86_modrm_rm(p, modrm);
+			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 			break;
 		default:
 			if (INCLUDE_MNEMONICS)
@@ -2168,6 +2217,48 @@ L_CONTINUE:
 		break;
 	case 0x06: //TODO: CLTS
 		break;
+	case 0x08: // INVD
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "INVD");
+		break;
+	case 0x09: // WBINVD
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "WBINVD");
+		break;
+	case 0x0D: // PREFETCHW /1
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (INCLUDE_MACHINECODE)
+			mcaddx8(p, modrm);
+		if ((modrm & RM_REG) == RM_REG_001) {
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "PREFETCHW ");
+			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
+		} else {
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, UNKNOWN_OP);
+			p.error = DisasmError.Illegal;
+		}
+		break;
+	case 0x10: // MOVUPS/MOVUPD/MOVSS/MOVSD
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE:	// MOVUPS
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "MOVUPS ");
+			x86_modrm(p, X86_MODRM_XMM, 1);
+			break;
+		case X86_0F_66H:	// MOVUPD
+			
+			break;
+		case X86_0F_F2H:	// MOVSS
+			
+			break;
+		case X86_0F_F3H:	// MOVSD
+			
+			break;
+		default:
+		}
+		break;
 	case 0xA2: // CPUID
 		if (INCLUDE_MNEMONICS)
 			mnadd(p, "CPUID");
@@ -2188,13 +2279,7 @@ void x86_b3_3Ah(ref disasm_params_t params) {
 }
 
 enum PrefixReg {
-	None,
-	CS,
-	DS,
-	ES,
-	FS,
-	GS,
-	SS
+	None, CS, DS, ES, FS, GS, SS
 }
 
 enum : ubyte {
@@ -2251,9 +2336,30 @@ enum : ubyte {
 	SIB_BASE = RM_RM,	/// Base filter
 }
 
-/// Fetch 32/16-bit operand-variable value, depending on operand prefix, and
-/// provides the proper zero-padded strin format. This affects the memory
-/// pointer.
+// Prefix combos for 0F
+package enum {
+	X86_0F_NONE,
+	X86_0F_66H,
+	X86_0F_F2H,
+	X86_0F_F3H,
+	X86_0F_F266H,
+}
+
+// ModR/M register width
+package enum {
+	X86_MODRM_NONE,	/// 8/16-bit registers
+	X86_MODRM_WIDE,	/// 32/64-bit registers, WIDE bit falls here
+	X86_MODRM_XMM,	/// 128-bit XMM register
+	X86_MODRM_YMM,	/// 256-bit YMM register
+	X86_MODRM_ZMM,	/// 512-bit ZMM register
+}
+
+int X86_OP_WIDE(int op) { return op & 1; }
+int X86_OP_DIR(int op)  { return op & 2; }
+
+/// (Internal) Fetch 32/16-bit operand-variable value, depending on operand
+/// prefix, and provides the proper zero-padded strin format. This affects the
+/// memory pointer.
 /// Params: p = disassembler structure
 /// Returns: 32-bit or 16-bit value
 package
@@ -2271,6 +2377,33 @@ uint x86_mmfu32v(ref disasm_params_t p, ref const(char) *f) {
 	return v;
 }
 
+/// (Internal) Returns a number depending on the set prefixes for the 2-byte
+/// instructions (0FH). Useful for a switch per-instruction. Does not check
+/// for errors. Unconfirmed with the official order it's supposed to have.
+///
+/// Enumeration mapping
+/// X86_0F_NONE  (0): No prefixes
+/// X86_0F_66H   (1): 66H
+/// X86_0F_F2H   (2): F2H
+/// X86_0F_F3H   (3): F3H
+/// X86_0F_F266H (4): 66H+F2H
+///
+/// Params: p = Disassembler parameters
+///
+/// Returns: Selection number (see Enumeration mapping)
+package
+int x86_0f_select(ref disasm_params_t p) {
+	switch (p.x86.group1) {
+	case 0xF2:
+		if (p.x86.prefix_operand)
+			return X86_0F_F266H;
+		return X86_0F_F2H;
+	case 0xF3: return X86_0F_F3H;
+	default:
+	}
+	return p.x86.prefix_operand ? X86_0F_66H : X86_0F_NONE;
+}
+
 const(char) *x86_segstr(int segreg) {
 	with (PrefixReg)
 	switch (segreg) {
@@ -2284,12 +2417,19 @@ const(char) *x86_segstr(int segreg) {
 	}
 }
 
-void x86_modrm(ref disasm_params_t p) {
+/// (Internal) Process a ModR/M byte automatically.
+///
+/// This handles text formatting depending on the width and direction settings.
+/// This also calls x86_modrm_rm and x86_modrm_reg. Width is adjusted for
+/// RM field.
+///
+/// Params:
+/// 	p = Disassembler parameters
+/// 	width = Register width, see X86_MODRM_* enumerations
+/// 	direction = If set, the registers are the target
+void x86_modrm(ref disasm_params_t p, int width, int direction) {
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
-	ubyte op = *(p.addru8 - 1);
-	int direction = op & 2;	// If set, direction is to REG
-	int wide = op & 1;	// If set, WIDE operation is in effect
 	ubyte modrm = *p.addru8;
 	++p.addrv;
 	const(char) *c = ", ";
@@ -2301,14 +2441,16 @@ void x86_modrm(ref disasm_params_t p) {
 		goto L_REG;
 
 L_RM:
-	x86_modrm_rm(p, modrm, wide);
+	// Memory regs are only generic regs, so a quick hack
+	x86_modrm_rm(p, modrm,
+		width == X86_MODRM_NONE ? X86_MODRM_NONE : X86_MODRM_WIDE);
 
 	if (direction) return;
 	else mnadd(p, c);
 
 L_REG:
 	if (INCLUDE_MNEMONICS) {
-		mnadd(p, x86_modrm_reg(p, modrm, wide));
+		mnadd(p, x86_modrm_reg(p, modrm, width));
 
 		if (direction) {
 			mnadd(p, c);
@@ -2317,9 +2459,25 @@ L_REG:
 	}
 }
 
-const(char) *x86_modrm_reg(ref disasm_params_t p, ubyte modrm, int wide = 1) {
-	if (wide)
-		switch (modrm & RM_REG) {
+const(char) *x86_modrm_reg(ref disasm_params_t p, ubyte modrm, int width) {
+	modrm &= RM_REG;
+
+	switch (width) {
+	case X86_MODRM_XMM:
+		switch (modrm) {
+		case RM_REG_000: return "XMM0";
+		case RM_REG_001: return "XMM1";
+		case RM_REG_010: return "XMM2";
+		case RM_REG_011: return "XMM3";
+		case RM_REG_100: return "XMM4";
+		case RM_REG_101: return "XMM5";
+		case RM_REG_110: return "XMM6";
+		case RM_REG_111: return "XMM7";
+		default:
+		}
+		break;
+	case X86_MODRM_WIDE:
+		switch (modrm) {
 		case RM_REG_000: return "EAX";
 		case RM_REG_001: return "ECX";
 		case RM_REG_010: return "EDX";
@@ -2330,9 +2488,10 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, ubyte modrm, int wide = 1) {
 		case RM_REG_111: return "EDI";
 		default:
 		}
-	else {
+		break;
+	default: // X86_MODRM_NONE
 		if (p.x86.prefix_operand)
-			switch (modrm & RM_REG) {
+			switch (modrm) {
 			case RM_REG_000: return "AX";
 			case RM_REG_001: return "CX";
 			case RM_REG_010: return "DX";
@@ -2344,7 +2503,7 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, ubyte modrm, int wide = 1) {
 			default:
 			}
 		else
-			switch (modrm & RM_REG) {
+			switch (modrm) {
 			case RM_REG_000: return "AL";
 			case RM_REG_001: return "CL";
 			case RM_REG_010: return "DL";
@@ -2355,20 +2514,24 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, ubyte modrm, int wide = 1) {
 			case RM_REG_111: return "DL";
 			default:
 			}
+		break;
 	}
 	return null;
 }
 
-void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int wide = 1) {
+void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
+
 	// SIB mode
 	if ((modrm & RM_RM) == RM_RM_100 && (modrm & RM_MOD) != RM_MOD_11) {
 		x86_sib(p, modrm);
 	} else { // ModR/M mode
-		if ((modrm & RM_MOD) != RM_MOD_11) wide = 1;
+		if (width == X86_MODRM_NONE)
+			if ((modrm & RM_MOD) != RM_MOD_11)
+				width = X86_MODRM_WIDE;
 		const(char) *seg = x86_segstr(p.x86.segreg);
-		const(char) *reg = x86_modrm_reg(p, modrm, wide);
+		const(char) *reg = x86_modrm_reg(p, modrm, width);
 		switch (modrm & RM_MOD) {
 		case RM_MOD_00:	// Memory Mode, no displacement
 			if (INCLUDE_MNEMONICS)
@@ -2431,18 +2594,18 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 				else
 					mnaddf(p, "[%s%s*%d%+d]",
 						seg,
-						x86_modrm_reg(p, sib >> 3), scale, *p.addru32);
+						x86_modrm_reg(p, sib >> 3, X86_MODRM_WIDE), scale, *p.addru32);
 			}
 			p.addrv += 4;
 		} else { // BASE32 + INDEX * SCALE
 			if (INCLUDE_MNEMONICS) {
-				base = x86_modrm_reg(p, sib); // Reg
+				base = x86_modrm_reg(p, sib, X86_MODRM_WIDE); // Reg
 				if ((sib & SIB_INDEX) == SIB_INDEX_100)
 					mnaddf(p, "[%s%s]", seg, base);
 				else
 					mnaddf(p, "[%s%s+%s*%d",
-						seg,
-						base, x86_modrm_reg(p, sib >> 3), scale);
+						seg, base,
+						x86_modrm_reg(p, sib >> 3, X86_MODRM_WIDE), scale);
 			}
 		}
 		return;
@@ -2452,14 +2615,14 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 				mcaddf(p, "%02X", *p.addru8);
 			if (INCLUDE_MNEMONICS)
 				mnaddf(p, "[%s%s+%d]",
-					seg, x86_modrm_reg(p, sib), *p.addru8);
+					seg, x86_modrm_reg(p, sib, X86_MODRM_WIDE), *p.addru8);
 			++p.addrv;
 		} else { // BASE8 + INDEX * SCALE + DISP32
 			if (INCLUDE_MACHINECODE)
 				mcaddf(p, "%08X", *p.addru32);
 			if (INCLUDE_MNEMONICS) {
-				base = x86_modrm_reg(p, sib, 0); // Reg
-				index = x86_modrm_reg(p, sib >> 3); // RM
+				base = x86_modrm_reg(p, sib, X86_MODRM_WIDE); // Reg
+				index = x86_modrm_reg(p, sib >> 3, X86_MODRM_WIDE); // RM
 				mnaddf(p, "[%s%s+%s*%d%+d]",
 					seg, base, index, scale, *p.addru32);
 			}
@@ -2472,10 +2635,10 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 		if (p.include & DISASM_I_MNEMONICS) {
 			if ((sib & SIB_INDEX) == SIB_INDEX_100) { // BASE32 + DISP32
 				mnaddf(p, "[%s%s+%d]",
-					seg, x86_modrm_reg(p, sib), *p.addru32);
+					seg, x86_modrm_reg(p, sib, X86_MODRM_WIDE), *p.addru32);
 			} else { // BASE32 + INDEX * SCALE + DISP32
-				base = x86_modrm_reg(p, cast(ubyte)(sib << 3));
-				index = x86_modrm_reg(p, sib);
+				base = x86_modrm_reg(p, cast(ubyte)(sib << 3), X86_MODRM_WIDE);
+				index = x86_modrm_reg(p, sib, X86_MODRM_WIDE);
 				mnaddf(p, "[%s%s+%s*%d%+d]",
 					seg, base, index, scale, *p.addru32);
 			}
