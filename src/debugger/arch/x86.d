@@ -107,7 +107,7 @@ L_CONTINUE:
 			mnadd(p, "PUSH CS");
 		break;
 	case 0x0F:
-		x86_b2(p);
+		x86_0f(p);
 		break;
 	case 0x10:	// ADC R/M8, REG8
 	case 0x11:	// ADC R/M32, REG32
@@ -2178,7 +2178,7 @@ L_CONTINUE:
 
 private:
 
-void x86_b2(ref disasm_params_t p) {
+void x86_0f(ref disasm_params_t p) {
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
 
@@ -2283,7 +2283,7 @@ void x86_b2(ref disasm_params_t p) {
 					const(char) *ra =
 						x86_modrm_reg(p, modrm, X86_MODRM_XMM);
 					const(char) *rb =
-						x86_modrm_reg(p, cast(ubyte)(modrm << 3), X86_MODRM_XMM);
+						x86_modrm_reg(p, modrm << 3, X86_MODRM_XMM);
 					mnaddf(p, "MOVHLPS %s, %s", ra, rb);
 				}
 			} else {
@@ -2335,11 +2335,11 @@ void x86_b2(ref disasm_params_t p) {
 	}
 }
 
-void x86_b3_38h(ref disasm_params_t params) {
+void x86_0f_38h(ref disasm_params_t params) {
 	
 }
 
-void x86_b3_3Ah(ref disasm_params_t params) {
+void x86_0f_3Ah(ref disasm_params_t params) {
 	
 }
 
@@ -2493,6 +2493,11 @@ const(char) *x86_segstr(int segreg) {
 void x86_modrm(ref disasm_params_t p, int width, int direction) {
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
+
+	// 11 111 111
+	// || ||| +++- RM
+	// || +++----- REG
+	// ++--------- MODE
 	ubyte modrm = *p.addru8;
 	++p.addrv;
 	const(char) *c = ", ";
@@ -2522,7 +2527,7 @@ L_REG:
 	}
 }
 
-const(char) *x86_modrm_reg(ref disasm_params_t p, ubyte modrm, int width) {
+const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 	modrm &= RM_REG;
 
 	switch (width) {
@@ -2594,7 +2599,7 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 			if ((modrm & RM_MOD) != RM_MOD_11)
 				width = X86_MODRM_WIDE;
 		const(char) *seg = x86_segstr(p.x86.segreg);
-		const(char) *reg = x86_modrm_reg(p, cast(ubyte)(modrm << 3), width);
+		const(char) *reg = x86_modrm_reg(p, modrm << 3, width);
 		switch (modrm & RM_MOD) {
 		case RM_MOD_00:	// Memory Mode, no displacement
 			if (INCLUDE_MNEMONICS)
@@ -2627,6 +2632,10 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
 	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
 
+	// 11 111 111
+	// || ||| +++- BASE
+	// || +++----- INDEX
+	// ++--------- SCALE
 	ubyte sib = *p.addru8;
 	++p.addrv;
 	int scale = 1 << (sib >> 6); // 2 ^ (0b11_000_000 >> 6)
@@ -2650,18 +2659,20 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 				else
 					mnaddf(p, "[%s%s*%d%+d]",
 						seg,
-						x86_modrm_reg(p, sib >> 3, X86_MODRM_WIDE), scale, *p.addru32);
+						x86_modrm_reg(p, sib, X86_MODRM_WIDE),
+						scale, *p.addru32);
 			}
 			p.addrv += 4;
 		} else { // BASE32 + INDEX * SCALE
 			if (INCLUDE_MNEMONICS) {
-				base = x86_modrm_reg(p, sib, X86_MODRM_WIDE); // Reg
+				base = x86_modrm_reg(p, sib << 3, X86_MODRM_WIDE);
 				if ((sib & SIB_INDEX) == SIB_INDEX_100)
 					mnaddf(p, "[%s%s]", seg, base);
 				else
 					mnaddf(p, "[%s%s+%s*%d",
 						seg, base,
-						x86_modrm_reg(p, sib >> 3, X86_MODRM_WIDE), scale);
+						x86_modrm_reg(p, sib, X86_MODRM_WIDE),
+						scale);
 			}
 		}
 		return;
@@ -2670,15 +2681,17 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 			if (INCLUDE_MACHINECODE)
 				mcaddf(p, "%02X", *p.addru8);
 			if (INCLUDE_MNEMONICS)
-				mnaddf(p, "[%s%s+%d]",
-					seg, x86_modrm_reg(p, sib, X86_MODRM_WIDE), *p.addru8);
+				mnaddf(p, "[%s%s%+d]",
+					seg,
+					x86_modrm_reg(p, sib << 3, X86_MODRM_WIDE),
+					*p.addru8);
 			++p.addrv;
 		} else { // BASE8 + INDEX * SCALE + DISP32
 			if (INCLUDE_MACHINECODE)
 				mcaddf(p, "%08X", *p.addru32);
 			if (INCLUDE_MNEMONICS) {
-				base = x86_modrm_reg(p, sib, X86_MODRM_WIDE); // Reg
-				index = x86_modrm_reg(p, sib >> 3, X86_MODRM_WIDE); // RM
+				base = x86_modrm_reg(p, sib << 3, X86_MODRM_NONE);
+				index = x86_modrm_reg(p, sib, X86_MODRM_WIDE);
 				mnaddf(p, "[%s%s+%s*%d%+d]",
 					seg, base, index, scale, *p.addru32);
 			}
@@ -2691,9 +2704,11 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 		if (p.include & DISASM_I_MNEMONICS) {
 			if ((sib & SIB_INDEX) == SIB_INDEX_100) { // BASE32 + DISP32
 				mnaddf(p, "[%s%s+%d]",
-					seg, x86_modrm_reg(p, sib, X86_MODRM_WIDE), *p.addru32);
+					seg,
+					x86_modrm_reg(p, sib << 3, X86_MODRM_WIDE),
+					*p.addru32);
 			} else { // BASE32 + INDEX * SCALE + DISP32
-				base = x86_modrm_reg(p, cast(ubyte)(sib << 3), X86_MODRM_WIDE);
+				base = x86_modrm_reg(p, sib << 3, X86_MODRM_WIDE);
 				index = x86_modrm_reg(p, sib, X86_MODRM_WIDE);
 				mnaddf(p, "[%s%s+%s*%d%+d]",
 					seg, base, index, scale, *p.addru32);
