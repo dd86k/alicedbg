@@ -2289,7 +2289,7 @@ void x86_b2(ref disasm_params_t p) {
 			} else {
 				if (INCLUDE_MNEMONICS)
 					mnadd(p, "MOVLPS ");
-				x86_modrm(p, X86_MODRM_WIDE, 1);
+				x86_modrm(p, X86_MODRM_XMM, 1);
 			}
 			break;
 		case X86_0F_66H:	// MOVSLDUP
