@@ -7,7 +7,7 @@ debug enum __BUILDTYPE__ = "debug";	/// Build type
 else  enum __BUILDTYPE__ = "release";	/// Build type
 
 //
-// PLATFORM_ABI string
+// ABI string
 //
 
 version (X86) {
@@ -16,7 +16,7 @@ version (X86) {
 	version = ABI32;
 } else
 version (X86_64) {
-	enum __ABI__ = "amd64";	/// Platform ABI string
+	enum __ABI__ = "x86-64";	/// Platform ABI string
 	version = X86_ANY;
 	version = ABI64;
 } else {
@@ -27,7 +27,7 @@ version (X86_64) {
 pragma(msg, "* abi: ", __ABI__);
 
 //
-// PLATFORM_CRT string
+// CRT string
 //
 
 version (CRuntime_Microsoft)
@@ -53,7 +53,7 @@ else
 pragma(msg, "* crt: ", __CRT__);
 
 //
-// PLATFORM_OS string
+// OS string
 //
 
 version (Win64)
@@ -116,3 +116,39 @@ else
 	enum __OS__ = "Unknown";	/// Platform OS string
 
 pragma(msg, "* os: ", __OS__);
+
+//
+// Target additional information strings
+//
+
+version (DigitalMars) {
+	version = TARGETINFO;
+} else
+version (LDC) {
+	version = TARGETINFO;
+	version = TARGETINFO_CPU;
+}
+
+version (TARGETINFO) {
+	/// Target object format string
+	enum __TARGET_OBJ_FORMAT__ = __traits(getTargetInfo, "objectFormat");
+	/// Target float ABI string
+	enum __TARGET_FLOAT_ABI__  = __traits(getTargetInfo, "floatAbi");
+	/// Target C++ Runtime string
+	enum __TARGET_CPP_RT__     = __traits(getTargetInfo,"cppRuntimeLibrary");
+} else {
+	/// Target object format string
+	enum __TARGET_OBJ_FORMAT__ = "unknown";
+	/// Target float ABI string
+	enum __TARGET_FLOAT_ABI__  = "unknown";
+	/// Target C++ Runtime string
+	enum __TARGET_CPP_RT__     = "unknown";
+}
+
+version (TARGETINFO_CPU) {
+	/// Target CPU string (LDC-only)
+	enum __TARGET_CPU__ = __traits(targetCPU);
+} else {
+	/// Target CPU string (LDC-only)
+	enum __TARGET_CPU__ = __ABI__;
+}

@@ -47,13 +47,12 @@ int cliver() {
 	"License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
 	"Home: <https://git.dd86k.space/alicedbg>, <https://github.com/dd86k/alicedbg>\n"~
 	"Compiler: "~__VENDOR__~" %u.%03u, "~
-		__traits(getTargetInfo, "objectFormat")~" obj format, "~
-		__traits(getTargetInfo, "floatAbi")~" float abi\n"~
-	"CRT: "~__CRT__~" ("~__traits(getTargetInfo,"cppRuntimeLibrary")~") on "~__OS__~"\n",
+		__TARGET_OBJ_FORMAT__~" obj format, "~
+		__TARGET_FLOAT_ABI__~" float abi\n"~
+	"CRT: "~__CRT__~" ("~__TARGET_CPP_RT__~") on "~__OS__~"\n"~
+	"CPU: "~__TARGET_CPU__~"\n",
 	ver.version_major, ver.version_minor
 	);
-	version (LDC)
-		puts("CPU: "~__traits(targetCPU));
 	return 0;
 }
 
