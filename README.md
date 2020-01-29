@@ -1,16 +1,41 @@
 # Introduction
 
-**Goal**: alicedbg aims to be a simple debugger for native and VM debugging.
-
 **Please note that this is still is very early development!**
 
-It exists because I wanted an easy-to-use debugger with multiple
-user-interfaces available anywhere and anytime, even via SSH. Also for
-academic reasons, more of the "I'm curious" type than anything else.
+The alicedbg project aims to be an easy-to-use, simple debugger.
+
+_Why not just use GDB?_ One might ask.
+
+_Why not make one myself?_ I asked myself.
+
+## Support Matrix
+
+| OS | CRT | Debugging core |
+|---|---|---|
+| Windows | Microsoft | ✔️ |
+| Linux | Glibc | ✔️ |
+
+| ABI | ~% | Disassembler status |
+|---|---|---|
+| x86-32 | 40 | Still adding |
+| x86-64 | 0 | Waiting on x86-32 |
+| arm | 0 | Waiting on x86-64 |
+| aarch64 | 0 | Waiting on x86-64 |
+
+## FAQ
+
+### Why D?
+
+I love the D programming language for so many reason I could go on forever
+talking about it, so I'll just say that I love it for its practical approach.
+
+### What about the GC?
+
+The project is compiled with the BetterC mode, so no druntime and no GC. The
+functions are also marked with a C extern so that hopefully C programs (or
+others) use its functions as a library (static or dynamically).
 
 # Usage
-
-## Getting started
 
 To debug an application, use -exec PATH, or to debug an existing process,
 use -pid PROCESSID.
@@ -57,7 +82,8 @@ DUB is highly required to build the project. A compiler can be chosen with the
 `--compiler=` switch. I try to support DMD, GDC, and LDC as much as possible.
 
 Do note that the `betterC` mode is activated for normal builds and
-documentation. Unittesting (and the rest) uses the Phobos library (D's stdlib).
+documentation. Unittesting (and the rest) uses the druntime library so any
+Phobos functions may be used.
 
 | Build type | Command |
 |---|---|
@@ -68,5 +94,4 @@ documentation. Unittesting (and the rest) uses the Phobos library (D's stdlib).
 
 Without DUB, it's still possible to compile the project, but I believe you'll
 have to reference every file (by module name is okay). The `-betterC` switch
-is optional, but required, since the project is written to fall under that
-mode.
+is optional, but recommended.
