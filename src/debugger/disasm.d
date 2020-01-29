@@ -190,6 +190,12 @@ private import core.stdc.stdarg;
 
 immutable const(char) *UNKNOWN_OP = "??";
 
+void mnill(ref disasm_params_t p) {
+	if (p.include & DISASM_I_MACHINECODE)
+		mnadd(p, UNKNOWN_OP);
+	p.error = DisasmError.Illegal;
+}
+
 void mcaddx8(ref disasm_params_t p, ubyte v) {
 	mcaddf(p, "%02X ", v);
 }

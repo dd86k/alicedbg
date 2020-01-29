@@ -762,9 +762,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (modrm & RM_RM) { // Invalid
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, UNKNOWN_OP);
-			p.error = DisasmError.Illegal;
+			mnill(p);
 			break;
 		}
 		if (INCLUDE_MACHINECODE)
@@ -1054,9 +1052,7 @@ L_CONTINUE:
 		case RM_REG_101: a = "ROR "; break;
 		case RM_REG_111: a = "SAR "; break;
 		default:
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, UNKNOWN_OP);
-			p.error = DisasmError.Illegal;
+			mnill(p);
 			break main;
 		}
 		if (INCLUDE_MNEMONICS)
@@ -1091,9 +1087,7 @@ L_CONTINUE:
 		if (INCLUDE_MACHINECODE)
 			mcaddx8(p, modrm);
 		if (modrm & RM_REG) {
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, UNKNOWN_OP);
-			p.error = DisasmError.Illegal;
+			mnill(p);
 			break main;
 		}
 		if (INCLUDE_MNEMONICS)
@@ -1110,9 +1104,7 @@ L_CONTINUE:
 		if (INCLUDE_MACHINECODE)
 			mcaddx8(p, modrm);
 		if (modrm & RM_REG) {
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, UNKNOWN_OP);
-			p.error = DisasmError.Illegal;
+			mnill(p);
 			break main;
 		}
 		if (INCLUDE_MNEMONICS)
@@ -1188,9 +1180,8 @@ L_CONTINUE:
 		case RM_REG_101: m = "SHR "; break;
 		case RM_REG_111: m = "ROL "; break;
 		default:
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, UNKNOWN_OP);
-			p.error = DisasmError.Illegal;
+			mnill(p);
+			break main;
 		}
 		if (INCLUDE_MNEMONICS) {
 			const(char) *a = b >= 0xD2 ? ", CL" : ", 1";
@@ -2075,9 +2066,7 @@ L_CONTINUE:
 				mnadd(p, w ? ", EAX" : ", AL");
 			break;
 		default:
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, UNKNOWN_OP);
-			p.error = DisasmError.Illegal;
+			mnill(p);
 			break main;
 		}
 		break;
@@ -2122,9 +2111,7 @@ L_CONTINUE:
 			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 			break;
 		default:
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, UNKNOWN_OP);
-			p.error = DisasmError.Illegal;
+			mnill(p);
 		}
 		break;
 	case 0xFF:	// GRP 5
@@ -2179,15 +2166,11 @@ L_CONTINUE:
 			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 			break;
 		default:
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, UNKNOWN_OP);
-			p.error = DisasmError.Illegal;
+			mnill(p);
 		}
 		break;
 	default:
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, UNKNOWN_OP);
-		p.error = DisasmError.Illegal;
+		mnill(p);
 	}
 
 	return p.error;
@@ -2233,60 +2216,114 @@ void x86_b2(ref disasm_params_t p) {
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "PREFETCHW ");
 			x86_modrm_rm(p, modrm, X86_MODRM_WIDE);
-		} else {
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, UNKNOWN_OP);
-			p.error = DisasmError.Illegal;
-		}
+		} else
+			mnill(p);
 		break;
 	case 0x10: // MOVUPS/MOVUPD/MOVSS/MOVSD
 		switch (x86_0f_select(p)) {
 		case X86_0F_NONE:	// MOVUPS
-			if (INCLUDE_MACHINECODE)
+			if (INCLUDE_MNEMONICS)
 				mnadd(p, "MOVUPS ");
 			x86_modrm(p, X86_MODRM_XMM, 1);
 			break;
 		case X86_0F_66H:	// MOVUPD
-			if (INCLUDE_MACHINECODE)
+			if (INCLUDE_MNEMONICS)
 				mnadd(p, "MOVUPD ");
 			x86_modrm(p, X86_MODRM_XMM, 1);
 			break;
 		case X86_0F_F2H:	// MOVSS
-			if (INCLUDE_MACHINECODE)
+			if (INCLUDE_MNEMONICS)
 				mnadd(p, "MOVSS ");
 			x86_modrm(p, X86_MODRM_XMM, 1);
 			break;
 		case X86_0F_F3H:	// MOVSD
-			if (INCLUDE_MACHINECODE)
+			if (INCLUDE_MNEMONICS)
 				mnadd(p, "MOVSD ");
 			x86_modrm(p, X86_MODRM_XMM, 1);
 			break;
 		default:
+			mnill(p);
 		}
 		break;
 	case 0x11: // MOVUPS/MOVUPD/MOVSS/MOVSD
 		switch (x86_0f_select(p)) {
 		case X86_0F_NONE:	// MOVUPS
-			if (INCLUDE_MACHINECODE)
+			if (INCLUDE_MNEMONICS)
 				mnadd(p, "MOVUPS ");
 			x86_modrm(p, X86_MODRM_XMM, 0);
 			break;
 		case X86_0F_66H:	// MOVUPD
-			if (INCLUDE_MACHINECODE)
+			if (INCLUDE_MNEMONICS)
 				mnadd(p, "MOVUPD ");
 			x86_modrm(p, X86_MODRM_XMM, 0);
 			break;
 		case X86_0F_F2H:	// MOVSS
-			if (INCLUDE_MACHINECODE)
+			if (INCLUDE_MNEMONICS)
 				mnadd(p, "MOVSS ");
 			x86_modrm(p, X86_MODRM_XMM, 0);
 			break;
 		case X86_0F_F3H:	// MOVSD
-			if (INCLUDE_MACHINECODE)
+			if (INCLUDE_MNEMONICS)
 				mnadd(p, "MOVSD ");
 			x86_modrm(p, X86_MODRM_XMM, 0);
 			break;
 		default:
+			mnill(p);
+		}
+		break;
+	case 0x12: // {MOVLPS|MOVHLPS}/MOVSLDUP/MOVLPD/MOVDDUP
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE:	// MOVLPS/MOVHLPS
+			if ((*p.addru8 & RM_MOD) == RM_MOD_11) {
+				ubyte modrm = *p.addru8;
+				++p.addrv;
+				if (INCLUDE_MACHINECODE)
+					mcaddx8(p, modrm);
+				if (INCLUDE_MNEMONICS) {
+					const(char) *ra =
+						x86_modrm_reg(p, modrm, X86_MODRM_XMM);
+					const(char) *rb =
+						x86_modrm_reg(p, cast(ubyte)(modrm << 3), X86_MODRM_XMM);
+					mnaddf(p, "MOVHLPS %s, %s", ra, rb);
+				}
+			} else {
+				if (INCLUDE_MNEMONICS)
+					mnadd(p, "MOVLPS ");
+				x86_modrm(p, X86_MODRM_WIDE, 1);
+			}
+			break;
+		case X86_0F_66H:	// MOVSLDUP
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "MOVSLDUP ");
+			x86_modrm(p, X86_MODRM_XMM, 1);
+			break;
+		case X86_0F_F2H:	// MOVLPD
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "MOVLPD ");
+			x86_modrm(p, X86_MODRM_XMM, 1);
+			break;
+		case X86_0F_F3H:	// MOVDDUP
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "MOVDDUP ");
+			x86_modrm(p, X86_MODRM_XMM, 1);
+			break;
+		default:
+			mnill(p);
+		}
+		break;
+	case 0x13: // MOVLPS/MOVLPD
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE:	// MOVLPS/MOVHLPS
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "MOVLPS ");
+			break;
+		case X86_0F_F2H:	// MOVLPD
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "MOVLPD ");
+			x86_modrm(p, X86_MODRM_XMM, 0);
+			break;
+		default:
+			mnill(p);
 		}
 		break;
 	case 0xA2: // CPUID
@@ -2294,9 +2331,7 @@ void x86_b2(ref disasm_params_t p) {
 			mnadd(p, "CPUID");
 		break;
 	default:
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, UNKNOWN_OP);
-		p.error = DisasmError.Illegal;
+		mnill(p);
 	}
 }
 
