@@ -135,7 +135,7 @@ version (TARGETINFO) {
 	/// Target float ABI string
 	enum __TARGET_FLOAT_ABI__  = __traits(getTargetInfo, "floatAbi");
 	/// Target C++ Runtime string
-	enum __TARGET_CPP_RT__     = __traits(getTargetInfo,"cppRuntimeLibrary");
+	enum __TARGET_CPP_RT__     = __traits(getTargetInfo, "cppRuntimeLibrary");
 } else {
 	/// Target object format string
 	enum __TARGET_OBJ_FORMAT__ = "unknown";

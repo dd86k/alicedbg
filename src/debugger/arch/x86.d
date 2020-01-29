@@ -1229,34 +1229,34 @@ L_CONTINUE:
 				switch (modrm & 0xF0) {
 				case 0xC0: // FADD/FMUL
 					if (modrmv < 0x8) { // FADD
-						f = "FADD ST(0),ST(%u)";
+						f = "FADD ST(0), ST(%u)";
 					} else { // FMUL
 						modrmv -= 8;
-						f = "FMUL ST(0),ST(%u)";
+						f = "FMUL ST(0), ST(%u)";
 					}
 					break;
 				case 0xD0: // FCOM/FCOMP
 					if (modrmv < 0x8) { // FCOM
-						f = "FCOM ST(0),ST(%u)";
+						f = "FCOM ST(0), ST(%u)";
 					} else { // FCOMP
 						modrmv -= 8;
-						f = "FCOMP ST(0),ST(%u)";
+						f = "FCOMP ST(0), ST(%u)";
 					}
 					break;
 				case 0xE0: // FSUB/FSUBR
 					if (modrmv < 0x8) { // FSUB
-						f = "FSUB ST(0),ST(%u)";
+						f = "FSUB ST(0), ST(%u)";
 					} else { // FSUBR
 						modrmv -= 8;
-						f = "FSUBR ST(0),ST(%u)";
+						f = "FSUBR ST(0), ST(%u)";
 					}
 					break;
 				case 0xF0: // FDIV/FDIVR
 					if (modrmv < 0x8) { // FDIV
-						f = "FDIV ST(0),ST(%u)";
+						f = "FDIV ST(0), ST(%u)";
 					} else { // FDIVR
 						modrmv -= 8;
-						f = "FDIVR ST(0),ST(%u)";
+						f = "FDIVR ST(0), ST(%u)";
 					}
 					break;
 				default:
@@ -1312,10 +1312,10 @@ L_CONTINUE:
 				switch (modrm & 0xF0) {
 				case 0xC0: // FLD/FXCH
 					if (modrmv < 0x8) { // FLD
-						f = "FLD ST(0),ST(%u)";
+						f = "FLD ST(0), ST(%u)";
 					} else { // FXCH
 						modrmv -= 8;
-						f = "FXCH ST(0),ST(%u)";
+						f = "FXCH ST(0), ST(%u)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
@@ -1422,19 +1422,19 @@ L_CONTINUE:
 				switch (modrm & 0xF0) {
 				case 0xC0: // FCMOVB/FCMOVE
 					if (modrmv < 0x8) { // FCMOVB
-						f = "FCMOVB ST(0),ST(%u)";
+						f = "FCMOVB ST(0), ST(%u)";
 					} else { // FCMOVE
 						modrmv -= 8;
-						f = "FCMOVE ST(0),ST(%u)";
+						f = "FCMOVE ST(0), ST(%u)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
 				case 0xD0: // FCMOVBE/FCMOVU
 					if (modrmv < 0x8) { // FCMOVBE
-						f = "FCMOVBE ST(0),ST(%u)";
+						f = "FCMOVBE ST(0), ST(%u)";
 					} else { // FCMOVU
 						modrmv -= 8;
-						f = "FCMOVU ST(0),ST(%u)";
+						f = "FCMOVU ST(0), ST(%u)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
@@ -1503,19 +1503,19 @@ L_CONTINUE:
 				switch (modrm & 0xF0) {
 				case 0xC0: // FCMOVNB/FCMOVNE
 					if (modrmv < 0x8) { // FCMOVNB
-						f = "FCMOVNB ST(0),ST(%u)";
+						f = "FCMOVNB ST(0), ST(%u)";
 					} else { // FCMOVNE
 						modrmv -= 8;
-						f = "FCMOVNE ST(0),ST(%u)";
+						f = "FCMOVNE ST(0), ST(%u)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
 				case 0xD0: // FCMOVNBE/FCMOVNU
 					if (modrmv < 0x8) { // FCMOVNBE
-						f = "FCMOVNBE ST(0),ST(%u)";
+						f = "FCMOVNBE ST(0), ST(%u)";
 					} else { // FCMOVNU
 						modrmv -= 8;
-						f = "FCMOVNU ST(0),ST(%u)";
+						f = "FCMOVNU ST(0), ST(%u)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
@@ -1532,12 +1532,12 @@ L_CONTINUE:
 						mnadd(p, f);
 					} else { // FUCOMI
 						modrmv -= 8;
-						mnaddf(p, "FUCOMI ST(0),ST(%u)", modrmv);
+						mnaddf(p, "FUCOMI ST(0), ST(%u)", modrmv);
 					}
 					break;
 				case 0xF0: // FCOMI/Reserved
 					if (modrmv < 0x8) { // FCOMI
-						f = "FCOMI ST(0),ST(%u)";
+						f = "FCOMI ST(0), ST(%u)";
 						mnaddf(p, f, modrmv);
 					} else { // Reserved
 						mnadd(p, UNKNOWN_OP);
@@ -1596,10 +1596,10 @@ L_CONTINUE:
 				switch (modrm & 0xF0) {
 				case 0xC0: // FADD/FMUL
 					if (modrmv < 0x8) { // FADD
-						f = "FADD ST(%u),ST(0)";
+						f = "FADD ST(%u), ST(0)";
 					} else { // FMUL
 						modrmv -= 8;
-						f = "FMUL ST(%u),ST(0)";
+						f = "FMUL ST(%u), ST(0)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
@@ -1609,19 +1609,19 @@ L_CONTINUE:
 					break;
 				case 0xE0: // FSUBR/FSUB
 					if (modrmv < 0x8) { // FSUBR
-						f = "FSUBR ST(%u),ST(0)";
+						f = "FSUBR ST(%u), ST(0)";
 					} else { // FSUB
 						modrmv -= 8;
-						f = "FSUB ST(%u),ST(0)";
+						f = "FSUB ST(%u), ST(0)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
 				case 0xF0: // FDIVR/FDIV
 					if (modrmv < 0x8) { // FDIVR
-						f = "FDIVR ST(%u),ST(0)";
+						f = "FDIVR ST(%u), ST(0)";
 					} else { // FDIV
 						modrmv -= 8;
-						f = "FDIV ST(%u),ST(0)";
+						f = "FDIV ST(%u), ST(0)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
@@ -1694,7 +1694,7 @@ L_CONTINUE:
 					break;
 				case 0xE0: // FUCOM/FUCOMP
 					if (modrmv < 0x8) { // FUCOM
-						f = "FUCOM ST(%u),ST(0)";
+						f = "FUCOM ST(%u), ST(0)";
 					} else { // FUCOMP
 						modrmv -= 8;
 						f = "FUCOMP ST(%u)";
@@ -1755,10 +1755,10 @@ L_CONTINUE:
 				switch (modrm & 0xF0) {
 				case 0xC0: // FADDP/FMULP
 					if (modrmv < 0x8) { // FADDP
-						f = "FADDP ST(%u),ST(0)";
+						f = "FADDP ST(%u), ST(0)";
 					} else { // FMULP
 						modrmv -= 8;
-						f = "FMULP ST(%u),ST(0)";
+						f = "FMULP ST(%u), ST(0)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
@@ -1773,19 +1773,19 @@ L_CONTINUE:
 					break;
 				case 0xE0: // FSUBRP/FSUBP
 					if (modrmv < 0x8) { // FSUBP
-						f = "FSUBRP ST(%u),ST(0)";
+						f = "FSUBRP ST(%u), ST(0)";
 					} else { // FSUBP
 						modrmv -= 8;
-						f = "FUCOMP ST(%u),ST(0)";
+						f = "FUCOMP ST(%u), ST(0)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
 				case 0xF0: // FDIVRP/FDIVP
 					if (modrmv < 0x8) { // FDIVRP
-						f = "FDIVRP ST(%u),ST(0)";
+						f = "FDIVRP ST(%u), ST(0)";
 					} else { // FDIVP
 						modrmv -= 8;
-						f = "FDIVP ST(%u),ST(0)";
+						f = "FDIVP ST(%u), ST(0)";
 					}
 					mnaddf(p, f, modrmv);
 					break;
@@ -1848,12 +1848,12 @@ L_CONTINUE:
 							mnadd(p, "FSTSW AX");
 					} else { // FUCOMIP
 						modrmv -= 8;
-						mnaddf(p, "FUCOMIP ST(0),ST(%u)", modrmv);
+						mnaddf(p, "FUCOMIP ST(0), ST(%u)", modrmv);
 					}
 					break;
 				case 0xF0: // FCOMIP/Reserved
 					if (modrmv < 0x8) { // FCOMIP
-						mnaddf(p, "FCOMIP ST(0),ST(%u)", modrmv);
+						mnaddf(p, "FCOMIP ST(0), ST(%u)", modrmv);
 					} else { // Reserved
 						mnadd(p, UNKNOWN_OP);
 						p.error = DisasmError.Illegal;
@@ -2247,13 +2247,44 @@ void x86_b2(ref disasm_params_t p) {
 			x86_modrm(p, X86_MODRM_XMM, 1);
 			break;
 		case X86_0F_66H:	// MOVUPD
-			
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "MOVUPD ");
+			x86_modrm(p, X86_MODRM_XMM, 1);
 			break;
 		case X86_0F_F2H:	// MOVSS
-			
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "MOVSS ");
+			x86_modrm(p, X86_MODRM_XMM, 1);
 			break;
 		case X86_0F_F3H:	// MOVSD
-			
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "MOVSD ");
+			x86_modrm(p, X86_MODRM_XMM, 1);
+			break;
+		default:
+		}
+		break;
+	case 0x11: // MOVUPS/MOVUPD/MOVSS/MOVSD
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE:	// MOVUPS
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "MOVUPS ");
+			x86_modrm(p, X86_MODRM_XMM, 0);
+			break;
+		case X86_0F_66H:	// MOVUPD
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "MOVUPD ");
+			x86_modrm(p, X86_MODRM_XMM, 0);
+			break;
+		case X86_0F_F2H:	// MOVSS
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "MOVSS ");
+			x86_modrm(p, X86_MODRM_XMM, 0);
+			break;
+		case X86_0F_F3H:	// MOVSD
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "MOVSD ");
+			x86_modrm(p, X86_MODRM_XMM, 0);
 			break;
 		default:
 		}
@@ -2359,7 +2390,9 @@ int X86_OP_DIR(int op)  { return op & 2; }
 /// (Internal) Fetch 32/16-bit operand-variable value, depending on operand
 /// prefix, and provides the proper zero-padded strin format. This affects the
 /// memory pointer.
-/// Params: p = disassembler structure
+/// Params:
+/// 	p = disassembler structure
+/// 	f = String pointer receiving machine formatting text
 /// Returns: 32-bit or 16-bit value
 package
 uint x86_mmfu32v(ref disasm_params_t p, ref const(char) *f) {
@@ -2393,14 +2426,10 @@ uint x86_mmfu32v(ref disasm_params_t p, ref const(char) *f) {
 package
 int x86_0f_select(ref disasm_params_t p) {
 	switch (p.x86.group1) {
-	case 0xF2:
-		if (p.x86.prefix_operand)
-			return X86_0F_F266H;
-		return X86_0F_F2H;
+	case 0xF2: return p.x86.prefix_operand ? X86_0F_F266H : X86_0F_F2H;
 	case 0xF3: return X86_0F_F3H;
-	default:
+	default:   return p.x86.prefix_operand ? X86_0F_66H : X86_0F_NONE;
 	}
-	return p.x86.prefix_operand ? X86_0F_66H : X86_0F_NONE;
 }
 
 const(char) *x86_segstr(int segreg) {
@@ -2441,9 +2470,8 @@ void x86_modrm(ref disasm_params_t p, int width, int direction) {
 
 L_RM:
 	// Memory regs are only general registers
-	if (width > X86_MODRM_WIDE)
-		width = X86_MODRM_WIDE;
-	x86_modrm_rm(p, modrm, width);
+	x86_modrm_rm(p, modrm,
+		width > X86_MODRM_WIDE ? X86_MODRM_WIDE : width);
 
 	if (direction) return;
 	else mnadd(p, c);
