@@ -17,4 +17,5 @@ alicedbg-test-*
 *.obj
 *.lst
 *.json
+dub*.s
 NOTES
