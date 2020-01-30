@@ -9,7 +9,7 @@ import debugger.core;
 extern (C):
 private:
 
-enum CLIInterface {
+enum UserInterface {
 	tui,
 	loop,
 //	interpreter,
@@ -31,7 +31,7 @@ enum CLIPage {
 
 /// CLI options
 struct cliopt_t {
-	CLIInterface ui;
+	UserInterface ui;
 	CLIDebugMode debugtype;
 	union {
 		ushort pid;
@@ -173,9 +173,9 @@ int main(int argc, const(char) **argv) {
 			}
 			const(char) *ui = argv[++argi];
 			if (strcmp(ui, "tui") == 0)
-				opt.ui = CLIInterface.tui;
+				opt.ui = UserInterface.tui;
 			else if (strcmp(ui, "loop") == 0)
-				opt.ui = CLIInterface.loop;
+				opt.ui = UserInterface.loop;
 			else if (strcmp(ui, "?") == 0)
 				return clipage(CLIPage.ui);
 			else {
@@ -268,7 +268,7 @@ int main(int argc, const(char) **argv) {
 		return EXIT_FAILURE;
 	}
 
-	with (CLIInterface)
+	with (UserInterface)
 	final switch (opt.ui) {
 	case loop: return loop_enter;
 	case tui: return tui_enter;

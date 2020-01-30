@@ -84,7 +84,7 @@ enum DisasmStyleX86 : ubyte {
 	Nasm,	/// (Not implemented) (NASM) Netwide Assembler
 	Masm,	/// (Not implemented) (MASM) Microsoft Assembler
 	Ideal,	/// (Not implemented) Borland Ideal
-	Hydeasm,	/// (Not implemented) Randall Hyde High Level Assembly Language
+	Hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
 	Att,	/// (Not implemented) AT&T
 }
 
