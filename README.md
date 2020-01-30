@@ -10,10 +10,14 @@ _Why not make one myself?_ I asked myself.
 
 ## Support Matrix
 
-| OS | CRT | Debugging core |
-|---|---|---|
-| Windows | Microsoft | ✔️ |
-| Linux | Glibc | ✔️ |
+### Feature Support
+
+| ABI | OS | CRT | Debugging core |
+|---|---|---|:-:|
+| x86, x86-64 | Windows | Microsoft | ✔️ |
+| | Linux | Glibc | ✔️ |
+
+### Disassembler Progress
 
 | ABI | ~% | Disassembler status |
 |---|---|---|
