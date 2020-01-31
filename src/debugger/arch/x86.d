@@ -2189,7 +2189,7 @@ void x86_0f(ref disasm_params_t p) {
 		mcaddx8(p, b);
 
 	switch (b) {
-	case 0x00: //TODO: GRP6
+	case 0x00: // GRP6
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 
@@ -2198,22 +2198,34 @@ void x86_0f(ref disasm_params_t p) {
 
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // SLDT
-		
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "SLDT ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_001: // STR
-		
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "STR ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_010: // LLDT
-		
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "LLDT ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_011: // LTR
-		
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "LTR ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_100: // VERR
-		
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "VERR ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
-		case RM_REG_101: // VERR
-		
+		case RM_REG_101: // VERW
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "VERW ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		default:
 			mnill(p);
@@ -2228,40 +2240,171 @@ void x86_0f(ref disasm_params_t p) {
 			mcaddx8(p, modrm);
 
 		switch (modrm & RM_REG) {
-		case RM_REG_000: // VM*
-			if (mod11) {
+		case RM_REG_000:
+			if (mod11) { // VM*
 				switch (modrm & RM_RM) {
 				case RM_RM_001: // VMCALL
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "VMCALL");
 					break;
 				case RM_RM_010: // VMLAUNCH
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "VMLAUNCH");
 					break;
 				case RM_RM_011: // VMRESUME
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "VMRESUME");
 					break;
 				case RM_RM_100: // VMXOFF
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "VMXOFF");
 					break;
 				default:
 					mnill(p);
 				}
 			} else { // SGDT
+				if (INCLUDE_MNEMONICS)
+					mnadd(p, "SGDT ");
+				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			}
 			break;
-		case RM_REG_001: // MONITOR*
-		
+		case RM_REG_001:
+			if (mod11) { // MONITOR*
+				switch (modrm & RM_RM) {
+				case RM_RM_000: // MONITOR
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "MONITOR");
+					break;
+				case RM_RM_001: // MWAIT
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "MWAIT");
+					break;
+				case RM_RM_010: // CLAC
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "CLAC");
+					break;
+				case RM_RM_011: // STAC
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "STAC");
+					break;
+				case RM_RM_111: // ENCLS
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "ENCLS");
+					break;
+				default:
+					mnill(p);
+				}
+			} else { // SIDT
+				if (INCLUDE_MNEMONICS)
+					mnadd(p, "SIDT ");
+				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			}
 			break;
-		case RM_REG_010: // X*
-		
+		case RM_REG_010:
+			if (mod11) { // X*
+				switch (modrm & RM_RM) {
+				case RM_RM_000: // XGETBV
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "XGETBV");
+					break;
+				case RM_RM_001: // XSETBV
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "XSETBV");
+					break;
+				case RM_RM_100: // VMFUNC
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "VMFUNC");
+					break;
+				case RM_RM_101: // XEND
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "XEND");
+					break;
+				case RM_RM_110: // XTEST
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "XTEST");
+					break;
+				case RM_RM_111: // ENCLU
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "ENCLU");
+					break;
+				default:
+					mnill(p);
+				}
+			} else { // LGDT
+				if (INCLUDE_MNEMONICS)
+					mnadd(p, "LGDT ");
+				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			}
 			break;
-		case RM_REG_011: // LIDT
-		
+		case RM_REG_011:
+			if (mod11) { // (AMD) SVM
+				switch (modrm & RM_RM) {
+				case RM_RM_000: // VMRUN
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "VMRUN");
+					break;
+				case RM_RM_001: // VMMCALL
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "VMMCALL");
+					break;
+				case RM_RM_010: // VMLOAD
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "VMLOAD");
+					break;
+				case RM_RM_011: // VMSAVE
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "VMSAVE");
+					break;
+				case RM_RM_100: // STGI
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "STGI");
+					break;
+				case RM_RM_011: // CLGI
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "CLGI");
+					break;
+				case RM_RM_011: // SKINIT
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "SKINIT");
+					break;
+				case RM_RM_011: // INVLPGA
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "INVLPGA");
+					break;
+				default:
+					mnill(p);
+				}
+			} else { // LIDT
+				if (INCLUDE_MNEMONICS)
+					mnadd(p, "LGDT ");
+				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			}
 			break;
 		case RM_REG_100: // SMSW
-		
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "SMSW ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_110: // LMSW
-		
+			if (INCLUDE_MNEMONICS)
+				mnadd(p, "LMSW ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
-		case RM_REG_111: // 
-		
+		case RM_REG_111:
+			if (mod11) { // *
+				switch (modrm & RM_RM) {
+				case RM_RM_001: // RDTSCP
+					if (INCLUDE_MNEMONICS)
+						mnadd(p, "RDTSCP");
+					break;
+				default:
+					mnill(p);
+				}
+			} else { // INVLPG
+				if (INCLUDE_MNEMONICS)
+					mnadd(p, "INVLPG ");
+				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			}
 			break;
 		default:
 			mnill(p);
@@ -2490,13 +2633,13 @@ void x86_0f(ref disasm_params_t p) {
 		case X86_WIDTH_NONE:
 		
 			break;
-		case X86_0F_66:
+		case X86_0F_66H:
 		
 			break;
-		case X86_0F_F2:
+		case X86_0F_F2H:
 		
 			break;
-		case X86_0F_F3:
+		case X86_0F_F3H:
 		
 			break;
 		default:
