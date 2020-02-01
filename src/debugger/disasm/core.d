@@ -137,13 +137,15 @@ enum DISASM_O_BACKWARD	= 0x0002;
 enum DISASM_O_MACHLOWERCASE	= 0x0004;
 /// Diasm option: Lower-case mnemonics instructions
 enum DISASM_O_INTRLOWERCASE	= 0x0008;
+/// Disasm option: Zero-fill output buffers
+enum DISASM_O_CLEARBUFFER	= 0x0010;
 
 /// Diasm option: Lower-case machine code instructions and mnemonics instructions
 enum DISASM_O_LOWERCASE	= DISASM_O_MACHLOWERCASE | DISASM_O_INTRLOWERCASE;
 
 /**
- * Disassemble from a memory pointer given in params. The caller must ensure
- * memory access rights are present and bounds must be respected.
+ * Disassemble from a memory pointer given in params. Caller must ensure
+ * memory pointer points to readable regions and bounds are respected.
  * Params:
  * 	p = Disassembler parameters
  * Returns: Error code if non-zero
@@ -157,6 +159,12 @@ int disasm_line(ref disasm_params_t p) {
 
 	p.error = DisasmError.None;
 	p.thisaddr = p.addrv;
+
+	if (p.options & DISASM_O_CLEARBUFFER) {
+		import core.stdc.string : memset;
+		memset(&p.mcbuf, 0, DISASM_BUF_SIZE);
+		memset(&p.mnbuf, 0, DISASM_BUF_SIZE);
+	}
 
 	with (DisasmABI)
 	switch (p.abi) {
