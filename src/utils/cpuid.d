@@ -1,4 +1,4 @@
-module debugger.cpuid;
+module utils.cpuid;
 
 extern (C):
 
