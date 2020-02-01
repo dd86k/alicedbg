@@ -2231,7 +2231,7 @@ void x86_0f(ref disasm_params_t p) {
 			mnill(p);
 		}
 		break;
-	case 0x01: //TODO: GRP7
+	case 0x01: // GRP7
 		ubyte modrm = *p.addru8;
 		ubyte mod11 = (modrm & RM_MOD) == RM_MOD_11;
 		++p.addrv;
@@ -2359,20 +2359,19 @@ void x86_0f(ref disasm_params_t p) {
 					if (INCLUDE_MNEMONICS)
 						mnadd(p, "STGI");
 					break;
-				case RM_RM_011: // CLGI
+				case RM_RM_101: // CLGI
 					if (INCLUDE_MNEMONICS)
 						mnadd(p, "CLGI");
 					break;
-				case RM_RM_011: // SKINIT
+				case RM_RM_110: // SKINIT
 					if (INCLUDE_MNEMONICS)
 						mnadd(p, "SKINIT");
 					break;
-				case RM_RM_011: // INVLPGA
+				case RM_RM_111: // INVLPGA
 					if (INCLUDE_MNEMONICS)
 						mnadd(p, "INVLPGA");
 					break;
-				default:
-					mnill(p);
+				default: // never
 				}
 			} else { // LIDT
 				if (INCLUDE_MNEMONICS)
@@ -2410,9 +2409,15 @@ void x86_0f(ref disasm_params_t p) {
 			mnill(p);
 		}
 		break;
-	case 0x02: //TODO: LAR REG32, R/M16
+	case 0x02: // LAR REG32, R/M16
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "LAR ");
+		x86_modrm(p, X86_WIDTH_WIDE, 1);
 		break;
-	case 0x03: //TODO: LSL REG32, R/M16
+	case 0x03: // LSL REG32, R/M16
+		if (INCLUDE_MNEMONICS)
+			mnadd(p, "LSL ");
+		x86_modrm(p, X86_WIDTH_WIDE, 1);
 		break;
 	case 0x06: // CLTS
 		if (INCLUDE_MNEMONICS)
@@ -2628,23 +2633,65 @@ void x86_0f(ref disasm_params_t p) {
 			mnill(p);
 		}
 		break;
-	case 0x18: //TODO: GRP 16
-		switch (x86_0f_select(p)) {
-		case X86_WIDTH_NONE:
+	case 0x18: // GRP 16
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+
+		if (INCLUDE_MACHINECODE)
+			mcaddx8(p, modrm);
+
+		if ((modrm & RM_MOD) == RM_MOD_11) {
+			mnill(p);
+			break;
+		}
+
+		switch (modrm & RM_REG) {
+		case RM_REG_000:
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "PREFETCHNTA ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			break;
+		case RM_REG_001:
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "PREFETCHT0 ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			break;
+		case RM_REG_010:
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "PREFETCHT1 ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			break;
+		case RM_REG_011:
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "PREFETCHT2 ");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			break;
+		default: // NOP (reserved)
+			if (INCLUDE_MACHINECODE)
+				mnadd(p, "NOP");
+		}
+		break;
+	case 0x19: // NOP (reserved)
+		if (INCLUDE_MACHINECODE)
+			mnadd(p, "NOP");
+		break;
+	case 0x1A: // BNDLDX/BNDMOV/BNDCU/BNDCL
+		/*switch (x86_0f_select(p)) {
+		case X86_0F_NONE: // BNDLDX
 		
 			break;
-		case X86_0F_66H:
+		case X86_0F_66H: // BNDMOV
 		
 			break;
-		case X86_0F_F2H:
+		case X86_0F_F2H: // BNDCU
 		
 			break;
-		case X86_0F_F3H:
+		case X86_0F_F3H: // BNDCL
 		
 			break;
 		default:
 			mnill(p);
-		}
+		}*/
 		break;
 	case 0xA2: // CPUID
 		if (INCLUDE_MNEMONICS)
