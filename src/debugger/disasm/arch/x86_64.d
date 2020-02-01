@@ -1,7 +1,7 @@
 /**
  * AMD64 specific disassembler
  */
-module debugger.arch.x86_64;
+module debugger.disasm.arch.x86_64;
 
 import debugger.disasm;
 import utils.str;

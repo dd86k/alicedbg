@@ -1,9 +1,9 @@
 /**
  * x86-specific disassembler.
  */
-module debugger.arch.x86;
+module debugger.disasm.arch.x86;
 
-import debugger.disasm;
+import debugger.disasm.core;
 import utils.str;
 
 extern (C):

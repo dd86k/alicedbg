@@ -1,8 +1,8 @@
-module debugger.disasm;
+module debugger.disasm.core;
 
 import debugger.arch;
 import utils.str;
-private import debugger.arch.x86 : x86_internals_t;
+private import debugger.disasm.arch.x86 : x86_internals_t;
 
 extern (C):
 

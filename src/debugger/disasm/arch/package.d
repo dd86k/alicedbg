@@ -1,5 +1,5 @@
 module debugger.arch;
 
 public import
-	debugger.arch.x86,
-	debugger.arch.x86_64;
+	debugger.disasm.arch.x86,
+	debugger.disasm.arch.x86_64;
