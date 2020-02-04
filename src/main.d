@@ -257,9 +257,9 @@ int main(int argc, const(char) **argv) {
 			else if (strcmp(dstyle, "att") == 0)
 				disopt.style = DisasmSyntax.Att;
 			else if (strcmp(dstyle, "?") == 0)
-				clipage(CLIPage.dstyles);
+				return clipage(CLIPage.dstyles);
 			else {
-				printf("unknown style: '%s'\n", dstyle);
+				printf("Unknown disassembler style: '%s'\n", dstyle);
 				return EXIT_FAILURE;
 			}
 			continue;
