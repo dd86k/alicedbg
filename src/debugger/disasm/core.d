@@ -45,7 +45,7 @@ struct disasm_params_t { align(1):
 	/// Platform to disasm. See the DisasmABI enum for more details.
 	ubyte abi;
 	/// Assembler style. See DisasmStyle enums for more details.
-	ubyte style;
+	DisasmSyntax style;
 	/// Operation mode. See DISASM_I_* flags. If unset, calculate
 	/// and modify address pointer only.
 	ubyte include;
@@ -79,13 +79,13 @@ enum DisasmABI : ubyte {
 }
 
 /// Disassembler x86 styles
-enum DisasmStyleX86 : ubyte {
-	Dasm,	/// (Not implemented) D inline x86 assembler
-	Nasm,	/// (Not implemented) (NASM) Netwide Assembler
-	Masm,	/// (Not implemented) (MASM) Microsoft Assembler
-	Ideal,	/// (Not implemented) Borland Ideal
-	Hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
-	Att,	/// (Not implemented) AT&T
+enum DisasmSyntax : ubyte {
+	Intel,	/// Intel syntax
+	Nasm,	/// (NASM) Netwide Assembler syntax
+	Att,	/// AT&T syntax
+//	Masm,	/// (Not implemented) (MASM) Microsoft Assembler
+//	Ideal,	/// (Not implemented) Borland Ideal
+//	Hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
 }
 
 /// Disassembler symbol demangling

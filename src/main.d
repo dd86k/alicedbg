@@ -4,7 +4,7 @@ import core.stdc.stdio;
 import consts;
 import ui.loop : loop_enter;
 import ui.tui : tui_enter;
-import debugger.core;
+import debugger, debugger.disasm, debugger.disasm.style;
 
 extern (C):
 private:
@@ -27,6 +27,7 @@ enum CLIPage {
 	main,
 	license,
 	ui,
+	dstyles,
 }
 
 /// CLI options
@@ -80,6 +81,14 @@ int clipage(CLIPage h) {
 //		"tcp-json .. (Experimental) JSON API server via TCP.\n"
 		;
 	break;
+	case CLIPage.dstyles:
+		r =
+		"Available disassembler styles (default=intel)\n"~
+		"intel .... Intel syntax\n"~
+		"nasm ..... Netwide Assembler syntax\n"~
+		"att ...... AT&T syntax"
+		;
+	break;
 	case CLIPage.license:
 		r =
 `BSD 3-Clause License
@@ -122,6 +131,9 @@ int main(int argc, const(char) **argv) {
 		return clipage(CLIPage.main);
 
 	cliopt_t opt;	/// Defaults to .init
+	disasm_params_t disopt;	/// .init
+	disopt.style = DisasmSyntax.Intel;
+	disopt.include = DISASM_I_MACHINECODE | DISASM_I_MNEMONICS;
 
 	// CLI
 	for (size_t argi = 1; argi < argc; ++argi) {
@@ -186,15 +198,8 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		// Set machine architecture, affects disassembly
-		/*if (strcmp(arg, "march") == 0) {
-			
-		}*/
-
 		// Binary file disassembly
-		if (strcmp(arg, "disasmdump") == 0 || strcmp(arg, "dd") == 0) {
-			import debugger.disasm : disasm_line, disasm_params_t,
-				DISASM_I_MACHINECODE, DISASM_I_MNEMONICS;
+		if (strcmp(arg, "ddump") == 0) {
 			import core.stdc.config : c_long;
 			import core.stdc.stdlib : malloc;
 
@@ -217,22 +222,47 @@ int main(int argc, const(char) **argv) {
 			c_long fl = ftell(f);
 			fseek(f, 0, SEEK_SET); // rewind is broken
 
-			ubyte *m = cast(ubyte*)malloc(fl);
+			void *m = cast(void*)malloc(fl);
 			if (fread(m, fl, 1, f) == 0) {
 				puts("cli: could not read file");
 				return EXIT_FAILURE;
 			}
 
-			disasm_params_t p;
-			p.include = DISASM_I_MACHINECODE | DISASM_I_MNEMONICS;
-			p.addru8 = m;
-			for (c_long fi; fi < fl; fi += p.addrv - p.thisaddr) {
-				disasm_line(p);
+			disopt.addr = m;
+			for (c_long fi; fi < fl; fi += disopt.addrv - disopt.thisaddr) {
+				disasm_line(disopt);
 				printf("%08X %-30s %-30s\n",
-					cast(uint)fi, &p.mcbuf, &p.mnbuf);
+					cast(uint)fi,
+					&disopt.mcbuf, &disopt.mnbuf);
 			}
 
 			return EXIT_SUCCESS;
+		}
+
+		// Set machine architecture, affects disassembly
+		/*if (strcmp(arg, "march") == 0) {
+			
+		}*/
+		// disassembler: select style
+		if (strcmp(arg, "dstyle") == 0) {
+			if (argi + 1 >= argc) {
+				puts("cli: ui argument missing");
+				return EXIT_FAILURE;
+			}
+			const(char) *dstyle = argv[++argi];
+			if (strcmp(dstyle, "intel") == 0)
+				disopt.style = DisasmSyntax.Intel;
+			else if (strcmp(dstyle, "nasm") == 0)
+				disopt.style = DisasmSyntax.Nasm;
+			else if (strcmp(dstyle, "att") == 0)
+				disopt.style = DisasmSyntax.Att;
+			else if (strcmp(dstyle, "?") == 0)
+				clipage(CLIPage.dstyles);
+			else {
+				printf("unknown style: '%s'\n", dstyle);
+				return EXIT_FAILURE;
+			}
+			continue;
 		}
 		
 		// Choose demangle settings for symbols

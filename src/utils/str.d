@@ -70,3 +70,29 @@ void strlcase(char *buf, size_t size) {
 			buf[i] += 32;
 	}
 }
+
+private __gshared size_t strfc = 0;
+/**
+ * Quick format.
+ *
+ * Quick and very dirty string formatting utility. This serves the purposes to
+ * avoid allocating new buffers before appending to (other) existing buffers.
+ * Cycles through 16 128-byte internal static buffers (2048 bytes).
+ *
+ * Params: f = Format string
+ *
+ * Returns: String
+ */
+const(char) *strf(const(char) *f, ...) {
+	__gshared char [128][16]b = void;
+
+	char *sb = cast(char*)b[strfc];
+
+	va_list va;
+	va_start(va, f);
+	vsnprintf(sb, 128, f, va);
+
+	if (++strfc > 15) strfc = 0;
+
+	return sb;
+}
