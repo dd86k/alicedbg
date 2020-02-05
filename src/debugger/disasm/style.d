@@ -81,6 +81,13 @@ const(char) *style_mn_imm(ref disasm_params_t p, int imm) {
 		return strf("%d", imm);
 }
 
+const(char) *style_mn_mem(ref disasm_params_t p, int imm) {
+	if (p.style  == DisasmSyntax.Att)
+		return strf("(%d)", imm);
+	else
+		return strf("[%d]", imm);
+}
+
 //
 // (X86) ModR/M
 //
