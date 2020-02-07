@@ -47,7 +47,7 @@ L_CONTINUE:
 	++p.addrv;
 
 	if (INCLUDE_MACHINECODE)
-		mcaddx8(p, b);
+		style_mc_x8(p, b);
 
 	main: switch (b) {
 	case 0x00:	// ADD R/M8, REG8
@@ -60,7 +60,7 @@ L_CONTINUE:
 		break;
 	case 0x04:	// ADD AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MACHINECODE) {
 			style_mn(p, "add");
 			style_mn_2(p,
@@ -72,44 +72,59 @@ L_CONTINUE:
 		break;
 	case 0x05:	// ADD EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MACHINECODE)
-			mnaddf(p, "ADD EAX, %u", *p.addru32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MACHINECODE) {
+			style_mn(p, "add");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_imm(p, *p.addru32)
+			);
+		}
 		p.addrv += 4;
 		break;
 	case 0x06:	// PUSH ES
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH ES");
+			style_mn_f(p, "push %s", style_mn_reg(p, "es"));
 		break;
 	case 0x07:	// POP ES
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP ES");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "es"));
 		break;
 	case 0x08:	// OR R/M8, REG8
 	case 0x09:	// OR R/M32, REG32
 	case 0x0A:	// OR REG8, R/M8
 	case 0x0B:	// OR REG32, R/M32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "OR ");
+			style_mn(p, "or");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x0C:	// OR AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "OR EAX, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "or");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				style_mn_imm(p, *p.addru8)
+			);
+		}
 		++p.addrv;
 		break;
 	case 0x0D:	// OR EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "OR EAX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "or");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_imm(p, *p.addru32)
+			);
+		}
 		p.addrv += 4;
 		break;
 	case 0x0E:
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH CS");
+			style_mn_f(p, "push %s", style_mn_reg(p, "cs"));
 		break;
 	case 0x0F:
 		x86_0f(p);
@@ -119,81 +134,111 @@ L_CONTINUE:
 	case 0x12:	// ADC REG8, R/M8
 	case 0x13:	// ADC REG32, R/M32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "ADC ");
+			style_mn(p, "adc");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x14:	// ADC AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "ADC EAX, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "adc");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				style_mn_imm(p, *p.addru8)
+			);
+		}
 		++p.addrv;
 		break;
 	case 0x15:	// ADC EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "ADC EAX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "adc");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_imm(p, *p.addru32)
+			);
+		}
 		p.addrv += 4;
 		break;
 	case 0x16:	// PUSH SS
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH SS");
+			style_mn_f(p, "push %s", style_mn_reg(p, "ss"));
 		break;
 	case 0x17:	// POP SS
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP SS");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "ss"));
 		break;
 	case 0x18:	// SBB R/M8, REG8
 	case 0x19:	// SBB R/M32, REG32
 	case 0x1A:	// SBB REG8, R/M8
 	case 0x1B:	// SBB REG32, R/M32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "SBB ");
+			style_mn(p, "sbb");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x1C:	// SBB AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "SBB EAX, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "sbb");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				style_mn_imm(p, *p.addru8)
+			);
+		}
 		++p.addrv;
 		break;
 	case 0x1D:	// SBB EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "SBB EAX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "sbb");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_imm(p, *p.addru32)
+			);
+		}
 		p.addrv += 4;
 		break;
 	case 0x1E:	// PUSH DS
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH DS");
+			style_mn_f(p, "push %s", style_mn_reg(p, "ds"));
 		break;
 	case 0x1F:	// POP DS
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP DS");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "ds"));
 		break;
 	case 0x20:	// AND R/M8, REG8
 	case 0x21:	// AND R/M32, REG32
 	case 0x22:	// AND REG8, R/M8
 	case 0x23:	// AND REG32, R/M32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "AND ");
+			style_mn(p, "and");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x24:	// AND AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "AND EAX, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "and");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				style_mn_imm(p, *p.addru8)
+			);
+		}
 		++p.addrv;
 		break;
 	case 0x25:	// AND EAX, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "AND EAX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "sbb");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_imm(p, *p.addru32)
+			);
+		}
 		p.addrv += 4;
 		break;
 	case 0x26:	// ES:
@@ -205,28 +250,38 @@ L_CONTINUE:
 		goto L_CONTINUE;
 	case 0x27:	// DAA
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "DAA");
+			style_mn(p, "daa");
 		break;
 	case 0x28:	// SUB R/M8, REG8
 	case 0x29:	// SUB R/M32, REG32
 	case 0x2A:	// SUB REG8, R/M8
 	case 0x2B:	// SUB REG32, R/M32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "SUB ");
+			style_mn(p, "sub");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
-	case 0x2C:	// AND AL, IMM8
+	case 0x2C:	// SUB AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "AND EAX, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "sub");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				style_mn_imm(p, *p.addru8)
+			);
+		}
 		++p.addrv;
 		break;
-	case 0x2D:	// AND EAX, IMM32
+	case 0x2D:	// SUB EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "AND EAX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "sub");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_imm(p, *p.addru32)
+			);
+		}
 		p.addrv += 4;
 		break;
 	case 0x2E:	// CS:
@@ -238,28 +293,38 @@ L_CONTINUE:
 		goto L_CONTINUE;
 	case 0x2F:	// DAS
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "DAA");
+			style_mn(p, "das");
 		break;
 	case 0x30:	// XOR R/M8, REG8
 	case 0x31:	// XOR R/M32, REG32
 	case 0x32:	// XOR REG8, R/M8
 	case 0x33:	// XOR REG32, R/M32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XOR ");
+			style_mn(p, "xor");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x34:	// XOR AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "XOR EAX, %d", *p.addri8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "xor");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				style_mn_imm(p, *p.addru8)
+			);
+		}
 		++p.addrv;
 		break;
 	case 0x35:	// XOR EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "XOR EAX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "xor");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_imm(p, *p.addru32)
+			);
+		}
 		p.addrv += 4;
 		break;
 	case 0x36:	// SS:
@@ -271,28 +336,38 @@ L_CONTINUE:
 		goto L_CONTINUE;
 	case 0x37:	// AAA
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "AAA");
+			style_mn(p, "aaa");
 		break;
 	case 0x38:	// CMP R/M8, REG8
 	case 0x39:	// CMP R/M32, REG32
 	case 0x3A:	// CMP REG8, R/M8
 	case 0x3B:	// CMP REG32, R/M32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "CMP ");
+			style_mn(p, "cmp");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x3C:	// CMP AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "CMP EAX, %d", *p.addri8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "cmp");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				style_mn_imm(p, *p.addru8)
+			);
+		}
 		++p.addrv;
 		break;
 	case 0x3D:	// CMP EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "CMP EAX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "cmp");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_imm(p, *p.addru32)
+			);
+		}
 		p.addrv += 4;
 		break;
 	case 0x3E:	// DS:
@@ -304,161 +379,176 @@ L_CONTINUE:
 		goto L_CONTINUE;
 	case 0x3F:	// AAS
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "AAS");
+			style_mn(p, "aas");
 		break;
 	case 0x40:	// INC EAX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INC EAX");
+			style_mn_f(p, "inc %s", style_mn_reg(p, "eax"));
 		break;
 	case 0x41:	// INC ECX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INC ECX");
+			style_mn_f(p, "inc %s", style_mn_reg(p, "ecx"));
 		break;
 	case 0x42:	// INC EDX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INC EDX");
+			style_mn_f(p, "inc %s", style_mn_reg(p, "edx"));
 		break;
 	case 0x43:	// INC EBX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INC EBX");
+			style_mn_f(p, "inc %s", style_mn_reg(p, "ebx"));
 		break;
 	case 0x44:	// INC ESP
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INC ESP");
+			style_mn_f(p, "inc %s", style_mn_reg(p, "esp"));
 		break;
 	case 0x45:	// INC EBP
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INC EBP");
+			style_mn_f(p, "inc %s", style_mn_reg(p, "ebp"));
 		break;
 	case 0x46:	// INC ESI
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INC ESI");
+			style_mn_f(p, "inc %s", style_mn_reg(p, "esi"));
 		break;
 	case 0x47:	// INC EDI
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INC EDI");
+			style_mn_f(p, "inc %s", style_mn_reg(p, "edi"));
 		break;
 	case 0x48:	// DEC EAX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "DEC EAX");
+			style_mn_f(p, "dec %s", style_mn_reg(p, "eax"));
 		break;
 	case 0x49:	// DEC ECX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "DEC ECX");
+			style_mn_f(p, "dec %s", style_mn_reg(p, "ecx"));
 		break;
 	case 0x4A:	// DEC EDX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "DEC EDX");
+			style_mn_f(p, "dec %s", style_mn_reg(p, "edx"));
 		break;
 	case 0x4B:	// DEC EBX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "DEC EBX");
+			style_mn_f(p, "dec %s", style_mn_reg(p, "ebx"));
 		break;
 	case 0x4C:	// DEC ESP
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "DEC ESP");
+			style_mn_f(p, "dec %s", style_mn_reg(p, "esp"));
 		break;
 	case 0x4D:	// DEC EBP
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "DEC EBP");
+			style_mn_f(p, "dec %s", style_mn_reg(p, "ebp"));
 		break;
 	case 0x4E:	// DEC ESI
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "DEC ESI");
+			style_mn_f(p, "dec %s", style_mn_reg(p, "esi"));
 		break;
 	case 0x4F:	// DEC EDI
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "DEC EDI");
+			style_mn_f(p, "dec %s", style_mn_reg(p, "edi"));
 		break;
 	case 0x50:	// PUSH EAX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH EAX");
+			style_mn_f(p, "push %s", style_mn_reg(p, "eax"));
 		break;
 	case 0x51:	// PUSH ECX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH ECX");
+			style_mn_f(p, "push %s", style_mn_reg(p, "ecx"));
 		break;
 	case 0x52:	// PUSH EDX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH EDX");
+			style_mn_f(p, "push %s", style_mn_reg(p, "edx"));
 		break;
 	case 0x53:	// PUSH EBX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH EBX");
+			style_mn_f(p, "push %s", style_mn_reg(p, "ebx"));
 		break;
 	case 0x54:	// PUSH ESP
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH ESP");
+			style_mn_f(p, "push %s", style_mn_reg(p, "esp"));
 		break;
 	case 0x55:	// PUSH EBP
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH EBP");
+			style_mn_f(p, "push %s", style_mn_reg(p, "ebp"));
 		break;
 	case 0x56:	// PUSH ESI
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH ESI");
+			style_mn_f(p, "push %s", style_mn_reg(p, "esi"));
 		break;
 	case 0x57:	// PUSH EDI
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSH EDI");
+			style_mn_f(p, "push %s", style_mn_reg(p, "edi"));
 		break;
 	case 0x58:	// POP EAX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP EAX");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "eax"));
 		break;
 	case 0x59:	// POP ECX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP ECX");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "ecx"));
 		break;
 	case 0x5A:	// POP EDX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP EDX");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "edx"));
 		break;
 	case 0x5B:	// POP EBX
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP EBX");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "ebx"));
 		break;
 	case 0x5C:	// POP ESP
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP ESP");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "esp"));
 		break;
 	case 0x5D:	// POP EBP
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP EBP");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "ebp"));
 		break;
 	case 0x5E:	// POP ESI
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP ESI");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "esi"));
 		break;
 	case 0x5F:	// POP EDI
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POP EDI");
+			style_mn_f(p, "pop %s", style_mn_reg(p, "edi"));
 		break;
 	case 0x60:	// PUSHAD
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSHAD");
+			style_mn(p, "pushad");
 		break;
 	case 0x61:	// POPAD
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POPAD");
+			style_mn(p, "popad");
 		break;
 	case 0x62:	// BOUND REG32, MEM32, MEM32
 		ubyte modrm = *p.addru8;
 		++p.addrv;
-		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%02X %08X %08X",
-				modrm, *p.addru32, *(p.addru32 + 1));
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "BOUND %s, %s %u %u",
-				x86_modrm_reg(p, modrm, b & 1),
-				x86_segstr(p.x86.segreg),
-				*p.addru32, *(p.addru32 + 1));
-		p.addrv += 8;
+		uint m1 = void;
+		uint m2 = void;
+		if (p.x86.prefix_operand) {
+			m1 = *p.addru16;
+			m2 = *(p.addru16 + 1);
+			p.addrv += 4;
+			if (INCLUDE_MACHINECODE)
+				style_mc_f(p, "%02X %04X %04X",
+					modrm, m1, m2);
+		} else {
+			m1 = *p.addru32;
+			m2 = *(p.addru32 + 1);
+			p.addrv += 8;
+			if (INCLUDE_MACHINECODE)
+				style_mc_f(p, "%02X %08X %08X",
+					modrm, m1, m2);
+		}
+		if (INCLUDE_MNEMONICS) {
+			style_mn_f(p, "bound %s, %s%u:%u",
+				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE)),
+				style_mn_reg(p, x86_segstr(p.x86.segreg)),
+				m1, m2);
+		}
 		break;
-	case 0x63:	// ARPL R/M16, REG16
+	case 0x63:	// ARPL REG16, R/M16
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "ARPL ");
-		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
+			style_mn(p, "arpl");
+		p.x86.prefix_operand = 1;
+		x86_modrm(p, X86_WIDTH_NONE, X86_DIR_REG);
 		break;
 	case 0x64:	// FS:
 		if (p.x86.group2) {
@@ -490,164 +580,164 @@ L_CONTINUE:
 		goto L_CONTINUE;
 	case 0x68:	// PUSH IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
+			style_mc_x32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "PUSH %d", *p.addri32);
+			style_mn_f(p, "pop %s", style_mn_imm(p, *p.addri32));
 		p.addrv += 4;
 		break;
 	case 0x69:	// IMUL REG32, R/M32, IMM32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "IMUL");
-		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
+			style_mn(p, "imul");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
+			style_mc_x32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, ", %d", *p.addri32);
+			style_mn_f(p, ", %d", style_mn_imm(p, *p.addri32));
 		p.addrv += 4;
 		break;
 	case 0x6A:	// PUSH IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "PUSH %d", *p.addri8);
+			style_mn_f(p, "push %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x6B:	// IMUL REG32, R/M32, IMM8
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "IMUL");
-		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
+			style_mn(p, "imul");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, ", %d", *p.addri8);
+			style_mn_f(p, ", %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x6C:	// INSB
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INSB");
+			style_mn(p, "insb");
 		break;
 	case 0x6D:	// INSD
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INSD");
+			style_mn(p, "insd");
 		break;
 	case 0x6E:	// OUTSB
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "OUTSB");
+			style_mn(p, "outsb");
 		break;
 	case 0x6F:	// OUTSD
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "OUTSD");
+			style_mn(p, "outsd");
 		break;
 	case 0x70:	// JO
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JO %d", *p.addri8);
+			style_mn_f(p, "jo %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x71:	// JNO
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JNO %d", *p.addri8);
+			style_mn_f(p, "jno %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x72:	// JB
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JB %d", *p.addri8);
+			style_mn_f(p, "jb %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x73:	// JNB
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JNB %d", *p.addri8);
+			style_mn_f(p, "jnb %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x74:	// JZ
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JZ %d", *p.addri8);
+			style_mn_f(p, "jz %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x75:	// JNZ
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JNZ %d", *p.addri8);
+			style_mn_f(p, "jnz %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x76:	// JBE
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JBE %d", *p.addri8);
+			style_mn_f(p, "jbe %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x77:	// JNBE
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JNBE %d", *p.addri8);
+			style_mn_f(p, "jnbe %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x78:	// JS
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JS %d", *p.addri8);
+			style_mn_f(p, "js %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x79:	// JNS
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JNS %d", *p.addri8);
+			style_mn_f(p, "jns %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x7A:	// JP
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JP %d", *p.addri8);
+			style_mn_f(p, "jp %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x7B:	// JNP
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JNP %d", *p.addri8);
+			style_mn_f(p, "jnp %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x7C:	// JL
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JL %d", *p.addri8);
+			style_mn_f(p, "jl %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x7D:	// JNL
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JNL %d", *p.addri8);
+			style_mn_f(p, "jnl %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x7E:	// JLE
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JLE %d", *p.addri8);
+			style_mn_f(p, "jle %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x7F:	// JNLE
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "JNLE %d", *p.addri8);
+			style_mn_f(p, "jnle %d", style_mn_imm(p, *p.addri8));
 		++p.addrv;
 		break;
 	case 0x81:	// GRP1 REG32, IMM32
@@ -658,18 +748,21 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			switch (modrm & RM_RM) {
-			case RM_RM_000: f = "ADD"; break;
-			case RM_RM_001: f = "OR";  break;
-			case RM_RM_010: f = "ADC"; break;
-			case RM_RM_011: f = "SBB"; break;
-			case RM_RM_100: f = "AND"; break;
-			case RM_RM_101: f = "SUB"; break;
-			case RM_RM_110: f = "XOR"; break;
-			case RM_RM_111: f = "CMP"; break;
+			case RM_RM_000: f = "add"; break;
+			case RM_RM_001: f = "or";  break;
+			case RM_RM_010: f = "adc"; break;
+			case RM_RM_011: f = "sbb"; break;
+			case RM_RM_100: f = "and"; break;
+			case RM_RM_101: f = "sub"; break;
+			case RM_RM_110: f = "xor"; break;
+			case RM_RM_111: f = "cmp"; break;
 			default: // impossible
 			}
-			mnaddf(p, "%s %s, %u",
-				f, x86_modrm_reg(p, modrm, b & 1), *p.addru32);
+			style_mn(p, f);
+			style_mn_2(p,
+				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE)),
+				style_mn_imm(p, *p.addru32)
+			);
 		}
 		p.addrv += 4;
 		break;
@@ -683,84 +776,96 @@ L_CONTINUE:
 		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			switch (modrm & RM_RM) {
-			case RM_RM_000: f = "ADD"; break;
-			case RM_RM_001: f = "OR";  break;
-			case RM_RM_010: f = "ADC"; break;
-			case RM_RM_011: f = "SBB"; break;
-			case RM_RM_100: f = "AND"; break;
-			case RM_RM_101: f = "SUB"; break;
-			case RM_RM_110: f = "XOR"; break;
-			case RM_RM_111: f = "CMP"; break;
+			case RM_RM_000: f = "add"; break;
+			case RM_RM_001: f = "or";  break;
+			case RM_RM_010: f = "adc"; break;
+			case RM_RM_011: f = "sbb"; break;
+			case RM_RM_100: f = "and"; break;
+			case RM_RM_101: f = "sub"; break;
+			case RM_RM_110: f = "xor"; break;
+			case RM_RM_111: f = "cmp"; break;
 			default: // impossible
 			}
-			mnaddf(p, "%s %s, %u",
-				f, x86_modrm_reg(p, modrm, b & 1), *p.addru8);
+			style_mn(p, f);
+			style_mn_2(p,
+				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_OP_WIDE(b))),
+				style_mn_imm(p, *p.addru32)
+			);
 		}
 		++p.addrv;
 		break;
 	case 0x84:	// TEST R/M8, REG8
 	case 0x85:	// TEST R/M32, REG32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "TEST ");
-		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
+			style_mn(p, "test");
+		x86_modrm(p, X86_OP_WIDE(b), X86_DIR_MEM);
 		break;
 	case 0x86:	// XCHG R/M8, REG8
 	case 0x87:	// XCHG R/M32, REG32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XCHG ");
-		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
+			style_mn(p, "xchg");
+		x86_modrm(p, X86_OP_WIDE(b), X86_DIR_MEM);
 		break;
 	case 0x88:	// MOV R/M8, REG8
 	case 0x89:	// MOV R/M32, REG32
 	case 0x8A:	// MOV REG8, R/M8
 	case 0x8B:	// MOV REG32, R/M32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "MOV ");
+			style_mn(p, "mov");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
-	case 0x8C:	// MOV REG32, SREG16
+	case 0x8C:	// MOV REG16, SEGREG16
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
+		const(char) *f = void;
+		switch (modrm & RM_REG) {
+		case RM_REG_000: f = "es"; break;
+		case RM_REG_001: f = "cs"; break;
+		case RM_REG_010: f = "ss"; break;
+		case RM_REG_011: f = "ds"; break;
+		case RM_REG_100: f = "fs"; break;
+		case RM_REG_101: f = "gs"; break;
+		default:
+			style_ill(p);
+			break main;
+		}
 		if (INCLUDE_MNEMONICS) {
-			const(char) *f = void;
-			switch (modrm & RM_REG) {
-			case RM_REG_000: f = "ES"; break;
-			case RM_REG_001: f = "CS"; break;
-			case RM_REG_010: f = "SS"; break;
-			case RM_REG_011: f = "DS"; break;
-			case RM_REG_100: f = "FS"; break;
-			case RM_REG_101: f = "GS"; break;
-			default: f = "SEGREG?"; break;
-			}
-			mnaddf(p, "MOV %s, %s",
-				x86_modrm_reg(p, modrm, X86_OP_WIDE(b)), f);
+			p.x86.prefix_operand = 1;
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_NONE)),
+				style_mn_reg(p, f));
 		}
 		break;
 	case 0x8D:	// LEA REG32, MEM32
 		if (INCLUDE_MNEMONICS)
-			mcadd(p, "LEA ");
-		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
+			style_mn(p, "lea");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
 		break;
-	case 0x8E:	// MOV SREG16, REG16
+	case 0x8E:	// MOV SEGREG16, REG16
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
+		const(char) *f = void;
+		switch (modrm & RM_REG) {
+		case RM_REG_000: f = "es"; break;
+		case RM_REG_001: f = "cs"; break;
+		case RM_REG_010: f = "ss"; break;
+		case RM_REG_011: f = "ds"; break;
+		case RM_REG_100: f = "fs"; break;
+		case RM_REG_101: f = "gs"; break;
+		default:
+			style_ill(p);
+		}
 		if (INCLUDE_MNEMONICS) {
-			const(char) *f = void;
-			switch (modrm & RM_REG) {
-			case RM_REG_000: f = "ES"; break;
-			case RM_REG_001: f = "CS"; break;
-			case RM_REG_010: f = "SS"; break;
-			case RM_REG_011: f = "DS"; break;
-			case RM_REG_100: f = "FS"; break;
-			case RM_REG_101: f = "GS"; break;
-			default: f = "SEGREG?"; break;
-			}
 			p.x86.prefix_operand = 1;
-			mnaddf(p, "MOV %s, %s", f, x86_modrm_reg(p, modrm, 0));
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, f),
+				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_NONE)));
 		}
 		break;
 	case 0x8F:	// GRP1A (POP) REG32
@@ -771,274 +876,456 @@ L_CONTINUE:
 			break;
 		}
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "POP %s",
-				x86_modrm_reg(p, modrm, X86_OP_WIDE(b)));
+			style_mn_f(p, "pop %s",
+				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE)));
 		break;
 	case 0x90:	// NOP
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "NOP");
+			style_mn(p, "nop");
 		break;
 	case 0x91:	// XCHG ECX, EAX
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XCHG ECX, EAX");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "xchg");
+			style_mn_2(p,
+				style_mn_reg(p, "ecx"),
+				style_mn_reg(p, "eax"));
+		}
 		break;
 	case 0x92:	// XCHG EDX, EAX
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XCHG EDX, EAX");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "xchg");
+			style_mn_2(p,
+				style_mn_reg(p, "edx"),
+				style_mn_reg(p, "eax"));
+		}
 		break;
 	case 0x93:	// XCHG EBX, EAX
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XCHG EBX, EAX");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "xchg");
+			style_mn_2(p,
+				style_mn_reg(p, "ebx"),
+				style_mn_reg(p, "eax"));
+		}
 		break;
 	case 0x94:	// XCHG ESP, EAX
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XCHG ESP, EAX");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "xchg");
+			style_mn_2(p,
+				style_mn_reg(p, "esp"),
+				style_mn_reg(p, "eax"));
+		}
 		break;
 	case 0x95:	// XCHG EBP, EAX
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XCHG EBP, EAX");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "xchg");
+			style_mn_2(p,
+				style_mn_reg(p, "ebp"),
+				style_mn_reg(p, "eax"));
+		}
 		break;
 	case 0x96:	// XCHG ESI, EAX
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XCHG ESI, EAX");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "xchg");
+			style_mn_2(p,
+				style_mn_reg(p, "esi"),
+				style_mn_reg(p, "eax"));
+		}
 		break;
 	case 0x97:	// XCHG EDI, EAX
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XCHG EDI, EAX");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "xchg");
+			style_mn_2(p,
+				style_mn_reg(p, "edi"),
+				style_mn_reg(p, "eax"));
+		}
 		break;
 	case 0x98:	// CBW
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "CBW");
+			style_mn(p, "cbw");
 		break;
 	case 0x99:	// CBD
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "CBD");
+			style_mn(p, "cbd");
 		break;
 	case 0x9A:	// CALL (FAR)
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
+			style_mc_x32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "CALL %d", *p.addri32);
+			style_mn_f(p, "call %d", *p.addri32);
 		p.addrv += 4;
 		break;
 	case 0x9B:	// WAIT/FWAIT
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "WAIT");
+			style_mn(p, "wait");
 		break;
 	case 0x9C:	// PUSHF/D/Q
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "PUSHFD");
+			style_mn(p, "pushfd");
 		break;
 	case 0x9D:	// POPF/D/Q
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "POPFD");
+			style_mn(p, "popfd");
 		break;
 	case 0x9E:	// SAHF
 		if (INCLUDE_MACHINECODE)
-			mnadd(p, "SAHF");
+			style_mn(p, "sahf");
 		break;
 	case 0x9F:	// LAHF
 		if (INCLUDE_MACHINECODE)
-			mnadd(p, "LAHF");
+			style_mn(p, "lahf");
 		break;
 	case 0xA0:	// MOV AL, MEM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) 
-			mnaddf(p, "MOV AL, [%s%d]",
-				x86_segstr(p.x86.segreg), *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn_f(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				style_mn_memstr(p, x86_mem(p, *p.addri32)));
+		}
 		p.addrv += 4;
 		break;
 	case 0xA1:	// MOV EAX, MEM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EAX, [%s%d]",
-				x86_segstr(p.x86.segreg), *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn_f(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_memstr(p, x86_mem(p, *p.addri32)));
+		}
 		p.addrv += 4;
 		break;
 	case 0xA2:	// MOV MEM8, AL
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV [%s%d], AL",
-				x86_segstr(p.x86.segreg), *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn_f(p, "mov");
+			style_mn_2(p,
+				style_mn_memstr(p, x86_mem(p, *p.addri32)),
+				style_mn_reg(p, "al"));
+		}
 		p.addrv += 4;
 		break;
 	case 0xA3:	// MOV MEM32, EAX
 		if (INCLUDE_MACHINECODE)
 			mcaddf(p, "%08X", *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV [%s%d], EAX",
-				x86_segstr(p.x86.segreg), *p.addri32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn_f(p, "mov");
+			style_mn_2(p,
+				style_mn_memstr(p, x86_mem(p, *p.addri32)),
+				style_mn_reg(p, "eax"));
+		}
 		p.addrv += 4;
 		break;
 	case 0xA4:	// MOVSB ES:EDI, DS:ESI
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "MOVSB ES:EDI, DS:ESI");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "movsb");
+			style_mn_2(p,
+				strf("%s:%s",
+					style_mn_reg(p, "es"),
+					style_mn_reg(p, "edi")),
+				strf("%s:%s",
+					style_mn_reg(p, "ds"),
+					style_mn_reg(p, "esi")));
+		}
 		break;
 	case 0xA5:	// MOVSD ES:EDI, DS:ESI
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "MOVSD ES:EDI, DS:ESI");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "movsd");
+			style_mn_2(p,
+				strf("%s:%s",
+					style_mn_reg(p, "es"),
+					style_mn_reg(p, "edi")),
+				strf("%s:%s",
+					style_mn_reg(p, "ds"),
+					style_mn_reg(p, "esi")));
+		}
 		break;
 	case 0xA6:	// MOVSB DS:ESI, ES:EDI
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "MOVSB DS:ESI, ES:EDI");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "movsb");
+			style_mn_2(p,
+				strf("%s:%s",
+					style_mn_reg(p, "ds"),
+					style_mn_reg(p, "esi")),
+				strf("%s:%s",
+					style_mn_reg(p, "es"),
+					style_mn_reg(p, "edi")));
+		}
 		break;
 	case 0xA7:	// MOVSD DS:ESI, ES:EDI
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "MOVSD DS:ESI, ES:EDI");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "movsd");
+			style_mn_2(p,
+				strf("%s:%s",
+					style_mn_reg(p, "ds"),
+					style_mn_reg(p, "esi")),
+				strf("%s:%s",
+					style_mn_reg(p, "es"),
+					style_mn_reg(p, "edi")));
+		}
 		break;
 	case 0xA8:	// TEST AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "TEST AL, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "test");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				style_mn_imm(p, *p.addru8));
+		}
 		++p.addrv;
 		break;
 	case 0xA9:	// TEST EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "TEST EAX, %d", *p.addru32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "test");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_imm(p, *p.addru32));
+		}
 		p.addrv += 4;
 		break;
 	case 0xAA:	// STOSB ES:EDI, AL
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "STOSB ES:EDI, AL");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "stosb");
+			style_mn_2(p,
+				strf("%s:%s",
+					style_mn_reg(p, "es"),
+					style_mn_reg(p, "edi")),
+				style_mn_reg(p, "al"));
+		}
 		break;
 	case 0xAB:	// STOSD ES:EDI, EAX
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "STOSD ES:EDI, EAX");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "stosd");
+			style_mn_2(p,
+				strf("%s:%s",
+					style_mn_reg(p, "es"),
+					style_mn_reg(p, "edi")),
+				style_mn_reg(p, "eax"));
+		}
 		break;
 	case 0xAC:	// LODSB AL, DS:ESI
-		if (INCLUDE_MNEMONICS)
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "lodsb");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				strf("%s:%s",
+					style_mn_reg(p, "ds"),
+					style_mn_reg(p, "esi")));
+		}
 			mnadd(p, "LODSB AL, DS:ESI");
 		break;
 	case 0xAD:	// LODSD EAX, DS:ESI
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "LODSD EAX, DS:ESI");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "lodsd");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				strf("%s:%s",
+					style_mn_reg(p, "ds"),
+					style_mn_reg(p, "esi")));
+		}
 		break;
 	case 0xAE:	// SCASB AL, ES:EDI
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "SCASB AL, ES:EDI");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "scasb");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				strf("%s:%s",
+					style_mn_reg(p, "ds"),
+					style_mn_reg(p, "esi")));
+		}
 		break;
 	case 0xAF:	// SCASD EAX, ES:EDI
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "SCASD EAX, ES:EDI");
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "scasd");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				strf("%s:%s",
+					style_mn_reg(p, "ds"),
+					style_mn_reg(p, "esi")));
+		}
 		break;
 	case 0xB0:	// MOV AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV AL, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "al"),
+				style_mn_imm(p, *p.addru8));
+		}
 		++p.addrv;
 		break;
 	case 0xB1:	// MOV DL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV DL, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "dl"),
+				style_mn_imm(p, *p.addru8));
+		}
 		++p.addrv;
 		break;
 	case 0xB2:	// MOV CL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV CL, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "cl"),
+				style_mn_imm(p, *p.addru8));
+		}
 		++p.addrv;
 		break;
 	case 0xB3:	// MOV BL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV BL, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "bl"),
+				style_mn_imm(p, *p.addru8));
+		}
 		++p.addrv;
 		break;
 	case 0xB4:	// MOV AH, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV AH, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "ah"),
+				style_mn_imm(p, *p.addru8));
+		}
 		++p.addrv;
 		break;
 	case 0xB5:	// MOV CH, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "ch"),
+				style_mn_imm(p, *p.addru8));
+		}
 			mnaddf(p, "MOV CH, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xB6:	// MOV DH, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV DH, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "dh"),
+				style_mn_imm(p, *p.addru8));
+		}
 		++p.addrv;
 		break;
 	case 0xB7:	// MOV BH, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV BH, %d", *p.addru8);
+			style_mc_x8(p, *p.addru8);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "dh"),
+				style_mn_imm(p, *p.addru8));
+		}
 		++p.addrv;
 		break;
 	case 0xB8:	// MOV EAX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EAX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "eax"),
+				style_mn_imm(p, *p.addru32));
+		}
 		p.addrv += 4;
 		break;
 	case 0xB9:	// MOV ECX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV ECX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "ecx"),
+				style_mn_imm(p, *p.addru32));
+		}
 		p.addrv += 4;
 		break;
 	case 0xBA:	// MOV EDX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EDX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "edx"),
+				style_mn_imm(p, *p.addru32));
+		}
 		p.addrv += 4;
 		break;
 	case 0xBB:	// MOV EBX, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EBX, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "ebx"),
+				style_mn_imm(p, *p.addru32));
+		}
 		p.addrv += 4;
 		break;
 	case 0xBC:	// MOV ESP, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV ESP, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "esp"),
+				style_mn_imm(p, *p.addru32));
+		}
 		p.addrv += 4;
 		break;
 	case 0xBD:	// MOV EBP, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EBP, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "ebp"),
+				style_mn_imm(p, *p.addru32));
+		}
 		p.addrv += 4;
 		break;
 	case 0xBE:	// MOV ESI, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV ESI, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "esi"),
+				style_mn_imm(p, *p.addru32));
+		}
 		p.addrv += 4;
 		break;
 	case 0xBF:	// MOV EDI, IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "MOV EDI, %d", *p.addri32);
+			style_mc_x32(p, *p.addru32);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "mov");
+			style_mn_2(p,
+				style_mn_reg(p, "edi"),
+				style_mn_imm(p, *p.addru32));
+		}
 		p.addrv += 4;
 		break;
 	case 0xC0:	// GRP2 R/M8, IMM8
@@ -1046,126 +1333,128 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		const(char) *a = void;
 		switch (modrm & RM_REG) {
-		case RM_REG_000: a = "ROR "; break;
-		case RM_REG_001: a = "RCL "; break;
-		case RM_REG_010: a = "RCR "; break;
-		case RM_REG_011: a = "SHL "; break;
-		case RM_REG_100: a = "SHR "; break;
-		case RM_REG_101: a = "ROR "; break;
-		case RM_REG_111: a = "SAR "; break;
+		case RM_REG_000: a = "ror"; break;
+		case RM_REG_001: a = "rcl"; break;
+		case RM_REG_010: a = "rcr"; break;
+		case RM_REG_011: a = "shl"; break;
+		case RM_REG_100: a = "shr"; break;
+		case RM_REG_101: a = "ror"; break;
+		case RM_REG_111: a = "sar"; break;
 		default:
-			mnill(p);
+			style_ill(p);
 			break main;
 		}
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, a);
-		x86_modrm_rm(p, modrm, b & 1);
+			style_mn(p, a);
+		x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, ", %d", *p.addru8);
+			style_mn_f(p, ", %s", style_mn_imm(p, *p.addru8));
 		break;
 	case 0xC2:	// RET IMM16
 		if (INCLUDE_MACHINECODE)
-			mcaddx16(p, *p.addru16);
+			style_mc_x16(p, *p.addru16);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "RET %d", *p.addri16);
+			style_mn_f(p, "ret %s", style_mn_imm(p, *p.addri16));
 		p.addrv += 2;
 		break;
 	case 0xC3:	// RET
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "RET");
+			style_mn(p, "RET");
 		break;
-	case 0xC4:	// LES REG, MEM
+	case 0xC4:	// LES REG32, MEM32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "LES ");
-		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
+			style_mn(p, "les");
+		x86_modrm(p, X86_WIDTH_NONE, X86_DIR_REG);
 		break;
-	case 0xC5:	// LDS REG, MEM
+	case 0xC5:	// LDS REG32, MEM32
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "LDS ");
-		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
+			style_mn(p, "lds");
+		x86_modrm(p, X86_WIDTH_NONE, X86_DIR_REG);
 		break;
 	case 0xC6:	// GRP11(1A) - MOV MEM8, IMM8
 		ubyte modrm = *p.addru8;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		if (modrm & RM_REG) {
-			mnill(p);
+			style_ill(p);
 			break main;
 		}
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "MOV BYTE PTR ");
-		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			style_mn(p, "mov");
+		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, ", %d", *p.addru8);
+			style_mn_f(p, ", %s", style_mn_imm(p, *p.addru8));
 		++p.addrv;
 		break;
 	case 0xC7:	// GRP11(1A) - MOV MEM32, IMM32
 		ubyte modrm = *p.addru8;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		if (modrm & RM_REG) {
-			mnill(p);
+			style_ill(p);
 			break main;
 		}
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, p.x86.prefix_operand ?
-				"MOV DWORD PTR " :
-				"MOV WORD PTR ");
+			style_mn(p, "mov");
 		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 		const(char) *f = void;
 		uint v = x86_mmfu32v(p, f);
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, f, v);
+			style_mn_f(p, f, v);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, ", %d", v);
+			style_mn_f(p, ", %s", style_mn_imm(v));
 		break;
 	case 0xC8:	// ENTER IMM16, IMM8
 		ubyte v = *(p.addru8 + 2);
 		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%04X %02X", *p.addru16, v);
-		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "ENTER %d %d", *p.addri16, v);
+			style_mc_f(p, "%04X %02X", *p.addru16, v);
+		if (INCLUDE_MNEMONICS) {
+			style_mn(p, "enter");
+			style_mn_2(p,
+				style_mn_imm(p, *p.addri16),
+				style_mn_imm(p, v));
+		}
 		p.addrv += 3;
 		break;
 	case 0xC9:	// LEAVE
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "LEAVE");
+			style_mn(p, "leave");
 		break;
 	case 0xCA:	// RET (far) IMM16
 		if (INCLUDE_MACHINECODE)
-			mcaddx16(p, *p.addru16);
+			style_mc_x16(p, *p.addru16);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "RET %d %d", *p.addri16);
+			style_mn_f(p, "ret %s", style_mn_imm(*p.addri16));
 		p.addrv += 2;
 		break;
 	case 0xCB:	// RET (far)
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "RET");
+			style_mn(p, "ret");
 		p.addrv += 2;
 		break;
 	case 0xCC:	// INT 3
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INT 3");
+			style_mn_f(p, "int %s", style_mn_imm(p, 3));
 		break;
 	case 0xCD:	// INT IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "INT %u", *p.addru8);
+			style_mn_f(p, "int %s", style_mn_imm(p, *p.addru8));
 		++p.addrv;
 		break;
 	case 0xCE:	// INTO
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INTO");
+			style_mn(p, "into");
 		break;
 	case 0xCF:	// IRET
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "IRET");
+			style_mn(p, "iret");
 		break;
 	case 0xD0:	// GRP2 R/M8, 1
 	case 0xD1:	// GRP2 R/M32, 1
@@ -1174,50 +1463,58 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		const(char) *m = void;
 		switch (modrm & RM_REG) {
-		case RM_REG_000: m = "ROL "; break;
-		case RM_REG_001: m = "ROR "; break;
-		case RM_REG_010: m = "RCL "; break;
-		case RM_REG_011: m = "RCR "; break;
-		case RM_REG_100: m = "SHL "; break;
-		case RM_REG_101: m = "SHR "; break;
-		case RM_REG_111: m = "ROL "; break;
+		case RM_REG_000: m = "rol"; break;
+		case RM_REG_001: m = "ror"; break;
+		case RM_REG_010: m = "rcl"; break;
+		case RM_REG_011: m = "rcr"; break;
+		case RM_REG_100: m = "shl"; break;
+		case RM_REG_101: m = "shr"; break;
+		case RM_REG_111: m = "rol"; break;
 		default:
-			mnill(p);
+			style_ill(p);
 			break main;
 		}
 		if (INCLUDE_MNEMONICS) {
-			const(char) *a = b >= 0xD2 ? ", CL" : ", 1";
-			mnadd(p, m);
-			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
-			mnadd(p, a);
+			const(char) *a = b >= 0xD2 ?
+				style_mn_reg("cl") :
+				style_mn_imm(1);
+			style_mn(p, m);
+			// Hack
+			if (p.style == DisasmSyntax.Att) {
+				style_mn_f(p, "%s, ", a);
+				x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
+			} else {
+				x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
+				style_mn_f(p, ", %s", a);
+			}
 		}
 		break;
 	case 0xD4:	// AAM IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "AAM %u", *p.addru8);
+			style_mn_f(p, "amm %s", style_mn_imm(*p.addru8));
 		++p.addrv;
 		break;
 	case 0xD5:	// AAD IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
-			mnaddf(p, "AAD %u", *p.addru8);
+			style_mn_f(p, "aad %s", style_mn_imm(*p.addru8));
 		++p.addrv;
 		break;
 	case 0xD7:	// XLAT
 		if (INCLUDE_MNEMONICS)
-			mnadd(p, "XLAT");
+			style_mn(p, "xlat");
 		break;
 	case 0xD8:	// ESCAPE D8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1261,7 +1558,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddx32(p, *p.addru32);
+				style_mc_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1300,7 +1597,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1371,7 +1668,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddx32(p, *p.addru32);
+				style_mc_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1410,7 +1707,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1452,7 +1749,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddx32(p, *p.addru32);
+				style_mc_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1491,7 +1788,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1545,7 +1842,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddx32(p, *p.addru32);
+				style_mc_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1584,7 +1881,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1626,7 +1923,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddx32(p, *p.addru32);
+				style_mc_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1665,7 +1962,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1706,7 +2003,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddx32(p, *p.addru32);
+				style_mc_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1743,7 +2040,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1790,7 +2087,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddx32(p, *p.addru32);
+				style_mc_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1829,7 +2126,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1862,7 +2159,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				mcaddx32(p, *p.addru32);
+				style_mc_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1899,63 +2196,63 @@ L_CONTINUE:
 		break;
 	case 0xE0:	// LOOPNE IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "LOOPNE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE1:	// LOOPE IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "LOOPE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE2:	// LOOP IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "LOOP %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE3:	// JECXZ IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JECXZ %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE4:	// IN AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "IN AL,%u", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xE5:	// IN EAX, IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "IN EAX,%u", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xE6:	// OUT IMM8,AL
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "OUT %u,AL", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xE7:	// OUT IMM8,EAX
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "OUT %u,EAX", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE8:	// CALL IMM32
 		if (INCLUDE_MACHINECODE)
-			mcaddx32(p, *p.addru32);
+			style_mc_x32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "CALL %d", *p.addri32);
 		p.addrv += 4;
@@ -1970,7 +2267,7 @@ L_CONTINUE:
 		break;
 	case 0xEB:	// JMP IMM8
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, *p.addru8);
+			style_mc_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JMP %d", *p.addri8);
 		++p.addrv;
@@ -2020,14 +2317,14 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000:
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "TEST ");
 			x86_modrm_rm(p, modrm, w);
 			if (INCLUDE_MACHINECODE)
-				mcaddx8(p, *p.addru8);
+				style_mc_x8(p, *p.addru8);
 			if (INCLUDE_MNEMONICS)
 				mnaddf(p, ", %d", *p.addru8);
 			++p.addrv;
@@ -2103,7 +2400,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // INC R/M8
 			if (INCLUDE_MNEMONICS)
@@ -2123,7 +2420,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // INC R/M32
 			if (INCLUDE_MNEMONICS)
@@ -2191,7 +2488,7 @@ void x86_0f(ref disasm_params_t p) {
 	++p.addrv;
 
 	if (INCLUDE_MACHINECODE)
-		mcaddx8(p, b);
+		style_mc_x8(p, b);
 
 	switch (b) {
 	case 0x00: // GRP6
@@ -2199,7 +2496,7 @@ void x86_0f(ref disasm_params_t p) {
 		++p.addrv;
 
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // SLDT
@@ -2242,7 +2539,7 @@ void x86_0f(ref disasm_params_t p) {
 		++p.addrv;
 
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 
 		switch (modrm & RM_REG) {
 		case RM_REG_000:
@@ -2444,7 +2741,7 @@ void x86_0f(ref disasm_params_t p) {
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 		if ((modrm & RM_REG) == RM_REG_001) {
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "PREFETCHW ");
@@ -2511,7 +2808,7 @@ void x86_0f(ref disasm_params_t p) {
 				ubyte modrm = *p.addru8;
 				++p.addrv;
 				if (INCLUDE_MACHINECODE)
-					mcaddx8(p, modrm);
+					style_mc_x8(p, modrm);
 				if (INCLUDE_MNEMONICS) {
 					mnaddf(p, "MOVHLPS %s, %s",
 						x86_modrm_reg(p, modrm, X86_WIDTH_XMM),
@@ -2597,7 +2894,7 @@ void x86_0f(ref disasm_params_t p) {
 				ubyte modrm = *p.addru8;
 				++p.addrv;
 				if (INCLUDE_MACHINECODE)
-					mcaddx8(p, modrm);
+					style_mc_x8(p, modrm);
 				if (INCLUDE_MNEMONICS)
 					mnaddf(p, "MOVHPS %s, %s",
 						x86_modrm_reg(p, modrm, X86_WIDTH_XMM),
@@ -2643,7 +2940,7 @@ void x86_0f(ref disasm_params_t p) {
 		++p.addrv;
 
 		if (INCLUDE_MACHINECODE)
-			mcaddx8(p, modrm);
+			style_mc_x8(p, modrm);
 
 		if ((modrm & RM_MOD) == RM_MOD_11) {
 			mnill(p);
@@ -2790,6 +3087,11 @@ package enum {
 	X86_WIDTH_YMM,	/// 256-bit YMM register
 	X86_WIDTH_ZMM,	/// 512-bit ZMM register
 }
+// ModR/M Direction
+package enum {
+	X86_DIR_MEM,	/// Direction: Towards R/M field
+	X86_DIR_REG	/// Direction: Towards REG field
+}
 
 int X86_OP_WIDE(int op) { return op & 1; }
 int X86_OP_DIR(int op)  { return op & 2; }
@@ -2814,6 +3116,10 @@ uint x86_mmfu32v(ref disasm_params_t p, ref const(char) *f) {
 		p.addrv += 4;
 	}
 	return v;
+}
+
+const(char) *x86_mem(ref disasm_params_t p, uint add) {
+	return strf("%s%d", x86_segstr(p.x86.segreg), add);
 }
 
 /// (Internal) Returns a number depending on the set prefixes for the 2-byte
@@ -2877,7 +3183,7 @@ void x86_modrm(ref disasm_params_t p, int width, int direction) {
 	++p.addrv;
 
 	if (INCLUDE_MACHINECODE)
-		mcaddx8(p, modrm);
+		style_mc_x8(p, modrm);
 
 	if (p.style == DisasmSyntax.Att)
 		direction = !direction;
@@ -3035,7 +3341,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	int scale = 1 << (sib >> 6); // 2 ^ (0b11_000_000 >> 6)
 
 	if (INCLUDE_MACHINECODE)
-		mcaddx8(p, sib);
+		style_mc_x8(p, sib);
 
 	const(char)* base = void, index = void, seg = void;
 

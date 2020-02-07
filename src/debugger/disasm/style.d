@@ -81,11 +81,18 @@ const(char) *style_mn_imm(ref disasm_params_t p, int imm) {
 		return strf("%d", imm);
 }
 
-const(char) *style_mn_mem(ref disasm_params_t p, int imm) {
+const(char) *style_mn_mem(ref disasm_params_t p, uint mem) {
 	if (p.style  == DisasmSyntax.Att)
-		return strf("(%d)", imm);
+		return strf("(%u)", mem);
 	else
-		return strf("[%d]", imm);
+		return strf("[%u]", mem);
+}
+
+const(char) *style_mn_memstr(ref disasm_params_t p, const(char) *mem) {
+	if (p.style  == DisasmSyntax.Att)
+		return strf("(%s)", mem);
+	else
+		return strf("[%s]", mem);
 }
 
 //
