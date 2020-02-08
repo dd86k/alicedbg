@@ -25,6 +25,7 @@ _Why not make one myself?_ I asked myself.
 | x86-64 | 0 | Waiting on x86-32 |
 | arm | 0 | Waiting on x86-64 |
 | aarch64 | 0 | Waiting on x86-64 |
+| webasm | 0 | Planned |
 
 ## FAQ
 
@@ -43,6 +44,12 @@ others) use its functions as a library (static or dynamically).
 
 To debug an application, use -exec PATH, or to debug an existing process,
 use -pid PROCESSID.
+
+| Option | Possible values | Description |
+|---|---|---|
+| `-ui` | `tui`, `loop`, `tcp-json` | Use an user interface |
+| `-dstyle` | `intel`, `nasm`, `att` | (Disassembler) Use syntax style |
+| `-ddump` | File path | (Disassembler) Disassemble flat binary |
 
 ## User Interfaces
 
@@ -71,7 +78,7 @@ On exceptions, this is added to output:
 * EXCEPTION #0
 PID=4104  TID=2176
 BREAKPOINT (80000003) at 77ABF146
-Code: CC  (INT 3)
+Code: CC  (int 3)
 ```
 
 Which features the exception counter, process ID, thread ID (Windows-only),
@@ -82,7 +89,7 @@ brief disassembly (when available).
 
 ## With DUB
 
-DUB is highly required to build the project. A compiler can be chosen with the
+Using DUB is recommended to build the project. A compiler can be chosen with the
 `--compiler=` switch. I try to support DMD, GDC, and LDC as much as possible.
 
 Do note that the `betterC` mode is activated for normal builds and
