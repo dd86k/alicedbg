@@ -82,31 +82,53 @@ version (CRuntime_Glibc) {
 		PTRACE_INTERRUPT = 0x4207,
 		/** Wait for next group event.  */
 		PTRACE_LISTEN = 0x4208,
-		PTRACE_PEEKSIGINFO = 0x4209,	/// 
-		PTRACE_GETSIGMASK = 0x420a,	/// 
-		PTRACE_SETSIGMASK = 0x420b,	/// 
-		PTRACE_SECCOMP_GET_FILTER = 0x420c	/// 
+		/** */
+		PTRACE_PEEKSIGINFO = 0x4209,
+		/** */
+		PTRACE_GETSIGMASK = 0x420a,
+		/** */
+		PTRACE_SETSIGMASK = 0x420b,
+		/** */
+		PTRACE_SECCOMP_GET_FILTER = 0x420c
 	}
 	enum {	// __ptrace_setoptions
+		/** */
 		PTRACE_O_TRACESYSGOOD	= 0x00000001,
+		/** */
 		PTRACE_O_TRACEFORK	= 0x00000002,
-		PTRACE_O_TRACEVFORK   = 0x00000004,
+		/** */
+		PTRACE_O_TRACEVFORK	= 0x00000004,
+		/** */
 		PTRACE_O_TRACECLONE	= 0x00000008,
+		/** */
 		PTRACE_O_TRACEEXEC	= 0x00000010,
+		/** */
 		PTRACE_O_TRACEVFORKDONE = 0x00000020,
+		/** */
 		PTRACE_O_TRACEEXIT	= 0x00000040,
-		PTRACE_O_TRACESECCOMP = 0x00000080,
+		/** */
+		PTRACE_O_TRACESECCOMP	= 0x00000080,
+		/** */
 		PTRACE_O_EXITKILL	= 0x00100000,
+		/** */
 		PTRACE_O_SUSPEND_SECCOMP	= 0x00200000,
-		PTRACE_O_MASK		= 0x003000ff
+		/** */
+		PTRACE_O_MASK	= 0x003000ff
 	}
 	enum {	// __ptrace_eventcodes
+		/** */
 		PTRACE_EVENT_FORK	= 1,
+		/** */
 		PTRACE_EVENT_VFORK	= 2,
+		/** */
 		PTRACE_EVENT_CLONE	= 3,
+		/** */
 		PTRACE_EVENT_EXEC	= 4,
+		/** */
 		PTRACE_EVENT_VFORK_DONE = 5,
+		/** */
 		PTRACE_EVENT_EXIT	= 6,
+		/** */
 		PTRACE_EVENT_SECCOMP  = 7
 	}
 	struct __ptrace_peeksiginfo_args {
@@ -125,28 +147,50 @@ version (CRuntime_Glibc) {
 	}
 	} else { // Generic
 	enum {
-		PT_TRACE_ME,	/// The only request of which a tracee can make
-		PTRACE_PEEKTEXT,	/// 
-		PTRACE_PEEKDATA,	/// 
-		PTRACE_PEEKUSER,	/// 
-		PTRACE_POKETEXT,	/// 
-		PTRACE_POKEDATA,	/// 
-		PTRACE_POKEUSER,	/// 
-		PTRACE_CONT,	/// 
-		PTRACE_KILL,	/// 
-		PTRACE_SINGLESTEP,	/// 
-		PTRACE_ATTACH,	/// 
-		PTRACE_DETACH,	/// 
-		PTRACE_GETREGS,	/// 
-		PTRACE_SETREGS,	/// 
-		PTRACE_GETFPREGS,	/// 
-		PTRACE_SETFPREGS,	/// 
-		PTRACE_READDATA,	/// 
-		PTRACE_WRITEDATA,	/// 
-		PTRACE_READTEXT,	/// 
-		PTRACE_WRITETEXT,	/// 
-		PTRACE_GETFPAREGS,	/// 
-		PTRACE_SETFPAREGS	/// 
+		/** The only request of which a tracee can make */
+		PT_TRACE_ME,
+		/** */
+		PTRACE_PEEKTEXT,
+		/** */
+		PTRACE_PEEKDATA,
+		/** */
+		PTRACE_PEEKUSER,
+		/** */
+		PTRACE_POKETEXT,
+		/** */
+		PTRACE_POKEDATA,
+		/** */
+		PTRACE_POKEUSER,
+		/** */
+		PTRACE_CONT,
+		/** */
+		PTRACE_KILL,
+		/** */
+		PTRACE_SINGLESTEP,
+		/** */
+		PTRACE_ATTACH,
+		/** */
+		PTRACE_DETACH,
+		/** */
+		PTRACE_GETREGS,
+		/** */
+		PTRACE_SETREGS,
+		/** */
+		PTRACE_GETFPREGS,
+		/** */
+		PTRACE_SETFPREGS,
+		/** */
+		PTRACE_READDATA,
+		/** */
+		PTRACE_WRITEDATA,
+		/** */
+		PTRACE_READTEXT,
+		/** */
+		PTRACE_WRITETEXT,
+		/** */
+		PTRACE_GETFPAREGS,
+		/** */
+		PTRACE_SETFPAREGS	
 	}
 	}
 }

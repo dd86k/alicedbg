@@ -17,8 +17,8 @@ int disasm_x86_64(ref disasm_params_t p) {
 	int e = DisasmError.None;
 	x64_prefreg = PrefixReg.None;
 	x64_pre_ad = x64_pre_op = false;
-	const int INCLUDE_MACHINECODE = p.include & DISASM_I_MACHINECODE;
-	const int INCLUDE_MNEMONICS = p.include & DISASM_I_MNEMONICS;
+	const int INCLUDE_MACHINECODE = p.mode & DISASM_I_MACHINECODE;
+	const int INCLUDE_MNEMONICS = p.mode & DISASM_I_MNEMONICS;
 	
 L_CONTINUE:
 	ubyte b = *p.addru8;

@@ -14,132 +14,247 @@ module debugger.sys.user;
 version (Posix):
 
 version (X86) {
+	/// 
 	struct user_fpregs_struct {
+		/// 
 		int cwd;
+		/// 
 		int swd;
+		/// 
 		int twd;
+		/// 
 		int fip;
+		/// 
 		int fcs;
+		/// 
 		int foo;
+		/// 
 		int fos;
+		/// 
 		int [20]st_space;
 	}
+	/// 
 	struct user_fpxregs_struct {
+		/// 
 		ushort cwd;
+		/// 
 		ushort swd;
+		/// 
 		ushort twd;
+		/// 
 		ushort fop;
+		/// 
 		int fip;
+		/// 
 		int fcs;
+		/// 
 		int foo;
+		/// 
 		int fos;
+		/// 
 		int mxcsr;
+		/// 
 		int reserved;
-		int [32]st_space;   /// 8*16 bytes for each FP-reg = 128 bytes
-		int [32]xmm_space;  /// 8*16 bytes for each XMM-reg = 128 bytes
+		/// 8*16 bytes for each FP-reg = 128 bytes
+		int [32]st_space;
+		/// 8*16 bytes for each XMM-reg = 128 bytes
+		int [32]xmm_space;
+		/// 
 		int [56]padding;
 	}
+	/// 
 	struct user_regs_struct {
+		/// 
 		int ebx;
+		/// 
 		int ecx;
+		/// 
 		int edx;
+		/// 
 		int esi;
+		/// 
 		int edi;
+		/// 
 		int ebp;
+		/// 
 		int eax;
+		/// 
 		int xds;
+		/// 
 		int xes;
+		/// 
 		int xfs;
+		/// 
 		int xgs;
+		/// 
 		int orig_eax;
+		/// 
 		int eip;
+		/// 
 		int xcs;
+		/// 
 		int eflags;
+		/// 
 		int esp;
+		/// 
 		int xss;
 	}
+	/// 
 	struct user {
+		/// 
 		user_regs_struct regs;
+		/// 
 		int u_fpvalid;
+		/// 
 		user_fpregs_struct i387;
+		/// 
 		uint u_tsize;
+		/// 
 		uint u_dsize;
+		/// 
 		uint u_ssize;
+		/// 
 		uint start_code;
+		/// 
 		uint start_stack;
+		/// 
 		int signal;
+		/// 
 		int reserved;
+		/// 
 		user_regs_struct*	u_ar0;
+		/// 
 		user_fpregs_struct*	u_fpstate;
+		/// 
 		uint magic;
+		/// 
 		char [32]u_comm;
+		/// 
 		int  [8]u_debugreg;
 	}
 } else
 version (X86_64) {
+	/// 
 	struct user_fpregs_struct {
+		/// 
 		ushort cwd;
+		/// 
 		ushort swd;
+		/// 
 		ushort ftw;
+		/// 
 		ushort fop;
+		/// 
 		ulong rip;
+		/// 
 		ulong rdp;
+		/// 
 		uint mxcsr;
+		/// 
 		uint mxcr_mask;
+		/// 
 		uint [32]st_space;   /// 8*16 bytes for each FP-reg = 128 bytes
+		/// 
 		uint [64]xmm_space;  /// 16*16 bytes for each XMM-reg = 256 bytes
+		/// 
 		uint [32]padding;
 	}
+	/// 
 	struct user_regs_struct {
+		/// 
 		ulong r15;
+		/// 
 		ulong r14;
+		/// 
 		ulong r13;
+		/// 
 		ulong r12;
+		/// 
 		ulong rbp;
+		/// 
 		ulong rbx;
+		/// 
 		ulong r11;
+		/// 
 		ulong r10;
+		/// 
 		ulong r9;
+		/// 
 		ulong r8;
+		/// 
 		ulong rax;
+		/// 
 		ulong rcx;
+		/// 
 		ulong rdx;
+		/// 
 		ulong rsi;
+		/// 
 		ulong rdi;
+		/// 
 		ulong orig_rax;
+		/// 
 		ulong rip;
+		/// 
 		ulong cs;
+		/// 
 		ulong eflags;
+		/// 
 		ulong rsp;
+		/// 
 		ulong ss;
+		/// 
 		ulong fs_base;
+		/// 
 		ulong gs_base;
+		/// 
 		ulong ds;
+		/// 
 		ulong es;
+		/// 
 		ulong fs;
+		/// 
 		ulong gs;
 	}
+	/// 
 	struct user {
-		user_regs_struct regs;
-		int u_fpvalid;
-		user_fpregs_struct i387;
-		ulong u_tsize;
-		ulong u_dsize;
-		ulong u_ssize;
-		ulong start_code;
-		ulong start_stack;
-		long signal;
-		int reserved;
+		/// 
+		ser_regs_struct regs;
+		/// 
+		nt u_fpvalid;
+		/// 
+		ser_fpregs_struct i387;
+		/// 
+		long u_tsize;
+		/// 
+		long u_dsize;
+		/// 
+		long u_ssize;
+		/// 
+		long start_code;
+		/// 
+		long start_stack;
+		/// 
+		ong signal;
+		/// 
+		nt reserved;
 		union {
+			/// 
 			user_regs_struct* u_ar0;
+			/// 
 			ulong __u_ar0_word;
 		}
 		union {
+			/// 
 			user_fpregs_struct* u_fpstate;
+			/// 
 			ulong __u_fpstate_word;
 		}
+		///
 		ulong magic;
+		///
 		char  [32]u_comm;
+		///
 		ulong [8]u_debugreg;
 	}
 }

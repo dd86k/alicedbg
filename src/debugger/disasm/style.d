@@ -31,7 +31,7 @@ package:
 //immutable const(char) *UNKNOWN_OP = "??";
 
 void style_ill(ref disasm_params_t p) {
-	if (p.include & DISASM_I_MACHINECODE)
+	if (p.mode & DISASM_I_MACHINECODE)
 		mnadd(p, UNKNOWN_OP);
 	p.error = DisasmError.Illegal;
 }
@@ -82,6 +82,10 @@ const(char) *style_mn_imm(ref disasm_params_t p, int imm) {
 }
 
 const(char) *style_mn_mem(ref disasm_params_t p, uint mem) {
+	return style_mn_segmem(p, "", mem);
+}
+
+const(char) *style_mn_segmem(ref disasm_params_t p, const(char) *seg, uint mem) {
 	if (p.style  == DisasmSyntax.Att)
 		return strf("(%u)", mem);
 	else
@@ -89,10 +93,14 @@ const(char) *style_mn_mem(ref disasm_params_t p, uint mem) {
 }
 
 const(char) *style_mn_memstr(ref disasm_params_t p, const(char) *mem) {
+	return style_mn_segmemstr(p, "", mem);
+}
+
+const(char) *style_mn_segmemstr(ref disasm_params_t p, const(char) *seg, const(char) *mem) {
 	if (p.style  == DisasmSyntax.Att)
-		return strf("(%s)", mem);
+		return strf("(%s%s)", seg, mem);
 	else
-		return strf("[%s]", mem);
+		return strf("[%s%s]", seg, mem);
 }
 
 //

@@ -3,19 +3,12 @@ module debugger.disasm.core;
 import debugger.arch;
 import utils.str;
 private import debugger.disasm.arch.x86 : x86_internals_t;
+private import debugger.disasm.formatter;
 
 extern (C):
 
 /// Disassembler parameters structure
 struct disasm_params_t { align(1):
-	/// Character buffer for MACHINE CODE
-	char [DISASM_BUF_SIZE]mcbuf;
-	/// Character buffer index and current length for MACHINE CODE
-	size_t mcbufi;
-	/// Character buffer for MNEMONICS
-	char [DISASM_BUF_SIZE]mnbuf;
-	/// Character buffer index and current length for MNEMONICS
-	size_t mnbufi;
 	union {
 		/// Memory address entry point. This value is modified to point
 		/// to the next instruction address. Acts as instruction
@@ -39,27 +32,43 @@ struct disasm_params_t { align(1):
 	}
 	/// Saved address position before the operation begins, good for
 	/// printing purposes or calculating the delta after disassembling.
-	size_t thisaddr;
+	size_t lastaddr;
 	/// Error code. See DisasmError enumeration for more details.
 	DisasmError error;
+	/// Demangle option. See DisasmDemangle enum.
+	DisasmDemangle demangle;
 	/// Platform to disasm. See the DisasmABI enum for more details.
-	ubyte abi;
+	DisasmABI abi;
 	/// Assembler style. See DisasmStyle enums for more details.
 	DisasmSyntax style;
 	/// Operation mode. See DISASM_I_* flags. If unset, calculate
 	/// and modify address pointer only.
-	ubyte include;
-	/// Demangle option. See DisasmDemangle enum.
-	ubyte demangle;
+	DisasmMode mode;
 	/// Settings flags. See DISASM_O_* flags.
-	ushort options;
-	x86_internals_t x86;	/// Used internally
+	uint options;
+	union {
+		void *internal;	/// Used internally
+		x86_internals_t *x86;	/// Used internally
+	}
+	disasm_fmt_t fmt;	/// Used by debugger.disasm.formatter
+	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer
+	char [DISASM_BUF_SIZE]mnbuf;	/// Mnemonics buffer
+	size_t mcbufi;	/// Machine code buffer index
+	size_t mnbufi;	/// Mnemonics buffer index
 }
 pragma(msg, "* disasm_params_t.sizeof: ", disasm_params_t.sizeof);
 
 //
 // Enumerations
 //
+
+/// Disassembler operating mode
+enum DisasmMode {
+	Size,
+	Data,
+	File,
+	Full
+}
 
 /// Disassembler error
 enum DisasmError {
@@ -71,7 +80,8 @@ enum DisasmError {
 
 /// Disassembler ABI
 enum DisasmABI : ubyte {
-	Auto,	/// Automatic (platform-dependant)
+	Platform,	/// Platform compiled target
+	Guess,	/// (Not implemented) Attempt to guess ISA
 	x86,	/// x86
 	x86_64,	/// AMD64
 	ARM,	/// (Not implemented) ARM
@@ -89,7 +99,7 @@ enum DisasmSyntax : ubyte {
 }
 
 /// Disassembler symbol demangling
-enum DisasmDemangle : ubyte {
+enum DisasmDemangle : ushort {
 	None,	/// (Not implemented) Leave symbol as-is
 	C,	/// (Not implemented) C mangling
 }
@@ -113,7 +123,7 @@ else
 version (AArch64)
 	enum DISASM_DEFAULT_ABI = DisasmABI.ARM64;	/// Platform default ABI
 else
-	enum DISASM_DEFAULT_ABI = DisasmABI.Auto;	/// Platform default ABI
+	enum DISASM_DEFAULT_ABI = DisasmABI.Platform;	/// Platform default ABI
 
 
 //
@@ -131,17 +141,18 @@ enum DISASM_I_EVERYTHING	= 0xFF;	/// Include everything
 // Option bits
 //
 
+/// Diasm option: 
+//enum DISASM_O_	= 0x0001;
 /// Diasm option: Go backwards instead of forward. More expensive to calculate!
 enum DISASM_O_BACKWARD	= 0x0002;
-/// Diasm option: Lower-case machine code instructions
-enum DISASM_O_MACHLOWERCASE	= 0x0004;
-/// Diasm option: Lower-case mnemonics instructions
-enum DISASM_O_INTRLOWERCASE	= 0x0008;
-/// Disasm option: Zero-fill output buffers
-enum DISASM_O_CLEARBUFFER	= 0x0010;
-
-/// Diasm option: Lower-case machine code instructions and mnemonics instructions
-enum DISASM_O_LOWERCASE	= DISASM_O_MACHLOWERCASE | DISASM_O_INTRLOWERCASE;
+/// Diasm option: 
+//enum DISASM_O_	= 0x0004;
+/// Diasm option: 
+//enum DISASM_O_	= 0x0008;
+/// Disasm option: 
+//enum DISASM_O_	= 0x0010;
+/// Disasm option: Do not group machine code bytes
+enum DISASM_O_GROUP_MACHINECODE	= 0x0020;
 
 /**
  * Disassemble from a memory pointer given in params. Caller must ensure
@@ -150,21 +161,16 @@ enum DISASM_O_LOWERCASE	= DISASM_O_MACHLOWERCASE | DISASM_O_INTRLOWERCASE;
  * 	p = Disassembler parameters
  * Returns: Error code if non-zero
  */
-int disasm_line(ref disasm_params_t p) {
+int disasm_line(ref disasm_params_t p, DisasmMode mode) {
+	p.mode = mode;
+	p.error = DisasmError.None;
+	p.lastaddr = p.addrv;
+	p.fmt.itemno = 0;
+
 	with (p) mcbufi = mnbufi = 0;
 
-	if (p.abi == DisasmABI.Auto) {
+	if (p.abi == DisasmABI.Platform)
 		p.abi = DISASM_DEFAULT_ABI;
-	}
-
-	p.error = DisasmError.None;
-	p.thisaddr = p.addrv;
-
-	if (p.options & DISASM_O_CLEARBUFFER) {
-		import core.stdc.string : memset;
-		memset(&p.mcbuf, 0, DISASM_BUF_SIZE);
-		memset(&p.mnbuf, 0, DISASM_BUF_SIZE);
-	}
 
 	with (DisasmABI)
 	switch (p.abi) {
@@ -173,12 +179,8 @@ int disasm_line(ref disasm_params_t p) {
 	default: return DisasmError.NoABI;
 	}
 
+	disasm_render(p);
 	with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
-
-	if (p.options & DISASM_O_MACHLOWERCASE)
-		strlcase(cast(char*)p.mcbuf, DISASM_BUF_SIZE);
-	if (p.options & DISASM_O_INTRLOWERCASE)
-		strlcase(cast(char*)p.mnbuf, DISASM_BUF_SIZE);
 
 	return p.error;
 }
@@ -199,7 +201,7 @@ private import core.stdc.stdarg;
 immutable const(char) *UNKNOWN_OP = "??";
 
 void mnill(ref disasm_params_t p) {
-	if (p.include & DISASM_I_MACHINECODE)
+	if (p.mode & DISASM_I_MACHINECODE)
 		mnadd(p, UNKNOWN_OP);
 	p.error = DisasmError.Illegal;
 }

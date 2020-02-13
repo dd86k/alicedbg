@@ -20,9 +20,8 @@ private:
 __gshared uint en;
 int loop_handler(exception_t *e) {
 	disasm_params_t p;
-	p.include = DISASM_I_MACHINECODE | DISASM_I_MNEMONICS;
 	p.addr = e.addr;
-	disasm_line(p);
+	disasm_line(p, DisasmMode.File);
 	printf(
 	"* EXCEPTION #%d\n"~
 	"PID=%u  TID=%u\n"~

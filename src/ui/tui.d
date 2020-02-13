@@ -82,22 +82,21 @@ int tui_handler(exception_t *e) {
 	term_clear;
 	// disasm settings
 	disasm_params_t params;
-	params.include = DISASM_I_EVERYTHING;
 	params.addrv = e.addrv;
 	// locals
 	const uint h = tui_size.height / 2;
 	const uint ihmax = tui_size.height - 2;
 	// On-point
 	term_pos(0, h);
-	if (disasm_line(params) == DisasmError.None)
+	if (disasm_line(params, DisasmMode.File) == DisasmError.None)
 		term_writef("> %zX %-20s %s",
-			params.thisaddr, &params.mcbuf, &params.mnbuf);
+			params.lastaddr, &params.mcbuf, &params.mnbuf);
 	// forward
 	for (uint hi = h + 1; hi < ihmax; ++hi) {
 		term_pos(0, hi);
-		disasm_line(params);
+		disasm_line(params, DisasmMode.File);
 		term_writef("  %zX %-20s %s",
-			params.thisaddr, &params.mcbuf, &params.mnbuf);
+			params.lastaddr, &params.mcbuf, &params.mnbuf);
 	}
 	// backward
 	//for (uint ih = h - 1; ih >= 0; ih) {

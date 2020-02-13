@@ -84,15 +84,26 @@ private __gshared size_t strfc = 0;
  * Returns: String
  */
 const(char) *strf(const(char) *f, ...) {
+	va_list va;
+	va_start(va, f);
+	return strfva(f, va);
+}
+/**
+ * Quick format.
+ *
+ * Quick and very dirty string formatting utility. This serves as pushing an
+ * existing list to an internal buffer.
+ *
+ * Params: va = va_list
+ *
+ * Returns: String
+ */
+const(char) *strfva(const(char) *f, va_list va) {
 	__gshared char [128][16]b = void;
 
 	char *sb = cast(char*)b[strfc];
-
-	va_list va;
-	va_start(va, f);
 	vsnprintf(sb, 128, f, va);
-
-	if (++strfc > 15) strfc = 0;
+	if (++strfc >= 15) strfc = 0;
 
 	return sb;
 }

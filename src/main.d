@@ -133,7 +133,6 @@ int main(int argc, const(char) **argv) {
 	cliopt_t opt;	/// Defaults to .init
 	disasm_params_t disopt;	/// .init
 	disopt.style = DisasmSyntax.Intel;
-	disopt.include = DISASM_I_MACHINECODE | DISASM_I_MNEMONICS;
 
 	// CLI
 	for (size_t argi = 1; argi < argc; ++argi) {
@@ -229,8 +228,8 @@ int main(int argc, const(char) **argv) {
 			}
 
 			disopt.addr = m;
-			for (c_long fi; fi < fl; fi += disopt.addrv - disopt.thisaddr) {
-				disasm_line(disopt);
+			for (c_long fi; fi < fl; fi += disopt.addrv - disopt.lastaddr) {
+				disasm_line(disopt, DisasmMode.File);
 				printf("%08X %-30s %-30s\n",
 					cast(uint)fi,
 					&disopt.mcbuf, &disopt.mnbuf);
@@ -275,6 +274,9 @@ int main(int argc, const(char) **argv) {
 		/*if (strcmp(arg, "backend") == 0) {
 			
 		}*/
+		
+		printf("'%s': unknown parameter\n", arg);
+		return EXIT_FAILURE;
 	}
 
 	int e = void;
