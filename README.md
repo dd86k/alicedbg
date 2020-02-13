@@ -12,19 +12,20 @@ _Why not make one myself?_ I asked myself.
 
 ### Feature Support
 
-| ABI | OS | CRT | Debugging core |
+| ISA | OS | CRT | Debugging core |
 |---|---|---|:-:|
 | x86, x86-64 | Windows | Microsoft | ✔️ |
 | | Linux | Glibc | ✔️ |
 
 ### Disassembler Progress
 
-| ABI | ~% | Disassembler status |
+| ISA | ~% | Note |
 |---|---|---|
 | x86-32 | 40 | Still adding |
 | x86-64 | 0 | Waiting on x86-32 |
-| arm | 0 | Waiting on x86-64 |
-| aarch64 | 0 | Waiting on x86-64 |
+| arm-t32 | 0 | Waiting on x86-64 |
+| arm-a32 | 0 | Waiting on x86-64 |
+| arm-a64 | 0 | Waiting on x86-64 |
 | webasm | 0 | Planned |
 
 ## FAQ
