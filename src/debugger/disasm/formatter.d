@@ -2,7 +2,6 @@ module debugger.disasm.formatter;
 
 import debugger.disasm.core;
 import core.stdc.stdarg;
-import core.stdc.stdio;	//TODO: Temporary
 import utils.str;
 
 extern (C):
@@ -16,6 +15,7 @@ enum FORMATTER_STACK_LIMIT = FORMATTER_STACK_SIZE - 1;
 enum FormatType {
 	String,	/// Pure string
 	Reg,	/// Register spec
+	SegReg,	/// Register spec
 	Imm,	/// Immediate spec
 	Mem,	/// Memory spec
 	MemReg,	/// Memory with Register
@@ -46,6 +46,9 @@ struct disasm_fmt_t {
 	size_t itemno;	/// Current item number
 	int opwidth;	/// Last operation width
 }
+
+/// Default string for illegal instructions
+immutable const(char) *DISASM_FMT_ERR_STR = "??";
 
 //
 // Machine code functions
@@ -111,11 +114,23 @@ void disasm_push_strf(ref disasm_params_t p, const(char) *f, ...) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = Register value
-void disasm_push_reg(ref disasm_params_t p, const(char) *v) {
+void disasm_push_reg(ref disasm_params_t p, const(char) *reg) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.Reg;
-	i.sval1 = v;
+	i.sval1 = reg;
+}
+/// Push a segment+register value into the formatting stack. This is printed
+/// depending on the register formatter (disasm_fmt_segreg).
+/// Params:
+/// 	p = Disassembler parameters
+/// 	v = Register value
+void disasm_push_segreg(ref disasm_params_t p, const(char) *seg, const(char) *reg) {
+	disasm_fmt_item_t *i = disasm_fmt_select(p);
+	if (i == null) return;
+	i.type = FormatType.Reg;
+	i.sval1 = seg;
+	i.sval2 = reg;
 }
 /// Push an immediate value into the formatting stack. This is printed depending
 /// on the immediate formatter (disasm_fmt_imm).
@@ -298,6 +313,15 @@ void disasm_push_x86_sib_mod01_index100(ref disasm_params_t p,
 // Core functions
 //
 
+/// Set error code to DisasmError.Illegal and override mnemonic buffer to
+/// DISASM_FMT_ERR_STR.
+/// Params: p = Disassembler parameters
+void disasm_err(ref disasm_params_t p) {
+	p.error = DisasmError.Illegal;
+	p.mnbufi =
+	stradd(cast(char*)p.mnbuf, DISASM_BUF_SIZE, 0, DISASM_FMT_ERR_STR);
+}
+
 /// Process items in the formatter stack and output them into the formatter
 /// buffers. Called by disasm_line, and caller is responsible of terminating
 /// string buffers.
@@ -368,6 +392,7 @@ const(char) *disasm_fmt_item(ref disasm_params_t p, ref disasm_fmt_item_t i) {
 	final switch (i.type) {
 	case String:	return i.sval1;
 	case Reg:	return disasm_fmt_reg(p, i.sval1);
+	case SegReg:	return disasm_fmt_segreg(p, i.sval1, i.sval2);
 	case Imm:	return disasm_fmt_imm(p, i.ival1);
 	case Mem:	return disasm_fmt_mem(p, i.ival1);
 	case MemReg:	return disasm_fmt_memreg(p, i.sval1);
@@ -399,6 +424,11 @@ const(char) *disasm_fmt_reg(ref disasm_params_t p, const(char) *v) {
 	case Att: return strf("%%%s", v);
 	default:  return v;
 	}
+}
+const(char) *disasm_fmt_segreg(ref disasm_params_t p, const(char) *seg, const(char) *reg) {
+	seg = disasm_fmt_reg(p, seg);
+	reg = disasm_fmt_reg(p, reg);
+	return strf("%s%s", seg, reg);
 }
 const(char) *disasm_fmt_imm(ref disasm_params_t f, int v) {
 	with (DisasmSyntax)

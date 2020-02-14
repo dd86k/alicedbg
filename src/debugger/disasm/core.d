@@ -7,6 +7,104 @@ private import debugger.disasm.formatter;
 
 extern (C):
 
+//
+// Enumerations
+//
+
+/// Disassembler operating mode
+enum DisasmMode {
+	Size,	/// Only calculate operation code sizes
+	Data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
+	File,	/// Machine code and instruction mnemonics formatting
+	Full	/// (Not implemented) Add symbols and demangling
+}
+
+/// Disassembler error
+enum DisasmError {
+	None,	/// Nothing to report
+	NotSupported,	/// Selected ISA is not currently supported
+	Illegal,	/// Illegal/invalid opcode
+}
+
+/// Disassembler ABI
+enum DisasmABI : ubyte {
+	Default,	/// Platform compiled target
+	Guess,	/// (Not implemented) Attempt to guess ISA
+	x86,	/// x86
+	x86_64,	/// AMD64
+	arm_t32,	/// (Not implemented) ARM: Thumb 32-bit
+	arm_a32,	/// (Not implemented) ARM: A32 (formally arm)
+	arm_a64,	/// (Not implemented) ARM: A64 (formally aarch64)
+}
+
+/// Disassembler x86 styles
+enum DisasmSyntax : ubyte {
+	Intel,	/// Intel syntax
+	Nasm,	/// (NASM) Netwide Assembler syntax
+	Att,	/// AT&T syntax
+//	Masm,	/// (Not implemented) (MASM) Microsoft Assembler
+//	Ideal,	/// (Not implemented) Borland Ideal
+//	Hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
+}
+
+/// Disassembler symbol demangling
+enum DisasmDemangle : ushort {
+	None,	/// (Not implemented) Leave symbol as-is
+	C,	/// (Not implemented) C mangling
+}
+
+//
+// Disasm constants
+//
+
+/// Character buffer size
+///
+/// Currently, 64 characters is enough to hold SIB memory references and AVX-512
+/// instructions. If that's not enough, update it to 80 characters.
+enum DISASM_BUF_SIZE = 64;
+
+version (X86)
+	enum DISASM_DEFAULT_ISA = DisasmABI.x86;	/// Platform default ABI
+else
+version (X86_64)
+	enum DISASM_DEFAULT_ISA = DisasmABI.x86_64;	/// Platform default ABI
+else
+version (ARM)
+	enum DISASM_DEFAULT_ISA = DisasmABI.arm_a32;	/// Platform default ABI
+else
+version (AArch64)
+	enum DISASM_DEFAULT_ISA = DisasmABI.arm_a64;	/// Platform default ABI
+else
+	enum DISASM_DEFAULT_ISA = DisasmABI.Default;	/// Platform default ABI
+
+//
+// Include bits
+//
+
+deprecated enum DISASM_I_MACHINECODE	= 0b0000_0001;	/// Include machine code
+deprecated enum DISASM_I_MNEMONICS	= 0b0000_0010;	/// Include instruction mnemonics
+deprecated enum DISASM_I_SYMBOLS	= 0b0000_0100;	/// (Not implemented) Include symbols
+deprecated enum DISASM_I_SOURCE	= 0b0000_1000;	/// (Not implemented) Include source code
+deprecated enum DISASM_I_COMMENTS	= 0b0001_0000;	/// (Not implemented) Include inlined comments
+deprecated enum DISASM_I_EVERYTHING	= 0xFF;	/// Include everything
+
+//
+// Option bits
+//
+
+/// Diasm option: 
+//enum DISASM_O_	= 0x0001;
+/// Diasm option: Go backwards instead of forward. More expensive to calculate!
+enum DISASM_O_BACKWARD	= 0x0002;
+/// Diasm option: 
+//enum DISASM_O_	= 0x0004;
+/// Diasm option: 
+//enum DISASM_O_	= 0x0008;
+/// Disasm option: 
+//enum DISASM_O_	= 0x0010;
+/// Disasm option: Do not group machine code bytes
+enum DISASM_O_NOGROUP_MACHINECODE	= 0x0020;
+
 /// Disassembler parameters structure
 struct disasm_params_t { align(1):
 	union {
@@ -58,102 +156,6 @@ struct disasm_params_t { align(1):
 }
 pragma(msg, "* disasm_params_t.sizeof: ", disasm_params_t.sizeof);
 
-//
-// Enumerations
-//
-
-/// Disassembler operating mode
-enum DisasmMode {
-	Size,
-	Data,
-	File,
-	Full
-}
-
-/// Disassembler error
-enum DisasmError {
-	None,	/// Nothing to report, you can continue
-	NoAuto,	/// Automatic mode is unavailable for compiled platform
-	NoABI,	/// Invalid ABI was selected
-	Illegal,	/// Illegal/invalid opcode
-}
-
-/// Disassembler ABI
-enum DisasmABI : ubyte {
-	Platform,	/// Platform compiled target
-	Guess,	/// (Not implemented) Attempt to guess ISA
-	x86,	/// x86
-	x86_64,	/// AMD64
-	ARM,	/// (Not implemented) ARM
-	ARM64,	/// (Not implemented) AArch64
-}
-
-/// Disassembler x86 styles
-enum DisasmSyntax : ubyte {
-	Intel,	/// Intel syntax
-	Nasm,	/// (NASM) Netwide Assembler syntax
-	Att,	/// AT&T syntax
-//	Masm,	/// (Not implemented) (MASM) Microsoft Assembler
-//	Ideal,	/// (Not implemented) Borland Ideal
-//	Hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
-}
-
-/// Disassembler symbol demangling
-enum DisasmDemangle : ushort {
-	None,	/// (Not implemented) Leave symbol as-is
-	C,	/// (Not implemented) C mangling
-}
-
-//
-// Disasm constants
-//
-
-/// Character buffer size
-enum DISASM_BUF_SIZE = 128;
-
-version (X86)
-	enum DISASM_DEFAULT_ABI = DisasmABI.x86;	/// Platform default ABI
-else
-version (X86_64)
-	enum DISASM_DEFAULT_ABI = DisasmABI.x86_64;	/// Platform default ABI
-else
-version (ARM)
-	enum DISASM_DEFAULT_ABI = DisasmABI.ARM;	/// Platform default ABI
-else
-version (AArch64)
-	enum DISASM_DEFAULT_ABI = DisasmABI.ARM64;	/// Platform default ABI
-else
-	enum DISASM_DEFAULT_ABI = DisasmABI.Platform;	/// Platform default ABI
-
-
-//
-// Include bits
-//
-
-enum DISASM_I_MACHINECODE	= 0b0000_0001;	/// Include machine code
-enum DISASM_I_MNEMONICS	= 0b0000_0010;	/// Include instruction mnemonics
-enum DISASM_I_SYMBOLS	= 0b0000_0100;	/// (Not implemented) Include symbols
-enum DISASM_I_SOURCE	= 0b0000_1000;	/// (Not implemented) Include source code
-enum DISASM_I_COMMENTS	= 0b0001_0000;	/// (Not implemented) Include inlined comments
-enum DISASM_I_EVERYTHING	= 0xFF;	/// Include everything
-
-//
-// Option bits
-//
-
-/// Diasm option: 
-//enum DISASM_O_	= 0x0001;
-/// Diasm option: Go backwards instead of forward. More expensive to calculate!
-enum DISASM_O_BACKWARD	= 0x0002;
-/// Diasm option: 
-//enum DISASM_O_	= 0x0004;
-/// Diasm option: 
-//enum DISASM_O_	= 0x0008;
-/// Disasm option: 
-//enum DISASM_O_	= 0x0010;
-/// Disasm option: Do not group machine code bytes
-enum DISASM_O_GROUP_MACHINECODE	= 0x0020;
-
 /**
  * Disassemble from a memory pointer given in params. Caller must ensure
  * memory pointer points to readable regions and bounds are respected.
@@ -167,20 +169,23 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 	p.lastaddr = p.addrv;
 	p.fmt.itemno = 0;
 
-	with (p) mcbufi = mnbufi = 0;
+	if (p.mode >= DisasmMode.File)
+		with (p) mcbufi = mnbufi = 0;
 
-	if (p.abi == DisasmABI.Platform)
-		p.abi = DISASM_DEFAULT_ABI;
+	if (p.abi == DisasmABI.Default)
+		p.abi = DISASM_DEFAULT_ISA;
 
 	with (DisasmABI)
 	switch (p.abi) {
 	case x86: disasm_x86(p); break;
 	case x86_64: disasm_x86_64(p); break;
-	default: return DisasmError.NoABI;
+	default: return DisasmError.NotSupported;
 	}
 
-	disasm_render(p);
-	with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
+	if (p.mode >= DisasmMode.File) {
+		disasm_render(p);
+		with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
+	}
 
 	return p.error;
 }
@@ -195,6 +200,7 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 //       silly).
 //
 
+deprecated:
 package:
 private import core.stdc.stdarg;
 

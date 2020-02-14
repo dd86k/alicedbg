@@ -1,6 +1,7 @@
 /**
  * Disassembler styling engine
  */
+deprecated
 module debugger.disasm.style;
 
 import debugger.disasm.core;

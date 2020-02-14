@@ -61,7 +61,7 @@ L_CONTINUE:
 	case 0x03:	// ADD REG32, R/M32
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "add");
-		__x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
+		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x04:	// ADD AL, IMM8
 		if (p.mode >= DisasmMode.File) {
@@ -82,48 +82,48 @@ L_CONTINUE:
 		p.addrv += 4;
 		break;
 	case 0x06:	// PUSH ES
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "es"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "es");
+		}
 		break;
 	case 0x07:	// POP ES
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "es"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "es");
+		}
 		break;
 	case 0x08:	// OR R/M8, REG8
 	case 0x09:	// OR R/M32, REG32
 	case 0x0A:	// OR REG8, R/M8
 	case 0x0B:	// OR REG32, R/M32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "or");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "or");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x0C:	// OR AL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "or");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				style_mn_imm(p, *p.addru8)
-			);
+			disasm_push_str(p, "or");
+			disasm_push_reg(p, "al");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0x0D:	// OR EAX, IMM32
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "or");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				style_mn_imm(p, *p.addru32)
-			);
+			disasm_push_str(p, "or");
+			disasm_push_reg(p, "eax");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
-	case 0x0E:
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "cs"));
+	case 0x0E:	// PUSH CS
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "cs");
+		}
 		break;
 	case 0x0F:
 		x86_0f(p);
@@ -132,111 +132,101 @@ L_CONTINUE:
 	case 0x11:	// ADC R/M32, REG32
 	case 0x12:	// ADC REG8, R/M8
 	case 0x13:	// ADC REG32, R/M32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "adc");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "adc");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x14:	// ADC AL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "adc");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				style_mn_imm(p, *p.addru8)
-			);
+			disasm_push_str(p, "adc");
+			disasm_push_reg(p, "al");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0x15:	// ADC EAX, IMM32
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "adc");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				style_mn_imm(p, *p.addru32)
-			);
+			disasm_push_str(p, "adc");
+			disasm_push_reg(p, "eax");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0x16:	// PUSH SS
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "ss"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "ss");
+		}
 		break;
 	case 0x17:	// POP SS
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "ss"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "ss");
+		}
 		break;
 	case 0x18:	// SBB R/M8, REG8
 	case 0x19:	// SBB R/M32, REG32
 	case 0x1A:	// SBB REG8, R/M8
 	case 0x1B:	// SBB REG32, R/M32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "sbb");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "sbb");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x1C:	// SBB AL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "sbb");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				style_mn_imm(p, *p.addru8)
-			);
+			disasm_push_str(p, "sbb");
+			disasm_push_reg(p, "al");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0x1D:	// SBB EAX, IMM32
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "sbb");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				style_mn_imm(p, *p.addru32)
-			);
+			disasm_push_str(p, "sbb");
+			disasm_push_reg(p, "eax");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0x1E:	// PUSH DS
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "ds"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "ds");
+		}
 		break;
 	case 0x1F:	// POP DS
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "ds"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "ds");
+		}
 		break;
 	case 0x20:	// AND R/M8, REG8
 	case 0x21:	// AND R/M32, REG32
 	case 0x22:	// AND REG8, R/M8
 	case 0x23:	// AND REG32, R/M32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "and");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "and");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x24:	// AND AL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "and");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				style_mn_imm(p, *p.addru8)
-			);
+			disasm_push_str(p, "and");
+			disasm_push_reg(p, "al");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
-	case 0x25:	// AND EAX, IMM8
-		if (INCLUDE_MACHINECODE)
+	case 0x25:	// AND EAX, IMM32
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "sbb");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				style_mn_imm(p, *p.addru32)
-			);
+			disasm_push_str(p, "and");
+			disasm_push_reg(p, "eax");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
@@ -248,38 +238,32 @@ L_CONTINUE:
 		p.x86.segreg = PrefixReg.ES;
 		goto L_CONTINUE;
 	case 0x27:	// DAA
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "daa");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "daa");
 		break;
 	case 0x28:	// SUB R/M8, REG8
 	case 0x29:	// SUB R/M32, REG32
 	case 0x2A:	// SUB REG8, R/M8
 	case 0x2B:	// SUB REG32, R/M32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "sub");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "sub");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x2C:	// SUB AL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "sub");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				style_mn_imm(p, *p.addru8)
-			);
+			disasm_push_str(p, "sub");
+			disasm_push_reg(p, "al");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0x2D:	// SUB EAX, IMM32
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "sub");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				style_mn_imm(p, *p.addru32)
-			);
+			disasm_push_str(p, "sub");
+			disasm_push_reg(p, "eax");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
@@ -291,38 +275,32 @@ L_CONTINUE:
 		p.x86.segreg = PrefixReg.CS;
 		goto L_CONTINUE;
 	case 0x2F:	// DAS
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "das");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "das");
 		break;
 	case 0x30:	// XOR R/M8, REG8
 	case 0x31:	// XOR R/M32, REG32
 	case 0x32:	// XOR REG8, R/M8
 	case 0x33:	// XOR REG32, R/M32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "xor");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "xor");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x34:	// XOR AL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (INCLUDE_MACHINECODE) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "xor");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				style_mn_imm(p, *p.addru8)
-			);
+			disasm_push_str(p, "xor");
+			disasm_push_reg(p, "al");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0x35:	// XOR EAX, IMM32
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "xor");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				style_mn_imm(p, *p.addru32)
-			);
+			disasm_push_str(p, "xor");
+			disasm_push_reg(p, "eax");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
@@ -334,38 +312,32 @@ L_CONTINUE:
 		p.x86.segreg = PrefixReg.SS;
 		goto L_CONTINUE;
 	case 0x37:	// AAA
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "aaa");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "aaa");
 		break;
 	case 0x38:	// CMP R/M8, REG8
 	case 0x39:	// CMP R/M32, REG32
 	case 0x3A:	// CMP REG8, R/M8
 	case 0x3B:	// CMP REG32, R/M32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "cmp");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmp");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x3C:	// CMP AL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "cmp");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				style_mn_imm(p, *p.addru8)
-			);
+			disasm_push_str(p, "cmp");
+			disasm_push_reg(p, "al");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0x3D:	// CMP EAX, IMM32
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "cmp");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				style_mn_imm(p, *p.addru32)
-			);
+			disasm_push_str(p, "cmp");
+			disasm_push_reg(p, "eax");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
@@ -377,176 +349,221 @@ L_CONTINUE:
 		p.x86.segreg = PrefixReg.DS;
 		goto L_CONTINUE;
 	case 0x3F:	// AAS
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "aas");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "aas");
 		break;
 	case 0x40:	// INC EAX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "inc %s", style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "inc");
+			disasm_push_reg(p, "eax");
+		}
 		break;
 	case 0x41:	// INC ECX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "inc %s", style_mn_reg(p, "ecx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "inc");
+			disasm_push_reg(p, "ecx");
+		}
 		break;
 	case 0x42:	// INC EDX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "inc %s", style_mn_reg(p, "edx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "inc");
+			disasm_push_reg(p, "edx");
+		}
 		break;
 	case 0x43:	// INC EBX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "inc %s", style_mn_reg(p, "ebx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "inc");
+			disasm_push_reg(p, "ebx");
+		}
 		break;
 	case 0x44:	// INC ESP
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "inc %s", style_mn_reg(p, "esp"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "inc");
+			disasm_push_reg(p, "esp");
+		}
 		break;
 	case 0x45:	// INC EBP
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "inc %s", style_mn_reg(p, "ebp"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "inc");
+			disasm_push_reg(p, "ebp");
+		}
 		break;
 	case 0x46:	// INC ESI
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "inc %s", style_mn_reg(p, "esi"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "inc");
+			disasm_push_reg(p, "esi");
+		}
 		break;
 	case 0x47:	// INC EDI
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "inc %s", style_mn_reg(p, "edi"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "inc");
+			disasm_push_reg(p, "edi");
+		}
 		break;
 	case 0x48:	// DEC EAX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "dec %s", style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "dec");
+			disasm_push_reg(p, "eax");
+		}
 		break;
 	case 0x49:	// DEC ECX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "dec %s", style_mn_reg(p, "ecx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "dec");
+			disasm_push_reg(p, "ecx");
+		}
 		break;
 	case 0x4A:	// DEC EDX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "dec %s", style_mn_reg(p, "edx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "dec");
+			disasm_push_reg(p, "edx");
+		}
 		break;
 	case 0x4B:	// DEC EBX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "dec %s", style_mn_reg(p, "ebx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "dec");
+			disasm_push_reg(p, "ebx");
+		}
 		break;
 	case 0x4C:	// DEC ESP
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "dec %s", style_mn_reg(p, "esp"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "dec");
+			disasm_push_reg(p, "esp");
+		}
 		break;
 	case 0x4D:	// DEC EBP
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "dec %s", style_mn_reg(p, "ebp"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "dec");
+			disasm_push_reg(p, "ebp");
+		}
 		break;
 	case 0x4E:	// DEC ESI
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "dec %s", style_mn_reg(p, "esi"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "dec");
+			disasm_push_reg(p, "esi");
+		}
 		break;
 	case 0x4F:	// DEC EDI
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "dec %s", style_mn_reg(p, "edi"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "dec");
+			disasm_push_reg(p, "edi");
+		}
 		break;
 	case 0x50:	// PUSH EAX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "eax");
+		}
 		break;
 	case 0x51:	// PUSH ECX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "ecx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "eax");
+		}
 		break;
 	case 0x52:	// PUSH EDX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "edx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "edx");
+		}
 		break;
 	case 0x53:	// PUSH EBX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "ebx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "ebx");
+		}
 		break;
 	case 0x54:	// PUSH ESP
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "esp"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "esp");
+		}
 		break;
 	case 0x55:	// PUSH EBP
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "ebp"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "ebp");
+		}
 		break;
 	case 0x56:	// PUSH ESI
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "esi"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "esi");
+		}
 		break;
 	case 0x57:	// PUSH EDI
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %s", style_mn_reg(p, "edi"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "push");
+			disasm_push_reg(p, "edi");
+		}
 		break;
 	case 0x58:	// POP EAX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "eax");
+		}
 		break;
 	case 0x59:	// POP ECX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "ecx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "eax");
+		}
 		break;
 	case 0x5A:	// POP EDX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "edx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "edx");
+		}
 		break;
 	case 0x5B:	// POP EBX
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "ebx"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "ebx");
+		}
 		break;
 	case 0x5C:	// POP ESP
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "esp"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "esp");
+		}
 		break;
 	case 0x5D:	// POP EBP
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "ebp"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "ebp");
+		}
 		break;
 	case 0x5E:	// POP ESI
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "esi"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "esi");
+		}
 		break;
 	case 0x5F:	// POP EDI
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_reg(p, "edi"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, "edi");
+		}
 		break;
 	case 0x60:	// PUSHAD
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "pushad");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "pushad");
 		break;
 	case 0x61:	// POPAD
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "popad");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "popad");
 		break;
-	case 0x62:	// BOUND REG32, MEM32, MEM32
+	case 0x62:	// BOUND REG32, MEM&MEM32
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "bound");
 		ubyte modrm = *p.addru8;
-		++p.addrv;
-		uint m1 = void;
-		uint m2 = void;
-		if (p.x86.prefix_operand) {
-			m1 = *p.addru16;
-			m2 = *(p.addru16 + 1);
-			p.addrv += 4;
-			if (INCLUDE_MACHINECODE)
-				style_mc_f(p, "%02X %04X %04X",
-					modrm, m1, m2);
-		} else {
-			m1 = *p.addru32;
-			m2 = *(p.addru32 + 1);
-			p.addrv += 8;
-			if (INCLUDE_MACHINECODE)
-				style_mc_f(p, "%02X %08X %08X",
-					modrm, m1, m2);
-		}
-		if (INCLUDE_MNEMONICS) {
-			style_mn_f(p, "bound %s, %s%u:%u",
-				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE)),
-				style_mn_reg(p, x86_segstr(p.x86.segreg)),
-				m1, m2);
-		}
+		if ((modrm & RM_MOD) == RM_MOD_11)
+			disasm_err(p);
+		else
+			x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
 		break;
 	case 0x63:	// ARPL REG16, R/M16
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "arpl");
-		p.x86.prefix_operand = 1;
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "arpl");
 		x86_modrm(p, X86_WIDTH_NONE, X86_DIR_REG);
 		break;
 	case 0x64:	// FS:
@@ -578,173 +595,190 @@ L_CONTINUE:
 		p.x86.prefix_address = true;
 		goto L_CONTINUE;
 	case 0x68:	// PUSH IMM32
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s", style_mn_imm(p, *p.addri32));
+			disasm_push_str(p, "push");
+			disasm_push_imm(p, *p.addri32);
+		}
 		p.addrv += 4;
 		break;
 	case 0x69:	// IMUL REG32, R/M32, IMM32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "imul");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "imul");
 		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, ", %d", style_mn_imm(p, *p.addri32));
+			disasm_push_imm(p, *p.addru32);
+		}
 		p.addrv += 4;
 		break;
 	case 0x6A:	// PUSH IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "push %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "push");
+			disasm_push_imm(p, *p.addru8);
+		}
 		++p.addrv;
 		break;
 	case 0x6B:	// IMUL REG32, R/M32, IMM8
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "imul");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "imul");
 		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, ", %d", style_mn_imm(p, *p.addri8));
+			disasm_push_imm(p, *p.addru8);
+		}
 		++p.addrv;
 		break;
 	case 0x6C:	// INSB
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "insb");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "insb");
 		break;
 	case 0x6D:	// INSD
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "insd");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "insd");
 		break;
 	case 0x6E:	// OUTSB
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "outsb");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "outsb");
 		break;
 	case 0x6F:	// OUTSD
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "outsd");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "outsd");
 		break;
 	case 0x70:	// JO
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jo %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jo");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x71:	// JNO
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jno %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jno");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x72:	// JB
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jb %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jb");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x73:	// JNB
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jnb %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jnb");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x74:	// JZ
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jz %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jz");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x75:	// JNZ
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jnz %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jnz");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x76:	// JBE
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jbe %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jbe");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x77:	// JNBE
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jnbe %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jnbe");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x78:	// JS
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "js %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "js");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x79:	// JNS
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jns %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jns");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x7A:	// JP
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jp %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jp");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x7B:	// JNP
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jnp %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jnp");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x7C:	// JL
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jl %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jl");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x7D:	// JNL
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jnl %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jnl");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x7E:	// JLE
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jle %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jle");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x7F:	// JNLE
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "jnle %d", style_mn_imm(p, *p.addri8));
+			disasm_push_str(p, "jnle");
+			disasm_push_imm(p, *p.addri8);
+		}
 		++p.addrv;
 		break;
 	case 0x81:	// GRP1 REG32, IMM32
 		ubyte modrm = *p.addru8;
 		++p.addrv;
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			mcaddf(p, "%02X %08X", modrm, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			switch (modrm & RM_RM) {
 			case RM_RM_000: f = "add"; break;
@@ -757,11 +791,9 @@ L_CONTINUE:
 			case RM_RM_111: f = "cmp"; break;
 			default: // impossible
 			}
-			style_mn(p, f);
-			style_mn_2(p,
-				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE)),
-				style_mn_imm(p, *p.addru32)
-			);
+			disasm_push_str(p, f);
+			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
@@ -770,9 +802,8 @@ L_CONTINUE:
 	case 0x83:	// GRP1 REG32, IMM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			mcaddf(p, "%02X %02X", modrm, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
 			const(char) *f = void;
 			switch (modrm & RM_RM) {
 			case RM_RM_000: f = "add"; break;
@@ -785,39 +816,35 @@ L_CONTINUE:
 			case RM_RM_111: f = "cmp"; break;
 			default: // impossible
 			}
-			style_mn(p, f);
-			style_mn_2(p,
-				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_OP_WIDE(b))),
-				style_mn_imm(p, *p.addru32)
-			);
+			disasm_push_str(p, f);
+			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_OP_WIDE(b)));
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0x84:	// TEST R/M8, REG8
 	case 0x85:	// TEST R/M32, REG32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "test");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "test");
 		x86_modrm(p, X86_OP_WIDE(b), X86_DIR_MEM);
 		break;
 	case 0x86:	// XCHG R/M8, REG8
 	case 0x87:	// XCHG R/M32, REG32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "xchg");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "xchg");
 		x86_modrm(p, X86_OP_WIDE(b), X86_DIR_MEM);
 		break;
 	case 0x88:	// MOV R/M8, REG8
 	case 0x89:	// MOV R/M32, REG32
 	case 0x8A:	// MOV REG8, R/M8
 	case 0x8B:	// MOV REG32, R/M32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "mov");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "mov");
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x8C:	// MOV REG16, SEGREG16
 		ubyte modrm = *p.addru8;
 		++p.addrv;
-		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
 		const(char) *f = void;
 		switch (modrm & RM_REG) {
 		case RM_REG_000: f = "es"; break;
@@ -826,28 +853,24 @@ L_CONTINUE:
 		case RM_REG_011: f = "ds"; break;
 		case RM_REG_100: f = "fs"; break;
 		case RM_REG_101: f = "gs"; break;
-		default:
-			style_ill(p);
-			break main;
+		default: disasm_err(p); break main;
 		}
-		if (INCLUDE_MNEMONICS) {
+		if (p.mode >= DisasmMode.File) {
 			p.x86.prefix_operand = 1;
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_NONE)),
-				style_mn_reg(p, f));
+			style_mc_x8(p, modrm);
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_NONE));
+			disasm_push_reg(p, f);
 		}
 		break;
 	case 0x8D:	// LEA REG32, MEM32
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "lea");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "lea");
 		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
 		break;
 	case 0x8E:	// MOV SEGREG16, REG16
 		ubyte modrm = *p.addru8;
 		++p.addrv;
-		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
 		const(char) *f = void;
 		switch (modrm & RM_REG) {
 		case RM_REG_000: f = "es"; break;
@@ -856,474 +879,383 @@ L_CONTINUE:
 		case RM_REG_011: f = "ds"; break;
 		case RM_REG_100: f = "fs"; break;
 		case RM_REG_101: f = "gs"; break;
-		default:
-			style_ill(p);
+		default: disasm_err(p); break main;
 		}
-		if (INCLUDE_MNEMONICS) {
+		if (p.mode >= DisasmMode.File) {
 			p.x86.prefix_operand = 1;
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, f),
-				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_NONE)));
+			style_mc_x8(p, modrm);
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, f);
+			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_NONE));
 		}
 		break;
-	case 0x8F:	// GRP1A (POP) REG32
+	case 0x8F:	// GRP1A POP REG32
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (modrm & RM_RM) { // Invalid
-			mnill(p);
+			disasm_err(p);
 			break;
 		}
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, modrm);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "pop %s",
-				style_mn_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE)));
+			disasm_push_str(p, "pop");
+			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+		}
 		break;
 	case 0x90:	// NOP
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "nop");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "nop");
 		break;
 	case 0x91:	// XCHG ECX, EAX
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "xchg");
-			style_mn_2(p,
-				style_mn_reg(p, "ecx"),
-				style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "xchg");
+			disasm_push_reg(p, "ecx");
+			disasm_push_reg(p, "eax");
 		}
 		break;
 	case 0x92:	// XCHG EDX, EAX
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "xchg");
-			style_mn_2(p,
-				style_mn_reg(p, "edx"),
-				style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "xchg");
+			disasm_push_reg(p, "edx");
+			disasm_push_reg(p, "eax");
 		}
 		break;
 	case 0x93:	// XCHG EBX, EAX
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "xchg");
-			style_mn_2(p,
-				style_mn_reg(p, "ebx"),
-				style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "xchg");
+			disasm_push_reg(p, "ebx");
+			disasm_push_reg(p, "eax");
 		}
 		break;
 	case 0x94:	// XCHG ESP, EAX
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "xchg");
-			style_mn_2(p,
-				style_mn_reg(p, "esp"),
-				style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "xchg");
+			disasm_push_reg(p, "esp");
+			disasm_push_reg(p, "eax");
 		}
 		break;
 	case 0x95:	// XCHG EBP, EAX
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "xchg");
-			style_mn_2(p,
-				style_mn_reg(p, "ebp"),
-				style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "xchg");
+			disasm_push_reg(p, "ebp");
+			disasm_push_reg(p, "eax");
 		}
 		break;
 	case 0x96:	// XCHG ESI, EAX
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "xchg");
-			style_mn_2(p,
-				style_mn_reg(p, "esi"),
-				style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "xchg");
+			disasm_push_reg(p, "esi");
+			disasm_push_reg(p, "eax");
 		}
 		break;
 	case 0x97:	// XCHG EDI, EAX
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "xchg");
-			style_mn_2(p,
-				style_mn_reg(p, "edi"),
-				style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "xchg");
+			disasm_push_reg(p, "edi");
+			disasm_push_reg(p, "eax");
 		}
 		break;
 	case 0x98:	// CBW
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "cbw");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cbw");
 		break;
 	case 0x99:	// CBD
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "cbd");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cbd");
 		break;
 	case 0x9A:	// CALL (FAR)
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, "call %d", *p.addri32);
+			disasm_push_str(p, "call");
+			disasm_push_imm(p, *p.addri32);
+		}
 		p.addrv += 4;
 		break;
 	case 0x9B:	// WAIT/FWAIT
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "wait");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "wait");
 		break;
-	case 0x9C:	// PUSHF/D/Q
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "pushfd");
+	case 0x9C:	// PUSHFD
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "pushfd");
 		break;
 	case 0x9D:	// POPF/D/Q
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, "popfd");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "popfd");
 		break;
 	case 0x9E:	// SAHF
-		if (INCLUDE_MACHINECODE)
-			style_mn(p, "sahf");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "sahf");
 		break;
 	case 0x9F:	// LAHF
-		if (INCLUDE_MACHINECODE)
-			style_mn(p, "lahf");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "lahf");
 		break;
 	case 0xA0:	// MOV AL, MEM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn_f(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				style_mn_memstr(p, x86_mem(p, *p.addri32)));
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "al");
+			disasm_push_mem(p, *p.addri32);
 		}
 		p.addrv += 4;
 		break;
 	case 0xA1:	// MOV EAX, MEM32
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn_f(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				style_mn_memstr(p, x86_mem(p, *p.addri32)));
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "eax");
+			disasm_push_mem(p, *p.addri32);
 		}
 		p.addrv += 4;
 		break;
 	case 0xA2:	// MOV MEM8, AL
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn_f(p, "mov");
-			style_mn_2(p,
-				style_mn_memstr(p, x86_mem(p, *p.addri32)),
-				style_mn_reg(p, "al"));
+			disasm_push_str(p, "mov");
+			disasm_push_mem(p, *p.addri32);
+			disasm_push_reg(p, "al");
 		}
 		p.addrv += 4;
 		break;
 	case 0xA3:	// MOV MEM32, EAX
-		if (INCLUDE_MACHINECODE)
-			mcaddf(p, "%08X", *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn_f(p, "mov");
-			style_mn_2(p,
-				style_mn_memstr(p, x86_mem(p, *p.addri32)),
-				style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x32(p, *p.addru32);
+			disasm_push_str(p, "mov");
+			disasm_push_mem(p, *p.addri32);
+			disasm_push_reg(p, "eax");
 		}
 		p.addrv += 4;
 		break;
 	case 0xA4:	// MOVSB ES:EDI, DS:ESI
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "movsb");
-			style_mn_2(p,
-				strf("%s:%s",
-					style_mn_reg(p, "es"),
-					style_mn_reg(p, "edi")),
-				strf("%s:%s",
-					style_mn_reg(p, "ds"),
-					style_mn_reg(p, "esi")));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "movsb");
+			disasm_push_segreg(p, "es:", "edi");
+			disasm_push_segreg(p, "ds:", "esi");
 		}
 		break;
 	case 0xA5:	// MOVSD ES:EDI, DS:ESI
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "movsd");
-			style_mn_2(p,
-				strf("%s:%s",
-					style_mn_reg(p, "es"),
-					style_mn_reg(p, "edi")),
-				strf("%s:%s",
-					style_mn_reg(p, "ds"),
-					style_mn_reg(p, "esi")));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "movsd");
+			disasm_push_segreg(p, "es:", "edi");
+			disasm_push_segreg(p, "ds:", "esi");
 		}
 		break;
 	case 0xA6:	// MOVSB DS:ESI, ES:EDI
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "movsb");
-			style_mn_2(p,
-				strf("%s:%s",
-					style_mn_reg(p, "ds"),
-					style_mn_reg(p, "esi")),
-				strf("%s:%s",
-					style_mn_reg(p, "es"),
-					style_mn_reg(p, "edi")));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "movsb");
+			disasm_push_segreg(p, "ds:", "esi");
+			disasm_push_segreg(p, "es:", "edi");
 		}
 		break;
 	case 0xA7:	// MOVSD DS:ESI, ES:EDI
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "movsd");
-			style_mn_2(p,
-				strf("%s:%s",
-					style_mn_reg(p, "ds"),
-					style_mn_reg(p, "esi")),
-				strf("%s:%s",
-					style_mn_reg(p, "es"),
-					style_mn_reg(p, "edi")));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "movsd");
+			disasm_push_segreg(p, "ds:", "esi");
+			disasm_push_segreg(p, "es:", "edi");
 		}
 		break;
 	case 0xA8:	// TEST AL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "test");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				style_mn_imm(p, *p.addru8));
+			disasm_push_str(p, "test");
+			disasm_push_reg(p, "al");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0xA9:	// TEST EAX, IMM32
-		if (INCLUDE_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "test");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				style_mn_imm(p, *p.addru32));
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x8(p, *p.addru8);
+			disasm_push_str(p, "test");
+			disasm_push_reg(p, "eax");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0xAA:	// STOSB ES:EDI, AL
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "stosb");
-			style_mn_2(p,
-				strf("%s:%s",
-					style_mn_reg(p, "es"),
-					style_mn_reg(p, "edi")),
-				style_mn_reg(p, "al"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "stosb");
+			disasm_push_segreg(p, "es:", "edi");
+			disasm_push_reg(p, "al");
 		}
 		break;
 	case 0xAB:	// STOSD ES:EDI, EAX
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "stosd");
-			style_mn_2(p,
-				strf("%s:%s",
-					style_mn_reg(p, "es"),
-					style_mn_reg(p, "edi")),
-				style_mn_reg(p, "eax"));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "stosd");
+			disasm_push_segreg(p, "es:", "edi");
+			disasm_push_reg(p, "eax");
 		}
 		break;
 	case 0xAC:	// LODSB AL, DS:ESI
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "lodsb");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				strf("%s:%s",
-					style_mn_reg(p, "ds"),
-					style_mn_reg(p, "esi")));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "lodsb");
+			disasm_push_reg(p, "al");
+			disasm_push_segreg(p, "ds:", "esi");
 		}
-			mnadd(p, "LODSB AL, DS:ESI");
 		break;
 	case 0xAD:	// LODSD EAX, DS:ESI
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "lodsd");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				strf("%s:%s",
-					style_mn_reg(p, "ds"),
-					style_mn_reg(p, "esi")));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "lodsd");
+			disasm_push_reg(p, "eax");
+			disasm_push_segreg(p, "ds:", "esi");
 		}
 		break;
 	case 0xAE:	// SCASB AL, ES:EDI
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "scasb");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				strf("%s:%s",
-					style_mn_reg(p, "ds"),
-					style_mn_reg(p, "esi")));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "scasb");
+			disasm_push_reg(p, "al");
+			disasm_push_segreg(p, "es:", "edi");
 		}
 		break;
 	case 0xAF:	// SCASD EAX, ES:EDI
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "scasd");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				strf("%s:%s",
-					style_mn_reg(p, "ds"),
-					style_mn_reg(p, "esi")));
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, "scasd");
+			disasm_push_reg(p, "eax");
+			disasm_push_segreg(p, "es:", "edi");
 		}
 		break;
 	case 0xB0:	// MOV AL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "al"),
-				style_mn_imm(p, *p.addru8));
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "al");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0xB1:	// MOV DL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "dl"),
-				style_mn_imm(p, *p.addru8));
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "dl");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0xB2:	// MOV CL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "cl"),
-				style_mn_imm(p, *p.addru8));
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "cl");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0xB3:	// MOV BL, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "bl"),
-				style_mn_imm(p, *p.addru8));
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "bl");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0xB4:	// MOV AH, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "ah"),
-				style_mn_imm(p, *p.addru8));
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "ah");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0xB5:	// MOV CH, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "ch"),
-				style_mn_imm(p, *p.addru8));
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "ch");
+			disasm_push_imm(p, *p.addru8);
 		}
-			mnaddf(p, "MOV CH, %d", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xB6:	// MOV DH, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "dh"),
-				style_mn_imm(p, *p.addru8));
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "dh");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0xB7:	// MOV BH, IMM8
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File) {
 			style_mc_x8(p, *p.addru8);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "dh"),
-				style_mn_imm(p, *p.addru8));
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "bh");
+			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case 0xB8:	// MOV EAX, IMM32
-		if (INCLUDE_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "eax"),
-				style_mn_imm(p, *p.addru32));
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x8(p, *p.addru8);
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "eax");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0xB9:	// MOV ECX, IMM32
-		if (INCLUDE_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "ecx"),
-				style_mn_imm(p, *p.addru32));
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x8(p, *p.addru8);
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "ecx");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0xBA:	// MOV EDX, IMM32
-		if (INCLUDE_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "edx"),
-				style_mn_imm(p, *p.addru32));
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x8(p, *p.addru8);
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "edx");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0xBB:	// MOV EBX, IMM32
-		if (INCLUDE_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "ebx"),
-				style_mn_imm(p, *p.addru32));
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x8(p, *p.addru8);
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "ebx");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0xBC:	// MOV ESP, IMM32
-		if (INCLUDE_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "esp"),
-				style_mn_imm(p, *p.addru32));
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x8(p, *p.addru8);
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "esp");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0xBD:	// MOV EBP, IMM32
-		if (INCLUDE_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "ebp"),
-				style_mn_imm(p, *p.addru32));
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x8(p, *p.addru8);
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "ebp");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0xBE:	// MOV ESI, IMM32
-		if (INCLUDE_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "esi"),
-				style_mn_imm(p, *p.addru32));
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x8(p, *p.addru8);
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "esi");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0xBF:	// MOV EDI, IMM32
-		if (INCLUDE_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
-		if (INCLUDE_MNEMONICS) {
-			style_mn(p, "mov");
-			style_mn_2(p,
-				style_mn_reg(p, "edi"),
-				style_mn_imm(p, *p.addru32));
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x8(p, *p.addru8);
+			disasm_push_str(p, "mov");
+			disasm_push_reg(p, "edi");
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
@@ -1331,26 +1263,24 @@ L_CONTINUE:
 	case 0xC1:	// GRP2 R/M32, IMM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
-		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
-		const(char) *a = void;
+		const(char) *r = void;
 		switch (modrm & RM_REG) {
-		case RM_REG_000: a = "ror"; break;
-		case RM_REG_001: a = "rcl"; break;
-		case RM_REG_010: a = "rcr"; break;
-		case RM_REG_011: a = "shl"; break;
-		case RM_REG_100: a = "shr"; break;
-		case RM_REG_101: a = "ror"; break;
-		case RM_REG_111: a = "sar"; break;
-		default:
-			style_ill(p);
-			break main;
+		case RM_REG_000: r = "ror"; break;
+		case RM_REG_001: r = "rcl"; break;
+		case RM_REG_010: r = "rcr"; break;
+		case RM_REG_011: r = "shl"; break;
+		case RM_REG_100: r = "shr"; break;
+		case RM_REG_101: r = "ror"; break;
+		case RM_REG_111: r = "sar"; break;
+		default: disasm_err(p); break main;
 		}
-		if (INCLUDE_MNEMONICS)
-			style_mn(p, a);
+		if (p.mode >= DisasmMode.File) {
+			style_mc_x8(p, modrm);
+			disasm_push_reg(p, r);
+		}
 		x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
-		if (INCLUDE_MNEMONICS)
-			style_mn_f(p, ", %s", style_mn_imm(p, *p.addru8));
+		if (p.mode >= DisasmMode.File)
+			disasm_push_imm(p, *p.addru8);
 		break;
 	case 0xC2:	// RET IMM16
 		if (INCLUDE_MACHINECODE)
@@ -3164,17 +3094,11 @@ const(char) *x86_segstr(int segreg) {
 /// This also calls x86_modrm_rm and x86_modrm_reg. Width is adjusted for
 /// RM field.
 ///
-/// Styles: DISASM_STYLE_SET_DIRECTION
-///
 /// Params:
 /// 	p = Disassembler parameters
 /// 	width = Register width, see X86_WIDTH_* enumerations
 /// 	direction = If set, the registers are the target
 void x86_modrm(ref disasm_params_t p, int width, int direction) {
-	immutable const(char) *c = ",";
-	const int INCLUDE_MACHINECODE = p.mode & DISASM_I_MACHINECODE;
-	const int INCLUDE_MNEMONICS = p.mode & DISASM_I_MNEMONICS;
-
 	// 11 111 111
 	// || ||| +++- RM
 	// || +++----- REG
@@ -3182,38 +3106,26 @@ void x86_modrm(ref disasm_params_t p, int width, int direction) {
 	ubyte modrm = *p.addru8;
 	++p.addrv;
 
-	if (INCLUDE_MACHINECODE)
+	if (p.mode >= DisasmMode.File)
 		style_mc_x8(p, modrm);
-
-	if (p.style == DisasmSyntax.Att)
-		direction = !direction;
 
 	if (direction)
 		goto L_REG;
 
 L_RM:
 	// Memory regs are only general registers
-	x86_modrm_rm(p, modrm,
-		width > X86_WIDTH_WIDE ? X86_WIDTH_WIDE : width);
-
+	x86_modrm_rm(p, modrm, width);
 	if (direction) return;
-	else style_mn(p, c);
 
 L_REG:
-	if (INCLUDE_MNEMONICS) {
-		style_mn(p, " ");
-		style_mn(p, style_mn_reg(p, 
-			x86_modrm_reg(p, modrm, width)));
-
-		if (direction) {
-			style_mn(p, c);
-			goto L_RM;
-		}
-	}
+	if (p.mode >= DisasmMode.File)
+		disasm_push_reg(p, x86_modrm_reg(p, modrm, width));
+	if (direction) goto L_RM;
 }
 
 const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 	modrm &= RM_REG;
+	//TODO: size_t r = modrm >> 3; // reg index for reg string arrays
 
 	const(char) *reg = void;
 
@@ -3277,8 +3189,6 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 
 /// (Internal) Process the R/M field automatically
 ///
-/// Styles: DISASM_STYLE_SET_WIDTHPOS, DISASM_STYLE_SEGPOS
-///
 /// Params:
 /// 	p = Disasm params
 /// 	modrm = Modrm byte
@@ -3287,176 +3197,6 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 	// SIB mode
 	if ((modrm & RM_RM) == RM_RM_100 && (modrm & RM_MOD) != RM_MOD_11) {
 		x86_sib(p, modrm);
-	} else { // ModR/M mode
-		const int INCLUDE_MACHINECODE = p.mode & DISASM_I_MACHINECODE;
-		const int INCLUDE_MNEMONICS = p.mode & DISASM_I_MNEMONICS;
-
-		if (width == X86_WIDTH_NONE)
-			if ((modrm & RM_MOD) != RM_MOD_11)
-				width = X86_WIDTH_WIDE;
-
-		const(char) *seg = x86_segstr(p.x86.segreg);
-		const(char) *reg = x86_modrm_reg(p, modrm << 3, width);
-
-		switch (modrm & RM_MOD) {
-		case RM_MOD_00:	// Memory Mode, no displacement
-			if (INCLUDE_MNEMONICS)
-				style_mn_rm_00(p, seg, reg);
-			break;
-		case RM_MOD_01:	// Memory Mode, 8-bit displacement
-			if (INCLUDE_MACHINECODE)
-				style_mc_x8(p, *p.addru8);
-			if (INCLUDE_MNEMONICS)
-				style_mn_rm_01(p, seg, reg, *p.addri8);
-			++p.addrv;
-			break;
-		case RM_MOD_10:	// Memory Mode, 32-bit displacement
-			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
-			if (INCLUDE_MNEMONICS)
-				style_mn_rm_01(p, seg, reg, *p.addri32);
-			p.addrv += 4;
-			break;
-		case RM_MOD_11:	// Register mode
-			if (INCLUDE_MNEMONICS) {
-				style_mn(p, " ");
-				style_mn_reg(p, reg);
-			}
-			break;
-		default: // Never reached
-		}
-	}
-}
-
-void x86_sib(ref disasm_params_t p, ubyte modrm) {
-	const int INCLUDE_MACHINECODE = p.mode & DISASM_I_MACHINECODE;
-	const int INCLUDE_MNEMONICS = p.mode & DISASM_I_MNEMONICS;
-
-	// 11 111 111
-	// || ||| +++- BASE
-	// || +++----- INDEX
-	// ++--------- SCALE
-	ubyte sib = *p.addru8;
-	++p.addrv;
-	int scale = 1 << (sib >> 6); // 2 ^ (0b11_000_000 >> 6)
-
-	if (INCLUDE_MACHINECODE)
-		style_mc_x8(p, sib);
-
-	const(char)* base = void, index = void, seg = void;
-
-	if (INCLUDE_MNEMONICS)
-		seg = x86_segstr(p.x86.segreg);
-
-	switch (modrm & RM_MOD) { // Mode
-	case RM_MOD_00:
-		if ((sib & SIB_BASE) == SIB_BASE_101) { // INDEX * SCALE + D32
-			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
-			if (INCLUDE_MNEMONICS) {
-				if ((sib & SIB_INDEX) == SIB_INDEX_100)
-					style_mn_sib_00_101_100(p, seg, *p.addru32);
-				else
-					style_mn_sib_00_101(p, seg,
-						x86_modrm_reg(p, sib, X86_WIDTH_WIDE),
-						scale, *p.addru32);
-			}
-			p.addrv += 4;
-		} else { // BASE32 + INDEX * SCALE
-			if (INCLUDE_MNEMONICS) {
-				base = x86_modrm_reg(p, sib << 3, X86_WIDTH_WIDE);
-				if ((sib & SIB_INDEX) == SIB_INDEX_100)
-					style_mn_sib_00_100(p, seg, base);
-				else
-					style_mn_sib_00(p, seg, base,
-						x86_modrm_reg(p, sib, X86_WIDTH_WIDE),
-						scale);
-			}
-		}
-		return;
-	case RM_MOD_01:
-		if ((sib & SIB_INDEX) == SIB_INDEX_100) { // B32 + D8
-			if (INCLUDE_MACHINECODE)
-				style_mc_x8(p, *p.addru8);
-			if (INCLUDE_MNEMONICS)
-				style_mn_sib_01_100(p, seg,
-					x86_modrm_reg(p, sib << 3, X86_WIDTH_WIDE),
-					*p.addru8);
-			++p.addrv;
-		} else { // BASE8 + INDEX * SCALE + DISP32
-			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
-			if (INCLUDE_MNEMONICS) {
-				base = x86_modrm_reg(p, sib << 3, X86_WIDTH_NONE);
-				index = x86_modrm_reg(p, sib, X86_WIDTH_WIDE);
-				style_mn_sib_01(p, seg, base, index, scale, *p.addru32);
-			}
-			p.addrv += 4;
-		}
-		break;
-	case RM_MOD_10:
-		if (p.mode & DISASM_I_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
-		if (p.mode & DISASM_I_MNEMONICS) {
-			base = x86_modrm_reg(p, sib << 3, X86_WIDTH_WIDE);
-			if ((sib & SIB_INDEX) == SIB_INDEX_100) { // BASE32 + DISP32
-				style_mn_sib_01_100(p, seg, base, *p.addru32);
-			} else { // BASE32 + INDEX * SCALE + DISP32
-				index = x86_modrm_reg(p, sib, X86_WIDTH_WIDE);
-				style_mn_sib_01(p, seg, base, index, scale, *p.addru32);
-			}
-		}
-		p.addrv += 4;
-		break;
-	default: // never
-	}
-}
-
-/// (Internal) Process a ModR/M byte automatically.
-///
-/// This handles text formatting depending on the width and direction settings.
-/// This also calls x86_modrm_rm and x86_modrm_reg. Width is adjusted for
-/// RM field.
-///
-/// Params:
-/// 	p = Disassembler parameters
-/// 	width = Register width, see X86_WIDTH_* enumerations
-/// 	direction = If set, the registers are the target
-void __x86_modrm(ref disasm_params_t p, int width, int direction) {
-	// 11 111 111
-	// || ||| +++- RM
-	// || +++----- REG
-	// ++--------- MODE
-	ubyte modrm = *p.addru8;
-	++p.addrv;
-
-	if (p.mode >= DisasmMode.File)
-		style_mc_x8(p, modrm);
-
-	if (direction)
-		goto L_REG;
-
-L_RM:
-	// Memory regs are only general registers
-	__x86_modrm_rm(p, modrm, width);
-	if (direction) return;
-
-L_REG:
-	if (p.mode >= DisasmMode.File)
-		disasm_push_reg(p, x86_modrm_reg(p, modrm, width));
-	if (direction) goto L_RM;
-}
-
-/// (Internal) Process the R/M field automatically
-///
-/// Params:
-/// 	p = Disasm params
-/// 	modrm = Modrm byte
-/// 	width = Register width
-void __x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
-	// SIB mode
-	if ((modrm & RM_RM) == RM_RM_100 && (modrm & RM_MOD) != RM_MOD_11) {
-		__x86_sib(p, modrm);
 	} else { // ModR/M mode
 		if (width == X86_WIDTH_NONE)
 			if ((modrm & RM_MOD) != RM_MOD_11)
@@ -3497,7 +3237,7 @@ void __x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 	}
 }
 
-void __x86_sib(ref disasm_params_t p, ubyte modrm) {
+void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	// 11 111 111
 	// || ||| +++- BASE
 	// || +++----- INDEX
