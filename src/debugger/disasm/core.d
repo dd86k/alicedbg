@@ -7,10 +7,6 @@ private import debugger.disasm.formatter;
 
 extern (C):
 
-//
-// Enumerations
-//
-
 /// Disassembler operating mode
 enum DisasmMode {
 	Size,	/// Only calculate operation code sizes
@@ -53,14 +49,11 @@ enum DisasmDemangle : ushort {
 	C,	/// (Not implemented) C mangling
 }
 
-//
-// Disasm constants
-//
-
 /// Character buffer size
 ///
-/// Currently, 64 characters is enough to hold SIB memory references and AVX-512
-/// instructions. If that's not enough, update it to 80 characters.
+/// Currently, 64 characters is enough to hold SIB memory references, AVX-512
+/// instructions, or 15 bytes of machine code hexadecimal numbers. If that's
+/// not enough, update it to 80 characters.
 enum DISASM_BUF_SIZE = 64;
 
 version (X86)

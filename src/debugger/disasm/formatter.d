@@ -59,28 +59,32 @@ immutable const(char) *DISASM_FMT_ERR_STR = "??";
 /// 	p = Disassembler parameters
 /// 	v = 8-bit value
 void disasm_push_x8(ref disasm_params_t p, ubyte v) {
-	//TODO: disasm_push_x8
+	disasm_xadd(p, strx02(v));
+	disasm_xadd(p, " ");
 }
 /// Push an 16-bit value into the machine code buffer.
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = 16-bit value
 void disasm_push_x16(ref disasm_params_t p, ushort v) {
-	//TODO: disasm_push_x16
+	disasm_xadd(p, strx04(v));
+	disasm_xadd(p, " ");
 }
 /// Push an 32-bit value into the machine code buffer.
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = 32-bit value
 void disasm_push_x32(ref disasm_params_t p, uint v) {
-	//TODO: disasm_push_x32
+	disasm_xadd(p, strx08(v));
+	disasm_xadd(p, " ");
 }
 /// Push an 64-bit value into the machine code buffer.
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = 64-bit value
 void disasm_push_x64(ref disasm_params_t p, ulong v) {
-	//TODO: disasm_push_x64
+	disasm_xadd(p, strx016(v));
+	disasm_xadd(p, " ");
 }
 
 //
@@ -332,28 +336,28 @@ void disasm_render(ref disasm_params_t p) {
 
 	if (nbitems < 1) return;
 
-	disasm_fmt_append(p, disasm_fmt_item(p, p.fmt.items[0]));
+	disasm_madd(p, disasm_fmt_item(p, p.fmt.items[0]));
 
 	if (nbitems < 2) return;
 
-	disasm_fmt_append(p, " ");
+	disasm_madd(p, " ");
 	if (p.style == DisasmSyntax.Att) {
 		if (nbitems > 2) {
-			disasm_fmt_append(p, disasm_fmt_item(p, p.fmt.items[2]));
-			disasm_fmt_append(p, ", ");
+			disasm_madd(p, disasm_fmt_item(p, p.fmt.items[2]));
+			disasm_madd(p, ", ");
 		}
-		disasm_fmt_append(p, disasm_fmt_item(p, p.fmt.items[1]));
+		disasm_madd(p, disasm_fmt_item(p, p.fmt.items[1]));
 	} else {
-		disasm_fmt_append(p, disasm_fmt_item(p, p.fmt.items[1]));
+		disasm_madd(p, disasm_fmt_item(p, p.fmt.items[1]));
 		if (nbitems > 2) {
-			disasm_fmt_append(p, ", ");
-			disasm_fmt_append(p, disasm_fmt_item(p, p.fmt.items[2]));
+			disasm_madd(p, ", ");
+			disasm_madd(p, disasm_fmt_item(p, p.fmt.items[2]));
 		}
 	}
 
 	for (size_t index = 3; index < nbitems; ++index) {
-		disasm_fmt_append(p, ", ");
-		disasm_fmt_append(p, disasm_fmt_item(p, p.fmt.items[index]));
+		disasm_madd(p, ", ");
+		disasm_madd(p, disasm_fmt_item(p, p.fmt.items[index]));
 	}
 }
 
@@ -372,14 +376,23 @@ disasm_fmt_item_t *disasm_fmt_select(ref disasm_params_t p) {
 	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT) return null;
 	return &p.fmt.items[p.fmt.itemno++];
 }
-/// (Internal) Adds string into the formatter's mnemonic string buffer. Called
+/// (Internal) Add string into the formatter's mnemonic string buffer. Called
 /// by disasm_render from disasm_line.
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = String
-void disasm_fmt_append(ref disasm_params_t p, const(char) *v) {
+void disasm_madd(ref disasm_params_t p, const(char) *s) {
 	with (p)
-	mnbufi = stradd(cast(char*)mnbuf, DISASM_BUF_SIZE, mnbufi, v);
+	mnbufi = stradd(cast(char*)mnbuf, DISASM_BUF_SIZE, mnbufi, s);
+}
+/// (Internal) Add string into the formatter's machine code string buffer.
+/// Called by disasm_push_x* functions.
+/// Params:
+/// 	p = Disassembler parameters
+/// 	v = String
+void disasm_xadd(ref disasm_params_t p, const(char) *s) {
+	with (p)
+	mcbufi = stradd(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, s);
 }
 /// (Internal) Format and return the formatted string of a formatter item. Called
 /// by disasm_render.

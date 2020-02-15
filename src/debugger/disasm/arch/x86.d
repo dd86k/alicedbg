@@ -52,7 +52,7 @@ L_CONTINUE:
 	++p.addrv;
 
 	if (p.mode >= DisasmMode.File)
-		style_mc_x8(p, b);
+		disasm_push_x8(p, b);
 
 	main: switch (b) {
 	case 0x00:	// ADD R/M8, REG8
@@ -65,7 +65,7 @@ L_CONTINUE:
 		break;
 	case 0x04:	// ADD AL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "add");
 			disasm_push_reg(p, "al");
 			disasm_push_imm(p, *p.addru8);
@@ -74,7 +74,7 @@ L_CONTINUE:
 		break;
 	case 0x05:	// ADD EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "add");
 			disasm_push_reg(p, "eax");
 			disasm_push_imm(p, *p.addru32);
@@ -103,7 +103,7 @@ L_CONTINUE:
 		break;
 	case 0x0C:	// OR AL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "or");
 			disasm_push_reg(p, "al");
 			disasm_push_imm(p, *p.addru8);
@@ -112,7 +112,7 @@ L_CONTINUE:
 		break;
 	case 0x0D:	// OR EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "or");
 			disasm_push_reg(p, "eax");
 			disasm_push_imm(p, *p.addru32);
@@ -138,7 +138,7 @@ L_CONTINUE:
 		break;
 	case 0x14:	// ADC AL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "adc");
 			disasm_push_reg(p, "al");
 			disasm_push_imm(p, *p.addru8);
@@ -147,7 +147,7 @@ L_CONTINUE:
 		break;
 	case 0x15:	// ADC EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "adc");
 			disasm_push_reg(p, "eax");
 			disasm_push_imm(p, *p.addru32);
@@ -176,7 +176,7 @@ L_CONTINUE:
 		break;
 	case 0x1C:	// SBB AL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "sbb");
 			disasm_push_reg(p, "al");
 			disasm_push_imm(p, *p.addru8);
@@ -185,7 +185,7 @@ L_CONTINUE:
 		break;
 	case 0x1D:	// SBB EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "sbb");
 			disasm_push_reg(p, "eax");
 			disasm_push_imm(p, *p.addru32);
@@ -214,7 +214,7 @@ L_CONTINUE:
 		break;
 	case 0x24:	// AND AL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "and");
 			disasm_push_reg(p, "al");
 			disasm_push_imm(p, *p.addru8);
@@ -223,7 +223,7 @@ L_CONTINUE:
 		break;
 	case 0x25:	// AND EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "and");
 			disasm_push_reg(p, "eax");
 			disasm_push_imm(p, *p.addru32);
@@ -251,7 +251,7 @@ L_CONTINUE:
 		break;
 	case 0x2C:	// SUB AL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "sub");
 			disasm_push_reg(p, "al");
 			disasm_push_imm(p, *p.addru8);
@@ -260,7 +260,7 @@ L_CONTINUE:
 		break;
 	case 0x2D:	// SUB EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "sub");
 			disasm_push_reg(p, "eax");
 			disasm_push_imm(p, *p.addru32);
@@ -288,7 +288,7 @@ L_CONTINUE:
 		break;
 	case 0x34:	// XOR AL, IMM8
 		if (INCLUDE_MACHINECODE) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "xor");
 			disasm_push_reg(p, "al");
 			disasm_push_imm(p, *p.addru8);
@@ -297,7 +297,7 @@ L_CONTINUE:
 		break;
 	case 0x35:	// XOR EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "xor");
 			disasm_push_reg(p, "eax");
 			disasm_push_imm(p, *p.addru32);
@@ -325,7 +325,7 @@ L_CONTINUE:
 		break;
 	case 0x3C:	// CMP AL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "cmp");
 			disasm_push_reg(p, "al");
 			disasm_push_imm(p, *p.addru8);
@@ -334,7 +334,7 @@ L_CONTINUE:
 		break;
 	case 0x3D:	// CMP EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "cmp");
 			disasm_push_reg(p, "eax");
 			disasm_push_imm(p, *p.addru32);
@@ -596,7 +596,7 @@ L_CONTINUE:
 		goto L_CONTINUE;
 	case 0x68:	// PUSH IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "push");
 			disasm_push_imm(p, *p.addri32);
 		}
@@ -607,14 +607,14 @@ L_CONTINUE:
 			disasm_push_str(p, "imul");
 		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
 	case 0x6A:	// PUSH IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "push");
 			disasm_push_imm(p, *p.addru8);
 		}
@@ -625,7 +625,7 @@ L_CONTINUE:
 			disasm_push_str(p, "imul");
 		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_imm(p, *p.addru8);
 		}
 		++p.addrv;
@@ -648,7 +648,7 @@ L_CONTINUE:
 		break;
 	case 0x70:	// JO
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jo");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -656,7 +656,7 @@ L_CONTINUE:
 		break;
 	case 0x71:	// JNO
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jno");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -664,7 +664,7 @@ L_CONTINUE:
 		break;
 	case 0x72:	// JB
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jb");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -672,7 +672,7 @@ L_CONTINUE:
 		break;
 	case 0x73:	// JNB
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jnb");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -680,7 +680,7 @@ L_CONTINUE:
 		break;
 	case 0x74:	// JZ
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jz");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -688,7 +688,7 @@ L_CONTINUE:
 		break;
 	case 0x75:	// JNZ
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jnz");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -696,7 +696,7 @@ L_CONTINUE:
 		break;
 	case 0x76:	// JBE
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jbe");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -704,7 +704,7 @@ L_CONTINUE:
 		break;
 	case 0x77:	// JNBE
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jnbe");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -712,7 +712,7 @@ L_CONTINUE:
 		break;
 	case 0x78:	// JS
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "js");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -720,7 +720,7 @@ L_CONTINUE:
 		break;
 	case 0x79:	// JNS
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jns");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -728,7 +728,7 @@ L_CONTINUE:
 		break;
 	case 0x7A:	// JP
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jp");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -736,7 +736,7 @@ L_CONTINUE:
 		break;
 	case 0x7B:	// JNP
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jnp");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -744,7 +744,7 @@ L_CONTINUE:
 		break;
 	case 0x7C:	// JL
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jl");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -752,7 +752,7 @@ L_CONTINUE:
 		break;
 	case 0x7D:	// JNL
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jnl");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -760,7 +760,7 @@ L_CONTINUE:
 		break;
 	case 0x7E:	// JLE
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jle");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -768,7 +768,7 @@ L_CONTINUE:
 		break;
 	case 0x7F:	// JNLE
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jnle");
 			disasm_push_imm(p, *p.addri8);
 		}
@@ -857,7 +857,7 @@ L_CONTINUE:
 		}
 		if (p.mode >= DisasmMode.File) {
 			p.x86.prefix_operand = 1;
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_NONE));
 			disasm_push_reg(p, f);
@@ -883,7 +883,7 @@ L_CONTINUE:
 		}
 		if (p.mode >= DisasmMode.File) {
 			p.x86.prefix_operand = 1;
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, f);
 			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_NONE));
@@ -897,7 +897,7 @@ L_CONTINUE:
 			break;
 		}
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 			disasm_push_str(p, "pop");
 			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
 		}
@@ -965,7 +965,7 @@ L_CONTINUE:
 		break;
 	case 0x9A:	// CALL (FAR)
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "call");
 			disasm_push_imm(p, *p.addri32);
 		}
@@ -993,7 +993,7 @@ L_CONTINUE:
 		break;
 	case 0xA0:	// MOV AL, MEM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "al");
 			disasm_push_mem(p, *p.addri32);
@@ -1002,7 +1002,7 @@ L_CONTINUE:
 		break;
 	case 0xA1:	// MOV EAX, MEM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "eax");
 			disasm_push_mem(p, *p.addri32);
@@ -1011,7 +1011,7 @@ L_CONTINUE:
 		break;
 	case 0xA2:	// MOV MEM8, AL
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "mov");
 			disasm_push_mem(p, *p.addri32);
 			disasm_push_reg(p, "al");
@@ -1020,7 +1020,7 @@ L_CONTINUE:
 		break;
 	case 0xA3:	// MOV MEM32, EAX
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "mov");
 			disasm_push_mem(p, *p.addri32);
 			disasm_push_reg(p, "eax");
@@ -1057,7 +1057,7 @@ L_CONTINUE:
 		break;
 	case 0xA8:	// TEST AL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "test");
 			disasm_push_reg(p, "al");
 			disasm_push_imm(p, *p.addru8);
@@ -1066,7 +1066,7 @@ L_CONTINUE:
 		break;
 	case 0xA9:	// TEST EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "test");
 			disasm_push_reg(p, "eax");
 			disasm_push_imm(p, *p.addru32);
@@ -1117,7 +1117,7 @@ L_CONTINUE:
 		break;
 	case 0xB0:	// MOV AL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "al");
 			disasm_push_imm(p, *p.addru8);
@@ -1126,7 +1126,7 @@ L_CONTINUE:
 		break;
 	case 0xB1:	// MOV DL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "dl");
 			disasm_push_imm(p, *p.addru8);
@@ -1135,7 +1135,7 @@ L_CONTINUE:
 		break;
 	case 0xB2:	// MOV CL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "cl");
 			disasm_push_imm(p, *p.addru8);
@@ -1144,7 +1144,7 @@ L_CONTINUE:
 		break;
 	case 0xB3:	// MOV BL, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "bl");
 			disasm_push_imm(p, *p.addru8);
@@ -1153,7 +1153,7 @@ L_CONTINUE:
 		break;
 	case 0xB4:	// MOV AH, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "ah");
 			disasm_push_imm(p, *p.addru8);
@@ -1162,7 +1162,7 @@ L_CONTINUE:
 		break;
 	case 0xB5:	// MOV CH, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "ch");
 			disasm_push_imm(p, *p.addru8);
@@ -1171,7 +1171,7 @@ L_CONTINUE:
 		break;
 	case 0xB6:	// MOV DH, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "dh");
 			disasm_push_imm(p, *p.addru8);
@@ -1180,7 +1180,7 @@ L_CONTINUE:
 		break;
 	case 0xB7:	// MOV BH, IMM8
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "bh");
 			disasm_push_imm(p, *p.addru8);
@@ -1189,7 +1189,7 @@ L_CONTINUE:
 		break;
 	case 0xB8:	// MOV EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "eax");
 			disasm_push_imm(p, *p.addru32);
@@ -1198,7 +1198,7 @@ L_CONTINUE:
 		break;
 	case 0xB9:	// MOV ECX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "ecx");
 			disasm_push_imm(p, *p.addru32);
@@ -1207,7 +1207,7 @@ L_CONTINUE:
 		break;
 	case 0xBA:	// MOV EDX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "edx");
 			disasm_push_imm(p, *p.addru32);
@@ -1216,7 +1216,7 @@ L_CONTINUE:
 		break;
 	case 0xBB:	// MOV EBX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "ebx");
 			disasm_push_imm(p, *p.addru32);
@@ -1225,7 +1225,7 @@ L_CONTINUE:
 		break;
 	case 0xBC:	// MOV ESP, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "esp");
 			disasm_push_imm(p, *p.addru32);
@@ -1234,7 +1234,7 @@ L_CONTINUE:
 		break;
 	case 0xBD:	// MOV EBP, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "ebp");
 			disasm_push_imm(p, *p.addru32);
@@ -1243,7 +1243,7 @@ L_CONTINUE:
 		break;
 	case 0xBE:	// MOV ESI, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "esi");
 			disasm_push_imm(p, *p.addru32);
@@ -1252,7 +1252,7 @@ L_CONTINUE:
 		break;
 	case 0xBF:	// MOV EDI, IMM32
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
 			disasm_push_reg(p, "edi");
 			disasm_push_imm(p, *p.addru32);
@@ -1275,16 +1275,19 @@ L_CONTINUE:
 		default: disasm_err(p); break main;
 		}
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 			disasm_push_reg(p, r);
 		}
 		x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
-		if (p.mode >= DisasmMode.File)
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_imm(p, *p.addru8);
+		}
 		break;
 	case 0xC2:	// RET IMM16
+	//TODO: CONTINUE FROM HERE
 		if (INCLUDE_MACHINECODE)
-			style_mc_x16(p, *p.addru16);
+			disasm_push_x16(p, *p.addru16);
 		if (INCLUDE_MNEMONICS)
 			style_mn_f(p, "ret %s", style_mn_imm(p, *p.addri16));
 		p.addrv += 2;
@@ -1306,7 +1309,7 @@ L_CONTINUE:
 	case 0xC6:	// GRP11(1A) - MOV MEM8, IMM8
 		ubyte modrm = *p.addru8;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		if (modrm & RM_REG) {
 			style_ill(p);
 			break main;
@@ -1315,7 +1318,7 @@ L_CONTINUE:
 			style_mn(p, "mov");
 		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			style_mn_f(p, ", %s", style_mn_imm(p, *p.addru8));
 		++p.addrv;
@@ -1323,7 +1326,7 @@ L_CONTINUE:
 	case 0xC7:	// GRP11(1A) - MOV MEM32, IMM32
 		ubyte modrm = *p.addru8;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		if (modrm & RM_REG) {
 			style_ill(p);
 			break main;
@@ -1356,7 +1359,7 @@ L_CONTINUE:
 		break;
 	case 0xCA:	// RET (far) IMM16
 		if (INCLUDE_MACHINECODE)
-			style_mc_x16(p, *p.addru16);
+			disasm_push_x16(p, *p.addru16);
 		if (INCLUDE_MNEMONICS)
 			style_mn_f(p, "ret %s", style_mn_imm(p, *p.addri16));
 		p.addrv += 2;
@@ -1372,7 +1375,7 @@ L_CONTINUE:
 		break;
 	case 0xCD:	// INT IMM8
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			style_mn_f(p, "int %s", style_mn_imm(p, *p.addru8));
 		++p.addrv;
@@ -1392,7 +1395,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		const(char) *m = void;
 		switch (modrm & RM_REG) {
 		case RM_REG_000: m = "rol"; break;
@@ -1424,14 +1427,14 @@ L_CONTINUE:
 		break;
 	case 0xD4:	// AAM IMM8
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			style_mn_f(p, "amm %s", style_mn_imm(p, *p.addru8));
 		++p.addrv;
 		break;
 	case 0xD5:	// AAD IMM8
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			style_mn_f(p, "aad %s", style_mn_imm(p, *p.addru8));
 		++p.addrv;
@@ -1444,7 +1447,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1488,7 +1491,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1527,7 +1530,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1598,7 +1601,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1637,7 +1640,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1679,7 +1682,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1718,7 +1721,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1772,7 +1775,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1811,7 +1814,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1853,7 +1856,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1892,7 +1895,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -1933,7 +1936,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -1970,7 +1973,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -2017,7 +2020,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -2056,7 +2059,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		const(char) *f = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
 			if (INCLUDE_MNEMONICS) {
@@ -2089,7 +2092,7 @@ L_CONTINUE:
 			}
 		} else { // operand is memory pointer
 			if (INCLUDE_MACHINECODE)
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 			if (INCLUDE_MNEMONICS) {
 				seg = x86_segstr(p.x86.segreg);
 				switch (modrm & RM_REG) {
@@ -2126,63 +2129,63 @@ L_CONTINUE:
 		break;
 	case 0xE0:	// LOOPNE IMM8
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "LOOPNE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE1:	// LOOPE IMM8
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "LOOPE %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE2:	// LOOP IMM8
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "LOOP %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE3:	// JECXZ IMM8
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JECXZ %d", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE4:	// IN AL, IMM8
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "IN AL,%u", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xE5:	// IN EAX, IMM8
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "IN EAX,%u", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xE6:	// OUT IMM8,AL
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "OUT %u,AL", *p.addru8);
 		++p.addrv;
 		break;
 	case 0xE7:	// OUT IMM8,EAX
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "OUT %u,EAX", *p.addri8);
 		++p.addrv;
 		break;
 	case 0xE8:	// CALL IMM32
 		if (INCLUDE_MACHINECODE)
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "CALL %d", *p.addri32);
 		p.addrv += 4;
@@ -2197,7 +2200,7 @@ L_CONTINUE:
 		break;
 	case 0xEB:	// JMP IMM8
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, *p.addru8);
+			disasm_push_x8(p, *p.addru8);
 		if (INCLUDE_MNEMONICS)
 			mnaddf(p, "JMP %d", *p.addri8);
 		++p.addrv;
@@ -2247,14 +2250,14 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000:
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "TEST ");
 			x86_modrm_rm(p, modrm, w);
 			if (INCLUDE_MACHINECODE)
-				style_mc_x8(p, *p.addru8);
+				disasm_push_x8(p, *p.addru8);
 			if (INCLUDE_MNEMONICS)
 				mnaddf(p, ", %d", *p.addru8);
 			++p.addrv;
@@ -2330,7 +2333,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // INC R/M8
 			if (INCLUDE_MNEMONICS)
@@ -2350,7 +2353,7 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // INC R/M32
 			if (INCLUDE_MNEMONICS)
@@ -2418,7 +2421,7 @@ void x86_0f(ref disasm_params_t p) {
 	++p.addrv;
 
 	if (INCLUDE_MACHINECODE)
-		style_mc_x8(p, b);
+		disasm_push_x8(p, b);
 
 	switch (b) {
 	case 0x00: // GRP6
@@ -2426,7 +2429,7 @@ void x86_0f(ref disasm_params_t p) {
 		++p.addrv;
 
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // SLDT
@@ -2469,7 +2472,7 @@ void x86_0f(ref disasm_params_t p) {
 		++p.addrv;
 
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 
 		switch (modrm & RM_REG) {
 		case RM_REG_000:
@@ -2671,7 +2674,7 @@ void x86_0f(ref disasm_params_t p) {
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 		if ((modrm & RM_REG) == RM_REG_001) {
 			if (INCLUDE_MNEMONICS)
 				mnadd(p, "PREFETCHW ");
@@ -2738,7 +2741,7 @@ void x86_0f(ref disasm_params_t p) {
 				ubyte modrm = *p.addru8;
 				++p.addrv;
 				if (INCLUDE_MACHINECODE)
-					style_mc_x8(p, modrm);
+					disasm_push_x8(p, modrm);
 				if (INCLUDE_MNEMONICS) {
 					mnaddf(p, "MOVHLPS %s, %s",
 						x86_modrm_reg(p, modrm, X86_WIDTH_XMM),
@@ -2824,7 +2827,7 @@ void x86_0f(ref disasm_params_t p) {
 				ubyte modrm = *p.addru8;
 				++p.addrv;
 				if (INCLUDE_MACHINECODE)
-					style_mc_x8(p, modrm);
+					disasm_push_x8(p, modrm);
 				if (INCLUDE_MNEMONICS)
 					mnaddf(p, "MOVHPS %s, %s",
 						x86_modrm_reg(p, modrm, X86_WIDTH_XMM),
@@ -2870,7 +2873,7 @@ void x86_0f(ref disasm_params_t p) {
 		++p.addrv;
 
 		if (INCLUDE_MACHINECODE)
-			style_mc_x8(p, modrm);
+			disasm_push_x8(p, modrm);
 
 		if ((modrm & RM_MOD) == RM_MOD_11) {
 			mnill(p);
@@ -3107,7 +3110,7 @@ void x86_modrm(ref disasm_params_t p, int width, int direction) {
 	++p.addrv;
 
 	if (p.mode >= DisasmMode.File)
-		style_mc_x8(p, modrm);
+		disasm_push_x8(p, modrm);
 
 	if (direction)
 		goto L_REG;
@@ -3215,14 +3218,14 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 			break;
 		case RM_MOD_01:	// Memory Mode, 8-bit displacement
 			if (p.mode >= DisasmMode.File) {
-				style_mc_x8(p, *p.addru8);
+				disasm_push_x8(p, *p.addru8);
 				disasm_push_memsegregimm(p, seg, reg, *p.addri8);
 			}
 			++p.addrv;
 			break;
 		case RM_MOD_10:	// Memory Mode, 32-bit displacement
 			if (p.mode >= DisasmMode.File) {
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 				disasm_push_memsegregimm(p, seg, reg, *p.addri32);
 			}
 			p.addrv += 4;
@@ -3249,7 +3252,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	const(char)* base = void, index = void, seg = void;
 
 	if (p.mode >= DisasmMode.File) {
-		style_mc_x8(p, sib);
+		disasm_push_x8(p, sib);
 		seg = x86_segstr(p.x86.segreg);
 	}
 
@@ -3257,7 +3260,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	case RM_MOD_00:
 		if ((sib & SIB_BASE) == SIB_BASE_101) { // INDEX * SCALE + D32
 			if (p.mode >= DisasmMode.File) {
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 				if ((sib & SIB_INDEX) == SIB_INDEX_100)
 					disasm_push_x86_sib_mod00_index100_base101(p,
 						seg, *p.addru32);
@@ -3281,7 +3284,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	case RM_MOD_01:
 		if ((sib & SIB_INDEX) == SIB_INDEX_100) { // B32 + D8
 			if (p.mode >= DisasmMode.File) {
-				style_mc_x8(p, *p.addru8);
+				disasm_push_x8(p, *p.addru8);
 				disasm_push_x86_sib_mod01_index100(p,
 					seg,
 					x86_modrm_reg(p, sib << 3, X86_WIDTH_WIDE),
@@ -3290,7 +3293,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 			++p.addrv;
 		} else { // BASE8 + INDEX * SCALE + DISP32
 			if (p.mode >= DisasmMode.File) {
-				style_mc_x32(p, *p.addru32);
+				disasm_push_x32(p, *p.addru32);
 				base = x86_modrm_reg(p, sib << 3, X86_WIDTH_NONE);
 				index = x86_modrm_reg(p, sib, X86_WIDTH_WIDE);
 				disasm_push_x86_sib_mod01(p,
@@ -3301,7 +3304,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 		break;
 	case RM_MOD_10:
 		if (p.mode >= DisasmMode.File) {
-			style_mc_x32(p, *p.addru32);
+			disasm_push_x32(p, *p.addru32);
 			base = x86_modrm_reg(p, sib << 3, X86_WIDTH_WIDE);
 			if ((sib & SIB_INDEX) == SIB_INDEX_100) { // BASE32 + DISP32
 				disasm_push_x86_sib_mod01_index100(p,

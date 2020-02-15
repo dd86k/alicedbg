@@ -8,6 +8,102 @@ private import core.stdc.stdarg;
 
 extern (C):
 
+/// Hexadecimal map for strx0* functions to provide much faster %X parsing
+private __gshared char [16]hexmaplow = "0123456789abcdef";
+/// Hexadecimal map for strx0* functions to provide much faster %X parsing
+private __gshared char [16]hexmapupp = "0123456789ABCDEF";
+
+/**
+ * Quick and dirty conversion function to convert an ubyte value to a
+ * '0'-padded hexadecimal string. Faster than using vsnprintf.
+ * Params: v = 8-bit value
+ * Returns: Null-terminated hexadecimal string
+ */
+const(char) *strx02(ubyte v, bool upper = false) {
+	__gshared char [3]b = void;
+
+	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
+
+	b[0] = h[v >> 4];
+	b[1] = h[v & 0xF];
+	b[2] = 0;
+
+	return cast(char*)b;
+}
+/**
+ * Quick and dirty conversion function to convert an ushort value to a
+ * '0'-padded hexadecimal string. Faster than using vsnprintf.
+ * Params: v = 16-bit value
+ * Returns: Null-terminated hexadecimal string
+ */
+const(char) *strx04(ushort v, bool upper = false) {
+	__gshared char [5]b = void;
+
+	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
+
+	b[3] = h[v & 0xF];
+	b[2] = h[(v >>= 4) & 0xF];
+	b[1] = h[(v >>= 4) & 0xF];
+	b[0] = h[(v >>= 4) & 0xF];
+	b[4] = 0;
+
+	return cast(char*)b;
+}
+/**
+ * Quick and dirty conversion function to convert an uint value to a
+ * '0'-padded hexadecimal string. Faster than using vsnprintf.
+ * Params: v = 32-bit value
+ * Returns: Null-terminated hexadecimal string
+ */
+const(char) *strx08(uint v, bool upper = false) {
+	__gshared char [9]b = void;
+
+	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
+
+	b[7] = h[v & 0xF];
+	b[6] = h[(v >>= 4) & 0xF];
+	b[5] = h[(v >>= 4) & 0xF];
+	b[4] = h[(v >>= 4) & 0xF];
+	b[3] = h[(v >>= 4) & 0xF];
+	b[2] = h[(v >>= 4) & 0xF];
+	b[1] = h[(v >>= 4) & 0xF];
+	b[0] = h[(v >>= 4) & 0xF];
+	b[8] = 0;
+
+	return cast(char*)b;
+}
+/**
+ * Quick and dirty conversion function to convert an ulong value to a
+ * '0'-padded hexadecimal string. Faster than using vsnprintf.
+ * Params: v = 64-bit value
+ * Returns: Null-terminated hexadecimal string
+ */
+const(char) *strx016(ulong v) {
+	__gshared char [17]b = void;
+
+	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
+
+	b[15] = h[v & 0xF];
+	b[14] = h[(v >>= 4) & 0xF];
+	b[13] = h[(v >>= 4) & 0xF];
+	b[12] = h[(v >>= 4) & 0xF];
+	b[11] = h[(v >>= 4) & 0xF];
+	b[10] = h[(v >>= 4) & 0xF];
+	b[9]  = h[(v >>= 4) & 0xF];
+	b[8]  = h[(v >>= 4) & 0xF];
+	b[7]  = h[(v >>= 4) & 0xF];
+	b[6]  = h[(v >>= 4) & 0xF];
+	b[5]  = h[(v >>= 4) & 0xF];
+	b[4]  = h[(v >>= 4) & 0xF];
+	b[3]  = h[(v >>= 4) & 0xF];
+	b[2]  = h[(v >>= 4) & 0xF];
+	b[1]  = h[(v >>= 4) & 0xF];
+	b[0]  = h[(v >>= 4) & 0xF];
+	b[16] = 0;
+
+	return cast(char*)b;
+}
+
 /**
  * Append a constant string to an existing buffer.
  * Params:
@@ -71,6 +167,7 @@ void strlcase(char *buf, size_t size) {
 	}
 }
 
+/// (Internal) strf/strfva buffer selection index
 private __gshared size_t strfc = 0;
 /**
  * Quick format.
