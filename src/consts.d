@@ -11,20 +11,20 @@ else  enum __BUILDTYPE__ = "release";	/// Build type
 //
 
 version (X86) {
-	enum __ABI__ = "x86";	/// Platform ABI string
+	enum __PLATFORM__ = "x86";	/// Platform ABI string
 	version = X86_ANY;
 	version = ABI32;
 } else
 version (X86_64) {
-	enum __ABI__ = "x86-64";	/// Platform ABI string
+	enum __PLATFORM__ = "x86-64";	/// Platform ABI string
 	version = X86_ANY;
 	version = ABI64;
 } else {
 	static assert(0,
-		"alicedbg is currently not supported on this ABI");
+		"Platform not supported");
 }
 
-pragma(msg, "* abi: ", __ABI__);
+pragma(msg, "* isa: ", __PLATFORM__);
 
 //
 // CRT string
@@ -150,5 +150,5 @@ version (TARGETINFO_CPU) {
 	enum __TARGET_CPU__ = __traits(targetCPU);
 } else {
 	/// Target CPU string (LDC-only)
-	enum __TARGET_CPU__ = __ABI__;
+	enum __TARGET_CPU__ = __PLATFORM__;
 }

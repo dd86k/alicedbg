@@ -37,22 +37,27 @@ enum CLIPage {
 	dstyles,
 }
 
+version (Windows)
+	enum F_ERR = "0x%08X";
+else
+	enum F_ERR = "%d";
+
 /// CLI options
 struct cliopt_t {
 	OperatingMode mode;
 	DebuggerUI ui;
 	DebuggerMode debugtype;
-	union {
-		ushort pid;
-		const(char) *file;
-	}
+	ushort pid;
+	const(char) *file;
+	const(char) *file_args;
+	const(char) *file_env;
 }
 
 /// Version page
 int cliver() {
 	import ver = std.compiler;
 	printf(
-	"alicedbg-"~__ABI__~" "~PROJECT_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
+	"alicedbg-"~__PLATFORM__~" "~PROJECT_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
 	"License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
 	"Home: <https://git.dd86k.space/alicedbg>, <https://github.com/dd86k/alicedbg>\n"~
 	"Compiler: "~__VENDOR__~" %u.%03u, "~
@@ -144,9 +149,8 @@ int main(int argc, const(char) **argv) {
 
 	// CLI
 	for (size_t argi = 1; argi < argc; ++argi) {
-		if (argv[argi][0] != '-') continue;
-
 		const(char) *arg = argv[argi] + 1;
+
 		if (strcmp(arg, "-help") == 0 || strcmp(arg, "help") == 0)
 			return clipage(CLIPage.main);
 		if (strcmp(arg, "-version") == 0 || strcmp(arg, "version") == 0)
@@ -185,6 +189,7 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
+		// debugger: ui
 		if (strcmp(arg, "ui") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: ui argument missing");
@@ -205,7 +210,7 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		// Binary file disassembly
+		// dumper: file path
 		if (strcmp(arg, "ddump") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: path argument missing");
@@ -241,20 +246,32 @@ int main(int argc, const(char) **argv) {
 			}
 			continue;
 		}
-		
+
 		// Choose demangle settings for symbols
 		/*if (strcmp(arg, "demangle") == 0) {
 			
 		}*/
-		
+
 		// Choose debugging backend, currently unsupported and only
 		// embedded option is available
 		/*if (strcmp(arg, "backend") == 0) {
 			
 		}*/
-		
-		printf("'%s': unknown parameter\n", arg);
-		return EXIT_FAILURE;
+
+		if (opt.file == null) {
+			opt.debugtype = DebuggerMode.file;
+			opt.file = argv[argi];
+			continue;
+		} else if (opt.file_args == null) {
+			opt.file_args = argv[argi];
+			continue;
+		} else if (opt.file_env == null) {
+			opt.file_env = argv[argi];
+			continue;
+		} else {
+			puts("cli: Out of default parameters");
+			return EXIT_FAILURE;
+		}
 	}
 
 	with (OperatingMode)
@@ -265,13 +282,13 @@ int main(int argc, const(char) **argv) {
 		switch (opt.debugtype) {
 		case file:
 			if ((e = dbg_file(opt.file)) != 0) {
-				printf("dbg: Could not load executable (%X)\n", e);
+				printf("dbg: Could not load executable ("~F_ERR~")\n", e);
 				return e;
 			}
 			break;
 		case pid:
 			if ((e = dbg_file(opt.file)) != 0) {
-				printf("dbg: Could not attach to pid (%X)\n", e);
+				printf("dbg: Could not attach to pid ("~F_ERR~")\n", e);
 				return e;
 			}
 			break;
