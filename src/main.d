@@ -4,19 +4,26 @@ import core.stdc.stdio;
 import consts;
 import ui.loop : loop_enter;
 import ui.tui : tui_enter;
-import debugger;
+import debugger, dumper;
 
 extern (C):
 private:
 
-enum UserInterface {
+enum OperatingMode {
+	debugger, // can't use word "debug" and "debug_" is eh
+	dumper,
+	profiler
+}
+
+// for debugger
+enum DebuggerUI {
 	tui,
 	loop,
 //	interpreter,
 //	tcp_json,
 }
 
-enum CLIDebugMode {
+enum DebuggerMode {
 	undecided,
 	file,
 	pid
@@ -32,8 +39,9 @@ enum CLIPage {
 
 /// CLI options
 struct cliopt_t {
-	UserInterface ui;
-	CLIDebugMode debugtype;
+	OperatingMode mode;
+	DebuggerUI ui;
+	DebuggerMode debugtype;
 	union {
 		ushort pid;
 		const(char) *file;
@@ -152,7 +160,7 @@ int main(int argc, const(char) **argv) {
 				puts("cli: file argument missing");
 				return EXIT_FAILURE;
 			}
-			opt.debugtype = CLIDebugMode.file;
+			opt.debugtype = DebuggerMode.file;
 			opt.file = argv[++argi];
 			continue;
 		}
@@ -171,7 +179,7 @@ int main(int argc, const(char) **argv) {
 				puts("cli: pid argument missing");
 				return EXIT_FAILURE;
 			}
-			opt.debugtype = CLIDebugMode.pid;
+			opt.debugtype = DebuggerMode.pid;
 			const(char) *id = argv[++argi];
 			opt.pid = cast(ushort)strtol(id, &id, 10);
 			continue;
@@ -184,9 +192,9 @@ int main(int argc, const(char) **argv) {
 			}
 			const(char) *ui = argv[++argi];
 			if (strcmp(ui, "tui") == 0)
-				opt.ui = UserInterface.tui;
+				opt.ui = DebuggerUI.tui;
 			else if (strcmp(ui, "loop") == 0)
-				opt.ui = UserInterface.loop;
+				opt.ui = DebuggerUI.loop;
 			else if (strcmp(ui, "?") == 0)
 				return clipage(CLIPage.ui);
 			else {
@@ -199,43 +207,13 @@ int main(int argc, const(char) **argv) {
 
 		// Binary file disassembly
 		if (strcmp(arg, "ddump") == 0) {
-			import core.stdc.config : c_long;
-			import core.stdc.stdlib : malloc;
-
 			if (argi + 1 >= argc) {
 				puts("cli: path argument missing");
 				return EXIT_FAILURE;
 			}
-
-			FILE *f = fopen(argv[++argi], "rb");
-
-			if (f == null) {
-				puts("cli: could not open file");
-				return EXIT_FAILURE;
-			}
-
-			if (fseek(f, 0, SEEK_END)) {
-				puts("cli: could not seek file");
-				return EXIT_FAILURE;
-			}
-			c_long fl = ftell(f);
-			fseek(f, 0, SEEK_SET); // rewind is broken
-
-			void *m = cast(void*)malloc(fl);
-			if (fread(m, fl, 1, f) == 0) {
-				puts("cli: could not read file");
-				return EXIT_FAILURE;
-			}
-
-			disopt.addr = m;
-			for (c_long fi; fi < fl; fi += disopt.addrv - disopt.lastaddr) {
-				disasm_line(disopt, DisasmMode.File);
-				printf("%08X %-30s %-30s\n",
-					cast(uint)fi,
-					&disopt.mcbuf, &disopt.mnbuf);
-			}
-
-			return EXIT_SUCCESS;
+			opt.mode = OperatingMode.dumper;
+			opt.file = argv[++argi];
+			continue;
 		}
 
 		// Set machine architecture, affects disassembly
@@ -279,30 +257,39 @@ int main(int argc, const(char) **argv) {
 		return EXIT_FAILURE;
 	}
 
-	int e = void;
-
-	with (CLIDebugMode)
-	switch (opt.debugtype) {
-	case file:
-		if ((e = dbg_file(opt.file)) != 0) {
-			printf("dbg: Could not load executable (%X)\n", e);
-			return e;
+	with (OperatingMode)
+	final switch (opt.mode) {
+	case debugger:
+		int e = void;
+		with (DebuggerMode)
+		switch (opt.debugtype) {
+		case file:
+			if ((e = dbg_file(opt.file)) != 0) {
+				printf("dbg: Could not load executable (%X)\n", e);
+				return e;
+			}
+			break;
+		case pid:
+			if ((e = dbg_file(opt.file)) != 0) {
+				printf("dbg: Could not attach to pid (%X)\n", e);
+				return e;
+			}
+			break;
+		default:
+			puts("cli: No file nor pid were specified.");
+			return EXIT_FAILURE;
 		}
-		break;
-	case pid:
-		if ((e = dbg_file(opt.file)) != 0) {
-			printf("dbg: Could not attach to pid (%X)\n", e);
-			return e;
-		}
-		break;
-	default:
-		puts("cli: No file nor pid were specified.");
-		return EXIT_FAILURE;
-	}
 
-	with (UserInterface)
-	final switch (opt.ui) {
-	case loop: return loop_enter;
-	case tui: return tui_enter;
+		with (DebuggerUI)
+		final switch (opt.ui) {
+		case loop: return loop_enter;
+		case tui: return tui_enter;
+		}
+	case dumper:
+		return dump(opt.file, disopt);
+	case profiler:
+	
+		break;
 	}
+	return 0;
 }
