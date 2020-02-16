@@ -8,20 +8,26 @@ _Why not just use GDB?_ One might ask.
 
 _Why not make one myself?_ I asked myself.
 
+Personal Goals:
+- [ ] Make a usable Text UI close to a professional debugger
+- [ ] Debug an application on my Raspberry Pi
+
 ## Support Matrix
 
 ### Feature Support
 
-| ISA | OS | CRT | Debugging core |
+| Platform | OS | CRT | Debugging core |
 |---|---|---|:-:|
-| x86, x86-64 | Windows | Microsoft | ✔️ |
+| x86 | Windows | Microsoft | ✔️ |
 | | Linux | Glibc | ✔️ |
+| ARM | Windows | Microsoft |  |
+| | Linux | Glibc | Planned! |
 
 ### Disassembler Progress
 
-| ISA | ~% | Note |
+| Platform | ~% | Note |
 |---|---|---|
-| x86-32 | 40 | Still adding |
+| x86-32 | 50 | Still adding |
 | x86-64 | 0 | Waiting on x86-32 |
 | arm-t32 | 0 | Waiting on x86-64 |
 | arm-a32 | 0 | Waiting on x86-64 |
