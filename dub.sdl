@@ -9,22 +9,32 @@ version "0.0.0"
 #targetPath "bin"
 
 buildType "debugv" {
-	buildOptions "betterC" platform="dmd"
-	buildOptions "betterC" platform="ldc"
+	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
+	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
+	buildOptions "debugMode" "debugInfo" platform="gdc"
 	dflags "-v"
 }
 
 buildType "debug" {
-	buildOptions "betterC" platform="dmd"
-	buildOptions "betterC" platform="ldc"
+	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
+	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
+	buildOptions "debugMode" "debugInfo" platform="gdc"
 }
 
 buildType "release" {
-	buildOptions "betterC" platform="dmd"
-	buildOptions "betterC" platform="ldc"
+	buildOptions "releaseMode" "betterC" platform="dmd"
+	buildOptions "releaseMode" "betterC" platform="ldc"
+	buildOptions "releaseMode" platform="gdc"
 }
 
 buildType "release-nobounds" {
-	buildOptions "betterC" platform="dmd"
-	buildOptions "betterC" platform="ldc"
+	buildOptions "releaseMode" "noBoundsCheck" "betterC" platform="dmd"
+	buildOptions "releaseMode" "noBoundsCheck" "betterC" platform="ldc"
+	buildOptions "releaseMode" "noBoundsCheck" platform="gdc"
+}
+
+buildType "release-maxperf" {
+	buildOptions "releaseMode" "noBoundsCheck" "inline" "betterC" platform="dmd"
+	buildOptions "releaseMode" "noBoundsCheck" "inline" "betterC" platform="ldc"
+	buildOptions "releaseMode" "noBoundsCheck" "inline" platform="gdc"
 }
