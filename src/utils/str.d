@@ -78,7 +78,7 @@ const(char) *strx08(uint v, bool upper = false) {
  * Params: v = 64-bit value
  * Returns: Null-terminated hexadecimal string
  */
-const(char) *strx016(ulong v) {
+const(char) *strx016(ulong v, bool upper = false) {
 	__gshared char [17]b = void;
 
 	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);

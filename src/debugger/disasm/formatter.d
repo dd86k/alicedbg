@@ -11,6 +11,12 @@ enum FORMATTER_STACK_SIZE = 8;
 /// Formatter stack limit (size - 1)
 enum FORMATTER_STACK_LIMIT = FORMATTER_STACK_SIZE - 1;
 
+/// Items will be processed in order regardless of style (i.e. at&t)
+enum FORMATTER_O_NO_DIRECTION = 1;
+/// (Not implemented) Second separator will be a space (" ") instead of a comma (", ").
+/// Very useful for instruction prefixes such as LOCK (x86)
+enum FORMATTER_O_PREFIX = 2;
+
 /// Item type, each item more or less has their own formatting function
 enum FormatType {
 	String,	/// Pure string
@@ -45,6 +51,7 @@ struct disasm_fmt_t {
 	disasm_fmt_item_t [FORMATTER_STACK_SIZE]items;	/// Stack
 	size_t itemno;	/// Current item number
 	int opwidth;	/// Last operation width
+	int settings;	/// Formatter settings for current stack
 }
 
 /// Default string for illegal instructions
@@ -340,8 +347,20 @@ void disasm_render(ref disasm_params_t p) {
 
 	if (nbitems < 2) return;
 
+	bool inversedir = void;
+
+	if (p.fmt.settings & FORMATTER_O_NO_DIRECTION) {
+		inversedir = false;
+	} else {
+		with (DisasmSyntax)
+		switch (p.style) {
+		case Att: inversedir = true; break;
+		default:  inversedir = false;
+		}
+	}
+
 	disasm_madd(p, " ");
-	if (p.style == DisasmSyntax.Att) {
+	if (inversedir) {
 		if (nbitems > 2) {
 			disasm_madd(p, disasm_fmt_item(p, p.fmt.items[2]));
 			disasm_madd(p, ", ");

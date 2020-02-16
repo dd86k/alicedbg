@@ -160,7 +160,7 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 	p.mode = mode;
 	p.error = DisasmError.None;
 	p.lastaddr = p.addrv;
-	p.fmt.itemno = 0;
+	p.fmt.settings = p.fmt.itemno = 0;
 
 	if (p.mode >= DisasmMode.File)
 		with (p) mcbufi = mnbufi = 0;
