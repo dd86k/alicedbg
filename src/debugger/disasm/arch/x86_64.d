@@ -3,38 +3,58 @@
  */
 module debugger.disasm.arch.x86_64;
 
-import debugger.disasm;
+import debugger.disasm.core;
+import debugger.disasm.formatter;
 import utils.str;
 
 extern (C):
+
+package
+struct x86_64_internals_t {
+	union {
+		int group1;
+		int lock;
+		int rep;
+		int repne;
+		int repe;
+	}
+	union {
+		int group2;
+		int segreg;
+	}
+	union {
+		int group3;
+		int prefix_operand;
+	}
+	union {
+		int group4;
+		int prefix_address;
+	}
+}
 
 /**
  * AMD64 disassembler.
  * Params: p = Disassembler parameters
  * Returns: DisasmError
  */
-int disasm_x86_64(ref disasm_params_t p) {
-	int e = DisasmError.None;
-	x64_prefreg = PrefixReg.None;
-	x64_pre_ad = x64_pre_op = false;
-	const int INCLUDE_MACHINECODE = p.mode & DISASM_I_MACHINECODE;
-	const int INCLUDE_MNEMONICS = p.mode & DISASM_I_MNEMONICS;
-	
+void disasm_x86_64(ref disasm_params_t p) {
+	x86_64_internals_t internals;
+//	p.x86_64 = &internals;
+
+	with (p.x86)
+	group1 = group2 = group3 = group4 = 0;
+
 L_CONTINUE:
 	ubyte b = *p.addru8;
 	++p.addrv;
 
-	if (INCLUDE_MACHINECODE)
-		mcaddf(p, "%02X ", b);
+	if (p.mode >= DisasmMode.File)
+		disasm_push_x8(p, b);
 	
-	switch (b) {
+	main: switch (b) {
 	
 	default:
 	}
-	
-	with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
-	
-	return DisasmError.None;
 }
 
 private:

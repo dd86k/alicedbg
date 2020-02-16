@@ -61,7 +61,7 @@ An user interface can be specified with the `-ui` option.
 | UI | Description |
 |---|---|
 | `tui` (Default) | (WIP) Text UI |
-| `loop` | Simple catch-try loop with no user input |
+| `loop` | Continue by default, show brief exception information |
 | `tcp-json` | (Planned feature) TCP+JSON API server |
 
 ### UI: tui
@@ -79,7 +79,7 @@ On exceptions, this is added to output:
 * EXCEPTION #0
 PID=4104  TID=2176
 BREAKPOINT (80000003) at 77ABF146
-Code: CC  (int 3)
+Code: cc  (int3)
 ```
 
 Which features the exception counter, process ID, thread ID (Windows-only),

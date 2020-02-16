@@ -4,7 +4,7 @@ import core.stdc.stdio;
 import consts;
 import ui.loop : loop_enter;
 import ui.tui : tui_enter;
-import debugger, debugger.disasm, debugger.disasm.style;
+import debugger;
 
 extern (C):
 private:

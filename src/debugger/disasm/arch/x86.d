@@ -4,7 +4,6 @@
 module debugger.disasm.arch.x86;
 
 import debugger.disasm.core;
-import debugger.disasm.style;
 import debugger.disasm.formatter;
 import utils.str;
 
@@ -38,14 +37,12 @@ struct x86_internals_t {
  * Params: p = Disassembler parameters
  * Returns: DisasmError
  */
-int disasm_x86(ref disasm_params_t p) {
+void disasm_x86(ref disasm_params_t p) {
 	x86_internals_t internals;
 	p.x86 = &internals;
 
 	with (p.x86)
 	group1 = group2 = group3 = group4 = 0;
-	deprecated const int INCLUDE_MACHINECODE = p.mode & DISASM_I_MACHINECODE;
-	deprecated const int INCLUDE_MNEMONICS = p.mode & DISASM_I_MNEMONICS;
 
 L_CONTINUE:
 	ubyte b = *p.addru8;
@@ -287,7 +284,7 @@ L_CONTINUE:
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x34:	// XOR AL, IMM8
-		if (INCLUDE_MACHINECODE) {
+		if (p.mode >= DisasmMode.File) {
 			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "xor");
 			disasm_push_reg(p, "al");
@@ -778,7 +775,6 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File) {
-			mcaddf(p, "%02X %08X", modrm, *p.addru32);
 			const(char) *f = void;
 			switch (modrm & RM_RM) {
 			case RM_RM_000: f = "add"; break;
@@ -791,6 +787,8 @@ L_CONTINUE:
 			case RM_RM_111: f = "cmp"; break;
 			default: // impossible
 			}
+			disasm_push_x8(p, modrm);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, f);
 			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
 			disasm_push_imm(p, *p.addru32);
@@ -803,7 +801,6 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File) {
-			mcaddf(p, "%02X %02X", modrm, *p.addru8);
 			const(char) *f = void;
 			switch (modrm & RM_RM) {
 			case RM_RM_000: f = "add"; break;
@@ -816,6 +813,8 @@ L_CONTINUE:
 			case RM_RM_111: f = "cmp"; break;
 			default: // impossible
 			}
+			disasm_push_x8(p, modrm);
+			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, f);
 			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_OP_WIDE(b)));
 			disasm_push_imm(p, *p.addru8);
@@ -1328,11 +1327,11 @@ L_CONTINUE:
 		if (p.mode >= DisasmMode.File)
 			disasm_push_x8(p, modrm);
 		if (modrm & RM_REG) {
-			style_ill(p);
+			disasm_err(p);
 			break main;
 		}
 		if (p.mode >= DisasmMode.File)
-			style_mn(p, "mov");
+			disasm_push_str(p, "mov");
 		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 		x86_vu32imm(p);
 		break;
@@ -1439,7 +1438,7 @@ L_CONTINUE:
 			disasm_push_x8(p, modrm);
 		const(char) *m = void, seg = void;
 		if (modrm > 0xBF) { // operand is FP
-			if (INCLUDE_MNEMONICS) {
+			if (p.mode >= DisasmMode.File) {
 				ubyte sti = modrm & 0xF; // ST index
 				switch (modrm & 0xF0) {
 				case 0xC0: // FADD/FMUL
@@ -1521,7 +1520,6 @@ L_CONTINUE:
 					disasm_push_str(p, m);
 					disasm_push_str(p, x87_ststr(p, 0));
 					disasm_push_str(p, x87_ststr(p, sti));
-					style_mn_f(p, m, sti);
 					break;
 				case 0xD0: // FNOP/Reserved
 					if (sti == 0)
@@ -1781,7 +1779,7 @@ L_CONTINUE:
 				disasm_push_str(p, x87_ststr(p, 0));
 			}
 		} else { // operand is memory pointer
-			if (INCLUDE_MACHINECODE) {
+			if (p.mode >= DisasmMode.File) {
 				switch (modrm & RM_REG) {
 				case RM_REG_000: m = "fadd"; break;
 				case RM_REG_001: m = "fmul"; break;
@@ -2074,7 +2072,7 @@ L_CONTINUE:
 			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "jmp");
 			disasm_push_imm(p, *p.addru8);
-		};
+		}
 		++p.addrv;
 		break;
 	case 0xF0:	// LOCK
@@ -2229,563 +2227,367 @@ L_CONTINUE:
 	case 0xFF:	// GRP 5
 		ubyte modrm = *p.addru8;
 		++p.addrv;
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File)
 			disasm_push_x8(p, modrm);
 		switch (modrm & RM_REG) {
 		case RM_REG_000: // INC R/M32
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, p.x86.prefix_operand ?
-					"INC WORD PTR " : "INC DWORD PTR ");
-			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, "inc");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_001: // DEC R/M32
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, p.x86.prefix_operand ?
-					"DEC WORD PTR " : "DEC DWORD PTR ");
-			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, "dec");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_010: // CALL NEAR R/M32
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "CALL NEAR ");
-			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, "call");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_011: // CALL FAR M16:M32
-			ushort v1 = *p.addru16;
-			p.addrv += 2;
-			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%04X %08", v1, *p.addru32);
-			if (INCLUDE_MNEMONICS)
-				mnaddf(p, "CALL FAR [%d:%d]", v1, *p.addru32);
+			if (p.mode >= DisasmMode.File) {
+				disasm_push_x32(p, *p.addru32);
+				disasm_push_str(p, "call");
+				disasm_push_memregimm(p,
+					x86_segstr(p.x86.segreg),
+					*p.addru32);
+			}
 			p.addrv += 4;
 			break;
 		case RM_REG_100: // JMP NEAR R/M32
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "CALL NEAR ");
-			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, "call");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_101: // JMP FAR M16:M32
-			ushort v1 = *p.addru16;
-			p.addrv += 2;
-			if (INCLUDE_MACHINECODE)
-				mcaddf(p, "%04X %08", v1, *p.addru32);
-			if (INCLUDE_MNEMONICS)
-				mnaddf(p, "JMP FAR [%d:%d]", v1, *p.addru32);
+			if (p.mode >= DisasmMode.File) {
+				disasm_push_x32(p, *p.addru32);
+				disasm_push_str(p, "jmp");
+				disasm_push_memregimm(p,
+					x86_segstr(p.x86.segreg),
+					*p.addru32);
+			}
 			p.addrv += 4;
 			break;
 		case RM_REG_110: // PUSH R/M32
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "PUSH ");
-			x86_modrm_rm(p, modrm, X86_OP_WIDE(b));
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, "push");
+			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		default:
-			mnill(p);
+			disasm_err(p);
 		}
 		break;
 	default:
-		mnill(p);
+		disasm_err(p);
 	}
-
-	return p.error;
 }
 
 private:
 
 void x86_0f(ref disasm_params_t p) {
-	const int INCLUDE_MACHINECODE = p.mode & DISASM_I_MACHINECODE;
-	const int INCLUDE_MNEMONICS = p.mode & DISASM_I_MNEMONICS;
-
 	ubyte b = *p.addru8;
 	++p.addrv;
 
-	if (INCLUDE_MACHINECODE)
+	if (p.mode >= DisasmMode.File)
 		disasm_push_x8(p, b);
 
-	switch (b) {
+	main: switch (b) {
 	case 0x00: // GRP6
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File)
 			disasm_push_x8(p, modrm);
 
+		const(char) *m = void;
 		switch (modrm & RM_REG) {
-		case RM_REG_000: // SLDT
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "SLDT ");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
-			break;
-		case RM_REG_001: // STR
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "STR ");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
-			break;
-		case RM_REG_010: // LLDT
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "LLDT ");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
-			break;
-		case RM_REG_011: // LTR
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "LTR ");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
-			break;
-		case RM_REG_100: // VERR
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "VERR ");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
-			break;
-		case RM_REG_101: // VERW
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "VERW ");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
-			break;
-		default:
-			mnill(p);
+		case RM_REG_000: m = "sldt"; break;
+		case RM_REG_001: m = "str"; break;
+		case RM_REG_010: m = "lldt"; break;
+		case RM_REG_011: m = "ltr"; break;
+		case RM_REG_100: m = "verr"; break;
+		case RM_REG_101: m = "verw"; break;
+		default: disasm_err(p); break main;
 		}
+
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 		break;
 	case 0x01: // GRP7
 		ubyte modrm = *p.addru8;
 		ubyte mod11 = (modrm & RM_MOD) == RM_MOD_11;
 		++p.addrv;
 
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File)
 			disasm_push_x8(p, modrm);
 
+		const(char) *m = void;
 		switch (modrm & RM_REG) {
 		case RM_REG_000:
 			if (mod11) { // VM*
+				if (p.mode < DisasmMode.File)
+					break;
 				switch (modrm & RM_RM) {
-				case RM_RM_001: // VMCALL
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "VMCALL");
-					break;
-				case RM_RM_010: // VMLAUNCH
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "VMLAUNCH");
-					break;
-				case RM_RM_011: // VMRESUME
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "VMRESUME");
-					break;
-				case RM_RM_100: // VMXOFF
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "VMXOFF");
-					break;
-				default:
-					mnill(p);
+				case RM_RM_001: m = "vmcall"; break;
+				case RM_RM_010: m = "vmlaunch"; break;
+				case RM_RM_011: m = "vmresume"; break;
+				case RM_RM_100: m = "vmxoff"; break;
+				default: disasm_err(p); break main;
 				}
+				disasm_push_str(p, m);
 			} else { // SGDT
-				if (INCLUDE_MNEMONICS)
-					mnadd(p, "SGDT ");
+				if (p.mode >= DisasmMode.File)
+					disasm_push_str(p, "sgdt");
 				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			}
 			break;
 		case RM_REG_001:
 			if (mod11) { // MONITOR*
+				if (p.mode < DisasmMode.File)
+					break;
 				switch (modrm & RM_RM) {
-				case RM_RM_000: // MONITOR
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "MONITOR");
-					break;
-				case RM_RM_001: // MWAIT
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "MWAIT");
-					break;
-				case RM_RM_010: // CLAC
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "CLAC");
-					break;
-				case RM_RM_011: // STAC
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "STAC");
-					break;
-				case RM_RM_111: // ENCLS
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "ENCLS");
-					break;
-				default:
-					mnill(p);
+				case RM_RM_000: m = "monitor"; break;
+				case RM_RM_001: m = "mwait"; break;
+				case RM_RM_010: m = "clac"; break;
+				case RM_RM_011: m = "stac"; break;
+				case RM_RM_111: m = "encls"; break;
+				default: disasm_err(p); break main;
 				}
+				disasm_push_str(p, m);
 			} else { // SIDT
-				if (INCLUDE_MNEMONICS)
-					mnadd(p, "SIDT ");
+				if (p.mode >= DisasmMode.File)
+					disasm_push_str(p, "sidt");
 				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			}
 			break;
 		case RM_REG_010:
 			if (mod11) { // X*
+				if (p.mode < DisasmMode.File)
+					break;
 				switch (modrm & RM_RM) {
-				case RM_RM_000: // XGETBV
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "XGETBV");
-					break;
-				case RM_RM_001: // XSETBV
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "XSETBV");
-					break;
-				case RM_RM_100: // VMFUNC
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "VMFUNC");
-					break;
-				case RM_RM_101: // XEND
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "XEND");
-					break;
-				case RM_RM_110: // XTEST
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "XTEST");
-					break;
-				case RM_RM_111: // ENCLU
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "ENCLU");
-					break;
-				default:
-					mnill(p);
+				case RM_RM_000: m = "xgetbv"; break;
+				case RM_RM_001: m = "xsetbv"; break;
+				case RM_RM_100: m = "vmfunc"; break;
+				case RM_RM_101: m = "xend"; break;
+				case RM_RM_110: m = "xtest"; break;
+				case RM_RM_111: m = "enclu"; break;
+				default: disasm_err(p); break main;
 				}
+				disasm_push_str(p, m);
 			} else { // LGDT
-				if (INCLUDE_MNEMONICS)
-					mnadd(p, "LGDT ");
+				if (p.mode >= DisasmMode.File)
+					disasm_push_str(p, "lgdt");
 				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			}
 			break;
 		case RM_REG_011:
 			if (mod11) { // (AMD) SVM
+				if (p.mode < DisasmMode.File)
+					break;
 				switch (modrm & RM_RM) {
-				case RM_RM_000: // VMRUN
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "VMRUN");
-					break;
-				case RM_RM_001: // VMMCALL
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "VMMCALL");
-					break;
-				case RM_RM_010: // VMLOAD
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "VMLOAD");
-					break;
-				case RM_RM_011: // VMSAVE
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "VMSAVE");
-					break;
-				case RM_RM_100: // STGI
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "STGI");
-					break;
-				case RM_RM_101: // CLGI
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "CLGI");
-					break;
-				case RM_RM_110: // SKINIT
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "SKINIT");
-					break;
-				case RM_RM_111: // INVLPGA
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "INVLPGA");
-					break;
+				case RM_RM_000: m = "vmrun"; break;
+				case RM_RM_001: m = "vmmcall"; break;
+				case RM_RM_010: m = "vmload"; break;
+				case RM_RM_011: m = "vmsave"; break;
+				case RM_RM_100: m = "stgi"; break;
+				case RM_RM_101: m = "clgi"; break;
+				case RM_RM_110: m = "skinit"; break;
+				case RM_RM_111: m = "invlpga"; break;
 				default: // never
 				}
+				disasm_push_str(p, m);
 			} else { // LIDT
-				if (INCLUDE_MNEMONICS)
-					mnadd(p, "LGDT ");
+				if (p.mode >= DisasmMode.File)
+					disasm_push_str(p, "lgdt");
 				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			}
 			break;
 		case RM_REG_100: // SMSW
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "SMSW ");
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, "smsw");
 			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_110: // LMSW
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "LMSW ");
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, "lmsw");
 			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			break;
 		case RM_REG_111:
 			if (mod11) { // *
-				switch (modrm & RM_RM) {
-				case RM_RM_001: // RDTSCP
-					if (INCLUDE_MNEMONICS)
-						mnadd(p, "RDTSCP");
-					break;
-				default:
-					mnill(p);
-				}
+				if ((modrm & RM_RM) == RM_RM_001) {
+					if (p.mode >= DisasmMode.File)
+						disasm_push_str(p, "rdtscp");
+				} else
+					disasm_err(p);
 			} else { // INVLPG
-				if (INCLUDE_MNEMONICS)
-					mnadd(p, "INVLPG ");
+				if (p.mode >= DisasmMode.File)
+					disasm_push_str(p, "invlpg");
 				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 			}
 			break;
 		default:
-			mnill(p);
+			disasm_err(p);
 		}
 		break;
 	case 0x02: // LAR REG32, R/M16
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "LAR ");
-		x86_modrm(p, X86_WIDTH_WIDE, 1);
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "lar");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
 		break;
 	case 0x03: // LSL REG32, R/M16
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "LSL ");
-		x86_modrm(p, X86_WIDTH_WIDE, 1);
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "lsl");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
 		break;
 	case 0x06: // CLTS
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "CLTS");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "clts");
 		break;
 	case 0x08: // INVD
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "INVD");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "invd");
 		break;
 	case 0x09: // WBINVD
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "WBINVD");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "wbinvd");
 		break;
 	case 0x0B: // UD2
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "UD2");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "ud2");
 		break;
 	case 0x0D: // PREFETCHW /1
 		ubyte modrm = *p.addru8;
 		++p.addrv;
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File)
 			disasm_push_x8(p, modrm);
 		if ((modrm & RM_REG) == RM_REG_001) {
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "PREFETCHW ");
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, "prefetchw");
 			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 		} else
-			mnill(p);
+			disasm_err(p);
 		break;
-	case 0x10: // MOVUPS/MOVUPD/MOVSS/MOVSD
+	case 0x10, 0x11: // MOVUPS/MOVUPD/MOVSS/MOVSD
+		const(char) *m = void;
 		switch (x86_0f_select(p)) {
-		case X86_0F_NONE:	// MOVUPS
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVUPS ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		case X86_0F_66H:	// MOVUPD
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVUPD ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		case X86_0F_F2H:	// MOVSD
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVSD ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		case X86_0F_F3H:	// MOVSS
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVSS ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		default:
-			mnill(p);
+		case X86_0F_NONE: m = "movups"; break;
+		case X86_0F_66H: m = "movupd"; break;
+		case X86_0F_F2H: m = "movsd"; break;
+		case X86_0F_F3H: m = "movss"; break;
+		default: disasm_err(p); break main;
 		}
-		break;
-	case 0x11: // MOVUPS/MOVUPD/MOVSS/MOVSD
-		switch (x86_0f_select(p)) {
-		case X86_0F_NONE:	// MOVUPS
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVUPS ");
-			x86_modrm(p, X86_WIDTH_XMM, 0);
-			break;
-		case X86_0F_66H:	// MOVUPD
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVUPD ");
-			x86_modrm(p, X86_WIDTH_XMM, 0);
-			break;
-		case X86_0F_F2H:	// MOVSD
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVSD ");
-			x86_modrm(p, X86_WIDTH_XMM, 0);
-			break;
-		case X86_0F_F3H:	// MOVSS
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVSS ");
-			x86_modrm(p, X86_WIDTH_XMM, 0);
-			break;
-		default:
-			mnill(p);
-		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_OP_DIR(b));
 		break;
 	case 0x12: // (MOVLPS|MOVHLPS)/MOVSLDUP/MOVLPD/MOVDDUP
+		const(char) *m = void;
 		switch (x86_0f_select(p)) {
-		case X86_0F_NONE:	// MOVLPS/MOVHLPS
-			if ((*p.addru8 & RM_MOD) == RM_MOD_11) {
-				ubyte modrm = *p.addru8;
-				++p.addrv;
-				if (INCLUDE_MACHINECODE)
-					disasm_push_x8(p, modrm);
-				if (INCLUDE_MNEMONICS) {
-					mnaddf(p, "MOVHLPS %s, %s",
-						x86_modrm_reg(p, modrm, X86_WIDTH_XMM),
-						x86_modrm_reg(p, modrm << 3, X86_WIDTH_XMM));
-				}
-			} else {
-				if (INCLUDE_MNEMONICS)
-					mnadd(p, "MOVLPS ");
-				x86_modrm(p, X86_WIDTH_XMM, 1);
-			}
+		case X86_0F_NONE:
+			m = (*p.addru8 & RM_MOD) == RM_MOD_11 ?
+				"movhlps" : "movlps";
 			break;
-		case X86_0F_66H:	// MOVSLDUP
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVSLDUP ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		case X86_0F_F2H:	// MOVDDUP
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVDDUP ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		case X86_0F_F3H:	// MOVLPD
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVLPD ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		default:
-			mnill(p);
+		case X86_0F_66H: m = "movlpd"; break;
+		case X86_0F_F2H: m = "movddup"; break;
+		case X86_0F_F3H: m = "movsldup"; break;
+		default: disasm_err(p); break main;
 		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
 		break;
 	case 0x13: // MOVLPS/MOVLPD
+		const(char) *m = void;
 		switch (x86_0f_select(p)) {
-		case X86_0F_NONE:	// MOVLPS
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVLPS ");
-			x86_modrm(p, X86_WIDTH_XMM, 0);
-			break;
-		case X86_0F_66H:	// MOVLPD
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVLPD ");
-			x86_modrm(p, X86_WIDTH_XMM, 0);
-			break;
-		default:
-			mnill(p);
+		case X86_0F_NONE: m = "movlps"; break;
+		case X86_0F_66H: m = "movlpd"; break;
+		default: disasm_err(p); break main;
 		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_MEM);
 		break;
 	case 0x14: // UNPCKLPS/UNPCKLPD
+		const(char) *m = void;
 		switch (x86_0f_select(p)) {
-		case X86_0F_NONE:	// UNPCKLPS
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "UNPCKLPD ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		case X86_0F_66H:	// UNPCKLPD
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "UNPCKLPD ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		default:
-			mnill(p);
+		case X86_0F_NONE: m = "unpcklpd"; break;
+		case X86_0F_66H: m = "unpcklpd"; break;
+		default: disasm_err(p); break main;
 		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
 		break;
 	case 0x15: // UNPCKHPS/UNPCKHPD
+		const(char) *m = void;
 		switch (x86_0f_select(p)) {
-		case X86_0F_NONE:	// UNPCKHPS
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "UNPCKHPS ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		case X86_0F_66H:	// UNPCKHPD
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "UNPCKHPD ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		default:
-			mnill(p);
+		case X86_0F_NONE: m = "unpckhps"; break;
+		case X86_0F_66H: m = "unpckhpd"; break;
+		default: disasm_err(p); break main;
 		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
 		break;
 	case 0x16: // (MOVHPS|MOVLHPS)/MOVHPD/MOVSHDUP
+		const(char) *m = void;
 		switch (x86_0f_select(p)) {
-		case X86_0F_NONE:	// MOVHPS
-			if ((*p.addru8 & RM_MOD) == RM_MOD_11) {
-				ubyte modrm = *p.addru8;
-				++p.addrv;
-				if (INCLUDE_MACHINECODE)
-					disasm_push_x8(p, modrm);
-				if (INCLUDE_MNEMONICS)
-					mnaddf(p, "MOVHPS %s, %s",
-						x86_modrm_reg(p, modrm, X86_WIDTH_XMM),
-						x86_modrm_reg(p, modrm << 3, X86_WIDTH_XMM));
-			} else {
-				if (INCLUDE_MNEMONICS)
-					mnadd(p, "MOVHPS ");
-				x86_modrm(p, X86_WIDTH_XMM, 1);
-			}
+		case X86_0F_NONE:
+			m = (*p.addru8 & RM_MOD) == RM_MOD_11 ?
+				"movlhps" : "movhps";
 			break;
-		case X86_0F_66H:	// MOVHPD
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVHPD ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		case X86_0F_F3H:	// MOVSHDUP
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVSHDUP ");
-			x86_modrm(p, X86_WIDTH_XMM, 1);
-			break;
-		default:
-			mnill(p);
+		case X86_0F_66H: m = "movhpd"; break;
+		case X86_0F_F3H: m = "movshdup "; break;
+		default: disasm_err(p); break main;
 		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
 		break;
 	case 0x17: // MOVHPS/MOVHPD
+		const(char) *m = void;
 		switch (x86_0f_select(p)) {
-		case X86_0F_NONE:	// MOVHPS
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVHPS ");
-			x86_modrm(p, X86_WIDTH_XMM, 0);
-			break;
-		case X86_0F_66H:	// MOVHPD
-			if (INCLUDE_MNEMONICS)
-				mnadd(p, "MOVHPD ");
-			x86_modrm(p, X86_WIDTH_XMM, 0);
-			break;
-		default:
-			mnill(p);
+		case X86_0F_NONE: m = "movhps"; break;
+		case X86_0F_66H: m = "movhpd"; break;
+		default: disasm_err(p); break main;
 		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_MEM);
 		break;
 	case 0x18: // GRP 16
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 
-		if (INCLUDE_MACHINECODE)
+		if (p.mode >= DisasmMode.File)
 			disasm_push_x8(p, modrm);
 
 		if ((modrm & RM_MOD) == RM_MOD_11) {
-			mnill(p);
+			disasm_err(p);
 			break;
 		}
 
+		const(char) *m = void;
 		switch (modrm & RM_REG) {
-		case RM_REG_000:
-			if (INCLUDE_MACHINECODE)
-				mnadd(p, "PREFETCHNTA ");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
-			break;
-		case RM_REG_001:
-			if (INCLUDE_MACHINECODE)
-				mnadd(p, "PREFETCHT0 ");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
-			break;
-		case RM_REG_010:
-			if (INCLUDE_MACHINECODE)
-				mnadd(p, "PREFETCHT1 ");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
-			break;
-		case RM_REG_011:
-			if (INCLUDE_MACHINECODE)
-				mnadd(p, "PREFETCHT2 ");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
-			break;
+		case RM_REG_000: m = "prefetchnta"; break;
+		case RM_REG_001: m = "prefetcht0"; break;
+		case RM_REG_010: m = "prefetcht1"; break;
+		case RM_REG_011: m = "prefetcht2"; break;
 		default: // NOP (reserved)
-			if (INCLUDE_MACHINECODE)
-				mnadd(p, "NOP");
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, "nop");
+			break main;
 		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 		break;
 	case 0x19: // NOP (reserved)
-		if (INCLUDE_MACHINECODE)
-			mnadd(p, "NOP");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "nop");
 		break;
 	case 0x1A: // BNDLDX/BNDMOV/BNDCU/BNDCL
 		/*switch (x86_0f_select(p)) {
@@ -2806,11 +2608,11 @@ void x86_0f(ref disasm_params_t p) {
 		}*/
 		break;
 	case 0xA2: // CPUID
-		if (INCLUDE_MNEMONICS)
-			mnadd(p, "CPUID");
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "CPUID");
 		break;
 	default:
-		mnill(p);
+		disasm_err(p);
 	}
 }
 
