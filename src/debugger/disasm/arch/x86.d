@@ -2609,7 +2609,7 @@ void x86_0f(ref disasm_params_t p) {
 		break;
 	case 0xA2: // CPUID
 		if (p.mode >= DisasmMode.File)
-			disasm_push_str(p, "CPUID");
+			disasm_push_str(p, "cpuid");
 		break;
 	default:
 		disasm_err(p);
@@ -2705,31 +2705,12 @@ package enum {
 	X86_DIR_REG	/// Direction: Towards REG field
 }
 
+/// (Internal) Function to determine if opcode has WIDE bit set
+/// Params: op = Opcode
 int X86_OP_WIDE(int op) { return op & 1; }
+/// (Internal) Function to determine if opcode has DIRECTION bit set
+/// Params: op = Opcode
 int X86_OP_DIR(int op)  { return op & 2; }
-
-/// (Internal) Fetch 32/16-bit operand-variable value, depending on operand
-/// prefix, and provides the proper zero-padded strin format. This affects the
-/// memory pointer.
-/// Params:
-/// 	p = disassembler structure
-/// 	f = String pointer receiving machine formatting text
-/// Returns: 32-bit or 16-bit value
-deprecated
-package
-uint x86_mmfu32v(ref disasm_params_t p, ref const(char) *f) {
-	uint v = void;
-	if (p.x86.prefix_operand) {
-		f = "%04X ";
-		v = *p.addru16;
-		p.addrv += 2;
-	} else {
-		f = "%08X ";
-		v = *p.addru32;
-		p.addrv += 4;
-	}
-	return v;
-}
 
 /// (Internal) Fetch variable 32-bit immediate, affected by operand prefix.
 /// Then if it's the case, fetch and push a 16-bit immediate instead.
