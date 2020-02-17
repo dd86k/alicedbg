@@ -18,9 +18,9 @@ Personal Goals:
 
 | Platform | OS | CRT | Debugging core |
 |---|---|---|:-:|
-| x86 | Windows | Microsoft | ✔️ |
+| x86 | At least Windows 7 | Microsoft | ✔️ |
 | | Linux | Glibc | ✔️ |
-| ARM | Windows | Microsoft |  |
+| ARM | At least Windows 10 | Microsoft |  |
 | | Linux | Glibc | Planned! |
 
 ### Disassembler Progress

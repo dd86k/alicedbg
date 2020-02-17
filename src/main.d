@@ -5,6 +5,7 @@ import consts;
 import ui.loop : loop_enter;
 import ui.tui : tui_enter;
 import debugger, dumper;
+import os.err;
 
 extern (C):
 private:
@@ -36,11 +37,6 @@ enum CLIPage {
 	ui,
 	dstyles,
 }
-
-version (Windows)
-	enum F_ERR = "0x%08X";
-else
-	enum F_ERR = "%d";
 
 /// CLI options
 struct cliopt_t {
@@ -282,7 +278,7 @@ int main(int argc, const(char) **argv) {
 		switch (opt.debugtype) {
 		case file:
 			if ((e = dbg_file(opt.file)) != 0) {
-				printf("dbg: Could not load executable ("~F_ERR~")\n", e);
+				printf("dbg: ("~F_ERR~") %s\n", e, err_msg(e));
 				return e;
 			}
 			break;
