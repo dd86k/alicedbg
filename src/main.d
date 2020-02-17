@@ -283,8 +283,8 @@ int main(int argc, const(char) **argv) {
 			}
 			break;
 		case pid:
-			if ((e = dbg_file(opt.file)) != 0) {
-				printf("dbg: Could not attach to pid ("~F_ERR~")\n", e);
+			if ((e = dbg_attach(opt.pid)) != 0) {
+				printf("dbg: ("~F_ERR~") %s\n", e, err_msg(e));
 				return e;
 			}
 			break;
@@ -301,7 +301,7 @@ int main(int argc, const(char) **argv) {
 	case dumper:
 		return dump(opt.file, disopt);
 	case profiler:
-	
+		puts("Profiling feature not yet implemented");
 		break;
 	}
 	return 0;

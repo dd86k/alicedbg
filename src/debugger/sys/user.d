@@ -152,10 +152,10 @@ version (X86_64) {
 		uint mxcsr;
 		/// 
 		uint mxcr_mask;
-		/// 
-		uint [32]st_space;   /// 8*16 bytes for each FP-reg = 128 bytes
-		/// 
-		uint [64]xmm_space;  /// 16*16 bytes for each XMM-reg = 256 bytes
+		/// 8*16 bytes for each FP-reg = 128 bytes
+		uint [32]st_space;
+		/// 16*16 bytes for each XMM-reg = 256 bytes
+		uint [64]xmm_space;
 		/// 
 		uint [32]padding;
 	}
