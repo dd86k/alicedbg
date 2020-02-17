@@ -2,10 +2,10 @@
 module os.err;
 
 version (Windows) {
-	/// Error code format
-	enum F_ERR = "0x%08X";
 	import core.sys.windows.windows;
 	import core.sys.windows.winnls;
+	/// Error code format
+	enum F_ERR = "0x%08X";
 
 	private enum LOCALE_NAME_USER_DEFAULT = null;
 	private enum LOCALE_ALL = 0;
@@ -43,7 +43,7 @@ const(char) *err_msg(int code) {
 			512,
 			null);
 		// Remove newline
-		if (buffer[fl - 2] == '\n')
+		if (buffer[fl - 2] == '\r')
 			buffer[fl - 2] = 0;
 		return cast(char*)buffer;
 	} else {

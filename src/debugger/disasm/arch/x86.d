@@ -2585,27 +2585,72 @@ void x86_0f(ref disasm_params_t p) {
 			disasm_push_str(p, m);
 		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 		break;
-	case 0x19: // NOP (reserved)
+	case 0x19, 0x1C, 0x1D, 0x1E: // NOP (reserved)
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "nop");
 		break;
 	case 0x1A: // BNDLDX/BNDMOV/BNDCU/BNDCL
-		/*switch (x86_0f_select(p)) {
-		case X86_0F_NONE: // BNDLDX
-		
-			break;
-		case X86_0F_66H: // BNDMOV
-		
-			break;
-		case X86_0F_F2H: // BNDCU
-		
-			break;
-		case X86_0F_F3H: // BNDCL
-		
-			break;
-		default:
-			mnill(p);
-		}*/
+		const(char) *m = void; // instruction
+		const(char) *r = void; // bound keyword (bnd0..bnd3)
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (p.mode >= DisasmMode.File)
+			disasm_push_x8(p, modrm);
+		switch (modrm & RM_REG) {
+		case RM_REG_000: r = "bnd0"; break;
+		case RM_REG_001: r = "bnd1"; break;
+		case RM_REG_010: r = "bnd2"; break;
+		case RM_REG_011: r = "bnd3"; break;
+		default: disasm_err(p); break main;
+		}
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "bndldx"; break;
+		case X86_0F_66H: m = "bndmov"; break;
+		case X86_0F_F2H: m = "bndcu"; break;
+		case X86_0F_F3H: m = "bndcl"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, m);
+			disasm_push_reg(p, r);
+		}
+		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+		break;
+	case 0x1B: // BNDSTX/BNDMOV/BNDCN/BNDMK
+		const(char) *m = void; // instruction
+		const(char) *r = void; // bound keyword (bnd0..bnd3)
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (p.mode >= DisasmMode.File)
+			disasm_push_x8(p, modrm);
+		switch (modrm & RM_REG) {
+		case RM_REG_000: r = "bnd0"; break;
+		case RM_REG_001: r = "bnd1"; break;
+		case RM_REG_010: r = "bnd2"; break;
+		case RM_REG_011: r = "bnd3"; break;
+		default: disasm_err(p); break main;
+		}
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "bndstx"; break;
+		case X86_0F_66H: m = "bndmov"; break;
+		case X86_0F_F2H: m = "bndcn"; break;
+		case X86_0F_F3H: m = "bndmk"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+		if (p.mode >= DisasmMode.File)
+			disasm_push_reg(p, r);
+		break;
+	case 0x1F: // Multi-byte NOP
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_x8(p, modrm);
+			disasm_push_str(p, "nop");
+		}
+		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 		break;
 	case 0xA2: // CPUID
 		if (p.mode >= DisasmMode.File)
