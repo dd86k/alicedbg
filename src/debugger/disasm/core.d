@@ -38,7 +38,7 @@ enum DisasmSyntax : ubyte {
 	Intel,	/// Intel syntax
 	Nasm,	/// (NASM) Netwide Assembler syntax
 	Att,	/// AT&T syntax
-//	Masm,	/// (Not implemented) (MASM) Microsoft Assembler
+//	Masm,	/// (Not implemented) (MASM) Microsoft/Macro Assembler
 //	Ideal,	/// (Not implemented) Borland Ideal
 //	Hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
 }
@@ -141,7 +141,7 @@ struct disasm_params_t { align(1):
 		void *internal;	/// Used internally
 		x86_internals_t *x86;	/// Used internally
 	}
-	disasm_fmt_t fmt;	/// Used by debugger.disasm.formatter
+	disasm_fmt_t *fmt;	/// Used by debugger.disasm.formatter
 	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer
 	char [DISASM_BUF_SIZE]mnbuf;	/// Mnemonics buffer
 	size_t mcbufi;	/// Machine code buffer index
@@ -160,10 +160,13 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 	p.mode = mode;
 	p.error = DisasmError.None;
 	p.lastaddr = p.addrv;
-	p.fmt.settings = p.fmt.itemno = 0;
 
-	if (p.mode >= DisasmMode.File)
+	if (p.mode >= DisasmMode.File) {
+		disasm_fmt_t fmt = void;
+		p.fmt = &fmt;
+		p.fmt.settings = p.fmt.itemno = 0;
 		with (p) mcbufi = mnbufi = 0;
+	}
 
 	if (p.abi == DisasmABI.Default)
 		p.abi = DISASM_DEFAULT_ISA;

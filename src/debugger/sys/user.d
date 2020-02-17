@@ -219,11 +219,11 @@ version (X86_64) {
 	/// 
 	struct user {
 		/// 
-		ser_regs_struct regs;
+		user_regs_struct regs;
 		/// 
-		nt u_fpvalid;
+		int u_fpvalid;
 		/// 
-		ser_fpregs_struct i387;
+		user_fpregs_struct i387;
 		/// 
 		long u_tsize;
 		/// 
