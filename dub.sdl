@@ -39,7 +39,7 @@ buildType "release-nobounds" {
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" platform="gdc"
 }
 
-buildType "release-maxperf" {
+buildType "release-inline" {
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" "betterC" platform="dmd"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" "betterC" platform="ldc"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" platform="gdc"
