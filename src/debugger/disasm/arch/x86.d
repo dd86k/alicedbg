@@ -24,11 +24,11 @@ struct x86_internals_t {
 	}
 	union {
 		int group3;
-		int prefix_operand;
+		int pf_operand; /// 66H Operand prefix
 	}
 	union {
 		int group4;
-		int prefix_address;
+		int pf_address; /// 67H Address prefix
 	}
 }
 
@@ -71,12 +71,10 @@ L_CONTINUE:
 		break;
 	case 0x05:	// ADD EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "add");
-			disasm_push_reg(p, "eax");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0x06:	// PUSH ES
 		if (p.mode >= DisasmMode.File) {
@@ -109,12 +107,10 @@ L_CONTINUE:
 		break;
 	case 0x0D:	// OR EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "or");
-			disasm_push_reg(p, "eax");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0x0E:	// PUSH CS
 		if (p.mode >= DisasmMode.File) {
@@ -144,12 +140,10 @@ L_CONTINUE:
 		break;
 	case 0x15:	// ADC EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "adc");
-			disasm_push_reg(p, "eax");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0x16:	// PUSH SS
 		if (p.mode >= DisasmMode.File) {
@@ -182,12 +176,10 @@ L_CONTINUE:
 		break;
 	case 0x1D:	// SBB EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "sbb");
-			disasm_push_reg(p, "eax");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0x1E:	// PUSH DS
 		if (p.mode >= DisasmMode.File) {
@@ -220,12 +212,10 @@ L_CONTINUE:
 		break;
 	case 0x25:	// AND EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "and");
-			disasm_push_reg(p, "eax");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0x26:	// ES:
 		if (p.x86.group2) {
@@ -257,12 +247,10 @@ L_CONTINUE:
 		break;
 	case 0x2D:	// SUB EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "sub");
-			disasm_push_reg(p, "eax");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0x2E:	// CS:
 		if (p.x86.group2) {
@@ -294,12 +282,10 @@ L_CONTINUE:
 		break;
 	case 0x35:	// XOR EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "xor");
-			disasm_push_reg(p, "eax");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0x36:	// SS:
 		if (p.x86.group2) {
@@ -331,12 +317,10 @@ L_CONTINUE:
 		break;
 	case 0x3D:	// CMP EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "cmp");
-			disasm_push_reg(p, "eax");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0x3E:	// DS:
 		if (p.x86.group2) {
@@ -352,202 +336,202 @@ L_CONTINUE:
 	case 0x40:	// INC EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x41:	// INC ECX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, "ecx");
+			disasm_push_reg(p, p.x86.pf_operand ? "cx" : "ecx");
 		}
 		break;
 	case 0x42:	// INC EDX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, "edx");
+			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
 		}
 		break;
 	case 0x43:	// INC EBX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, "ebx");
+			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
 		}
 		break;
 	case 0x44:	// INC ESP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, "esp");
+			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
 		}
 		break;
 	case 0x45:	// INC EBP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, "ebp");
+			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
 		}
 		break;
 	case 0x46:	// INC ESI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, "esi");
+			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
 		}
 		break;
 	case 0x47:	// INC EDI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, "edi");
+			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
 		}
 		break;
 	case 0x48:	// DEC EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x49:	// DEC ECX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, "ecx");
+			disasm_push_reg(p, p.x86.pf_operand ? "cx" : "ecx");
 		}
 		break;
 	case 0x4A:	// DEC EDX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, "edx");
+			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
 		}
 		break;
 	case 0x4B:	// DEC EBX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, "ebx");
+			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
 		}
 		break;
 	case 0x4C:	// DEC ESP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, "esp");
+			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
 		}
 		break;
 	case 0x4D:	// DEC EBP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, "ebp");
+			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
 		}
 		break;
 	case 0x4E:	// DEC ESI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, "esi");
+			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
 		}
 		break;
 	case 0x4F:	// DEC EDI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, "edi");
+			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
 		}
 		break;
 	case 0x50:	// PUSH EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x51:	// PUSH ECX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "ecx");
 		}
 		break;
 	case 0x52:	// PUSH EDX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, "edx");
+			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
 		}
 		break;
 	case 0x53:	// PUSH EBX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, "ebx");
+			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
 		}
 		break;
 	case 0x54:	// PUSH ESP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, "esp");
+			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
 		}
 		break;
 	case 0x55:	// PUSH EBP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, "ebp");
+			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
 		}
 		break;
 	case 0x56:	// PUSH ESI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, "esi");
+			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
 		}
 		break;
 	case 0x57:	// PUSH EDI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, "edi");
+			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
 		}
 		break;
 	case 0x58:	// POP EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x59:	// POP ECX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "cx" : "ecx");
 		}
 		break;
 	case 0x5A:	// POP EDX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, "edx");
+			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
 		}
 		break;
 	case 0x5B:	// POP EBX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, "ebx");
+			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
 		}
 		break;
 	case 0x5C:	// POP ESP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, "esp");
+			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
 		}
 		break;
 	case 0x5D:	// POP EBP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, "ebp");
+			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
 		}
 		break;
 	case 0x5E:	// POP ESI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, "esi");
+			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
 		}
 		break;
 	case 0x5F:	// POP EDI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, "edi");
+			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
 		}
 		break;
 	case 0x60:	// PUSHAD
 		if (p.mode >= DisasmMode.File)
-			disasm_push_str(p, "pushad");
+			disasm_push_str(p, p.x86.pf_operand ? "pusha" : "pushad");
 		break;
 	case 0x61:	// POPAD
 		if (p.mode >= DisasmMode.File)
-			disasm_push_str(p, "popad");
+			disasm_push_str(p, p.x86.pf_operand ? "popa" : "popad");
 		break;
 	case 0x62:	// BOUND REG32, MEM&MEM32
 		if (p.mode >= DisasmMode.File)
@@ -582,20 +566,20 @@ L_CONTINUE:
 			p.error = DisasmError.Illegal;
 			break;
 		}
-		p.x86.prefix_operand = 0x66;
+		p.x86.pf_operand = 0x66;
 		goto L_CONTINUE;
 	case 0x67:	// PREFIX: ADDRESS SIZE
 		if (p.x86.group4) {
 			p.error = DisasmError.Illegal;
 			break;
 		}
-		p.x86.prefix_address = true;
+		p.x86.pf_address = true;
 		goto L_CONTINUE;
 	case 0x68:	// PUSH IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, "push");
-			disasm_push_imm(p, *p.addri32);
+			disasm_push_imm(p, *p.addru32);
 		}
 		p.addrv += 4;
 		break;
@@ -776,24 +760,23 @@ L_CONTINUE:
 		++p.addrv;
 		if (p.mode >= DisasmMode.File) {
 			const(char) *f = void;
-			switch (modrm & RM_RM) {
-			case RM_RM_000: f = "add"; break;
-			case RM_RM_001: f = "or";  break;
-			case RM_RM_010: f = "adc"; break;
-			case RM_RM_011: f = "sbb"; break;
-			case RM_RM_100: f = "and"; break;
-			case RM_RM_101: f = "sub"; break;
-			case RM_RM_110: f = "xor"; break;
-			case RM_RM_111: f = "cmp"; break;
+			switch (modrm & RM_REG) {
+			case RM_REG_000: f = "add"; break;
+			case RM_REG_001: f = "or";  break;
+			case RM_REG_010: f = "adc"; break;
+			case RM_REG_011: f = "sbb"; break;
+			case RM_REG_100: f = "and"; break;
+			case RM_REG_101: f = "sub"; break;
+			case RM_REG_110: f = "xor"; break;
+			case RM_REG_111: f = "cmp"; break;
 			default: // impossible
 			}
 			disasm_push_x8(p, modrm);
-			disasm_push_x32(p, *p.addru32);
 			disasm_push_str(p, f);
-			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, x86_modrm_reg(p, modrm << 3,
+				p.x86.pf_operand ? X86_WIDTH_NONE : X86_WIDTH_WIDE));
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0x80:	// GRP1 REG8, IMM8
 	case 0x82:	// GRP1 REG8, IMM8
@@ -814,7 +797,7 @@ L_CONTINUE:
 			default: // impossible
 			}
 			disasm_push_x8(p, modrm);
-			disasm_push_x32(p, *p.addru32);
+			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, f);
 			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_OP_WIDE(b)));
 			disasm_push_imm(p, *p.addru8);
@@ -842,51 +825,37 @@ L_CONTINUE:
 		x86_modrm(p, X86_OP_WIDE(b), X86_OP_DIR(b));
 		break;
 	case 0x8C:	// MOV REG16, SEGREG16
+	case 0x8E:	// MOV SEGREG16, REG16
 		ubyte modrm = *p.addru8;
 		++p.addrv;
-		const(char) *m = void;
+		const(char) *seg = void;
 		switch (modrm & RM_REG) {
-		case RM_REG_000: m = "es"; break;
-		case RM_REG_001: m = "cs"; break;
-		case RM_REG_010: m = "ss"; break;
-		case RM_REG_011: m = "ds"; break;
-		case RM_REG_100: m = "fs"; break;
-		case RM_REG_101: m = "gs"; break;
+		case RM_REG_000: seg = "es"; break;
+		case RM_REG_001: seg = "cs"; break;
+		case RM_REG_010: seg = "ss"; break;
+		case RM_REG_011: seg = "ds"; break;
+		case RM_REG_100: seg = "fs"; break;
+		case RM_REG_101: seg = "gs"; break;
 		default: disasm_err(p); break main;
 		}
 		if (p.mode >= DisasmMode.File) {
-			p.x86.prefix_operand = 1;
+			p.x86.pf_operand = 1;
 			disasm_push_x8(p, modrm);
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_NONE));
-			disasm_push_reg(p, m);
+			const(char) *reg = x86_modrm_reg(p, modrm, X86_WIDTH_NONE);
+			if (X86_OP_DIR(b)) {
+				disasm_push_reg(p, seg);
+				disasm_push_reg(p, reg);
+			} else {
+				disasm_push_reg(p, reg);
+				disasm_push_reg(p, seg);
+			}
 		}
 		break;
 	case 0x8D:	// LEA REG32, MEM32
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "lea");
 		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
-		break;
-	case 0x8E:	// MOV SEGREG16, REG16
-		ubyte modrm = *p.addru8;
-		++p.addrv;
-		const(char) *m = void;
-		switch (modrm & RM_REG) {
-		case RM_REG_000: m = "es"; break;
-		case RM_REG_001: m = "cs"; break;
-		case RM_REG_010: m = "ss"; break;
-		case RM_REG_011: m = "ds"; break;
-		case RM_REG_100: m = "fs"; break;
-		case RM_REG_101: m = "gs"; break;
-		default: disasm_err(p); break main;
-		}
-		if (p.mode >= DisasmMode.File) {
-			p.x86.prefix_operand = 1;
-			disasm_push_x8(p, modrm);
-			disasm_push_str(p, "mov");
-			disasm_push_reg(p, m);
-			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_NONE));
-		}
 		break;
 	case 0x8F:	// GRP1A POP REG32
 		ubyte modrm = *p.addru8;
@@ -908,50 +877,50 @@ L_CONTINUE:
 	case 0x91:	// XCHG ECX, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, "ecx");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "cx" : "ecx");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x92:	// XCHG EDX, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, "edx");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x93:	// XCHG EBX, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, "ebx");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x94:	// XCHG ESP, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, "esp");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x95:	// XCHG EBP, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, "ebp");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x96:	// XCHG ESI, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, "esi");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x97:	// XCHG EDI, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, "edi");
-			disasm_push_reg(p, "eax");
+			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		break;
 	case 0x98:	// CBW
@@ -976,11 +945,11 @@ L_CONTINUE:
 		break;
 	case 0x9C:	// PUSHFD
 		if (p.mode >= DisasmMode.File)
-			disasm_push_str(p, "pushfd");
+			disasm_push_str(p, "pushf");
 		break;
 	case 0x9D:	// POPF/D/Q
 		if (p.mode >= DisasmMode.File)
-			disasm_push_str(p, "popfd");
+			disasm_push_str(p, "popf");
 		break;
 	case 0x9E:	// SAHF
 		if (p.mode >= DisasmMode.File)
@@ -1065,12 +1034,10 @@ L_CONTINUE:
 		break;
 	case 0xA9:	// TEST EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "test");
 			disasm_push_reg(p, "eax");
-			disasm_push_imm(p, *p.addru32);
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0xAA:	// STOSB ES:EDI, AL
 		if (p.mode >= DisasmMode.File) {
@@ -1188,75 +1155,59 @@ L_CONTINUE:
 		break;
 	case 0xB8:	// MOV EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, "eax");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0xB9:	// MOV ECX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, "ecx");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "cx" : "ecx");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0xBA:	// MOV EDX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, "edx");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0xBB:	// MOV EBX, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, "ebx");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0xBC:	// MOV ESP, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, "esp");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0xBD:	// MOV EBP, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, "ebp");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0xBE:	// MOV ESI, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, "esi");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0xBF:	// MOV EDI, IMM32
 		if (p.mode >= DisasmMode.File) {
-			disasm_push_x8(p, *p.addru8);
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, "edi");
-			disasm_push_imm(p, *p.addru32);
+			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
 		}
-		p.addrv += 4;
+		x86_vu32imm(p);
 		break;
 	case 0xC0:	// GRP2 R/M8, IMM8
 	case 0xC1:	// GRP2 R/M32, IMM8
@@ -2652,6 +2603,78 @@ void x86_0f(ref disasm_params_t p) {
 		}
 		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
 		break;
+	case 0x20: // MOV REG, CR
+	case 0x22: // MOV CR, REG
+		//TODO: LOCK prefix can extend modrm to get cr15
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (p.mode >= DisasmMode.File)
+			disasm_push_x8(p, modrm);
+		if ((modrm & RM_MOD) != RM_MOD_11) {
+			disasm_err(p);
+			break;
+		}
+		if (p.mode >= DisasmMode.File) {
+			const(char) *reg = x86_modrm_reg(p, modrm << 3, X86_WIDTH_WIDE);
+			const(char) *cr = void;
+			switch (modrm & RM_REG) {
+			case RM_REG_000: cr = "cr0"; break;
+			case RM_REG_001: cr = "cr1"; break;
+			case RM_REG_010: cr = "cr2"; break;
+			case RM_REG_011: cr = "cr3"; break;
+			case RM_REG_100: cr = "cr4"; break;
+			case RM_REG_101: cr = "cr5"; break;
+			case RM_REG_110: cr = "cr6"; break;
+			case RM_REG_111: cr = "cr7"; break;
+			default: // never
+			}
+			disasm_push_str(p, "mov");
+			if (X86_OP_DIR(b)) {
+				disasm_push_reg(p, cr);
+				disasm_push_reg(p, reg);
+			} else {
+				disasm_push_reg(p, reg);
+				disasm_push_reg(p, cr);
+			}
+		}
+		break;
+	case 0x21: // MOV REG, DR
+	case 0x23: // MOV DR, REG
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if (p.mode >= DisasmMode.File)
+			disasm_push_x8(p, modrm);
+		if ((modrm & RM_MOD) != RM_MOD_11) {
+			disasm_err(p);
+			break;
+		}
+		if (p.mode >= DisasmMode.File) {
+			const(char) *reg = x86_modrm_reg(p, modrm << 3, X86_WIDTH_WIDE);
+			const(char) *dr = void;
+			switch (modrm & RM_REG) {
+			case RM_REG_000: dr = "dr0"; break;
+			case RM_REG_001: dr = "dr1"; break;
+			case RM_REG_010: dr = "dr2"; break;
+			case RM_REG_011: dr = "dr3"; break;
+			case RM_REG_100: dr = "dr4"; break;
+			case RM_REG_101: dr = "dr5"; break;
+			case RM_REG_110: dr = "dr6"; break;
+			case RM_REG_111: dr = "dr7"; break;
+			default: // never
+			}
+			disasm_push_str(p, "mov");
+			if (X86_OP_DIR(b)) {
+				disasm_push_reg(p, dr);
+				disasm_push_reg(p, reg);
+			} else {
+				disasm_push_reg(p, reg);
+				disasm_push_reg(p, dr);
+			}
+		}
+		break;
+	case 0x28: // 
+	
+		break;
 	case 0xA2: // CPUID
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cpuid");
@@ -2762,16 +2785,36 @@ int X86_OP_DIR(int op)  { return op & 2; }
 /// Modifies memory pointer.
 /// Params: p = disassembler structure
 void x86_vu32imm(ref disasm_params_t p) {
-	if (p.x86.prefix_operand) { // 16-bit
-		if (p.mode > DisasmMode.File) {
+	if (p.x86.pf_operand) { // 16-bit
+		if (p.mode >= DisasmMode.File) {
 			disasm_push_x16(p, *p.addru16);
 			disasm_push_imm(p, *p.addru16);
 		}
 		p.addrv += 2;
 	} else { // Normal mode 32-bit
-		if (p.mode > DisasmMode.File) {
+		if (p.mode >= DisasmMode.File) {
 			disasm_push_x32(p, *p.addru32);
 			disasm_push_imm(p, *p.addru32);
+		}
+		p.addrv += 4;
+	}
+}
+
+/// (Internal) Fetch variable 32-bit of memory type, affected by address prefix.
+/// Then if it's the case, fetch and push a 16-bit memory type instead.
+/// Does not account for SEGREG. Modifies memory pointer.
+/// Params: p = disassembler structure
+void x86_vu32mem(ref disasm_params_t p) {
+	if (p.x86.pf_address) { // 16-bit
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_x16(p, *p.addru16);
+			disasm_push_mem(p, *p.addru16);
+		}
+		p.addrv += 2;
+	} else { // Normal mode 32-bit
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_x32(p, *p.addru32);
+			disasm_push_mem(p, *p.addru32);
 		}
 		p.addrv += 4;
 	}
@@ -2794,9 +2837,9 @@ void x86_vu32imm(ref disasm_params_t p) {
 package
 int x86_0f_select(ref disasm_params_t p) {
 	switch (p.x86.group1) {
-	case 0xF2: return p.x86.prefix_operand ? X86_0F_F266H : X86_0F_F2H;
+	case 0xF2: return p.x86.pf_operand ? X86_0F_F266H : X86_0F_F2H;
 	case 0xF3: return X86_0F_F3H;
-	default:   return p.x86.prefix_operand ? X86_0F_66H : X86_0F_NONE;
+	default:   return p.x86.pf_operand ? X86_0F_66H : X86_0F_NONE;
 	}
 }
 
@@ -2930,7 +2973,7 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 		}
 		break;
 	default: // X86_MODRM_NONE
-		if (p.x86.prefix_operand)
+		if (p.x86.pf_operand)
 			switch (modrm) {
 			case RM_REG_000: reg = "ax"; break;
 			case RM_REG_001: reg = "cx"; break;

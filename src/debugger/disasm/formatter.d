@@ -51,7 +51,7 @@ struct disasm_fmt_t {
 	disasm_fmt_item_t [FORMATTER_STACK_SIZE]items;	/// Stack
 	size_t itemno;	/// Current item number
 	int opwidth;	/// Last operation width
-	int settings;	/// Formatter settings for current stack
+	int settings;	/// Formatter settings for current stack/instruction
 }
 
 /// Default string for illegal instructions
