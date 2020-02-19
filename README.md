@@ -9,8 +9,10 @@ _Why not just use GDB?_ One might ask.
 _Why not make one myself?_ I asked myself.
 
 Personal Goals:
+
 - [ ] Make a usable Text UI close to a professional debugger
-- [ ] Debug an application on my Raspberry Pi
+- [ ] Debug an application on my Raspberry Pi 3B+ and my Purism Librem 5
+- [ ] Embed, as a library, into an embedded HTTP server to provide a WebUI
 
 ## Support Matrix
 
@@ -18,9 +20,9 @@ Personal Goals:
 
 | Platform | OS | CRT | Debugging core |
 |---|---|---|:-:|
-| x86 | At least Windows 7 | Microsoft | ✔️ |
+| x86 | Windows 7 and up | Microsoft | ✔️ |
 | | Linux | Glibc | ✔️ |
-| ARM | At least Windows 10 | Microsoft |  |
+| ARM | Windows 10 | Microsoft |  |
 | | Linux | Glibc | Planned! |
 
 ### Disassembler Progress
