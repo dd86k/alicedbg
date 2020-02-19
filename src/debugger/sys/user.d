@@ -235,9 +235,9 @@ version (X86_64) {
 		/// 
 		long start_stack;
 		/// 
-		ong signal;
+		long signal;
 		/// 
-		nt reserved;
+		int reserved;
 		union {
 			/// 
 			user_regs_struct* u_ar0;
