@@ -2605,7 +2605,7 @@ void x86_0f(ref disasm_params_t p) {
 		break;
 	case 0x20: // MOV REG, CR
 	case 0x22: // MOV CR, REG
-		//TODO: LOCK prefix can extend modrm to get cr15
+		//TODO: LOCK prefix can extend modrm to get upto cr15
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
@@ -2672,8 +2672,77 @@ void x86_0f(ref disasm_params_t p) {
 			}
 		}
 		break;
-	case 0x28: // 
-	
+	case 0x28: // MOVAPS/MOVAPD XMM, R/M
+	case 0x29: // MOVAPS/MOVAPD R/M, XMM
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "movaps"; break;
+		case X86_0F_66H: m = "movapd"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_OP_DIR(b));
+		break;
+	case 0x2A: // CVTPI2PS/CVTPI2PD/CVTSI2SD/CVTSI2SS REG, R/M
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "cvtpi2ps"; break;
+		case X86_0F_66H: m = "cvtpi2pd"; break;
+		case X86_0F_F2H: m = "cvtsi2sd"; break;
+		case X86_0F_F3H: m = "cvtsi2ss"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x2B: // MOVNTPS/MOVNTPD R/M, REG
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "movntps"; break;
+		case X86_0F_66H: m = "movntpd"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_MEM);
+		break;
+	case 0x2C: // CVTTPS2PI/CVTTPD2PI/CVTTSD2SI/CVTTSS2SI
+		ubyte modrm = *p.addru8;
+		++p.addr;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE:
+			if (p.mode >= DisasmMode.File) {
+				disasm_push_str(p, "cvttps2pi");
+				disasm_push_reg(p,
+					x86_modrm_reg(p, modrm, X86_WIDTH_MM));
+			}
+			break;
+		case X86_0F_66H:
+			if (p.mode >= DisasmMode.File) {
+				disasm_push_str(p, "cvttpd2pi");
+				disasm_push_reg(p,
+					x86_modrm_reg(p, modrm, X86_WIDTH_MM));
+			}
+			break;
+		case X86_0F_F2H:
+			if (p.mode >= DisasmMode.File) {
+				disasm_push_str(p, "cvttsd2si");
+				disasm_push_reg(p,
+					x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+			}
+			break;
+		case X86_0F_F3H:
+			if (p.mode >= DisasmMode.File) {
+				disasm_push_str(p, "cvttss2si");
+				disasm_push_reg(p,
+					x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+			}
+			break;
+		default: disasm_err(p); break main;
+		}
+		x86_modrm_rm(p, modrm, X86_WIDTH_XMM);
 		break;
 	case 0xA2: // CPUID
 		if (p.mode >= DisasmMode.File)
@@ -2723,10 +2792,10 @@ enum : ubyte {
 	RM_RM_111 = 7,	/// R/M 111 bits
 	RM_RM = RM_RM_111,	/// Used for masking the R/M bits (00 000 111)
 
-	SIB_SCALE_00 = 0,	/// SCALE 00, *1
-	SIB_SCALE_01 = 64,	/// SCALE 01, *2
-	SIB_SCALE_10 = 128,	/// SCALE 10, *4
-	SIB_SCALE_11 = 192,	/// SCALE 11, *8
+	SIB_SCALE_00 = RM_MOD_00,	/// SCALE 00, *1
+	SIB_SCALE_01 = RM_MOD_01,	/// SCALE 01, *2
+	SIB_SCALE_10 = RM_MOD_10,	/// SCALE 10, *4
+	SIB_SCALE_11 = RM_MOD_11,	/// SCALE 11, *8
 	SIB_SCALE = SIB_SCALE_11,	/// Scale filter
 
 	SIB_INDEX_000 = RM_REG_000,	/// INDEX 000, EAX
@@ -2763,9 +2832,10 @@ package enum {
 package enum {
 	X86_WIDTH_NONE,	/// 8/16-bit registers
 	X86_WIDTH_WIDE,	/// 32/64-bit registers, WIDE bit falls here
-	X86_WIDTH_XMM,	/// 128-bit XMM register
-	X86_WIDTH_YMM,	/// 256-bit YMM register
-	X86_WIDTH_ZMM,	/// 512-bit ZMM register
+	X86_WIDTH_MM,	/// 80-bit MM registers (MMX)
+	X86_WIDTH_XMM,	/// 128-bit XMM registers (SSE)
+	X86_WIDTH_YMM,	/// 256-bit YMM registers
+	X86_WIDTH_ZMM,	/// 512-bit ZMM registers
 }
 // ModR/M Direction
 package enum {
@@ -2843,6 +2913,10 @@ int x86_0f_select(ref disasm_params_t p) {
 	}
 }
 
+/// (Internal) Return a segment register depending on its opcode.
+/// Returns an empty string if unset.
+/// Params: segreg = Byte opcode
+/// Returns: Segment register string
 const(char) *x86_segstr(int segreg) {
 	const(char) *s = void;
 	with (PrefixReg)
@@ -2906,9 +2980,9 @@ const(char) *x87_ststr(ref disasm_params_t p, int index) {
 
 /// (Internal) Process a ModR/M byte automatically.
 ///
-/// This handles text formatting depending on the width and direction settings.
-/// This also calls x86_modrm_rm and x86_modrm_reg. Width is adjusted for
-/// RM field.
+/// This function calls x86_modrm_rm and disasm_push_reg depending on the
+/// direction flag. If non-zero (X86_DIR_REG), the reg field is processed
+/// first; Otherwise vice versa (X86_DIR_MEM).
 ///
 /// Params:
 /// 	p = Disassembler parameters
@@ -2921,9 +2995,6 @@ void x86_modrm(ref disasm_params_t p, int width, int direction) {
 	// ++--------- MODE
 	ubyte modrm = *p.addru8;
 	++p.addrv;
-
-	if (p.mode >= DisasmMode.File)
-		disasm_push_x8(p, modrm);
 
 	if (direction)
 		goto L_REG;
@@ -2946,19 +3017,6 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 	const(char) *reg = void;
 
 	switch (width) {
-	case X86_WIDTH_XMM:
-		switch (modrm) {
-		case RM_REG_000: reg = "xmm0"; break;
-		case RM_REG_001: reg = "xmm1"; break;
-		case RM_REG_010: reg = "xmm2"; break;
-		case RM_REG_011: reg = "xmm3"; break;
-		case RM_REG_100: reg = "xmm4"; break;
-		case RM_REG_101: reg = "xmm5"; break;
-		case RM_REG_110: reg = "xmm6"; break;
-		case RM_REG_111: reg = "xmm7"; break;
-		default:
-		}
-		break;
 	case X86_WIDTH_WIDE:
 		switch (modrm) {
 		case RM_REG_000: reg = "eax"; break;
@@ -2969,6 +3027,32 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 		case RM_REG_101: reg = "ebp"; break;
 		case RM_REG_110: reg = "esi"; break;
 		case RM_REG_111: reg = "edi"; break;
+		default:
+		}
+		break;
+	case X86_WIDTH_MM:
+		switch (modrm) {
+		case RM_REG_000: reg = "mm0"; break;
+		case RM_REG_001: reg = "mm1"; break;
+		case RM_REG_010: reg = "mm2"; break;
+		case RM_REG_011: reg = "mm3"; break;
+		case RM_REG_100: reg = "mm4"; break;
+		case RM_REG_101: reg = "mm5"; break;
+		case RM_REG_110: reg = "mm6"; break;
+		case RM_REG_111: reg = "mm7"; break;
+		default:
+		}
+		break;
+	case X86_WIDTH_XMM:
+		switch (modrm) {
+		case RM_REG_000: reg = "xmm0"; break;
+		case RM_REG_001: reg = "xmm1"; break;
+		case RM_REG_010: reg = "xmm2"; break;
+		case RM_REG_011: reg = "xmm3"; break;
+		case RM_REG_100: reg = "xmm4"; break;
+		case RM_REG_101: reg = "xmm5"; break;
+		case RM_REG_110: reg = "xmm6"; break;
+		case RM_REG_111: reg = "xmm7"; break;
 		default:
 		}
 		break;
@@ -3010,19 +3094,22 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 /// 	modrm = Modrm byte
 /// 	width = Register width
 void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
+	if (p.mode >= DisasmMode.File)
+		disasm_push_x8(p, modrm);
+
 	// SIB mode
 	if ((modrm & RM_RM) == RM_RM_100 && (modrm & RM_MOD) != RM_MOD_11) {
 		x86_sib(p, modrm);
 	} else { // ModR/M mode
-		if (width == X86_WIDTH_NONE)
-			if ((modrm & RM_MOD) != RM_MOD_11)
+		// If mode non-reg, R/M field is as wide as the operating mode
+		if ((modrm & RM_MOD) != RM_MOD_11)
+			if (width > X86_WIDTH_WIDE)
 				width = X86_WIDTH_WIDE;
 
 		/// segreg for memspec
 		const(char) *seg = x86_segstr(p.x86.segreg);
 		/// reg for memspec, not operation width!
-		const(char) *reg = x86_modrm_reg(p, modrm << 3,
-			width > X86_WIDTH_WIDE ? X86_WIDTH_WIDE : width);
+		const(char) *reg = x86_modrm_reg(p, modrm << 3, width);
 
 		switch (modrm & RM_MOD) {
 		case RM_MOD_00:	// Memory Mode, no displacement
