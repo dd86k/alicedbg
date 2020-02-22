@@ -118,7 +118,7 @@ L_CONTINUE:
 			disasm_push_reg(p, "cs");
 		}
 		break;
-	case 0x0F:
+	case 0x0F:	// 2-byte opcode
 		x86_0f(p);
 		break;
 	case 0x10:	// ADC R/M8, REG8
@@ -2744,6 +2744,98 @@ void x86_0f(ref disasm_params_t p) {
 		}
 		x86_modrm_rm(p, modrm, X86_WIDTH_XMM);
 		break;
+	case 0x2D: // CVTPS2PI/CVTPD2PI/CVTSD2SI/CVTSS2SI
+		ubyte modrm = *p.addru8;
+		++p.addr;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE:
+			if (p.mode >= DisasmMode.File) {
+				disasm_push_str(p, "cvtps2pi");
+				disasm_push_reg(p,
+					x86_modrm_reg(p, modrm, X86_WIDTH_MM));
+			}
+			break;
+		case X86_0F_66H:
+			if (p.mode >= DisasmMode.File) {
+				disasm_push_str(p, "cvtpd2pi");
+				disasm_push_reg(p,
+					x86_modrm_reg(p, modrm, X86_WIDTH_MM));
+			}
+			break;
+		case X86_0F_F2H:
+			if (p.mode >= DisasmMode.File) {
+				disasm_push_str(p, "cvtsd2si");
+				disasm_push_reg(p,
+					x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+			}
+			break;
+		case X86_0F_F3H:
+			if (p.mode >= DisasmMode.File) {
+				disasm_push_str(p, "cvtss2si");
+				disasm_push_reg(p,
+					x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+			}
+			break;
+		default: disasm_err(p); break main;
+		}
+		x86_modrm_rm(p, modrm, X86_WIDTH_XMM);
+		break;
+	case 0x2E: // UCOMISS/UCOMISD
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "ucomiss"; break;
+		case X86_0F_66H: m = "ucomisd"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x2F: // COMISS/COMISD
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "comiss"; break;
+		case X86_0F_66H: m = "comisd"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x30: // WRMSR
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "wrmsr");
+		break;
+	case 0x31: // RDTSC
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "rdtsc");
+		break;
+	case 0x32: // RDMSR
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "rdmsr");
+		break;
+	case 0x33: // RDPMC
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "rdpmc");
+		break;
+	case 0x34: // SYSENTER
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "sysenter");
+		break;
+	case 0x35: // SYSEXIT
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "sysexit");
+		break;
+	case 0x37: // GETSEC
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "getsec");
+		break;
+	case 0x38: // 3-byte opcode
+		x86_0f_38h(p);
+		break;
+	case 0x3A: // 3-byte-opcode
+		x86_0f_3Ah(p);
+		break;
 	case 0xA2: // CPUID
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cpuid");
@@ -2831,16 +2923,16 @@ package enum {
 // ModR/M register width
 package enum {
 	X86_WIDTH_NONE,	/// 8/16-bit registers
-	X86_WIDTH_WIDE,	/// 32/64-bit registers, WIDE bit falls here
+	X86_WIDTH_WIDE,	/// 32/64-bit extended registers (i386/amd64)
 	X86_WIDTH_MM,	/// 80-bit MM registers (MMX)
 	X86_WIDTH_XMM,	/// 128-bit XMM registers (SSE)
-	X86_WIDTH_YMM,	/// 256-bit YMM registers
-	X86_WIDTH_ZMM,	/// 512-bit ZMM registers
+	X86_WIDTH_YMM,	/// 256-bit YMM registers (AVX)
+	X86_WIDTH_ZMM,	/// 512-bit ZMM registers (AVX-512)
 }
 // ModR/M Direction
 package enum {
-	X86_DIR_MEM,	/// Direction: Towards R/M field
-	X86_DIR_REG	/// Direction: Towards REG field
+	X86_DIR_MEM,	/// Destination: Memory, Source: REG
+	X86_DIR_REG	/// Destination: REG, Source: Memory
 }
 
 /// (Internal) Function to determine if opcode has WIDE bit set
@@ -3101,10 +3193,9 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 	if ((modrm & RM_RM) == RM_RM_100 && (modrm & RM_MOD) != RM_MOD_11) {
 		x86_sib(p, modrm);
 	} else { // ModR/M mode
-		// If mode non-reg, R/M field is as wide as the operating mode
+		// If mode non-reg, R/M field is wide reg as per operating mode
 		if ((modrm & RM_MOD) != RM_MOD_11)
-			if (width > X86_WIDTH_WIDE)
-				width = X86_WIDTH_WIDE;
+			width = X86_WIDTH_WIDE;
 
 		/// segreg for memspec
 		const(char) *seg = x86_segstr(p.x86.segreg);
