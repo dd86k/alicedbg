@@ -24,11 +24,11 @@ struct x86_64_internals_t {
 	}
 	union {
 		int group3;
-		int prefix_operand;
+		int pf_operand; /// 66H Operand prefix
 	}
 	union {
 		int group4;
-		int prefix_address;
+		int pf_address; /// 67H Address prefix
 	}
 }
 

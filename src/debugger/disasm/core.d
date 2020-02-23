@@ -1,9 +1,7 @@
 module debugger.disasm.core;
 
 import debugger.arch;
-import utils.str;
-private import debugger.disasm.arch.x86 : x86_internals_t;
-private import debugger.disasm.formatter;
+import debugger.disasm.formatter;
 
 extern (C):
 

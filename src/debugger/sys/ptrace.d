@@ -12,6 +12,31 @@ import core.stdc.config : c_long;
 
 extern (C):
 
+/// siginfo.h
+struct siginfo_t {
+	/// Signal number.
+	int si_signo;
+	/// If non-zero, an errno value associated with this signal,
+	/// as defined in <errno.h>
+	int si_errno;
+	/// Signal code.
+	int si_code;
+	/// Sending process ID.
+	int si_pid;
+	/// Real user ID of sending process.
+	int si_uid;
+	/// Address of faulting instruction.
+	void *si_addr;
+	/// Exit value or signal.
+	int si_status;
+	/// Band event for SIGPOLL.
+	int si_band;
+	union {
+		int sival_int;	/// Signal value
+		void *sival_ptr;	/// Signal address
+	}
+}
+
 /// Based on Glibc 2.25
 version (CRuntime_Glibc) {
 	version (linux) {

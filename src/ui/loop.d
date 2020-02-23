@@ -23,7 +23,7 @@ int loop_handler(exception_t *e) {
 	p.addr = e.addr;
 	disasm_line(p, DisasmMode.File);
 	printf(
-	"* EXCEPTION #%d\n"~
+	"* EXCEPTION #%u\n"~
 	"PID=%u  TID=%u\n"~
 	"%s (%X) at %zX\n"~
 	"Code: %s (%s)\n"~

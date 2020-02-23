@@ -15,10 +15,10 @@ version (Windows) {
 	private HANDLE hprocess; /// 
 } else
 version (Posix) {
-	private import core.sys.posix.signal;
 	private import core.sys.posix.sys.stat;
-	private import core.sys.posix.sys.wait;
-	private import core.sys.posix.unistd;
+	private import core.sys.posix.sys.wait :
+		waitpid, SIGCONT, WUNTRACED;
+	private import core.sys.posix.unistd : fork, execve;
 	private import core.stdc.stdlib : exit;
 	private import debugger.sys.ptrace;
 	private import debugger.sys.user : user;
@@ -121,9 +121,8 @@ int dbg_sethandle(int function(exception_t *) f) {
  * Continues the execution of the thread (and/or process) until a new debug
  * event occurs. When an exception occurs, the exception_t structure is
  * populated with debugging information.
- * (Windows) Uses WaitForDebugEvent, filters any but EXCEPTION_DEBUG_EVENT, and
- * ContinueDebugEvent
- * (Posix) Uses ptrace(2), filters SIGCONT, and waitid(2)
+ * (Windows) Uses WaitForDebugEvent, filters any but EXCEPTION_DEBUG_EVENT
+ * (Posix) Uses ptrace(2) and waitpid(2), filters SIGCONT
  * Returns: Zero on success; Otherwise an error occured
  */
 int dbg_loop() {
@@ -131,25 +130,24 @@ int dbg_loop() {
 		return 4;
 
 	exception_t e = void;
+	prep_context(e);
+
 	version (Windows) {
 		DEBUG_EVENT de = void;
 L_DEBUG_LOOP:
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
 			return 3;
 
-		// Filter interesting events
+		// Filter events
 		switch (de.dwDebugEventCode) {
-		case EXCEPTION_DEBUG_EVENT:
-			prep_ex_debug(e, de.Exception);
-			break;
+		case EXCEPTION_DEBUG_EVENT: break;
 		case EXIT_PROCESS_DEBUG_EVENT: return 0;
 		default:
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
 			goto L_DEBUG_LOOP;
 		}
 
-		e.pid = de.dwProcessId;
-		e.tid = de.dwThreadId;
+		prep_ex_debug(e, de.Exception);
 
 		CONTEXT c = void;
 		c.ContextFlags = CONTEXT_ALL;
@@ -182,15 +180,15 @@ L_DEBUG_LOOP:
 	} else
 	version (Posix) {
 		siginfo_t sig = void;
+		int wstatus = void;
 L_DEBUG_LOOP:
-		// Linux examples use __WALL and is supposed to imply (but does
-		// not include) WEXITED | WSTOPPED but does not act like it.
-		// waitid(2) returns 0 or -1 so it's pointless to verify its value
-		if (waitid(idtype_t.P_ALL, 0, &sig, WEXITED | WSTOPPED) == -1)
+		if (waitpid(-1, &wstatus, WUNTRACED) == -1)
 			return 3;
+		if (ptrace(PTRACE_GETSIGINFO, hprocess, null, &sig) == -1)
+			return 5;
 
-		// Filter uninteresting events/signals
-		switch (sig._sifields._sigchld.si_status) {
+		// Filter events
+		switch (sig.si_status) {
 		case SIGCONT: goto L_DEBUG_LOOP;
 		default:
 		}
@@ -198,11 +196,8 @@ L_DEBUG_LOOP:
 		prep_ex_sig(e, sig);
 
 		user u;
-		ptrace(PTRACE_GETREGS, hprocess, null, &u);
+		ptrace(PTRACE_GETREGS, -1, null, &u);
 		prep_ex_regs(e, u);
-
-		e.pid = sig._sifields._kill.si_pid;
-		e.tid = 0;
 
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
@@ -221,12 +216,26 @@ L_DEBUG_LOOP:
 
 private:
 
+void prep_context(ref exception_t e) {
+	version (X86) {
+		e.registers[0].name = "EAX";
+		e.registers[0].type = RegisterType.U32;
+	} else
+	version (X86_64) {
+		e.registers[0].name = "RAX";
+		e.registers[0].type = RegisterType.U64;
+	}
+}
+
 //
 // Exception preparing functions (OS specific)
 //
 
 version (Windows) {
+
 int prep_ex_debug(ref exception_t e, ref EXCEPTION_DEBUG_INFO di) {
+	e.pid = de.dwProcessId;
+	e.tid = de.dwThreadId;
 	e.addr = di.ExceptionRecord.ExceptionAddress;
 	e.oscode = di.ExceptionRecord.ExceptionCode;
 	switch (e.oscode) {
@@ -242,37 +251,33 @@ int prep_ex_debug(ref exception_t e, ref EXCEPTION_DEBUG_INFO di) {
 }
 int prep_ex_context(ref exception_t e, ref CONTEXT c) {
 	version (X86) {
-		e.registers[0].name = "EAX";
 		e.registers[0].u32 = c.Eax;
-		e.registers[0].type = RegisterType.U32;
 	} else
 	version (X86_64) {
-		e.registers[0].name = "RAX";
 		e.registers[0].u64 = c.Rax;
-		e.registers[0].type = RegisterType.U64;
 	}
 	return 0;
 }
+
 } else // version Windows
 version (Posix) {
+
 int prep_ex_sig(ref exception_t e, ref siginfo_t si) {
+	e.pid = si.si_pid;
 	e.tid = 0;
-	e.addr = si._sifields._sigfault.si_addr;
-	e.oscode = si._sifields._sigchld.si_status;
-	e.type = codetype(si._sifields._sigchld.si_status, si.si_code);
+	e.addr = si.si_addr;
+	e.oscode = si.si_status;
+	e.type = codetype(si.si_status, si.si_code);
 	return 0;
 }
 int prep_ex_regs(ref exception_t e, ref user u) {
 	version (X86) {
-		e.registers[0].name = "EAX";
 		e.registers[0].u32 = u.regs.eax;
-		e.registers[0].type = RegisterType.U32;
 	} else
 	version (X86_64) {
-		e.registers[0].name = "RAX";
 		e.registers[0].u64 = u.regs.rax;
-		e.registers[0].type = RegisterType.U64;
 	}
 	return 0;
 }
+
 } // version Posix
