@@ -39,9 +39,9 @@ struct x86_64_internals_t {
  */
 void disasm_x86_64(ref disasm_params_t p) {
 	x86_64_internals_t internals;
-//	p.x86_64 = &internals;
+	p.x86_64 = &internals;
 
-	with (p.x86)
+	with (p.x86_64)
 	group1 = group2 = group3 = group4 = 0;
 
 L_CONTINUE:
@@ -59,35 +59,22 @@ L_CONTINUE:
 
 private:
 
-int x86_64_mapb2(ref disasm_params_t params) {
-	const ubyte b = *params.addru8;
-	
-	
-	return DisasmError.None;
+void x86_64_mapb2(ref disasm_params_t p) {
+	const ubyte b = *p.addru8;
 }
 
-int x86_64_mapb3_38h(ref disasm_params_t params) {
-	
-	
-	return DisasmError.None;
+void x86_64_mapb3_38h(ref disasm_params_t p) {
 }
 
-int x86_64_mapb3_3ah(ref disasm_params_t params) {
-	
-	
-	return DisasmError.None;
+void x86_64_mapb3_3ah(ref disasm_params_t p) {
 }
 
 // 1-byte VEX (0xC5)
-int x86_64_map2_vex1(ref disasm_params_t params) {
-	
-	return DisasmError.None;
+void x86_64_map2_vex1(ref disasm_params_t params) {
 }
 
 // 2-byte VEX (0xC4)
-int x86_64_map2_vex2(ref disasm_params_t params) {
-	
-	return DisasmError.None;
+void x86_64_map2_vex2(ref disasm_params_t params) {
 }
 
 enum PrefixReg : ubyte {
@@ -99,7 +86,3 @@ enum PrefixReg : ubyte {
 	GS,
 	SS
 }
-
-__gshared bool x64_pre_op;	/// OPERAND prefix (66H)
-__gshared bool x64_pre_ad;	/// ADDRESS prefix (67H)
-__gshared PrefixReg x64_prefreg;	/// Preferred segment register prefix

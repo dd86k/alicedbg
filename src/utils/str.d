@@ -167,8 +167,6 @@ void strlcase(char *buf, size_t size) {
 	}
 }
 
-/// (Internal) strf/strfva buffer selection index
-private __gshared size_t strfc = 0;
 /**
  * Quick format.
  *
@@ -196,6 +194,7 @@ const(char) *strf(const(char) *f, ...) {
  * Returns: String
  */
 const(char) *strfva(const(char) *f, va_list va) {
+	__gshared size_t strfc; /// buffer selection index
 	__gshared char [128][16]b = void;
 
 	char *sb = cast(char*)b[strfc];

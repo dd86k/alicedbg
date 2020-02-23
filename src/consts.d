@@ -10,15 +10,18 @@ else  enum __BUILDTYPE__ = "release";	/// Build type
 // ABI string
 //
 
+version (D_LP64)
+	version = ABI64;
+else
+	version = ABI32;
+
 version (X86) {
 	enum __PLATFORM__ = "x86";	/// Platform ABI string
 	version = X86_ANY;
-	version = ABI32;
 } else
 version (X86_64) {
 	enum __PLATFORM__ = "x86-64";	/// Platform ABI string
 	version = X86_ANY;
-	version = ABI64;
 } else {
 	static assert(0,
 		"Platform not supported");
@@ -122,30 +125,43 @@ pragma(msg, "* os: ", __OS__);
 //
 
 version (DigitalMars) {
-	version = TARGETINFO;
+	version = COMPILER_TARGETINFO;
 } else
 version (LDC) {
-	version = TARGETINFO;
-	version = TARGETINFO_CPU;
+	version = COMPILER_TARGETINFO;
+	version = COMPILER_TARGETINFO_CPU;
 }
 
-version (TARGETINFO) {
+version (COMPILER_TARGETINFO) {
 	/// Target object format string
 	enum __TARGET_OBJ_FORMAT__ = __traits(getTargetInfo, "objectFormat");
 	/// Target float ABI string
 	enum __TARGET_FLOAT_ABI__  = __traits(getTargetInfo, "floatAbi");
-	/// Target C++ Runtime string
-	enum __TARGET_CPP_RT__     = __traits(getTargetInfo, "cppRuntimeLibrary");
+	// Likely to happen on non-Windows platforms
+	static if (__traits(getTargetInfo, "cppRuntimeLibrary") != null)
+		/// Target C++ Runtime string
+		enum __TARGET_CPP_RT__ = __traits(getTargetInfo, "cppRuntimeLibrary");
+	else
+		/// Target C++ Runtime string
+		enum __TARGET_CPP_RT__ = "none"; // assuming none since empty
 } else {
 	/// Target object format string
 	enum __TARGET_OBJ_FORMAT__ = "unknown";
 	/// Target float ABI string
 	enum __TARGET_FLOAT_ABI__  = "unknown";
-	/// Target C++ Runtime string
-	enum __TARGET_CPP_RT__     = "unknown";
+	version (CppRuntime_Gcc)
+		/// Target C++ Runtime string
+		enum __TARGET_CPP_RT__ = "gcc";
+	else
+	version (CppRuntime_Microsoft)
+		/// Target C++ Runtime string
+		enum __TARGET_CPP_RT__ = "microsoft";
+	else
+		/// Target C++ Runtime string
+		enum __TARGET_CPP_RT__ = "none"; // assuming none
 }
 
-version (TARGETINFO_CPU) {
+version (COMPILER_TARGETINFO_CPU) {
 	/// Target CPU string (LDC-only)
 	enum __TARGET_CPU__ = __traits(targetCPU);
 } else {

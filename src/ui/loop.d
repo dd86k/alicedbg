@@ -17,8 +17,8 @@ int loop_enter() {
 
 private:
 
-__gshared uint en;
 int loop_handler(exception_t *e) {
+	__gshared uint en;
 	disasm_params_t p;
 	p.addr = e.addr;
 	disasm_line(p, DisasmMode.File);

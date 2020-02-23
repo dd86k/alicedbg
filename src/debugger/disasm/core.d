@@ -140,6 +140,7 @@ struct disasm_params_t { align(1):
 	union {
 		void *internal;	/// Used internally
 		x86_internals_t *x86;	/// Used internally
+		x86_64_internals_t *x86_64;	/// Used internally
 	}
 	disasm_fmt_t *fmt;	/// Used by debugger.disasm.formatter
 	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer

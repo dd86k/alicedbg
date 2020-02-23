@@ -15,11 +15,13 @@ version (Windows) {
 	private HANDLE hprocess; /// 
 } else
 version (Posix) {
+	private import core.sys.posix.signal;
+	private import core.sys.posix.sys.stat;
+	private import core.sys.posix.sys.wait;
+	private import core.sys.posix.unistd;
+	private import core.stdc.stdlib : exit;
 	private import debugger.sys.ptrace;
-	private import core.sys.posix.signal, core.sys.posix.sys.wait;
-	private import core.sys.linux.unistd;
-	import core.stdc.stdio, core.stdc.stdlib;
-	import debugger.sys.user : user;
+	private import debugger.sys.user : user;
 	private enum __WALL = 0x40000000;
 	private pid_t hprocess;
 }
@@ -37,12 +39,13 @@ int function(exception_t*) user_function;
 
 /**
  * Load executable image to debug, its starting argument, and starting folder.
- * This does not start the process.
+ * This does not start the process. On Posix system, stat(2) is used to
+ * determine if the file exists beforehand.
  * (Windows) Uses CreateProcessA with DEBUG_ONLY_THIS_PROCESS.
- * (Posix) Uses fork(2), ptrace(PTRACE_TRACEME), and execl(2)
+ * (Posix) Uses stat(2), fork(2), ptrace(2) (as PTRACE_TRACEME), and execve(2)
  * Params:
  * 	cmd = Command
- * Returns: Zero on success; Otherwise an error occured
+ * Returns: Zero on success; Otherwise os error code is returned
  */
 int dbg_file(const(char) *cmd) {
 	version (Windows) {
@@ -54,7 +57,7 @@ int dbg_file(const(char) *cmd) {
 		// DEBUG_ONLY_THIS_PROCESS is recommended over DEBUG_PROCESS
 		// because it may create child processes/threads that
 		// we probably don't want to catch possible child exceptions
-		if (CreateProcessA(cast(char*)cmd, null,
+		if (CreateProcessA(cmd, null,
 			null, null,
 			FALSE, DEBUG_ONLY_THIS_PROCESS,
 			null, null,
@@ -65,13 +68,21 @@ int dbg_file(const(char) *cmd) {
 		hprocess = pi.hProcess;
 	} else
 	version (Posix) {
+		// Verify if file exists and program has access to it
+		stat_t st = void;
+		if (stat(cmd, &st) == -1)
+			return errno;
+		// Proceed normally
 		hprocess = fork();
 		if (hprocess == -1)
 			return errno;
 		if (hprocess == 0) {
 			if (ptrace(PTRACE_TRACEME, 0, null, null))
 				return errno;
-			exit(execl(cmd, null, null));
+			int e = execve(cmd, null, null);
+			if (e == -1)
+				return errno;
+			exit(e);
 		}
 	}
 	return 0;
@@ -82,7 +93,7 @@ int dbg_file(const(char) *cmd) {
  * (Windows) Uses DebugActiveProcess
  * (Posix) Uses ptrace(PTRACE_SEIZE)
  * Params: pid = Process ID
- * Returns: Zero on success; Otherwise an error (Windows) Returns GetLastError
+ * Returns: Non-zero on error: (Posix) errno or (Windows) GetLastError
  */
 int dbg_attach(int pid) {
 	version (Windows) {

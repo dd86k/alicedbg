@@ -55,12 +55,15 @@ int cliver() {
 	printf(
 	"alicedbg-"~__PLATFORM__~" "~PROJECT_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
 	"License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
-	"Home: <https://git.dd86k.space/alicedbg>, <https://github.com/dd86k/alicedbg>\n"~
+	"Home: <https://git.dd86k.space/alicedbg>\n"~
+	"Mirror: <https://github.com/dd86k/alicedbg>\n"~
 	"Compiler: "~__VENDOR__~" %u.%03u, "~
 		__TARGET_OBJ_FORMAT__~" obj format, "~
 		__TARGET_FLOAT_ABI__~" float abi\n"~
-	"CRT: "~__CRT__~" ("~__TARGET_CPP_RT__~") on "~__OS__~"\n"~
-	"CPU: "~__TARGET_CPU__~"\n",
+	"CRT: "~__CRT__~" (cpprt: "~__TARGET_CPP_RT__~") on "~__OS__~"\n"~
+	"CPU: "~__TARGET_CPU__~"\n"~
+	"Features: dbg disasm\n"~
+	"Disasm: x86\n",
 	ver.version_major, ver.version_minor
 	);
 	return 0;
@@ -69,8 +72,9 @@ int cliver() {
 /// "sub-help" pages, such as -ui ? and the rest
 int clipage(CLIPage h) {
 	const(char) *r = void;
+	with (CLIPage)
 	final switch (h) {
-	case CLIPage.main:
+	case main:
 		r =
 		"Aiming to be a simple debugger\n"~
 		"Usage:\n"~
@@ -78,11 +82,11 @@ int clipage(CLIPage h) {
 		"  alicedbg {--help|--version|--license}\n"~
 		"\n"~
 		"OPTIONS\n"~
-		"	-exec      debugger: Load executable file\n"~
-		"	-pid       debugger: Attach to process id\n"~
-		"	-ui        Choose user interface (see -ui ?)\n";
+		"  -exec      debugger: Load executable file\n"~
+		"  -pid       debugger: Attach to process id\n"~
+		"  -ui        Choose user interface (see -ui ?)\n";
 		break;
-	case CLIPage.ui:
+	case ui:
 		r =
 		"Available UIs (default=tui)\n"~
 		"tui ....... (WIP) Text UI with full debugging experience.\n"~
@@ -90,7 +94,7 @@ int clipage(CLIPage h) {
 //		"tcp-json .. (Experimental) JSON API server via TCP.\n"
 		;
 	break;
-	case CLIPage.dstyles:
+	case dstyles:
 		r =
 		"Available disassembler styles (default=intel)\n"~
 		"intel .... Intel syntax\n"~
@@ -98,7 +102,7 @@ int clipage(CLIPage h) {
 		"att ...... AT&T syntax"
 		;
 	break;
-	case CLIPage.license:
+	case license:
 		r =
 `BSD 3-Clause License
 
@@ -147,12 +151,7 @@ int main(int argc, const(char) **argv) {
 	for (size_t argi = 1; argi < argc; ++argi) {
 		const(char) *arg = argv[argi] + 1;
 
-		if (strcmp(arg, "-help") == 0 || strcmp(arg, "help") == 0)
-			return clipage(CLIPage.main);
-		if (strcmp(arg, "-version") == 0 || strcmp(arg, "version") == 0)
-			return cliver;
-		if (strcmp(arg, "-license") == 0)
-			return clipage(CLIPage.license);
+		if (*argv[argi] != '-') goto L_CLI_DEFAULT;
 
 		// debugger: select file
 		if (strcmp(arg, "exec") == 0) {
@@ -181,7 +180,7 @@ int main(int argc, const(char) **argv) {
 			}
 			opt.debugtype = DebuggerMode.pid;
 			const(char) *id = argv[++argi];
-			opt.pid = cast(ushort)strtol(id, &id, 10);
+			opt.pid = cast(ushort)strtol(id, null, 10);
 			continue;
 		}
 
@@ -254,16 +253,28 @@ int main(int argc, const(char) **argv) {
 			
 		}*/
 
+		if (strcmp(arg, "version") == 0 || strcmp(arg, "-version") == 0)
+			return cliver;
+		if (strcmp(arg, "help") == 0 || strcmp(arg, "-help") == 0)
+			return clipage(CLIPage.main);
+		if (strcmp(arg, "-license") == 0)
+			return clipage(CLIPage.license);
+
+		continue;
+
+		//
+		// Default arguments
+		//
+
+L_CLI_DEFAULT:
 		if (opt.file == null) {
+			opt.mode = OperatingMode.debugger;
 			opt.debugtype = DebuggerMode.file;
 			opt.file = argv[argi];
-			continue;
 		} else if (opt.file_args == null) {
 			opt.file_args = argv[argi];
-			continue;
 		} else if (opt.file_env == null) {
 			opt.file_env = argv[argi];
-			continue;
 		} else {
 			puts("cli: Out of default parameters");
 			return EXIT_FAILURE;
