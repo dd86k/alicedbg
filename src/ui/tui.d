@@ -101,7 +101,7 @@ int tui_handler(exception_t *e) {
 	// backward
 	//for (uint ih = h - 1; ih >= 0; ih) {
 	// status
-	tui_status(e.type.typestr);
+	tui_status(exception_type_str(e.type));
 	term_flush;
 	return tui_loop();
 }

@@ -11,11 +11,11 @@
 module debugger.exception;
 
 version (Windows) {
-	import core.sys.windows.winbase;
+	import core.sys.windows.windows;
 } else
 version (Posix) {
-	version (linux)
-		import core.sys.posix.signal;
+	import debugger.sys.user : user;
+	import debugger.sys.ptrace : siginfo_t;
 	import core.sys.posix.signal;
 }
 
@@ -23,12 +23,12 @@ import consts;
 
 extern (C):
 
-/// 
+/// Register array size, may vary on target platform
 enum REG_COUNT = 32;
 
 /// Register size
 enum RegisterType {
-	Unknown, U8, I8, U16, I16, U32, I32, U64, I64, F32, F64
+	Unknown, U8, U16, U32, U64, F32, F64
 }
 
 /// Unhandled exception type of process/program
@@ -63,37 +63,42 @@ enum ExceptionType {
 /// Filtered exception structure after goinng through the platform-dependant
 /// handler.
 struct exception_t {
-	ExceptionType type;	/// Exception type
-	uint oscode;	/// Original OS code or signal for hardware exception
-	uint ecode;	/// (Windows) Original OS event code
-	uint pid;	/// Process ID
-	uint tid;	/// Thread ID if available
+	/// Exception type, see ExceptionType enumeration.
+	ExceptionType type;
+	/// Original OS code or signal for hardware exception.
+	uint oscode;
+	/// (Windows) Original OS event code.
+	uint ecode;
+	/// Process ID.
+	uint pid;
+	/// Thread ID if available.
+	uint tid;
 	union {
-		size_t addrv;	/// Memory address value
-		void *addr;	/// Memory address pointer
+		/// Memory address value
+		size_t addrv;
+		/// Memory address pointer
+		void *addr;
 	}
-	register_t [REG_COUNT]registers;	/// Registers 
+	/// Register population, this may depend on the OS and CRT
+	register_t [REG_COUNT]registers;
+	/// Register count in registers field, populated by
+	/// exception_reg_init.
+	size_t regcount;
 }
 
 /// Register structure, designs a single register for UI ends to understand
 struct register_t {
 	RegisterType type;	/// Register type (size)
 	union {
-		ubyte u8;	/// Register alias: ubyte (u8)
-		byte  i8;	/// Register alias: byte (i8)
+		ubyte  u8;	/// Register alias: ubyte (u8)
 		ushort u16;	/// Register alias: ushort (u16)
-		short  i16;	/// Register alias: short (i16)
-		uint u32;	/// Register alias: uint (u32)
-		int  i32;	/// Register alias: int (i32)
-		ulong u64;	/// Register alias: ulong (u64)
-		long  i64;	/// Register alias: long (i64)
-		float f32;	/// Register alias: float (f32)
+		uint   u32;	/// Register alias: uint (u32)
+		ulong  u64;	/// Register alias: ulong (u64)
+		float  f32;	/// Register alias: float (f32)
 		double f64;	/// Register alias: double (f64)
 	}
-	const(char) *name;	/// Register name
+	const(char) *name;	/// Register name from exception_reg_init
 }
-
-
 
 // Windows: Mostly covered in winbase.h or winnt.h
 // - Include\shared\winnt.h (at least for x86, amd64)
@@ -112,7 +117,7 @@ struct register_t {
  * 	subcode = OS sub-code
  * Returns: ExceptionType (enum)
  */
-ExceptionType codetype(uint code, uint subcode = 0) {
+ExceptionType exception_type_code(uint code, uint subcode = 0) {
 	version (Windows) {
 		with (ExceptionType)
 		switch (code) {
@@ -240,17 +245,12 @@ ExceptionType codetype(uint code, uint subcode = 0) {
 	}
 }
 
-/**
- * Get a very short descriptive string for a ExceptionType value in all
- * uppercase. UI or client may want to lowercase if they want, but I'm keeping
- * the uppercase.
- * Params: code = ExceptionType
- * Returns: String
- */
-const(char) *typestr(ExceptionType code) {
-	// A final switch is preferred over an array as the final switch will
-	// verify, at compile-time, if all enum members are used, and we do
-	// not need the extra performance
+/// Get a very short descriptive string for a ExceptionType value in all
+/// uppercase. UI or client may want to lowercase if they want, but I'm keeping
+/// the uppercase.
+/// Params: code = ExceptionType
+/// Returns: String
+const(char) *exception_type_str(ExceptionType code) {
 	with (ExceptionType)
 	final switch (code) {
 	case Unknown:	return "UNKNOWN";
@@ -279,3 +279,166 @@ const(char) *typestr(ExceptionType code) {
 	case NoContinue:	return "OS: NO CONTINUE";
 	}
 }
+
+/// Format a register depending on their type as a zero-padded number.
+/// Params: reg = register_t structure
+/// Returns: 
+const(char) *exception_reg_fhex(ref register_t reg) {
+	import utils.str : strf;
+	with (RegisterType)
+	switch (reg.type) {
+	case U8:  return strf("%02x", reg.u8);
+	case U16: return strf("%04x", reg.u16);
+	case U32, F32: return strf("%08x", reg.u32);
+	case U64, F64: return strf("%016llx", reg.u64);
+	default: return "??";
+	}
+}
+/*
+const(char) *exception_reg_fval(ref register_t reg) {
+	import utils.str : strf;
+	
+}*/
+
+package:
+
+void exception_reg_init(ref exception_t e) {
+	version (X86) {
+		e.regcount = 10;
+		e.registers[0].name = "EIP";
+		e.registers[0].type = RegisterType.U32;
+		e.registers[1].name = "EFLAGS";
+		e.registers[1].type = RegisterType.U32;
+		e.registers[2].name = "EAX";
+		e.registers[2].type = RegisterType.U32;
+		e.registers[3].name = "EBX";
+		e.registers[3].type = RegisterType.U32;
+		e.registers[4].name = "ECX";
+		e.registers[4].type = RegisterType.U32;
+		e.registers[5].name = "EDX";
+		e.registers[5].type = RegisterType.U32;
+		e.registers[6].name = "ESP";
+		e.registers[6].type = RegisterType.U32;
+		e.registers[7].name = "EBP";
+		e.registers[7].type = RegisterType.U32;
+		e.registers[8].name = "ESI";
+		e.registers[8].type = RegisterType.U32;
+		e.registers[9].name = "EDI";
+		e.registers[9].type = RegisterType.U32;
+	} else
+	version (X86_64) {
+		e.regcount = 10;
+		e.registers[0].name = "RIP";
+		e.registers[0].type = RegisterType.U64;
+		e.registers[1].name = "RFLAGS";
+		e.registers[1].type = RegisterType.U64;
+		e.registers[2].name = "RAX";
+		e.registers[2].type = RegisterType.U64;
+		e.registers[3].name = "RBX";
+		e.registers[3].type = RegisterType.U64;
+		e.registers[4].name = "RCX";
+		e.registers[4].type = RegisterType.U64;
+		e.registers[5].name = "RDX";
+		e.registers[5].type = RegisterType.U64;
+		e.registers[6].name = "RSP";
+		e.registers[6].type = RegisterType.U64;
+		e.registers[7].name = "RBP";
+		e.registers[7].type = RegisterType.U64;
+		e.registers[8].name = "RSI";
+		e.registers[8].type = RegisterType.U64;
+		e.registers[9].name = "RDI";
+		e.registers[9].type = RegisterType.U64;
+	}
+}
+
+version (Windows) {
+
+/// Translate Windows' DEBUG_EVENT to an exception_t
+int exception_tr_windows(ref exception_t e, ref DEBUG_EVENT de) {
+	e.pid = de.dwProcessId;
+	e.tid = de.dwThreadId;
+	e.addr = de.Exception.ExceptionRecord.ExceptionAddress;
+	e.oscode = de.Exception.ExceptionRecord.ExceptionCode;
+	switch (e.oscode) {
+	case EXCEPTION_IN_PAGE_ERROR:
+	case EXCEPTION_ACCESS_VIOLATION:
+		e.type = exception_type_code(
+			de.Exception.ExceptionRecord.ExceptionCode,
+			cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]);
+		break;
+	default:
+		e.type = exception_type_code(de.Exception.ExceptionRecord.ExceptionCode);
+	}
+	return 0;
+}
+/// Populate exception_t.registers array from Windows' CONTEXT
+int exception_ctx_windows(ref exception_t e, ref CONTEXT c) {
+	version (X86) {
+		e.registers[0].u32 = c.Eip;
+		e.registers[1].u32 = c.EFlags;
+		e.registers[2].u32 = c.Eax;
+		e.registers[3].u32 = c.Ebx;
+		e.registers[4].u32 = c.Ecx;
+		e.registers[5].u32 = c.Edx;
+		e.registers[6].u32 = c.Esp;
+		e.registers[7].u32 = c.Ebp;
+		e.registers[8].u32 = c.Esi;
+		e.registers[9].u32 = c.Edi;
+	} else
+	version (X86_64) {
+		e.registers[0].u64 = c.Rip;
+		e.registers[1].u32 = c.EFlags;
+		e.registers[2].u64 = c.Rax;
+		e.registers[3].u64 = c.Rbx;
+		e.registers[4].u64 = c.Rcx;
+		e.registers[5].u64 = c.Rdx;
+		e.registers[6].u64 = c.Rsp;
+		e.registers[7].u64 = c.Rbp;
+		e.registers[8].u64 = c.Rsi;
+		e.registers[9].u64 = c.Rdi;
+	}
+	return 0;
+}
+
+} else // version Windows
+version (Posix) {
+
+/// Translate Posix's siginfo_t to an exception_t
+int exception_tr_siginfo(ref exception_t e, ref siginfo_t si) {
+	e.pid = si.si_pid;
+	e.tid = 0;
+	e.addr = si.si_addr;
+	e.oscode = si.si_status;
+	e.type = exception_type_code(si.si_status, si.si_code);
+	return 0;
+}
+/// Populate exception_t.registers array from Glibc's user
+int exception_ctx_user(ref exception_t e, ref user u) {
+	version (X86) {
+		e.registers[0].u32 = u.regs.eip;
+		e.registers[1].u32 = u.regs.eflags;
+		e.registers[2].u32 = u.regs.eax;
+		e.registers[3].u32 = u.regs.ebx;
+		e.registers[4].u32 = u.regs.ecx;
+		e.registers[5].u32 = u.regs.edx;
+		e.registers[6].u32 = u.regs.esp;
+		e.registers[7].u32 = u.regs.ebp;
+		e.registers[8].u32 = u.regs.esi;
+		e.registers[9].u32 = u.regs.edi;
+	} else
+	version (X86_64) {
+		e.registers[0].u64 = u.regs.rip;
+		e.registers[1].u32 = cast(uint)u.regs.eflags;
+		e.registers[2].u64 = u.regs.rax;
+		e.registers[3].u64 = u.regs.rbx;
+		e.registers[4].u64 = u.regs.rcx;
+		e.registers[5].u64 = u.regs.rdx;
+		e.registers[6].u64 = u.regs.rsp;
+		e.registers[7].u64 = u.regs.rbp;
+		e.registers[8].u64 = u.regs.rsi;
+		e.registers[9].u64 = u.regs.rdi;
+	}
+	return 0;
+}
+
+} // version Posix

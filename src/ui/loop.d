@@ -3,11 +3,12 @@
  */
 module ui.loop;
 
-//import misc.ddc;
 import core.stdc.stdio;
-import debugger.exception, debugger.core, debugger.disasm;
+import debugger, os.err : F_ERR;
 
 extern (C):
+
+private int putchar(int); // the D definition crashes?
 
 /// Starts plain UI
 int loop_enter() {
@@ -23,16 +24,21 @@ int loop_handler(exception_t *e) {
 	p.addr = e.addr;
 	disasm_line(p, DisasmMode.File);
 	printf(
-	"* EXCEPTION #%u\n"~
-	"PID=%u  TID=%u\n"~
-	"%s (%X) at %zX\n"~
-	"Code: %s (%s)\n"~
-	"\n"
-	,
-	en++,
+	"\n-------------------------------------\n"~
+	"* EXCEPTION #%u: %s ("~F_ERR~")\n"~
+	"* PID=%u TID=%u\n"~
+	"> %zX / %s / %s\n",
+	en++, exception_type_str(e.type), e.oscode,
 	e.pid, e.tid,
-	e.type.typestr, e.oscode, e.addrv,
-	&p.mcbuf, &p.mnbuf
+	e.addrv, &p.mcbuf, &p.mnbuf
 	);
+	// Print per block of two registers
+	for (size_t i; i < e.regcount; ++i) {
+		printf("  %6s=%s",
+			e.registers[i].name,
+			exception_reg_fhex(e.registers[i]));
+		if (i & 1)
+			putchar('\n');
+	}
 	return DebuggerAction.proceed;
 }

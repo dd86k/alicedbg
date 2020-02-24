@@ -179,7 +179,7 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 
 	if (p.mode >= DisasmMode.File) {
 		disasm_render(p);
-		with (p) mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
+		with (p) mcbuf[mcbufi - 1] = mnbuf[mnbufi] = 0;
 	}
 
 	return p.error;

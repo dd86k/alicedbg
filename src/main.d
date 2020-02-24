@@ -10,7 +10,7 @@ import os.err;
 extern (C):
 private:
 
-enum OperatingMode {
+enum OperatingModule {
 	debugger, // can't use word "debug" and "debug_" is eh
 	dumper,
 	profiler
@@ -40,7 +40,7 @@ enum CLIPage {
 
 /// CLI options
 struct cliopt_t {
-	OperatingMode mode;
+	OperatingModule mode;
 	DebuggerUI ui;
 	DebuggerMode debugtype;
 	ushort pid;
@@ -211,7 +211,7 @@ int main(int argc, const(char) **argv) {
 				puts("cli: path argument missing");
 				return EXIT_FAILURE;
 			}
-			opt.mode = OperatingMode.dumper;
+			opt.mode = OperatingModule.dumper;
 			opt.file = argv[++argi];
 			continue;
 		}
@@ -268,7 +268,7 @@ int main(int argc, const(char) **argv) {
 
 L_CLI_DEFAULT:
 		if (opt.file == null) {
-			opt.mode = OperatingMode.debugger;
+			opt.mode = OperatingModule.debugger;
 			opt.debugtype = DebuggerMode.file;
 			opt.file = argv[argi];
 		} else if (opt.file_args == null) {
@@ -281,7 +281,7 @@ L_CLI_DEFAULT:
 		}
 	}
 
-	with (OperatingMode)
+	with (OperatingModule)
 	final switch (opt.mode) {
 	case debugger:
 		int e = void;

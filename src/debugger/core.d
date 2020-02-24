@@ -130,7 +130,7 @@ int dbg_loop() {
 		return 4;
 
 	exception_t e = void;
-	prep_context(e);
+	exception_reg_init(e);
 
 	version (Windows) {
 		DEBUG_EVENT de = void;
@@ -147,12 +147,12 @@ L_DEBUG_LOOP:
 			goto L_DEBUG_LOOP;
 		}
 
-		prep_ex_debug(e, de.Exception);
+		exception_tr_windows(e, de);
 
 		CONTEXT c = void;
 		c.ContextFlags = CONTEXT_ALL;
 		GetThreadContext(hthread, &c);
-		prep_ex_context(e, c);
+		exception_ctx_windows(e, c);
 
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
@@ -193,11 +193,11 @@ L_DEBUG_LOOP:
 		default:
 		}
 
-		prep_ex_sig(e, sig);
+		exception_tr_siginfo(e, sig);
 
 		user u;
-		ptrace(PTRACE_GETREGS, -1, null, &u);
-		prep_ex_regs(e, u);
+		if (ptrace(PTRACE_GETREGS, hprocess, null, &u) != -1)
+			exception_ctx_user(e, u);
 
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
@@ -216,68 +216,6 @@ L_DEBUG_LOOP:
 
 private:
 
-void prep_context(ref exception_t e) {
-	version (X86) {
-		e.registers[0].name = "EAX";
-		e.registers[0].type = RegisterType.U32;
-	} else
-	version (X86_64) {
-		e.registers[0].name = "RAX";
-		e.registers[0].type = RegisterType.U64;
-	}
-}
-
 //
 // Exception preparing functions (OS specific)
 //
-
-version (Windows) {
-
-int prep_ex_debug(ref exception_t e, ref EXCEPTION_DEBUG_INFO di) {
-	e.pid = de.dwProcessId;
-	e.tid = de.dwThreadId;
-	e.addr = di.ExceptionRecord.ExceptionAddress;
-	e.oscode = di.ExceptionRecord.ExceptionCode;
-	switch (e.oscode) {
-	case EXCEPTION_IN_PAGE_ERROR:
-	case EXCEPTION_ACCESS_VIOLATION:
-		e.type = codetype(di.ExceptionRecord.ExceptionCode,
-			cast(uint)di.ExceptionRecord.ExceptionInformation[0]);
-		break;
-	default:
-		e.type = codetype(di.ExceptionRecord.ExceptionCode);
-	}
-	return 0;
-}
-int prep_ex_context(ref exception_t e, ref CONTEXT c) {
-	version (X86) {
-		e.registers[0].u32 = c.Eax;
-	} else
-	version (X86_64) {
-		e.registers[0].u64 = c.Rax;
-	}
-	return 0;
-}
-
-} else // version Windows
-version (Posix) {
-
-int prep_ex_sig(ref exception_t e, ref siginfo_t si) {
-	e.pid = si.si_pid;
-	e.tid = 0;
-	e.addr = si.si_addr;
-	e.oscode = si.si_status;
-	e.type = codetype(si.si_status, si.si_code);
-	return 0;
-}
-int prep_ex_regs(ref exception_t e, ref user u) {
-	version (X86) {
-		e.registers[0].u32 = u.regs.eax;
-	} else
-	version (X86_64) {
-		e.registers[0].u64 = u.regs.rax;
-	}
-	return 0;
-}
-
-} // version Posix
