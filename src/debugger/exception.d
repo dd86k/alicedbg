@@ -109,9 +109,10 @@ struct register_t {
 
 /**
  * (Internal) Translate an oscode to a universal exception type.
- *
- * Subcode: (Windows) See `EXCEPTION_RECORD.ExceptionInformation`. (Posix) Via
- * `sigaction_t.si_code`.
+ * - Windows: `DEBUG_INFO.Exception.ExceptionRecord.ExceptionCode` and
+ * `cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]` in certain
+ * cases.
+ * - Posix: Signal number (`siginfo_t.si_signo`) and `si_code`.
  * Params:
  * 	code = OS code
  * 	subcode = OS sub-code
@@ -331,7 +332,7 @@ void exception_reg_init(ref exception_t e) {
 		e.registers[0].name = "RIP";
 		e.registers[0].type = RegisterType.U64;
 		e.registers[1].name = "RFLAGS";
-		e.registers[1].type = RegisterType.U64;
+		e.registers[1].type = RegisterType.U32;
 		e.registers[2].name = "RAX";
 		e.registers[2].type = RegisterType.U64;
 		e.registers[3].name = "RBX";
@@ -402,19 +403,20 @@ int exception_ctx_windows(ref exception_t e, ref CONTEXT c) {
 
 } else // version Windows
 version (Posix) {
-
+	
 /// Translate Posix's siginfo_t to an exception_t
 int exception_tr_siginfo(ref exception_t e, ref siginfo_t si) {
 	e.pid = si.si_pid;
 	e.tid = 0;
 	e.addr = si.si_addr;
-	e.oscode = si.si_status;
-	e.type = exception_type_code(si.si_status, si.si_code);
+	e.oscode = si.si_signo;
+	e.type = exception_type_code(si.si_signo, si.si_code);
 	return 0;
 }
 /// Populate exception_t.registers array from Glibc's user
 int exception_ctx_user(ref exception_t e, ref user u) {
 	version (X86) {
+//		e.addrv = u.regs.eip;
 		e.registers[0].u32 = u.regs.eip;
 		e.registers[1].u32 = u.regs.eflags;
 		e.registers[2].u32 = u.regs.eax;
@@ -427,6 +429,8 @@ int exception_ctx_user(ref exception_t e, ref user u) {
 		e.registers[9].u32 = u.regs.edi;
 	} else
 	version (X86_64) {
+		printf("r: %zX\n", u.regs.rip);
+//		e.addrv = u.regs.rip;
 		e.registers[0].u64 = u.regs.rip;
 		e.registers[1].u32 = cast(uint)u.regs.eflags;
 		e.registers[2].u64 = u.regs.rax;

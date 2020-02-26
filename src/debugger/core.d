@@ -12,18 +12,18 @@ version (Windows) {
 	//SymInitialize, GetFileNameFromHandle, SymGetModuleInfo64,
 	//StackWalk64, SymGetSymFromAddr64, SymFromName
 	private HANDLE hthread; /// Saved thread handle, DEBUG_INFO doesn't contain one
-	private HANDLE hprocess; /// 
+	private HANDLE hprocess; /// Saved process handle
 } else
 version (Posix) {
-	private import core.sys.posix.sys.stat;
-	private import core.sys.posix.sys.wait :
+	import core.sys.posix.sys.stat;
+	import core.sys.posix.sys.wait :
 		waitpid, SIGCONT, WUNTRACED;
-	private import core.sys.posix.unistd : fork, execve;
-	private import core.stdc.stdlib : exit;
-	private import debugger.sys.ptrace;
-	private import debugger.sys.user : user;
+	import core.sys.posix.unistd : fork, execve;
+	import core.sys.posix.signal : kill, SIGKILL;
+	import core.stdc.stdlib : exit;
+	import debugger.sys.ptrace;
 	private enum __WALL = 0x40000000;
-	private pid_t hprocess;
+	private pid_t hprocess; /// Saved process ID
 }
 
 /// Actions that a user function handler may return
@@ -181,28 +181,35 @@ L_DEBUG_LOOP:
 	version (Posix) {
 		siginfo_t sig = void;
 		int wstatus = void;
+		int pid = void;
 L_DEBUG_LOOP:
-		if (waitpid(-1, &wstatus, WUNTRACED) == -1)
+		pid = waitpid(hprocess, &wstatus, 0);
+
+		if (pid == -1)
 			return 3;
-		if (ptrace(PTRACE_GETSIGINFO, hprocess, null, &sig) == -1)
+
+		if (ptrace(PTRACE_GETSIGINFO, pid, null, &sig) == -1)
 			return 5;
 
 		// Filter events
-		switch (sig.si_status) {
-		case SIGCONT: goto L_DEBUG_LOOP;
-		default:
-		}
+		/*switch (sig.si_signo) {
+		case SIGSEGV, SIGFPE, SIGILL, SIGBUS, SIGTRAP:
+		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
+			break;
+		default: goto L_DEBUG_LOOP; // e.g. SIGCONT
+		}*/
 
 		exception_tr_siginfo(e, sig);
 
-		user u;
-		if (ptrace(PTRACE_GETREGS, hprocess, null, &u) != -1)
+		user u = void;
+		if (ptrace(PTRACE_GETREGS, pid, null, &u) != -1)
 			exception_ctx_user(e, u);
 
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
 		case exit:
-			ptrace(PTRACE_KILL, hprocess, null, null);
+			//TODO: See if ptrace(PTRACE_CONT, pid, null, SIGKILL); is a better choice
+			kill(hprocess, SIGKILL); // PTRACE_KILL is deprecated
 			return 0;
 		case step:
 			ptrace(PTRACE_SINGLESTEP, hprocess, null, null);
@@ -213,9 +220,3 @@ L_DEBUG_LOOP:
 		}
 	}
 }
-
-private:
-
-//
-// Exception preparing functions (OS specific)
-//
