@@ -19,8 +19,6 @@ version (Posix) {
 	import core.sys.posix.signal;
 }
 
-import consts;
-
 extern (C):
 
 /// Register array size, may vary on target platform
@@ -60,18 +58,16 @@ enum ExceptionType {
 //	OSError,	/// OS error (WaitForDebugEvent returned FALSE or waitid returned -1)
 }
 
-/// Filtered exception structure after goinng through the platform-dependant
-/// handler.
+/// Represents an exception. Upon creation, these are populated depending on
+/// the platform with their respective function.
 struct exception_t {
-	/// Exception type, see ExceptionType enumeration.
+	/// Exception type, see the ExceptionType enumeration.
 	ExceptionType type;
-	/// Original OS code or signal for hardware exception.
+	/// Original OS code (exception or signal value).
 	uint oscode;
-	/// (Windows) Original OS event code.
-	uint ecode;
 	/// Process ID.
 	uint pid;
-	/// Thread ID if available.
+	/// Thread ID, if available; Otherwise zero.
 	uint tid;
 	union {
 		/// Memory address value
@@ -79,11 +75,11 @@ struct exception_t {
 		/// Memory address pointer
 		void *addr;
 	}
-	/// Register population, this may depend on the OS and CRT
-	register_t [REG_COUNT]registers;
 	/// Register count in registers field, populated by
 	/// exception_reg_init.
 	size_t regcount;
+	/// Register population, this may depend on the OS and CRT
+	register_t [REG_COUNT]registers;
 }
 
 /// Register structure, designs a single register for UI ends to understand
@@ -108,15 +104,15 @@ struct register_t {
 // Linux: see sigaction(2)
 
 /**
- * (Internal) Translate an oscode to a universal exception type.
+ * (Internal) Translate an oscode to an ExceptionType enum value.
  * - Windows: `DEBUG_INFO.Exception.ExceptionRecord.ExceptionCode` and
  * `cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]` in certain
  * cases.
- * - Posix: Signal number (`siginfo_t.si_signo`) and `si_code`.
+ * - Posix: Signal number (`si_signo`) and its code `si_code` in certain cases.
  * Params:
  * 	code = OS code
  * 	subcode = OS sub-code
- * Returns: ExceptionType (enum)
+ * Returns: ExceptionType enum value
  */
 ExceptionType exception_type_code(uint code, uint subcode = 0) {
 	version (Windows) {
@@ -429,7 +425,6 @@ int exception_ctx_user(ref exception_t e, ref user u) {
 		e.registers[9].u32 = u.regs.edi;
 	} else
 	version (X86_64) {
-		printf("r: %zX\n", u.regs.rip);
 //		e.addrv = u.regs.rip;
 		e.registers[0].u64 = u.regs.rip;
 		e.registers[1].u32 = cast(uint)u.regs.eflags;

@@ -191,13 +191,14 @@ L_DEBUG_LOOP:
 		if (ptrace(PTRACE_GETSIGINFO, pid, null, &sig) == -1)
 			return 5;
 
-		// Filter events
-		/*switch (sig.si_signo) {
-		case SIGSEGV, SIGFPE, SIGILL, SIGBUS, SIGTRAP:
-		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
-			break;
-		default: goto L_DEBUG_LOOP; // e.g. SIGCONT
-		}*/
+		// Filter signals
+		switch (sig.si_signo) {
+//		case SIGSEGV, SIGFPE, SIGILL, SIGBUS, SIGTRAP:
+//		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
+//			break;
+		case SIGCONT: goto L_DEBUG_LOOP;
+		default:
+		}
 
 		exception_tr_siginfo(e, sig);
 

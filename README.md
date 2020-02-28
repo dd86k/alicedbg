@@ -82,22 +82,18 @@ The loop UI is the simplest implementation, featuring simple output on
 exceptions. The UI continues automatically on exceptions and is not
 interactive.
 
-On an exception, this is printed to output:
+Occuring exceptions are printed on screen:
+
 ```
-* EXCEPTION #0
-PID=6584  TID=8504
-BREAKPOINT (80000003) at 777AF146
-Code: cc  (int3)
-   EIP=777af147
-EFLAGS=00000246
-   EAX=00000000
-   EBX=0092f000
-   ECX=95630000
-   EDX=00000000
-   ESP=007bf3d8
-   EBP=007bf404
-   ESI=00ca1c18
-   EDI=777137ec
+-------------------------------------
+* EXCEPTION #0: BREAKPOINT (0x80000003)
+* PID=5876 TID=1748
+> 7783F146 / cc / int3
+     EIP=7783f147  EFLAGS=00000246
+     EAX=00000000     EBX=00b5e000
+     ECX=4c830000     EDX=00000000
+     ESP=00cff318     EBP=00cff344
+     ESI=01261be8     EDI=777a37ec
 ```
 
 Which features the exception counter, process ID, thread ID (Windows-only),
