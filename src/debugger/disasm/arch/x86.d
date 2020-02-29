@@ -2817,6 +2817,290 @@ void x86_0f(ref disasm_params_t p) {
 	case 0x3A: // 3-byte-opcode
 		x86_0f_3Ah(p);
 		break;
+	case 0x40: // CMOVO
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovo");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x41: // CMOVNO
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovno");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x42: // CMOVB
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovb");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x43: // CMOVAE
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovae");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x44: // CMOVE
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmove");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x45: // CMOVNE
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovne");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x46: // CMOVBE
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovbe");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x47: // CMOVA
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmova");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x48: // CMOVS
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovs");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x49: // CMOVNS
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovns");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x4A: // CMOVP
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovp");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x4B: // CMOVNP
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovnp");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x4C: // CMOVL
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovl");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x4D: // CMOVNL
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovnl");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x4E: // CMOVLE
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovle");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x4F: // CMOVNLE
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "cmovnle");
+		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		break;
+	case 0x50: // MOVMSKPS/MOVMSKPD
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "movmskps"; break;
+		case X86_0F_66H: m = "movmskpd"; break;
+		default: disasm_err(p); break main;
+		}
+		ubyte modrm = *p.addru8;
+		++p.addrv;
+		if ((modrm & RM_MOD) != RM_MOD_11) {
+			disasm_err(p);
+			break;
+		}
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_x8(p, modrm);
+			disasm_push_str(p, m);
+			disasm_push_reg(p,
+				x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+			disasm_push_reg(p,
+				x86_modrm_reg(p, modrm << 3, X86_WIDTH_XMM));
+		}
+		break;
+	case 0x51: // SQRTPS/SQRTPD/SQRTSD/SQRTSS
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "sqrtps"; break;
+		case X86_0F_66H: m = "sqrtpd"; break;
+		case X86_0F_F2H: m = "sqrtsd"; break;
+		case X86_0F_F3H: m = "sqrtss"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x52: // RSQRTPS/RSQRTSS
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "rsqrtps"; break;
+		case X86_0F_F3H: m = "rsqrtss"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x53: // RCPPS/RCPSS
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "rcpps"; break;
+		case X86_0F_F3H: m = "rcpss"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x54: // ANDPS/ANDPD
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "andps"; break;
+		case X86_0F_66H: m = "andpd"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x55: // ANDNPS/ANDNPD
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "andnps"; break;
+		case X86_0F_66H: m = "andnpd"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x56: // ORPS/ORPD
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "orps"; break;
+		case X86_0F_66H: m = "orpd"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x57: // XORPS/XORPD
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "xorps"; break;
+		case X86_0F_66H: m = "xorpd"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x58: // ADDPS/ADDPD/ADDSD/ADDSS
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "addps"; break;
+		case X86_0F_66H: m = "addpd"; break;
+		case X86_0F_F2H: m = "addsd"; break;
+		case X86_0F_F3H: m = "addss"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x59: // MULPS/MULPD/MULSD/MULSS
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "mulps"; break;
+		case X86_0F_66H: m = "mulpd"; break;
+		case X86_0F_F2H: m = "mulsd"; break;
+		case X86_0F_F3H: m = "mulss"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x5A: // CVTPS2PD/CVTPD2PS/CVTSD2SS/CVTSS2SD
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "cvtps2pd"; break;
+		case X86_0F_66H: m = "cvtpd2ps"; break;
+		case X86_0F_F2H: m = "cvtsd2ss"; break;
+		case X86_0F_F3H: m = "cvtss2sd"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x5B: // CVTDQ2PS/CVTPS2DQ/CVTTPS2DQ
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "cvtdq2ps"; break;
+		case X86_0F_66H: m = "cvtps2dq"; break;
+		case X86_0F_F3H: m = "cvttps2dq"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x5C: // SUBPS/SUBPD/SUBSD/SUBSS
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "subps"; break;
+		case X86_0F_66H: m = "subpd"; break;
+		case X86_0F_F2H: m = "subsd"; break;
+		case X86_0F_F3H: m = "subss"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x5D: // MINPS/MINPD/MINSD/MINSS
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "minps"; break;
+		case X86_0F_66H: m = "minpd"; break;
+		case X86_0F_F2H: m = "minsd"; break;
+		case X86_0F_F3H: m = "minss"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x5E: // DIVPS/DIVPD/DIVSD/DIVSS
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "divps"; break;
+		case X86_0F_66H: m = "divpd"; break;
+		case X86_0F_F2H: m = "divsd"; break;
+		case X86_0F_F3H: m = "divss"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
+	case 0x5F: // MAXPS/MAXPD/MAXSS/MAXSD
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: m = "maxps"; break;
+		case X86_0F_66H: m = "maxpd"; break;
+		case X86_0F_F2H: m = "maxss"; break;
+		case X86_0F_F3H: m = "maxsd"; break;
+		default: disasm_err(p); break main;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
+		break;
 	case 0xA2: // CPUID
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cpuid");
