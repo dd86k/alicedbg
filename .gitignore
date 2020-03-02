@@ -18,4 +18,9 @@ alicedbg-test-*
 *.lst
 *.json
 dub*.s
+
+# Personal notes
 NOTES
+
+# Commit message (git commit -t)
+MSG

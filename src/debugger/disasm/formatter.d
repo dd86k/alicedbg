@@ -1,7 +1,33 @@
+/**
+ * Disassembler formatting engine.
+ *
+ * This provides the item and style formatting for the disassembler. The
+ * decoder (disassembler) pushes items with their respective types (e.g.
+ * register, immediate, etc.) and the formatter takes take of rendering
+ * the final result. Values are referenced (i.e. strings), not copied. For
+ * example, disasm_push_reg pushes a register string value.
+ *
+ * Each item in the stack are processed from first to last (left to right),
+ * typically begining with the mnemonic instruction, then usually an immediate,
+ * memory reference, or register, to finally be formatted using their respected
+ * formatting function (e.g. a register string is passed through
+ * disasm_fmt_reg).
+ *
+ * The operand ordering is INSTRUCTION TARGET, SOURCE (Intel), this is
+ * important to know since this behavior is affected by the disassembler
+ * syntax setting (e.g. At&t vs. Intel/Nasm/Masm). This behavior can be
+ * bypassed with the FORMATTER_O_NO_DIRECTION formatter setting if the style
+ * does not affect the operand ordering.
+ *
+ * Machine code and mnemonic items are processed differently. The machine code
+ * items are immediately processed upon arrival onto the string buffer, so
+ * machine code and mnemonic items can be pushed in any order, only the
+ * mnemonic items use the formatter's stack.
+ */
 module debugger.disasm.formatter;
 
-import debugger.disasm.core;
 import core.stdc.stdarg;
+import debugger.disasm.core;
 import utils.str;
 
 extern (C):
@@ -11,7 +37,7 @@ enum FORMATTER_STACK_SIZE = 8;
 /// Formatter stack limit (size - 1)
 enum FORMATTER_STACK_LIMIT = FORMATTER_STACK_SIZE - 1;
 
-/// Items will be processed in order regardless of style (i.e. at&t)
+/// Items will be processed in order regardless of style
 enum FORMATTER_O_NO_DIRECTION = 1;
 /// (Not implemented) Second separator will be a space (" ") instead of a comma (", ").
 /// Very useful for instruction prefixes such as LOCK (x86)
@@ -334,8 +360,8 @@ void disasm_err(ref disasm_params_t p) {
 }
 
 /// Process items in the formatter stack and output them into the formatter
-/// buffers. Called by disasm_line, and caller is responsible of terminating
-/// string buffers.
+/// buffers. Caller is responsible of terminating string buffers. Called by
+/// disasm_line.
 /// Params:
 /// 	p = Disassembler parameters
 void disasm_render(ref disasm_params_t p) {
