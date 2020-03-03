@@ -3952,6 +3952,7 @@ void x86_0f(ref disasm_params_t p) {
 			case RM_REG_101: m = "xrstor"; break;
 			case RM_REG_110: m = "xsaveopt"; break;
 			case RM_REG_111: m = "clflush"; break;
+			default: // Never
 			}
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, m);
