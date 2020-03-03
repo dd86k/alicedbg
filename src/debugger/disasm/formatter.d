@@ -350,11 +350,13 @@ void disasm_push_x86_sib_mod01_index100(ref disasm_params_t p,
 // Core functions
 //
 
-/// Set error code to DisasmError.Illegal and override mnemonic buffer to
+/// Set error code with DisasmError enum and override mnemonic buffer to
 /// DISASM_FMT_ERR_STR.
-/// Params: p = Disassembler parameters
-void disasm_err(ref disasm_params_t p) {
-	p.error = DisasmError.Illegal;
+/// Params:
+/// 	p = Disassembler parameters
+/// 	e = Disassembler error (DisasmError, defaults to Illegal)
+void disasm_err(ref disasm_params_t p, DisasmError err = DisasmError.Illegal) {
+	p.error = err;
 	p.mnbufi =
 	stradd(cast(char*)p.mnbuf, DISASM_BUF_SIZE, 0, DISASM_FMT_ERR_STR);
 }
