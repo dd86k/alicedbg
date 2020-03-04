@@ -147,7 +147,21 @@ L_DEBUG_LOOP:
 			goto L_DEBUG_LOOP;
 		}
 
-		exception_tr_windows(e, de);
+		e.pid = de.dwProcessId;
+		e.tid = de.dwThreadId;
+		e.addr = de.Exception.ExceptionRecord.ExceptionAddress;
+		e.oscode = de.Exception.ExceptionRecord.ExceptionCode;
+		switch (e.oscode) {
+		case EXCEPTION_IN_PAGE_ERROR:
+		case EXCEPTION_ACCESS_VIOLATION:
+			e.type = exception_type_code(
+				de.Exception.ExceptionRecord.ExceptionCode,
+				cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]);
+			break;
+		default:
+			e.type = exception_type_code(
+				de.Exception.ExceptionRecord.ExceptionCode);
+		}
 
 		CONTEXT c = void;
 		c.ContextFlags = CONTEXT_ALL;
@@ -179,20 +193,33 @@ L_DEBUG_LOOP:
 		}
 	} else
 	version (Posix) {
-		siginfo_t sig = void;
 		int wstatus = void;
 		int pid = void;
+		int chld_signo = void;
 L_DEBUG_LOOP:
-		pid = waitpid(hprocess, &wstatus, 0);
+		pid = waitpid(-1, &wstatus, 0);
 
 		if (pid == -1)
 			return 3;
 
-		if (ptrace(PTRACE_GETSIGINFO, pid, null, &sig) == -1)
-			return 5;
+		// Bits  Desc
+		// 6:0   Signo that caused child to exit
+		//       0x7f if child stopped/continued
+		//       or zero if child exited without signal
+		//  7    Core dumped
+		// 15:8  exit value (or returned main value)
+		//       or signal that cause child to stop/continue
+		chld_signo = wstatus >> 8;
+
+		// Only interested if child is continuing or stopped; Otherwise
+		// it exited and there's nothing more we can do about it.
+		// So return its status code
+		if ((wstatus & 0x7F) != 0x7F)
+			return chld_signo;
 
 		// Filter signals
-		switch (sig.si_signo) {
+		//switch (sig.si_signo) {
+		switch (chld_signo) {
 //		case SIGSEGV, SIGFPE, SIGILL, SIGBUS, SIGTRAP:
 //		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
 //			break;
@@ -200,11 +227,30 @@ L_DEBUG_LOOP:
 		default:
 		}
 
-		exception_tr_siginfo(e, sig);
+		e.pid = pid;
+		e.oscode = chld_signo;
+		e.type = exception_type_code(chld_signo);
 
 		user u = void;
-		if (ptrace(PTRACE_GETREGS, pid, null, &u) != -1)
-			exception_ctx_user(e, u);
+		if (ptrace(PTRACE_GETREGS, pid, null, &u) == -1)
+			return 6;
+
+		exception_ctx_user(e, u);
+
+		if (chld_signo == SIGTRAP) {
+			// Assuming opcode CC triggered SIGTRAP
+			version (X86) {
+				e.addrv = u.regs.eip - 1;
+			} else
+			version (X86_64) {
+				e.addrv = u.regs.rip - 1;
+			}
+		} else {
+			siginfo_t sig = void;
+			if (ptrace(PTRACE_GETSIGINFO, pid, null, &sig) == -1)
+				return 5;
+			e.addr = sig._sifields._sigfault.si_addr;
+		}
 
 		with (DebuggerAction)
 		final switch (user_function(&e)) {

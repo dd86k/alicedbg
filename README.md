@@ -21,20 +21,22 @@ Personal Goals:
 | Platform | OS | CRT | Debugging core |
 |---|---|---|:-:|
 | x86 | Windows 7 and up | Microsoft | ✔️ |
-| | Linux | Glibc | ✔️ |
+| | Linux | Glibc | ✔️* |
 | ARM | Windows 10 | Microsoft |  |
 | | Linux | Glibc | Planned! |
 
+\* Currently unstable
+
 ### Disassembler Progress
 
-| Platform | ~% | Note |
-|---|---|---|
-| x86-32 | 50 | Still adding |
-| x86-64 | 0 | Waiting on x86-32 |
-| arm-t32 | 0 | Waiting on x86-64 |
-| arm-a32 | 0 | Waiting on x86-64 |
-| arm-a64 | 0 | Waiting on x86-64 |
-| webasm | 0 | Planned |
+| Platform | ~% | Extensions or Version | Note |
+|---|---|---|---|
+| x86-32 | 50 | MMX, SSE | Still adding |
+| x86-64 | 0 | | Waiting on x86-32 |
+| arm-t32 | 0 | | Waiting on x86-64 |
+| arm-a32 | 0 | | Waiting on x86-64 |
+| arm-a64 | 0 | | Waiting on x86-64 |
+| webasm | 0 | | Planned |
 
 ## FAQ
 

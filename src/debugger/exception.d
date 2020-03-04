@@ -205,7 +205,6 @@ ExceptionType exception_type_code(uint code, uint subcode = 0) {
 			default: return Unknown;
 			}
 		case SIGTRAP:
-			// Getting 4 instead of 1? Odd
 			/*switch (subcode) {
 			case TRAP_BRKPT: return Breakpoint;
 			case TRAP_TRACE:
@@ -219,9 +218,9 @@ ExceptionType exception_type_code(uint code, uint subcode = 0) {
 		case SIGCHLD:
 			switch (subcode) {
 			case CLD_EXITED: return Exit;
-			case CLD_KILLED: return Unknown;
+			case CLD_KILLED: return Exit;
 			case CLD_DUMPED: return Unknown;
-			case CLD_TRAPPED: return Unknown;
+			case CLD_TRAPPED: return Breakpoint;
 			case CLD_STOPPED: return Unknown;
 			case CLD_CONTINUED: return Unknown;
 			default: return Unknown;
@@ -350,24 +349,6 @@ void exception_reg_init(ref exception_t e) {
 
 version (Windows) {
 
-/// Translate Windows' DEBUG_EVENT to an exception_t
-int exception_tr_windows(ref exception_t e, ref DEBUG_EVENT de) {
-	e.pid = de.dwProcessId;
-	e.tid = de.dwThreadId;
-	e.addr = de.Exception.ExceptionRecord.ExceptionAddress;
-	e.oscode = de.Exception.ExceptionRecord.ExceptionCode;
-	switch (e.oscode) {
-	case EXCEPTION_IN_PAGE_ERROR:
-	case EXCEPTION_ACCESS_VIOLATION:
-		e.type = exception_type_code(
-			de.Exception.ExceptionRecord.ExceptionCode,
-			cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]);
-		break;
-	default:
-		e.type = exception_type_code(de.Exception.ExceptionRecord.ExceptionCode);
-	}
-	return 0;
-}
 /// Populate exception_t.registers array from Windows' CONTEXT
 int exception_ctx_windows(ref exception_t e, ref CONTEXT c) {
 	version (X86) {
@@ -399,16 +380,7 @@ int exception_ctx_windows(ref exception_t e, ref CONTEXT c) {
 
 } else // version Windows
 version (Posix) {
-	
-/// Translate Posix's siginfo_t to an exception_t
-int exception_tr_siginfo(ref exception_t e, ref siginfo_t si) {
-	e.pid = si.si_pid;
-	e.tid = 0;
-	e.addr = si.si_addr;
-	e.oscode = si.si_signo;
-	e.type = exception_type_code(si.si_signo, si.si_code);
-	return 0;
-}
+
 /// Populate exception_t.registers array from Glibc's user
 int exception_ctx_user(ref exception_t e, ref user u) {
 	version (X86) {

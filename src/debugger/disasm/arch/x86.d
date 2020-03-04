@@ -540,12 +540,12 @@ L_CONTINUE:
 		if ((modrm & RM_MOD) == RM_MOD_11)
 			disasm_err(p);
 		else
-			x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+			x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x63:	// ARPL REG16, R/M16
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "arpl");
-		x86_modrm(p, X86_WIDTH_NONE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_BYTE, X86_DIR_REG);
 		break;
 	case 0x64:	// FS:
 		if (p.x86.group2) {
@@ -563,17 +563,17 @@ L_CONTINUE:
 		goto L_CONTINUE;
 	case 0x66:	// PREFIX: OPERAND SIZE
 		if (p.x86.group3) {
-			p.error = DisasmError.Illegal;
-			break;
+			disasm_err(p);
+			break main;
 		}
 		p.x86.pf_operand = 0x66;
 		goto L_CONTINUE;
 	case 0x67:	// PREFIX: ADDRESS SIZE
 		if (p.x86.group4) {
-			p.error = DisasmError.Illegal;
-			break;
+			disasm_err(p);
+			break main;
 		}
-		p.x86.pf_address = true;
+		p.x86.pf_address = 0x67;
 		goto L_CONTINUE;
 	case 0x68:	// PUSH IMM32
 		if (p.mode >= DisasmMode.File) {
@@ -586,7 +586,7 @@ L_CONTINUE:
 	case 0x69:	// IMUL REG32, R/M32, IMM32
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "imul");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x32(p, *p.addru32);
 			disasm_push_imm(p, *p.addru32);
@@ -604,7 +604,7 @@ L_CONTINUE:
 	case 0x6B:	// IMUL REG32, R/M32, IMM8
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "imul");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x8(p, *p.addru8);
 			disasm_push_imm(p, *p.addru8);
@@ -774,7 +774,7 @@ L_CONTINUE:
 			disasm_push_x8(p, modrm);
 			disasm_push_str(p, f);
 			disasm_push_reg(p, x86_modrm_reg(p, modrm << 3,
-				p.x86.pf_operand ? X86_WIDTH_NONE : X86_WIDTH_WIDE));
+				p.x86.pf_operand ? X86_WIDTH_BYTE : X86_WIDTH_EXT));
 		}
 		x86_vu32imm(p);
 		break;
@@ -842,7 +842,7 @@ L_CONTINUE:
 			p.x86.pf_operand = 1;
 			disasm_push_x8(p, modrm);
 			disasm_push_str(p, "mov");
-			const(char) *reg = x86_modrm_reg(p, modrm, X86_WIDTH_NONE);
+			const(char) *reg = x86_modrm_reg(p, modrm, X86_WIDTH_BYTE);
 			if (X86_OP_DIR(b)) {
 				disasm_push_reg(p, seg);
 				disasm_push_reg(p, reg);
@@ -855,7 +855,7 @@ L_CONTINUE:
 	case 0x8D:	// LEA REG32, MEM32
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "lea");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x8F:	// GRP1A POP REG32
 		ubyte modrm = *p.addru8;
@@ -867,7 +867,7 @@ L_CONTINUE:
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x8(p, modrm);
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+			disasm_push_reg(p, x86_modrm_reg(p, modrm, X86_WIDTH_EXT));
 		}
 		break;
 	case 0x90:	// NOP
@@ -1247,12 +1247,12 @@ L_CONTINUE:
 	case 0xC4:	// LES REG32, MEM32
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "les");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0xC5:	// LDS REG32, MEM32
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "lds");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0xC6:	// GRP11(1A) - MOV MEM8, IMM8
 		ubyte modrm = *p.addru8;
@@ -1263,7 +1263,7 @@ L_CONTINUE:
 		}
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "mov");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x8(p, *p.addru8);
 			disasm_push_imm(p, *p.addru8);
@@ -1279,7 +1279,7 @@ L_CONTINUE:
 		}
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "mov");
-		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 		x86_vu32imm(p);
 		break;
 	case 0xC8:	// ENTER IMM16, IMM8
@@ -2158,12 +2158,12 @@ L_CONTINUE:
 		case RM_REG_000: // INC R/M8
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "inc");
-			x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 			break;
 		case RM_REG_001: // DEC R/M8
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "dec");
-			x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 			break;
 		default:
 			disasm_err(p);
@@ -2176,17 +2176,17 @@ L_CONTINUE:
 		case RM_REG_000: // INC R/M32
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "inc");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			break;
 		case RM_REG_001: // DEC R/M32
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "dec");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			break;
 		case RM_REG_010: // CALL NEAR R/M32
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "call");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			break;
 		case RM_REG_011: // CALL FAR M16:M32
 			if (p.mode >= DisasmMode.File) {
@@ -2201,7 +2201,7 @@ L_CONTINUE:
 		case RM_REG_100: // JMP NEAR R/M32
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "call");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			break;
 		case RM_REG_101: // JMP FAR M16:M32
 			if (p.mode >= DisasmMode.File) {
@@ -2216,7 +2216,7 @@ L_CONTINUE:
 		case RM_REG_110: // PUSH R/M32
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "push");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			break;
 		default:
 			disasm_err(p);
@@ -2254,7 +2254,7 @@ void x86_0f(ref disasm_params_t p) {
 
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, m);
-		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 		break;
 	case 0x01: // GRP7
 		ubyte modrm = *p.addru8;
@@ -2279,7 +2279,7 @@ void x86_0f(ref disasm_params_t p) {
 			} else { // SGDT
 				if (p.mode >= DisasmMode.File)
 					disasm_push_str(p, "sgdt");
-				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+				x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			}
 			break;
 		case RM_REG_001:
@@ -2299,7 +2299,7 @@ void x86_0f(ref disasm_params_t p) {
 			} else { // SIDT
 				if (p.mode >= DisasmMode.File)
 					disasm_push_str(p, "sidt");
-				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+				x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			}
 			break;
 		case RM_REG_010:
@@ -2320,7 +2320,7 @@ void x86_0f(ref disasm_params_t p) {
 			} else { // LGDT
 				if (p.mode >= DisasmMode.File)
 					disasm_push_str(p, "lgdt");
-				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+				x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			}
 			break;
 		case RM_REG_011:
@@ -2343,18 +2343,18 @@ void x86_0f(ref disasm_params_t p) {
 			} else { // LIDT
 				if (p.mode >= DisasmMode.File)
 					disasm_push_str(p, "lgdt");
-				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+				x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			}
 			break;
 		case RM_REG_100: // SMSW
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "smsw");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			break;
 		case RM_REG_110: // LMSW
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "lmsw");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			break;
 		case RM_REG_111:
 			if (mod11) { // *
@@ -2368,7 +2368,7 @@ void x86_0f(ref disasm_params_t p) {
 			} else { // INVLPG
 				if (p.mode >= DisasmMode.File)
 					disasm_push_str(p, "invlpg");
-				x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+				x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			}
 			break;
 		default:
@@ -2378,12 +2378,12 @@ void x86_0f(ref disasm_params_t p) {
 	case 0x02: // LAR REG32, R/M16
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "lar");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x03: // LSL REG32, R/M16
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "lsl");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x06: // CLTS
 		if (p.mode >= DisasmMode.File)
@@ -2407,7 +2407,7 @@ void x86_0f(ref disasm_params_t p) {
 		if ((modrm & RM_REG) == RM_REG_001) {
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "prefetchw");
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 		} else
 			disasm_err(p);
 		break;
@@ -2521,7 +2521,7 @@ void x86_0f(ref disasm_params_t p) {
 		}
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, m);
-		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 		break;
 	case 0x19, 0x1C, 0x1D, 0x1E: // NOP (reserved)
 		if (p.mode >= DisasmMode.File)
@@ -2550,7 +2550,7 @@ void x86_0f(ref disasm_params_t p) {
 			disasm_push_str(p, m);
 			disasm_push_reg(p, r);
 		}
-		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 		break;
 	case 0x1B: // BNDSTX/BNDMOV/BNDCN/BNDMK
 		const(char) *m = void; // instruction
@@ -2573,7 +2573,7 @@ void x86_0f(ref disasm_params_t p) {
 		}
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, m);
-		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 		if (p.mode >= DisasmMode.File)
 			disasm_push_reg(p, r);
 		break;
@@ -2582,7 +2582,7 @@ void x86_0f(ref disasm_params_t p) {
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "nop");
-		x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 		break;
 	case 0x20: // MOV REG, CR
 	case 0x22: // MOV CR, REG
@@ -2596,7 +2596,7 @@ void x86_0f(ref disasm_params_t p) {
 			break;
 		}
 		if (p.mode >= DisasmMode.File) {
-			const(char) *reg = x86_modrm_reg(p, modrm << 3, X86_WIDTH_WIDE);
+			const(char) *reg = x86_modrm_reg(p, modrm << 3, X86_WIDTH_EXT);
 			const(char) *cr = void;
 			switch (modrm & RM_REG) {
 			case RM_REG_000: cr = "cr0"; break;
@@ -2630,7 +2630,7 @@ void x86_0f(ref disasm_params_t p) {
 			break;
 		}
 		if (p.mode >= DisasmMode.File) {
-			const(char) *reg = x86_modrm_reg(p, modrm << 3, X86_WIDTH_WIDE);
+			const(char) *reg = x86_modrm_reg(p, modrm << 3, X86_WIDTH_EXT);
 			const(char) *dr = void;
 			switch (modrm & RM_REG) {
 			case RM_REG_000: dr = "dr0"; break;
@@ -2711,14 +2711,14 @@ void x86_0f(ref disasm_params_t p) {
 			if (p.mode >= DisasmMode.File) {
 				disasm_push_str(p, "cvttsd2si");
 				disasm_push_reg(p,
-					x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+					x86_modrm_reg(p, modrm, X86_WIDTH_EXT));
 			}
 			break;
 		case X86_0F_F3H:
 			if (p.mode >= DisasmMode.File) {
 				disasm_push_str(p, "cvttss2si");
 				disasm_push_reg(p,
-					x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+					x86_modrm_reg(p, modrm, X86_WIDTH_EXT));
 			}
 			break;
 		default: disasm_err(p); break main;
@@ -2747,14 +2747,14 @@ void x86_0f(ref disasm_params_t p) {
 			if (p.mode >= DisasmMode.File) {
 				disasm_push_str(p, "cvtsd2si");
 				disasm_push_reg(p,
-					x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+					x86_modrm_reg(p, modrm, X86_WIDTH_EXT));
 			}
 			break;
 		case X86_0F_F3H:
 			if (p.mode >= DisasmMode.File) {
 				disasm_push_str(p, "cvtss2si");
 				disasm_push_reg(p,
-					x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+					x86_modrm_reg(p, modrm, X86_WIDTH_EXT));
 			}
 			break;
 		default: disasm_err(p); break main;
@@ -2820,82 +2820,82 @@ void x86_0f(ref disasm_params_t p) {
 	case 0x40: // CMOVO
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovo");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x41: // CMOVNO
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovno");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x42: // CMOVB
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovb");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x43: // CMOVAE
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovae");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x44: // CMOVE
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmove");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x45: // CMOVNE
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovne");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x46: // CMOVBE
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovbe");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x47: // CMOVA
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmova");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x48: // CMOVS
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovs");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x49: // CMOVNS
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovns");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x4A: // CMOVP
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovp");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x4B: // CMOVNP
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovnp");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x4C: // CMOVL
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovl");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x4D: // CMOVNL
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovnl");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x4E: // CMOVLE
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovle");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x4F: // CMOVNLE
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmovnle");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x50: // MOVMSKPS/MOVMSKPD
 		const(char) *m = void;
@@ -2914,7 +2914,7 @@ void x86_0f(ref disasm_params_t p) {
 			disasm_push_x8(p, modrm);
 			disasm_push_str(p, m);
 			disasm_push_reg(p,
-				x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+				x86_modrm_reg(p, modrm, X86_WIDTH_EXT));
 			disasm_push_reg(p,
 				x86_modrm_reg(p, modrm << 3, X86_WIDTH_XMM));
 		}
@@ -3493,7 +3493,7 @@ void x86_0f(ref disasm_params_t p) {
 		}
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "vmread");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_MEM);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_MEM);
 		break;
 	case 0x79: // VMWRITE
 		switch (x86_0f_select(p)) {
@@ -3502,7 +3502,7 @@ void x86_0f(ref disasm_params_t p) {
 		}
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "vmwrite");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0x7C: // HADDPD/HADDPS
 		const(char) *m = void;
@@ -3722,112 +3722,112 @@ void x86_0f(ref disasm_params_t p) {
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "seto");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x91: // SETNO MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setno");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x92: // SETB MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setb");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x93: // SETAE MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setae");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x94: // SETE MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "sete");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x95: // SETNE MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setne");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x96: // SETBE MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setbe");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x97: // SETA MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "seta");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x98: // SETS MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "sets");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x99: // SETNS MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setns");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x9A: // SETP MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setp");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x9B: // SETNP MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setnp");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x9C: // SETL MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setl");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x9D: // SETNL MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setnl");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x9E: // SETLE MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setle");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0x9F: // SETNLE MEM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "setnle");
-		x86_modrm_rm(p, modrm, X86_WIDTH_NONE);
+		x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 		break;
 	case 0xA0: // PUSH FS
 		if (p.mode >= DisasmMode.File) {
@@ -3848,13 +3848,13 @@ void x86_0f(ref disasm_params_t p) {
 	case 0xA3: // BT RM, REG
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "bt");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_MEM);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_MEM);
 		break;
 	case 0xA4: // SHLD RM32, REG32, IMM8
 	case 0xA5: // SHLD RM32, REG32, CL
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "shld");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_MEM);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_MEM);
 		if (b & 1) {
 			if (p.mode >= DisasmMode.File)
 				disasm_push_reg(p, "cl");
@@ -3886,13 +3886,13 @@ void x86_0f(ref disasm_params_t p) {
 	case 0xAB: // BTS RM, REG
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "bts");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_MEM);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_MEM);
 		break;
 	case 0xAC: // SHRD RM32, REG32, IMM8
 	case 0xAD: // SHRD RM32, REG32, CL
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "shld");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_MEM);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_MEM);
 		if (b & 1) {
 			if (p.mode >= DisasmMode.File)
 				disasm_push_reg(p, "cl");
@@ -3936,7 +3936,7 @@ void x86_0f(ref disasm_params_t p) {
 					disasm_push_x8(p, modrm);
 					disasm_push_str(p, m);
 					disasm_push_reg(p,
-						x86_modrm_reg(p, modrm, X86_WIDTH_WIDE));
+						x86_modrm_reg(p, modrm, X86_WIDTH_EXT));
 				}
 				break;
 			default: disasm_err(p); break main;
@@ -3956,19 +3956,24 @@ void x86_0f(ref disasm_params_t p) {
 			}
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, m);
-			x86_modrm_rm(p, modrm, X86_WIDTH_WIDE);
+			x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 		}
 		break;
 	case 0xAF: // IMUL 
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "imul");
-		x86_modrm(p, X86_WIDTH_WIDE, X86_DIR_REG);
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	case 0xB0: // CMPXCHG RM8, REG8
-	case 0xB1: // CMPXCHG RM8, REG8
+	case 0xB1: // CMPXCHG RM32, REG32
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "cmpxchg");
-		x86_modrm(p, X86_WIDTH_NONE, X86_OP_WIDE(b));
+		x86_modrm(p, X86_OP_WIDE(b), X86_DIR_MEM);
+		break;
+	case 0xB2: // LSS REG32, RM32
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "lss");
+		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
 		break;
 	default:
 		disasm_err(p);
@@ -4052,8 +4057,9 @@ package enum {
 
 // ModR/M register width
 package enum {
-	X86_WIDTH_NONE,	/// 8/16-bit registers
-	X86_WIDTH_WIDE,	/// 32/64-bit extended registers (i386/amd64)
+	X86_WIDTH_BYTE,	/// 8-bit registers
+	X86_WIDTH_EXT,	/// 32/64-bit extended registers (i386/amd64)
+	X86_WIDTH_WIDE,	/// 8-bit registers
 	X86_WIDTH_MM,	/// 80-bit MM registers (MMX)
 	X86_WIDTH_XMM,	/// 128-bit XMM registers (SSE)
 	X86_WIDTH_YMM,	/// 256-bit YMM registers (AVX)
@@ -4232,81 +4238,47 @@ L_REG:
 	if (direction) goto L_RM;
 }
 
+/// (Internal) Retrieve a register name from a ModR/M byte (REG field) and a
+/// specified width. This function conditionally honors the operand prefix
+/// (66H) when the width is X86_WIDTH_EXT.
+/// Params:
+/// 	p = Disassembler parameters
+/// 	modrm = ModR/M byte
+/// 	width = Register width (byte, wide, mm, xmm, etc.)
+/// Returns: Register string
 const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
-	modrm &= RM_REG;
-	//TODO: size_t r = modrm >> 3; // reg index for reg string arrays
+	// This is asking for trouble, hopefully more checks will be added later
+	// The array has this order for X86_OP_WIDE
+	__gshared const(char) *[][]x86_regs = [
+		[ "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh" ],
+		[ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi" ],
+		[ "ax", "cx", "dx", "cx", "sp", "bp", "si", "di" ],
+		[ "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7" ],
+		[ "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7" ],
+	];
+	size_t i = (modrm & RM_REG) >> 3;
 
-	const(char) *reg = void;
+	if (width == X86_WIDTH_EXT && p.x86.pf_operand)
+		width = X86_WIDTH_WIDE;
 
-	switch (width) {
-	case X86_WIDTH_WIDE:
-		switch (modrm) {
-		case RM_REG_000: reg = "eax"; break;
-		case RM_REG_001: reg = "ecx"; break;
-		case RM_REG_010: reg = "edx"; break;
-		case RM_REG_011: reg = "ebx"; break;
-		case RM_REG_100: reg = "esp"; break;
-		case RM_REG_101: reg = "ebp"; break;
-		case RM_REG_110: reg = "esi"; break;
-		case RM_REG_111: reg = "edi"; break;
-		default:
-		}
-		break;
-	case X86_WIDTH_MM:
-		switch (modrm) {
-		case RM_REG_000: reg = "mm0"; break;
-		case RM_REG_001: reg = "mm1"; break;
-		case RM_REG_010: reg = "mm2"; break;
-		case RM_REG_011: reg = "mm3"; break;
-		case RM_REG_100: reg = "mm4"; break;
-		case RM_REG_101: reg = "mm5"; break;
-		case RM_REG_110: reg = "mm6"; break;
-		case RM_REG_111: reg = "mm7"; break;
-		default:
-		}
-		break;
-	case X86_WIDTH_XMM:
-		switch (modrm) {
-		case RM_REG_000: reg = "xmm0"; break;
-		case RM_REG_001: reg = "xmm1"; break;
-		case RM_REG_010: reg = "xmm2"; break;
-		case RM_REG_011: reg = "xmm3"; break;
-		case RM_REG_100: reg = "xmm4"; break;
-		case RM_REG_101: reg = "xmm5"; break;
-		case RM_REG_110: reg = "xmm6"; break;
-		case RM_REG_111: reg = "xmm7"; break;
-		default:
-		}
-		break;
-	default: // X86_MODRM_NONE
-		if (p.x86.pf_operand)
-			switch (modrm) {
-			case RM_REG_000: reg = "ax"; break;
-			case RM_REG_001: reg = "cx"; break;
-			case RM_REG_010: reg = "dx"; break;
-			case RM_REG_011: reg = "bx"; break;
-			case RM_REG_100: reg = "sp"; break;
-			case RM_REG_101: reg = "bp"; break;
-			case RM_REG_110: reg = "si"; break;
-			case RM_REG_111: reg = "di"; break;
-			default:
-			}
-		else
-			switch (modrm) {
-			case RM_REG_000: reg = "al"; break;
-			case RM_REG_001: reg = "cl"; break;
-			case RM_REG_010: reg = "dl"; break;
-			case RM_REG_011: reg = "bl"; break;
-			case RM_REG_100: reg = "ah"; break;
-			case RM_REG_101: reg = "ch"; break;
-			case RM_REG_110: reg = "dh"; break;
-			case RM_REG_111: reg = "dl"; break;
-			default:
-			}
-		break;
-	}
+	return x86_regs[width][i];
+}
 
-	return reg;
+/// (Internal) Retrieve a register name from a ModR/M byte (RM field) and
+/// conditionally returns the 16-bit addressing 
+/// Params:
+/// 	p = Disassembler parameters
+/// 	modrm = ModR/M byte
+/// Returns: Register string
+const(char) *x86_modrm_rm_reg(int modrm, int addrpf) {
+	// This is asking for trouble, hopefully more checks will be added later
+	__gshared const(char) *[][]x86_regs = [
+		[ "bx+si", "bx+di", "bp+si", "bi+di", "si", "di", "bp", "bx" ],
+		[ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi" ],
+	];
+	size_t i = modrm & RM_RM;
+	size_t pf = !addrpf;
+	return x86_regs[pf][i];
 }
 
 /// (Internal) Process the R/M field automatically
@@ -4327,35 +4299,7 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 	//
 
 	const(char) *seg = x86_segstr(p.x86.segreg);
-	const(char) *reg = void;
-
-	// x86_modrm_reg would bring the disavantage of mis-choosing rm_reg
-	if (p.x86.pf_address) {
-		//TODO: Find a way to "push" both registers... Make MemSegRegReg type?
-		switch (rm) {
-		case RM_RM_000: reg = "bx+si"; break;
-		case RM_RM_001: reg = "bx+di"; break;
-		case RM_RM_010: reg = "bp+si"; break;
-		case RM_RM_011: reg = "bi+di"; break;
-		case RM_RM_100: reg = "si"; break;
-		case RM_RM_101: reg = "di"; break;
-		case RM_RM_110: reg = "bp"; break;
-		case RM_RM_111: reg = "bx"; break;
-		default:
-		}
-	} else {
-		switch (rm) {
-		case RM_RM_000: reg = "eax"; break;
-		case RM_RM_001: reg = "ecx"; break;
-		case RM_RM_010: reg = "edx"; break;
-		case RM_RM_011: reg = "ebx"; break;
-		case RM_RM_100: reg = "esp"; break;
-		case RM_RM_101: reg = "ebp"; break;
-		case RM_RM_110: reg = "esi"; break;
-		case RM_RM_111: reg = "edi"; break;
-		default:
-		}
-	}
+	const(char) *reg = x86_modrm_rm_reg(modrm, p.x86.pf_address); 
 
 	switch (mode) {
 	case RM_MOD_00:	// Memory Mode, no displacement
@@ -4457,18 +4401,18 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 						seg, *p.addru32);
 				else
 					disasm_push_x86_sib_mod00_base101(p, seg,
-						x86_modrm_reg(p, sib, X86_WIDTH_WIDE),
+						x86_modrm_rm_reg(sib, false),
 						scale, *p.addru32);
 			}
 			p.addrv += 4;
 		} else { // BASE32 + INDEX * SCALE
 			if (p.mode < DisasmMode.File) return;
-			rbase = x86_modrm_reg(p, sib << 3, X86_WIDTH_WIDE);
+			rbase = x86_modrm_rm_reg(sib, false);
 			if (index == SIB_INDEX_100)
 				disasm_push_x86_sib_mod00_index100(p, seg, rbase);
 			else
 				disasm_push_x86_sib_mod00(p, seg, rbase,
-					x86_modrm_reg(p, sib, X86_WIDTH_WIDE),
+					x86_modrm_rm_reg(sib, false),
 					scale);
 		}
 		return;
@@ -4478,15 +4422,15 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 				disasm_push_x8(p, *p.addru8);
 				disasm_push_x86_sib_mod01_index100(p,
 					seg,
-					x86_modrm_reg(p, sib << 3, X86_WIDTH_WIDE),
+					x86_modrm_rm_reg(sib, false),
 					*p.addru8);
 			}
 			++p.addrv;
 		} else { // BASE8 + INDEX * SCALE + DISP32
 			if (p.mode >= DisasmMode.File) {
 				disasm_push_x32(p, *p.addru32);
-				rbase = x86_modrm_reg(p, sib << 3, X86_WIDTH_NONE);
-				rindex = x86_modrm_reg(p, sib, X86_WIDTH_WIDE);
+				rbase = x86_modrm_rm_reg(sib, false);
+				rindex = x86_modrm_rm_reg(sib >> 3, false);
 				disasm_push_x86_sib_mod01(p,
 					seg, rbase, rindex, scale, *p.addru32);
 			}
@@ -4496,12 +4440,12 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	case RM_MOD_10:
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x32(p, *p.addru32);
-			rbase = x86_modrm_reg(p, sib << 3, X86_WIDTH_WIDE);
+			rbase = x86_modrm_rm_reg(sib, false);
 			if ((sib & SIB_INDEX) == SIB_INDEX_100) { // BASE32 + DISP32
 				disasm_push_x86_sib_mod01_index100(p,
 				seg, rbase, *p.addru32);
 			} else { // BASE32 + INDEX * SCALE + DISP32
-				rindex = x86_modrm_reg(p, sib, X86_WIDTH_WIDE);
+				rindex = x86_modrm_rm_reg(sib >> 3, false);
 				disasm_push_x86_sib_mod01(p,
 					seg, rbase, rindex, scale, *p.addru32);
 			}

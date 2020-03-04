@@ -19,6 +19,9 @@ alicedbg-test-*
 *.json
 dub*.s
 
+# Stuff not ready yet
+include
+
 # Personal notes
 NOTES
 
