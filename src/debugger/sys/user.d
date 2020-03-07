@@ -107,15 +107,15 @@ version (X86) {
 		int u_fpvalid;
 		/// 
 		user_fpregs_struct i387;
-		/// 
+		/// Text segment size (pages).
 		uint u_tsize;
-		/// 
+		/// Data segment size (pages).
 		uint u_dsize;
-		/// 
+		/// Stack segment size (pages).
 		uint u_ssize;
-		/// 
+		/// Starting virtual address of text.
 		uint start_code;
-		/// 
+		/// Starting virtual address of stack area.
 		uint start_stack;
 		/// 
 		int signal;
@@ -224,15 +224,15 @@ version (X86_64) {
 		int u_fpvalid;
 		/// 
 		user_fpregs_struct i387;
-		/// 
+		/// Text segment size (pages).
 		long u_tsize;
-		/// 
+		/// Data segment size (pages).
 		long u_dsize;
-		/// 
+		/// Stack segment size (pages).
 		long u_ssize;
-		/// 
+		/// Starting virtual address of text.
 		long start_code;
-		/// 
+		/// Starting virtual address of stack area.
 		long start_stack;
 		/// 
 		long signal;
@@ -240,13 +240,13 @@ version (X86_64) {
 		int reserved;
 		union {
 			/// 
-			user_regs_struct* u_ar0;
+			user_regs_struct *u_ar0;
 			/// 
 			ulong __u_ar0_word;
 		}
 		union {
 			/// 
-			user_fpregs_struct* u_fpstate;
+			user_fpregs_struct *u_fpstate;
 			/// 
 			ulong __u_fpstate_word;
 		}

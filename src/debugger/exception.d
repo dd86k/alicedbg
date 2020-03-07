@@ -14,7 +14,7 @@ version (Windows) {
 	import core.sys.windows.windows;
 } else
 version (Posix) {
-	import debugger.sys.user : user;
+	import debugger.sys.user;
 	import debugger.sys.ptrace : siginfo_t;
 	import core.sys.posix.signal;
 }
@@ -381,33 +381,33 @@ int exception_ctx_windows(ref exception_t e, ref CONTEXT c) {
 } else // version Windows
 version (Posix) {
 
-/// Populate exception_t.registers array from Glibc's user
-int exception_ctx_user(ref exception_t e, ref user u) {
+/// Populate exception_t.registers array from user_regs_struct
+int exception_ctx_user(ref exception_t e, ref user_regs_struct u) {
 	version (X86) {
 //		e.addrv = u.regs.eip;
-		e.registers[0].u32 = u.regs.eip;
-		e.registers[1].u32 = u.regs.eflags;
-		e.registers[2].u32 = u.regs.eax;
-		e.registers[3].u32 = u.regs.ebx;
-		e.registers[4].u32 = u.regs.ecx;
-		e.registers[5].u32 = u.regs.edx;
-		e.registers[6].u32 = u.regs.esp;
-		e.registers[7].u32 = u.regs.ebp;
-		e.registers[8].u32 = u.regs.esi;
-		e.registers[9].u32 = u.regs.edi;
+		e.registers[0].u32 = u.eip;
+		e.registers[1].u32 = u.eflags;
+		e.registers[2].u32 = u.eax;
+		e.registers[3].u32 = u.ebx;
+		e.registers[4].u32 = u.ecx;
+		e.registers[5].u32 = u.edx;
+		e.registers[6].u32 = u.esp;
+		e.registers[7].u32 = u.ebp;
+		e.registers[8].u32 = u.esi;
+		e.registers[9].u32 = u.edi;
 	} else
 	version (X86_64) {
 //		e.addrv = u.regs.rip;
-		e.registers[0].u64 = u.regs.rip;
-		e.registers[1].u32 = cast(uint)u.regs.eflags;
-		e.registers[2].u64 = u.regs.rax;
-		e.registers[3].u64 = u.regs.rbx;
-		e.registers[4].u64 = u.regs.rcx;
-		e.registers[5].u64 = u.regs.rdx;
-		e.registers[6].u64 = u.regs.rsp;
-		e.registers[7].u64 = u.regs.rbp;
-		e.registers[8].u64 = u.regs.rsi;
-		e.registers[9].u64 = u.regs.rdi;
+		e.registers[0].u64 = u.rip;
+		e.registers[1].u32 = cast(uint)u.eflags;
+		e.registers[2].u64 = u.rax;
+		e.registers[3].u64 = u.rbx;
+		e.registers[4].u64 = u.rcx;
+		e.registers[5].u64 = u.rdx;
+		e.registers[6].u64 = u.rsp;
+		e.registers[7].u64 = u.rbp;
+		e.registers[8].u64 = u.rsi;
+		e.registers[9].u64 = u.rdi;
 	}
 	return 0;
 }

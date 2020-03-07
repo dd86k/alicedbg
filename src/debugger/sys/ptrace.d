@@ -14,7 +14,6 @@ public import core.sys.posix.signal :
 	siginfo_t,
 	SIGSEGV, SIGFPE, SIGILL, SIGINT, SIGTERM, SIGABRT,
 	SIGTRAP, SIGBUS;
-public import debugger.sys.user : user;
 import core.sys.posix.sys.types : pid_t, uid_t;
 
 extern (C):

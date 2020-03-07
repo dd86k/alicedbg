@@ -351,7 +351,7 @@ void disasm_push_x86_sib_mod01_index100(ref disasm_params_t p,
 //
 
 /// Set error code with DisasmError enum and override mnemonic buffer to
-/// DISASM_FMT_ERR_STR.
+/// DISASM_FMT_ERR_STR (copied string). Does not touch the machine code buffer.
 /// Params:
 /// 	p = Disassembler parameters
 /// 	e = Disassembler error (DisasmError, defaults to Illegal)
@@ -441,6 +441,11 @@ void disasm_xadd(ref disasm_params_t p, const(char) *s) {
 	with (p)
 	mcbufi = stradd(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, s);
 }
+
+//
+// Formatting functions
+//
+
 /// (Internal) Format and return the formatted string of a formatter item. Called
 /// by disasm_render.
 /// Params:

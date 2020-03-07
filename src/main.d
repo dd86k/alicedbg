@@ -33,9 +33,10 @@ enum DebuggerMode {
 /// "sub-help" screen for cshow
 enum CLIPage {
 	main,
-	license,
 	ui,
 	dstyles,
+	marchs,
+	license,
 }
 
 /// CLI options
@@ -96,11 +97,14 @@ int clipage(CLIPage h) {
 	break;
 	case dstyles:
 		r =
-		"Available disassembler styles (default=intel)\n"~
+		"Available disassembler styles\n"~
 		"intel .... Intel syntax\n"~
 		"nasm ..... Netwide Assembler syntax\n"~
 		"att ...... AT&T syntax"
 		;
+	break;
+	case marchs:
+		r = "Architectures: x86, x86_64";
 	break;
 	case license:
 		r =
@@ -145,7 +149,6 @@ int main(int argc, const(char) **argv) {
 
 	cliopt_t opt;	/// Defaults to .init
 	disasm_params_t disopt;	/// .init
-	disopt.style = DisasmSyntax.Intel;
 
 	// CLI
 	for (size_t argi = 1; argi < argc; ++argi) {
@@ -216,10 +219,35 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		// Set machine architecture, affects disassembly
-		/*if (strcmp(arg, "march") == 0) {
-			
-		}*/
+		// disassembler: machine architecture, affects disassembly
+		if (strcmp(arg, "march") == 0) {
+			if (argi + 1 >= argc) {
+				puts("cli: ui argument missing");
+				return EXIT_FAILURE;
+			}
+			const(char) *march = argv[++argi];
+			if (strcmp(march, "x86") == 0)
+				disopt.abi = DisasmABI.x86;
+			else if (strcmp(march, "x86_64") == 0)
+				disopt.abi = DisasmABI.x86_64;
+			else if (strcmp(march, "thumb") == 0)
+				disopt.abi = DisasmABI.arm_t32;
+			else if (strcmp(march, "arm") == 0)
+				disopt.abi = DisasmABI.arm_a32;
+			else if (strcmp(march, "aarch64") == 0)
+				disopt.abi = DisasmABI.arm_a64;
+			else if (strcmp(march, "guess") == 0) {
+				puts("guess feature not implemented");
+				return EXIT_FAILURE;
+			} else if (strcmp(march, "?") == 0)
+				return clipage(CLIPage.marchs);
+			else {
+				printf("Unknown machine architecture: '%s'\n", march);
+				return EXIT_FAILURE;
+			}
+			continue;
+		}
+
 		// disassembler: select style
 		if (strcmp(arg, "dstyle") == 0) {
 			if (argi + 1 >= argc) {

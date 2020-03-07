@@ -16,13 +16,14 @@ enum DisasmMode {
 /// Disassembler error
 enum DisasmError {
 	None,	/// Nothing to report
+	NullAddress,	/// Address given in 
 	NotSupported,	/// Selected ISA is not currently supported
 	Illegal,	/// Illegal/invalid opcode
 }
 
 /// Disassembler ABI
 enum DisasmABI : ubyte {
-	Default,	/// Platform compiled target
+	Default,	/// Platform compiled target default
 	Guess,	/// (Not implemented) Attempt to guess ISA
 	x86,	/// x86
 	x86_64,	/// AMD64
@@ -33,6 +34,7 @@ enum DisasmABI : ubyte {
 
 /// Disassembler x86 styles
 enum DisasmSyntax : ubyte {
+	Default,	/// Platform compiled target default
 	Intel,	/// Intel syntax
 	Nasm,	/// (NASM) Netwide Assembler syntax
 	Att,	/// AT&T syntax
@@ -54,30 +56,23 @@ enum DisasmDemangle : ushort {
 /// not enough, update it to 80 characters.
 enum DISASM_BUF_SIZE = 64;
 
-version (X86)
+version (X86) {
 	enum DISASM_DEFAULT_ISA = DisasmABI.x86;	/// Platform default ABI
-else
-version (X86_64)
+	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Intel;	/// Platform default syntax
+} else
+version (X86_64) {
 	enum DISASM_DEFAULT_ISA = DisasmABI.x86_64;	/// Platform default ABI
-else
-version (ARM)
+	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Intel;	/// Platform default syntax
+} else
+version (ARM) {
 	enum DISASM_DEFAULT_ISA = DisasmABI.arm_a32;	/// Platform default ABI
-else
-version (AArch64)
+	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Att;	/// Platform default syntax
+} else
+version (AArch64) {
 	enum DISASM_DEFAULT_ISA = DisasmABI.arm_a64;	/// Platform default ABI
-else
+	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Att;	/// Platform default syntax
+} else
 	enum DISASM_DEFAULT_ISA = DisasmABI.Default;	/// Platform default ABI
-
-//
-// Include bits
-//
-
-deprecated enum DISASM_I_MACHINECODE	= 0b0000_0001;	/// Include machine code
-deprecated enum DISASM_I_MNEMONICS	= 0b0000_0010;	/// Include instruction mnemonics
-deprecated enum DISASM_I_SYMBOLS	= 0b0000_0100;	/// (Not implemented) Include symbols
-deprecated enum DISASM_I_SOURCE	= 0b0000_1000;	/// (Not implemented) Include source code
-deprecated enum DISASM_I_COMMENTS	= 0b0001_0000;	/// (Not implemented) Include inlined comments
-deprecated enum DISASM_I_EVERYTHING	= 0xFF;	/// Include everything
 
 //
 // Option bits
@@ -149,13 +144,20 @@ struct disasm_params_t { align(1):
 pragma(msg, "* disasm_params_t.sizeof: ", disasm_params_t.sizeof);
 
 /**
- * Disassemble from a memory pointer given in params. Caller must ensure
- * memory pointer points to readable regions and bounds are respected.
+ * Disassemble instructions from a memory pointer given in disasm_params_t.
+ * Caller must ensure memory pointer points to readable regions and givens
+ * bounds are respected. The error field is always set.
  * Params:
  * 	p = Disassembler parameters
- * Returns: Error code if non-zero
+ * Returns: Error code; Non-zero indicating an error
  */
 int disasm_line(ref disasm_params_t p, DisasmMode mode) {
+	if (p.addr == null) {
+		disasm_err(p, DisasmError.NullAddress);
+		p.mcbuf[0] = 0;
+		return p.error;
+	}
+
 	p.mode = mode;
 	p.error = DisasmError.None;
 	p.lastaddr = p.addrv;
@@ -174,10 +176,15 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 	switch (p.abi) {
 	case x86: disasm_x86(p); break;
 	case x86_64: disasm_x86_64(p); break;
-	default: return DisasmError.NotSupported;
+	default:
+		disasm_err(p, DisasmError.NotSupported);
+		p.mcbuf[0] = 0;
+		return p.error;
 	}
 
 	if (p.mode >= DisasmMode.File) {
+		if (p.style == DisasmSyntax.Default)
+			p.style = DISASM_DEFAULT_SYNTAX;
 		disasm_render(p);
 		with (p) mcbuf[mcbufi - 1] = mnbuf[mnbufi] = 0;
 	}

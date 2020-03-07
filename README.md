@@ -12,7 +12,8 @@ Personal Goals:
 
 - [ ] Make a usable Text UI close to a professional debugger
 - [ ] Debug an application on my Raspberry Pi 3B+ and my Purism Librem 5
-- [ ] Embed, as a library, into an embedded HTTP server to provide a WebUI
+- [ ] Disassemble ARM instructions with the Intel syntax
+- [ ] Embed, as a library, into an embedded HTTP server to provide a local WebUI
 
 ## Support Matrix
 

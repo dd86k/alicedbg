@@ -22,6 +22,7 @@ version (Posix) {
 	import core.sys.posix.signal : kill, SIGKILL;
 	import core.stdc.stdlib : exit;
 	import debugger.sys.ptrace;
+	import debugger.sys.user;
 	private enum __WALL = 0x40000000;
 	private pid_t hprocess; /// Saved process ID
 }
@@ -82,7 +83,6 @@ int dbg_file(const(char) *cmd) {
 			int e = execve(cmd, null, null);
 			if (e == -1)
 				return errno;
-			exit(e);
 		}
 	}
 	return 0;
@@ -194,10 +194,8 @@ L_DEBUG_LOOP:
 	} else
 	version (Posix) {
 		int wstatus = void;
-		int pid = void;
-		int chld_signo = void;
 L_DEBUG_LOOP:
-		pid = waitpid(-1, &wstatus, 0);
+		int pid = waitpid(-1, &wstatus, 0);
 
 		if (pid == -1)
 			return 3;
@@ -209,7 +207,7 @@ L_DEBUG_LOOP:
 		//  7    Core dumped
 		// 15:8  exit value (or returned main value)
 		//       or signal that cause child to stop/continue
-		chld_signo = wstatus >> 8;
+		int chld_signo = wstatus >> 8;
 
 		// Only interested if child is continuing or stopped; Otherwise
 		// it exited and there's nothing more we can do about it.
@@ -228,23 +226,27 @@ L_DEBUG_LOOP:
 		}
 
 		e.pid = pid;
+		e.tid = 0;
 		e.oscode = chld_signo;
 		e.type = exception_type_code(chld_signo);
 
-		user u = void;
+		user_regs_struct u = void;
 		if (ptrace(PTRACE_GETREGS, pid, null, &u) == -1)
 			return 6;
 
 		exception_ctx_user(e, u);
 
 		if (chld_signo == SIGTRAP) {
-			// Assuming opcode CC triggered SIGTRAP
-			version (X86) {
-				e.addrv = u.regs.eip - 1;
-			} else
-			version (X86_64) {
-				e.addrv = u.regs.rip - 1;
-			}
+			//TODO: Find a way to find the fault address
+			// And make it readable (via mprotect?)
+			// - linux does not fill si_addr on a SIGTRAP from a ptrace event
+			//   - see sigaction(2)
+			// - linux *only* fills user_regs_struct for "user area"
+			//   - see arch/x86/include/asm/user_64.h
+			// - using EIP/RIP is NOT a good idea
+			//   - IP ALWAYS point to NEXT instruction
+			//   - First SIGTRAP does use int3 (Windows does, not linux)
+			e.addr = null;
 		} else {
 			siginfo_t sig = void;
 			if (ptrace(PTRACE_GETSIGINFO, pid, null, &sig) == -1)
@@ -255,7 +257,6 @@ L_DEBUG_LOOP:
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
 		case exit:
-			//TODO: See if ptrace(PTRACE_CONT, pid, null, SIGKILL); is a better choice
 			kill(hprocess, SIGKILL); // PTRACE_KILL is deprecated
 			return 0;
 		case step:
