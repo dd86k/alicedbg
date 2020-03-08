@@ -51,7 +51,7 @@ L_CONTINUE:
 	if (p.mode >= DisasmMode.File)
 		disasm_push_x8(p, b);
 
-	main: switch (b) {
+	switch (b) {
 	case 0xCC: // int3
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "int3");
