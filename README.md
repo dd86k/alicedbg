@@ -21,7 +21,7 @@ Personal Goals:
 
 | Platform | OS | CRT | Debugging core |
 |---|---|---|:-:|
-| x86 | Windows 7 and up | Microsoft | ✔️ |
+| x86 | Windows 7 and up | Microsoft (including WOW64) | ✔️ |
 | | Linux | Glibc | ✔️* |
 | ARM | Windows 10 | Microsoft |  |
 | | Linux | Glibc | Planned! |

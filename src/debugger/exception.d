@@ -12,6 +12,7 @@ module debugger.exception;
 
 version (Windows) {
 	import core.sys.windows.windows;
+	import debugger.sys.wow64;
 } else
 version (Posix) {
 	import debugger.sys.user;
@@ -298,8 +299,24 @@ const(char) *exception_reg_fval(ref register_t reg) {
 
 package:
 
-void exception_reg_init(ref exception_t e) {
-	version (X86) {
+// This is only here due to Windows' WOW64
+enum InitPlatform {
+	Native,
+	x86,
+	x86_64
+}
+
+// Thanks, Windows, for your silly WOW64
+void exception_reg_init(ref exception_t e, InitPlatform plat) {
+	if (plat == InitPlatform.Native) {
+		version (X86)
+			plat = InitPlatform.x86;
+		else version (X86_64)
+			plat = InitPlatform.x86_64;
+	}
+	with (InitPlatform)
+	switch (plat) {
+	case x86:
 		e.regcount = 10;
 		e.registers[0].name = "EIP";
 		e.registers[0].type = RegisterType.U32;
@@ -321,8 +338,8 @@ void exception_reg_init(ref exception_t e) {
 		e.registers[8].type = RegisterType.U32;
 		e.registers[9].name = "EDI";
 		e.registers[9].type = RegisterType.U32;
-	} else
-	version (X86_64) {
+		return;
+	case x86_64:
 		e.regcount = 10;
 		e.registers[0].name = "RIP";
 		e.registers[0].type = RegisterType.U64;
@@ -344,6 +361,8 @@ void exception_reg_init(ref exception_t e) {
 		e.registers[8].type = RegisterType.U64;
 		e.registers[9].name = "RDI";
 		e.registers[9].type = RegisterType.U64;
+		return;
+	default:
 	}
 }
 
@@ -375,6 +394,21 @@ int exception_ctx_windows(ref exception_t e, ref CONTEXT c) {
 		e.registers[8].u64 = c.Rsi;
 		e.registers[9].u64 = c.Rdi;
 	}
+	return 0;
+}
+
+version (Win64)
+int exception_ctx_windows_wow64(ref exception_t e, ref WOW64_CONTEXT c) {
+	e.registers[0].u32 = c.Eip;
+	e.registers[1].u32 = c.EFlags;
+	e.registers[2].u32 = c.Eax;
+	e.registers[3].u32 = c.Ebx;
+	e.registers[4].u32 = c.Ecx;
+	e.registers[5].u32 = c.Edx;
+	e.registers[6].u32 = c.Esp;
+	e.registers[7].u32 = c.Ebp;
+	e.registers[8].u32 = c.Esi;
+	e.registers[9].u32 = c.Edi;
 	return 0;
 }
 

@@ -9,10 +9,13 @@ __gshared:
 
 version (Windows) {
 	import core.sys.windows.windows;
+	import debugger.sys.wow64;
 	//SymInitialize, GetFileNameFromHandle, SymGetModuleInfo64,
 	//StackWalk64, SymGetSymFromAddr64, SymFromName
 	private HANDLE hthread; /// Saved thread handle, DEBUG_INFO doesn't contain one
 	private HANDLE hprocess; /// Saved process handle
+	version (Win64)
+		private int processWOW64;
 } else
 version (Posix) {
 	import core.sys.posix.sys.stat;
@@ -35,7 +38,7 @@ enum DebuggerAction {
 	step,	/// Proceed with a single step
 }
 
-private
+private __gshared
 int function(exception_t*) user_function;
 
 /**
@@ -52,24 +55,30 @@ int dbg_file(const(char) *cmd) {
 	version (Windows) {
 		STARTUPINFOA si = void;
 		PROCESS_INFORMATION pi = void;
-		memset(&si, 0, si.sizeof);
-		memset(&pi, 0, pi.sizeof);
+		memset(&si, 0, si.sizeof); // D init fields might NOT BE zero
+		memset(&pi, 0, pi.sizeof); // Might also be faster to memset
 		si.cb = STARTUPINFOA.sizeof;
-		// DEBUG_ONLY_THIS_PROCESS is recommended over DEBUG_PROCESS
-		// because it may create child processes/threads that
-		// we probably don't want to catch possible child exceptions
+		// Not using DEBUG_ONLY_THIS_PROCESS because our posix
+		// counterpart is using -1 (all children) for waitpid.
 		if (CreateProcessA(cmd, null,
 			null, null,
-			FALSE, DEBUG_ONLY_THIS_PROCESS,
-			null, null,
-			&si, &pi) == 0) {
+			FALSE, DEBUG_PROCESS,
+			null, null, &si, &pi) == 0)
 			return GetLastError();
-		}
 		hthread = pi.hThread;
 		hprocess = pi.hProcess;
+		// Microsoft recommends getting function pointer with
+		// GetProcAddress("kernel32", "IsWow64Process"), but so far
+		// only 64-bit versions of Windows really have WOW64.
+		// Nevertheless, required to support 32-bit processes under
+		// 64-bit builds.
+		version (Win64) {
+			if (IsWow64Process(hprocess, &processWOW64))
+				return GetLastError();
+		}
 	} else
 	version (Posix) {
-		// Verify if file exists and program has access to it
+		// Verify if file exists and we has access to it
 		stat_t st = void;
 		if (stat(cmd, &st) == -1)
 			return errno;
@@ -80,8 +89,7 @@ int dbg_file(const(char) *cmd) {
 		if (hprocess == 0) {
 			if (ptrace(PTRACE_TRACEME, 0, null, null))
 				return errno;
-			int e = execve(cmd, null, null);
-			if (e == -1)
+			if (execve(cmd, null, null) == -1)
 				return errno;
 		}
 	}
@@ -112,7 +120,7 @@ int dbg_attach(int pid) {
  * Params: f = Function pointer
  * Returns: Zero on success; Otherwise an error occured
  */
-int dbg_sethandle(int function(exception_t *) f) {
+int dbg_sethandle(int function(exception_t*) f) {
 	user_function = f;
 	return 0;
 }
@@ -130,7 +138,11 @@ int dbg_loop() {
 		return 4;
 
 	exception_t e = void;
-	exception_reg_init(e);
+
+	version (Win64) {
+		exception_reg_init(e, processWOW64 ? InitPlatform.x86 : InitPlatform.Native);
+	} else
+		exception_reg_init(e, InitPlatform.Native);
 
 	version (Windows) {
 		DEBUG_EVENT de = void;
@@ -163,10 +175,23 @@ L_DEBUG_LOOP:
 				de.Exception.ExceptionRecord.ExceptionCode);
 		}
 
-		CONTEXT c = void;
-		c.ContextFlags = CONTEXT_ALL;
-		GetThreadContext(hthread, &c);
-		exception_ctx_windows(e, c);
+		CONTEXT ctx = void;
+		version (Win64) {
+			WOW64_CONTEXT ctxwow64 = void;
+			if (processWOW64) {
+				ctxwow64.ContextFlags = CONTEXT_ALL;
+				Wow64GetThreadContext(hthread, &ctxwow64);
+				exception_ctx_windows_wow64(e, ctxwow64);
+			} else {
+				ctx.ContextFlags = CONTEXT_ALL;
+				GetThreadContext(hthread, &ctx);
+				exception_ctx_windows(e, ctx);
+			}
+		} else {
+			ctx.ContextFlags = CONTEXT_ALL;
+			GetThreadContext(hthread, &ctx);
+			exception_ctx_windows(e, ctx);
+		}
 
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
@@ -174,21 +199,30 @@ L_DEBUG_LOOP:
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
 			return 0;
 		case step:
+			// Enable single-stepping via Trap flag
 			version (X86) {
-			//	if (de.Exception.dwFirstChance)
-			//		--c.Eip;
-				c.EFlags |= 0x100;	// Trap Flag, enable single-stepping
+				ctx.EFlags |= 0x100;
 			} else
 			version (X86_64) {
-			//	if (de.Exception.dwFirstChance)
-			//		--c.Rip;
-				c.EFlags |= 0x100;	// Trap Flag, enable single-stepping
+				if (processWOW64)
+					ctxwow64.EFlags |= 0x100;
+				else
+					ctx.EFlags |= 0x100;
 			}
 			FlushInstructionCache(hprocess, null, 0);
-			SetThreadContext(hthread, &c);
+			version (Win64) {
+				if (processWOW64) {
+					Wow64SetThreadContext(hthread, &ctxwow64);
+				} else {
+					SetThreadContext(hthread, &ctx);
+				}
+			} else {
+				SetThreadContext(hthread, &ctx);
+			}
 			goto case;
 		case proceed:
-			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
+			if (ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE) == 0)
+				return GetLastError();
 			goto L_DEBUG_LOOP;
 		}
 	} else
@@ -245,7 +279,7 @@ L_DEBUG_LOOP:
 			//   - see arch/x86/include/asm/user_64.h
 			// - using EIP/RIP is NOT a good idea
 			//   - IP ALWAYS point to NEXT instruction
-			//   - First SIGTRAP does use int3 (Windows does, not linux)
+			//   - First SIGTRAP does NOT contain int3 (Windows does, though)
 			e.addr = null;
 		} else {
 			siginfo_t sig = void;

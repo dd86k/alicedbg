@@ -38,7 +38,7 @@ struct x86_internals_t {
  * Returns: DisasmError
  */
 void disasm_x86(ref disasm_params_t p) {
-	x86_internals_t internals;
+	x86_internals_t internals = void;
 	p.x86 = &internals;
 
 	with (p.x86)
@@ -3319,6 +3319,7 @@ void x86_0f(ref disasm_params_t p) {
 		++p.addrv;
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x8(p, modrm);
+			disasm_push_x8(p, imm);
 			disasm_push_str(p, m);
 			disasm_push_reg(p,
 				x86_modrm_reg(p, modrm, w));

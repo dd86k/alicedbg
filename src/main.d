@@ -219,7 +219,7 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		// disassembler: machine architecture, affects disassembly
+		// debugger: machine architecture, affects disassembly
 		if (strcmp(arg, "march") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: ui argument missing");
@@ -334,9 +334,13 @@ L_CLI_DEFAULT:
 
 		with (DebuggerUI)
 		final switch (opt.ui) {
-		case loop: return loop_enter;
-		case tui: return tui_enter;
+		case loop: e = loop_enter(disopt); break;
+		case tui: e = tui_enter(disopt); break;
 		}
+		if (e) {
+			printf("ui: ("~F_ERR~") %s\n", e, err_msg(e));
+		}
+		return e;
 	case dumper:
 		return dump(opt.file, disopt);
 	case profiler:

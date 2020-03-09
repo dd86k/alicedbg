@@ -4,13 +4,14 @@ module ui.tui;
 import core.stdc.stdio;
 import os.term;
 import debugger;
+import ui.common;
 
 extern (C):
 __gshared:
 
 /// Initiate TUI and enter input loop
 /// Return: Error code
-int tui_enter() {
+int tui_enter(ref disasm_params_t p) {
 	term_init;
 	term_wsize(tui_size);
 	if (tui_size.width < 80 || tui_size.height < 24) {
@@ -22,6 +23,7 @@ int tui_enter() {
 		printf("Could not initiate terminal buffer (%d)\n", e);
 		return e;
 	}
+	disparams = p;
 	dbg_sethandle(&tui_handler);
 	return dbg_loop;
 }
@@ -80,23 +82,21 @@ L_READKEY:
 /// Params: e = Exception structure
 int tui_handler(exception_t *e) {
 	term_clear;
-	// disasm settings
-	disasm_params_t params;
-	params.addrv = e.addrv;
+	disparams.addr = e.addr;
 	// locals
 	const uint h = tui_size.height / 2;
 	const uint ihmax = tui_size.height - 2;
 	// On-point
 	term_pos(0, h);
-	if (disasm_line(params, DisasmMode.File) == DisasmError.None)
+	if (disasm_line(disparams, DisasmMode.File) == DisasmError.None)
 		term_writef("> %zX %-20s %s",
-			params.lastaddr, &params.mcbuf, &params.mnbuf);
+			disparams.lastaddr, &disparams.mcbuf, &disparams.mnbuf);
 	// forward
 	for (uint hi = h + 1; hi < ihmax; ++hi) {
 		term_pos(0, hi);
-		disasm_line(params, DisasmMode.File);
+		disasm_line(disparams, DisasmMode.File);
 		term_writef("  %zX %-20s %s",
-			params.lastaddr, &params.mcbuf, &params.mnbuf);
+			disparams.lastaddr, &disparams.mcbuf, &disparams.mnbuf);
 	}
 	// backward
 	//for (uint ih = h - 1; ih >= 0; ih) {

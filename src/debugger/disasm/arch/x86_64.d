@@ -30,6 +30,7 @@ struct x86_64_internals_t {
 		int group4;
 		int pf_address; /// 67H Address prefix
 	}
+	int rex; /// REX prefix
 }
 
 /**
@@ -38,11 +39,11 @@ struct x86_64_internals_t {
  * Returns: DisasmError
  */
 void disasm_x86_64(ref disasm_params_t p) {
-	x86_64_internals_t internals;
+	x86_64_internals_t internals = void;
 	p.x86_64 = &internals;
 
 	with (p.x86_64)
-	group1 = group2 = group3 = group4 = 0;
+	group1 = group2 = group3 = group4 = rex = 0;
 
 L_CONTINUE:
 	ubyte b = *p.addru8;

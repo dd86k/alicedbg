@@ -42,6 +42,10 @@ enum FORMATTER_O_NO_DIRECTION = 1;
 /// (Not implemented) Second separator will be a space (" ") instead of a comma (", ").
 /// Very useful for instruction prefixes such as LOCK (x86)
 enum FORMATTER_O_PREFIX = 2;
+/// Machine code: Do not group machine group integers
+enum FORMATTER_O_MC_NOGROUP = 4;
+/// Machine code: Do not add an extra space
+enum FORMATTER_O_MC_NOSPACE = 8;
 
 /// Item type, each item more or less has their own formatting function
 enum FormatType {
@@ -93,7 +97,8 @@ immutable const(char) *DISASM_FMT_ERR_STR = "??";
 /// 	v = 8-bit value
 void disasm_push_x8(ref disasm_params_t p, ubyte v) {
 	disasm_xadd(p, strx02(v));
-	disasm_xadd(p, " ");
+	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
+		disasm_xadd(p, " ");
 }
 /// Push an 16-bit value into the machine code buffer.
 /// Params:
@@ -101,7 +106,8 @@ void disasm_push_x8(ref disasm_params_t p, ubyte v) {
 /// 	v = 16-bit value
 void disasm_push_x16(ref disasm_params_t p, ushort v) {
 	disasm_xadd(p, strx04(v));
-	disasm_xadd(p, " ");
+	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
+		disasm_xadd(p, " ");
 }
 /// Push an 32-bit value into the machine code buffer.
 /// Params:
@@ -109,7 +115,8 @@ void disasm_push_x16(ref disasm_params_t p, ushort v) {
 /// 	v = 32-bit value
 void disasm_push_x32(ref disasm_params_t p, uint v) {
 	disasm_xadd(p, strx08(v));
-	disasm_xadd(p, " ");
+	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
+		disasm_xadd(p, " ");
 }
 /// Push an 64-bit value into the machine code buffer.
 /// Params:
@@ -117,7 +124,8 @@ void disasm_push_x32(ref disasm_params_t p, uint v) {
 /// 	v = 64-bit value
 void disasm_push_x64(ref disasm_params_t p, ulong v) {
 	disasm_xadd(p, strx016(v));
-	disasm_xadd(p, " ");
+	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
+		disasm_xadd(p, " ");
 }
 
 //
