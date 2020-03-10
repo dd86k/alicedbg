@@ -85,7 +85,15 @@ struct disasm_fmt_t {
 }
 
 /// Default string for illegal instructions
+private
 immutable const(char) *DISASM_FMT_ERR_STR = "??";
+
+// Reduces number of global string instances
+// immutable implies __gshared
+private
+immutable const(char) *DISASM_FMT_SPACE = " ";
+private
+immutable const(char) *DISASM_FMT_COMMA_SPACE = ", ";
 
 //
 // Machine code functions
@@ -98,7 +106,7 @@ immutable const(char) *DISASM_FMT_ERR_STR = "??";
 void disasm_push_x8(ref disasm_params_t p, ubyte v) {
 	disasm_xadd(p, strx02(v));
 	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
-		disasm_xadd(p, " ");
+		disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 16-bit value into the machine code buffer.
 /// Params:
@@ -107,7 +115,7 @@ void disasm_push_x8(ref disasm_params_t p, ubyte v) {
 void disasm_push_x16(ref disasm_params_t p, ushort v) {
 	disasm_xadd(p, strx04(v));
 	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
-		disasm_xadd(p, " ");
+		disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 32-bit value into the machine code buffer.
 /// Params:
@@ -116,7 +124,7 @@ void disasm_push_x16(ref disasm_params_t p, ushort v) {
 void disasm_push_x32(ref disasm_params_t p, uint v) {
 	disasm_xadd(p, strx08(v));
 	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
-		disasm_xadd(p, " ");
+		disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 64-bit value into the machine code buffer.
 /// Params:
@@ -125,7 +133,7 @@ void disasm_push_x32(ref disasm_params_t p, uint v) {
 void disasm_push_x64(ref disasm_params_t p, ulong v) {
 	disasm_xadd(p, strx016(v));
 	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
-		disasm_xadd(p, " ");
+		disasm_xadd(p, DISASM_FMT_SPACE);
 }
 
 //
@@ -395,23 +403,23 @@ void disasm_render(ref disasm_params_t p) {
 		}
 	}
 
-	disasm_madd(p, " ");
+	disasm_madd(p, DISASM_FMT_SPACE);
 	if (inversedir) {
 		if (nbitems > 2) {
 			disasm_madd(p, disasm_fmt_item(p, p.fmt.items[2]));
-			disasm_madd(p, ", ");
+			disasm_madd(p, DISASM_FMT_COMMA_SPACE);
 		}
 		disasm_madd(p, disasm_fmt_item(p, p.fmt.items[1]));
 	} else {
 		disasm_madd(p, disasm_fmt_item(p, p.fmt.items[1]));
 		if (nbitems > 2) {
-			disasm_madd(p, ", ");
+			disasm_madd(p, DISASM_FMT_COMMA_SPACE);
 			disasm_madd(p, disasm_fmt_item(p, p.fmt.items[2]));
 		}
 	}
 
 	for (size_t index = 3; index < nbitems; ++index) {
-		disasm_madd(p, ", ");
+		disasm_madd(p, DISASM_FMT_COMMA_SPACE);
 		disasm_madd(p, disasm_fmt_item(p, p.fmt.items[index]));
 	}
 }
@@ -490,7 +498,8 @@ const(char) *disasm_fmt_item(ref disasm_params_t p, ref disasm_fmt_item_t i) {
 		return disasm_fmt_sib_memsegbaseimm(p, i.sval2, i.sval1, i.ival1);
 	}
 }
-const(char) *disasm_fmt_reg(ref disasm_params_t p, const(char) *v) {
+const(char) *disasm_fmt_reg(ref disasm_params_t p,
+	const(char) *v) {
 	if (v[0] == 0) return v;
 	with (DisasmSyntax)
 	switch (p.style) {
@@ -498,33 +507,38 @@ const(char) *disasm_fmt_reg(ref disasm_params_t p, const(char) *v) {
 	default:  return v;
 	}
 }
-const(char) *disasm_fmt_segreg(ref disasm_params_t p, const(char) *seg, const(char) *reg) {
+const(char) *disasm_fmt_segreg(ref disasm_params_t p,
+	const(char) *seg, const(char) *reg) {
 	seg = disasm_fmt_reg(p, seg);
 	reg = disasm_fmt_reg(p, reg);
 	return strf("%s%s", seg, reg);
 }
-const(char) *disasm_fmt_imm(ref disasm_params_t f, int v) {
+const(char) *disasm_fmt_imm(ref disasm_params_t f,
+	int v) {
 	with (DisasmSyntax)
 	switch (f.style) {
 	case Att: return strf("$%d", v);
 	default:  return strf("%d", v);
 	}
 }
-const(char) *disasm_fmt_mem(ref disasm_params_t p, int v) {
+const(char) *disasm_fmt_mem(ref disasm_params_t p,
+	int v) {
 	with (DisasmSyntax)
 	switch (p.style) {
 	case Att: return strf("(%d)", v);
 	default:  return strf("[%d]", v);
 	}
 }
-const(char) *disasm_fmt_memreg(ref disasm_params_t p, const(char) *v) {
+const(char) *disasm_fmt_memreg(ref disasm_params_t p,
+	const(char) *v) {
 	with (DisasmSyntax)
 	switch (p.style) {
 	case Att: return strf("(%s)", v);
 	default:  return strf("[%s]", v);
 	}
 }
-const(char) *disasm_fmt_memsegreg(ref disasm_params_t p, const(char) *seg, const(char) *reg) {
+const(char) *disasm_fmt_memsegreg(ref disasm_params_t p,
+	const(char) *seg, const(char) *reg) {
 	seg = disasm_fmt_reg(p, seg);
 	reg = disasm_fmt_reg(p, reg);
 	with (DisasmSyntax)
@@ -534,7 +548,8 @@ const(char) *disasm_fmt_memsegreg(ref disasm_params_t p, const(char) *seg, const
 	default:   return strf("%s[%s]", seg, reg);
 	}
 }
-const(char) *disasm_fmt_memregimm(ref disasm_params_t p, const(char) *reg, int v) {
+const(char) *disasm_fmt_memregimm(ref disasm_params_t p,
+	const(char) *reg, int v) {
 	reg = disasm_fmt_reg(p, reg);
 	with (DisasmSyntax)
 	switch (p.style) {
@@ -542,7 +557,8 @@ const(char) *disasm_fmt_memregimm(ref disasm_params_t p, const(char) *reg, int v
 	default:   return strf("[%s%+d]", reg, v);
 	}
 }
-const(char) *disasm_fmt_memsegregimm(ref disasm_params_t p, const(char) *seg, const(char) *reg, int v) {
+const(char) *disasm_fmt_memsegregimm(ref disasm_params_t p,
+	const(char) *seg, const(char) *reg, int v) {
 	seg = disasm_fmt_reg(p, seg);
 	reg = disasm_fmt_reg(p, reg);
 	with (DisasmSyntax)

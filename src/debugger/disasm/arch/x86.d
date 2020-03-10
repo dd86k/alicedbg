@@ -4269,8 +4269,16 @@ void x86_0f(ref disasm_params_t p) {
 			disasm_push_reg(p, "edi");
 		}
 		return;
-	case 0xD0: // ADDSUBPD/ADDSUBPS
-	
+	case 0xD0: // ADDSUBPD/ADDSUBPS REG128, RM128
+		const(char) *m = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_66H: m = "addsubpd"; break;
+		case X86_0F_F2H: m = "addsubps"; break;
+		default: disasm_err(p); return;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
 		return;
 	default: // ANCHOR End of instructions
 		disasm_err(p);
@@ -4596,7 +4604,7 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 	//
 
 	const(char) *seg = x86_segstr(p.x86.segreg);
-	const(char) *reg = x86_modrm_rm_reg(modrm, p.x86.pf_address); 
+	const(char) *reg = void;
 
 	switch (mode) {
 	case RM_MOD_00:	// Memory Mode, no displacement
@@ -4607,14 +4615,17 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 				if (p.mode >= DisasmMode.File)
 					disasm_push_memregimm(p, seg, m);
 			} else {
-				if (p.mode >= DisasmMode.File)
+				if (p.mode >= DisasmMode.File) {
+					reg = x86_modrm_rm_reg(modrm, p.x86.pf_address);
 					disasm_push_memsegreg(p, seg, reg);
+				}
 			}
 		} else {
 			if (rm == RM_RM_100) {
 				x86_sib(p, modrm);
 				return;
 			}
+			reg = x86_modrm_rm_reg(modrm, p.x86.pf_address);
 			if (rm == RM_RM_101) {
 				uint m = *p.addru32;
 				p.addrv += 4;
@@ -4633,6 +4644,7 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 		}
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x8(p, *p.addru8);
+			reg = x86_modrm_rm_reg(modrm, p.x86.pf_address);
 			disasm_push_memsegregimm(p, seg, reg, *p.addru8);
 		}
 		++p.addrv;
@@ -4652,13 +4664,15 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 			p.addrv += 4;
 			disasm_push_x32(p, m);
 		}
-		if (p.mode >= DisasmMode.File)
+		if (p.mode >= DisasmMode.File) {
+			reg = x86_modrm_rm_reg(modrm, p.x86.pf_address);
 			disasm_push_memsegregimm(p, seg, reg, m);
+		}
 		p.addrv += 4;
 		break;
 	case RM_MOD_11:
 		if (p.mode >= DisasmMode.File)
-			disasm_push_reg(p, reg);
+			disasm_push_reg(p, x86_modrm_reg(p, modrm << 3, width));
 		break;
 	default: // Never reached
 	}
