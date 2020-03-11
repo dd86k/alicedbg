@@ -1,7 +1,7 @@
 /**
  * x86-specific disassembler.
  */
-module debugger.disasm.arch.x86;
+module debugger.disasm.arch.x86_32;
 
 import debugger.disasm.core;
 import debugger.disasm.formatter;
@@ -10,7 +10,7 @@ import utils.str;
 extern (C):
 
 package
-struct x86_internals_t {
+struct x86_32_internals_t {
 	union {
 		int group1;
 		int lock;
@@ -34,15 +34,17 @@ struct x86_internals_t {
 
 /**
  * x86 disassembler.
- * Params: p = Disassembler parameters
- * Returns: DisasmError
+ * Params:
+ * 	p = Disassembler parameters
+ * 	init = Initiate structure (x86_16 sets this to false)
  */
-void disasm_x86(ref disasm_params_t p) {
-	x86_internals_t internals = void;
-	p.x86 = &internals;
-
-	with (p.x86)
-	group1 = group2 = group3 = group4 = 0;
+void disasm_x86_32(ref disasm_params_t p, bool init = true) {
+	if (init) {
+		x86_32_internals_t i = void;
+		with (i)
+		group1 = group2 = group3 = group4 = 0;
+		p.x86_32 = &i;
+	}
 
 L_CONTINUE:
 	ubyte b = *p.addru8;
@@ -72,7 +74,7 @@ L_CONTINUE:
 	case 0x05:	// ADD EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "add");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		x86_vu32imm(p);
 		return;
@@ -108,7 +110,7 @@ L_CONTINUE:
 	case 0x0D:	// OR EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "or");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		x86_vu32imm(p);
 		return;
@@ -141,7 +143,7 @@ L_CONTINUE:
 	case 0x15:	// ADC EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "adc");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		x86_vu32imm(p);
 		return;
@@ -177,7 +179,7 @@ L_CONTINUE:
 	case 0x1D:	// SBB EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "sbb");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		x86_vu32imm(p);
 		return;
@@ -213,16 +215,16 @@ L_CONTINUE:
 	case 0x25:	// AND EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "and");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0x26:	// ES:
-		if (p.x86.group2) {
+		if (p.x86_32.group2) {
 			p.error = DisasmError.Illegal;
 			return;
 		}
-		p.x86.segreg = PrefixReg.ES;
+		p.x86_32.segreg = PrefixReg.ES;
 		goto L_CONTINUE;
 	case 0x27:	// DAA
 		if (p.mode >= DisasmMode.File)
@@ -248,16 +250,16 @@ L_CONTINUE:
 	case 0x2D:	// SUB EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "sub");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0x2E:	// CS:
-		if (p.x86.group2) {
+		if (p.x86_32.group2) {
 			p.error = DisasmError.Illegal;
 			return;
 		}
-		p.x86.segreg = PrefixReg.CS;
+		p.x86_32.segreg = PrefixReg.CS;
 		goto L_CONTINUE;
 	case 0x2F:	// DAS
 		if (p.mode >= DisasmMode.File)
@@ -283,16 +285,16 @@ L_CONTINUE:
 	case 0x35:	// XOR EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xor");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0x36:	// SS:
-		if (p.x86.group2) {
+		if (p.x86_32.group2) {
 			p.error = DisasmError.Illegal;
 			return;
 		}
-		p.x86.segreg = PrefixReg.SS;
+		p.x86_32.segreg = PrefixReg.SS;
 		goto L_CONTINUE;
 	case 0x37:	// AAA
 		if (p.mode >= DisasmMode.File)
@@ -318,16 +320,16 @@ L_CONTINUE:
 	case 0x3D:	// CMP EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "cmp");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0x3E:	// DS:
-		if (p.x86.group2) {
+		if (p.x86_32.group2) {
 			p.error = DisasmError.Illegal;
 			return;
 		}
-		p.x86.segreg = PrefixReg.DS;
+		p.x86_32.segreg = PrefixReg.DS;
 		goto L_CONTINUE;
 	case 0x3F:	// AAS
 		if (p.mode >= DisasmMode.File)
@@ -336,202 +338,202 @@ L_CONTINUE:
 	case 0x40:	// INC EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x41:	// INC ECX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, p.x86.pf_operand ? "cx" : "ecx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "cx" : "ecx");
 		}
 		return;
 	case 0x42:	// INC EDX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "dx" : "edx");
 		}
 		return;
 	case 0x43:	// INC EBX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bx" : "ebx");
 		}
 		return;
 	case 0x44:	// INC ESP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "sp" : "esp");
 		}
 		return;
 	case 0x45:	// INC EBP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bp" : "ebp");
 		}
 		return;
 	case 0x46:	// INC ESI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "si" : "esi");
 		}
 		return;
 	case 0x47:	// INC EDI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "inc");
-			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "di" : "edi");
 		}
 		return;
 	case 0x48:	// DEC EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x49:	// DEC ECX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, p.x86.pf_operand ? "cx" : "ecx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "cx" : "ecx");
 		}
 		return;
 	case 0x4A:	// DEC EDX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "dx" : "edx");
 		}
 		return;
 	case 0x4B:	// DEC EBX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bx" : "ebx");
 		}
 		return;
 	case 0x4C:	// DEC ESP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "sp" : "esp");
 		}
 		return;
 	case 0x4D:	// DEC EBP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bp" : "ebp");
 		}
 		return;
 	case 0x4E:	// DEC ESI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "si" : "esi");
 		}
 		return;
 	case 0x4F:	// DEC EDI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "dec");
-			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "di" : "edi");
 		}
 		return;
 	case 0x50:	// PUSH EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x51:	// PUSH ECX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "ecx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "ecx");
 		}
 		return;
 	case 0x52:	// PUSH EDX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "dx" : "edx");
 		}
 		return;
 	case 0x53:	// PUSH EBX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bx" : "ebx");
 		}
 		return;
 	case 0x54:	// PUSH ESP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "sp" : "esp");
 		}
 		return;
 	case 0x55:	// PUSH EBP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bp" : "ebp");
 		}
 		return;
 	case 0x56:	// PUSH ESI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "si" : "esi");
 		}
 		return;
 	case 0x57:	// PUSH EDI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "push");
-			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "di" : "edi");
 		}
 		return;
 	case 0x58:	// POP EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x59:	// POP ECX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, p.x86.pf_operand ? "cx" : "ecx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "cx" : "ecx");
 		}
 		return;
 	case 0x5A:	// POP EDX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "dx" : "edx");
 		}
 		return;
 	case 0x5B:	// POP EBX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bx" : "ebx");
 		}
 		return;
 	case 0x5C:	// POP ESP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "sp" : "esp");
 		}
 		return;
 	case 0x5D:	// POP EBP
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bp" : "ebp");
 		}
 		return;
 	case 0x5E:	// POP ESI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "si" : "esi");
 		}
 		return;
 	case 0x5F:	// POP EDI
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "pop");
-			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "di" : "edi");
 		}
 		return;
 	case 0x60:	// PUSHAD
 		if (p.mode >= DisasmMode.File)
-			disasm_push_str(p, p.x86.pf_operand ? "pusha" : "pushad");
+			disasm_push_str(p, p.x86_32.pf_operand ? "pusha" : "pushad");
 		return;
 	case 0x61:	// POPAD
 		if (p.mode >= DisasmMode.File)
-			disasm_push_str(p, p.x86.pf_operand ? "popa" : "popad");
+			disasm_push_str(p, p.x86_32.pf_operand ? "popa" : "popad");
 		return;
 	case 0x62:	// BOUND REG32, MEM&MEM32
 		if (p.mode >= DisasmMode.File)
@@ -548,32 +550,32 @@ L_CONTINUE:
 		x86_modrm(p, X86_WIDTH_BYTE, X86_DIR_REG);
 		return;
 	case 0x64:	// FS:
-		if (p.x86.group2) {
+		if (p.x86_32.group2) {
 			p.error = DisasmError.Illegal;
 			return;
 		}
-		p.x86.segreg = PrefixReg.FS;
+		p.x86_32.segreg = PrefixReg.FS;
 		goto L_CONTINUE;
 	case 0x65:	// GS:
-		if (p.x86.group2) {
+		if (p.x86_32.group2) {
 			p.error = DisasmError.Illegal;
 			return;
 		}
-		p.x86.segreg = PrefixReg.GS;
+		p.x86_32.segreg = PrefixReg.GS;
 		goto L_CONTINUE;
 	case 0x66:	// PREFIX: OPERAND SIZE
-		if (p.x86.group3) {
+		if (p.x86_32.group3) {
 			disasm_err(p);
 			return;
 		}
-		p.x86.pf_operand = 0x66;
+		p.x86_32.pf_operand = 0x66;
 		goto L_CONTINUE;
 	case 0x67:	// PREFIX: ADDRESS SIZE
-		if (p.x86.group4) {
+		if (p.x86_32.group4) {
 			disasm_err(p);
 			return;
 		}
-		p.x86.pf_address = 0x67;
+		p.x86_32.pf_address = 0x67;
 		goto L_CONTINUE;
 	case 0x68:	// PUSH IMM32
 		if (p.mode >= DisasmMode.File) {
@@ -774,7 +776,7 @@ L_CONTINUE:
 			disasm_push_x8(p, modrm);
 			disasm_push_str(p, f);
 			disasm_push_reg(p, x86_modrm_reg(p, modrm << 3,
-				p.x86.pf_operand ? X86_WIDTH_BYTE : X86_WIDTH_EXT));
+				p.x86_32.pf_operand ? X86_WIDTH_BYTE : X86_WIDTH_EXT));
 		}
 		x86_vu32imm(p);
 		return;
@@ -839,7 +841,7 @@ L_CONTINUE:
 		default: disasm_err(p); return;
 		}
 		if (p.mode >= DisasmMode.File) {
-			p.x86.pf_operand = 1;
+			p.x86_32.pf_operand = 1;
 			disasm_push_x8(p, modrm);
 			disasm_push_str(p, "mov");
 			const(char) *reg = x86_modrm_reg(p, modrm, X86_WIDTH_BYTE);
@@ -877,50 +879,50 @@ L_CONTINUE:
 	case 0x91:	// XCHG ECX, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, p.x86.pf_operand ? "cx" : "ecx");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "cx" : "ecx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x92:	// XCHG EDX, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "dx" : "edx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x93:	// XCHG EBX, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bx" : "ebx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x94:	// XCHG ESP, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "sp" : "esp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x95:	// XCHG EBP, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bp" : "ebp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x96:	// XCHG ESI, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "si" : "esi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x97:	// XCHG EDI, EAX
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "xchg");
-			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "di" : "edi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		return;
 	case 0x98:	// CBW
@@ -1156,56 +1158,56 @@ L_CONTINUE:
 	case 0xB8:	// MOV EAX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "ax" : "eax");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0xB9:	// MOV ECX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, p.x86.pf_operand ? "cx" : "ecx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "cx" : "ecx");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0xBA:	// MOV EDX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, p.x86.pf_operand ? "dx" : "edx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "dx" : "edx");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0xBB:	// MOV EBX, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, p.x86.pf_operand ? "bx" : "ebx");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bx" : "ebx");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0xBC:	// MOV ESP, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, p.x86.pf_operand ? "sp" : "esp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "sp" : "esp");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0xBD:	// MOV EBP, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, p.x86.pf_operand ? "bp" : "ebp");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "bp" : "ebp");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0xBE:	// MOV ESI, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, p.x86.pf_operand ? "si" : "esi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "si" : "esi");
 		}
 		x86_vu32imm(p);
 		return;
 	case 0xBF:	// MOV EDI, IMM32
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_str(p, "mov");
-			disasm_push_reg(p, p.x86.pf_operand ? "di" : "edi");
+			disasm_push_reg(p, p.x86_32.pf_operand ? "di" : "edi");
 		}
 		x86_vu32imm(p);
 		return;
@@ -1442,7 +1444,7 @@ L_CONTINUE:
 				case RM_REG_111: m = "fdivr"; break;
 				default: // never
 				}
-				seg = x86_segstr(p.x86.segreg);
+				seg = x86_segstr(p.x86_32.segreg);
 				disasm_push_x32(p, *p.addru32);
 				disasm_push_str(p, m);
 				disasm_push_memregimm(p, seg, *p.addru32);
@@ -1535,7 +1537,7 @@ L_CONTINUE:
 				case RM_REG_111: m = "fstcw"; break;
 				default: disasm_err(p); return;
 				}
-				seg = x86_segstr(p.x86.segreg);
+				seg = x86_segstr(p.x86_32.segreg);
 				disasm_push_x32(p, *p.addru32);
 				disasm_push_str(p, m);
 				disasm_push_memregimm(p, seg, *p.addru32);
@@ -1601,7 +1603,7 @@ L_CONTINUE:
 				case RM_REG_111: m = "fidivr"; break;
 				default: // never
 				}
-				seg = x86_segstr(p.x86.segreg);
+				seg = x86_segstr(p.x86_32.segreg);
 				disasm_push_x32(p, *p.addru32);
 				disasm_push_str(p, m);
 				disasm_push_memregimm(p, seg, *p.addru32);
@@ -1686,7 +1688,7 @@ L_CONTINUE:
 				case RM_REG_111: m = "fidivr"; break;
 				default: // never
 				}
-				seg = x86_segstr(p.x86.segreg);
+				seg = x86_segstr(p.x86_32.segreg);
 				disasm_push_x32(p, *p.addru32);
 				disasm_push_str(p, m);
 				disasm_push_memregimm(p, seg, *p.addru32);
@@ -1747,7 +1749,7 @@ L_CONTINUE:
 				case RM_REG_111: m = "fdivr"; break;
 				default: // never
 				}
-				seg = x86_segstr(p.x86.segreg);
+				seg = x86_segstr(p.x86_32.segreg);
 				disasm_push_x32(p, *p.addru32);
 				disasm_push_str(p, m);
 				disasm_push_memregimm(p, seg, *p.addru32);
@@ -1814,7 +1816,7 @@ L_CONTINUE:
 			default: disasm_err(p); return;
 			}
 			if (p.mode >= DisasmMode.File) {
-				seg = x86_segstr(p.x86.segreg);
+				seg = x86_segstr(p.x86_32.segreg);
 				disasm_push_x32(p, *p.addru32);
 				disasm_push_str(p, m);
 				disasm_push_memregimm(p, seg, *p.addru32);
@@ -1879,7 +1881,7 @@ L_CONTINUE:
 				case RM_REG_111: m = "fidivr"; break;
 				default: // never
 				}
-				seg = x86_segstr(p.x86.segreg);
+				seg = x86_segstr(p.x86_32.segreg);
 				disasm_push_x32(p, *p.addru32);
 				disasm_push_str(p, m);
 				disasm_push_memregimm(p, seg, *p.addru32);
@@ -1940,7 +1942,7 @@ L_CONTINUE:
 				case RM_REG_111: m = "fistp"; break;
 				default: // never
 				}
-				seg = x86_segstr(p.x86.segreg);
+				seg = x86_segstr(p.x86_32.segreg);
 				disasm_push_x32(p, *p.addru32);
 				disasm_push_str(p, m);
 				disasm_push_memregimm(p, seg, *p.addru32);
@@ -2038,11 +2040,11 @@ L_CONTINUE:
 		++p.addrv;
 		return;
 	case 0xF0:	// LOCK
-		if (p.x86.group1) {
+		if (p.x86_32.group1) {
 			disasm_err(p);
 			return;
 		}
-		p.x86.lock = 0xF0;
+		p.x86_32.lock = 0xF0;
 		//TODO: Uncomment when formatter prefix setting is working
 //		p.fmt.settings |= FORMATTER_O_PREFIX;
 //		if (p.mode >= DisasmMode.File)
@@ -2053,22 +2055,22 @@ L_CONTINUE:
 			disasm_push_str(p, "int1");
 		return;
 	case 0xF2:	// REPNE
-		if (p.x86.group1) {
+		if (p.x86_32.group1) {
 			disasm_err(p);
 			return;
 		}
-		p.x86.repne = 0xF2;
+		p.x86_32.repne = 0xF2;
 		//TODO: Uncomment when formatter prefix setting is working
 //		p.fmt.settings |= FORMATTER_O_PREFIX;
 //		if (p.mode >= DisasmMode.File)
 //			disasm_push_str(p, "repne");
 		goto L_CONTINUE;
 	case 0xF3:	// REP
-		if (p.x86.group1) {
+		if (p.x86_32.group1) {
 			disasm_err(p);
 			return;
 		}
-		p.x86.rep = 0xF3;
+		p.x86_32.rep = 0xF3;
 		//TODO: Uncomment when formatter prefix setting is working
 //		p.fmt.settings |= FORMATTER_O_PREFIX;
 //		if (p.mode >= DisasmMode.File)
@@ -2206,7 +2208,7 @@ L_CONTINUE:
 				disasm_push_x32(p, *p.addru32);
 				disasm_push_str(p, "call");
 				disasm_push_memregimm(p,
-					x86_segstr(p.x86.segreg),
+					x86_segstr(p.x86_32.segreg),
 					*p.addru32);
 			}
 			p.addrv += 4;
@@ -2221,7 +2223,7 @@ L_CONTINUE:
 				disasm_push_x32(p, *p.addru32);
 				disasm_push_str(p, "jmp");
 				disasm_push_memregimm(p,
-					x86_segstr(p.x86.segreg),
+					x86_segstr(p.x86_32.segreg),
 					*p.addru32);
 			}
 			p.addrv += 4;
@@ -4388,7 +4390,7 @@ int X86_OP_DIR(int op)  { return op & 2; }
 /// Modifies memory pointer.
 /// Params: p = disassembler structure
 void x86_vu32imm(ref disasm_params_t p) {
-	if (p.x86.pf_operand) { // 16-bit
+	if (p.x86_32.pf_operand) { // 16-bit
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x16(p, *p.addru16);
 			disasm_push_imm(p, *p.addru16);
@@ -4408,7 +4410,7 @@ void x86_vu32imm(ref disasm_params_t p) {
 /// Does not account for SEGREG. Modifies memory pointer.
 /// Params: p = disassembler structure
 void x86_vu32mem(ref disasm_params_t p) {
-	if (p.x86.pf_address) { // 16-bit
+	if (p.x86_32.pf_address) { // 16-bit
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x16(p, *p.addru16);
 			disasm_push_mem(p, *p.addru16);
@@ -4439,10 +4441,10 @@ void x86_vu32mem(ref disasm_params_t p) {
 /// Returns: Selection number (see Enumeration mapping)
 package
 int x86_0f_select(ref disasm_params_t p) {
-	switch (p.x86.group1) {
-	case 0xF2: return p.x86.pf_operand ? X86_0F_F266H : X86_0F_F2H;
+	switch (p.x86_32.group1) {
+	case 0xF2: return p.x86_32.pf_operand ? X86_0F_F266H : X86_0F_F2H;
 	case 0xF3: return X86_0F_F3H;
-	default:   return p.x86.pf_operand ? X86_0F_66H : X86_0F_NONE;
+	default:   return p.x86_32.pf_operand ? X86_0F_66H : X86_0F_NONE;
 	}
 }
 
@@ -4563,7 +4565,7 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 	];
 	size_t i = (modrm & RM_REG) >> 3;
 
-	if (width == X86_WIDTH_EXT && p.x86.pf_operand)
+	if (width == X86_WIDTH_EXT && p.x86_32.pf_operand)
 		width = X86_WIDTH_WIDE;
 
 	return x86_regs[width][i];
@@ -4603,12 +4605,12 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 	// ModR/M Mode
 	//
 
-	const(char) *seg = x86_segstr(p.x86.segreg);
+	const(char) *seg = x86_segstr(p.x86_32.segreg);
 	const(char) *reg = void;
 
 	switch (mode) {
 	case RM_MOD_00:	// Memory Mode, no displacement
-		if (p.x86.pf_address) {
+		if (p.x86_32.pf_address) {
 			if (rm == RM_RM_110) {
 				ushort m = *p.addru16;
 				p.addrv += 2;
@@ -4616,7 +4618,7 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 					disasm_push_memregimm(p, seg, m);
 			} else {
 				if (p.mode >= DisasmMode.File) {
-					reg = x86_modrm_rm_reg(modrm, p.x86.pf_address);
+					reg = x86_modrm_rm_reg(modrm, p.x86_32.pf_address);
 					disasm_push_memsegreg(p, seg, reg);
 				}
 			}
@@ -4625,7 +4627,7 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 				x86_sib(p, modrm);
 				return;
 			}
-			reg = x86_modrm_rm_reg(modrm, p.x86.pf_address);
+			reg = x86_modrm_rm_reg(modrm, p.x86_32.pf_address);
 			if (rm == RM_RM_101) {
 				uint m = *p.addru32;
 				p.addrv += 4;
@@ -4644,14 +4646,14 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 		}
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x8(p, *p.addru8);
-			reg = x86_modrm_rm_reg(modrm, p.x86.pf_address);
+			reg = x86_modrm_rm_reg(modrm, p.x86_32.pf_address);
 			disasm_push_memsegregimm(p, seg, reg, *p.addru8);
 		}
 		++p.addrv;
 		break;
 	case RM_MOD_10:	// Memory Mode, 32-bit displacement
 		uint m = void;
-		if (p.x86.pf_address) {
+		if (p.x86_32.pf_address) {
 			m = *p.addru16;
 			p.addrv += 2;
 			disasm_push_x16(p, cast(ushort)m);
@@ -4665,7 +4667,7 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 			disasm_push_x32(p, m);
 		}
 		if (p.mode >= DisasmMode.File) {
-			reg = x86_modrm_rm_reg(modrm, p.x86.pf_address);
+			reg = x86_modrm_rm_reg(modrm, p.x86_32.pf_address);
 			disasm_push_memsegregimm(p, seg, reg, m);
 		}
 		p.addrv += 4;
@@ -4694,7 +4696,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 
 	if (p.mode >= DisasmMode.File) {
 		disasm_push_x8(p, sib);
-		seg = x86_segstr(p.x86.segreg);
+		seg = x86_segstr(p.x86_32.segreg);
 	}
 
 	if (index == SIB_INDEX_100) {

@@ -1,12 +1,12 @@
 module debugger.disasm.core;
 
-import debugger.arch;
+import debugger.disasm.arch;
 import debugger.disasm.formatter;
 
 extern (C):
 
 /// Disassembler operating mode
-enum DisasmMode {
+enum DisasmMode : ubyte {
 	Size,	/// Only calculate operation code sizes
 	Data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
 	File,	/// Machine code and instruction mnemonics formatting
@@ -14,7 +14,7 @@ enum DisasmMode {
 }
 
 /// Disassembler error
-enum DisasmError {
+enum DisasmError : ushort {
 	None,	/// Nothing to report
 	NullAddress,	/// Address given in 
 	NotSupported,	/// Selected ISA is not currently supported
@@ -25,8 +25,9 @@ enum DisasmError {
 enum DisasmABI : ubyte {
 	Default,	/// Platform compiled target default
 	Guess,	/// (Not implemented) Attempt to guess ISA
-	x86,	/// x86
-	x86_64,	/// AMD64
+	x86_16,	/// 8086, 80186, 80286
+	x86_32,	/// x86, 80386+, i386
+	x86_64,	/// AMD64, Intel64, x64 (Windows)
 	arm_t32,	/// (Not implemented) ARM: Thumb 32-bit
 	arm_a32,	/// (Not implemented) ARM: A32 (formally arm)
 	arm_a64,	/// (Not implemented) ARM: A64 (formally aarch64)
@@ -57,7 +58,7 @@ enum DisasmDemangle : ushort {
 enum DISASM_BUF_SIZE = 64;
 
 version (X86) {
-	enum DISASM_DEFAULT_ISA = DisasmABI.x86;	/// Platform default ABI
+	enum DISASM_DEFAULT_ISA = DisasmABI.x86_32;	/// Platform default ABI
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Intel;	/// Platform default syntax
 } else
 version (X86_64) {
@@ -71,8 +72,9 @@ version (ARM) {
 version (AArch64) {
 	enum DISASM_DEFAULT_ISA = DisasmABI.arm_a64;	/// Platform default ABI
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Att;	/// Platform default syntax
-} else
+} else {
 	enum DISASM_DEFAULT_ISA = DisasmABI.Default;	/// Platform default ABI
+}
 
 //
 // Option bits
@@ -88,8 +90,10 @@ enum DISASM_O_BACKWARD	= 0x0002;
 //enum DISASM_O_	= 0x0008;
 /// Disasm option: 
 //enum DISASM_O_	= 0x0010;
-/// Disasm option: Do not group machine code bytes
-enum DISASM_O_NOGROUP_MACHINECODE	= 0x0020;
+/// Disasm option: Do not group machine code integers
+enum DISASM_O_MC_INT_SEP	= 0x0020;
+/// Disasm option: Do not add an extra space
+enum DISASM_O_MC_NOSPACE	= 0x0040;
 
 /// Disassembler parameters structure
 struct disasm_params_t { align(1):
@@ -112,12 +116,14 @@ struct disasm_params_t { align(1):
 		int    *addri32;	/// Used internally
 		long   *addri64;	/// Used internally
 		float  *addrf32;	/// Used internally
-		double *addrd32;	/// Used internally
+		double *addrf64;	/// Used internally
 	}
 	/// Saved address position before the operation begins, good for
 	/// printing purposes or calculating the delta after disassembling.
+	/// This field is filled by disasm_line before disassembling.
 	size_t lastaddr;
-	/// Error code. See DisasmError enumeration for more details.
+	/// Error code. See DisasmError enumeration for more details. Set by
+	/// disasm_line or the the decoder.
 	DisasmError error;
 	/// Demangle option. See DisasmDemangle enum.
 	DisasmDemangle demangle;
@@ -125,17 +131,16 @@ struct disasm_params_t { align(1):
 	DisasmABI abi;
 	/// Assembler style. See DisasmStyle enums for more details.
 	DisasmSyntax style;
-	/// Operation mode. See DISASM_I_* flags. If unset, calculate
-	/// and modify address pointer only.
+	/// Operation mode.
 	DisasmMode mode;
 	/// Settings flags. See DISASM_O_* flags.
 	uint options;
 	union {
 		void *internal;	/// Used internally
-		x86_internals_t *x86;	/// Used internally
+		x86_32_internals_t *x86_32;	/// Used internally
 		x86_64_internals_t *x86_64;	/// Used internally
 	}
-	disasm_fmt_t *fmt;	/// Used by debugger.disasm.formatter
+	disasm_fmt_t *fmt;	/// Formatter structure pointer, used internally
 	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer
 	char [DISASM_BUF_SIZE]mnbuf;	/// Mnemonics buffer
 	size_t mcbufi;	/// Machine code buffer index
@@ -147,8 +152,17 @@ pragma(msg, "* disasm_params_t.sizeof: ", disasm_params_t.sizeof);
  * Disassemble instructions from a memory pointer given in disasm_params_t.
  * Caller must ensure memory pointer points to readable regions and givens
  * bounds are respected. The error field is always set.
+ *
+ * Disassembling modes go by the following: Size only traverses the instruction
+ * stream. (Not implemented) Data fills the newloc field with the calculated
+ * value from jumps, branches, and calls. File disassembles the instruction
+ * stream and formats the output depending on the syntax/style. (Not
+ * implemented) Full also adds labels, and source code (when available).
+ *
  * Params:
  * 	p = Disassembler parameters
+ * 	mode = Disassembling mode
+ *
  * Returns: Error code; Non-zero indicating an error
  */
 int disasm_line(ref disasm_params_t p, DisasmMode mode) {
@@ -174,7 +188,8 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 
 	with (DisasmABI)
 	switch (p.abi) {
-	case x86: disasm_x86(p); break;
+	case x86_16: disasm_x86_16(p); break;
+	case x86_32: disasm_x86_32(p); break;
 	case x86_64: disasm_x86_64(p); break;
 	default:
 		disasm_err(p, DisasmError.NotSupported);
@@ -186,7 +201,10 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 		if (p.style == DisasmSyntax.Default)
 			p.style = DISASM_DEFAULT_SYNTAX;
 		disasm_render(p);
-		with (p) mcbuf[mcbufi - 1] = mnbuf[mnbufi] = 0;
+		with (p) {
+			if (mcbuf[mcbufi - 1] == ' ') --mcbufi;
+			mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
+		}
 	}
 
 	return p.error;

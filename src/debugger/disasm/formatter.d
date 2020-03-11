@@ -37,15 +37,15 @@ enum FORMATTER_STACK_SIZE = 8;
 /// Formatter stack limit (size - 1)
 enum FORMATTER_STACK_LIMIT = FORMATTER_STACK_SIZE - 1;
 
+//
+// Formatter options for decoder
+//
+
 /// Items will be processed in order regardless of style
 enum FORMATTER_O_NO_DIRECTION = 1;
 /// (Not implemented) Second separator will be a space (" ") instead of a comma (", ").
 /// Very useful for instruction prefixes such as LOCK (x86)
 enum FORMATTER_O_PREFIX = 2;
-/// Machine code: Do not group machine group integers
-enum FORMATTER_O_MC_NOGROUP = 4;
-/// Machine code: Do not add an extra space
-enum FORMATTER_O_MC_NOSPACE = 8;
 
 /// Item type, each item more or less has their own formatting function
 enum FormatType {
@@ -81,15 +81,13 @@ struct disasm_fmt_t {
 	disasm_fmt_item_t [FORMATTER_STACK_SIZE]items;	/// Stack
 	size_t itemno;	/// Current item number
 	int opwidth;	/// Last operation width
-	int settings;	/// Formatter settings for current stack/instruction
+	int settings;	/// Formatter settings for current stack/instruction (from decoder)
 }
 
 /// Default string for illegal instructions
+// immutable implies __gshared
 private
 immutable const(char) *DISASM_FMT_ERR_STR = "??";
-
-// Reduces number of global string instances
-// immutable implies __gshared
 private
 immutable const(char) *DISASM_FMT_SPACE = " ";
 private
@@ -105,7 +103,7 @@ immutable const(char) *DISASM_FMT_COMMA_SPACE = ", ";
 /// 	v = 8-bit value
 void disasm_push_x8(ref disasm_params_t p, ubyte v) {
 	disasm_xadd(p, strx02(v));
-	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
+	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
 		disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 16-bit value into the machine code buffer.
@@ -114,7 +112,7 @@ void disasm_push_x8(ref disasm_params_t p, ubyte v) {
 /// 	v = 16-bit value
 void disasm_push_x16(ref disasm_params_t p, ushort v) {
 	disasm_xadd(p, strx04(v));
-	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
+	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
 		disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 32-bit value into the machine code buffer.
@@ -123,7 +121,7 @@ void disasm_push_x16(ref disasm_params_t p, ushort v) {
 /// 	v = 32-bit value
 void disasm_push_x32(ref disasm_params_t p, uint v) {
 	disasm_xadd(p, strx08(v));
-	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
+	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
 		disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 64-bit value into the machine code buffer.
@@ -132,7 +130,7 @@ void disasm_push_x32(ref disasm_params_t p, uint v) {
 /// 	v = 64-bit value
 void disasm_push_x64(ref disasm_params_t p, ulong v) {
 	disasm_xadd(p, strx016(v));
-	if ((p.fmt.settings & FORMATTER_O_MC_NOSPACE) == 0)
+	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
 		disasm_xadd(p, DISASM_FMT_SPACE);
 }
 

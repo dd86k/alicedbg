@@ -227,9 +227,11 @@ int main(int argc, const(char) **argv) {
 			}
 			const(char) *march = argv[++argi];
 			if (strcmp(march, "x86") == 0)
-				disopt.abi = DisasmABI.x86;
+				disopt.abi = DisasmABI.x86_32;
 			else if (strcmp(march, "x86_64") == 0)
 				disopt.abi = DisasmABI.x86_64;
+			else if (strcmp(march, "x86_16") == 0)
+				disopt.abi = DisasmABI.x86_16;
 			else if (strcmp(march, "thumb") == 0)
 				disopt.abi = DisasmABI.arm_t32;
 			else if (strcmp(march, "arm") == 0)
