@@ -177,6 +177,13 @@ void strlcase(char *buf, size_t size) {
 	}
 }
 
+/// Quick Format stack size (characters)
+enum STR_QUICK_STACK_SIZE = 128;
+/// Quick Format stacks count
+enum STR_QUICK_STACKS_COUNT = 16;
+/// Quick Format stack limit (count - 1) for index comparason
+enum STR_QUICK_STACKS_LIMIT = STR_QUICK_STACKS_COUNT - 1;
+
 /**
  * Quick format.
  *
@@ -209,11 +216,11 @@ const(char) *strf(const(char) *f, ...) {
  */
 const(char) *strfva(const(char) *f, va_list va) {
 	__gshared size_t strfc; /// buffer selection index
-	__gshared char [128][16]b = void;
+	__gshared char [STR_QUICK_STACK_SIZE][STR_QUICK_STACKS_COUNT]b = void;
 
 	char *sb = cast(char*)b[strfc];
-	vsnprintf(sb, 128, f, va);
-	if (++strfc >= 15) strfc = 0;
+	vsnprintf(sb, STR_QUICK_STACK_SIZE, f, va);
+	if (++strfc >= STR_QUICK_STACKS_LIMIT) strfc = 0;
 
 	return sb;
 }

@@ -73,7 +73,7 @@ int cliver() {
 	"CRT: "~__CRT__~" (cpprt: "~__TARGET_CPP_RT__~") on "~__OS__~"\n"~
 	"CPU: "~__TARGET_CPU__~"\n"~
 	"Features: dbg disasm\n"~
-	"Disasm: x86\n",
+	"Disasm: x86_16 x86\n",
 	ver.version_major, ver.version_minor
 	);
 	return 0;
@@ -236,7 +236,7 @@ int main(int argc, const(char) **argv) {
 			}
 			const(char) *march = argv[++argi];
 			if (strcmp(march, "x86") == 0)
-				disopt.abi = DisasmABI.x86_32;
+				disopt.abi = DisasmABI.x86;
 			else if (strcmp(march, "x86_64") == 0)
 				disopt.abi = DisasmABI.x86_64;
 			else if (strcmp(march, "x86_16") == 0)

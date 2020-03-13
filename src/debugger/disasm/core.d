@@ -21,7 +21,7 @@ enum DisasmMode : ubyte {
 /// Disassembler error
 enum DisasmError : ushort {
 	None,	/// Nothing to report
-	NullAddress,	/// Address given in 
+	NullAddress,	/// Address given is null (0)
 	NotSupported,	/// Selected ISA is not currently supported
 	Illegal,	/// Illegal/invalid opcode
 }
@@ -31,7 +31,7 @@ enum DisasmABI : ubyte {
 	Default,	/// Platform compiled target default
 	Guess,	/// (Not implemented) Attempt to guess ISA
 	x86_16,	/// 8086, 80186, 80286
-	x86_32,	/// x86, 80386+, i386
+	x86,	/// x86-32, 80386/i386
 	x86_64,	/// AMD64, Intel64, x64 (Windows)
 	arm_t32,	/// (Not implemented) ARM: Thumb 32-bit
 	arm_a32,	/// (Not implemented) ARM: A32 (formally arm)
@@ -63,7 +63,7 @@ enum DisasmDemangle : ushort {
 enum DISASM_BUF_SIZE = 64;
 
 version (X86) {
-	enum DISASM_DEFAULT_ISA = DisasmABI.x86_32;	/// Platform default ABI
+	enum DISASM_DEFAULT_ISA = DisasmABI.x86;	/// Platform default ABI
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Intel;	/// Platform default syntax
 } else
 version (X86_64) {
@@ -193,9 +193,9 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 
 	with (DisasmABI)
 	switch (p.abi) {
-	case x86_16: disasm_x86_16(p); break;
-	case x86_32: disasm_x86_32(p); break;
-	case x86_64: disasm_x86_64(p); break;
+	case x86_16:	disasm_x86_16(p); break;
+	case x86:	disasm_x86(p); break;
+	case x86_64:	disasm_x86_64(p); break;
 	default:
 		disasm_err(p, DisasmError.NotSupported);
 		p.mcbuf[0] = 0;

@@ -6,7 +6,7 @@
 module debugger.disasm.arch.x86_16;
 
 import debugger.disasm.core : disasm_params_t;
-import debugger.disasm.arch.x86_32 : disasm_x86_32, x86_32_internals_t;
+import debugger.disasm.arch.x86 : disasm_x86, x86_32_internals_t;
 
 extern (C):
 
@@ -20,5 +20,5 @@ void disasm_x86_16(ref disasm_params_t p) {
 	i.pf_operand = 0x66;
 	i.pf_address = 0x67;
 	p.x86_32 = &i;
-	disasm_x86_32(p, false);
+	disasm_x86(p, false);
 }

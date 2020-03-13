@@ -3,7 +3,7 @@
  *
  * License: BSD 3-Clause
  */
-module debugger.disasm.arch.x86_32;
+module debugger.disasm.arch.x86;
 
 import debugger.disasm.core;
 import debugger.disasm.formatter;
@@ -40,7 +40,7 @@ struct x86_32_internals_t {
  * 	p = Disassembler parameters
  * 	init = Initiate structure (x86_16 sets this to false)
  */
-void disasm_x86_32(ref disasm_params_t p, bool init = true) {
+void disasm_x86(ref disasm_params_t p, bool init = true) {
 	if (init) {
 		x86_32_internals_t i = void;
 		with (i)
