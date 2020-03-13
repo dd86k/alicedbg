@@ -1,5 +1,7 @@
 /**
  * String helper functions. Simple string functions to aid redundant typing.
+ *
+ * License: BSD 3-Clause
  */
 module utils.str;
 
@@ -16,7 +18,9 @@ private __gshared char [16]hexmapupp = "0123456789ABCDEF";
 /**
  * Quick and dirty conversion function to convert an ubyte value to a
  * '0'-padded hexadecimal string. Faster than using vsnprintf.
- * Params: v = 8-bit value
+ * Params:
+ * 	v = 8-bit value
+ * 	upper = Use upper hexadecimal character
  * Returns: Null-terminated hexadecimal string
  */
 const(char) *strx02(ubyte v, bool upper = false) {
@@ -33,7 +37,9 @@ const(char) *strx02(ubyte v, bool upper = false) {
 /**
  * Quick and dirty conversion function to convert an ushort value to a
  * '0'-padded hexadecimal string. Faster than using vsnprintf.
- * Params: v = 16-bit value
+ * Params:
+ * 	v = 8-bit value
+ * 	upper = Use upper hexadecimal character
  * Returns: Null-terminated hexadecimal string
  */
 const(char) *strx04(ushort v, bool upper = false) {
@@ -52,7 +58,9 @@ const(char) *strx04(ushort v, bool upper = false) {
 /**
  * Quick and dirty conversion function to convert an uint value to a
  * '0'-padded hexadecimal string. Faster than using vsnprintf.
- * Params: v = 32-bit value
+ * Params:
+ * 	v = 8-bit value
+ * 	upper = Use upper hexadecimal character
  * Returns: Null-terminated hexadecimal string
  */
 const(char) *strx08(uint v, bool upper = false) {
@@ -75,7 +83,9 @@ const(char) *strx08(uint v, bool upper = false) {
 /**
  * Quick and dirty conversion function to convert an ulong value to a
  * '0'-padded hexadecimal string. Faster than using vsnprintf.
- * Params: v = 64-bit value
+ * Params:
+ * 	v = 8-bit value
+ * 	upper = Use upper hexadecimal character
  * Returns: Null-terminated hexadecimal string
  */
 const(char) *strx016(ulong v, bool upper = false) {
@@ -174,7 +184,9 @@ void strlcase(char *buf, size_t size) {
  * avoid allocating new buffers before appending to (other) existing buffers.
  * Cycles through 16 128-byte internal static buffers (2048 bytes).
  *
- * Params: f = Format string
+ * Params:
+ * 	f = Format string
+ * 	... = Arguments
  *
  * Returns: String
  */
@@ -189,7 +201,9 @@ const(char) *strf(const(char) *f, ...) {
  * Quick and very dirty string formatting utility. This serves as pushing an
  * existing list to an internal buffer.
  *
- * Params: va = va_list
+ * Params:
+ * 	f = Format string
+ * 	va = va_list
  *
  * Returns: String
  */

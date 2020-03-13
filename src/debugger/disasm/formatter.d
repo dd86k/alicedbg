@@ -1,7 +1,10 @@
 /**
  * Disassembler formatting engine.
  *
- * This provides the item and style formatting for the disassembler. The
+ * The formatting engine is designed to format any given pieces of string from
+ * the decoder in a given order by the style setting.
+ *
+ * This module provides the item and style formatting for the disassembler. The
  * decoder (disassembler) pushes items with their respective types (e.g.
  * register, immediate, etc.) and the formatter takes take of rendering
  * the final result. Values are referenced (i.e. strings), not copied. For
@@ -23,6 +26,8 @@
  * items are immediately processed upon arrival onto the string buffer, so
  * machine code and mnemonic items can be pushed in any order, only the
  * mnemonic items use the formatter's stack.
+ *
+ * License: BSD 3-Clause
  */
 module debugger.disasm.formatter;
 
@@ -152,6 +157,7 @@ void disasm_push_str(ref disasm_params_t p, const(char) *v) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	f = String format
+///     ... = Arguments
 void disasm_push_strf(ref disasm_params_t p, const(char) *f, ...) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
@@ -164,7 +170,7 @@ void disasm_push_strf(ref disasm_params_t p, const(char) *f, ...) {
 /// on the register formatter (disasm_fmt_reg).
 /// Params:
 /// 	p = Disassembler parameters
-/// 	v = Register value
+/// 	reg = Register value
 void disasm_push_reg(ref disasm_params_t p, const(char) *reg) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
@@ -175,7 +181,8 @@ void disasm_push_reg(ref disasm_params_t p, const(char) *reg) {
 /// depending on the register formatter (disasm_fmt_segreg).
 /// Params:
 /// 	p = Disassembler parameters
-/// 	v = Register value
+/// 	seg = Segment register value
+/// 	reg = Register value
 void disasm_push_segreg(ref disasm_params_t p, const(char) *seg, const(char) *reg) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
@@ -209,7 +216,7 @@ void disasm_push_mem(ref disasm_params_t p, int v) {
 /// depending on the memory+register formatter (disasm_fmt_memreg).
 /// Params:
 /// 	p = Disassembler parameters
-/// 	v = Register value
+/// 	reg = Register value
 void disasm_push_memreg(ref disasm_params_t p, const(char) *reg) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
@@ -368,7 +375,7 @@ void disasm_push_x86_sib_mod01_index100(ref disasm_params_t p,
 /// DISASM_FMT_ERR_STR (copied string). Does not touch the machine code buffer.
 /// Params:
 /// 	p = Disassembler parameters
-/// 	e = Disassembler error (DisasmError, defaults to Illegal)
+/// 	err = Disassembler error (DisasmError, defaults to Illegal)
 void disasm_err(ref disasm_params_t p, DisasmError err = DisasmError.Illegal) {
 	p.error = err;
 	p.mnbufi =
@@ -441,7 +448,7 @@ disasm_fmt_item_t *disasm_fmt_select(ref disasm_params_t p) {
 /// by disasm_render from disasm_line.
 /// Params:
 /// 	p = Disassembler parameters
-/// 	v = String
+/// 	s = String
 void disasm_madd(ref disasm_params_t p, const(char) *s) {
 	with (p)
 	mnbufi = stradd(cast(char*)mnbuf, DISASM_BUF_SIZE, mnbufi, s);
@@ -450,7 +457,7 @@ void disasm_madd(ref disasm_params_t p, const(char) *s) {
 /// Called by disasm_push_x* functions.
 /// Params:
 /// 	p = Disassembler parameters
-/// 	v = String
+/// 	s = String
 void disasm_xadd(ref disasm_params_t p, const(char) *s) {
 	with (p)
 	mcbufi = stradd(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, s);

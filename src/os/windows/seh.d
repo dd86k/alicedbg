@@ -1,5 +1,7 @@
 /**
  * SEH wrapper for Windows
+ *
+ * License: BSD 3-Clause
  */
 module os.windows.seh;
 

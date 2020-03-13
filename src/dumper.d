@@ -1,3 +1,8 @@
+/**
+ * Imitates objdump functionality
+ *
+ * License: BSD 3-Clause
+ */
 module dumper;
 
 import core.stdc.stdio;
@@ -11,7 +16,7 @@ extern (C):
 /// Disassemble given gile. Currently only supports flat binary files.
 /// Params:
 /// 	file = File path
-/// 	dispot = Disassembler settings
+/// 	disopt = Disassembler settings
 /// Returns: Error code if non-zero
 int dump(const(char) *file, ref disasm_params_t disopt) {
 	FILE *f = fopen(file, "rb");

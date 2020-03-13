@@ -1,3 +1,8 @@
+/**
+ * WOW64 bindings
+ *
+ * License: BSD 3-Clause
+ */
 module debugger.sys.wow64;
 
 version (Win64):

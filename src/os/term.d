@@ -1,5 +1,7 @@
 /**
  * In-house console/terminal library
+ *
+ * License: BSD 3-Clause
  */
 module os.term;
 

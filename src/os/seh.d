@@ -1,3 +1,8 @@
+/**
+ * SEH package
+ *
+ * License: BSD 3-Clause
+ */
 module os.seh;
 
 version (Windows) {

@@ -1,3 +1,8 @@
+/**
+ * Package module for archs
+ *
+ * License: BSD 3-Clause
+ */
 module debugger.disasm.arch;
 
 public import

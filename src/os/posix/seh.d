@@ -1,5 +1,7 @@
 /**
  * SEH wrapper for Posix
+ *
+ * License: BSD 3-Clause
  */
 module os.posix.seh;
 

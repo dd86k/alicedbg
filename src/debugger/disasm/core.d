@@ -1,3 +1,8 @@
+/**
+ * Disassembler core.
+ *
+ * License: BSD 3-Clause
+ */
 module debugger.disasm.core;
 
 import debugger.disasm.arch;

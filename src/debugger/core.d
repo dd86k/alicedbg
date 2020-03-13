@@ -1,3 +1,8 @@
+/**
+ * Debugger core
+ *
+ * License: BSD 3-Clause
+ */
 module debugger.core;
 
 import core.stdc.string : memset;

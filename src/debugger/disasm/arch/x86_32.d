@@ -1,5 +1,7 @@
 /**
  * x86-specific disassembler.
+ *
+ * License: BSD 3-Clause
  */
 module debugger.disasm.arch.x86_32;
 
@@ -4114,7 +4116,7 @@ void x86_0f(ref disasm_params_t p) {
 			disasm_push_str(p, "movnti");
 		x86_modrm(p, X86_WIDTH_EXT, X86_DIR_MEM);
 		return;
-	case 0xC4: // PINSRW REG80/128, RM, IMM8
+	case 0xC4: // PINSRW REG64/128, RM, IMM8
 		int w = void;
 		switch (x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_WIDTH_MM; break;
@@ -4131,7 +4133,7 @@ void x86_0f(ref disasm_params_t p) {
 			disasm_push_imm(p, imm);
 		}
 		return;
-	case 0xC5: // PEXTRW REG32, REG80/128, IMM8
+	case 0xC5: // PEXTRW REG32, REG64/128, IMM8
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		if ((modrm & RM_MOD) != RM_MOD_11) {
@@ -4282,6 +4284,61 @@ void x86_0f(ref disasm_params_t p) {
 			disasm_push_str(p, m);
 		x86_modrm(p, X86_WIDTH_XMM, X86_DIR_REG);
 		return;
+	case 0xD1: // PSRLW REG64/128, RM64/128
+		int w = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: w = X86_WIDTH_MM; break;
+		case X86_0F_66H: w = X86_WIDTH_XMM; break;
+		default: disasm_err(p); return;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "psrlw");
+		x86_modrm(p, w, X86_DIR_REG);
+		return;
+	case 0xD2: // PSRLD REG64/128, RM64/128
+		int w = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: w = X86_WIDTH_MM; break;
+		case X86_0F_66H: w = X86_WIDTH_XMM; break;
+		default: disasm_err(p); return;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "psrld");
+		x86_modrm(p, w, X86_DIR_REG);
+		return;
+	case 0xD3: // PSRLQ REG64/128, RM64/128
+		int w = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: w = X86_WIDTH_MM; break;
+		case X86_0F_66H: w = X86_WIDTH_XMM; break;
+		default: disasm_err(p); return;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "psrlq");
+		x86_modrm(p, w, X86_DIR_REG);
+		return;
+	case 0xD4: // PADDQ REG64/128, RM64/128
+		int w = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: w = X86_WIDTH_MM; break;
+		case X86_0F_66H: w = X86_WIDTH_XMM; break;
+		default: disasm_err(p); return;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "paddq");
+		x86_modrm(p, w, X86_DIR_REG);
+		return;
+	case 0xD5: // PMULLW REG64/128, RM64/128
+		int w = void;
+		switch (x86_0f_select(p)) {
+		case X86_0F_NONE: w = X86_WIDTH_MM; break;
+		case X86_0F_66H: w = X86_WIDTH_XMM; break;
+		default: disasm_err(p); return;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "pmullw");
+		x86_modrm(p, w, X86_DIR_REG);
+		return;
 	default: // ANCHOR End of instructions
 		disasm_err(p);
 	}
@@ -4364,10 +4421,10 @@ package enum {
 
 // ModR/M register width
 package enum {
-	X86_WIDTH_BYTE,	/// 8-bit registers
+	X86_WIDTH_BYTE,	/// 8-bit registers (8086)
 	X86_WIDTH_EXT,	/// 32/64-bit extended registers (i386/amd64)
-	X86_WIDTH_WIDE,	/// 8-bit registers
-	X86_WIDTH_MM,	/// 80-bit MM registers (MMX)
+	X86_WIDTH_WIDE,	/// 16-bit registers (8086)
+	X86_WIDTH_MM,	/// 64-bit MM registers (MMX)
 	X86_WIDTH_XMM,	/// 128-bit XMM registers (SSE)
 	X86_WIDTH_YMM,	/// 256-bit YMM registers (AVX)
 	X86_WIDTH_ZMM,	/// 512-bit ZMM registers (AVX-512)
@@ -4556,12 +4613,15 @@ L_REG:
 const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 	// This is asking for trouble, hopefully more checks will be added later
 	// The array has this order for X86_OP_WIDE
+	// NOTE: ModR/M extension is x86-64 only! (REX)
 	__gshared const(char) *[][]x86_regs = [
 		[ "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh" ],
 		[ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi" ],
 		[ "ax", "cx", "dx", "cx", "sp", "bp", "si", "di" ],
 		[ "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7" ],
 		[ "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7" ],
+		[ "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7" ],
+		[ "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7" ],
 	];
 	size_t i = (modrm & RM_REG) >> 3;
 

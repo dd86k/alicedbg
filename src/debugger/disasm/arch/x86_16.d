@@ -1,3 +1,8 @@
+/**
+ * x86-16 disassembler (based on x86-32 decoder)
+ *
+ * License: BSD 3-Clause
+ */
 module debugger.disasm.arch.x86_16;
 
 import debugger.disasm.core : disasm_params_t;

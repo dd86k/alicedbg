@@ -1,3 +1,8 @@
+/**
+ * Compile constants
+ *
+ * License: BSD 3-Clause
+ */
 module consts;
 
 /// Project version

@@ -3,6 +3,8 @@
  *
  * Sharing this module has a few advantages such as: reduce binary size, avoid
  * linking issues, etc.
+ *
+ * License: BSD 3-Clause
  */
 module ui.common;
 

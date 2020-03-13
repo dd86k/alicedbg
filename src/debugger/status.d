@@ -1,6 +1,8 @@
 /**
- * Provides status messaging for up-to-date information from the debugger,
- * useful for UIs (users) to know what the debugger is working on.
+ * (Not implemented) Provides status messaging for up-to-date information from
+ * the debugger, useful for UIs (users) to know what the debugger is working on.
+ *
+ * License: BSD 3-Clause
  */
 module debugger.status;
 

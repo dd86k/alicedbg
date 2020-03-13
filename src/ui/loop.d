@@ -1,5 +1,7 @@
 /**
  * Loop on exceptions and continue whenever possible. No user input for this UI.
+ *
+ * License: BSD 3-Clause
  */
 module ui.loop;
 

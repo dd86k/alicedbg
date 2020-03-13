@@ -8,6 +8,8 @@
  * you know what you are doing.
  * ```
  * We need this for PTRACE_GETREGS, for example.
+ *
+ * License: BSD 3-Clause
  */
 module debugger.sys.user;
 

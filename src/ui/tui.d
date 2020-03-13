@@ -1,3 +1,8 @@
+/**
+ * Text UI
+ *
+ * License: BSD 3-Clause
+ */
 module ui.tui;
 
 //import misc.ddc;

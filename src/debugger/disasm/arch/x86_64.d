@@ -1,5 +1,7 @@
 /**
  * AMD64 specific disassembler
+ *
+ * License: BSD 3-Clause
  */
 module debugger.disasm.arch.x86_64;
 
@@ -30,7 +32,24 @@ struct x86_64_internals_t {
 		int group4;
 		int pf_address; /// 67H Address prefix
 	}
-	int rex; /// REX prefix
+	/// REX prefix (after legacy prefixes)
+	// 0100 w r x b
+	//      | | | +- Set: Extension of the ModRM.RM, SIB.BASE, or Opcode REG fields
+	//      | | +--- Set: Extension of the SIB.INDEX field
+	//      | +----- Set: Extension of the ModRM.REG field
+	//      +------- Unset: Operand size determined by CS.D. Set: 64-bit operand
+	//
+	// The 4-bit extension borrows from REX, so it's effectively the following:
+	// - REX.X and REX.R unset
+	//   - REX.B + OPCODE.REG -> Register index
+	// - No SIB (REX.X is unset, regardless of ModRM.MOD)
+	//   - REX.R + ModRM.REG -> Register index
+	//   - REX.B + ModRM.RM  -> Memory spec
+	// - With SIB
+	//   - REX.R + ModRM.REG -> Register index
+	//   - REX.B + SIB.BASE  -> SIB.BASE
+	//   - REX.X + SIB.INDEX -> SIB.INDEX
+	int rex;
 }
 
 /**
@@ -57,6 +76,9 @@ L_CONTINUE:
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, "int3");
 		break;
+	case 0x40: .. case 0x4F:
+		p.x86_64.rex = b;
+		goto L_CONTINUE;
 	default: disasm_err(p);
 	}
 }

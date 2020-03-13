@@ -7,6 +7,8 @@
  * to distinguish an exception type of Fault as EXCEPTION_ACCESS_VIOLATION
  * (0xC00000005) AND SIGSEGV. That'd be hell!). So a "translater" (see function
  * `codetype`) converts those codes to our enumeration.
+ *
+ * License: BSD 3-Clause
  */
 module debugger.exception;
 

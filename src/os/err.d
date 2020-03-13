@@ -1,4 +1,8 @@
-/// OS error module.
+/**
+ * OS error module.
+ *
+ * License: BSD 3-Clause
+ */
 module os.err;
 
 version (Windows) {

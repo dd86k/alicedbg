@@ -3,6 +3,8 @@
  * available on Posix systems where ptrace is available, and is currently
  * based on Glibc 2.25. Support for more runtimes will be implemented
  * here with time.
+ *
+ * License: BSD 3-Clause
  */
 module debugger.sys.ptrace;
 

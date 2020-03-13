@@ -1,3 +1,12 @@
+/**
+ * Command line interface.
+ *
+ * Module declaration present for license notice.
+ *
+ * License: BSD 3-Clause
+ */
+module main;
+
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
