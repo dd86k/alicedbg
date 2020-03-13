@@ -4588,8 +4588,7 @@ void x86_modrm(ref disasm_params_t p, int width, int direction) {
 	ubyte modrm = *p.addru8;
 	++p.addrv;
 
-	if (direction)
-		goto L_REG;
+	if (direction) goto L_REG;
 
 L_RM:
 	// Memory regs are only general registers
@@ -4609,7 +4608,7 @@ L_REG:
 /// 	p = Disassembler parameters
 /// 	modrm = ModR/M byte
 /// 	width = Register width (byte, wide, mm, xmm, etc.)
-/// Returns: Register string
+/// Returns: Register string or null if out of bound
 const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 	// This is asking for trouble, hopefully more checks will be added later
 	// The array has this order for X86_OP_WIDE
@@ -4623,7 +4622,9 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 		[ "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7" ],
 		[ "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7" ],
 	];
+	if (width > 6) return null;
 	size_t i = (modrm & RM_REG) >> 3;
+	if (i > 7) return null;
 
 	if (width == X86_WIDTH_EXT && p.x86_32.pf_operand)
 		width = X86_WIDTH_WIDE;
@@ -4644,6 +4645,7 @@ const(char) *x86_modrm_rm_reg(int modrm, int addrpf) {
 		[ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi" ],
 	];
 	size_t i = modrm & RM_RM;
+	if (i > 7) return null;
 	size_t pf = !addrpf;
 	return x86_regs[pf][i];
 }

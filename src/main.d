@@ -19,10 +19,10 @@ import os.err;
 extern (C):
 private:
 
-enum OperatingModule {
-	debugger, // can't use word "debug" and "debug_" is eh
-	dumper,
-	profiler
+enum OperatingMode {
+	debug_,
+	dump,
+	profile
 }
 
 // for debugger
@@ -50,7 +50,7 @@ enum CLIPage {
 
 /// CLI options
 struct cliopt_t {
-	OperatingModule mode;
+	OperatingMode mode;
 	DebuggerUI ui;
 	DebuggerMode debugtype;
 	ushort pid;
@@ -165,6 +165,26 @@ int main(int argc, const(char) **argv) {
 
 		if (*argv[argi] != '-') goto L_CLI_DEFAULT;
 
+		// choose operating mode
+		if (strcmp(arg, "mode") == 0) {
+			if (argi + 1 >= argc) {
+				puts("cli: path argument missing");
+				return EXIT_FAILURE;
+			}
+			const(char) *mode = argv[++argi];
+			if (strcmp(mode, "dump") == 0)
+				opt.mode = OperatingMode.dump;
+			else if (strcmp(mode, "profile") == 0)
+				opt.mode = OperatingMode.profile;
+			else if (strcmp(mode, "debug") == 0)
+				opt.mode = OperatingMode.debug_;
+			else {
+				printf("unknown mode: %s\n", mode);
+				return EXIT_FAILURE;
+			}
+			continue;
+		}
+
 		// debugger: select file
 		if (strcmp(arg, "exec") == 0) {
 			if (argi + 1 >= argc) {
@@ -214,17 +234,6 @@ int main(int argc, const(char) **argv) {
 					ui);
 				return EXIT_FAILURE;
 			}
-			continue;
-		}
-
-		// dumper: file path
-		if (strcmp(arg, "ddump") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: path argument missing");
-				return EXIT_FAILURE;
-			}
-			opt.mode = OperatingModule.dumper;
-			opt.file = argv[++argi];
 			continue;
 		}
 
@@ -307,7 +316,6 @@ int main(int argc, const(char) **argv) {
 
 L_CLI_DEFAULT:
 		if (opt.file == null) {
-			opt.mode = OperatingModule.debugger;
 			opt.debugtype = DebuggerMode.file;
 			opt.file = argv[argi];
 		} else if (opt.file_args == null) {
@@ -320,9 +328,9 @@ L_CLI_DEFAULT:
 		}
 	}
 
-	with (OperatingModule)
+	with (OperatingMode)
 	final switch (opt.mode) {
-	case debugger:
+	case debug_:
 		int e = void;
 		with (DebuggerMode)
 		switch (opt.debugtype) {
@@ -352,9 +360,9 @@ L_CLI_DEFAULT:
 			printf("ui: ("~F_ERR~") %s\n", e, err_msg(e));
 		}
 		return e;
-	case dumper:
-		return dump(opt.file, disopt);
-	case profiler:
+	case dump:
+		return dump_file(opt.file, disopt);
+	case profile:
 		puts("Profiling feature not yet implemented");
 		break;
 	}

@@ -14,14 +14,8 @@ version (Windows) {
 	private enum LOCALE_NAME_USER_DEFAULT = null;
 	private enum LOCALE_ALL = 0;
 
-	extern (Windows)
-	private
-	int GetLocaleInfoEx(
-		LPCWSTR lpLocaleName,
-		LCTYPE LCType,
-		LPWSTR lpLCData,
-		int cchData
-	);
+	extern (Windows) private
+	int GetLocaleInfoEx(LPCWSTR, LCTYPE, LPWSTR, int);
 } else {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
@@ -29,33 +23,28 @@ version (Windows) {
 	enum F_ERR = "%d";
 }
 
-/// Get error message from the OS (or crt) by providing the error code
+/// Get error message from the OS (or CRT) by providing the error code
+/// Params:
+/// 	core = Error code number from OS
+/// Returns: String
 const(char) *err_msg(int code) {
 	version (Windows) {
 		__gshared char [512]buffer = void;
-		int l = GetLocaleInfoEx( // Recommended over MAKELANGID
-			LOCALE_NAME_USER_DEFAULT,
-			LOCALE_ALL,
-			null,
-			0);
-		size_t fl = FormatMessageA(
-			FORMAT_MESSAGE_FROM_SYSTEM,
+		size_t len = FormatMessageA(
+			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_MAX_WIDTH_MASK,
 			null,
 			code,
-			l,
+			0,	// Default
 			cast(char*)buffer,
 			512,
 			null);
-		// Remove newline
-		if (buffer[fl - 2] == '\r')
-			buffer[fl - 2] = 0;
-		return cast(char*)buffer;
+		return len ? cast(char*)buffer : "(err)";
 	} else {
 		return strerror(code);
 	}
 }
 
-/// Get the last error code from the OS (or crt)
+/// Get the last error code from the OS (or CRT)
 /// Returns: GetLastError from Windows, otherwise errno
 int err_lastcode() {
 	version (Windows)

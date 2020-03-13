@@ -13,12 +13,13 @@ import debugger.disasm;
 
 extern (C):
 
-/// Disassemble given gile. Currently only supports flat binary files.
+/// Disassemble given file to stdout. Currently only supports flat binary
+/// files.
 /// Params:
 /// 	file = File path
 /// 	disopt = Disassembler settings
 /// Returns: Error code if non-zero
-int dump(const(char) *file, ref disasm_params_t disopt) {
+int dump_file(const(char) *file, ref disasm_params_t disopt) {
 	FILE *f = fopen(file, "rb");
 
 	if (f == null) {

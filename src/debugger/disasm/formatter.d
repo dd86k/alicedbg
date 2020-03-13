@@ -92,7 +92,7 @@ struct disasm_fmt_t {
 /// Default string for illegal instructions
 // immutable implies __gshared
 private
-immutable const(char) *DISASM_FMT_ERR_STR = "??";
+immutable const(char) *DISASM_FMT_ERR_STR = "(bad)";
 private
 immutable const(char) *DISASM_FMT_SPACE = " ";
 private
