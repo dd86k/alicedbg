@@ -332,23 +332,19 @@ L_CLI_DEFAULT:
 	final switch (opt.mode) {
 	case debug_:
 		int e = void;
+
 		with (DebuggerMode)
 		switch (opt.debugtype) {
-		case file:
-			if ((e = dbg_file(opt.file)) != 0) {
-				printf("dbg: ("~F_ERR~") %s\n", e, err_msg(e));
-				return e;
-			}
-			break;
-		case pid:
-			if ((e = dbg_attach(opt.pid)) != 0) {
-				printf("dbg: ("~F_ERR~") %s\n", e, err_msg(e));
-				return e;
-			}
-			break;
+		case file: e = dbg_file(opt.file); break;
+		case pid: e = dbg_attach(opt.pid); break;
 		default:
 			puts("cli: No file nor pid were specified.");
 			return EXIT_FAILURE;
+		}
+
+		if (e) {
+			err_print("dbg", e);
+			return e;
 		}
 
 		with (DebuggerUI)
@@ -356,9 +352,9 @@ L_CLI_DEFAULT:
 		case loop: e = loop_enter(disopt); break;
 		case tui: e = tui_enter(disopt); break;
 		}
-		if (e) {
-			printf("ui: ("~F_ERR~") %s\n", e, err_msg(e));
-		}
+
+		if (e)
+			err_print("dbg", e);
 		return e;
 	case dump:
 		return dump_file(opt.file, disopt);

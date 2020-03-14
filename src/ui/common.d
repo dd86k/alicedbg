@@ -13,4 +13,4 @@ import debugger.disasm;
 public:
 
 /// Disassembler parameters
-__gshared disasm_params_t disparams;
+__gshared disasm_params_t g_disparams;

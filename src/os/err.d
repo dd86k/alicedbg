@@ -7,15 +7,8 @@ module os.err;
 
 version (Windows) {
 	import core.sys.windows.windows;
-	import core.sys.windows.winnls;
 	/// Error code format
 	enum F_ERR = "0x%08X";
-
-	private enum LOCALE_NAME_USER_DEFAULT = null;
-	private enum LOCALE_ALL = 0;
-
-	extern (Windows) private
-	int GetLocaleInfoEx(LPCWSTR, LCTYPE, LPWSTR, int);
 } else {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
@@ -51,4 +44,13 @@ int err_lastcode() {
 		return GetLastError;
 	else
 		return errno;
+}
+
+/// Print code and message to std ala perror
+/// Params:
+/// 	mod = Module name
+/// 	code = Error code
+void err_print(const(char) *mod, int code) {
+	import core.stdc.stdio : printf;
+	printf("%s: ("~F_ERR~") %s\n", mod, code, err_msg(code));
 }

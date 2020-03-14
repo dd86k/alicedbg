@@ -15,6 +15,15 @@ module debugger.exception;
 version (Windows) {
 	import core.sys.windows.windows;
 	import debugger.sys.wow64;
+	enum { // NTSTATUS missing D bindings (WOW64)
+		STATUS_WX86_UNSIMULATE = 0x4000001C,	/// WOW64 exception code
+		STATUS_WX86_CONTINUE = 0x4000001D,	/// WOW64 exception code
+		STATUS_WX86_SINGLE_STEP = 0x4000001E,	/// WOW64 exception code
+		STATUS_WX86_BREAKPOINT = 0x4000001F,	/// WOW64 exception code
+		STATUS_WX86_EXCEPTION_CONTINUE = 0x40000020,	/// WOW64 exception code
+		STATUS_WX86_EXCEPTION_LASTCHANCE = 0x40000021,	/// WOW64 exception code
+		STATUS_WX86_EXCEPTION_CHAIN = 0x40000022,	/// WOW64 exception code
+	}
 } else
 version (Posix) {
 	import debugger.sys.user;
@@ -132,8 +141,10 @@ ExceptionType exception_type_code(uint code, uint subcode = 0) {
 			default: return Unknown;
 			}
 		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:	return BoundExceeded;
-		case EXCEPTION_BREAKPOINT:	return Breakpoint;
-		case EXCEPTION_SINGLE_STEP:	return Step;
+		case EXCEPTION_BREAKPOINT, STATUS_WX86_BREAKPOINT:
+			return Breakpoint;
+		case EXCEPTION_SINGLE_STEP, STATUS_WX86_SINGLE_STEP:
+			return Step;
 		case EXCEPTION_DATATYPE_MISALIGNMENT:	return Misalignment;
 		case EXCEPTION_ILLEGAL_INSTRUCTION:	return Illegal;
 		case EXCEPTION_IN_PAGE_ERROR:

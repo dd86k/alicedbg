@@ -18,7 +18,7 @@ extern (C):
 int loop_enter(ref disasm_params_t p) {
 	if (term_init)
 		return 1;
-	disparams = p;
+	g_disparams = p;
 	dbg_sethandle(&loop_handler);
 	return dbg_loop;
 }
@@ -36,11 +36,23 @@ int loop_handler(exception_t *e) {
 	e.pid, e.tid,
 	e.addrv
 	);
-	disparams.addr = e.addr;
-	if (disasm_line(disparams, DisasmMode.File) == DisasmError.None) {
-		printf(" / %s / %s", &disparams.mcbuf, &disparams.mnbuf);
+
+	// * Disassembly
+	g_disparams.addr = e.addr;
+	DisasmError derr = cast(DisasmError)disasm_line(g_disparams, DisasmMode.File);
+	with (DisasmError)
+	switch (derr) {
+	case None:
+		printf(" / %s / %s", &g_disparams.mcbuf, &g_disparams.mnbuf);
+		break;
+	case Illegal:
+		printf(" / %s", &g_disparams.mcbuf);
+		break;
+	default:
 	}
 	putchar('\n');
+
+	// * Register
 	// Print per block of two registers
 	for (size_t i; i < e.regcount; ++i) {
 		printf("  %6s=%s",
@@ -49,6 +61,8 @@ int loop_handler(exception_t *e) {
 		if (i & 1)
 			putchar('\n');
 	}
+
+	// * Input
 L_PROMPT:
 	printf("\nAction [S=Step,C=Continue,Q=Quit] ");
 	InputInfo ii = void;
