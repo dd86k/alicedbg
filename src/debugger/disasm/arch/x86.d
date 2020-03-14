@@ -20,6 +20,8 @@ struct x86_32_internals_t {
 	int segreg;
 	int pf_operand; /// 66H Operand prefix
 	int pf_address; /// 67H Address prefix
+	/// VEX prefix
+	int vex; //TODO: x86-32 VEX
 }
 
 /**
@@ -1833,7 +1835,7 @@ L_CONTINUE:
 	case 0xDF:	// ESCAPE DF
 		ubyte modrm = *p.addru8;
 		++p.addrv;
-		const(char) *m = void, seg = void;
+		const(char) *m = void;
 		if (modrm > 0xBF) { // operand is FP
 			ubyte sti = modrm & 0xF;
 			switch (modrm & 0xF0) {
@@ -2747,10 +2749,10 @@ void x86_0f(ref disasm_params_t p) {
 			disasm_push_str(p, "getsec");
 		return;
 	case 0x38: // 3-byte opcode
-		x86_0f_38h(p);
+		x86_0f38(p);
 		return;
 	case 0x3A: // 3-byte-opcode
-		x86_0f_3Ah(p);
+		x86_0f3a(p);
 		return;
 	case 0x40: // CMOVO
 		if (p.mode >= DisasmMode.File)
@@ -4785,11 +4787,11 @@ void x86_0f(ref disasm_params_t p) {
 	}
 }
 
-void x86_0f_38h(ref disasm_params_t params) {
+void x86_0f38(ref disasm_params_t params) {
 	
 }
 
-void x86_0f_3Ah(ref disasm_params_t params) {
+void x86_0f3a(ref disasm_params_t params) {
 	
 }
 
@@ -5054,14 +5056,14 @@ const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
 	// This is asking for trouble, hopefully more checks will be added later
 	// The array has this order for X86_OP_WIDE
 	// NOTE: ModR/M extension is x86-64 only! (REX)
-	__gshared const(char) *[][]x86_regs = [
-		[ "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh" ],
-		[ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi" ],
-		[ "ax", "cx", "dx", "cx", "sp", "bp", "si", "di" ],
-		[ "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7" ],
-		[ "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7" ],
-		[ "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7" ],
-		[ "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7" ],
+	immutable const(char) *[][]x86_regs = [
+		[ "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh" ],	// BYTE
+		[ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi" ],	// EXI
+		[ "ax", "cx", "dx", "cx", "sp", "bp", "si", "di" ],	// WIDE
+		[ "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7" ],	// MM
+		[ "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7" ],	// XMM
+		[ "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7" ],	// YMM
+		[ "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7" ],	// ZMM
 	];
 	if (width > 6) return null;
 	size_t i = (modrm & RM_REG) >> 3;

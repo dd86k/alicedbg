@@ -205,7 +205,8 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 	if (p.mode >= DisasmMode.File) {
 		if (p.style == DisasmSyntax.Default)
 			p.style = DISASM_DEFAULT_SYNTAX;
-		disasm_render(p);
+		if (p.error == DisasmError.None)
+			disasm_render(p);
 		with (p) {
 			if (mcbuf[mcbufi - 1] == ' ') --mcbufi;
 			mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
