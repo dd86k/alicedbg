@@ -35,6 +35,8 @@ import core.stdc.stdarg;
 import debugger.disasm.core;
 import utils.str;
 
+//TODO: New type: Prefix -- Next thing to print would be a space, not comma
+
 extern (C):
 
 /// Formatter item stack size
