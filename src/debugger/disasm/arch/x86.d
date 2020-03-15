@@ -12,7 +12,7 @@ import utils.str;
 extern (C):
 
 package
-struct x86_32_internals_t {
+struct x86_internals_t {
 	int lock;
 	int repz;	// (F3h) REP/REPE/REPZ
 	int repnz;	// (F2h) REPNE/REPNZ/BND
@@ -32,7 +32,7 @@ struct x86_32_internals_t {
  */
 void disasm_x86(ref disasm_params_t p, bool init = true) {
 	if (init) {
-		x86_32_internals_t i;
+		x86_internals_t i;
 		p.x86 = &i;
 	}
 

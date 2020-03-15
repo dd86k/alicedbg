@@ -21,7 +21,8 @@ struct x86_64_internals_t {
 	int segreg;
 	int pf_operand; /// 66H Operand prefix
 	int pf_address; /// 67H Address prefix
-	/// REX prefix (after legacy prefixes)
+	/// REX prefix
+	// * After legacy prefixes
 	// 0100 w r x b
 	//      | | | +- Set: Extension of the ModRM.RM, SIB.BASE, or Opcode REG fields
 	//      | | +--- Set: Extension of the SIB.INDEX field
@@ -39,6 +40,9 @@ struct x86_64_internals_t {
 	//   - REX.B + SIB.BASE  -> SIB.BASE
 	//   - REX.X + SIB.INDEX -> SIB.INDEX
 	int rex;
+	/// VEX prefix
+	// * After legacy prefixes
+	int vex;
 }
 
 /**

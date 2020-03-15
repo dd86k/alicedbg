@@ -54,26 +54,16 @@ others) use its functions as a library (static or dynamically).
 
 # Usage
 
-To debug an application, use -exec PATH, or to debug an existing process,
-use -pid PROCESSID.
+The command-line interface processes items from left to right and was inspired
+from the ffmpeg project (-option value).
 
-| Option | Possible values | Description |
-|---|---|---|
-| `-ui` | `tui`, `loop`, `tcp-json` | Use an user interface |
-| `-dstyle` | `intel`, `nasm`, `att` | (Disassembler) Use syntax style |
-| `-ddump` | File path | (Disassembler) Disassemble flat binary |
+The default operating mode is the debugger with the Text UI.
 
-## User Interfaces
-
-An user interface can be specified with the `-ui` option.
-
-`-ui ?` outputs this list:
-
-| UI | Description |
-|---|---|
-| `tui` (Default) | (WIP) Text UI |
-| `loop` | Continue by default, show brief exception information |
-| `tcp-json` | (Planned feature) TCP+JSON API server |
+| Option | Possible values | Default | Description |
+|---|---|---|---|
+| `-ui` | `tui`, `loop`, `tcp-json` | `tui` | Debugger user interface |
+| `-dstyle` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
+| `-mode` | `debugger`, `dump`, `profile` | `debugger` | Operating mode |
 
 ### UI: tui
 
@@ -82,33 +72,34 @@ The Text UI is currently in development.
 ### UI: loop
 
 The loop UI is the simplest implementation, featuring simple output on
-exceptions. The UI continues automatically on exceptions and is not
-interactive.
-
-Occuring exceptions are printed on screen:
+exceptions. On an exception, a prompt asks if you wish to continue,
+step, or quit.
 
 ```
 -------------------------------------
 * EXCEPTION #0: BREAKPOINT (0x80000003)
-* PID=5876 TID=1748
-> 7783F146 / cc / int3
-     EIP=7783f147  EFLAGS=00000246
-     EAX=00000000     EBX=00b5e000
-     ECX=4c830000     EDX=00000000
-     ESP=00cff318     EBP=00cff344
-     ESI=01261be8     EDI=777a37ec
+* PID=1768 TID=9288
+> 7FF8B9FF2DBC / cc / int3
+     RIP=00007ff8b9ff2dbd  RFLAGS=00000246
+     RAX=0000000000000000     RBX=0000000000000010
+     RCX=00007ff8b9fbfc04     RDX=0000000000000000
+     RSP=000000445dcff0a0     RBP=0000000000000000
+     RSI=00007ff8ba04d100     RDI=000000445dbaf000
+
+Action [S=Step,C=Continue,Q=Quit]
 ```
 
-Which features the exception counter, process ID, thread ID (Windows-only),
-exception messsage (with its OS-specific code), memory location, a brief
-disassembly (when available), and register list (when available).
+Which features the exception counter, process ID, thread ID, short exception
+messsage, OS-specific code, memory location, a brief disassembly (when
+available), and register list (when available).
 
 # Build Instructions
 
 ## With DUB
 
-Using DUB is recommended to build the project. A compiler can be chosen with the
-`--compiler=` switch. I try to support DMD, GDC, and LDC as much as possible.
+DUB often comes with a D compiler and is recommended to build the project. A
+compiler can be chosen with the `--compiler=` option. I try to support DMD,
+GDC, and LDC as much as possible.
 
 Do note that the `betterC` mode is activated for normal builds and
 documentation. Unittesting (and the rest) uses the druntime library so any
@@ -119,8 +110,11 @@ Phobos functions may be used.
 | Debug | `dub build` |
 | Release | `dub build -b release-nobounds` |
 
-## Without DUB
+## With make
 
-Without DUB, it's still possible to compile the project, but I believe you'll
-have to reference every file (by module name is okay). The `-betterC` switch
-is optional, but recommended.
+Planned.
+
+## Manually
+
+It's still possible to compile the project by referencing every source files.
+The `-betterC` switch is optional, but recommended.

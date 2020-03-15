@@ -142,7 +142,7 @@ struct disasm_params_t { align(1):
 	uint options;
 	union {
 		void *internal;	/// Used internally
-		x86_32_internals_t *x86;	/// Used internally
+		x86_internals_t *x86;	/// Used internally
 		x86_64_internals_t *x86_64;	/// Used internally
 	}
 	disasm_fmt_t *fmt;	/// Formatter structure pointer, used internally
