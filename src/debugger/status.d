@@ -6,7 +6,8 @@
  */
 module debugger.status;
 
-private void function(const(char)*) status_handler;
+private __gshared
+void function(const(char)*) status_handler;
 
 /**
  * Set status handler (from UI).

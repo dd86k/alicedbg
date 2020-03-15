@@ -1,8 +1,9 @@
-# Introduction
+# alicedbg
 
 **Please note that this is still is very early development!**
 
-The alicedbg project aims to be an easy-to-use, simple debugger.
+The alicedbg project aims to be an easy-to-use, simple debugger, object dumper,
+and profiler.
 
 _Why not just use GDB?_ One might ask.
 
@@ -21,7 +22,7 @@ Personal Goals:
 
 | Platform | OS | CRT | Debugging core |
 |---|---|---|:-:|
-| x86 | Windows 7 and up | Microsoft (including WOW64) | ✔️ |
+| x86 | Windows 7 and up | Microsoft (+WOW64) | ✔️ |
 | | Linux | Glibc | ✔️* |
 | ARM | Windows 10 | Microsoft |  |
 | | Linux | Glibc | Planned! |
@@ -32,7 +33,7 @@ Personal Goals:
 
 | Platform | ~% | Extensions or Version | Note |
 |---|---|---|---|
-| x86-32 | 50 | MMX, SSE | Still adding |
+| x86-32 | 60 | x87, MMX, SSE | Still adding |
 | x86-64 | 0 | | Waiting on x86-32 |
 | arm-t32 | 0 | | Waiting on x86-64 |
 | arm-a32 | 0 | | Waiting on x86-64 |

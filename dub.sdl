@@ -1,5 +1,5 @@
 name "alicedbg"
-description "Aiming to be a simple debugger"
+description "Aiming to be a simple debugger, object dumper, and profiler"
 homepage "http://github.com/dd86k/alicedbg"
 authors "dd86k <dd@dax.moe>"
 copyright "Copyright © 2019-2020, dd86k"
@@ -18,7 +18,9 @@ buildType "debugv" {
 	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
 	buildOptions "debugMode" "debugInfo" platform="gdc"
-	dflags "-v"
+	dflags "-v" "-vgc" "-vtls" platform="dmd"
+	dflags "-v" "--vgc" platform="ldc"
+	dflags "-v" platform="gdc"
 }
 
 buildType "debug" {
