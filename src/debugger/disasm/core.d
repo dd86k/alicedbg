@@ -79,6 +79,7 @@ version (AArch64) {
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Att;	/// Platform default syntax
 } else {
 	enum DISASM_DEFAULT_ISA = DisasmABI.Default;	/// Platform default ABI
+	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Nasm;	/// Platform default syntax
 }
 
 //
