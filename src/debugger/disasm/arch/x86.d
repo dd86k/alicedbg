@@ -1912,7 +1912,7 @@ void x86_0f(ref disasm_params_t p) {
 				"movlhps" : "movhps";
 			break;
 		case X86_0F_66H: m = "movhpd"; break;
-		case X86_0F_F3H: m = "movshdup "; break;
+		case X86_0F_F3H: m = "movshdup"; break;
 		default: disasm_err(p); return;
 		}
 		if (p.mode >= DisasmMode.File)
@@ -1945,18 +1945,11 @@ void x86_0f(ref disasm_params_t p) {
 		case RM_REG_001: m = "prefetcht0"; break;
 		case RM_REG_010: m = "prefetcht1"; break;
 		case RM_REG_011: m = "prefetcht2"; break;
-		default: // NOP (reserved)
-			if (p.mode >= DisasmMode.File)
-				disasm_push_str(p, "nop");
-			return;
+		default: disasm_err(p); return;
 		}
 		if (p.mode >= DisasmMode.File)
 			disasm_push_str(p, m);
 		x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
-		return;
-	case 0x19, 0x1C, 0x1D, 0x1E: // NOP (reserved)
-		if (p.mode >= DisasmMode.File)
-			disasm_push_str(p, "nop");
 		return;
 	case 0x1A: // BNDLDX/BNDMOV/BNDCU/BNDCL
 		const(char) *m = void; // instruction
