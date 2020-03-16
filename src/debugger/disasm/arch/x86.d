@@ -1,5 +1,5 @@
 /**
- * x86-specific disassembler.
+ * x86 disassembler.
  *
  * License: BSD 3-Clause
  */
@@ -1627,50 +1627,29 @@ L_CONTINUE:
 		if (dbit) {
 			ubyte modrm = *p.addru8;
 			++p.addrv;
+			const(char) *m = void;
 			if (wbit) { // GRP5
-				const(char) *m = void;
 				switch (modrm & RM_REG) {
 				case RM_REG_000: m = "inc"; break;
 				case RM_REG_001: m = "dec"; break;
-				case RM_REG_010: m = "call"; break;
-				case RM_REG_011: // CALL FAR M16:M32
-					if (p.mode >= DisasmMode.File) {
-						disasm_push_x32(p, *p.addru32);
-						disasm_push_str(p, "call");
-						disasm_push_memregimm(p,
-							x86_segstr(p.x86.segreg),
-							*p.addru32);
-					}
-					p.addrv += 4;
-					return;
-				case RM_REG_100: m = "jmp"; break;
-				case RM_REG_101: // JMP FAR M16:M32
-					if (p.mode >= DisasmMode.File) {
-						disasm_push_x32(p, *p.addru32);
-						disasm_push_str(p, "jmp");
-						disasm_push_memregimm(p,
-							x86_segstr(p.x86.segreg),
-							*p.addru32);
-					}
-					p.addrv += 4;
-					return;
+				case RM_REG_010:
+				case RM_REG_011: m = "call"; break; // fword
+				case RM_REG_100:
+				case RM_REG_101: m = "jmp"; break; // fword
 				case RM_REG_110: m = "push"; break;
 				default: disasm_err(p); return;
 				}
-				if (p.mode >= DisasmMode.File)
-					disasm_push_str(p, m);
-				x86_modrm_rm(p, modrm, X86_WIDTH_EXT);
 			} else { // GRP4
-				const(char) *m = void;
 				switch (modrm & RM_REG) {
 				case RM_REG_000: m = "inc"; break;
 				case RM_REG_001: m = "dec"; break;
 				default: disasm_err(p); return;
 				}
-				if (p.mode >= DisasmMode.File)
-					disasm_push_str(p, m);
-				x86_modrm_rm(p, modrm, X86_WIDTH_BYTE);
 			}
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, m);
+			x86_modrm_rm(p, modrm,
+				wbit ? X86_WIDTH_EXT : X86_WIDTH_BYTE);
 		} else {
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, wbit ? "std" : "cld");
@@ -4428,8 +4407,8 @@ void x86_u32imm(ref disasm_params_t p) {
 	}
 }
 
-/// (Internal) Fetch variable 32-bit immediate, affected by address prefix.
-/// Then if it's the case, fetch and push a 16-bit immediate instead.
+/// (Internal) Fetch variable 16+16/32-bit as immediate, affected by address
+/// prefix. Handles machine code and mnemonics, including the segment register.
 /// Modifies memory pointer.
 /// Params: p = disassembler structure
 void x86_immmem(ref disasm_params_t p) {
@@ -4701,11 +4680,10 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 		}
 		p.addrv += 4;
 		break;
-	case RM_MOD_11:
+	default:
 		if (p.mode >= DisasmMode.File)
 			disasm_push_reg(p, x86_modrm_reg(p, modrm << 3, width));
 		break;
-	default: // Never reached
 	}
 }
 
@@ -4779,7 +4757,7 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 			p.addrv += 4;
 		}
 		break;
-	case RM_MOD_10:
+	default:
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x32(p, *p.addru32);
 			rbase = x86_modrm_rm_reg(sib, false);
@@ -4794,6 +4772,5 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 		}
 		p.addrv += 4;
 		break;
-	default: // never
 	}
 }
