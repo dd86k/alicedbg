@@ -256,6 +256,10 @@ int main(int argc, const(char) **argv) {
 				disopt.abi = DisasmABI.arm_a32;
 			else if (strcmp(march, "aarch64") == 0)
 				disopt.abi = DisasmABI.arm_a64;
+			else if (strcmp(march, "rv32") == 0)
+				disopt.abi = DisasmABI.rv32;
+			else if (strcmp(march, "rv64") == 0)
+				disopt.abi = DisasmABI.rv64;
 			else if (strcmp(march, "guess") == 0) {
 				puts("guess feature not implemented");
 				return EXIT_FAILURE;

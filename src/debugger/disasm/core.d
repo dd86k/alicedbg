@@ -36,6 +36,8 @@ enum DisasmABI : ubyte {
 	arm_t32,	/// (Not implemented) ARM: Thumb 32-bit
 	arm_a32,	/// (Not implemented) ARM: A32 (formally arm)
 	arm_a64,	/// (Not implemented) ARM: A64 (formally aarch64)
+	rv32,	/// RISC-V 32-bit
+	rv64,	/// RISC-V 64-bit
 }
 
 /// Disassembler x86 styles
@@ -145,6 +147,7 @@ struct disasm_params_t { align(1):
 		void *internal;	/// Used internally
 		x86_internals_t *x86;	/// Used internally
 		x86_64_internals_t *x86_64;	/// Used internally
+		rv32_internals_t *rv32;	/// Used internally
 	}
 	disasm_fmt_t *fmt;	/// Formatter structure pointer, used internally
 	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer
@@ -197,6 +200,7 @@ int disasm_line(ref disasm_params_t p, DisasmMode mode) {
 	case x86_16:	disasm_x86_16(p); break;
 	case x86:	disasm_x86(p); break;
 	case x86_64:	disasm_x86_64(p); break;
+	case rv32:	disasm_rv32(p); break;
 	default:
 		disasm_err(p, DisasmError.NotSupported);
 		p.mcbuf[0] = 0;

@@ -18,7 +18,7 @@ Personal Goals:
 
 ## Support Matrix
 
-### Feature Support
+### Debugger Support
 
 | Platform | OS | CRT | Debugging core |
 |---|---|---|:-:|
@@ -29,16 +29,27 @@ Personal Goals:
 
 \* Currently unstable
 
-### Disassembler Progress
+### Disassembler Support
 
-| Platform | ~% | Extensions or Version | Note |
+| Platform | ~% | Extensions or Version | Notes |
 |---|---|---|---|
 | x86-32 | 60 | x87, MMX, SSE | Still adding |
 | x86-64 | 0 | | Waiting on x86-32 |
 | arm-t32 | 0 | | Waiting on x86-64 |
 | arm-a32 | 0 | | Waiting on x86-64 |
 | arm-a64 | 0 | | Waiting on x86-64 |
+| riscv-32 | 1 | RVC 2.0, RV32I 2.1 | |
 | webasm | 0 | | Planned |
+
+### Object Dump Support
+
+| Type | ~% | Extensions | Notes |
+| Binary | 50 | Far from perfect |
+| MZ | 0 | | |
+| LE | 0 | | |
+| NE | 0 | | |
+| PE | 0 | | |
+| ELF | 0 | | |
 
 ## FAQ
 

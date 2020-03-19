@@ -18,7 +18,7 @@ version (Windows) {
 
 /// Get error message from the OS (or CRT) by providing the error code
 /// Params:
-/// 	core = Error code number from OS
+/// 	code = Error code number from OS
 /// Returns: String
 const(char) *err_msg(int code) {
 	version (Windows) {
