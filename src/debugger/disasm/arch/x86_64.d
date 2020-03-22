@@ -40,9 +40,10 @@ struct x86_64_internals_t {
 	//   - REX.B + SIB.BASE  -> SIB.BASE
 	//   - REX.X + SIB.INDEX -> SIB.INDEX
 	int rex;
-	/// VEX prefix
-	// * After legacy prefixes
-	int vex;
+	/// VEX prefix (after legacy prefixes)
+	/// First byte indicates 2-byte VEX (C5H), 3-byte VEX (C4H), or
+	/// 4-byte EVEX (62H)
+	ubyte[4] vex;
 }
 
 /**
@@ -67,6 +68,11 @@ L_CONTINUE:
 			disasm_push_str(p, "int3");
 		break;
 	case 0x40: .. case 0x4F:
+		// Only one REX per instruction
+		if (p.x86_64.rex) {
+			disasm_err(p);
+			return;
+		}
 		p.x86_64.rex = b;
 		goto L_CONTINUE;
 	default: disasm_err(p);

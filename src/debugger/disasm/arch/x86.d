@@ -12,16 +12,18 @@ import utils.str;
 extern (C):
 
 package
-struct x86_internals_t {
-	int lock;
-	int repz;	// (F3h) REP/REPE/REPZ
-	int repnz;	// (F2h) REPNE/REPNZ/BND
-	int last_prefix;	// Last effective prefix for 0f (f2/f3)
-	int segreg;
+struct x86_internals_t { align(1):
+	int lock;	/// LOCK Prefix
+	int repz;	/// (F3H) REP/REPE/REPZ
+	int repnz;	/// (F2H) REPNE/REPNZ/BND
+	int last_prefix;	/// Last effective prefix for 0f (F2H/F3H)
+	int segreg;	/// Last selected segment register
 	int pf_operand; /// 66H Operand prefix
 	int pf_address; /// 67H Address prefix
 	/// VEX prefix
-	int vex; //TODO: x86-32 VEX
+	/// First byte indicates 2-byte VEX (C5H), 3-byte VEX (C4H), or
+	/// 4-byte EVEX (62H)
+	ubyte[4] vex;
 }
 
 /**
@@ -839,6 +841,19 @@ L_CONTINUE:
 			else
 				x86_u8imm(p);
 		} else {
+			ubyte modrm = *p.addru8;
+			if ((modrm & RM_MOD) == RM_MOD_11) {
+				p.x86.vex[0] = b;
+				if (wbit) { // C5H, VEX 2-byte prefix
+					p.x86.vex[1] = modrm;
+					++p.addrv;
+				} else { // C4H, VEX 3-byte prefix
+					p.x86.vex[1] = modrm;
+					p.x86.vex[2] = *(p.addru8 + 1);
+					p.addrv += 2;
+				}
+				return;
+			}
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, wbit ? "lds" : "les");
 			x86_modrm(p, X86_WIDTH_EXT, X86_DIR_REG);
