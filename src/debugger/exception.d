@@ -293,7 +293,7 @@ const(char) *exception_type_str(ExceptionType code) {
 /// Format a register depending on their type as a zero-padded number.
 /// Params: reg = register_t structure
 /// Returns: 
-const(char) *exception_reg_fhex(ref register_t reg) {
+const(char) *exception_reg_fhex(register_t *reg) {
 	import utils.str : strf;
 	with (RegisterType)
 	switch (reg.type) {
@@ -305,7 +305,7 @@ const(char) *exception_reg_fhex(ref register_t reg) {
 	}
 }
 /*
-const(char) *exception_reg_fval(ref register_t reg) {
+const(char) *exception_reg_fval(register_t *reg) {
 	import utils.str : strf;
 	
 }*/
@@ -320,7 +320,7 @@ enum InitPlatform {
 }
 
 // Thanks, Windows, for your silly WOW64
-void exception_reg_init(ref exception_t e, InitPlatform plat) {
+void exception_reg_init(exception_t *e, InitPlatform plat) {
 	if (plat == InitPlatform.Native) {
 		version (X86)
 			plat = InitPlatform.x86;
@@ -382,7 +382,7 @@ void exception_reg_init(ref exception_t e, InitPlatform plat) {
 version (Windows) {
 
 /// Populate exception_t.registers array from Windows' CONTEXT
-int exception_ctx_windows(ref exception_t e, ref CONTEXT c) {
+int exception_ctx_windows(exception_t *e, CONTEXT *c) {
 	version (X86) {
 		e.registers[0].u32 = c.Eip;
 		e.registers[1].u32 = c.EFlags;
@@ -411,7 +411,7 @@ int exception_ctx_windows(ref exception_t e, ref CONTEXT c) {
 }
 
 version (Win64)
-int exception_ctx_windows_wow64(ref exception_t e, ref WOW64_CONTEXT c) {
+int exception_ctx_windows_wow64(exception_t *e, WOW64_CONTEXT *c) {
 	e.registers[0].u32 = c.Eip;
 	e.registers[1].u32 = c.EFlags;
 	e.registers[2].u32 = c.Eax;
@@ -429,7 +429,7 @@ int exception_ctx_windows_wow64(ref exception_t e, ref WOW64_CONTEXT c) {
 version (Posix) {
 
 /// Populate exception_t.registers array from user_regs_struct
-int exception_ctx_user(ref exception_t e, ref user_regs_struct u) {
+int exception_ctx_user(exception_t *e, user_regs_struct *u) {
 	version (X86) {
 //		e.addrv = u.regs.eip;
 		e.registers[0].u32 = u.eip;

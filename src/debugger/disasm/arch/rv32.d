@@ -21,7 +21,7 @@ struct rv32_internals_t {
 
 /// Disassemble riscv-32.
 /// Params: p = Disassembler parameters
-void disasm_rv32(ref disasm_params_t p) {
+void disasm_rv32(disasm_params_t *p) {
 	rv32_internals_t i = void;
 	p.rv32 = &i;
 

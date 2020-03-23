@@ -145,9 +145,9 @@ int dbg_loop() {
 	exception_t e = void;
 
 	version (Win64) {
-		exception_reg_init(e, processWOW64 ? InitPlatform.x86 : InitPlatform.Native);
+		exception_reg_init(&e, processWOW64 ? InitPlatform.x86 : InitPlatform.Native);
 	} else
-		exception_reg_init(e, InitPlatform.Native);
+		exception_reg_init(&e, InitPlatform.Native);
 
 	version (Windows) {
 		DEBUG_EVENT de = void;
@@ -186,16 +186,16 @@ L_DEBUG_LOOP:
 			if (processWOW64) {
 				ctxwow64.ContextFlags = CONTEXT_ALL;
 				Wow64GetThreadContext(hthread, &ctxwow64);
-				exception_ctx_windows_wow64(e, ctxwow64);
+				exception_ctx_windows_wow64(&e, &ctxwow64);
 			} else {
 				ctx.ContextFlags = CONTEXT_ALL;
 				GetThreadContext(hthread, &ctx);
-				exception_ctx_windows(e, ctx);
+				exception_ctx_windows(&e, &ctx);
 			}
 		} else {
 			ctx.ContextFlags = CONTEXT_ALL;
 			GetThreadContext(hthread, &ctx);
-			exception_ctx_windows(e, ctx);
+			exception_ctx_windows(&e, &ctx);
 		}
 
 		with (DebuggerAction)

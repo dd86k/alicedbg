@@ -14,7 +14,7 @@ extern (C):
  * x86-16 disassembler.
  * Params: p = Disassembler parameters
  */
-void disasm_x86_16(ref disasm_params_t p) {
+void disasm_x86_16(disasm_params_t *p) {
 	x86_internals_t i;
 	i.pf_operand = 0x66;
 	i.pf_address = 0x67;

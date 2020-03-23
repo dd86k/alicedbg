@@ -23,7 +23,10 @@ struct x86_internals_t { align(1):
 	/// VEX prefix
 	/// First byte indicates 2-byte VEX (C5H), 3-byte VEX (C4H), or
 	/// 4-byte EVEX (62H)
-	ubyte[4] vex;
+	union {
+		uint vex32;
+		ubyte[4] vex;
+	}
 }
 
 /**
@@ -32,7 +35,7 @@ struct x86_internals_t { align(1):
  * 	p = Disassembler parameters
  * 	init = Initiate structure (x86_16 sets this to false)
  */
-void disasm_x86(ref disasm_params_t p, bool init = true) {
+void disasm_x86(disasm_params_t *p, bool init = true) {
 	if (init) {
 		x86_internals_t i;
 		p.x86 = &i;
@@ -840,7 +843,7 @@ L_CONTINUE:
 				x86_u32imm(p);
 			else
 				x86_u8imm(p);
-		} else {
+		} else { // MOD=11 checking is only in x86-32
 			ubyte modrm = *p.addru8;
 			if ((modrm & RM_MOD) == RM_MOD_11) {
 				p.x86.vex[0] = b;
@@ -1675,7 +1678,7 @@ L_CONTINUE:
 
 private:
 
-void x86_0f(ref disasm_params_t p) {
+void x86_0f(disasm_params_t *p) {
 	ubyte b = *p.addru8;
 	++p.addrv;
 
@@ -3544,11 +3547,11 @@ void x86_0f(ref disasm_params_t p) {
 	}
 }
 
-void x86_0f38(ref disasm_params_t params) {
+void x86_0f38(disasm_params_t *params) {
 	
 }
 
-void x86_0f3a(ref disasm_params_t params) {
+void x86_0f3a(disasm_params_t *params) {
 	
 }
 
@@ -3642,7 +3645,7 @@ int X86_OP_WIDE(int op) { return op & 1; }
 /// Params: op = Opcode
 int X86_OP_DIR(int op)  { return op & 2; }
 
-void x86_u8imm(ref disasm_params_t p) {
+void x86_u8imm(disasm_params_t *p) {
 	if (p.mode >= DisasmMode.File) {
 		disasm_push_x8(p, *p.addru8);
 		disasm_push_imm(p, *p.addru8);
@@ -3654,7 +3657,7 @@ void x86_u8imm(ref disasm_params_t p) {
 /// Then if it's the case, fetch and push a 16-bit immediate instead.
 /// Modifies memory pointer.
 /// Params: p = disassembler structure
-void x86_u32imm(ref disasm_params_t p) {
+void x86_u32imm(disasm_params_t *p) {
 	if (p.x86.pf_operand) { // 16-bit
 		if (p.mode >= DisasmMode.File) {
 			disasm_push_x16(p, *p.addru16);
@@ -3674,7 +3677,7 @@ void x86_u32imm(ref disasm_params_t p) {
 /// prefix. Handles machine code and mnemonics, including the segment register.
 /// Modifies memory pointer.
 /// Params: p = disassembler structure
-void x86_immmem(ref disasm_params_t p) {
+void x86_immmem(disasm_params_t *p) {
 	const(char) *seg = x86_segstr(p.x86.segreg);
 	if (p.x86.pf_address) { // 16-bit
 		if (p.mode >= DisasmMode.File) {
@@ -3706,7 +3709,7 @@ void x86_immmem(ref disasm_params_t p) {
 ///
 /// Returns: Selection number (see Enumeration mapping)
 package
-int x86_0f_select(ref disasm_params_t p) {
+int x86_0f_select(disasm_params_t *p) {
 	switch (p.x86.last_prefix) {
 	case 0xF2: return p.x86.pf_operand ? X86_0F_F266H : X86_0F_F2H;
 	case 0xF3: return X86_0F_F3H;
@@ -3733,7 +3736,7 @@ const(char) *x86_segstr(int segreg) {
 	return s;
 }
 
-const(char) *x87_ststr(ref disasm_params_t p, int index) {
+const(char) *x87_ststr(disasm_params_t *p, int index) {
 	const(char) *st = void;
 	with (DisasmSyntax)
 	switch (p.style) {
@@ -3789,7 +3792,7 @@ const(char) *x87_ststr(ref disasm_params_t p, int index) {
 /// 	p = Disassembler parameters
 /// 	width = Register width, see X86_WIDTH_* enumerations
 /// 	direction = If set, the registers are the target
-void x86_modrm(ref disasm_params_t p, int width, int direction) {
+void x86_modrm(disasm_params_t *p, int width, int direction) {
 	// 11 111 111
 	// || ||| +++- RM
 	// || +++----- REG
@@ -3818,7 +3821,7 @@ L_REG:
 /// 	modrm = ModR/M byte
 /// 	width = Register width (byte, wide, mm, xmm, etc.)
 /// Returns: Register string or null if out of bound
-const(char) *x86_modrm_reg(ref disasm_params_t p, int modrm, int width) {
+const(char) *x86_modrm_reg(disasm_params_t *p, int modrm, int width) {
 	// This is asking for trouble, hopefully more checks will be added later
 	// The array has this order for X86_OP_WIDE
 	// NOTE: ModR/M extension is x86-64 only! (REX)
@@ -3865,7 +3868,7 @@ const(char) *x86_modrm_rm_reg(int modrm, int addrpf) {
 /// 	p = Disasm params
 /// 	modrm = Modrm byte
 /// 	width = Register width
-void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
+void x86_modrm_rm(disasm_params_t *p, ubyte modrm, int width) {
 	if (p.mode >= DisasmMode.File)
 		disasm_push_x8(p, modrm);
 
@@ -3951,7 +3954,7 @@ void x86_modrm_rm(ref disasm_params_t p, ubyte modrm, int width) {
 }
 
 // Process SIB, ignores address prefix
-void x86_sib(ref disasm_params_t p, ubyte modrm) {
+void x86_sib(disasm_params_t *p, ubyte modrm) {
 	// 11 111 111
 	// || ||| +++- BASE
 	// || +++----- INDEX
@@ -3967,11 +3970,6 @@ void x86_sib(ref disasm_params_t p, ubyte modrm) {
 	if (p.mode >= DisasmMode.File) {
 		disasm_push_x8(p, sib);
 		seg = x86_segstr(p.x86.segreg);
-	}
-
-	if (index == SIB_INDEX_100) {
-		disasm_err(p);
-		return;
 	}
 
 	switch (modrm & RM_MOD) { // Mode

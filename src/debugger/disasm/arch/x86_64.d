@@ -43,7 +43,10 @@ struct x86_64_internals_t {
 	/// VEX prefix (after legacy prefixes)
 	/// First byte indicates 2-byte VEX (C5H), 3-byte VEX (C4H), or
 	/// 4-byte EVEX (62H)
-	ubyte[4] vex;
+	union {
+		uint vex32;
+		ubyte[4] vex;
+	}
 }
 
 /**
@@ -51,7 +54,7 @@ struct x86_64_internals_t {
  * Params: p = Disassembler parameters
  * Returns: DisasmError
  */
-void disasm_x86_64(ref disasm_params_t p) {
+void disasm_x86_64(disasm_params_t *p) {
 	x86_64_internals_t i;
 	p.x86_64 = &i;
 
@@ -81,21 +84,21 @@ L_CONTINUE:
 
 private:
 
-void x86_64_0f(ref disasm_params_t p) {
+void x86_64_0f(disasm_params_t *p) {
 	ubyte b = *p.addru8;
 }
 
-void x86_64_0f38(ref disasm_params_t p) {
+void x86_64_0f38(disasm_params_t *p) {
 }
 
-void x86_64_0f3a(ref disasm_params_t p) {
+void x86_64_0f3a(disasm_params_t *p) {
 }
 
 // 1-byte VEX (0xC5)
-void x86_64_map2_vex1(ref disasm_params_t params) {
+void x86_64_map2_vex1(disasm_params_t *p) {
 }
 
 // 2-byte VEX (0xC4)
-void x86_64_map2_vex2(ref disasm_params_t params) {
+void x86_64_map2_vex2(disasm_params_t *p) {
 }
 

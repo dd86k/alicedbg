@@ -15,10 +15,10 @@ import ui.common;
 extern (C):
 
 /// Starts plain UI
-int loop_enter(ref disasm_params_t p) {
+int loop_enter(disasm_params_t *p) {
 	if (term_init)
 		return 1;
-	g_disparams = p;
+	memcpy(&g_disparams, p, disasm_params_t.sizeof);
 	dbg_sethandle(&loop_handler);
 	return dbg_loop;
 }
@@ -39,7 +39,7 @@ int loop_handler(exception_t *e) {
 
 	// * Disassembly
 	g_disparams.addr = e.addr;
-	DisasmError derr = cast(DisasmError)disasm_line(g_disparams, DisasmMode.File);
+	DisasmError derr = cast(DisasmError)disasm_line(&g_disparams, DisasmMode.File);
 	with (DisasmError)
 	switch (derr) {
 	case None:
@@ -57,7 +57,7 @@ int loop_handler(exception_t *e) {
 	for (size_t i; i < e.regcount; ++i) {
 		printf("  %6s=%s",
 			e.registers[i].name,
-			exception_reg_fhex(e.registers[i]));
+			exception_reg_fhex(&e.registers[i]));
 		if (i & 1)
 			putchar('\n');
 	}
@@ -67,7 +67,7 @@ L_PROMPT:
 	printf("\nAction [S=Step,C=Continue,Q=Quit] ");
 	InputInfo ii = void;
 L_INPUT:
-	term_read(ii);
+	term_read(&ii);
 	if (ii.type != InputType.Key)
 		goto L_INPUT;
 	switch (ii.key.keyCode) {

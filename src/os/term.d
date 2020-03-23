@@ -92,8 +92,8 @@ int term_setup(TermType type = TermType.Normal) {
 			if (SetConsoleActiveScreenBuffer(handleOut) == FALSE)
 				return 3;
 			WindowSize ws = void;
-			term_wsize(ws);
-			if (term_buf_init(ws))
+			term_wsize(&ws);
+			if (term_buf_init(&ws))
 				return 4;
 			break;
 		default:
@@ -140,7 +140,7 @@ void __term_resize(int) {
  * 	s = Terminal window size
  */
 private
-int term_buf_init(ref WindowSize s) {
+int term_buf_init(WindowSize *s) {
 	import core.stdc.stdlib : realloc, malloc;
 	version (Windows) {
 		const size_t bsize = s.height * s.width;
@@ -226,7 +226,7 @@ void term_clear() {
  *
  * Note: A COORD uses SHORT (short) and Linux uses unsigned shorts.
  */
-void term_wsize(ref WindowSize ws) {
+void term_wsize(WindowSize *ws) {
 	version (Windows) {
 		CONSOLE_SCREEN_BUFFER_INFO c = void;
 		GetConsoleScreenBufferInfo(handleOut, &c);
@@ -328,7 +328,7 @@ void term_flush() {
  * via the SIGWINCH signal.
  * Params: ii = InputInfo structure
  */
-void term_read(ref InputInfo ii) {
+void term_read(InputInfo *ii) {
 	//TODO: consider memset
 	ii.type = InputType.None;
 	version (Windows) {

@@ -158,7 +158,7 @@ size_t straddf(char *buf, size_t size, size_t bufi, const(char) *f, ...) {
  * 	va = Argument list
  * Returns: Updated buffer index
  */
-size_t straddva(char *buf, size_t size, size_t bufi, const(char) *f, ref va_list va) {
+size_t straddva(char *buf, size_t size, size_t bufi, const(char) *f, va_list va) {
 	char [128]b = void;
 	vsnprintf(cast(char*)b, 128, f, va);
 	return stradd(buf, size, bufi, cast(char*)b);

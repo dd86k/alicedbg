@@ -92,13 +92,14 @@ struct disasm_fmt_t {
 }
 
 /// Default string for illegal instructions
-// immutable implies __gshared
 private
-immutable const(char) *DISASM_FMT_ERR_STR = "(bad)";
+__gshared const(char) *DISASM_FMT_ERR_STR = "(bad)";
 private
-immutable const(char) *DISASM_FMT_SPACE = " ";
+__gshared const(char) *DISASM_FMT_SPACE = " ";
 private
-immutable const(char) *DISASM_FMT_COMMA_SPACE = ", ";
+__gshared const(char) *DISASM_FMT_TAB = "\t";
+private
+__gshared const(char) *DISASM_FMT_COMMA_SPACE = ", ";
 
 //
 // Machine code functions
@@ -108,7 +109,7 @@ immutable const(char) *DISASM_FMT_COMMA_SPACE = ", ";
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = 8-bit value
-void disasm_push_x8(ref disasm_params_t p, ubyte v) {
+void disasm_push_x8(disasm_params_t *p, ubyte v) {
 	disasm_xadd(p, strx02(v));
 	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
 		disasm_xadd(p, DISASM_FMT_SPACE);
@@ -117,7 +118,7 @@ void disasm_push_x8(ref disasm_params_t p, ubyte v) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = 16-bit value
-void disasm_push_x16(ref disasm_params_t p, ushort v) {
+void disasm_push_x16(disasm_params_t *p, ushort v) {
 	disasm_xadd(p, strx04(v));
 	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
 		disasm_xadd(p, DISASM_FMT_SPACE);
@@ -126,7 +127,7 @@ void disasm_push_x16(ref disasm_params_t p, ushort v) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = 32-bit value
-void disasm_push_x32(ref disasm_params_t p, uint v) {
+void disasm_push_x32(disasm_params_t *p, uint v) {
 	disasm_xadd(p, strx08(v));
 	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
 		disasm_xadd(p, DISASM_FMT_SPACE);
@@ -135,7 +136,7 @@ void disasm_push_x32(ref disasm_params_t p, uint v) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = 64-bit value
-void disasm_push_x64(ref disasm_params_t p, ulong v) {
+void disasm_push_x64(disasm_params_t *p, ulong v) {
 	disasm_xadd(p, strx016(v));
 	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
 		disasm_xadd(p, DISASM_FMT_SPACE);
@@ -149,7 +150,7 @@ void disasm_push_x64(ref disasm_params_t p, ulong v) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = String value
-void disasm_push_str(ref disasm_params_t p, const(char) *v) {
+void disasm_push_str(disasm_params_t *p, const(char) *v) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.String;
@@ -160,7 +161,7 @@ void disasm_push_str(ref disasm_params_t p, const(char) *v) {
 /// 	p = Disassembler parameters
 /// 	f = String format
 ///     ... = Arguments
-void disasm_push_strf(ref disasm_params_t p, const(char) *f, ...) {
+void disasm_push_strf(disasm_params_t *p, const(char) *f, ...) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	va_list va;
@@ -173,7 +174,7 @@ void disasm_push_strf(ref disasm_params_t p, const(char) *f, ...) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	reg = Register value
-void disasm_push_reg(ref disasm_params_t p, const(char) *reg) {
+void disasm_push_reg(disasm_params_t *p, const(char) *reg) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.Reg;
@@ -185,7 +186,7 @@ void disasm_push_reg(ref disasm_params_t p, const(char) *reg) {
 /// 	p = Disassembler parameters
 /// 	seg = Segment register value
 /// 	reg = Register value
-void disasm_push_segreg(ref disasm_params_t p, const(char) *seg, const(char) *reg) {
+void disasm_push_segreg(disasm_params_t *p, const(char) *seg, const(char) *reg) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.Reg;
@@ -197,7 +198,7 @@ void disasm_push_segreg(ref disasm_params_t p, const(char) *seg, const(char) *re
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = Immediate value
-void disasm_push_imm(ref disasm_params_t p, int v) {
+void disasm_push_imm(disasm_params_t *p, int v) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.Imm;
@@ -208,7 +209,7 @@ void disasm_push_imm(ref disasm_params_t p, int v) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = Absolute memory value
-void disasm_push_mem(ref disasm_params_t p, int v) {
+void disasm_push_mem(disasm_params_t *p, int v) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.Mem;
@@ -219,7 +220,7 @@ void disasm_push_mem(ref disasm_params_t p, int v) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	reg = Register value
-void disasm_push_memreg(ref disasm_params_t p, const(char) *reg) {
+void disasm_push_memreg(disasm_params_t *p, const(char) *reg) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.MemReg;
@@ -231,7 +232,7 @@ void disasm_push_memreg(ref disasm_params_t p, const(char) *reg) {
 /// 	p = Disassembler parameters
 /// 	seg = Segment register value
 /// 	reg = Register value
-void disasm_push_memsegreg(ref disasm_params_t p, const(char) *seg, const(char) *reg) {
+void disasm_push_memsegreg(disasm_params_t *p, const(char) *seg, const(char) *reg) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.MemSegReg;
@@ -244,7 +245,7 @@ void disasm_push_memsegreg(ref disasm_params_t p, const(char) *seg, const(char) 
 /// 	p = Disassembler parameters
 /// 	reg = Register value
 /// 	v = Immediate value
-void disasm_push_memregimm(ref disasm_params_t p, const(char) *reg, int v) {
+void disasm_push_memregimm(disasm_params_t *p, const(char) *reg, int v) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.MemRegImm;
@@ -258,7 +259,7 @@ void disasm_push_memregimm(ref disasm_params_t p, const(char) *reg, int v) {
 /// 	seg = Segment register value
 /// 	reg = Register value
 /// 	v = Immediate value
-void disasm_push_memsegregimm(ref disasm_params_t p, const(char) *seg, const(char) *reg, int v) {
+void disasm_push_memsegregimm(disasm_params_t *p, const(char) *seg, const(char) *reg, int v) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.MemSegRegImm;
@@ -274,7 +275,7 @@ void disasm_push_memsegregimm(ref disasm_params_t p, const(char) *seg, const(cha
 /// 	base = Base register value
 /// 	index = Index register value
 /// 	scale = Scale value
-void disasm_push_x86_sib_mod00(ref disasm_params_t p,
+void disasm_push_x86_sib_mod00(disasm_params_t *p,
 	const(char) *seg, const(char) *base, const(char) *index, int scale) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
@@ -290,7 +291,7 @@ void disasm_push_x86_sib_mod00(ref disasm_params_t p,
 /// 	p = Disassembler parameters
 /// 	seg = Segment register value
 /// 	base = Base register value
-void disasm_push_x86_sib_mod00_index100(ref disasm_params_t p,
+void disasm_push_x86_sib_mod00_index100(disasm_params_t *p,
 	const(char) *seg, const(char) *base) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
@@ -306,7 +307,7 @@ void disasm_push_x86_sib_mod00_index100(ref disasm_params_t p,
 /// 	index = Index register value
 /// 	scale = Scale value
 /// 	imm = Displacement value
-void disasm_push_x86_sib_mod00_base101(ref disasm_params_t p,
+void disasm_push_x86_sib_mod00_base101(disasm_params_t *p,
 	const(char) *seg, const(char) *index, int scale, int imm) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
@@ -322,7 +323,7 @@ void disasm_push_x86_sib_mod00_base101(ref disasm_params_t p,
 /// 	p = Disassembler parameters
 /// 	seg = Segment register value
 /// 	imm = Displacement value
-void disasm_push_x86_sib_mod00_index100_base101(ref disasm_params_t p,
+void disasm_push_x86_sib_mod00_index100_base101(disasm_params_t *p,
 	const(char) *seg, int imm) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
@@ -340,7 +341,7 @@ void disasm_push_x86_sib_mod00_index100_base101(ref disasm_params_t p,
 /// 	index = Index register value
 /// 	scale = Scale value
 /// 	imm = Displacement value
-void disasm_push_x86_sib_mod01(ref disasm_params_t p,
+void disasm_push_x86_sib_mod01(disasm_params_t *p,
 	const(char) *seg, const(char) *base, const(char) *index, int scale, int imm) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
@@ -359,7 +360,7 @@ void disasm_push_x86_sib_mod01(ref disasm_params_t p,
 /// 	seg = Segment register value
 /// 	base = Base register value
 /// 	imm = Displacement value
-void disasm_push_x86_sib_mod01_index100(ref disasm_params_t p,
+void disasm_push_x86_sib_mod01_index100(disasm_params_t *p,
 	const(char) *seg, const(char) *base, int imm) {
 	disasm_fmt_item_t *i = disasm_fmt_select(p);
 	if (i == null) return;
@@ -378,7 +379,7 @@ void disasm_push_x86_sib_mod01_index100(ref disasm_params_t p,
 /// Params:
 /// 	p = Disassembler parameters
 /// 	err = Disassembler error (DisasmError, defaults to Illegal)
-void disasm_err(ref disasm_params_t p, DisasmError err = DisasmError.Illegal) {
+void disasm_err(disasm_params_t *p, DisasmError err = DisasmError.Illegal) {
 	p.error = err;
 	p.mnbufi =
 	stradd(cast(char*)p.mnbuf, DISASM_BUF_SIZE, 0, DISASM_FMT_ERR_STR);
@@ -389,12 +390,12 @@ void disasm_err(ref disasm_params_t p, DisasmError err = DisasmError.Illegal) {
 /// disasm_line.
 /// Params:
 /// 	p = Disassembler parameters
-void disasm_render(ref disasm_params_t p) {
+void disasm_render(disasm_params_t *p) {
 	size_t nbitems = p.fmt.itemno; /// number of total items
 
 	if (nbitems < 1) return;
 
-	disasm_madd(p, disasm_fmt_item(p, p.fmt.items[0]));
+	disasm_madd(p, disasm_fmt_item(p, &p.fmt.items[0]));
 
 	if (nbitems < 2) return;
 
@@ -410,24 +411,25 @@ void disasm_render(ref disasm_params_t p) {
 		}
 	}
 
-	disasm_madd(p, DISASM_FMT_SPACE);
+	disasm_madd(p, DISASM_FMT_TAB);
+
 	if (inversedir) {
 		if (nbitems > 2) {
-			disasm_madd(p, disasm_fmt_item(p, p.fmt.items[2]));
+			disasm_madd(p, disasm_fmt_item(p, &p.fmt.items[2]));
 			disasm_madd(p, DISASM_FMT_COMMA_SPACE);
 		}
-		disasm_madd(p, disasm_fmt_item(p, p.fmt.items[1]));
+		disasm_madd(p, disasm_fmt_item(p, &p.fmt.items[1]));
 	} else {
-		disasm_madd(p, disasm_fmt_item(p, p.fmt.items[1]));
+		disasm_madd(p, disasm_fmt_item(p, &p.fmt.items[1]));
 		if (nbitems > 2) {
 			disasm_madd(p, DISASM_FMT_COMMA_SPACE);
-			disasm_madd(p, disasm_fmt_item(p, p.fmt.items[2]));
+			disasm_madd(p, disasm_fmt_item(p, &p.fmt.items[2]));
 		}
 	}
 
 	for (size_t index = 3; index < nbitems; ++index) {
 		disasm_madd(p, DISASM_FMT_COMMA_SPACE);
-		disasm_madd(p, disasm_fmt_item(p, p.fmt.items[index]));
+		disasm_madd(p, disasm_fmt_item(p, &p.fmt.items[index]));
 	}
 }
 
@@ -442,7 +444,7 @@ package:
 /// Params:
 /// 	p = Disassembler parameters
 /// Returns: Formatter item if there is still space; Otherwise null
-disasm_fmt_item_t *disasm_fmt_select(ref disasm_params_t p) {
+disasm_fmt_item_t *disasm_fmt_select(disasm_params_t *p) {
 	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT) return null;
 	return &p.fmt.items[p.fmt.itemno++];
 }
@@ -451,7 +453,7 @@ disasm_fmt_item_t *disasm_fmt_select(ref disasm_params_t p) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	s = String
-void disasm_madd(ref disasm_params_t p, const(char) *s) {
+void disasm_madd(disasm_params_t *p, const(char) *s) {
 	with (p)
 	mnbufi = stradd(cast(char*)mnbuf, DISASM_BUF_SIZE, mnbufi, s);
 }
@@ -460,7 +462,7 @@ void disasm_madd(ref disasm_params_t p, const(char) *s) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	s = String
-void disasm_xadd(ref disasm_params_t p, const(char) *s) {
+void disasm_xadd(disasm_params_t *p, const(char) *s) {
 	with (p)
 	mcbufi = stradd(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, s);
 }
@@ -475,7 +477,7 @@ void disasm_xadd(ref disasm_params_t p, const(char) *s) {
 /// 	p = Disassembler parameters
 /// 	i = Formatter item
 /// Returns: Formatted string
-const(char) *disasm_fmt_item(ref disasm_params_t p, ref disasm_fmt_item_t i) {
+const(char) *disasm_fmt_item(disasm_params_t *p, disasm_fmt_item_t *i) {
 	with (FormatType)
 	final switch (i.type) {
 	case String:	return i.sval1;
@@ -505,7 +507,7 @@ const(char) *disasm_fmt_item(ref disasm_params_t p, ref disasm_fmt_item_t i) {
 		return disasm_fmt_sib_memsegbaseimm(p, i.sval2, i.sval1, i.ival1);
 	}
 }
-const(char) *disasm_fmt_reg(ref disasm_params_t p,
+const(char) *disasm_fmt_reg(disasm_params_t *p,
 	const(char) *v) {
 	if (v[0] == 0) return v;
 	with (DisasmSyntax)
@@ -514,13 +516,13 @@ const(char) *disasm_fmt_reg(ref disasm_params_t p,
 	default:  return v;
 	}
 }
-const(char) *disasm_fmt_segreg(ref disasm_params_t p,
+const(char) *disasm_fmt_segreg(disasm_params_t *p,
 	const(char) *seg, const(char) *reg) {
 	seg = disasm_fmt_reg(p, seg);
 	reg = disasm_fmt_reg(p, reg);
 	return strf("%s%s", seg, reg);
 }
-const(char) *disasm_fmt_imm(ref disasm_params_t f,
+const(char) *disasm_fmt_imm(disasm_params_t *f,
 	int v) {
 	with (DisasmSyntax)
 	switch (f.style) {
@@ -528,7 +530,7 @@ const(char) *disasm_fmt_imm(ref disasm_params_t f,
 	default:  return strf("%d", v);
 	}
 }
-const(char) *disasm_fmt_mem(ref disasm_params_t p,
+const(char) *disasm_fmt_mem(disasm_params_t *p,
 	int v) {
 	with (DisasmSyntax)
 	switch (p.style) {
@@ -536,7 +538,7 @@ const(char) *disasm_fmt_mem(ref disasm_params_t p,
 	default:  return strf("[%d]", v);
 	}
 }
-const(char) *disasm_fmt_memreg(ref disasm_params_t p,
+const(char) *disasm_fmt_memreg(disasm_params_t *p,
 	const(char) *v) {
 	with (DisasmSyntax)
 	switch (p.style) {
@@ -544,7 +546,7 @@ const(char) *disasm_fmt_memreg(ref disasm_params_t p,
 	default:  return strf("[%s]", v);
 	}
 }
-const(char) *disasm_fmt_memsegreg(ref disasm_params_t p,
+const(char) *disasm_fmt_memsegreg(disasm_params_t *p,
 	const(char) *seg, const(char) *reg) {
 	seg = disasm_fmt_reg(p, seg);
 	reg = disasm_fmt_reg(p, reg);
@@ -555,7 +557,7 @@ const(char) *disasm_fmt_memsegreg(ref disasm_params_t p,
 	default:   return strf("%s[%s]", seg, reg);
 	}
 }
-const(char) *disasm_fmt_memregimm(ref disasm_params_t p,
+const(char) *disasm_fmt_memregimm(disasm_params_t *p,
 	const(char) *reg, int v) {
 	reg = disasm_fmt_reg(p, reg);
 	with (DisasmSyntax)
@@ -564,7 +566,7 @@ const(char) *disasm_fmt_memregimm(ref disasm_params_t p,
 	default:   return strf("[%s%+d]", reg, v);
 	}
 }
-const(char) *disasm_fmt_memsegregimm(ref disasm_params_t p,
+const(char) *disasm_fmt_memsegregimm(disasm_params_t *p,
 	const(char) *seg, const(char) *reg, int v) {
 	seg = disasm_fmt_reg(p, seg);
 	reg = disasm_fmt_reg(p, reg);
@@ -575,7 +577,7 @@ const(char) *disasm_fmt_memsegregimm(ref disasm_params_t p,
 	default:   return strf("%s[%s%+d]", seg, reg, v);
 	}
 }
-const(char) *disasm_fmt_sib_memsegbaseindexscale(ref disasm_params_t p,
+const(char) *disasm_fmt_sib_memsegbaseindexscale(disasm_params_t *p,
 	const(char) *seg, const(char) *base, const(char) *index, int scale) {
 	seg = disasm_fmt_reg(p, seg);
 	base = disasm_fmt_reg(p, base);
@@ -587,7 +589,7 @@ const(char) *disasm_fmt_sib_memsegbaseindexscale(ref disasm_params_t p,
 	default:   return strf("%s[%s+%s*%d]", seg, base, index, scale);
 	}
 }
-const(char) *disasm_fmt_sib_memsegbase(ref disasm_params_t p,
+const(char) *disasm_fmt_sib_memsegbase(disasm_params_t *p,
 	const(char) *seg, const(char) *base) {
 	seg = disasm_fmt_reg(p, seg);
 	base = disasm_fmt_reg(p, base);
@@ -598,7 +600,7 @@ const(char) *disasm_fmt_sib_memsegbase(ref disasm_params_t p,
 	default:   return strf("%s[%s]", seg, base);
 	}
 }
-const(char) *disasm_fmt_sib_memsegindexscaleimm(ref disasm_params_t p,
+const(char) *disasm_fmt_sib_memsegindexscaleimm(disasm_params_t *p,
 	const(char) *seg, const(char) *index, ulong scale, int imm) {
 	seg = disasm_fmt_reg(p, seg);
 	index = disasm_fmt_reg(p, index);
@@ -609,7 +611,7 @@ const(char) *disasm_fmt_sib_memsegindexscaleimm(ref disasm_params_t p,
 	default:   return strf("%s[%s*%d%+d]", seg, index, scale, imm);
 	}
 }
-const(char) *disasm_fmt_sib_memsegimm(ref disasm_params_t p,
+const(char) *disasm_fmt_sib_memsegimm(disasm_params_t *p,
 	const(char) *seg, int imm) {
 	seg = disasm_fmt_reg(p, seg);
 	with (DisasmSyntax)
@@ -619,7 +621,7 @@ const(char) *disasm_fmt_sib_memsegimm(ref disasm_params_t p,
 	default:   return strf("%s[%+d]", seg, imm);
 	}
 }
-const(char) *disasm_fmt_sib_memsegbaseindexscaleimm(ref disasm_params_t p,
+const(char) *disasm_fmt_sib_memsegbaseindexscaleimm(disasm_params_t *p,
 	const(char) *seg, const(char) *base, const(char) *index, int scale, int imm) {
 	seg = disasm_fmt_reg(p, seg);
 	base = disasm_fmt_reg(p, base);
@@ -631,7 +633,7 @@ const(char) *disasm_fmt_sib_memsegbaseindexscaleimm(ref disasm_params_t p,
 	default:   return strf("%s[%s+%s*%d%+d]", seg, base, index, scale, imm);
 	}
 }
-const(char) *disasm_fmt_sib_memsegbaseimm(ref disasm_params_t p,
+const(char) *disasm_fmt_sib_memsegbaseimm(disasm_params_t *p,
 	const(char) *seg, const(char) *base, int imm) {
 	seg = disasm_fmt_reg(p, seg);
 	base = disasm_fmt_reg(p, base);

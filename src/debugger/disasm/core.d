@@ -174,7 +174,7 @@ pragma(msg, "* disasm_params_t.sizeof: ", disasm_params_t.sizeof);
  *
  * Returns: Error code; Non-zero indicating an error
  */
-int disasm_line(ref disasm_params_t p, DisasmMode mode) {
+int disasm_line(disasm_params_t *p, DisasmMode mode) {
 	if (p.addr == null) {
 		disasm_err(p, DisasmError.NullAddress);
 		p.mcbuf[0] = 0;

@@ -1,4 +1,4 @@
-# alicedbg
+# Alice Debugger Project
 
 **Please note that this is still is very early development!**
 
@@ -44,6 +44,7 @@ Personal Goals:
 ### Object Dump Support
 
 | Type | ~% | Extensions | Notes |
+|---|---|---|---|
 | Binary | 50 | Far from perfect |
 | MZ | 0 | | |
 | LE | 0 | | |

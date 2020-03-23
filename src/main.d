@@ -185,6 +185,12 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
+		// shorthand of "-mode dump"
+		if (strcmp(arg, "dump") == 0) {
+			opt.mode = OperatingMode.dump;
+			continue;
+		}
+
 		// debugger: select file
 		if (strcmp(arg, "exec") == 0) {
 			if (argi + 1 >= argc) {
@@ -332,11 +338,10 @@ L_CLI_DEFAULT:
 		}
 	}
 
+	int e = void;
 	with (OperatingMode)
 	final switch (opt.mode) {
 	case debug_:
-		int e = void;
-
 		with (DebuggerMode)
 		switch (opt.debugtype) {
 		case file: e = dbg_file(opt.file); break;
@@ -353,18 +358,17 @@ L_CLI_DEFAULT:
 
 		with (DebuggerUI)
 		final switch (opt.ui) {
-		case loop: e = loop_enter(disopt); break;
-		case tui: e = tui_enter(disopt); break;
+		case loop: e = loop_enter(&disopt); break;
+		case tui: e = tui_enter(&disopt); break;
 		}
-
-		if (e)
-			err_print("dbg", e);
-		return e;
+		break;
 	case dump:
-		return dump_file(opt.file, disopt);
+		e = dump_file(opt.file, &disopt);
+		break;
 	case profile:
 		puts("Profiling feature not yet implemented");
-		break;
+		return EXIT_FAILURE;
 	}
-	return 0;
+
+	return e;
 }
