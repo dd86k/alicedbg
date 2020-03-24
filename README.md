@@ -15,6 +15,7 @@ Personal Goals:
 - [ ] Debug an application on my Raspberry Pi 3B+ and my Purism Librem 5
 - [ ] Disassemble ARM instructions with the Intel syntax
 - [ ] Embed, as a library, into an embedded HTTP server to provide a local WebUI
+- [ ] Make a disassembly as a service
 
 ## Support Matrix
 
@@ -31,9 +32,9 @@ Personal Goals:
 
 ### Disassembler Support
 
-| Platform | ~% | Extensions or Version | Notes |
+| Platform | ~% | Extensions | Notes |
 |---|---|---|---|
-| x86-32 | 60 | x87, MMX, SSE | Still adding |
+| x86-32 | 60 | x87, MMX, SSE, AES, SHA, VMX, SVM | Still adding |
 | x86-64 | 0 | | Waiting on x86-32 |
 | arm-t32 | 0 | | Waiting on x86-64 |
 | arm-a32 | 0 | | Waiting on x86-64 |

@@ -18,8 +18,9 @@ extern (C):
 /// Params:
 /// 	file = File path
 /// 	disopt = Disassembler settings
+/// 	flags = Dumper options
 /// Returns: Error code if non-zero
-int dump_file(const(char) *file, disasm_params_t *dp) {
+int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 	if (file == null) {
 		puts("dump: file is null");
 		return EXIT_FAILURE;
@@ -27,12 +28,13 @@ int dump_file(const(char) *file, disasm_params_t *dp) {
 	FILE *f = fopen(file, "rb");
 
 	file_info_t finfo = void;
-	if (file_load(f, &finfo, 0)) {
-		puts("dump: could not open file");
+	if (file_load(f, &finfo, 0) == FileError.Operation) {
+		puts("loader: could not read/seek");
 		return EXIT_FAILURE;
 	}
 
-	dp.abi = finfo.isa;
+	if (dp.abi == DisasmABI.Default)
+		dp.abi = finfo.isa;
 
 	with (FileType)
 	switch (finfo.type) {

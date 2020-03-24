@@ -263,7 +263,7 @@ enum : ushort { // PE_HEADER.Machine, likely all little-endian
 	PE_MACHINE_ARM64	= 0xaa64,	// arm_a64
 	PE_MACHINE_EBC	= 0xebc,	// EFI Byte-Code
 	PE_MACHINE_I386	= 0x14c,	// x86
-	PE_MACHINE_IA64	= 0x200,	// ia64 (titanium, not x86-64!)
+	PE_MACHINE_IA64	= 0x200,	// Itanium (not x86-64!)
 	PE_MACHINE_M32R	= 0x9041,	// lsb
 	PE_MACHINE_MIPS16	= 0x266,
 	PE_MACHINE_MIPSFPU	= 0x366,

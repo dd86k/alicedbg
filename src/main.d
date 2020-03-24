@@ -57,6 +57,7 @@ struct cliopt_t {
 	const(char) *file;
 	const(char) *file_args;
 	const(char) *file_env;
+	int dumpopt;	/// Dumper flags
 }
 
 /// Version page

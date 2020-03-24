@@ -432,6 +432,14 @@ void disasm_render(disasm_params_t *p) {
 		disasm_madd(p, disasm_fmt_item(p, &p.fmt.items[index]));
 	}
 }
+/// (Internal) Places null characters in buffers
+/// Params: Disassembler parameters
+void disasm_render_finish(disasm_params_t *p) {
+	with (p) {
+		if (mcbuf[mcbufi - 1] == ' ') --mcbufi;
+		mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
+	}
+}
 
 //
 // Internal functions

@@ -212,10 +212,7 @@ int disasm_line(disasm_params_t *p, DisasmMode mode) {
 			p.style = DISASM_DEFAULT_SYNTAX;
 		if (p.error == DisasmError.None)
 			disasm_render(p);
-		with (p) {
-			if (mcbuf[mcbufi - 1] == ' ') --mcbufi;
-			mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
-		}
+		disasm_render_finish(p);
 	}
 
 	return p.error;

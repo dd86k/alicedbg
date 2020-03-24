@@ -273,7 +273,7 @@ L_DEBUG_LOOP:
 		if (ptrace(PTRACE_GETREGS, pid, null, &u) == -1)
 			return 6;
 
-		exception_ctx_user(e, u);
+		exception_ctx_user(&e, &u);
 
 		if (chld_signo == SIGTRAP) {
 			//TODO: Find a way to find the fault address

@@ -30,8 +30,6 @@ enum FileError {
 enum FileType {
 	/// Mysterious file format
 	Unknown,
-	/// Binary/flat format
-	Raw,
 	/// Mark Zbikowski format
 	MZ,
 	/// New Executable format
@@ -86,6 +84,7 @@ int file_load(FILE *file, file_info_t *info, int flags) {
 	// Auto-detection
 	//
 
+	info.type = FileType.Unknown;
 	file_sig_t sig = void;
 	if (fread(&sig, 4, 1, info.handle) == 0)
 		return FileError.Operation;
@@ -105,20 +104,16 @@ int file_load(FILE *file, file_info_t *info, int flags) {
 		case SIG_PE:
 			if (sig.u16[1]) // "PE\0\0"
 				return FileError.Unsupported;
-			file_load_pe(info);
-			break;
+			return file_load_pe(info);
 		default: // MZ
 			return FileError.Unsupported;
 		}
-		break;
 /*	case SIG_ELF_L:
 	
 		break;*/
 	default:
 		return FileError.Unsupported;
 	}
-
-	return FileError.None;
 }
 
 int file_cmp_section(const(char)* sname, int ssize, const(char) *tname) {
