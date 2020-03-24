@@ -312,6 +312,10 @@ int main(int argc, const(char) **argv) {
 			
 		}*/
 
+		// dumper: file is raw
+		if (strcmp(arg, "raw") == 0)
+			opt.dumpopt |= DUMPER_FILE_RAW;
+
 		if (strcmp(arg, "version") == 0 || strcmp(arg, "-version") == 0)
 			return cliver;
 		if (strcmp(arg, "help") == 0 || strcmp(arg, "-help") == 0)
@@ -364,7 +368,7 @@ L_CLI_DEFAULT:
 		}
 		break;
 	case dump:
-		e = dump_file(opt.file, &disopt);
+		e = dump_file(opt.file, &disopt, opt.dumpopt);
 		break;
 	case profile:
 		puts("Profiling feature not yet implemented");

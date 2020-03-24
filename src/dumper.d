@@ -13,6 +13,10 @@ import debugger.disasm, debugger.file.loader;
 
 extern (C):
 
+enum { // Dumper flags
+	DUMPER_FILE_RAW = 1,	/// File is raw, do not attempt to detect it
+}
+
 /// Disassemble given file to stdout. Currently only supports flat binary
 /// files.
 /// Params:
@@ -26,20 +30,12 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 		return EXIT_FAILURE;
 	}
 	FILE *f = fopen(file, "rb");
-
-	file_info_t finfo = void;
-	if (file_load(f, &finfo, 0) == FileError.Operation) {
-		puts("loader: could not read/seek");
+	if (f == null) {
+		puts("dump: could not open file");
 		return EXIT_FAILURE;
 	}
 
-	if (dp.abi == DisasmABI.Default)
-		dp.abi = finfo.isa;
-
-	with (FileType)
-	switch (finfo.type) {
-	case PE: return dumper_print_pe32(&finfo, dp);
-	default:
+	if (flags & DUMPER_FILE_RAW) {
 		if (fseek(f, 0, SEEK_END)) {
 			puts("dump: could not seek file");
 			return EXIT_FAILURE;
@@ -60,9 +56,25 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 				cast(uint)fi,
 				&dp.mcbuf, &dp.mnbuf);
 		}
-	}
+		return EXIT_SUCCESS;
+	} else {
+		file_info_t finfo = void;
+		if (file_load(f, &finfo, 0)) {
+			puts("loader: could not load file");
+			return EXIT_FAILURE;
+		}
 
-	return 0;
+		if (dp.abi == DisasmABI.Default)
+			dp.abi = finfo.isa;
+
+		with (FileType)
+		switch (finfo.type) {
+		case PE: return dumper_print_pe32(&finfo, dp);
+		default:
+			puts("loader: format not supported");
+			return EXIT_FAILURE;
+		}
+	}
 }
 
 // ANCHOR PE32
