@@ -213,7 +213,7 @@ void term_clear() {
 		}
 	} else version (Posix) {
 		WindowSize ws = void;
-		term_wsize(ws);
+		term_wsize(&ws);
 		//TODO: write 'default' attribute character
 		printf("\033[0;0H%*s\033[0;0H", ws.height * ws.width, cast(char*)"");
 	}

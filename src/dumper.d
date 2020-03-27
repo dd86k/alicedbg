@@ -13,8 +13,21 @@ import debugger.disasm, debugger.file.loader;
 
 extern (C):
 
-enum { // Dumper flags
-	DUMPER_FILE_RAW = 1,	/// File is raw, do not attempt to detect it
+enum { // Dumper flags (-show)
+	/// File is raw, do not attempt to detect its format
+	DUMPER_FILE_RAW	= 1,
+	/// Include headers (image headers, optional headers, directories) in
+	/// output.
+	DUMPER_SHOW_HEADERS	= 0x0100,
+	/// Include sections in output.
+	DUMPER_SHOW_SECTIONS	= 0x0200,
+	/// Include imports in output. This includes dynamic libraries such as
+	/// DLL files (for Windows, under `.rdata`) and SO files.
+	DUMPER_SHOW_IMPORTS	= 0x0400,
+	/// Include symbols in output.
+	DUMPER_SHOW_SYMBOLS	= 0x0800,
+	/// Include section disassembly in output.
+	DUMPER_SHOW_DISASSEMBLY	= 0x8000,
 }
 
 /// Disassemble given file to stdout. Currently only supports flat binary
@@ -64,12 +77,12 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 			return EXIT_FAILURE;
 		}
 
-		if (dp.abi == DisasmABI.Default)
-			dp.abi = finfo.isa;
+		if (dp.isa == DisasmISA.Default)
+			dp.isa = finfo.isa;
 
 		with (FileType)
 		switch (finfo.type) {
-		case PE: return dumper_print_pe32(&finfo, dp);
+		case PE: return dumper_print_pe32(&finfo, dp, flags);
 		default:
 			puts("loader: format not supported");
 			return EXIT_FAILURE;
@@ -84,7 +97,7 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 /// 	fi = File information
 /// 	dp = Disassembler parameters
 /// Returns: Non-zero on error
-int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp) {
+int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 	import debugger.file.objs.pe; // @suppress(dscanner.suspicious.local_imports)
 	import core.stdc.time : time_t, tm, localtime, strftime;
 
@@ -126,6 +139,8 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp) {
 		NumberOfSymbols, NumberOfSymbols,
 		SizeOfOptionalHeader, SizeOfOptionalHeader,
 		Characteristics);
+
+	// Characteristics flags
 	if (Characteristics & PE_CHARACTERISTIC_RELOCS_STRIPPED)
 		printf("RELOCS_STRIPPED,");
 	if (Characteristics & PE_CHARACTERISTIC_EXECUTABLE_IMAGE)
@@ -177,6 +192,7 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp) {
 			printf("dumper: (PE32) Unknown Subsystem: %04X\n", OptSubsystem);
 			return EXIT_FAILURE;
 		}
+
 		// same offsets
 		ubyte MajorLinkerVersion = fi.pe.ohdr.MajorLinkerVersion;
 		ubyte MinorLinkerVersion = fi.pe.ohdr.MinorLinkerVersion;
@@ -196,8 +212,8 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp) {
 		ushort DllCharacteristics = void;
 		uint NumberOfRvaAndSizes = void;
 		uint LoaderFlags = void;
-		// Optional Header
-		printf(
+
+		printf(	// Optional Header
 		"*\n* Optional Header\n*\n\n"~
 		"Type                         Image\n"~
 		"Magic                        %04X\t(PE%s)\n"~
@@ -242,7 +258,7 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp) {
 		SizeOfHeaders, SizeOfHeaders,
 		fi.pe.ohdr.CheckSum,
 		OptSubsystem, str_sys);
-		// And their differences
+
 		switch (SizeOfOptionalHeader) {
 		case 0xE0: // 32
 			uint BaseOfData = fi.pe.ohdr.BaseOfData;
@@ -291,6 +307,7 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp) {
 			break;
 		default: goto L_SECTIONS;
 		}
+
 		printf(
 		"LoaderFlags                  %08X\n"~
 		"NumberOfRvaAndSizes          %08X\n"~
@@ -298,6 +315,8 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp) {
 		LoaderFlags,
 		NumberOfRvaAndSizes,
 		DllCharacteristics);
+
+		// DllCharacteristics flags
 		if (DllCharacteristics & PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA)
 			printf("HIGH_ENTROPY_VA,");
 		if (DllCharacteristics & PE_DLLCHARACTERISTICS_DYNAMIC_BASE)
@@ -320,9 +339,8 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp) {
 			printf("GUARD_CF,");
 		if (DllCharacteristics & PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE)
 			printf("TERMINAL_SERVER_AWARE,");
-		// Directory
-		//TODO: Fix
-		printf(
+
+		printf(	// Directory
 		")\n\n*\n* Directories\n*\n\n"~
 		"Export Table             %08X  %08X  (%u)\n"~
 		"Import Table             %08X  %08X  (%u)\n"~
@@ -366,36 +384,125 @@ L_SECTIONS:
 	//
 
 	puts("\n*\n* Sections\n*");
-	c_long pos = ftell(fi.handle);
+	c_long pos_section = ftell(fi.handle);	/// Saved position for sections
 	for (ushort si; si < NumberOfSections; ++si) {
 		PE_SECTION_ENTRY section = void;
 
 		if (fread(&section, section.sizeof, 1, fi.handle) == 0)
 			return EXIT_FAILURE;
 
-		printf("\n%.8s\n"~
-			"VS=%08X VA=%08X SORD=%08X PTRD=%08X\n"~
-			"PTR=%08X PTL=%08X NOR=%04X NOL=%04X\n"~
-			"C=%08X\n\n",
-			&section.Name,
-			section.VirtualSize,
-			section.VirtualAddress,
-			section.SizeOfRawData,
-			section.PointerToRawData,
-			section.PointerToRelocations,
-			section.PointerToLinenumbers,
-			section.NumberOfRelocations,
-			section.NumberOfLinenumbers,
-			section.Characteristics);
+		printf(
+		"\n%u. %.8s\n"~
+		"VirtualAddress        %08X\n"~
+		"VirtualSize           %08X\t(%u)\n"~
+		"PointerToRawData      %08X\n"~
+		"SizeOfRawData         %08X\t(%u)\n"~
+		"PointerToRelocations  %08X\n"~
+		"NumberOfRelocations   %04X\t(%u)\n"~
+		"PointerToLinenumbers  %08X\n"~
+		"NumberOfLinenumbers   %04X\t(%u)\n"~
+		"Characteristics       %08X\t(",
+		si, &section.Name,
+		section.VirtualAddress,
+		section.VirtualSize, section.VirtualSize,
+		section.PointerToRawData,
+		section.SizeOfRawData, section.SizeOfRawData,
+		section.PointerToRelocations,
+		section.NumberOfRelocations, section.NumberOfRelocations,
+		section.PointerToLinenumbers,
+		section.NumberOfLinenumbers, section.NumberOfLinenumbers,
+		section.Characteristics);
+
+		// Section Characteristics flags
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_NO_PAD)
+			printf("NO_PAD,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_CODE)
+			printf("CODE,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_INITIALIZED_DATA)
+			printf("INITIALIZED_DATA,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_UNINITIALIZED_DATA)
+			printf("UNINITIALIZED_DATA,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_LNK_OTHER)
+			printf("LNK_OTHER,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_LNK_INFO)
+			printf("LNK_INFO,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_LNK_REMOVE)
+			printf("LNK_REMOVE,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_LNK_COMDAT)
+			printf("LNK_COMDAT,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_GPREL)
+			printf("GPREL,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_PURGEABLE)
+			printf("MEM_PURGEABLE,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_16BIT)
+			printf("MEM_16BIT,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_LOCKED)
+			printf("MEM_LOCKED,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_PRELOAD)
+			printf("PRELOAD,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_1BYTES)
+			printf("ALIGN_1BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_2BYTES)
+			printf("ALIGN_2BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_4BYTES)
+			printf("ALIGN_4BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_8BYTES)
+			printf("ALIGN_8BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_16BYTES)
+			printf("ALIGN_16BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_32BYTES)
+			printf("ALIGN_32BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_64BYTES)
+			printf("ALIGN_64BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_128BYTES)
+			printf("ALIGN_128BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_256BYTES)
+			printf("ALIGN_256BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_5121BYTES)
+			printf("ALIGN_5121BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_10241BYTES)
+			printf("ALIGN_10241BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_20481BYTES)
+			printf("ALIGN_20481BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_40961BYTES)
+			printf("ALIGN_40961BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_8192BYTES)
+			printf("ALIGN_8192BYTES,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_LNK_NRELOC_OVFL)
+			printf("LNK_NRELOC_OVFL,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_DISCARDABLE)
+			printf("MEM_DISCARDABLE,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_NOT_CACHED)
+			printf("MEM_NOT_CACHED,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_NOT_PAGED)
+			printf("MEM_NOT_PAGED,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_SHARED)
+			printf("MEM_SHARED,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE)
+			printf("MEM_EXECUTE,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_READ)
+			printf("MEM_READ,");
+		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_WRITE)
+			printf("MEM_WRITE,");
+
+		puts(")");
 	}
+
+	//
+	// Symbols
+	//
+
+
 
 	//
 	// Disassembly
 	//
 
-	puts("** Disassembly");
+	//TODO: Measure by section length
+
+	puts("\n*\n* Disassembly\n*");
 	void *mem = cast(void*)malloc(64);
-	fseek(fi.handle, pos, SEEK_SET);
+	fseek(fi.handle, pos_section, SEEK_SET);
 	for (ushort si; si < NumberOfSections; ++si) {
 		PE_SECTION_ENTRY section = void;
 
@@ -403,7 +510,7 @@ L_SECTIONS:
 			return EXIT_FAILURE;
 
 		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE) {
-			pos = ftell(fi.handle);
+			pos_section = ftell(fi.handle);
 
 			if (fseek(fi.handle, section.PointerToRawData, SEEK_SET))
 				return EXIT_FAILURE;
@@ -422,9 +529,22 @@ L_SECTIONS:
 					&dp.mcbuf, &dp.mnbuf);
 			}
 
-			fseek(fi.handle, pos, SEEK_SET);
+			fseek(fi.handle, pos_section, SEEK_SET);
 		}
 	}
 
+	return EXIT_SUCCESS;
+}
+
+// ANCHOR MZ
+/// Print MZ info to stdout, a file_info_t structure must be loaded before
+/// calling this function.
+/// Params:
+/// 	fi = File information
+/// 	dp = Disassembler parameters
+/// Returns: Non-zero on error
+int dumper_print_mz(file_info_t *fi, disasm_params_t *dp, int flags) {
+	//TODO: MZ
+	
 	return EXIT_SUCCESS;
 }

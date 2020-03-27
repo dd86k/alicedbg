@@ -252,21 +252,21 @@ int main(int argc, const(char) **argv) {
 			}
 			const(char) *march = argv[++argi];
 			if (strcmp(march, "x86") == 0)
-				disopt.abi = DisasmABI.x86;
+				disopt.isa = DisasmISA.x86;
 			else if (strcmp(march, "x86_64") == 0)
-				disopt.abi = DisasmABI.x86_64;
+				disopt.isa = DisasmISA.x86_64;
 			else if (strcmp(march, "x86_16") == 0)
-				disopt.abi = DisasmABI.x86_16;
+				disopt.isa = DisasmISA.x86_16;
 			else if (strcmp(march, "thumb") == 0)
-				disopt.abi = DisasmABI.arm_t32;
+				disopt.isa = DisasmISA.arm_t32;
 			else if (strcmp(march, "arm") == 0)
-				disopt.abi = DisasmABI.arm_a32;
+				disopt.isa = DisasmISA.arm_a32;
 			else if (strcmp(march, "aarch64") == 0)
-				disopt.abi = DisasmABI.arm_a64;
+				disopt.isa = DisasmISA.arm_a64;
 			else if (strcmp(march, "rv32") == 0)
-				disopt.abi = DisasmABI.rv32;
+				disopt.isa = DisasmISA.rv32;
 			else if (strcmp(march, "rv64") == 0)
-				disopt.abi = DisasmABI.rv64;
+				disopt.isa = DisasmISA.rv64;
 			else if (strcmp(march, "guess") == 0) {
 				puts("guess feature not implemented");
 				return EXIT_FAILURE;

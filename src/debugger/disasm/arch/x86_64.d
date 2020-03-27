@@ -12,7 +12,6 @@ import debugger.disasm.arch.x86;
 
 extern (C):
 
-package
 struct x86_64_internals_t {
 	int lock;
 	int repz;	// (F3h) REP/REPE/REPZ

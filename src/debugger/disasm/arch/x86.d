@@ -1,5 +1,5 @@
 /**
- * x86 disassembler.
+ * x86-32 disassembler.
  *
  * License: BSD 3-Clause
  */
@@ -11,7 +11,6 @@ import utils.str;
 
 extern (C):
 
-package
 struct x86_internals_t { align(1):
 	int lock;	/// LOCK Prefix
 	int repz;	/// (F3H) REP/REPE/REPZ
@@ -3877,12 +3876,28 @@ void x86_0f38(disasm_params_t *p) {
 			disasm_err(p);
 		}
 		return;
-	default: disasm_err(p);
+	default: disasm_err(p); // ANCHOR End of 0f38
 	}
 }
 
 void x86_0f3a(disasm_params_t *p) {
-	
+	ubyte b = *p.addru8;
+	++p.addrv;
+
+	if (p.mode >= DisasmMode.File)
+		disasm_push_x8(p, b);
+
+	int wbit = b & 1;
+	int dbit = b & 2;
+	switch (b & 252) { // 1111_1100
+	case 0b0000_1000: // 08H-0BH
+		if (p.x86.pf_operand == 0) {
+			disasm_err(p);
+			return;
+		}
+		return;
+	default: disasm_err(p); // ANCHOR End of 0f3a
+	}
 }
 
 enum x86SegReg {

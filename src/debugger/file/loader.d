@@ -6,7 +6,7 @@
 module debugger.file.loader;
 
 import core.stdc.stdio;
-import debugger.disasm.core : DisasmABI; // ISA translation
+import debugger.disasm.core : DisasmISA; // ISA translation
 private import debugger.file.objs;
 import os.err;
 
@@ -47,17 +47,20 @@ enum FileType {
 /// Executable file information and headers
 //TODO: Field saying if image or object?
 struct file_info_t {
-	/// File handle, used internally
+	/// File handle, used internally.
 	FILE *handle;
-	/// File type, populated by the respective loading function
+	/// File type, populated by the respective loading function.
 	FileType type;
+	/// Unset for little, set for big. Used in cswap functions.
+	int endian;
+	/// Image's ISA translated value for disasm
+	DisasmISA isa;
 	//
 	// Internal fields
 	//
 	union {
 		file_info_pe_t pe;	/// PE headers
 	}
-	DisasmABI isa;
 }
 struct file_info_pe_t { // PE32
 	PE_HEADER hdr;

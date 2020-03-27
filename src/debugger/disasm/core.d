@@ -27,7 +27,7 @@ enum DisasmError {
 }
 
 /// Disassembler ABI
-enum DisasmABI : ubyte {
+enum DisasmISA : ubyte {
 	Default,	/// Platform compiled target default
 	Guess,	/// (Not implemented) Attempt to guess ISA
 	x86_16,	/// 8086, 80186, 80286
@@ -65,22 +65,22 @@ enum DisasmDemangle : ushort {
 enum DISASM_BUF_SIZE = 64;
 
 version (X86) {
-	enum DISASM_DEFAULT_ISA = DisasmABI.x86;	/// Platform default ABI
+	enum DISASM_DEFAULT_ISA = DisasmISA.x86;	/// Platform default ABI
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Intel;	/// Platform default syntax
 } else
 version (X86_64) {
-	enum DISASM_DEFAULT_ISA = DisasmABI.x86_64;	/// Platform default ABI
+	enum DISASM_DEFAULT_ISA = DisasmISA.x86_64;	/// Platform default ABI
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Intel;	/// Platform default syntax
 } else
 version (ARM) {
-	enum DISASM_DEFAULT_ISA = DisasmABI.arm_a32;	/// Platform default ABI
+	enum DISASM_DEFAULT_ISA = DisasmISA.arm_a32;	/// Platform default ABI
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Att;	/// Platform default syntax
 } else
 version (AArch64) {
-	enum DISASM_DEFAULT_ISA = DisasmABI.arm_a64;	/// Platform default ABI
+	enum DISASM_DEFAULT_ISA = DisasmISA.arm_a64;	/// Platform default ABI
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Att;	/// Platform default syntax
 } else {
-	enum DISASM_DEFAULT_ISA = DisasmABI.Default;	/// Platform default ABI
+	enum DISASM_DEFAULT_ISA = DisasmISA.Default;	/// Platform default ABI
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Nasm;	/// Platform default syntax
 }
 
@@ -136,7 +136,7 @@ struct disasm_params_t { align(1):
 	/// Demangle option. See DisasmDemangle enum.
 	DisasmDemangle demangle;
 	/// Platform to disasm. See the DisasmABI enum for more details.
-	DisasmABI abi;
+	DisasmISA isa;
 	/// Assembler style. See DisasmStyle enums for more details.
 	DisasmSyntax style;
 	/// Operation mode.
@@ -151,11 +151,10 @@ struct disasm_params_t { align(1):
 	}
 	disasm_fmt_t *fmt;	/// Formatter structure pointer, used internally
 	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer
-	char [DISASM_BUF_SIZE]mnbuf;	/// Mnemonics buffer
 	size_t mcbufi;	/// Machine code buffer index
+	char [DISASM_BUF_SIZE]mnbuf;	/// Mnemonics buffer
 	size_t mnbufi;	/// Mnemonics buffer index
 }
-pragma(msg, "* disasm_params_t.sizeof: ", disasm_params_t.sizeof);
 
 /**
  * Disassemble instructions from a memory pointer given in disasm_params_t.
@@ -192,11 +191,11 @@ int disasm_line(disasm_params_t *p, DisasmMode mode) {
 		with (p) mcbufi = mnbufi = 0;
 	}
 
-	if (p.abi == DisasmABI.Default)
-		p.abi = DISASM_DEFAULT_ISA;
+	if (p.isa == DisasmISA.Default)
+		p.isa = DISASM_DEFAULT_ISA;
 
-	with (DisasmABI)
-	switch (p.abi) {
+	with (DisasmISA)
+	switch (p.isa) {
 	case x86_16:	disasm_x86_16(p); break;
 	case x86:	disasm_x86(p); break;
 	case x86_64:	disasm_x86_64(p); break;
@@ -216,6 +215,23 @@ int disasm_line(disasm_params_t *p, DisasmMode mode) {
 	}
 
 	return p.error;
+}
+
+/// See if platform is big-endian (useful for cswap functions). Default values,
+/// such as Default and Guess, return the value for the compiled target, so 0
+/// if the target is in little-endian, and 1 if the target is big-endian.
+/// Params: isa = DisasmISA value
+/// Returns: Zero if little-endian, non-zero if big-endian
+int disasm_msbisa(DisasmISA isa) {
+	with (DisasmISA)
+	switch (isa) {
+	case x86_16, x86, x86_64, rv32, rv64: return 0;
+	default:
+		version (LittleEndian)
+			return 0;
+		else
+			return 1;
+	}
 }
 
 //TODO: ushort disasm_optstr(const(char)*) -- Interpret string value for disasm option
