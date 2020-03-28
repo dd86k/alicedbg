@@ -67,6 +67,7 @@ struct file_info_pe_t { // PE32
 	union {
 		PE_OPTIONAL_HEADER ohdr;
 		PE_OPTIONAL_HEADER64 ohdr64;
+		PE_OPTIONAL_HEADERROM ohdrrom;
 	}
 	PE_IMAGE_DATA_DIRECTORY dir;
 }

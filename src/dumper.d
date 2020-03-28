@@ -24,10 +24,16 @@ enum { // Dumper flags (-show)
 	/// Include imports in output. This includes dynamic libraries such as
 	/// DLL files (for Windows, under `.rdata`) and SO files.
 	DUMPER_SHOW_IMPORTS	= 0x0400,
+	/// 
+	//DUMPER_SHOW_EXPORTS	= 0x0400,
 	/// Include symbols in output.
-	DUMPER_SHOW_SYMBOLS	= 0x0800,
+	DUMPER_SHOW_SYMBOLS	= 0x1000,
 	/// Include section disassembly in output.
 	DUMPER_SHOW_DISASSEMBLY	= 0x8000,
+	/// Include everything in output
+	DUMPER_SHOW_EVERYTHING	= 0xFF00,
+	//TODO: flag to export resources/certs
+	//DUMPER_EXPORT_RESOURCES	= 0x01_0000,
 }
 
 /// Disassemble given file to stdout. Currently only supports flat binary
@@ -96,6 +102,7 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 /// Params:
 /// 	fi = File information
 /// 	dp = Disassembler parameters
+/// 	flags = Show X flags
 /// Returns: Non-zero on error
 int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 	import debugger.file.objs.pe; // @suppress(dscanner.suspicious.local_imports)
@@ -193,27 +200,11 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 			return EXIT_FAILURE;
 		}
 
-		// same offsets
-		ubyte MajorLinkerVersion = fi.pe.ohdr.MajorLinkerVersion;
-		ubyte MinorLinkerVersion = fi.pe.ohdr.MinorLinkerVersion;
-		uint SizeOfCode = fi.pe.ohdr.SizeOfCode;
-		uint SizeOfInitializedData = fi.pe.ohdr.SizeOfInitializedData;
-		uint SizeOfUninitializedData = fi.pe.ohdr.SizeOfUninitializedData;
-		uint SectionAlignment = fi.pe.ohdr.SectionAlignment;
-		uint FileAlignment = fi.pe.ohdr.FileAlignment;
-		ushort MajorOperatingSystemVersion = fi.pe.ohdr.MajorOperatingSystemVersion;
-		ushort MinorOperatingSystemVersion = fi.pe.ohdr.MinorOperatingSystemVersion;
-		ushort MajorImageVersion = fi.pe.ohdr.MajorImageVersion;
-		ushort MinorImageVersion = fi.pe.ohdr.MinorImageVersion;
-		ushort MajorSubsystemVersion = fi.pe.ohdr.MajorSubsystemVersion;
-		ushort MinorSubsystemVersion = fi.pe.ohdr.MinorSubsystemVersion;
-		uint SizeOfImage = fi.pe.ohdr.SizeOfImage;
-		uint SizeOfHeaders = fi.pe.ohdr.SizeOfHeaders;
-		ushort DllCharacteristics = void;
-		uint NumberOfRvaAndSizes = void;
-		uint LoaderFlags = void;
+		//
+		// Standard fields
+		//
 
-		printf(	// Optional Header
+		printf(
 		"*\n* Optional Header\n*\n\n"~
 		"Type                         Image\n"~
 		"Magic                        %04X\t(PE%s)\n"~
@@ -223,89 +214,126 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 		"SizeOfInitializedData        %08X\t(%u)\n"~
 		"SizeOfUninitializedData      %08X\t(%u)\n"~
 		"AddressOfEntryPoint          %08X\n"~
-		"BaseOfCode                   %08X\n"~
-		"SectionAlignment             %08X\t(%u)\n"~
-		"FileAlignment                %08X\t(%u)\n"~
-		"MajorOperatingSystemVersion  %04X\t(%u)\n"~
-		"MinorOperatingSystemVersion  %04X\t(%u)\n"~
-		"MajorImageVersion            %04X\t(%u)\n"~
-		"MinorImageVersion            %04X\t(%u)\n"~
-		"MajorSubsystemVersion        %04X\t(%u)\n"~
-		"MinorSubsystemVersion        %04X\t(%u)\n"~
-		"Win32VersionValue            %08X\n"~
-		"SizeOfImage                  %08X\t(%u)\n"~
-		"SizeOfHeaders                %08X\t(%u)\n"~
-		"CheckSum                     %08X\n"~
-		"Subsystem                    %04X\t(%s)\n",
+		"BaseOfCode                   %08X\n",
 		OptMagic, str_mag,
-		MajorLinkerVersion, MajorLinkerVersion,
-		MinorLinkerVersion, MinorLinkerVersion,
-		SizeOfCode, SizeOfCode,
-		SizeOfInitializedData, SizeOfInitializedData,
-		SizeOfUninitializedData, SizeOfUninitializedData,
+		fi.pe.ohdr.MajorLinkerVersion, fi.pe.ohdr.MajorLinkerVersion,
+		fi.pe.ohdr.MinorLinkerVersion, fi.pe.ohdr.MinorLinkerVersion,
+		fi.pe.ohdr.SizeOfCode, fi.pe.ohdr.SizeOfCode,
+		fi.pe.ohdr.SizeOfInitializedData, fi.pe.ohdr.SizeOfInitializedData,
+		fi.pe.ohdr.SizeOfUninitializedData, fi.pe.ohdr.SizeOfUninitializedData,
 		fi.pe.ohdr.AddressOfEntryPoint,
-		fi.pe.ohdr.BaseOfCode,
-		SectionAlignment, SectionAlignment,
-		FileAlignment, FileAlignment,
-		MajorOperatingSystemVersion, MajorOperatingSystemVersion,
-		MinorOperatingSystemVersion, MinorOperatingSystemVersion,
-		MajorImageVersion, MajorImageVersion,
-		MinorImageVersion, MinorImageVersion,
-		MajorSubsystemVersion, MajorSubsystemVersion,
-		MinorSubsystemVersion, MinorSubsystemVersion,
-		fi.pe.ohdr.Win32VersionValue,
-		SizeOfImage, SizeOfImage,
-		SizeOfHeaders, SizeOfHeaders,
-		fi.pe.ohdr.CheckSum,
-		OptSubsystem, str_sys);
+		fi.pe.ohdr.BaseOfCode);
+
+		ushort DllCharacteristics = void;
+		uint NumberOfRvaAndSizes = void;
+		uint LoaderFlags = void;
+
+		//
+		// NT additional fields
+		//
 
 		switch (SizeOfOptionalHeader) {
-		case 0xE0: // 32
-			uint BaseOfData = fi.pe.ohdr.BaseOfData;
-			uint ImageBase = fi.pe.ohdr.ImageBase;
-			uint SizeOfStackReserve = fi.pe.ohdr.SizeOfStackReserve;
-			uint SizeOfStackCommit = fi.pe.ohdr.SizeOfStackCommit;
-			uint SizeOfHeapReserve = fi.pe.ohdr.SizeOfHeapReserve;
-			uint SizeOfHeapCommit = fi.pe.ohdr.SizeOfHeapCommit;
+		case PE_OHDR_SIZE: // 32
 			printf(
 			"BaseOfData                   %08X\n"~
 			"ImageBase                    %08X\n"~
+			"SectionAlignment             %08X\t(%u)\n"~
+			"FileAlignment                %08X\t(%u)\n"~
+			"MajorOperatingSystemVersion  %04X\t(%u)\n"~
+			"MinorOperatingSystemVersion  %04X\t(%u)\n"~
+			"MajorImageVersion            %04X\t(%u)\n"~
+			"MinorImageVersion            %04X\t(%u)\n"~
+			"MajorSubsystemVersion        %04X\t(%u)\n"~
+			"MinorSubsystemVersion        %04X\t(%u)\n"~
+			"Win32VersionValue            %08X\n"~
+			"SizeOfImage                  %08X\t(%u)\n"~
+			"SizeOfHeaders                %08X\t(%u)\n"~
+			"CheckSum                     %08X\n"~
+			"Subsystem                    %04X\t(%s)\n"~
 			"SizeOfStackReserve           %08X\t(%u)\n"~
 			"SizeOfStackCommit            %08X\t(%u)\n"~
 			"SizeOfHeapReserve            %08X\t(%u)\n"~
 			"SizeOfHeapCommit             %08X\t(%u)\n",
-			BaseOfData,
-			ImageBase,
-			SizeOfStackReserve, SizeOfStackReserve,
-			SizeOfStackCommit, SizeOfStackCommit,
-			SizeOfHeapReserve, SizeOfHeapReserve,
-			SizeOfHeapCommit, SizeOfHeapCommit);
+			fi.pe.ohdr.BaseOfData,
+			fi.pe.ohdr.ImageBase,
+			fi.pe.ohdr.SectionAlignment, fi.pe.ohdr.SectionAlignment,
+			fi.pe.ohdr.FileAlignment, fi.pe.ohdr.FileAlignment,
+			fi.pe.ohdr.MajorOperatingSystemVersion, fi.pe.ohdr.MajorOperatingSystemVersion,
+			fi.pe.ohdr.MinorOperatingSystemVersion, fi.pe.ohdr.MinorOperatingSystemVersion,
+			fi.pe.ohdr.MajorImageVersion, fi.pe.ohdr.MajorImageVersion,
+			fi.pe.ohdr.MinorImageVersion, fi.pe.ohdr.MinorImageVersion,
+			fi.pe.ohdr.MajorSubsystemVersion, fi.pe.ohdr.MajorSubsystemVersion,
+			fi.pe.ohdr.MinorSubsystemVersion, fi.pe.ohdr.MinorSubsystemVersion,
+			fi.pe.ohdr.Win32VersionValue,
+			fi.pe.ohdr.SizeOfImage, fi.pe.ohdr.SizeOfImage,
+			fi.pe.ohdr.SizeOfHeaders, fi.pe.ohdr.SizeOfHeaders,
+			fi.pe.ohdr.CheckSum,
+			fi.pe.ohdr.Subsystem, str_sys,
+			fi.pe.ohdr.SizeOfStackReserve, fi.pe.ohdr.SizeOfStackReserve,
+			fi.pe.ohdr.SizeOfStackCommit, fi.pe.ohdr.SizeOfStackCommit,
+			fi.pe.ohdr.SizeOfHeapReserve, fi.pe.ohdr.SizeOfHeapReserve,
+			fi.pe.ohdr.SizeOfHeapCommit, fi.pe.ohdr.SizeOfHeapCommit);
 			LoaderFlags = fi.pe.ohdr.LoaderFlags;
 			DllCharacteristics = fi.pe.ohdr.DllCharacteristics;
 			NumberOfRvaAndSizes = fi.pe.ohdr.NumberOfRvaAndSizes;
 			break;
-		case 0xF0: // 64
-			ulong ImageBase = fi.pe.ohdr64.ImageBase;
-			ulong SizeOfStackReserve = fi.pe.ohdr64.SizeOfStackReserve;
-			ulong SizeOfStackCommit = fi.pe.ohdr64.SizeOfStackCommit;
-			ulong SizeOfHeapReserve = fi.pe.ohdr64.SizeOfHeapReserve;
-			ulong SizeOfHeapCommit = fi.pe.ohdr64.SizeOfHeapCommit;
+		case PE_OHDR64_SIZE: // 64
 			printf(
 			"ImageBase                    %016llX\n"~
+			"SectionAlignment             %08X\t(%u)\n"~
+			"FileAlignment                %08X\t(%u)\n"~
+			"MajorOperatingSystemVersion  %04X\t(%u)\n"~
+			"MinorOperatingSystemVersion  %04X\t(%u)\n"~
+			"MajorImageVersion            %04X\t(%u)\n"~
+			"MinorImageVersion            %04X\t(%u)\n"~
+			"MajorSubsystemVersion        %04X\t(%u)\n"~
+			"MinorSubsystemVersion        %04X\t(%u)\n"~
+			"Win32VersionValue            %08X\n"~
+			"SizeOfImage                  %08X\t(%u)\n"~
+			"SizeOfHeaders                %08X\t(%u)\n"~
+			"CheckSum                     %08X\n"~
+			"Subsystem                    %04X\t(%s)\n"~
 			"SizeOfStackReserve           %016llX\t(%llu)\n"~
 			"SizeOfStackCommit            %016llX\t(%llu)\n"~
 			"SizeOfHeapReserve            %016llX\t(%llu)\n"~
 			"SizeOfHeapCommit             %016llX\t(%llu)\n",
-			ImageBase,
-			SizeOfStackReserve, SizeOfStackReserve,
-			SizeOfStackCommit, SizeOfStackCommit,
-			SizeOfHeapReserve, SizeOfHeapReserve,
-			SizeOfHeapCommit, SizeOfHeapCommit);
+			fi.pe.ohdr64.ImageBase,
+			fi.pe.ohdr64.SectionAlignment, fi.pe.ohdr64.SectionAlignment,
+			fi.pe.ohdr64.FileAlignment, fi.pe.ohdr64.FileAlignment,
+			fi.pe.ohdr64.MajorOperatingSystemVersion, fi.pe.ohdr64.MajorOperatingSystemVersion,
+			fi.pe.ohdr64.MinorOperatingSystemVersion, fi.pe.ohdr64.MinorOperatingSystemVersion,
+			fi.pe.ohdr64.MajorImageVersion, fi.pe.ohdr64.MajorImageVersion,
+			fi.pe.ohdr64.MinorImageVersion, fi.pe.ohdr64.MinorImageVersion,
+			fi.pe.ohdr64.MajorSubsystemVersion, fi.pe.ohdr64.MajorSubsystemVersion,
+			fi.pe.ohdr64.MinorSubsystemVersion, fi.pe.ohdr64.MinorSubsystemVersion,
+			fi.pe.ohdr.Win32VersionValue,
+			fi.pe.ohdr64.SizeOfStackReserve, fi.pe.ohdr64.SizeOfStackReserve,
+			fi.pe.ohdr64.SizeOfStackCommit, fi.pe.ohdr64.SizeOfStackCommit,
+			fi.pe.ohdr64.SizeOfHeapReserve, fi.pe.ohdr64.SizeOfHeapReserve,
+			fi.pe.ohdr64.SizeOfHeapCommit, fi.pe.ohdr64.SizeOfHeapCommit);
 			LoaderFlags = fi.pe.ohdr64.LoaderFlags;
 			DllCharacteristics = fi.pe.ohdr64.DllCharacteristics;
 			NumberOfRvaAndSizes = fi.pe.ohdr64.NumberOfRvaAndSizes;
 			break;
-		default: goto L_SECTIONS;
+		case PE_OHDRROM_SIZE: // 56, ROM has no flags/dirs
+			printf(
+			"BaseOfData  %08X\n"~
+			"BaseOfBss   %08X\n"~
+			"GprMask     %08X\n"~
+			"CprMask     %08X  %08X  %08X  %08X\n"~
+			"GpValue     %08X\n",
+			fi.pe.ohdrrom.BaseOfData,
+			fi.pe.ohdrrom.BaseOfBss,
+			fi.pe.ohdrrom.GprMask,
+			fi.pe.ohdrrom.CprMask[0], fi.pe.ohdrrom.CprMask[1],
+			fi.pe.ohdrrom.CprMask[2], fi.pe.ohdrrom.CprMask[3],
+			fi.pe.ohdrrom.GpValue,
+			);
+			return EXIT_SUCCESS;
+		default:
+			printf("dumper: unknown optional header size of %u\n",
+				SizeOfOptionalHeader);
+			return EXIT_FAILURE;
 		}
 
 		printf(
@@ -342,6 +370,7 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 
 		printf(	// Directory
 		")\n\n*\n* Directories\n*\n\n"~
+		"Directory                RVA       Size\n"~
 		"Export Table             %08X  %08X  (%u)\n"~
 		"Import Table             %08X  %08X  (%u)\n"~
 		"Resource Table           %08X  %08X  (%u)\n"~
@@ -375,7 +404,9 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 		fi.pe.dir.CLRHeader.va, fi.pe.dir.CLRHeader.size, fi.pe.dir.CLRHeader.size,
 		fi.pe.dir.Reserved.va, fi.pe.dir.Reserved.size, fi.pe.dir.Reserved.size);
 	} else {
+		//TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
 		printf("Type                         Object\n");
+		return 0;
 	}
 
 L_SECTIONS:
@@ -440,34 +471,25 @@ L_SECTIONS:
 			printf("MEM_LOCKED,");
 		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_PRELOAD)
 			printf("PRELOAD,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_1BYTES)
-			printf("ALIGN_1BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_2BYTES)
-			printf("ALIGN_2BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_4BYTES)
-			printf("ALIGN_4BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_8BYTES)
-			printf("ALIGN_8BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_16BYTES)
-			printf("ALIGN_16BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_32BYTES)
-			printf("ALIGN_32BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_64BYTES)
-			printf("ALIGN_64BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_128BYTES)
-			printf("ALIGN_128BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_256BYTES)
-			printf("ALIGN_256BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_5121BYTES)
-			printf("ALIGN_5121BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_10241BYTES)
-			printf("ALIGN_10241BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_20481BYTES)
-			printf("ALIGN_20481BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_40961BYTES)
-			printf("ALIGN_40961BYTES,");
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_8192BYTES)
-			printf("ALIGN_8192BYTES,");
+		const(char) *scn_align = void;
+		switch (section.Characteristics & 0x00F00000) {
+		case PE_SECTION_CHARACTERISTIC_ALIGN_1BYTES: scn_align = "ALIGN_1BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_2BYTES: scn_align = "ALIGN_2BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_4BYTES: scn_align = "ALIGN_4BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_8BYTES: scn_align = "ALIGN_8BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_16BYTES: scn_align = "ALIGN_16BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_32BYTES: scn_align = "ALIGN_32BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_64BYTES: scn_align = "ALIGN_64BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_128BYTES: scn_align = "ALIGN_128BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_256BYTES: scn_align = "ALIGN_256BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_512BYTES: scn_align = "ALIGN_512BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_1024BYTES: scn_align = "ALIGN_1024BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_2048BYTES: scn_align = "ALIGN_2048BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_4096BYTES: scn_align = "ALIGN_4096BYTES,"; break;
+		case PE_SECTION_CHARACTERISTIC_ALIGN_8192BYTES: scn_align = "ALIGN_8192BYTES,"; break;
+		default: scn_align = ""; break; // "ALIGN_DEFAULT(16)"? seen under PEDUMP (1997)
+		}
+		printf(scn_align);
 		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_LNK_NRELOC_OVFL)
 			printf("LNK_NRELOC_OVFL,");
 		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_DISCARDABLE)
@@ -492,6 +514,52 @@ L_SECTIONS:
 	// Symbols
 	//
 
+
+
+	//
+	// Imports
+	// NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
+	//
+
+	puts("\n*\n* Imports\n*\n");
+	uint rva_loadcf = fi.pe.dir.LoadConfigurationTable.va;
+	uint rva_import = fi.pe.dir.ImportTable.va;
+	uint fo_loadcf, fo_import; // unset means not found!
+	fseek(fi.handle, pos_section, SEEK_SET);
+	for (ushort si; si < NumberOfSections; ++si) {
+		PE_SECTION_ENTRY section = void;
+
+		if (fread(&section, section.sizeof, 1, fi.handle) == 0)
+			return EXIT_FAILURE;
+
+		if (fo_loadcf == 0)
+		if (section.VirtualAddress <= rva_loadcf &&
+			section.VirtualAddress + section.SizeOfRawData > rva_loadcf) {
+			fo_loadcf = section.PointerToRawData +
+				(rva_loadcf - section.VirtualAddress);
+		}
+
+		if (fo_import == 0)
+		if (section.VirtualAddress <= rva_import &&
+			section.VirtualAddress + section.SizeOfRawData > rva_import) {
+			fo_import = section.PointerToRawData +
+				(rva_import - section.VirtualAddress);
+		}
+
+		if (fo_loadcf && fo_import)
+			break;
+	}
+	if (fo_loadcf) {
+		PE_LOAD_CONFIG_DIR32 loaddir = void;
+		fseek(fi.handle, fo_loadcf, SEEK_SET);
+		fread(&loaddir, PE_LOAD_CONFIG_DIR32.sizeof, 1, fi.handle);
+		printf("Size %08X\n", loaddir.Size);
+	}
+	if (fo_import) {
+		PE_LOAD_CONFIG_DIR32 loaddir = void;
+		fseek(fi.handle, fo_loadcf, SEEK_SET);
+		fread(&loaddir, PE_LOAD_CONFIG_DIR32.sizeof, 1, fi.handle);
+	}
 
 
 	//
@@ -542,6 +610,7 @@ L_SECTIONS:
 /// Params:
 /// 	fi = File information
 /// 	dp = Disassembler parameters
+/// 	flags = Show X flags
 /// Returns: Non-zero on error
 int dumper_print_mz(file_info_t *fi, disasm_params_t *dp, int flags) {
 	//TODO: MZ

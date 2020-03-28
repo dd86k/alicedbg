@@ -129,7 +129,7 @@ void term_event_resize(void function(ushort,ushort) f) {
 version (Posix) private
 void __term_resize(int) {
 	WindowSize ws = void;
-	term_wsize(ws);
+	term_wsize(&ws);
 	handler_resize(ws.width, ws.height);
 }
 
