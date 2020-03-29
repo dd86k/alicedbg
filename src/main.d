@@ -82,27 +82,35 @@ int cliver() {
 }
 
 /// "sub-help" pages, such as -ui ? and the rest
+/// Main advantage is that it's all in one place
 int clipage(CLIPage h) {
 	const(char) *r = void;
 	with (CLIPage)
 	final switch (h) {
 	case main:
 		r =
-		"Aiming to be a simple debugger\n"~
+		"Aiming to be a simple debugger, dumper, and profiler\n"~
 		"Usage:\n"~
-		"  alicedbg {-pid ID|-exec FILE} [OPTIONS...]\n"~
+		"  alicedbg {-pid|-exec|-dump} {FILE|ID} [OPTIONS...]\n"~
 		"  alicedbg {--help|--version|--license}\n"~
 		"\n"~
 		"OPTIONS\n"~
-		"  -exec      debugger: Load executable file\n"~
-		"  -pid       debugger: Attach to process id\n"~
-		"  -ui        Choose user interface (see -ui ?)\n";
+		"  -mode    Manually select an operating mode (see -mode ?)\n"~
+		"  -march   Select ISA for disassembler (see -march ?)\n"~
+		"  -dstyle  Select disassembler style (see -dstyle ?)\n"~
+		"  -exec    debugger: Load executable file\n"~
+		"  -pid     debugger: Attach to process id\n"~
+		"  -ui      debugger: Choose user interface (default=tui, see -ui ?)\n"~
+		"  -dump    dumper: Selects dump mode\n"~
+		"  -raw     dumper: Disassemble raw file\n"~
+		"  -show    dumper: Select what to show (default=h, see -show ?)\n";
 		break;
 	case ui:
 		r =
 		"Available UIs (default=tui)\n"~
 		"tui ....... (WIP) Text UI with full debugging experience.\n"~
-		"loop ...... Print exceptions, continues automatically, no user input.\n"
+		"loop ...... Print exceptions, minimum user interaction."
+//		"cmd ....... (Experimental) (REPL) Command-based, like a shell.\n"
 //		"tcp-json .. (Experimental) JSON API server via TCP.\n"
 		;
 		break;
@@ -113,7 +121,7 @@ int clipage(CLIPage h) {
 		"h .. Show headers\n"~
 		"s .. Show sections\n"~
 		"i .. Show imports\n"~
-		"d .. Show disassembly (code sections only)\n"
+		"d .. Show disassembly (code sections only)"
 //		"D .. Show disassembly (all sections)"
 		;
 		break;

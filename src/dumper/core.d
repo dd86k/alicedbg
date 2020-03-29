@@ -75,22 +75,22 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 				&dp.mcbuf, &dp.mnbuf);
 		}
 		return EXIT_SUCCESS;
-	} else {
-		file_info_t finfo = void;
-		if (file_load(f, &finfo, 0)) {
-			puts("loader: could not load file");
-			return EXIT_FAILURE;
-		}
+	}
 
-		if (dp.isa == DisasmISA.Default)
-			dp.isa = finfo.isa;
+	file_info_t finfo = void;
+	if (file_load(f, &finfo, 0)) {
+		puts("loader: could not load file");
+		return EXIT_FAILURE;
+	}
 
-		with (FileType)
-		switch (finfo.type) {
-		case PE: return dumper_print_pe32(&finfo, dp, flags);
-		default:
-			puts("loader: format not supported");
-			return EXIT_FAILURE;
-		}
+	if (dp.isa == DisasmISA.Default)
+		dp.isa = finfo.isa;
+
+	with (FileType)
+	switch (finfo.type) {
+	case PE: return dumper_print_pe32(&finfo, dp, flags);
+	default:
+		puts("loader: format not supported");
+		return EXIT_FAILURE;
 	}
 }

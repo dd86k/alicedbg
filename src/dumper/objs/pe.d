@@ -9,6 +9,7 @@ import core.stdc.stdio;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
 import core.stdc.time : time_t, tm, localtime, strftime;
+import dumper.core;
 import debugger.file.loader : file_info_t;
 import debugger.disasm.core : disasm_params_t, disasm_line, DisasmMode;
 import debugger.file.objs.pe;
@@ -16,19 +17,21 @@ import debugger.file.objs.pe;
 extern (C):
 
 /// Print PE32 info to stdout, a file_info_t structure must be loaded before
-/// calling this function.
+/// calling this function. If an unknown Machine type is detected, this only
+/// prints the first header. FILE handle must be pointing to section table.
 /// Params:
 /// 	fi = File information
 /// 	dp = Disassembler parameters
 /// 	flags = Show X flags
 /// Returns: Non-zero on error
 int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
-	bool unkmach;
+	bool unkmach = void;
 	const(char) *str_mach = file_pe_str_mach(fi.pe.hdr.Machine);
 	if (str_mach == null) {
 		str_mach = "UNKNOWN";
 		unkmach = true;
-	}
+	} else
+		unkmach = false;
 
 	char[32] tbuffer = void;
 	if (strftime(cast(char*)tbuffer, 32, "%c",
@@ -37,29 +40,37 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 		l = "strftime:err";
 	}
 
-	uint ohdrsz = fi.pe.hdr.SizeOfOptionalHeader;	/// SizeOfOptionalHeader
+	// variables are declared here because compiler whines about GOTO
+	// skipping declarations
+	ushort OptMagic; /// For future references, 0 means there is no optheader
+	c_long pos_section = ftell(fi.handle);	/// Saved position for sections
+	uint fo_loadcf, fo_import; // unset means not found
 
 	//
 	// PE Header
 	//
 
+	if ((flags & DUMPER_SHOW_HEADERS) == 0)
+		goto L_SECTIONS;
+
 	with (fi.pe.hdr)
-	printf("Microsoft Portable Executable format\n\n"~
-		"*\n* Header\n*\n\n"~
-		"Machine               %04X\t(%s)\n"~
-		"NumberOfSections      %04X\t(%u)\n"~
-		"TimeDateStamp         %04X\t(%s)\n"~
-		"PointerToSymbolTable  %08X\n"~
-		"NumberOfSymbols       %08X\t(%u)\n"~
-		"SizeOfOptionalHeader  %04X\t(%u)\n"~
-		"Characteristics       %04X\t(",
-		Machine, str_mach,
-		NumberOfSections, NumberOfSections,
-		TimeDateStamp, cast(char*)tbuffer,
-		PointerToSymbolTable,
-		NumberOfSymbols, NumberOfSymbols,
-		SizeOfOptionalHeader, SizeOfOptionalHeader,
-		Characteristics);
+	printf(
+	"Microsoft Portable Executable format\n\n"~
+	"*\n* Header\n*\n\n"~
+	"Machine               %04X\t(%s)\n"~
+	"NumberOfSections      %04X\t(%u)\n"~
+	"TimeDateStamp         %04X\t(%s)\n"~
+	"PointerToSymbolTable  %08X\n"~
+	"NumberOfSymbols       %08X\t(%u)\n"~
+	"SizeOfOptionalHeader  %04X\t(%u)\n"~
+	"Characteristics       %04X\t(",
+	Machine, str_mach,
+	NumberOfSections, NumberOfSections,
+	TimeDateStamp, cast(char*)tbuffer,
+	PointerToSymbolTable,
+	NumberOfSymbols, NumberOfSymbols,
+	SizeOfOptionalHeader, SizeOfOptionalHeader,
+	Characteristics);
 
 	with (fi.pe.hdr) { // Characteristics flags
 	if (Characteristics & PE_CHARACTERISTIC_RELOCS_STRIPPED)
@@ -104,8 +115,7 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 	// PE Optional Header, and Directory
 	//
 
-	ushort OptMagic; /// For future references, 0 means there is no optheader
-	if (ohdrsz) { // No gotos here, it could skip declarations
+	if (fi.pe.hdr.SizeOfOptionalHeader) { // No gotos here, it could skip declarations
 		const(char)* str_mag = file_pe_str_magic(fi.pe.ohdr.Magic);
 		if (str_mag == null) {
 			printf("dumper: (PE32) Unknown Magic: %04X\n", fi.pe.ohdr.Magic);
@@ -258,8 +268,8 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 			);
 			return EXIT_SUCCESS;
 		default:
-			printf("dumper: unknown optional header size of %u\n",
-				ohdrsz);
+			printf("dumper: unknown Magic %04X\n",
+				fi.pe.ohdr.Magic);
 			return EXIT_FAILURE;
 		}
 
@@ -340,12 +350,13 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 	//
 	// Sections
 	//
+L_SECTIONS:
 
-	ushort seccnt = fi.pe.hdr.NumberOfSections;	/// NumberOfSections
+	if ((flags & DUMPER_SHOW_SECTIONS) == 0)
+		goto L_SYMBOLS;
 
 	puts("\n*\n* Sections\n*");
-	c_long pos_section = ftell(fi.handle);	/// Saved position for sections
-	for (ushort si; si < seccnt; ++si) {
+	for (ushort si; si < fi.pe.hdr.NumberOfSections; ++si) {
 		PE_SECTION_ENTRY section = void;
 
 		if (fread(&section, section.sizeof, 1, fi.handle) == 0)
@@ -403,6 +414,7 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 			printf("PRELOAD,");
 		const(char) *scn_align = void;
 		switch (Characteristics & 0x00F00000) {
+//		case 0: // "ALIGN_DEFAULT(16)"? seen under PEDUMP (1997)
 		case PE_SECTION_CHARACTERISTIC_ALIGN_1BYTES: scn_align = "ALIGN_1BYTES,"; break;
 		case PE_SECTION_CHARACTERISTIC_ALIGN_2BYTES: scn_align = "ALIGN_2BYTES,"; break;
 		case PE_SECTION_CHARACTERISTIC_ALIGN_4BYTES: scn_align = "ALIGN_4BYTES,"; break;
@@ -417,7 +429,7 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 		case PE_SECTION_CHARACTERISTIC_ALIGN_2048BYTES: scn_align = "ALIGN_2048BYTES,"; break;
 		case PE_SECTION_CHARACTERISTIC_ALIGN_4096BYTES: scn_align = "ALIGN_4096BYTES,"; break;
 		case PE_SECTION_CHARACTERISTIC_ALIGN_8192BYTES: scn_align = "ALIGN_8192BYTES,"; break;
-		default: scn_align = ""; break; // "ALIGN_DEFAULT(16)"? seen under PEDUMP (1997)
+		default: scn_align = ""; break;
 		}
 		printf(scn_align);
 		if (Characteristics & PE_SECTION_CHARACTERISTIC_LNK_NRELOC_OVFL)
@@ -442,9 +454,12 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 	}
 
 	//
-	// Symbols
+	//TODO: Symbols
 	//
+L_SYMBOLS:
 
+/*	if ((flags & DUMPER_SHOW_SYMBOLS) == 0)
+		goto L_IMPORTS;*/
 
 
 	//
@@ -452,29 +467,30 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 	//
 	// NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
 	//
+L_IMPORTS:
 
-	uint rva_loadcf = fi.pe.dir.LoadConfigurationTable.va;
-	uint rva_import = fi.pe.dir.ImportTable.va;
-	uint fo_loadcf, fo_import; // unset means not found!
+	if ((flags & DUMPER_SHOW_IMPORTS) == 0)
+		goto L_DISASM;
+
 	fseek(fi.handle, pos_section, SEEK_SET);
-	for (ushort si; si < seccnt; ++si) {
+	for (ushort si; si < fi.pe.hdr.NumberOfSections; ++si) {
 		PE_SECTION_ENTRY section = void;
 
 		if (fread(&section, section.sizeof, 1, fi.handle) == 0)
 			return EXIT_FAILURE;
 
 		if (fo_loadcf == 0)
-		if (section.VirtualAddress <= rva_loadcf &&
-			section.VirtualAddress + section.SizeOfRawData > rva_loadcf) {
+		if (section.VirtualAddress <= fi.pe.dir.LoadConfigurationTable.va &&
+			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.LoadConfigurationTable.va) {
 			fo_loadcf = section.PointerToRawData +
-				(rva_loadcf - section.VirtualAddress);
+				(fi.pe.dir.LoadConfigurationTable.va - section.VirtualAddress);
 		}
 
 		if (fo_import == 0)
-		if (section.VirtualAddress <= rva_import &&
-			section.VirtualAddress + section.SizeOfRawData > rva_import) {
+		if (section.VirtualAddress <= fi.pe.dir.ImportTable.va &&
+			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.ImportTable.va) {
 			fo_import = section.PointerToRawData +
-				(rva_import - section.VirtualAddress);
+				(fi.pe.dir.ImportTable.va - section.VirtualAddress);
 		}
 
 		if (fo_loadcf && fo_import)
@@ -726,13 +742,17 @@ L_LOAD_CONFIG_EXIT:
 	//
 	// Disassembly
 	//
+L_DISASM:
+
+	if ((flags & DUMPER_SHOW_DISASSEMBLY) == 0)
+		return EXIT_SUCCESS;
 
 	//TODO: Measure by section length
 
 	puts("\n*\n* Disassembly\n*");
 	void *mem = cast(void*)malloc(64);
 	fseek(fi.handle, pos_section, SEEK_SET);
-	for (ushort si; si < seccnt; ++si) {
+	for (ushort si; si < fi.pe.hdr.NumberOfSections; ++si) {
 		PE_SECTION_ENTRY section = void;
 
 		if (fread(&section, section.sizeof, 1, fi.handle) == 0)
