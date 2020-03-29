@@ -134,9 +134,9 @@ enum { // PE_SECTION_ENTRY.Characteristics flags
 }
 
 enum : ushort { // PE image format/magic
-	PE_HDRROM	= 0x0107,	// No longer used?
-	PE_HDR32	= 0x010B,
-	PE_HDR64	= 0x020B,
+	PE_FMT_ROM	= 0x0107,	// No longer used?
+	PE_FMT_32	= 0x010B,	/// PE32
+	PE_FMT_64	= 0x020B,	/// PE32+
 }
 
 enum : ushort { // PE_HEADER
@@ -259,7 +259,6 @@ struct PE_OPTIONAL_HEADERROM {
 	uint32_t[4] CprMask;
 	uint32_t GpValue;
 }
-pragma(msg, "PE_OPTIONAL_HEADERROM : ", PE_OPTIONAL_HEADERROM.sizeof);
 
 struct PE_DIRECTORY_ENTRY { align(1):
 	uint32_t va;	/// Relative Virtual Address
@@ -301,7 +300,7 @@ struct PE_SECTION_ENTRY { align(1):
 }
 
 // IMAGE_IMPORT_DESCRIPTOR
-struct PE_IMAGE_DESCRIPTOR { align(1):
+struct PE_IMPORT_DESCRIPTOR { align(1):
 	uint32_t OriginalFirstThunk;
 	uint32_t TimeDateStamp; // time_t
 	uint32_t ForwarderChain;
@@ -309,9 +308,24 @@ struct PE_IMAGE_DESCRIPTOR { align(1):
 	uint32_t FirstThunk;
 }
 
+// Rough guesses for OS limits, offsets+4 since missing Size (already read)
+enum PE_LOAD_CONFIG32_LIMIT_XP = 64;
+enum PE_LOAD_CONFIG32_LIMIT_VI = PE_LOAD_CONFIG_DIR32.GuardFlags.offsetof + 4;
+enum PE_LOAD_CONFIG32_LIMIT_8 = PE_LOAD_CONFIG_DIR32.GuardLongJumpTargetCount.offsetof + 4;
+enum PE_LOAD_CONFIG64_LIMIT_XP = PE_LOAD_CONFIG_DIR64.SecurityCookie.offsetof + 4;
+enum PE_LOAD_CONFIG64_LIMIT_VI = PE_LOAD_CONFIG_DIR64.GuardFlags.offsetof + 4;
+enum PE_LOAD_CONFIG64_LIMIT_8 = PE_LOAD_CONFIG_DIR64.GuardLongJumpTargetCount.offsetof + 4;
+
+struct PE_LOAD_CONFIG_CODE_INTEGRITY { align(1):
+	uint16_t Flags;	// Flags to indicate if CI information is available, etc.
+	uint16_t Catalog;	// 0xFFFF means not available
+	uint32_t CatalogOffset;
+	uint32_t Reserved;	// Additional bitmask to be defined later
+}
+
 /// IMAGE_LOAD_CONFIG_DIRECTORY32
 struct PE_LOAD_CONFIG_DIR32 { align(1):
-	uint32_t Size; // Characteristics, Windows XP defines this as 64
+	uint32_t Size; // Doc: Characteristics, header: Size, Windows XP=64
 	uint32_t TimeDateStamp; // time_t
 	uint16_t MajorVersion;
 	uint16_t MinorVersion;
@@ -332,19 +346,32 @@ struct PE_LOAD_CONFIG_DIR32 { align(1):
 	uint32_t SEHandlerTable;
 	uint32_t SEHandlerCount;
 	uint32_t GuardCFCheckFunctionPointer; // Control Flow
-	uint32_t Reserved2;
+	uint32_t GuardCFDispatchFunctionPointer;
 	uint32_t GuardCFFunctionTable;
 	uint32_t GuardCFFunctionCount;
-	uint32_t GuardFlags;
-	uint8_t[12] CodeIntegrity;
+	uint32_t GuardFlags; // Windows 7's limit?
+	PE_LOAD_CONFIG_CODE_INTEGRITY CodeIntegrity;
 	uint32_t GuardAddressTakenIatEntryTable;
 	uint32_t GuardAddressTakenIatEntryCount;
 	uint32_t GuardLongJumpTargetTable;
-	uint32_t GuardLongJumpTargetCount;
+	uint32_t GuardLongJumpTargetCount; // Windows 8's limit?
+	// Windows 10?
+	uint32_t DynamicValueRelocTable;	// VA
+	uint32_t CHPEMetadataPointer;
+	uint32_t GuardRFFailureRoutine;	// VA
+	uint32_t GuardRFFailureRoutineFunctionPointer;	// VA
+	uint32_t DynamicValueRelocTableOffset;
+	uint16_t DynamicValueRelocTableSection;
+	uint16_t Reserved2;
+	uint32_t GuardRFVerifyStackPointerFunctionPointer;	// VA
+	uint32_t HotPatchTableOffset;
+	uint32_t Reserved3;
+	uint32_t EnclaveConfigurationPointer;	// VA
+	uint32_t VolatileMetadataPointer;	// VA
 }
 
 /// IMAGE_LOAD_CONFIG_DIRECTORY64
-struct PE_LOAD_CONFIG_DIR64 {
+struct PE_LOAD_CONFIG_DIR64 { align(1):
 	uint32_t Size; // Characteristics
 	uint32_t TimeDateStamp; // time_t
 	uint16_t MajorVersion;
@@ -366,15 +393,35 @@ struct PE_LOAD_CONFIG_DIR64 {
 	uint64_t SEHandlerTable;
 	uint64_t SEHandlerCount;
 	uint64_t GuardCFCheckFunctionPointer; // Control Flow
-	uint64_t Reserved2;
+	uint64_t GuardCFDispatchFunctionPointer;
 	uint64_t GuardCFFunctionTable;
 	uint64_t GuardCFFunctionCount;
-	uint32_t GuardFlags;
-	uint8_t[12] CodeIntegrity;
+	uint32_t GuardFlags; // Windows 7's limit?
+	PE_LOAD_CONFIG_CODE_INTEGRITY CodeIntegrity;
 	uint64_t GuardAddressTakenIatEntryTable;
 	uint64_t GuardAddressTakenIatEntryCount;
 	uint64_t GuardLongJumpTargetTable;
 	uint64_t GuardLongJumpTargetCount;
+	// Windows 10?
+	uint64_t DynamicValueRelocTable;         // VA
+	uint64_t CHPEMetadataPointer;            // VA
+	uint64_t GuardRFFailureRoutine;          // VA
+	uint64_t GuardRFFailureRoutineFunctionPointer; // VA
+	uint32_t DynamicValueRelocTableOffset;
+	uint16_t DynamicValueRelocTableSection;
+	uint16_t Reserved2;
+	uint64_t GuardRFVerifyStackPointerFunctionPointer; // VA
+	uint32_t HotPatchTableOffset;
+	uint32_t Reserved3;
+	uint64_t EnclaveConfigurationPointer;     // VA
+	uint64_t VolatileMetadataPointer;         // VA
+}
+
+struct PE_LOAD_CONFIG_META { align(1):
+	union {
+		PE_LOAD_CONFIG_DIR32 dir32;
+		PE_LOAD_CONFIG_DIR64 dir64;
+	}
 }
 
 int file_load_pe(file_info_t *fi) {
@@ -452,9 +499,9 @@ const(char) *file_pe_str_mach(ushort mach) {
 const(char) *file_pe_str_magic(ushort mag) {
 	const(char) *str_mag = void;
 	switch (mag) {
-	case PE_HDR32: str_mag = "32"; break;
-	case PE_HDR64: str_mag = "32+"; break;
-	case PE_HDRROM: str_mag = "-ROM"; break;
+	case PE_FMT_32: str_mag = "PE32"; break;
+	case PE_FMT_64: str_mag = "PE32+"; break;
+	case PE_FMT_ROM: str_mag = "PE-ROM"; break;
 	default: str_mag = null;
 	}
 	return str_mag;
