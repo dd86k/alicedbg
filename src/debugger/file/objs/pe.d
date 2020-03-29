@@ -16,12 +16,10 @@ import debugger.disasm.core : DisasmISA, disasm_msbisa; // ISA translation
 
 extern (C):
 
-//enum PE_OHDR_SIZE = 0xE0; // PE32
-//enum PE_OHDR64_SIZE = 0xF0; // PE32+
-//enum PE_OHDRROM_SIZE = 0x38; // PE-ROM
-enum PE_OHDR_SIZE = PE_OPTIONAL_HEADER.sizeof + PE_IMAGE_DATA_DIRECTORY.sizeof; // PE32
-enum PE_OHDR64_SIZE = PE_OPTIONAL_HEADER64.sizeof + PE_IMAGE_DATA_DIRECTORY.sizeof; // PE32+
-enum PE_OHDRROM_SIZE = PE_OPTIONAL_HEADERROM.sizeof + PE_IMAGE_DATA_DIRECTORY.sizeof; // PE-ROM
+enum int PE_DIRECTORY_SIZE = PE_IMAGE_DATA_DIRECTORY.sizeof;
+enum int PE_OHDR_SIZE = PE_OPTIONAL_HEADER.sizeof + PE_DIRECTORY_SIZE; // PE32
+enum int PE_OHDR64_SIZE = PE_OPTIONAL_HEADER64.sizeof + PE_DIRECTORY_SIZE; // PE32+
+enum int PE_OHDRROM_SIZE = PE_OPTIONAL_HEADERROM.sizeof + PE_DIRECTORY_SIZE; // PE-ROM
 
 enum : ushort { // PE_HEADER.Machine, likely all little-endian
 	PE_MACHINE_UNKNOWN	= 0,
@@ -134,7 +132,7 @@ enum { // PE_SECTION_ENTRY.Characteristics flags
 }
 
 enum : ushort { // PE image format/magic
-	PE_FMT_ROM	= 0x0107,	// No longer used?
+	PE_FMT_ROM	= 0x0107,	// No longer used? Docs no longer have it
 	PE_FMT_32	= 0x010B,	/// PE32
 	PE_FMT_64	= 0x020B,	/// PE32+
 }

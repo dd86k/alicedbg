@@ -43,6 +43,7 @@ enum DebuggerMode {
 enum CLIPage {
 	main,
 	ui,
+	show,
 	dstyles,
 	marchs,
 	license,
@@ -104,7 +105,18 @@ int clipage(CLIPage h) {
 		"loop ...... Print exceptions, continues automatically, no user input.\n"
 //		"tcp-json .. (Experimental) JSON API server via TCP.\n"
 		;
-	break;
+		break;
+	case show:
+		r =
+		"Available SHOW fields for dumper (default=h)\n"~
+		"A .. Show all fields\n"~
+		"h .. Show headers\n"~
+		"s .. Show sections\n"~
+		"i .. Show imports\n"~
+		"d .. Show disassembly (code sections only)\n"
+//		"D .. Show disassembly (all sections)"
+		;
+		break;
 	case dstyles:
 		r =
 		"Available disassembler styles\n"~
@@ -112,10 +124,10 @@ int clipage(CLIPage h) {
 		"nasm ..... Netwide Assembler syntax\n"~
 		"att ...... AT&T syntax"
 		;
-	break;
+		break;
 	case marchs:
 		r = "Architectures: x86, x86_64";
-	break;
+		break;
 	case license:
 		r =
 `BSD 3-Clause License
@@ -314,8 +326,31 @@ int main(int argc, const(char) **argv) {
 		}*/
 
 		// dumper: file is raw
-		if (strcmp(arg, "raw") == 0)
+		if (strcmp(arg, "raw") == 0) {
 			opt.dumpopt |= DUMPER_FILE_RAW;
+			continue;
+		}
+
+		// dumper: show fields
+		if (strcmp(arg, "show") == 0) {
+			if (argi + 1 >= argc) {
+				puts("cli: show argument missing");
+				return EXIT_FAILURE;
+			}
+			const(char)* cf = argv[++argi];
+			switch (*cf) {
+			case 'A': opt.dumpopt |= DUMPER_SHOW_EVERYTHING; break;
+			case 'h': opt.dumpopt |= DUMPER_SHOW_HEADERS; break;
+			case 's': opt.dumpopt |= DUMPER_SHOW_SECTIONS; break;
+			case 'i': opt.dumpopt |= DUMPER_SHOW_IMPORTS; break;
+			case 'd': opt.dumpopt |= DUMPER_SHOW_DISASSEMBLY; break;
+			case '?': return clipage(CLIPage.show);
+			default:
+				printf("cli: unknown show flag: %c\n", *cf);
+				return EXIT_FAILURE;
+			}
+			continue;
+		}
 
 		if (strcmp(arg, "version") == 0 || strcmp(arg, "-version") == 0)
 			return cliver;

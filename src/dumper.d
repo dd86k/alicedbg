@@ -114,9 +114,9 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 		return EXIT_FAILURE;
 	}
 
-	char[32] tbuffer = void;;
+	char[32] tbuffer = void;
 	if (strftime(cast(char*)tbuffer, 32, "%c",
-		localtime(cast(time_t*)&lconf.dir64.TimeDateStamp)) == 0) {
+		localtime(cast(time_t*)&fi.pe.hdr.TimeDateStamp)) == 0) {
 		const(char)* l = cast(char*)&tbuffer;
 		l = "strftime:err";
 	}
@@ -231,8 +231,8 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 		// NT additional fields
 		//
 
-		switch (ohdrsz) {
-		case PE_OHDR_SIZE: // 32
+		switch (fi.pe.ohdr.Magic) {
+		case PE_FMT_32: // 32
 			with (fi.pe.ohdr)
 			printf(
 			"BaseOfData                   %08X\n"~
@@ -278,7 +278,7 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 			DllCharacteristics = fi.pe.ohdr.DllCharacteristics;
 			NumberOfRvaAndSizes = fi.pe.ohdr.NumberOfRvaAndSizes;
 			break;
-		case PE_OHDR64_SIZE: // 64
+		case PE_FMT_64: // 64
 			with (fi.pe.ohdr64)
 			printf(
 			"ImageBase                    %016llX\n"~
@@ -322,7 +322,7 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 			DllCharacteristics = fi.pe.ohdr64.DllCharacteristics;
 			NumberOfRvaAndSizes = fi.pe.ohdr64.NumberOfRvaAndSizes;
 			break;
-		case PE_OHDRROM_SIZE: // 56, ROM has no flags/directories
+		case PE_FMT_ROM: // ROM has no flags/directories
 			with (fi.pe.ohdrrom)
 			printf(
 			"BaseOfData                   %08X\n"~
@@ -330,12 +330,12 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 			"GprMask                      %08X\n"~
 			"CprMask                      %08X %08X %08X %08X\n"~
 			"GpValue                      %08X\n",
-			ohdrrom.BaseOfData,
-			ohdrrom.BaseOfBss,
-			ohdrrom.GprMask,
-			ohdrrom.CprMask[0], CprMask[1],
-			ohdrrom.CprMask[2], CprMask[3],
-			ohdrrom.GpValue,
+			BaseOfData,
+			BaseOfBss,
+			GprMask,
+			CprMask[0], CprMask[1],
+			CprMask[2], CprMask[3],
+			GpValue,
 			);
 			return EXIT_SUCCESS;
 		default:
