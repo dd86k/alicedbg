@@ -2090,6 +2090,8 @@ void x86_0f(disasm_params_t *p) {
 				switch (x86_0f_select(p)) {
 				case X86_0F_NONE: m = "movntps"; break;
 				case X86_0F_66H: m = "movntpd"; break;
+				case X86_0F_F2H: m = "movntsd"; break; // SSE4a
+				case X86_0F_F3H: m = "movntsd"; break; // SSE4a
 				default: disasm_err(p); return;
 				}
 				if (p.mode >= DisasmMode.File)
@@ -2631,13 +2633,77 @@ void x86_0f(disasm_params_t *p) {
 			return;
 		}
 		switch (x86_0f_select(p)) {
-		case X86_0F_NONE: break;
+		case X86_0F_NONE: // (Intel) VMX
+			if (p.mode >= DisasmMode.File)
+				disasm_push_str(p, wbit ? "vmwrite" : "vmread");
+			x86_modrm(p, wbit, X86_WIDTH_EXT, X86_WIDTH_EXT);
+			return;
+		case X86_0F_66H: // (AMD) SSE4a
+			ubyte modrm = *p.addru8; // Reg only
+			++p.addrv;
+			if (wbit) {
+				if ((modrm & RM_MOD) != RM_MOD_11) {
+					disasm_err(p);
+					return;
+				}
+				if (p.mode >= DisasmMode.File) {
+					disasm_push_x8(p, modrm);
+					disasm_push_str(p, "extrq");
+					disasm_push_reg(p,
+						x86_modrm_reg(p, modrm, X86_WIDTH_XMM));
+					disasm_push_reg(p,
+						x86_modrm_reg(p, modrm << 3, X86_WIDTH_XMM));
+				}
+			} else { // Group 17/GRP17
+				if (modrm & RM_REG || (modrm & RM_MOD) != RM_MOD_11) {
+					disasm_err(p);
+					return;
+				}
+				if (p.mode >= DisasmMode.File) {
+					disasm_push_x8(p, modrm);
+					disasm_push_str(p, "extrq");
+					disasm_push_reg(p,
+						x86_modrm_reg(p, modrm << 3, X86_WIDTH_XMM));
+				}
+				x86_u8imm(p);
+				x86_u8imm(p);
+			}
+			return;
+		case X86_0F_F2H: // SSE4a
+			ubyte modrm = *p.addru8; // Reg only
+			++p.addrv;
+			if (wbit) {
+				if ((modrm & RM_MOD) != RM_MOD_11) {
+					disasm_err(p);
+					return;
+				}
+				if (p.mode >= DisasmMode.File) {
+					disasm_push_x8(p, modrm);
+					disasm_push_str(p, "insertq");
+					disasm_push_reg(p,
+						x86_modrm_reg(p, modrm, X86_WIDTH_XMM));
+					disasm_push_reg(p,
+						x86_modrm_reg(p, modrm << 3, X86_WIDTH_XMM));
+				}
+			} else { // Group 17/GRP17
+				if ((modrm & RM_MOD) != RM_MOD_11) {
+					disasm_err(p);
+					return;
+				}
+				if (p.mode >= DisasmMode.File) {
+					disasm_push_x8(p, modrm);
+					disasm_push_str(p, "insertq");
+					disasm_push_reg(p,
+						x86_modrm_reg(p, modrm, X86_WIDTH_XMM));
+					disasm_push_reg(p,
+						x86_modrm_reg(p, modrm << 3, X86_WIDTH_XMM));
+				}
+				x86_u8imm(p);
+				x86_u8imm(p);
+			}
+			return;
 		default: disasm_err(p); return;
 		}
-		if (p.mode >= DisasmMode.File)
-			disasm_push_str(p, wbit ? "vmwrite" : "vmread");
-		x86_modrm(p, wbit, X86_WIDTH_EXT, X86_WIDTH_EXT);
-		return;
 	case 0b0111_1100: // 7CH-7FH
 		const(char) *m = void;
 		if (dbit) {

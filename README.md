@@ -34,7 +34,7 @@ Personal Goals:
 
 | Platform | ~% | Extensions | Notes |
 |---|---|---|---|
-| x86-32 | 60 | x87, MMX, SSE, AES, SHA, VMX, SVM | Still adding |
+| x86-32 | 60 | x87, MMX, SSE (2, 3, 4.1, 4.2, 4a), AES, SHA, VMX, SVM | Still adding |
 | x86-64 | 0 | | Waiting on x86-32 |
 | arm-t32 | 0 | | Waiting on x86-64 |
 | arm-a32 | 0 | | Waiting on x86-64 |
@@ -136,10 +136,19 @@ It's still possible to compile the project by referencing every source files.
 The `-betterC` switch is optional, but recommended.
 
 ## Notes on fuzzing
-In order to preform a fuzz, ldc version 1.0.0 or newer and AFL 2.50 or newer are required, additionally the LLVM version that ldc and the library `afl-llvm-pass.so` have been built with must be the same.
+In order to preform a fuzz, ldc version 1.0.0 or newer and AFL 2.50 or newer
+are required, additionally the LLVM version that ldc and the library
+`afl-llvm-pass.so` have been built with must be the same.
 
-To fuzz, export the environment variable `AFL_ROOT` to the location where `afl-llvm-pass.so` is located, then build with `dub -d afl`.
+To fuzz, export the environment variable `AFL_ROOT` to the location where
+`afl-llvm-pass.so` is located, then build with `dub -d afl`.
 
-Then create two directories, `findings` and `testcases`, after that populate `testcases` with files you wish to test with. It takes the files in this directory and applies various transformations to them in order to explore new code paths and attempt to find crashes, so it's important that all of these input files be valid and correct.
+Then create two directories, `findings` and `testcases`, after that populate
+`testcases` with files you wish to test with. It takes the files in this
+directory and applies various transformations to them in order to explore new
+code paths and attempt to find crashes, so it's important that all of these
+input files be valid and correct.
 
-After that, to fuzz, simply run `afl-fuzz -i testcases -o findings ./alicedbg --DRT-trapExceptions=0 <OPTIONS> @@` where `<OPTIONS>` are the various options you wish to test with.
+After that, to fuzz, simply run
+`afl-fuzz -i testcases -o findings ./alicedbg --DRT-trapExceptions=0 <OPTIONS> @@`
+where `<OPTIONS>` are the various alicedbg options you wish to test with.
