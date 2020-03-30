@@ -8,6 +8,14 @@ version "0.0.0"
 
 #targetPath "bin"
 
+buildType "afl" {
+    toolchainRequirements dmd="no" gdc="no" ldc=">=1.0.0"
+    dflags "-plugin=$AFL_ROOT/afl-llvm-pass.so"
+    sourceFiles "$AFL_ROOT/afl-llvm-rt.o"
+    versions "AFL"
+    buildOptions "debugMode" "debugInfo" "betterC"
+}
+
 buildType "profile" {
 	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="ldc"

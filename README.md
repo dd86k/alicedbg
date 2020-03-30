@@ -124,6 +124,7 @@ Phobos functions may be used.
 |---|---|
 | Debug | `dub build` |
 | Release | `dub build -b release-nobounds` |
+| AFL Fuzz | `dub build -b afl` |
 
 ## With make
 
@@ -133,3 +134,12 @@ Planned.
 
 It's still possible to compile the project by referencing every source files.
 The `-betterC` switch is optional, but recommended.
+
+## Notes on fuzzing
+In order to preform a fuzz, ldc version 1.0.0 or newer and AFL 2.50 or newer are required, additionally the LLVM version that ldc and the library `afl-llvm-pass.so` have been built with must be the same.
+
+To fuzz, export the environment variable `AFL_ROOT` to the location where `afl-llvm-pass.so` is located, then build with `dub -d afl`.
+
+Then create two directories, `findings` and `testcases`, after that populate `testcases` with files you wish to test with.
+
+After that, to fuzz, simply run `afl-fuzz -i testcases -o findings ./alicedbg --DRT-trapExceptions=0 <OPTIONS> @@` where `<OPTIONS>` are the various options you wish to test with.
