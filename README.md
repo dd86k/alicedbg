@@ -50,8 +50,9 @@ Personal Goals:
 | MZ | 0 | | |
 | LE | 0 | | |
 | NE | 0 | | |
-| PE | 0 | | |
+| PE | 15 | PE32-ROM, PE32, PE32+ | |
 | ELF | 0 | | |
+| Mach-O | 0 | | |
 
 ## FAQ
 

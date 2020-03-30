@@ -307,6 +307,10 @@ struct PE_IMPORT_DESCRIPTOR { align(1):
 }
 
 // Rough guesses for OS limits, offsets+4 since missing Size (already read)
+// If the count is still misleading, the size check will be performed by field
+// Examples:
+// putty-x86 0.73: 92
+// putty-amd64 0.73: 148
 enum PE_LOAD_CONFIG32_LIMIT_XP = 64;
 enum PE_LOAD_CONFIG32_LIMIT_VI = PE_LOAD_CONFIG_DIR32.GuardFlags.offsetof + 4;
 enum PE_LOAD_CONFIG32_LIMIT_8 = PE_LOAD_CONFIG_DIR32.GuardLongJumpTargetCount.offsetof + 4;

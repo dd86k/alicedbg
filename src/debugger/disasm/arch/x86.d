@@ -3895,6 +3895,103 @@ void x86_0f3a(disasm_params_t *p) {
 			disasm_err(p);
 			return;
 		}
+		p.x86.pf_operand = 0;
+		const(char) *m = void;
+		int wmem = void;
+		if (dbit) {
+			if (wbit) {
+				m = "roundsd";
+				wmem = X86_WIDTH_MM;
+			} else {
+				m = "roundss";
+				wmem = X86_WIDTH_EXT;
+			}
+		} else {
+			wmem = X86_WIDTH_XMM;
+			m = wbit ? "roundpd" : "roundps";
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_DIR_REG, wmem, X86_WIDTH_XMM);
+		x86_u8imm(p);
+		return;
+	case 0b0000_1100: // 0CH-0FH
+		const(char) *m = void;
+		int w = void;
+		if (dbit) {
+			if (wbit) {
+				m = "palignr";
+				w =  p.x86.pf_operand ? X86_WIDTH_XMM : X86_WIDTH_MM;
+			} else {
+				if (p.x86.pf_operand == 0) {
+					disasm_err(p);
+					return;
+				}
+				m = "pblendw";
+				w = X86_WIDTH_XMM;
+			}
+		} else {
+			if (p.x86.pf_operand == 0) {
+				disasm_err(p);
+				return;
+			}
+			w = X86_WIDTH_XMM;
+			m = wbit ? "blendpd" : "blendps";
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_DIR_REG, w, w);
+		x86_u8imm(p);
+		return;
+	case 0b0001_0100: // 14H-17H
+		if (p.x86.pf_operand == 0) {
+			disasm_err(p);
+			return;
+		}
+		p.x86.pf_operand = 0;
+		const(char) *m = void;
+		int wmem = void;
+		if (dbit) {
+			m = wbit ? "extractps" : "pextrd";
+			wmem = X86_WIDTH_EXT;
+		} else {
+			if (wbit) {
+				m = "pextrw";
+				wmem = X86_WIDTH_WIDE;
+			} else {
+				m = "pextrb";
+				wmem = X86_WIDTH_BYTE;
+			}
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_DIR_MEM, wmem, X86_WIDTH_XMM);
+		x86_u8imm(p);
+		return;
+	case 0b0010_0000: // 20H-23H
+		if ((dbit && wbit) || p.x86.pf_operand == 0) {
+			disasm_err(p);
+			return;
+		}
+		p.x86.pf_operand = 0;
+		const(char) *m = void;
+		int wmem = void;
+		if (dbit) {
+			m = "pinsrd";
+			wmem = X86_WIDTH_EXT;
+		} else {
+			if (wbit) {
+				m = "insertps";
+				wmem = X86_WIDTH_EXT;
+			} else {
+				m = "pinsrb";
+				wmem = X86_WIDTH_BYTE;
+			}
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_DIR_REG, wmem, X86_WIDTH_XMM);
+		x86_u8imm(p);
 		return;
 	default: disasm_err(p); // ANCHOR End of 0f3a
 	}
@@ -3969,13 +4066,13 @@ package enum {
 
 // ModR/M register width
 package enum {
-	X86_WIDTH_BYTE,	/// 8-bit registers (8086)
-	X86_WIDTH_EXT,	/// 32/64-bit extended registers (i386/amd64)
-	X86_WIDTH_WIDE,	/// 16-bit registers (8086)
-	X86_WIDTH_MM,	/// 64-bit MM registers (MMX)
-	X86_WIDTH_XMM,	/// 128-bit XMM registers (SSE)
-	X86_WIDTH_YMM,	/// 256-bit YMM registers (AVX)
-	X86_WIDTH_ZMM,	/// 512-bit ZMM registers (AVX-512)
+	X86_WIDTH_BYTE,	/// 8-bit registers (8086), BYTE PTR
+	X86_WIDTH_EXT,	/// 32/64-bit extended registers (i386/amd64), DWORD PTR
+	X86_WIDTH_WIDE,	/// 16-bit registers (8086), WORD PTR
+	X86_WIDTH_MM,	/// 64-bit MM registers (MMX), QWORD PTR
+	X86_WIDTH_XMM,	/// 128-bit XMM registers (SSE), OWORD PTR
+	X86_WIDTH_YMM,	/// 256-bit YMM registers (AVX), YWORD PTR
+	X86_WIDTH_ZMM,	/// 512-bit ZMM registers (AVX-512), ZWORD PTR
 }
 // ModR/M Direction
 package enum {
