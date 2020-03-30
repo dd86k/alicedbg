@@ -2932,10 +2932,10 @@ void x86_0f(disasm_params_t *p) {
 			} else { // GRP15
 				ubyte modrm = *p.addru8;
 				++p.addrv;
+				const(char) *m = void;
 				if ((modrm & RM_MOD) == RM_MOD_11) {
 					switch (x86_0f_select(p)) {
 					case X86_0F_NONE:
-						const(char) *m = void;
 						switch (modrm & RM_REG) {
 						case RM_REG_101: m = "lfence"; break;
 						case RM_REG_110: m = "mfence"; break;
@@ -2947,26 +2947,42 @@ void x86_0f(disasm_params_t *p) {
 							disasm_push_str(p, m);
 						}
 						return;
+					case X86_0F_66H, X86_0F_F2H: // waitpkg
+						switch (modrm & RM_REG) {
+						case RM_REG_110: // Same REG field (/6)
+							m = p.x86.pf_operand ? "tpause" : "umwait";
+							break;
+						default: disasm_err(p); return;
+						}
+						if (p.mode >= DisasmMode.File) {
+							p.x86.pf_operand = 0;
+							disasm_push_x8(p, modrm);
+							disasm_push_str(p, m);
+							disasm_push_reg(p,
+								x86_modrm_reg(p, modrm << 3, X86_WIDTH_EXT));
+							disasm_push_reg(p, "edx");
+							disasm_push_reg(p, "eax");
+						}
+						return;
 					case X86_0F_F3H:
-						const(char) *m = void;
 						switch (modrm & RM_REG) {
 						case RM_REG_000: m = "rdfsbase"; break;
 						case RM_REG_001: m = "rdgsbase"; break;
 						case RM_REG_010: m = "wrfsbase"; break;
 						case RM_REG_011: m = "wrgsbase"; break;
+						case RM_REG_110: m = "umonitor"; break;
 						default: disasm_err(p); return;
 						}
 						if (p.mode >= DisasmMode.File) {
 							disasm_push_x8(p, modrm);
 							disasm_push_str(p, m);
 							disasm_push_reg(p,
-								x86_modrm_reg(p, modrm, X86_WIDTH_EXT));
+								x86_modrm_reg(p, modrm << 3, X86_WIDTH_EXT));
 						}
 						return;
 					default: disasm_err(p); return;
 					}
 				} else { // mem
-					const(char) *m = void;
 					switch (modrm & RM_REG) {
 					case RM_REG_000: m = "fxsave"; break;
 					case RM_REG_001: m = "fxrstor"; break;

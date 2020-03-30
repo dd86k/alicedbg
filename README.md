@@ -34,7 +34,7 @@ Personal Goals:
 
 | Platform | ~% | Extensions | Notes |
 |---|---|---|---|
-| x86-32 | 60 | x87, MMX, SSE (2, 3, 4.1, 4.2, 4a), AES, SHA, VMX, SVM | Still adding |
+| x86-32 | 60 | x87, MMX, SSE (2, 3, 4.1, 4.2, 4a), AES, SHA, VMX, SVM, SMX, WAITPKG | Still adding |
 | x86-64 | 0 | | Waiting on x86-32 |
 | arm-t32 | 0 | | Waiting on x86-64 |
 | arm-a32 | 0 | | Waiting on x86-64 |
