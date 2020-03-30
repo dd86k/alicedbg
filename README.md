@@ -140,6 +140,6 @@ In order to preform a fuzz, ldc version 1.0.0 or newer and AFL 2.50 or newer are
 
 To fuzz, export the environment variable `AFL_ROOT` to the location where `afl-llvm-pass.so` is located, then build with `dub -d afl`.
 
-Then create two directories, `findings` and `testcases`, after that populate `testcases` with files you wish to test with.
+Then create two directories, `findings` and `testcases`, after that populate `testcases` with files you wish to test with. It takes the files in this directory and applies various transformations to them in order to explore new code paths and attempt to find crashes, so it's important that all of these input files be valid and correct.
 
 After that, to fuzz, simply run `afl-fuzz -i testcases -o findings ./alicedbg --DRT-trapExceptions=0 <OPTIONS> @@` where `<OPTIONS>` are the various options you wish to test with.
