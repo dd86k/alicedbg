@@ -3993,6 +3993,68 @@ void x86_0f3a(disasm_params_t *p) {
 		x86_modrm(p, X86_DIR_REG, wmem, X86_WIDTH_XMM);
 		x86_u8imm(p);
 		return;
+	case 0b0100_0000: // 40H-43H
+		if ((dbit && wbit) || p.x86.pf_operand == 0) {
+			disasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		if (dbit) {
+			m = "mpsadbw";
+		} else {
+			m = wbit ? "dppd" : "dpps";
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_DIR_REG, X86_WIDTH_XMM, X86_WIDTH_XMM);
+		x86_u8imm(p);
+		return;
+	case 0b0100_0100: // 44H-47H
+		if (wbit || dbit || p.x86.pf_operand == 0) {
+			disasm_err(p);
+			return;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "pclmulqdq");
+		x86_modrm(p, X86_DIR_REG, X86_WIDTH_XMM, X86_WIDTH_XMM);
+		x86_u8imm(p);
+		return;
+	case 0b0110_0000: // 60H-63H
+		if (p.x86.pf_operand == 0) {
+			disasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		if (dbit) {
+			m = wbit ? "pcmpistri" : "pcmpistrm";
+		} else {
+			m = wbit ? "pcmpestri" : "pcmpestrm";
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_modrm(p, X86_DIR_REG, X86_WIDTH_XMM, X86_WIDTH_XMM);
+		x86_u8imm(p);
+		return;
+	case 0b1100_1100: // CCH-CFH
+		if (wbit || dbit || p.x86.pf_operand) {
+			disasm_err(p);
+			return;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "sha1rnds4");
+		x86_modrm(p, X86_DIR_REG, X86_WIDTH_XMM, X86_WIDTH_XMM);
+		x86_u8imm(p);
+		return;
+	case 0b1101_1100: // DCH-DFH
+		if (wbit == 0 || dbit == 0 || p.x86.pf_operand == 0) {
+			disasm_err(p);
+			return;
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, "aeskeygenassist");
+		x86_modrm(p, X86_DIR_REG, X86_WIDTH_XMM, X86_WIDTH_XMM);
+		x86_u8imm(p);
+		return;
 	default: disasm_err(p); // ANCHOR End of 0f3a
 	}
 }
