@@ -34,7 +34,7 @@ Personal Goals:
 
 | Platform | ~% | Extensions | Notes |
 |---|---|---|---|
-| x86-32 | 60 | x87, MMX, SSE (2, 3, 4.1, 4.2, 4a), AES, SHA, VMX, SVM, SMX, WAITPKG | Still adding |
+| x86-32 | 60 | x87, MMX, SSE (2, 3, 4.1, 4.2, 4a), AES, SHA, VMX, SVM 1.0, SMX, WAITPKG | Still adding |
 | x86-64 | 0 | | Waiting on x86-32 |
 | arm-t32 | 0 | | Waiting on x86-64 |
 | arm-a32 | 0 | | Waiting on x86-64 |
@@ -136,6 +136,7 @@ It's still possible to compile the project by referencing every source files.
 The `-betterC` switch is optional, but recommended.
 
 ## Notes on fuzzing
+
 In order to preform a fuzz, ldc version 1.0.0 or newer and AFL 2.50 or newer
 are required, additionally the LLVM version that ldc and the library
 `afl-llvm-pass.so` have been built with must be the same.
