@@ -27,3 +27,7 @@ NOTES
 
 # Commit message (git commit -t)
 MSG
+
+# AFL stuff
+testcases/
+findings/
