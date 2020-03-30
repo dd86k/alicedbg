@@ -66,7 +66,7 @@ int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
 	"Characteristics       %04X\t(",
 	Machine, str_mach,
 	NumberOfSections, NumberOfSections,
-	TimeDateStamp, cast(char*)tbuffer,
+	TimeDateStamp, &tbuffer,
 	PointerToSymbolTable,
 	NumberOfSymbols, NumberOfSymbols,
 	SizeOfOptionalHeader, SizeOfOptionalHeader,
@@ -503,7 +503,6 @@ L_IMPORTS:
 		PE_LOAD_CONFIG_META lconf = void;
 		char[32] lcbuffer = void;
 
-		int lcsz = void; /// Size field, bytes to read
 		if (fread(&lconf, 4, 1, fi.handle) == 0)
 			return EXIT_FAILURE;
 		if (fread(&lconf.dir32.TimeDateStamp, lconf.dir32.Size, 1, fi.handle) == 0)
@@ -560,7 +559,7 @@ L_IMPORTS:
 			EditList,
 			SecurityCookie);
 			
-			if (lcsz <= PE_LOAD_CONFIG32_LIMIT_XP)
+			if (lconf.dir32.Size <= PE_LOAD_CONFIG32_LIMIT_XP)
 				goto L_LOAD_CONFIG_EXIT;
 
 			with (lconf.dir32)
@@ -580,7 +579,7 @@ L_IMPORTS:
 			GuardCFFunctionCount,
 			GuardFlags);
 
-			if (lcsz <= PE_LOAD_CONFIG32_LIMIT_VI)
+			if (lconf.dir32.Size <= PE_LOAD_CONFIG32_LIMIT_VI)
 				goto L_LOAD_CONFIG_EXIT;
 
 			with (lconf.dir32)
@@ -602,7 +601,7 @@ L_IMPORTS:
 			GuardLongJumpTargetTable,
 			GuardLongJumpTargetCount);
 
-			if (lcsz <= PE_LOAD_CONFIG32_LIMIT_8)
+			if (lconf.dir32.Size <= PE_LOAD_CONFIG32_LIMIT_8)
 				goto L_LOAD_CONFIG_EXIT;
 
 			with (lconf.dir32)
@@ -657,7 +656,7 @@ L_IMPORTS:
 			EditList,
 			SecurityCookie);
 
-			if (lcsz <= PE_LOAD_CONFIG64_LIMIT_XP)
+			if (lconf.dir64.Size <= PE_LOAD_CONFIG64_LIMIT_XP)
 				goto L_LOAD_CONFIG_EXIT;
 
 			with (lconf.dir64)
@@ -677,7 +676,7 @@ L_IMPORTS:
 			GuardCFFunctionCount,
 			GuardFlags);
 
-			if (lcsz <= PE_LOAD_CONFIG64_LIMIT_VI)
+			if (lconf.dir64.Size <= PE_LOAD_CONFIG64_LIMIT_VI)
 				goto L_LOAD_CONFIG_EXIT;
 
 			with (lconf.dir64)
@@ -699,7 +698,7 @@ L_IMPORTS:
 			GuardLongJumpTargetTable,
 			GuardLongJumpTargetCount);
 
-			if (lcsz <= PE_LOAD_CONFIG64_LIMIT_8)
+			if (lconf.dir64.Size <= PE_LOAD_CONFIG64_LIMIT_8)
 				goto L_LOAD_CONFIG_EXIT;
 
 			with (lconf.dir64)
