@@ -10,7 +10,7 @@ import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
 import core.stdc.time : time_t, tm, localtime, strftime;
 import dumper.core;
-import debugger.file.loader : file_info_t;
+import debugger.obj.loader : obj_info_t;
 import debugger.disasm.core : disasm_params_t, disasm_line, DisasmMode;
 import debugger.file.objs.pe;
 
@@ -24,7 +24,7 @@ extern (C):
 /// 	dp = Disassembler parameters
 /// 	flags = Show X flags
 /// Returns: Non-zero on error
-int dumper_print_pe32(file_info_t *fi, disasm_params_t *dp, int flags) {
+int dumper_print_pe32(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	bool unkmach = void;
 	const(char) *str_mach = file_pe_str_mach(fi.pe.hdr.Machine);
 	if (str_mach == null) {

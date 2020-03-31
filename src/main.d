@@ -1,7 +1,8 @@
 /**
  * Command line interface.
  *
- * Module declaration present for license notice.
+ * This module provides a non-pragmatic approach of configurating the debugger,
+ * dumper, or profiler settings via a command-line interface.
  *
  * License: BSD 3-Clause
  */
@@ -134,7 +135,18 @@ int clipage(CLIPage h) {
 		;
 		break;
 	case marchs:
-		r = "Architectures: x86, x86_64";
+		r =
+		"Available architectures\n"~
+		"x86_16 ..... Intel x86 16-bit mode (8086)\n"~
+		"x86 ........ Intel and AMD x86 (i386+)"
+//		"x86_64 ..... EM64T/Intel64 and AMD64\n"
+//		"thumb ...... ARM Thumb 32-bit\n"~
+//		"arm ........ ARM 32-bit\n"~
+//		"aarch64 .... ARM 64-bit\n"~
+//		"rv32 ....... RISC-V 32-bit\n"~
+//		"rv64 ....... RISC-V 64-bit\n"~
+//		"rv128 ...... RISC-V 128-bit\n"~
+		;
 		break;
 	case license:
 		r =

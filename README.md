@@ -40,13 +40,17 @@ Personal Goals:
 | arm-a32 | 0 | | Waiting on x86-64 |
 | arm-a64 | 0 | | Waiting on x86-64 |
 | riscv-32 | 1 | RVC 2.0, RV32I 2.1 | |
+| riscv-64 | 0 | | Waiting on riscv-32 |
+| riscv-128 | 0 | | Waiting on riscv-32 |
+| powerpc-32 | 0 | | |
+| powerpc-64 | 0 | | |
 | webasm | 0 | | Planned |
 
 ### Object Dump Support
 
 | Type | ~% | Extensions | Notes |
 |---|---|---|---|
-| Binary | 50 | Far from perfect |
+| Binary | 50 | | Far from perfect | 
 | MZ | 0 | | |
 | LE | 0 | | |
 | NE | 0 | | |
@@ -70,19 +74,31 @@ others) use its functions as a library (static or dynamically).
 # Usage
 
 The command-line interface processes items from left to right and was inspired
-from the ffmpeg project (-option value).
-
-The default operating mode is the debugger with the Text UI.
+from the ffmpeg project (`-option [value]`).
 
 | Option | Possible values | Default | Description |
 |---|---|---|---|
-| `-ui` | `tui`, `loop`, `tcp-json` | `tui` | Debugger user interface |
-| `-dstyle` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
 | `-mode` | `debugger`, `dump`, `profile` | `debugger` | Operating mode |
+| `-march` | See `-march ?` | Target dependant | (Disassembler) Set machine architecture |
+| `-dstyle` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
+| `-exec` | File path | | Set mode to Debugger and next argument as `file` |
+| `-pid` | Process ID | | Set mode to Debugger and next argument as `pid` |
+| `-ui` | `tui`, `loop`, `tcp-json` | `tui` | (Debugger) User interface |
+| `-dump` | | | Alias of `-mode dump` |
+| `-raw` | | | (Dumper) Skip file format detection and process as raw blob |
+| `-show` | `A`,`h`,`s`,`i`,`d` | `h` | (Dumper) Include item(s) into output |
+
+Default operating mode is set to the debugger, and the default UI is set to the
+TUI type.
+
+Default arguments are: `file`, `file_args`, and `file_envs`, which applies to
+any operating modes without an option switch (`-example`). Therefore, it is
+possible to only write examples such as `alicedbg -dump putty.exe -show A`,
+`alicedbg -ui loop debuggee`, and `alicedbg -dump -march x86 -raw test_x86`.
 
 ### UI: tui
 
-The Text UI is currently in development.
+The Text UI is currently in development, and is currently not ready for use.
 
 ### UI: loop
 
@@ -112,9 +128,9 @@ available), and register list (when available).
 
 ## With DUB
 
-DUB often comes with a D compiler and is recommended to build the project. A
-compiler can be chosen with the `--compiler=` option. I try to support DMD,
-GDC, and LDC as much as possible.
+DUB often comes with a D compiler and is the recommended way to build the
+project. A compiler can be chosen with the `--compiler=` option. I try to
+support DMD, GDC, and LDC as much as possible.
 
 Do note that the `betterC` mode is activated for normal builds and
 documentation. Unittesting (and the rest) uses the druntime library so any
@@ -126,7 +142,7 @@ Phobos functions may be used.
 | Release | `dub build -b release-nobounds` |
 | AFL Fuzz | `dub build -b afl` |
 
-## With make
+## With make(1)
 
 Planned.
 
@@ -153,3 +169,13 @@ input files be valid and correct.
 After that, to fuzz, simply run
 `afl-fuzz -i testcases -o findings ./alicedbg --DRT-trapExceptions=0 <OPTIONS> @@`
 where `<OPTIONS>` are the various alicedbg options you wish to test with.
+
+## Notes on profile builds (`-b profile`)
+
+Profiling depends on special functions from druntime and D's main function (not
+the main function externed as C), therefore making D's embedded profiling
+feature unavailable to profile alicedbg internals.
+
+For the time being, you will have to use existing profiling tools (ltrace,
+strace, gdb, lldb, etc.). alicedbg's profiling feature (operation mode, not a
+build type) is planned.

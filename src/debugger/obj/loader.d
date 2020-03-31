@@ -1,9 +1,9 @@
 /**
- * Executable image loader.
+ * Object and (executable) image loader.
  *
  * License: BSD 3-Clause
  */
-module debugger.file.loader;
+module debugger.obj.loader;
 
 import core.stdc.stdio;
 import debugger.disasm.core : DisasmISA; // ISA translation
@@ -13,7 +13,7 @@ import os.err;
 extern (C):
 
 /// File operation error code
-enum FileError {
+enum ObjError {
 	/// Operating was a success, so no error occurred
 	None,
 	/// Operation error (e.g. can't seek, can't read)
@@ -27,7 +27,7 @@ enum FileError {
 }
 
 /// Loaded, or specified, executable/object format
-enum FileType {
+enum ObjType {
 	/// Mysterious file format
 	Unknown,
 	/// Mark Zbikowski format
@@ -46,11 +46,11 @@ enum FileType {
 
 /// Executable file information and headers
 //TODO: Field saying if image or object?
-struct file_info_t {
+struct obj_info_t {
 	/// File handle, used internally.
 	FILE *handle;
 	/// File type, populated by the respective loading function.
-	FileType type;
+	ObjType type;
 	/// Unset for little, set for big. Used in cswap functions.
 	int endian;
 	/// Image's ISA translated value for disasm
@@ -59,10 +59,10 @@ struct file_info_t {
 	// Internal fields
 	//
 	union {
-		file_info_pe_t pe;	/// PE headers
+		obj_info_pe_t pe;	/// PE headers
 	}
 }
-struct file_info_pe_t { // PE32
+struct obj_info_pe_t { // PE32
 	PE_HEADER hdr;
 	union {
 		PE_OPTIONAL_HEADER ohdr;
@@ -79,48 +79,48 @@ struct file_info_pe_t { // PE32
 /// 	info = file_info_t structure
 /// 	flags = Load options (placeholder)
 /// Returns: OS error code or a FileError on error
-int file_load(FILE *file, file_info_t *info, int flags) {
+int obj_load(FILE *file, obj_info_t *info, int flags) {
 	if (file == null)
-		return FileError.Operation;
+		return ObjError.Operation;
 	info.handle = file;
 
 	//
 	// Auto-detection
 	//
 
-	info.type = FileType.Unknown;
+	info.type = ObjType.Unknown;
 	file_sig_t sig = void;
 	if (fread(&sig, 4, 1, info.handle) == 0)
-		return FileError.Operation;
+		return ObjError.Operation;
 
 	switch (sig.u16[0]) {
 	case SIG_MZ: // 'ZM' files exist, but very rare (MSDOS 2 era)
 		if (fseek(info.handle, 0x3C, SEEK_SET))
-			return FileError.Operation;
+			return ObjError.Operation;
 		uint hdrloc = void;
 		if (fread(&hdrloc, 4, 1, info.handle) == 0)
-			return FileError.Operation;
+			return ObjError.Operation;
 		if (fseek(info.handle, hdrloc, SEEK_SET))
-			return FileError.Operation;
+			return ObjError.Operation;
 		if (fread(&sig, 4, 1, info.handle) == 0)
-			return FileError.Operation;
+			return ObjError.Operation;
 		switch (sig.u16[0]) {
 		case SIG_PE:
 			if (sig.u16[1]) // "PE\0\0"
-				return FileError.Unsupported;
+				return ObjError.Unsupported;
 			return file_load_pe(info);
 		default: // MZ
-			return FileError.Unsupported;
+			return ObjError.Unsupported;
 		}
 /*	case SIG_ELF_L:
 	
 		break;*/
 	default:
-		return FileError.Unsupported;
+		return ObjError.Unsupported;
 	}
 }
 
-int file_cmp_section(const(char)* sname, int ssize, const(char) *tname) {
+int obj_sec_cmpname(const(char)* sname, int ssize, const(char) *tname) {
 	import core.stdc.string : strncmp;
 	return strncmp(sname, tname, ssize) == 0;
 }

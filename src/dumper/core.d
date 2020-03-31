@@ -8,7 +8,7 @@ module dumper.core;
 import core.stdc.stdio;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
-import debugger.disasm, debugger.file.loader, dumper.objs;
+import debugger.disasm, debugger.obj.loader, dumper.objs;
 
 extern (C):
 
@@ -77,8 +77,8 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 		return EXIT_SUCCESS;
 	}
 
-	file_info_t finfo = void;
-	if (file_load(f, &finfo, 0)) {
+	obj_info_t finfo = void;
+	if (obj_load(f, &finfo, 0)) {
 		puts("loader: could not load file");
 		return EXIT_FAILURE;
 	}
@@ -86,7 +86,7 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 	if (dp.isa == DisasmISA.Default)
 		dp.isa = finfo.isa;
 
-	with (FileType)
+	with (ObjType)
 	switch (finfo.type) {
 	case PE: return dumper_print_pe32(&finfo, dp, flags);
 	default:

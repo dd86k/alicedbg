@@ -11,7 +11,7 @@ module debugger.file.objs.pe;
 
 import core.stdc.stdio, core.stdc.inttypes;
 import core.stdc.string : memset;
-import debugger.file.loader : file_info_t, FileType;
+import debugger.obj.loader : obj_info_t, ObjType;
 import debugger.disasm.core : DisasmISA, disasm_msbisa; // ISA translation
 
 extern (C):
@@ -426,14 +426,14 @@ struct PE_LOAD_CONFIG_META { align(1):
 	}
 }
 
-int file_load_pe(file_info_t *fi) {
+int file_load_pe(obj_info_t *fi) {
 	if (fi.handle == null)
 		return 1;
 
 	if (fread(&fi.pe.hdr, PE_HEADER.sizeof, 1, fi.handle) == 0)
 		return 1;
 
-	fi.type = FileType.PE;
+	fi.type = ObjType.PE;
 
 	// Image only: PE Optional Header + directories
 	//TODO: MS recommends checking Size with Magic (e.g. Size=0xF0 = Magic=PE32+)
