@@ -379,7 +379,8 @@ int main(int argc, const(char) **argv) {
 		if (strcmp(arg, "-license") == 0)
 			return clipage(CLIPage.license);
 
-		continue;
+		printf("cli: unknown option: %s\n", arg);
+		return EXIT_FAILURE;
 
 		//
 		// Default arguments

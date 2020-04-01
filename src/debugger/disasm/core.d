@@ -180,14 +180,17 @@ int disasm_line(disasm_params_t *p, DisasmMode mode) {
 		return p.error;
 	}
 
+	int modefile = mode >= DisasmMode.File;
+
 	p.mode = mode;
 	p.error = DisasmError.None;
 	p.lastaddr = p.addrv;
 
-	if (p.mode >= DisasmMode.File) {
+	if (modefile) {
 		disasm_fmt_t fmt = void;
 		p.fmt = &fmt;
-		p.fmt.settings = p.fmt.itemno = 0;
+		p.fmt.itemno = 0;
+		p.fmt.settings = p.fmt.opwidth = 0;
 		with (p) mcbufi = mnbufi = 0;
 	}
 
@@ -202,16 +205,16 @@ int disasm_line(disasm_params_t *p, DisasmMode mode) {
 	case rv32:	disasm_rv32(p); break;
 	default:
 		disasm_err(p, DisasmError.NotSupported);
-		p.mcbuf[0] = 0;
+		p.mcbuf[0] = p.mnbuf[0] = 0;
 		return p.error;
 	}
 
-	if (p.mode >= DisasmMode.File) {
+	if (modefile) {
 		if (p.style == DisasmSyntax.Default)
 			p.style = DISASM_DEFAULT_SYNTAX;
 		if (p.error == DisasmError.None)
 			disasm_render(p);
-		disasm_render_finish(p);
+		disasm_render_finish(p); // leave machine code buffer intact
 	}
 
 	return p.error;

@@ -84,22 +84,29 @@ struct disasm_fmt_item_t {
 	const(char) *sval3;	/// String value 3
 }
 /// Formatter structure embedded into the disassembler structure
-struct disasm_fmt_t {
+struct disasm_fmt_t { align(1):
 	disasm_fmt_item_t [FORMATTER_STACK_SIZE]items;	/// Stack
 	size_t itemno;	/// Current item number
-	int opwidth;	/// Last operation width
-	int settings;	/// Formatter settings for current stack/instruction (from decoder)
+	union {
+		uint u0;
+		struct {
+			/// Last operation width
+			ushort opwidth;
+			/// Formatter settings for current stack/instruction (from decoder)
+			ushort settings;
+		}
+	}
 }
 
 /// Default string for illegal instructions
 private
-__gshared const(char) *DISASM_FMT_ERR_STR = "(bad)";
+__gshared const(char) *DISASM_FMT_ERR_STR	= "(bad)";
 private
-__gshared const(char) *DISASM_FMT_SPACE = " ";
+__gshared const(char) *DISASM_FMT_SPACE	= " ";
 private
-__gshared const(char) *DISASM_FMT_TAB = "\t";
+__gshared const(char) *DISASM_FMT_TAB	= "\t";
 private
-__gshared const(char) *DISASM_FMT_COMMA_SPACE = ", ";
+__gshared const(char) *DISASM_FMT_COMMA_SPACE	= ", ";
 
 //
 // Machine code functions

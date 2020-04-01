@@ -22,16 +22,32 @@ struct x86_internals_t { align(1):
 	/// VEX prefix
 	/// First byte indicates 2-byte VEX (C5H), 3-byte VEX (C4H),
 	/// 3-byte XOP (8FH), or 4-byte EVEX (62H)
+	/// VEX.2B: 11000101 RvvvvLpp
+	/// VEX.3B: 11000100 RXBmmmmm WvvvvLpp
+	/// XOP   : 10001111 RXBmmmmm WvvvvLpp
 	union {
 		uint vex32;
 		ubyte[4] vex;
 	}
+	// VEX loaded values
+	int vex_vlen;	/// Implied vector length
+	int vex_ext;	/// Implied opcode extension (66H, F2H, F3H)
+	int vex_reg;	/// Implied register
+//	int vex_x;	/// Alias to REX.X, set in 32-bit mode
+//	int vex_b;	/// Alias to REX.B, set in 32-bit mode
+//	int vex_w;	/// Alias to REX.W, ignored in 32-bit mode
 }
 
 //TODO: Consider group instructions per operand (e.g. all REG8, IMM8)
 //      + Possible binary reduction
 //      - Possible lookup time increase (e.g. case 4,8: + another switch for string)
 //TODO: Repass all instructions to adjust their reg/mem operation width
+//      [ ] 1-byte
+//      [ ] 0f
+//      [ ] 0f38
+//      [x] 0f3a
+//TODO: (x86-16) Ensure all 66H cases are covered in the legacy 1-byte map
+//      e.g. Where EAX (or a 32-bit reg is ref'd), ensure 66H can affect it
 
 /**
  * x86 disassembler.
@@ -538,8 +554,7 @@ L_CONTINUE:
 			case RM_REG_100: f = "and"; break;
 			case RM_REG_101: f = "sub"; break;
 			case RM_REG_110: f = "xor"; break;
-			case RM_REG_111: f = "cmp"; break;
-			default: // impossible
+			default:         f = "cmp"; break;
 			}
 			disasm_push_x8(p, modrm);
 			disasm_push_str(p, f);
@@ -578,15 +593,26 @@ L_CONTINUE:
 			if (dbit) { // GRP1A POP REG32
 				ubyte modrm = *p.addru8;
 				++p.addrv;
-				if (modrm & RM_RM) { // Invalid
-					disasm_err(p);
+				int xop_map = modrm & X86_VEX_MAP;
+				if (xop_map < 8) {
+					if (modrm & RM_REG) {
+						disasm_err(p);
+						return;
+					}
+					if (p.mode >= DisasmMode.File) {
+						disasm_push_x8(p, modrm);
+						disasm_push_str(p, "pop");
+						disasm_push_reg(p,
+							x86_modrm_reg(p, modrm, X86_WIDTH_EXT));
+					}
 					return;
 				}
-				if (p.mode >= DisasmMode.File) {
-					disasm_push_x8(p, modrm);
-					disasm_push_str(p, "pop");
-					disasm_push_reg(p,
-						x86_modrm_reg(p, modrm, X86_WIDTH_EXT));
+				// ANCHOR: XOP prefix
+				switch (xop_map) {
+				case X86_XOP_MAP8: x86_xop_8(p); return;
+				case X86_XOP_MAP9: x86_xop_9(p); return;
+				case X86_XOP_MAP10: x86_xop_10(p); return;
+				default: disasm_err(p); return;
 				}
 			} else { // LEA REG32, MEM32
 				if (p.mode >= DisasmMode.File)
@@ -714,14 +740,16 @@ L_CONTINUE:
 			if (p.mode >= DisasmMode.File) {
 				disasm_push_str(p, wbit ? "stosd" : "stosb");
 				disasm_push_segreg(p, "es:", "edi");
-				disasm_push_reg(p, wbit ? "eax" : "al");
+				disasm_push_reg(p, wbit ?
+					(p.x86.pf_operand ? "ax" : "eax") : "al");
 			}
 		} else {
 			if (p.mode >= DisasmMode.File)
 				disasm_push_str(p, "test");
 			if (wbit) {
 				if (p.mode >= DisasmMode.File)
-					disasm_push_reg(p, "eax");
+					disasm_push_reg(p,
+						p.x86.pf_operand ? "ax" : "eax");
 				x86_u32imm(p);
 			} else {
 				if (p.mode >= DisasmMode.File)
@@ -731,18 +759,38 @@ L_CONTINUE:
 		}
 		return;
 	case 0b1010_1100: // ACH-AFH
+		const(char) *m = void, a = void, s = void;
 		if (dbit) {
-			if (p.mode >= DisasmMode.File) {
-				disasm_push_str(p, wbit ? "scasd" : "scasb");
-				disasm_push_reg(p, wbit ? "eax" : "al");
-				disasm_push_segreg(p, "es:", "edi");
+			s = p.x86.pf_operand ? "di" : "edi";
+			if (wbit) {
+				m = "scasd";
+				if (p.x86.pf_operand) {
+					a = "ax";
+				} else {
+					a = "eax";
+				}
+			} else {
+				m = "scasb";
+				a = "al";
 			}
 		} else {
-			if (p.mode >= DisasmMode.File) {
-				disasm_push_str(p, wbit ? "lodsd" : "lodsb");
-				disasm_push_reg(p, wbit ? "eax" : "al");
-				disasm_push_segreg(p, "es:", "esi");
+			s = p.x86.pf_operand ? "si" : "esi";
+			if (wbit) {
+				m = "lodsd";
+				if (p.x86.pf_operand) {
+					a = "ax";
+				} else {
+					a = "eax";
+				}
+			} else {
+				m = "lodsb";
+				a = "al";
 			}
+		}
+		if (p.mode >= DisasmMode.File) {
+			disasm_push_str(p, m);
+			disasm_push_reg(p, a);
+			disasm_push_segreg(p, "es:", s);
 		}
 		return;
 	case 0b1011_0000: // B0H-B3H
@@ -850,14 +898,33 @@ L_CONTINUE:
 		} else { // MOD=11 checking is only in x86-32
 			ubyte modrm = *p.addru8;
 			if ((modrm & RM_MOD) == RM_MOD_11) {
+				// ANCHOR: VEX 2-byte/3-byte prefix
 				p.x86.vex[0] = b;
+				p.x86.vex[1] = modrm;
 				if (wbit) { // C5H, VEX 2-byte prefix
-					p.x86.vex[1] = modrm;
+					if (p.mode >= DisasmMode.File)
+						disasm_push_x8(p, p.x86.vex[1]);
+					p.x86.vex_reg  = (~(modrm >> 3)) & 7; // 32-bit
+					p.x86.vex_vlen = modrm & 4;
+					p.x86.vex_ext  = modrm & 3;
 					++p.addrv;
+					x86_vex_0f(p);
 				} else { // C4H, VEX 3-byte prefix
-					p.x86.vex[1] = modrm;
 					p.x86.vex[2] = *(p.addru8 + 1);
+					if (p.mode >= DisasmMode.File) {
+						disasm_push_x8(p, p.x86.vex[1]);
+						disasm_push_x8(p, p.x86.vex[2]);
+					}
+					p.x86.vex_reg  = (~(p.x86.vex[2] >> 3)) & 7; // 32-bit
+					p.x86.vex_vlen = p.x86.vex[2] & 4;
+					p.x86.vex_ext  = p.x86.vex[2] & 3;
 					p.addrv += 2;
+					switch (p.x86.vex[1] & X86_VEX_MAP) {
+					case X86_VEX_MAP_0F: x86_vex_0f(p); return;
+					case X86_VEX_MAP_0F38: x86_vex_0f38(p); return;
+					case X86_VEX_MAP_0F3A: x86_vex_0f3a(p); return;
+					default: disasm_err(p); return;
+					}
 				}
 				return;
 			}
@@ -988,7 +1055,7 @@ L_CONTINUE:
 						m = "fsubr";
 					}
 					break;
-				case 0xF0: // FDIV/FDIVR
+				default: // (F0) FDIV/FDIVR
 					if (sti < 0x8) { // FDIV
 						m = "fdiv";
 					} else { // FDIVR
@@ -996,7 +1063,6 @@ L_CONTINUE:
 						m = "fdivr";
 					}
 					break;
-				default:
 				}
 				disasm_push_x8(p, modrm);
 				disasm_push_str(p, m);
@@ -1012,8 +1078,7 @@ L_CONTINUE:
 					case RM_REG_100: m = "fsub"; break;
 					case RM_REG_101: m = "fsubr"; break;
 					case RM_REG_110: m = "fdiv"; break;
-					case RM_REG_111: m = "fdivr"; break;
-					default: // never
+					default:         m = "fdivr"; break;
 					}
 					disasm_push_str(p, m);
 				}
@@ -1067,7 +1132,7 @@ L_CONTINUE:
 						disasm_push_str(p, m);
 					}
 					return;
-				case 0xF0:
+				default: // F0
 					if (p.mode < DisasmMode.File)
 						return;
 					switch (sti) {
@@ -1086,13 +1151,11 @@ L_CONTINUE:
 					case 0xC: m = "frndint"; break;
 					case 0xD: m = "fscale"; break;
 					case 0xE: m = "fsin"; break;
-					case 0xF: m = "fcos"; break;
-					default: // never
+					default: m = "fcos"; break; // 0F
 					}
 					disasm_push_x8(p, modrm);
 					disasm_push_str(p, m);
 					return;
-				default:
 				}
 			} else { // operand is memory pointer
 				switch (modrm & RM_REG) {
@@ -1164,8 +1227,7 @@ L_CONTINUE:
 					case RM_REG_100: m = "fisub"; break;
 					case RM_REG_101: m = "fisubr"; break;
 					case RM_REG_110: m = "fidiv"; break;
-					case RM_REG_111: m = "fidivr"; break;
-					default: // never
+					default:         m = "fidivr"; break;
 					}
 					disasm_push_str(p, m);
 				}
@@ -1223,7 +1285,7 @@ L_CONTINUE:
 						}
 					}
 					return;
-				case 0xF0: // FCOMI/Reserved
+				default: // (F0) FCOMI/Reserved
 					if (sti < 0x8) { // FCOMI
 						disasm_push_x8(p, modrm);
 						disasm_push_str(p, "fcomi");
@@ -1233,7 +1295,6 @@ L_CONTINUE:
 						disasm_err(p);
 					}
 					return;
-				default: // Never
 				}
 			} else { // operand is memory pointer
 				switch (modrm & RM_REG) {
@@ -1302,8 +1363,7 @@ L_CONTINUE:
 					case RM_REG_100: m = "fsub"; break;
 					case RM_REG_101: m = "fsubr"; break;
 					case RM_REG_110: m = "fdiv"; break;
-					case RM_REG_111: m = "fdivr"; break;
-					default: // never
+					default:         m = "fdivr"; break;
 					}
 					disasm_push_str(p, m);
 				}
@@ -1400,7 +1460,7 @@ L_CONTINUE:
 						m = "fucomp";
 					}
 					break;
-				case 0xF0: // FDIVRP/FDIVP
+				default: // (F0) FDIVRP/FDIVP
 					if (sti < 0x8) { // FDIVRP
 						m = "fdivrp";
 					} else { // FDIVP
@@ -1408,7 +1468,6 @@ L_CONTINUE:
 						m = "fdivp";
 					}
 					break;
-				default:
 				}
 				if (p.mode >= DisasmMode.File) {
 					disasm_push_x8(p, modrm);
@@ -1426,8 +1485,7 @@ L_CONTINUE:
 					case RM_REG_100: m = "fisub"; break;
 					case RM_REG_101: m = "fisubr"; break;
 					case RM_REG_110: m = "fidiv"; break;
-					case RM_REG_111: m = "fidivr"; break;
-					default: // never
+					default:         m = "fidivr"; break;
 					}
 					disasm_push_str(p, m);
 				}
@@ -1481,8 +1539,7 @@ L_CONTINUE:
 					case RM_REG_100: m = "fbld"; break;
 					case RM_REG_101: m = "fild"; break;
 					case RM_REG_110: m = "fbstp"; break;
-					case RM_REG_111: m = "fistp"; break;
-					default: // never
+					default:         m = "fistp"; break;
 					}
 					disasm_push_str(p, m);
 				}
@@ -1541,13 +1598,23 @@ L_CONTINUE:
 	case 0b1110_1100: // ECH-EFH
 		if (p.mode < DisasmMode.File)
 			return;
+		const(char) *m = void;
+		if (wbit) {
+			if (p.x86.pf_operand) {
+				m = "ax";
+			} else {
+				m = "eax";
+			}
+		} else {
+			m = "al";
+		}
 		if (dbit) {
 			disasm_push_str(p, "out");
 			disasm_push_reg(p, "dx");
-			disasm_push_reg(p, wbit ? "eax" : "al");
+			disasm_push_reg(p, m);
 		} else {
 			disasm_push_str(p, "in");
-			disasm_push_reg(p, wbit ? "eax" : "al");
+			disasm_push_reg(p, m);
 			disasm_push_reg(p, "dx");
 		}
 		return;
@@ -1645,7 +1712,7 @@ L_CONTINUE:
 		}
 		disasm_push_str(p, m);
 		return;
-	default: // FCH-FFH ANCHOR Last case
+	default: // FCH-FFH
 		if (dbit) {
 			ubyte modrm = *p.addru8;
 			++p.addrv;
@@ -1777,8 +1844,7 @@ void x86_0f(disasm_params_t *p) {
 						case RM_RM_100: m = "stgi"; break;
 						case RM_RM_101: m = "clgi"; break;
 						case RM_RM_110: m = "skinit"; break;
-						case RM_RM_111: m = "invlpga"; break;
-						default: // never
+						default:        m = "invlpga"; break;
 						}
 						disasm_push_x8(p, modrm);
 						disasm_push_str(p, m);
@@ -2037,8 +2103,7 @@ void x86_0f(disasm_params_t *p) {
 			case RM_REG_100: sr = "dr4"; break;
 			case RM_REG_101: sr = "dr5"; break;
 			case RM_REG_110: sr = "dr6"; break;
-			case RM_REG_111: sr = "dr7"; break;
-			default: // never
+			default:         sr = "dr7"; break;
 			}
 			disasm_push_str(p, "mov");
 			if (dbit) {
@@ -2058,8 +2123,7 @@ void x86_0f(disasm_params_t *p) {
 				case RM_REG_100: sr = "cr12"; break;
 				case RM_REG_101: sr = "cr13"; break;
 				case RM_REG_110: sr = "cr14"; break;
-				case RM_REG_111: sr = "cr15"; break;
-				default: // never
+				default:         sr = "cr15"; break;
 				}
 			else
 				switch (modrm & RM_REG) {
@@ -2070,8 +2134,7 @@ void x86_0f(disasm_params_t *p) {
 				case RM_REG_100: sr = "cr4"; break;
 				case RM_REG_101: sr = "cr5"; break;
 				case RM_REG_110: sr = "cr6"; break;
-				case RM_REG_111: sr = "cr7"; break;
-				default: // never
+				default:         sr = "cr7"; break;
 				}
 			disasm_push_str(p, "mov");
 			if (dbit) {
@@ -2991,8 +3054,7 @@ void x86_0f(disasm_params_t *p) {
 					case RM_REG_100: m = "xsave"; break;
 					case RM_REG_101: m = "xrstor"; break;
 					case RM_REG_110: m = "xsaveopt"; break;
-					case RM_REG_111: m = "clflush"; break;
-					default: // Never
+					default:         m = "clflush"; break;
 					}
 					if (p.mode >= DisasmMode.File)
 						disasm_push_str(p, m);
@@ -3629,8 +3691,7 @@ void x86_0f(disasm_params_t *p) {
 		}
 		x86_modrm(p, X86_DIR_REG, w, w);
 		return;
-	default: // ANCHOR End of instructions
-		disasm_err(p);
+	default: disasm_err(p); return;
 	}
 }
 
@@ -3958,7 +4019,7 @@ void x86_0f38(disasm_params_t *p) {
 			disasm_err(p);
 		}
 		return;
-	default: disasm_err(p); // ANCHOR End of 0f38
+	default: disasm_err(p); return;
 	}
 }
 
@@ -4137,9 +4198,116 @@ void x86_0f3a(disasm_params_t *p) {
 		x86_modrm(p, X86_DIR_REG, X86_WIDTH_XMM, X86_WIDTH_XMM);
 		x86_u8imm(p);
 		return;
-	default: disasm_err(p); // ANCHOR End of 0f3a
+	default: disasm_err(p); return;
 	}
 }
+
+//
+// ANCHOR: VEX/XOP maps
+//
+
+void x86_vex_0f(disasm_params_t *p) {
+	ubyte b = *p.addru8;
+	++p.addrv;
+
+	if (p.mode >= DisasmMode.File)
+		disasm_push_x8(p, b);
+
+	int wbit = b & 1;
+	int dbit = b & 2;
+	switch (b & 252) {
+	case 0b0001_0000: // 10H-13H
+		const(char) *m = void;
+		int s;	/// 3-operand
+		int wmem = void;
+		if (dbit) {
+			if (wbit) {
+				dbit = !dbit;
+				switch (p.x86.vex_ext) {
+				case X86_VEX_EXT_NONE:
+					m = "vmovlps";
+					wmem = X86_WIDTH_MM;
+					break;
+				case X86_VEX_EXT_66H:
+					m = "vmovlpd";
+					wmem = X86_WIDTH_MM;
+					break;
+				default: disasm_err(p); return;
+				}
+			} else {
+				switch (p.x86.vex_ext) {
+				case X86_VEX_EXT_NONE:
+					m = "vmovlps";
+					wmem = X86_WIDTH_MM;
+					s = 1;
+					break;
+				case X86_VEX_EXT_66H:
+					m = "vmovlpd";
+					wmem = X86_WIDTH_MM;
+					s = 1;
+					break;
+				case X86_VEX_EXT_F3H:
+					m = "vmovsldup";
+					wmem = X86_WIDTH_XMM;
+					break;
+				default:
+					m = "vmovddup";
+					wmem = X86_WIDTH_MM;
+					break;
+				}
+			}
+		} else {
+			if (wbit == 0) dbit = !dbit;
+			switch (p.x86.vex_ext) {
+			case X86_VEX_EXT_NONE:
+				m = "vmovups";
+				wmem = X86_WIDTH_XMM;
+				break;
+			case X86_VEX_EXT_66H:
+				m = "vmovupd";
+				wmem = X86_WIDTH_XMM;
+				break;
+			case X86_VEX_EXT_F3H:
+				m = "vmovss";
+				wmem = X86_WIDTH_EXT;
+				break;
+			default:
+				m = "vmovsd";
+				wmem = X86_WIDTH_MM;
+				break;
+			}
+		}
+		if (p.mode >= DisasmMode.File)
+			disasm_push_str(p, m);
+		x86_vex_modrm(p, dbit, wmem, X86_WIDTH_XMM, s);
+		return;
+	default: disasm_err(p); return;
+	}
+}
+
+void x86_vex_0f38(disasm_params_t *p) {
+	
+}
+
+void x86_vex_0f3a(disasm_params_t *p) {
+	
+}
+
+void x86_xop_8(disasm_params_t *p) {
+	
+}
+
+void x86_xop_9(disasm_params_t *p) {
+	
+}
+
+void x86_xop_10(disasm_params_t *p) {
+	
+}
+
+//
+// ANCHOR: Internal functions
+//
 
 enum x86SegReg {
 	None, CS, DS, ES, FS, GS, SS
@@ -4379,25 +4547,21 @@ const(char) *x87_ststr(disasm_params_t *p, int index) {
 /// 	direction = If set, the registers are the target
 /// 	wmem = Memory operation width, see X86_WIDTH_* enumerations
 /// 	wreg = Register width, see X86_WIDTH_* enumerations
-void x86_modrm(disasm_params_t *p, int direction, int wmem, int wreg) {
-	// 11 111 111
-	// || ||| +++- RM
-	// || +++----- REG
-	// ++--------- MODE
+void x86_modrm(disasm_params_t *p, int dir, int wmem, int wreg) {
 	ubyte modrm = *p.addru8;
 	++p.addrv;
 
-	if (direction) goto L_REG;
+	if (dir) goto L_REG;
 
 L_RM:
 	// Memory regs are only general registers
 	x86_modrm_rm(p, modrm, wmem);
-	if (direction) return;
+	if (dir) return;
 
 L_REG:
 	if (p.mode >= DisasmMode.File)
 		disasm_push_reg(p, x86_modrm_reg(p, modrm, wreg));
-	if (direction) goto L_RM;
+	if (dir) goto L_RM;
 }
 
 /// (Internal) Retrieve a register name from a ModR/M byte (REG field) and a
@@ -4410,7 +4574,7 @@ L_REG:
 /// Returns: Register string or null if out of bound
 const(char) *x86_modrm_reg(disasm_params_t *p, int modrm, int width) {
 	// This is asking for trouble, hopefully more checks will be added later
-	// The array has this order for X86_OP_WIDE
+	// The array has this order for X86_OP_WIDE, non-vex register
 	// NOTE: ModR/M extension is x86-64 only! (REX)
 	__gshared const(char) *[][]x86_regs = [
 		[ "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh" ],	// BYTE
@@ -4418,8 +4582,6 @@ const(char) *x86_modrm_reg(disasm_params_t *p, int modrm, int width) {
 		[ "ax", "cx", "dx", "cx", "sp", "bp", "si", "di" ],	// WIDE
 		[ "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7" ],	// MM
 		[ "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7" ],	// XMM
-		[ "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7" ],	// YMM
-		[ "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7" ],	// ZMM
 	];
 	if (width > 6) return null;
 	size_t i = (modrm & RM_REG) >> 3;
@@ -4621,4 +4783,66 @@ void x86_sib(disasm_params_t *p, ubyte modrm) {
 		p.addrv += 4;
 		break;
 	}
+}
+
+//
+// ANCHOR: VEX internals
+//
+
+// VEX byte "type"
+enum : ubyte {
+	X86_VEX_TYPE_2BYTE	= 0xC5,
+	X86_VEX_TYPE_3BYTE	= 0xC4,
+	X86_VEX_TYPE_XOP	= 0x8F,
+	X86_VEX_TYPE_EVEX	= 0x62,
+	X86_VEX_EXT_NONE	= 0,
+	X86_VEX_EXT_66H	= 1,
+	X86_VEX_EXT_F3H	= 2,
+	X86_VEX_EXT_F2H	= 3,
+}
+
+// VEX 3-byte m-mmmm field and XOP, 2-byte VEX implies the 0F map (Map 1)
+enum X86_VEX_MAP	= 0b1_1111;	/// Map filter
+enum X86_VEX_MAP_0F	= 0b0_0001;	/// Map 1
+enum X86_VEX_MAP_0F38	= 0b0_0010;	/// Map 2
+enum X86_VEX_MAP_0F3A	= 0b0_0011;	/// Map 3
+enum X86_XOP_MAP8	= 0b0_1000;	/// Map 8
+enum X86_XOP_MAP9	= 0b0_1001;	/// Map 9
+enum X86_XOP_MAP10	= 0b0_1010;	/// Map 10
+
+/**
+ * (Internal) Automatically process a ModR/M byte under a VEX map
+ * Params:
+ * 	p = Disassembler parameters
+ * 	dir = ModR/M direction (0=Mem, 1=Reg)
+ * 	wmem = Memory pointer width
+ * 	wreg = Register size
+ * 	scalar = This instruction has 3 operands
+ */
+void x86_vex_modrm(disasm_params_t *p, int dir, int wmem, int wreg, int scalar) {
+	ubyte modrm = *p.addru8;
+	++p.addrv;
+
+	if (dir) goto L_REG;
+
+L_RM:
+	// Memory regs are only general registers
+	x86_modrm_rm(p, modrm, wmem);
+	if (dir) return;
+
+L_REG:
+	if (p.mode >= DisasmMode.File) {
+		disasm_push_reg(p, x86_modrm_reg(p, modrm, wreg));
+		if (scalar)
+			disasm_push_reg(p, x86_vex_reg(p, p.x86.vex_reg));
+	}
+	if (dir) goto L_RM;
+}
+
+const(char) *x86_vex_reg(disasm_params_t *p, int vvv) {
+	__gshared const(char) *[]x86_xmm_regs =
+		[ "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7" ];	// XMM
+	__gshared const(char) *[]x86_ymm_regs =
+		[ "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7" ];	// YMM
+	return p.x86.vex_vlen ? x86_ymm_regs[vvv] : x86_xmm_regs[vvv];
 }
