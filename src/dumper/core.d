@@ -77,6 +77,11 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 		return EXIT_SUCCESS;
 	}
 
+	// When nothing is set, the default is to show headers
+	if ((flags & DUMPER_SHOW_EVERYTHING) == 0) {
+		flags = DUMPER_SHOW_HEADERS;
+	}
+
 	obj_info_t finfo = void;
 	if (obj_load(f, &finfo, 0)) {
 		puts("loader: could not load file");

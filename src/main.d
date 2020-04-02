@@ -190,7 +190,6 @@ int main(int argc, const(char) **argv) {
 		return clipage(CLIPage.main);
 
 	cliopt_t opt;	/// Defaults to .init
-	opt.dumpopt = DUMPER_SHOW_HEADERS; // Default
 	disasm_params_t disopt;	/// .init
 
 	// CLI
