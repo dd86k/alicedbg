@@ -357,16 +357,23 @@ int main(int argc, const(char) **argv) {
 				return EXIT_FAILURE;
 			}
 			const(char)* cf = argv[++argi];
-			switch (*cf) {
-			case 'A': opt.dumpopt |= DUMPER_SHOW_EVERYTHING; break;
-			case 'h': opt.dumpopt |= DUMPER_SHOW_HEADERS; break;
-			case 's': opt.dumpopt |= DUMPER_SHOW_SECTIONS; break;
-			case 'i': opt.dumpopt |= DUMPER_SHOW_IMPORTS; break;
-			case 'd': opt.dumpopt |= DUMPER_SHOW_DISASSEMBLY; break;
-			case '?': return clipage(CLIPage.show);
-			default:
-				printf("cli: unknown show flag: %c\n", *cf);
-				return EXIT_FAILURE;
+			while (*cf) {
+				char c = *cf;
+				switch (c) {
+				case 'A': opt.dumpopt |= DUMPER_SHOW_EVERYTHING; break;
+				case 'h': opt.dumpopt |= DUMPER_SHOW_HEADERS; break;
+				case 's': opt.dumpopt |= DUMPER_SHOW_SECTIONS; break;
+				case 'i': opt.dumpopt |= DUMPER_SHOW_IMPORTS; break;
+				case 'd': opt.dumpopt |= DUMPER_SHOW_DISASSEMBLY; break;
+				case 'l': opt.dumpopt |= DUMPER_SHOW_LOADCFG; break;
+				case 'm': opt.dumpopt |= DUMPER_SHOW_SYMBOLS; break;
+				case 'e': opt.dumpopt |= DUMPER_SHOW_SYMBOLS; break;
+				case '?': return clipage(CLIPage.show);
+				default:
+					printf("cli: unknown show flag: %c\n", c);
+					return EXIT_FAILURE;
+				}
+				++cf;
 			}
 			continue;
 		}

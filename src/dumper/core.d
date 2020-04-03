@@ -13,26 +13,71 @@ import debugger.disasm, debugger.obj.loader, dumper.objs;
 extern (C):
 
 enum { // Dumper flags (-show)
-	/// File is raw, do not attempt to detect its format
-	DUMPER_FILE_RAW	= 1,
-	/// Include headers (image headers, optional headers, directories) in
-	/// output.
-	DUMPER_SHOW_HEADERS	= 0x0100,
-	/// Include sections in output.
-	DUMPER_SHOW_SECTIONS	= 0x0200,
-	/// Include imports in output. This includes dynamic libraries such as
-	/// DLL files (for Windows, under `.rdata`) and SO files.
-	DUMPER_SHOW_IMPORTS	= 0x0400,
-	/// 
-	//DUMPER_SHOW_EXPORTS	= 0x0400,
-	/// Include symbols in output.
-	DUMPER_SHOW_SYMBOLS	= 0x1000,
-	/// Include section disassembly in output.
-	DUMPER_SHOW_DISASSEMBLY	= 0x8000,
-	/// Include everything in output
-	DUMPER_SHOW_EVERYTHING	= 0xFF00,
-	//TODO: flag to export resources/certs
-	//DUMPER_EXPORT_RESOURCES	= 0x01_0000,
+	//
+	// Loader flags (settings)
+	//
+
+	/// (Not implemented) Load file entirely in memory
+	DUMPER_LOADER_FILE_MEM	= LOADER_FILE_MEM,
+
+	//
+	// Dumper flags (settings)
+	//
+
+	/// File is raw, do not attempt to detect its format, disassembly only
+	DUMPER_FILE_RAW	= 0x0100,
+	// ('r') Show information raw (hexadecimal dumps) only. Affects
+	// resource exports as well.
+//	DUMPER_SHOW_RAW	= 0x8000,
+
+	//
+	// Show flags
+	//
+
+	/// ('h') Include headers (image headers, optional headers,
+	/// directories) in output.
+	DUMPER_SHOW_HEADERS	= 0x0001_0000,
+	/// ('s') Include sections in output.
+	DUMPER_SHOW_SECTIONS	= 0x0002_0000,
+	/// ('i') Include imports in output. This includes dynamic libraries
+	/// such as DLL files (for Window: Import Directory) and SO files.
+	DUMPER_SHOW_IMPORTS	= 0x0004_0000,
+	///TODO: ('e') Include exports in output.
+	DUMPER_SHOW_EXPORTS	= 0x0008_0000,
+	/// ('m') Include symbols in output.
+	DUMPER_SHOW_SYMBOLS	= 0x0010_0000,
+	/// ('l') Include load configuration.
+	DUMPER_SHOW_LOADCFG	= 0x0020_0000,
+	// ('') 
+//	DUMPER_SHOW_	= 0x0040_0000,
+	// ('') 
+//	DUMPER_SHOW_	= 0x0080_0000,
+	/// ('d') Include section disassembly in output.
+	DUMPER_SHOW_DISASSEMBLY	= 0x0100_0000,
+	/// ('A') Include everything in output.
+	DUMPER_SHOW_EVERYTHING	= 0x0FFF_0000,
+
+	//
+	// Export flags
+	//
+
+	// These are more options that are unaffected by "show everything"
+	//TODO: ('o') Export resources into current directory
+//	DUMPER_EXPORT_RESOURCES	= 0x1000_0000,
+	//TODO: ('c') Export certificates into current directory
+//	DUMPER_EXPORT_CERTS	= 0x1000_0000,
+}
+
+/// This struct exists avoid casting all the time
+struct uptr_t {
+	union {
+		size_t val;
+		void   *vptr;
+		ubyte  *u8ptr;
+		ushort *u16ptr;
+		uint   *u32ptr;
+		ulong  *u64ptr;
+	}
 }
 
 /// Disassemble given file to stdout. Currently only supports flat binary

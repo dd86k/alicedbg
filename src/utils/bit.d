@@ -87,4 +87,23 @@ unittest {
 	assert(bswap16(0xAABB) == 0xBBAA);
 	assert(bswap32(0xAABBCCDD) == 0xDDCCBBAA);
 	assert(bswap64(0xAABBCCDD_11223344) == 0x44332211_DDCCBBAA);
+	version (LittleEndian) {
+		// LSB matches
+		assert(cswap16(0xAABB, 0) == 0xAABB);
+		assert(cswap32(0xAABBCCDD, 0) == 0xAABBCCDD);
+		assert(cswap64(0xAABBCCDD_11223344, 0) == 0xAABBCCDD_11223344);
+		// MSB does not match
+		assert(cswap16(0xAABB, 1) == 0xBBAA);
+		assert(cswap32(0xAABBCCDD, 1) == 0xDDCCBBAA);
+		assert(cswap64(0xAABBCCDD_11223344, 1) == 0x44332211_DDCCBBAA);
+	} else {
+		// LSB does not match
+		assert(cswap16(0xAABB, 0) == 0xBBAA);
+		assert(cswap32(0xAABBCCDD, 0) == 0xDDCCBBAA);
+		assert(cswap64(0xAABBCCDD_11223344, 0) == 0x44332211_DDCCBBAA);
+		// MSB matches
+		assert(cswap16(0xAABB, 1) == 0xAABB);
+		assert(cswap32(0xAABBCCDD, 1) == 0xAABBCCDD);
+		assert(cswap64(0xAABBCCDD_11223344, 1) == 0xAABBCCDD_11223344);
+	}
 }

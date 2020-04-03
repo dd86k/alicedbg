@@ -12,6 +12,11 @@ import os.err;
 
 extern (C):
 
+// Loader flags
+enum {
+	LOADER_FILE_MEM = 1
+}
+
 /// File operation error code
 enum ObjError {
 	/// Operating was a success, so no error occurred

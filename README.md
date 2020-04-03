@@ -63,7 +63,8 @@ Personal Goals:
 ### Why D?
 
 I love the D programming language for so many reason I could go on forever
-talking about it, so I'll just say that I love it for its practical approach.
+talking about it, so I'll just say that I love it for its practical approach
+and technical reasons. It gets the job well done.
 
 ### What about the GC?
 

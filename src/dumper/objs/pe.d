@@ -44,7 +44,7 @@ int dumper_print_pe32(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	// skipping declarations
 	ushort OptMagic; /// For future references, 0 means there is no optheader
 	c_long pos_section = ftell(fi.handle);	/// Saved position for sections
-	uint fo_loadcf, fo_import; // unset means not found
+	uint fo_loadcf, fo_import, fo_importaddr; // file offsets
 
 	//
 	// PE Header
@@ -126,6 +126,8 @@ int dumper_print_pe32(obj_info_t *fi, disasm_params_t *dp, int flags) {
 			printf("dumper: (PE32) Unknown Subsystem: %04X\n", fi.pe.ohdr.Subsystem);
 			return EXIT_FAILURE;
 		}
+
+		OptMagic = fi.pe.ohdr.Magic;
 
 		//
 		// Standard fields
@@ -325,22 +327,22 @@ int dumper_print_pe32(obj_info_t *fi, disasm_params_t *dp, int flags) {
 		"Delay Import Descriptor  %08X  %08X  (%u)\n"~
 		"CLR Header               %08X  %08X  (%u)\n"~
 		"Reserved                 %08X  %08X  (%u)\n",
-		ExportTable.va,	ExportTable.size, ExportTable.size,
-		ImportTable.va,	ImportTable.size, ImportTable.size,
-		ResourceTable.va,	ResourceTable.size, ResourceTable.size,
-		ExceptionTable.va,	ExceptionTable.size, ExceptionTable.size,
-		CertificateTable.va,	CertificateTable.size, CertificateTable.size,
-		BaseRelocationTable.va,	BaseRelocationTable.size, BaseRelocationTable.size,
-		DebugDirectory.va,	DebugDirectory.size, DebugDirectory.size,
-		ArchitectureData.va,	ArchitectureData.size, ArchitectureData.size,
-		GlobalPtr.va,	GlobalPtr.size, GlobalPtr.size,
-		TLSTable.va,	TLSTable.size, TLSTable.size,
-		LoadConfigurationTable.va,	LoadConfigurationTable.size, LoadConfigurationTable.size,
-		BoundImportTable.va,	BoundImportTable.size, BoundImportTable.size,
-		ImportAddressTable.va,	ImportAddressTable.size, ImportAddressTable.size,
-		DelayImport.va,	DelayImport.size, DelayImport.size,
-		CLRHeader.va,	CLRHeader.size, CLRHeader.size,
-		Reserved.va,	Reserved.size, Reserved.size);
+		ExportTable.rva,	ExportTable.size, ExportTable.size,
+		ImportTable.rva,	ImportTable.size, ImportTable.size,
+		ResourceTable.rva,	ResourceTable.size, ResourceTable.size,
+		ExceptionTable.rva,	ExceptionTable.size, ExceptionTable.size,
+		CertificateTable.rva,	CertificateTable.size, CertificateTable.size,
+		BaseRelocationTable.rva,	BaseRelocationTable.size, BaseRelocationTable.size,
+		DebugDirectory.rva,	DebugDirectory.size, DebugDirectory.size,
+		ArchitectureData.rva,	ArchitectureData.size, ArchitectureData.size,
+		GlobalPtr.rva,	GlobalPtr.size, GlobalPtr.size,
+		TLSTable.rva,	TLSTable.size, TLSTable.size,
+		LoadConfigurationTable.rva,	LoadConfigurationTable.size, LoadConfigurationTable.size,
+		BoundImportTable.rva,	BoundImportTable.size, BoundImportTable.size,
+		ImportAddressTable.rva,	ImportAddressTable.size, ImportAddressTable.size,
+		DelayImport.rva,	DelayImport.size, DelayImport.size,
+		CLRHeader.rva,	CLRHeader.size, CLRHeader.size,
+		Reserved.rva,	Reserved.size, Reserved.size);
 	} else {
 		//TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
 		printf("Type                         Object\n");
@@ -463,13 +465,13 @@ L_SYMBOLS:
 
 
 	//
-	// LoadConfig/Imports
+	// LoadConfig, Imports, .NET meta
 	//
 	// NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
 	//
 L_IMPORTS:
 
-	if ((flags & DUMPER_SHOW_IMPORTS) == 0)
+	if ((flags & (DUMPER_SHOW_IMPORTS | DUMPER_SHOW_LOADCFG)) == 0)
 		goto L_DISASM;
 
 	fseek(fi.handle, pos_section, SEEK_SET);
@@ -480,23 +482,30 @@ L_IMPORTS:
 			return EXIT_FAILURE;
 
 		if (fo_loadcf == 0)
-		if (section.VirtualAddress <= fi.pe.dir.LoadConfigurationTable.va &&
-			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.LoadConfigurationTable.va) {
+		if (section.VirtualAddress <= fi.pe.dir.LoadConfigurationTable.rva &&
+			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.LoadConfigurationTable.rva) {
 			fo_loadcf = section.PointerToRawData +
-				(fi.pe.dir.LoadConfigurationTable.va - section.VirtualAddress);
+				(fi.pe.dir.LoadConfigurationTable.rva - section.VirtualAddress);
 		}
 
 		if (fo_import == 0)
-		if (section.VirtualAddress <= fi.pe.dir.ImportTable.va &&
-			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.ImportTable.va) {
+		if (section.VirtualAddress <= fi.pe.dir.ImportTable.rva &&
+			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.ImportTable.rva) {
 			fo_import = section.PointerToRawData +
-				(fi.pe.dir.ImportTable.va - section.VirtualAddress);
+				(fi.pe.dir.ImportTable.rva - section.VirtualAddress);
 		}
 
-		if (fo_loadcf && fo_import)
+		if (fo_importaddr == 0)
+		if (section.VirtualAddress <= fi.pe.dir.ImportAddressTable.rva &&
+			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.ImportAddressTable.rva) {
+			fo_loadcf = section.PointerToRawData +
+				(fi.pe.dir.ImportAddressTable.rva - section.VirtualAddress);
+		}
+
+		if (fo_loadcf && fo_import && fo_importaddr)
 			break;
 	}
-	if (fo_loadcf) {
+	if (fo_loadcf && flags & DUMPER_SHOW_LOADCFG) { // LOAD_CONFIGURATION
 		if (fseek(fi.handle, fo_loadcf, SEEK_SET))
 			return EXIT_FAILURE;
 
@@ -531,7 +540,6 @@ L_IMPORTS:
 		GlobalFlagsClear,
 		GlobalFlagsSet,
 		CriticalSectionDefaultTimeout);
-		
 
 		if (OptMagic != PE_FMT_64) { // 32
 			with (lconf.dir32)
@@ -558,9 +566,9 @@ L_IMPORTS:
 			Reserved1,
 			EditList,
 			SecurityCookie);
-			
+
 			if (lconf.dir32.Size <= PE_LOAD_CONFIG32_LIMIT_XP)
-				goto L_LOAD_CONFIG_EXIT;
+				goto L_LOADCFG_EXIT;
 
 			with (lconf.dir32)
 			printf(
@@ -580,7 +588,7 @@ L_IMPORTS:
 			GuardFlags);
 
 			if (lconf.dir32.Size <= PE_LOAD_CONFIG32_LIMIT_VI)
-				goto L_LOAD_CONFIG_EXIT;
+				goto L_LOADCFG_EXIT;
 
 			with (lconf.dir32)
 			printf(
@@ -602,7 +610,7 @@ L_IMPORTS:
 			GuardLongJumpTargetCount);
 
 			if (lconf.dir32.Size <= PE_LOAD_CONFIG32_LIMIT_8)
-				goto L_LOAD_CONFIG_EXIT;
+				goto L_LOADCFG_EXIT;
 
 			with (lconf.dir32)
 			printf(
@@ -657,7 +665,7 @@ L_IMPORTS:
 			SecurityCookie);
 
 			if (lconf.dir64.Size <= PE_LOAD_CONFIG64_LIMIT_XP)
-				goto L_LOAD_CONFIG_EXIT;
+				goto L_LOADCFG_EXIT;
 
 			with (lconf.dir64)
 			printf(
@@ -677,7 +685,7 @@ L_IMPORTS:
 			GuardFlags);
 
 			if (lconf.dir64.Size <= PE_LOAD_CONFIG64_LIMIT_VI)
-				goto L_LOAD_CONFIG_EXIT;
+				goto L_LOADCFG_EXIT;
 
 			with (lconf.dir64)
 			printf(
@@ -699,7 +707,7 @@ L_IMPORTS:
 			GuardLongJumpTargetCount);
 
 			if (lconf.dir64.Size <= PE_LOAD_CONFIG64_LIMIT_8)
-				goto L_LOAD_CONFIG_EXIT;
+				goto L_LOADCFG_EXIT;
 
 			with (lconf.dir64)
 			printf(
@@ -728,15 +736,78 @@ L_IMPORTS:
 			EnclaveConfigurationPointer,
 			VolatileMetadataPointer);
 		}
-	}
-L_LOAD_CONFIG_EXIT:
+	} // LOAD_CONFIGURATION
+L_LOADCFG_EXIT:
 
-	if (fo_import) {
-		PE_LOAD_CONFIG_DIR32 loaddir = void;
-		fseek(fi.handle, fo_loadcf, SEEK_SET);
-		fread(&loaddir, PE_LOAD_CONFIG_DIR32.sizeof, 1, fi.handle);
-	}
+	if (fo_import && fo_importaddr && flags & DUMPER_SHOW_IMPORTS) { // IMPORTS
+		uptr_t imptr = void; /// Import Directory pointer
+		uptr_t adptr = void; /// Import Address Directory pointer
+		imptr.vptr = malloc(fi.pe.dir.ImportTable.size);
+		if (imptr.vptr == null || adptr.vptr == null)
+			return EXIT_FAILURE;
 
+		if (fseek(fi.handle, fo_import, SEEK_SET))
+			return EXIT_FAILURE;
+		if (fread(imptr.vptr, fi.pe.dir.ImportTable.size, 1, fi.handle) == 0)
+			return EXIT_FAILURE;
+		if (fseek(fi.handle, fo_importaddr, SEEK_SET))
+			return EXIT_FAILURE;
+		if (fread(adptr.vptr, fi.pe.dir.ImportAddressTable.size, 1, fi.handle) == 0)
+			return EXIT_FAILURE;
+
+		PE_IMPORT_DESCRIPTOR *idesc = cast(PE_IMPORT_DESCRIPTOR*)imptr.vptr;
+		uptr_t ip = void; /// Calculated pointer to lookup table
+		puts("\n*\n* Imports\n*\n");
+L_IMPORT_READ:
+		if (idesc.Characteristics == 0)
+			goto L_IMPORT_EXIT;
+
+		with (idesc)
+		printf(
+		"Characteristics  %08X\n"~
+		"TimeDateStamp    %08X\n"~
+		"ForwarderChain   %08X\n"~
+		"Name             %08X\n"~
+		"FirstThunk       %08X\n\n",
+		Characteristics,
+		TimeDateStamp,
+		ForwarderChain,
+		Name,
+		FirstThunk
+		);
+		goto L_IMPORT_READ;
+
+		//
+		// Import Lookup Table
+		//
+
+		switch (OptMagic) {
+		case PE_FMT_32:
+			PE_IMPORT_LTE32 lte32 = void;
+			lte32.val = *ip.u32ptr;
+			if (lte32.val & 0x8000_0000) { // Ordinal
+				printf("%04X\n", lte32.num);
+			} else { // Name
+				printf("%08X\n", lte32.rva);
+			}
+			
+			++ip.u32ptr;
+			break;
+		/*case PE_FMT_64:
+			PE_IMPORT_LTE64 lte64 = void;
+			lte64.val = *ip.u64ptr;
+			if (lte64.val2 >> 31) { // Ordinal
+			} else { // Name
+			}
+		
+			++ip.u64ptr;
+			break;*/
+		default: return EXIT_FAILURE;
+		}
+		++idesc;
+		goto L_IMPORT_READ;
+	} // IMPORTS
+L_IMPORT_EXIT:
 
 	//
 	// Disassembly

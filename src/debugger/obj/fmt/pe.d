@@ -259,7 +259,7 @@ struct PE_OPTIONAL_HEADERROM {
 }
 
 struct PE_DIRECTORY_ENTRY { align(1):
-	uint32_t va;	/// Relative Virtual Address
+	uint32_t rva;	/// Relative Virtual Address
 	uint32_t size;	/// Size in bytes
 }
 
@@ -295,15 +295,6 @@ struct PE_SECTION_ENTRY { align(1):
 	uint16_t NumberOfRelocations;
 	uint16_t NumberOfLinenumbers;
 	uint32_t Characteristics;
-}
-
-// IMAGE_IMPORT_DESCRIPTOR
-struct PE_IMPORT_DESCRIPTOR { align(1):
-	uint32_t OriginalFirstThunk;
-	uint32_t TimeDateStamp; // time_t
-	uint32_t ForwarderChain;
-	uint32_t Name;
-	uint32_t FirstThunk;
 }
 
 // Rough guesses for OS limits, offsets+4 since missing Size (already read)
@@ -426,14 +417,38 @@ struct PE_LOAD_CONFIG_META { align(1):
 	}
 }
 
+// IMAGE_IMPORT_DESCRIPTOR
+struct PE_IMPORT_DESCRIPTOR { align(1):
+	uint32_t Characteristics; // used in WINNT.H but no longer descriptive
+	uint32_t TimeDateStamp; // time_t
+	uint32_t ForwarderChain;
+	uint32_t Name;
+	uint32_t FirstThunk;
+}
+
+/// Import Lookup Table entry structure to help
+struct PE_IMPORT_LTE32 { align(1):
+	union {
+		uint val;
+		ushort num; /// Ordinal Number (FLAG: 0)
+		uint rva; /// Hint/Name Table RVA (FLAG: 1)
+	}
+}
+/// Import Lookup Table entry structure to help
+struct PE_IMPORT_LTE64 { align(1):
+	union {
+		ulong val;
+		struct { uint val1, val2; }
+		ushort num; /// Ordinal Number (FLAG: 0)
+		uint rva; /// Hint/Name Table RVA (FLAG: 1)
+	}
+}
+
 int file_load_pe(obj_info_t *fi) {
 	if (fi.handle == null)
 		return 1;
-
 	if (fread(&fi.pe.hdr, PE_HEADER.sizeof, 1, fi.handle) == 0)
 		return 1;
-
-	fi.type = ObjType.PE;
 
 	// Image only: PE Optional Header + directories
 	//TODO: MS recommends checking Size with Magic (e.g. Size=0xF0 = Magic=PE32+)
@@ -448,12 +463,14 @@ int file_load_pe(obj_info_t *fi) {
 			return 1;
 	}
 
+	fi.type = ObjType.PE;
+
 	// Translate Machine field into DisasmABI
 	switch (fi.pe.hdr.Machine) {
 	case PE_MACHINE_I386: fi.isa = DisasmISA.x86; break;
 	case PE_MACHINE_AMD64: fi.isa = DisasmISA.x86_64; break;
 	case PE_MACHINE_RISCV32: fi.isa = DisasmISA.rv32; break;
-	default:
+	default: fi.isa = DisasmISA.Default;
 	}
 	fi.endian = disasm_msbisa(fi.isa);
 
