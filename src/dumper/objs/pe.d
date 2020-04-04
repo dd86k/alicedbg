@@ -778,7 +778,7 @@ L_IMPORT_READ:
 		goto L_IMPORT_READ;
 
 		//
-		// Import Lookup Table
+		//TODO: Import Lookup Table
 		//
 
 		switch (OptMagic) {

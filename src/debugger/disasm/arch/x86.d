@@ -4237,7 +4237,8 @@ void x86_vex_0f(disasm_params_t *p) {
 			} else {
 				switch (p.x86.vex_ext) {
 				case X86_VEX_EXT_NONE:
-					m = "vmovlps";
+					m = (*p.addru8 & RM_MOD) == RM_MOD_11 ?
+						"vmovhlps" : "vmovlps";
 					wmem = X86_WIDTH_MM;
 					s = 1;
 					break;
@@ -4270,10 +4271,14 @@ void x86_vex_0f(disasm_params_t *p) {
 			case X86_VEX_EXT_F3H:
 				m = "vmovss";
 				wmem = X86_WIDTH_EXT;
+				if ((*p.addru8 & RM_MOD) == RM_MOD_11)
+					s = 1;
 				break;
 			default:
 				m = "vmovsd";
 				wmem = X86_WIDTH_MM;
+				if ((*p.addru8 & RM_MOD) == RM_MOD_11)
+					s = 1;
 				break;
 			}
 		}
