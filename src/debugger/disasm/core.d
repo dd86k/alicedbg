@@ -88,9 +88,9 @@ version (AArch64) {
 // Option bits
 //
 
-/// Diasm option: 
-//enum DISASM_O_	= 0x0001;
-/// Diasm option: Go backwards instead of forward. More expensive to calculate!
+///TODO: Diasm option: Use space instead of a tab between the mnemonic and operands
+enum DISASM_O_SPACE	= 0x0001;
+///TODO: Diasm option: Go backwards instead of forward. More expensive to calculate!
 enum DISASM_O_BACKWARD	= 0x0002;
 /// Diasm option: 
 //enum DISASM_O_	= 0x0004;
@@ -98,7 +98,7 @@ enum DISASM_O_BACKWARD	= 0x0002;
 //enum DISASM_O_	= 0x0008;
 /// Disasm option: 
 //enum DISASM_O_	= 0x0010;
-/// Disasm option: Do not group machine code integers
+///TODO: Disasm option: Do not group machine code integers
 enum DISASM_O_MC_INT_SEP	= 0x0020;
 /// Disasm option: Do not add an extra space
 enum DISASM_O_MC_NOSPACE	= 0x0040;
@@ -107,14 +107,10 @@ enum DISASM_O_MC_NOSPACE	= 0x0040;
 struct disasm_params_t { align(1):
 	union {
 		/// Memory address entry point. This value is modified to point
-		/// to the next instruction address. Acts as instruction
-		/// pointer/program counter.
-		void *addr;
-		/// Memory address entry point. This value is modified to point
-		/// to the next instruction address. Acts as instruction
-		/// pointer/program counter.
-		size_t addrv;
-		// Aliases
+		/// to the current instruction address for the disassembler.
+		/// Acts as instruction pointer/program counter.
+		void   *addr;
+		size_t addrv;	/// Non-pointer format for calculations
 		ubyte  *addru8; 	/// Used internally
 		ushort *addru16;	/// Used internally
 		uint   *addru32;	/// Used internally
@@ -126,9 +122,9 @@ struct disasm_params_t { align(1):
 		float  *addrf32;	/// Used internally
 		double *addrf64;	/// Used internally
 	}
-	/// Saved address position before the operation begins, good for
-	/// printing purposes or calculating the delta after disassembling.
-	/// This field is filled by disasm_line before disassembling.
+	/// This field is populated by disasm_line before calling the decoder.
+	/// It serves the client for printing the address and the decoder
+	/// the basis for jump/call address calculations.
 	size_t lastaddr;
 	/// Error code. See DisasmError enumeration for more details. Set by
 	/// disasm_line or the the decoder.
@@ -190,7 +186,7 @@ int disasm_line(disasm_params_t *p, DisasmMode mode) {
 		disasm_fmt_t fmt = void;
 		p.fmt = &fmt;
 		p.fmt.itemno = 0;
-		p.fmt.settings = p.fmt.opwidth = 0;
+		p.fmt.settings = 0;
 		with (p) mcbufi = mnbufi = 0;
 	}
 

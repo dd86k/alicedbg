@@ -141,7 +141,7 @@ Phobos functions may be used.
 |---|---|
 | Debug | `dub build` |
 | Release | `dub build -b release-nobounds` |
-| AFL Fuzz | `dub build -b afl` |
+| AFL Fuzz | `dub build -b afl --compiler=ldc2` |
 
 ## With make(1)
 
@@ -152,7 +152,7 @@ Planned.
 It's still possible to compile the project by referencing every source files.
 The `-betterC` switch is optional, but recommended.
 
-## Notes on fuzzing
+## Fuzzing with AFL
 
 In order to preform a fuzz, ldc version 1.0.0 or newer and AFL 2.50 or newer
 are required, additionally the LLVM version that ldc and the library
@@ -171,7 +171,29 @@ After that, to fuzz, simply run
 `afl-fuzz -i testcases -o findings ./alicedbg --DRT-trapExceptions=0 <OPTIONS> @@`
 where `<OPTIONS>` are the various alicedbg options you wish to test with.
 
-## Notes on profile builds (`-b profile`)
+## Fuzzing with zzuf
+
+zzuf is a transparent application input fuzzer (source: man page). zzuf
+remains a good tool for its deterministic behavior.
+
+To use zzuf, you will require a valid binary program, either flat for the
+disassembler or an image-type for the dumper. The main parameters are `-r`
+(rate) and `-s` (seed). A basic one-time fuzz can be written as
+`zuff -r 0.10 -s 47289 ./alice -dump -raw -march x86 bin/x86`, zuff will
+automatically pick up the file opening operating and start fuzzing.
+
+A way to automate this would be using a combination of `--seed=START:STOP`
+(seed range, most important part) and `-j` (number of jobs), or perhaps
+supplying $RANDOM as a seed number.
+
+Recommended options
+
+| Option | Value |
+|---|---|
+| `-r` | 0.10 (higher produces irrelevant instructions) |
+| `-s` | $RANDOM (be sure to save it) |
+
+## Profile builds (`-b profile`)
 
 Profiling depends on special functions from druntime and D's main function (not
 the main function externed as C), therefore making D's embedded profiling

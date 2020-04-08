@@ -17,18 +17,24 @@ enum { // Dumper flags (-show)
 	// Loader flags (settings)
 	//
 
-	/// (Not implemented) Load file entirely in memory
+	///TODO: Load file entirely in memory
 	DUMPER_LOADER_FILE_MEM	= LOADER_FILE_MEM,
 
 	//
 	// Dumper flags (settings)
 	//
 
-	/// File is raw, do not attempt to detect its format, disassembly only
+	/// ("-raw") File is raw, do not attempt to detect its format,
+	/// disassembly only
 	DUMPER_FILE_RAW	= 0x0100,
-	// ('r') Show information raw (hexadecimal dumps) only. Affects
-	// resource exports as well.
-//	DUMPER_SHOW_RAW	= 0x8000,
+	///TODO: Do not format instructions. Instead, show disassembler statistics.
+	/// Statistics include number of instructions, average instruction length,
+	/// minimum instruction length, maximum instruction length, and its total
+	/// size.
+	DUMPER_FILE_DISASM_STATS	= 0x0200,
+	///TODO: ('r') Show information raw (hexadecimal dumps) only. Affects
+	/// resource exports as well.
+	DUMPER_SHOW_RAW	= 0x8000,
 
 	//
 	// Show flags
@@ -62,10 +68,11 @@ enum { // Dumper flags (-show)
 	//
 
 	// These are more options that are unaffected by "show everything"
-	//TODO: ('o') Export resources into current directory
-//	DUMPER_EXPORT_RESOURCES	= 0x1000_0000,
-	//TODO: ('c') Export certificates into current directory
-//	DUMPER_EXPORT_CERTS	= 0x1000_0000,
+	///TODO: ('o') Export resources into current directory. This includes
+	/// icons and images.
+	DUMPER_EXPORT_RESOURCES	= 0x1000_0000,
+	///TODO: ('c') Export certificates into current directory.
+	DUMPER_EXPORT_CERTS	= 0x2000_0000,
 }
 
 /// This struct exists avoid casting all the time

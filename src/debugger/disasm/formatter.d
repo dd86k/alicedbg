@@ -54,6 +54,8 @@ enum FORMATTER_O_NO_DIRECTION = 1;
 /// Very useful for instruction prefixes such as LOCK (x86)
 enum FORMATTER_O_PREFIX = 2;
 
+//TODO: Make MemMem type (0000:0000)
+//TODO: Hexadecimal format setting (with width?)
 /// Item type, each item more or less has their own formatting function
 enum FormatType {
 	String,	/// Pure string
@@ -87,15 +89,8 @@ struct disasm_fmt_item_t {
 struct disasm_fmt_t { align(1):
 	disasm_fmt_item_t [FORMATTER_STACK_SIZE]items;	/// Stack
 	size_t itemno;	/// Current item number
-	union {
-		uint u0;
-		struct {
-			/// Last operation width
-			ushort opwidth;
-			/// Formatter settings for current stack/instruction (from decoder)
-			ushort settings;
-		}
-	}
+	/// Formatter settings for current stack/instruction (from decoder)
+	ushort settings;
 }
 
 /// Default string for illegal instructions
