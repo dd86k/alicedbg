@@ -5,9 +5,10 @@
  */
 module dumper.objs.pe;
 
+import etc.ddc : putchar;
 import core.stdc.stdio;
 import core.stdc.config : c_long;
-import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
+import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
 import core.stdc.time : time_t, tm, localtime, strftime;
 import dumper.core;
 import debugger.obj.loader : obj_info_t;
@@ -42,9 +43,11 @@ int dumper_print_pe32(obj_info_t *fi, disasm_params_t *dp, int flags) {
 
 	// variables are declared here because compiler whines about GOTO
 	// skipping declarations
-	ushort OptMagic; /// For future references, 0 means there is no optheader
+	ushort OptMagic = fi.pe.ohdr.Magic; /// For future references
 	c_long pos_section = ftell(fi.handle);	/// Saved position for sections
 	uint fo_loadcf, fo_import, fo_importaddr; // file offsets
+	uint sec_import_size = void; // used in calculating offets
+	uint sec_import_fo = void; // used in calculating offets
 
 	//
 	// PE Header
@@ -126,8 +129,6 @@ int dumper_print_pe32(obj_info_t *fi, disasm_params_t *dp, int flags) {
 			printf("dumper: (PE32) Unknown Subsystem: %04X\n", fi.pe.ohdr.Subsystem);
 			return EXIT_FAILURE;
 		}
-
-		OptMagic = fi.pe.ohdr.Magic;
 
 		//
 		// Standard fields
@@ -493,13 +494,17 @@ L_IMPORTS:
 			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.ImportTable.rva) {
 			fo_import = section.PointerToRawData +
 				(fi.pe.dir.ImportTable.rva - section.VirtualAddress);
+			sec_import_size = section.SizeOfRawData;
+			sec_import_fo = section.PointerToRawData;
 		}
 
 		if (fo_importaddr == 0)
 		if (section.VirtualAddress <= fi.pe.dir.ImportAddressTable.rva &&
 			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.ImportAddressTable.rva) {
-			fo_loadcf = section.PointerToRawData +
+			fo_importaddr = section.PointerToRawData +
 				(fi.pe.dir.ImportAddressTable.rva - section.VirtualAddress);
+			sec_import_size = section.SizeOfRawData;
+			sec_import_fo = section.PointerToRawData;
 		}
 
 		if (fo_loadcf && fo_import && fo_importaddr)
@@ -739,74 +744,92 @@ L_IMPORTS:
 	} // LOAD_CONFIGURATION
 L_LOADCFG_EXIT:
 
-	if (fo_import && fo_importaddr && flags & DUMPER_SHOW_IMPORTS) { // IMPORTS
-		uptr_t imptr = void; /// Import Directory pointer
-		uptr_t adptr = void; /// Import Address Directory pointer
-		imptr.vptr = malloc(fi.pe.dir.ImportTable.size);
-		if (imptr.vptr == null || adptr.vptr == null)
+	//TODO: Load entire section
+	//      Names and stuff can be outside of the selected section
+	//      Only works on mscoff formats, crashes on omf
+	if (fo_import && fo_importaddr && flags & DUMPER_SHOW_IMPORTS) {
+		// Import Directory only contains structs
+		//   Contains Name RVA and ImportAddress RVA
+		// Import Address Directory only contains RVAs
+		// So get lowest file offset, calculate rest of section to read
+		// into memory, calculate offets.
+		// Then ImportDir.ImportAddress.RVA -> RVA -> Hint[2]+Name*
+		uint fo = fo_import < fo_importaddr ? fo_import : fo_importaddr;
+		uint size = sec_import_size - (fo - sec_import_fo);
+
+		uptr_t p = void; /// Import Directory pointer
+		p.vptr = malloc(size);
+		if (p.vptr == null)
+			return EXIT_FAILURE;
+		if (fseek(fi.handle, fo, SEEK_SET))
+			return EXIT_FAILURE;
+		if (fread(p.vptr, size, 1, fi.handle) == 0)
 			return EXIT_FAILURE;
 
-		if (fseek(fi.handle, fo_import, SEEK_SET))
-			return EXIT_FAILURE;
-		if (fread(imptr.vptr, fi.pe.dir.ImportTable.size, 1, fi.handle) == 0)
-			return EXIT_FAILURE;
-		if (fseek(fi.handle, fo_importaddr, SEEK_SET))
-			return EXIT_FAILURE;
-		if (fread(adptr.vptr, fi.pe.dir.ImportAddressTable.size, 1, fi.handle) == 0)
-			return EXIT_FAILURE;
+		PE_IMPORT_DESCRIPTOR *idesc = cast(PE_IMPORT_DESCRIPTOR*)p.vptr;
 
-		PE_IMPORT_DESCRIPTOR *idesc = cast(PE_IMPORT_DESCRIPTOR*)imptr.vptr;
-		uptr_t ip = void; /// Calculated pointer to lookup table
 		puts("\n*\n* Imports\n*\n");
 L_IMPORT_READ:
-		if (idesc.Characteristics == 0)
+		if (idesc.Characteristics == 0) {
+			free(p.vptr);
 			goto L_IMPORT_EXIT;
+		}
 
 		with (idesc)
 		printf(
 		"Characteristics  %08X\n"~
 		"TimeDateStamp    %08X\n"~
 		"ForwarderChain   %08X\n"~
-		"Name             %08X\n"~
+		"Name             %08X\t%s\n"~
 		"FirstThunk       %08X\n\n",
 		Characteristics,
 		TimeDateStamp,
 		ForwarderChain,
-		Name,
+		Name, p.u8ptr + (Name - fi.pe.dir.ImportTable.rva),
 		FirstThunk
 		);
-		goto L_IMPORT_READ;
 
-		//
-		//TODO: Import Lookup Table
-		//
+		ubyte *n = p.u8ptr + (idesc.Characteristics - fi.pe.dir.ImportTable.rva);
 
 		switch (OptMagic) {
 		case PE_FMT_32:
-			PE_IMPORT_LTE32 lte32 = void;
-			lte32.val = *ip.u32ptr;
-			if (lte32.val & 0x8000_0000) { // Ordinal
-				printf("%04X\n", lte32.num);
-			} else { // Name
-				printf("%08X\n", lte32.rva);
+			PE_IMPORT_LTE32 *lte32 = cast(PE_IMPORT_LTE32*)n;
+			while (lte32.val) {
+				if (lte32.val & 0x8000_0000) { // Ordinal
+					printf("%04X\t", lte32.num);
+				} else { // Name
+					ushort *hint = cast(ushort*)(p.u8ptr +
+						(lte32.rva - fi.pe.dir.ImportTable.rva));
+					ubyte *name = (cast(ubyte*)hint) + 2;
+					printf("%08X\t%04X\t%s\n",
+						lte32.rva, *hint, name);
+				}
+				++lte32;
 			}
-			
-			++ip.u32ptr;
+			putchar('\n');
 			break;
-		/*case PE_FMT_64:
-			PE_IMPORT_LTE64 lte64 = void;
-			lte64.val = *ip.u64ptr;
-			if (lte64.val2 >> 31) { // Ordinal
-			} else { // Name
+		case PE_FMT_64:
+			PE_IMPORT_LTE64 *lte64 = cast(PE_IMPORT_LTE64*)n;
+			while (lte64.val1) {
+				if (lte64.val2 & 0x8000_0000) { // Ordinal
+					printf("%04X\t", lte64.num);
+				} else { // Name
+					ushort *hint = cast(ushort*)(p.u8ptr +
+						(lte64.rva - fi.pe.dir.ImportTable.rva));
+					ubyte *name = (cast(ubyte*)hint) + 2;
+					printf("%08X\t%04X\t%s\n",
+						lte64.rva, *hint, name);
+				}
+				++lte64;
 			}
-		
-			++ip.u64ptr;
-			break;*/
+			putchar('\n');
+			break;
 		default: return EXIT_FAILURE;
 		}
+
 		++idesc;
 		goto L_IMPORT_READ;
-	} // IMPORTS
+	}
 L_IMPORT_EXIT:
 
 	//
