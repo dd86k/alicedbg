@@ -9,6 +9,7 @@ import etc.ddc : putchar;
 import core.stdc.stdio;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
+import core.stdc.string : strcpy;
 import core.stdc.time : time_t, tm, localtime, strftime;
 import dumper.core;
 import debugger.obj.loader : obj_info_t;
@@ -34,11 +35,15 @@ int dumper_print_pe32(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	} else
 		unkmach = false;
 
+	//TODO: Fix strftime crash (Windows)
+	// Getting 0xC0000409 (STATUS_STACK_BUFFER_OVERRUN) for high numbers
+	// Should we try FILETIME (8 bytes..) or SYSTEMTIME (16 bytes..)
+	// windbg.exe x86: 1995-01-25
+	// windbg.exe x64: 2068-03-02
 	char[32] tbuffer = void;
-	if (strftime(cast(char*)tbuffer, 32, "%c",
+	if (strftime(cast(char*)&tbuffer, 32, "%c",
 		localtime(cast(time_t*)&fi.pe.hdr.TimeDateStamp)) == 0) {
-		const(char)* l = cast(char*)&tbuffer;
-		l = "strftime:err";
+		strcpy(cast(char*)tbuffer, "strftime:err");
 	}
 
 	// variables are declared here because compiler whines about GOTO
@@ -473,6 +478,8 @@ L_SYMBOLS:
 L_IMPORTS:
 
 	if ((flags & (DUMPER_SHOW_IMPORTS | DUMPER_SHOW_LOADCFG)) == 0)
+		goto L_DISASM;
+	if (fi.pe.hdr.SizeOfOptionalHeader == 0)
 		goto L_DISASM;
 
 	fseek(fi.handle, pos_section, SEEK_SET);
