@@ -80,8 +80,8 @@ struct obj_info_pe_t { // PE32
 /// Load an executable or object file from path. Uses FILE. If you see
 /// an executable image larger than 2 GiB, do let me know.
 /// Params:
-/// 	path = File path
-/// 	info = file_info_t structure
+/// 	file = Opened FILE
+/// 	info = file_info_t structure pointer
 /// 	flags = Load options (placeholder)
 /// Returns: OS error code or a FileError on error
 int obj_load(FILE *file, obj_info_t *info, int flags) {
