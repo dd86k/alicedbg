@@ -48,6 +48,7 @@ buildType "release-inline" {
 }
 
 buildType "headers" {
+	buildOptions "syntaxOnly"
 	dflags "-H" "--Hd=dinclude" platform="ldc"
 	dflags "-H" "-Hd=dinclude" platform="dmd"
 }
