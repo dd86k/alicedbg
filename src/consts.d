@@ -5,6 +5,21 @@
  */
 module consts;
 
+extern (C):
+
+const(char) *adbg_info_version() {
+	return PROJECT_VERSION ~ "-" ~ __BUILDTYPE__;
+}
+const(char) *adbg_info_platform() {
+	return __PLATFORM__;
+}
+const(char) *adbg_info_crt() {
+	return __CRT__;
+}
+const(char) *adbg_info_os() {
+	return __OS__;
+}
+
 /// Project version
 enum PROJECT_VERSION = "0.0.0";
 

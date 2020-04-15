@@ -6,7 +6,7 @@
 module debugger.disasm.arch.x86_16;
 
 import debugger.disasm.core : disasm_params_t;
-import debugger.disasm.arch.x86 : disasm_x86, x86_internals_t;
+import debugger.disasm.arch.x86 : adbg_dasm_x86, x86_internals_t;
 
 extern (C):
 
@@ -14,10 +14,10 @@ extern (C):
  * x86-16 disassembler.
  * Params: p = Disassembler parameters
  */
-void disasm_x86_16(disasm_params_t *p) {
+void adbg_dasm_x86_16(disasm_params_t *p) {
 	x86_internals_t i;
 	i.pf_operand = 0x66;
 	i.pf_address = 0x67;
 	p.x86 = &i;
-	disasm_x86(p, false);
+	adbg_dasm_x86(p, false);
 }

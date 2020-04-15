@@ -10,7 +10,7 @@ import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
 import core.stdc.time : time_t, tm, localtime, strftime;
 import debugger.obj.loader : obj_info_t;
-import debugger.disasm.core : disasm_params_t, disasm_line, DisasmMode;
+import debugger.disasm.core : disasm_params_t, adbg_dasm_line, DisasmMode;
 import debugger.file.objs.pe;
 
 extern (C):
@@ -22,7 +22,7 @@ extern (C):
 /// 	dp = Disassembler parameters
 /// 	flags = Show X flags
 /// Returns: Non-zero on error
-int dumper_print_mz(obj_info_t *fi, disasm_params_t *dp, int flags) {
+int adbg_dmpr_mz_print(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	//TODO: MZ
 	
 	return EXIT_SUCCESS;

@@ -84,7 +84,7 @@ struct obj_info_pe_t { // PE32
 /// 	info = file_info_t structure pointer
 /// 	flags = Load options (placeholder)
 /// Returns: OS error code or a FileError on error
-int obj_load(FILE *file, obj_info_t *info, int flags) {
+int adbg_obj_load(FILE *file, obj_info_t *info, int flags) {
 	if (file == null)
 		return ObjError.Operation;
 	info.handle = file;
@@ -113,7 +113,7 @@ int obj_load(FILE *file, obj_info_t *info, int flags) {
 		case SIG_PE:
 			if (sig.u16[1]) // "PE\0\0"
 				return ObjError.Unsupported;
-			return file_load_pe(info);
+			return adbg_obj_pe_load(info);
 		default: // MZ
 			return ObjError.Unsupported;
 		}
@@ -125,7 +125,7 @@ int obj_load(FILE *file, obj_info_t *info, int flags) {
 	}
 }
 
-int obj_sec_cmpname(const(char)* sname, int ssize, const(char) *tname) {
+int adbg_obj_cmp_section(const(char)* sname, int ssize, const(char) *tname) {
 	import core.stdc.string : strncmp;
 	return strncmp(sname, tname, ssize) == 0;
 }

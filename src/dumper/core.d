@@ -91,10 +91,10 @@ struct uptr_t {
 /// files.
 /// Params:
 /// 	file = File path
-/// 	disopt = Disassembler settings
+/// 	dp = Disassembler settings
 /// 	flags = Dumper options
 /// Returns: Error code if non-zero
-int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
+int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 	if (file == null) {
 		puts("dump: file is null");
 		return EXIT_FAILURE;
@@ -121,7 +121,7 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 
 		dp.addr = m;
 		for (c_long fi; fi < fl; fi += dp.addrv - dp.lastaddr) {
-			disasm_line(dp, DisasmMode.File);
+			adbg_dasm_line(dp, DisasmMode.File);
 			printf("%08X %-30s %-30s\n",
 				cast(uint)fi,
 				&dp.mcbuf, &dp.mnbuf);
@@ -135,7 +135,7 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 	}
 
 	obj_info_t finfo = void;
-	if (obj_load(f, &finfo, 0)) {
+	if (adbg_obj_load(f, &finfo, 0)) {
 		puts("loader: could not load file");
 		return EXIT_FAILURE;
 	}
@@ -145,7 +145,7 @@ int dump_file(const(char) *file, disasm_params_t *dp, int flags) {
 
 	with (ObjType)
 	switch (finfo.type) {
-	case PE: return dumper_print_pe32(&finfo, dp, flags);
+	case PE: return adbg_dmpr_pe_print(&finfo, dp, flags);
 	default:
 		puts("loader: format not supported");
 		return EXIT_FAILURE;

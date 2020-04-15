@@ -9,37 +9,37 @@ import etc.ddc;
 import core.stdc.stdio : printf, puts;
 import core.stdc.string : memcpy;
 import debugger, os.err : F_ERR;
-import os.term : term_init, term_read, InputInfo, Key, InputType;
+import os.term : adbg_term_init, adbg_term_read, InputInfo, Key, InputType;
 import ui.common;
 
 extern (C):
 
 /// Starts plain UI
-int loop_enter(disasm_params_t *p) {
-	if (term_init)
+int adbg_ui_loop_enter(disasm_params_t *p) {
+	if (adbg_term_init)
 		return 1;
 	memcpy(&g_disparams, p, disasm_params_t.sizeof);
-	dbg_sethandle(&loop_handler);
-	return dbg_loop;
+	adbg_sethandler(&adbg_ui_loop_handler);
+	return adbg_enterloop;
 }
 
 private:
 
-int loop_handler(exception_t *e) {
+int adbg_ui_loop_handler(exception_t *e) {
 	__gshared uint en;
 	printf(
 	"\n-------------------------------------\n"~
 	"* EXCEPTION #%u: %s ("~F_ERR~")\n"~
 	"* PID=%u TID=%u\n"~
 	"> %zX",
-	en++, exception_type_str(e.type), e.oscode,
+	en++, adbg_ex_typestr(e.type), e.oscode,
 	e.pid, e.tid,
 	e.addrv
 	);
 
 	// * Disassembly
 	g_disparams.addr = e.addr;
-	DisasmError derr = cast(DisasmError)disasm_line(&g_disparams, DisasmMode.File);
+	DisasmError derr = cast(DisasmError)adbg_dasm_line(&g_disparams, DisasmMode.File);
 	with (DisasmError)
 	switch (derr) {
 	case None:
@@ -57,7 +57,7 @@ int loop_handler(exception_t *e) {
 	for (size_t i; i < e.regcount; ++i) {
 		printf("  %6s=%s",
 			e.registers[i].name,
-			exception_reg_fhex(&e.registers[i]));
+			adbg_ex_reg_fhex(&e.registers[i]));
 		if (i & 1)
 			putchar('\n');
 	}
@@ -67,7 +67,7 @@ L_PROMPT:
 	printf("\nAction [S=Step,C=Continue,Q=Quit] ");
 	InputInfo ii = void;
 L_INPUT:
-	term_read(&ii);
+	adbg_term_read(&ii);
 	if (ii.type != InputType.Key)
 		goto L_INPUT;
 	switch (ii.key.keyCode) {

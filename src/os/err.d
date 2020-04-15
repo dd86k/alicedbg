@@ -20,7 +20,7 @@ version (Windows) {
 /// Params:
 /// 	code = Error code number from OS
 /// Returns: String
-const(char) *err_msg(int code) {
+const(char) *adbg_err_osmsg(int code) {
 	version (Windows) {
 		__gshared char [512]buffer = void;
 		size_t len = FormatMessageA(
@@ -39,7 +39,7 @@ const(char) *err_msg(int code) {
 
 /// Get the last error code from the OS (or CRT)
 /// Returns: GetLastError from Windows, otherwise errno
-int err_lastcode() {
+int adbg_err_oscode() {
 	version (Windows)
 		return GetLastError;
 	else
@@ -50,7 +50,7 @@ int err_lastcode() {
 /// Params:
 /// 	mod = Module name
 /// 	code = Error code
-void err_print(const(char) *mod, int code) {
+void adbg_err_osprint(const(char) *mod, int code) {
 	import core.stdc.stdio : printf;
-	printf("%s: ("~F_ERR~") %s\n", mod, code, err_msg(code));
+	printf("%s: ("~F_ERR~") %s\n", mod, code, adbg_err_osmsg(code));
 }

@@ -122,12 +122,12 @@ struct disasm_params_t { align(1):
 		float  *addrf32;	/// Used internally
 		double *addrf64;	/// Used internally
 	}
-	/// This field is populated by disasm_line before calling the decoder.
+	/// This field is populated by adbg_dasm_line before calling the decoder.
 	/// It serves the client for printing the address and the decoder
 	/// the basis for jump/call address calculations.
 	size_t lastaddr;
 	/// Error code. See DisasmError enumeration for more details. Set by
-	/// disasm_line or the the decoder.
+	/// adbg_dasm_line or the the decoder.
 	DisasmError error;
 	/// Demangle option. See DisasmDemangle enum.
 	DisasmDemangle demangle;
@@ -169,9 +169,9 @@ struct disasm_params_t { align(1):
  *
  * Returns: Error code; Non-zero indicating an error
  */
-int disasm_line(disasm_params_t *p, DisasmMode mode) {
+int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 	if (p.addr == null) {
-		disasm_err(p, DisasmError.NullAddress);
+		adbg_dasm_err(p, DisasmError.NullAddress);
 		p.mcbuf[0] = 0;
 		return p.error;
 	}
@@ -195,12 +195,12 @@ int disasm_line(disasm_params_t *p, DisasmMode mode) {
 
 	with (DisasmISA)
 	switch (p.isa) {
-	case x86_16:	disasm_x86_16(p); break;
-	case x86:	disasm_x86(p); break;
-	case x86_64:	disasm_x86_64(p); break;
-	case rv32:	disasm_rv32(p); break;
+	case x86_16:	adbg_dasm_x86_16(p); break;
+	case x86:	adbg_dasm_x86(p); break;
+	case x86_64:	adbg_dasm_x86_64(p); break;
+	case rv32:	adbg_dasm_rv32(p); break;
 	default:
-		disasm_err(p, DisasmError.NotSupported);
+		adbg_dasm_err(p, DisasmError.NotSupported);
 		p.mcbuf[0] = p.mnbuf[0] = 0;
 		return p.error;
 	}
@@ -209,8 +209,8 @@ int disasm_line(disasm_params_t *p, DisasmMode mode) {
 		if (p.style == DisasmSyntax.Default)
 			p.style = DISASM_DEFAULT_SYNTAX;
 		if (p.error == DisasmError.None)
-			disasm_render(p);
-		disasm_render_finish(p); // leave machine code buffer intact
+			adbg_dasm_render(p);
+		adbg_dasm_finalize(p); // leave machine code buffer intact
 	}
 
 	return p.error;
@@ -221,7 +221,7 @@ int disasm_line(disasm_params_t *p, DisasmMode mode) {
 /// if the target is in little-endian, and 1 if the target is big-endian.
 /// Params: isa = DisasmISA value
 /// Returns: Zero if little-endian, non-zero if big-endian
-int disasm_msbisa(DisasmISA isa) {
+int adbg_dasm_msb(DisasmISA isa) {
 	with (DisasmISA)
 	switch (isa) {
 	case x86_16, x86, x86_64, rv32, rv64: return 0;

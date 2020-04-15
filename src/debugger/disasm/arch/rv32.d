@@ -12,47 +12,50 @@ import utils.str, utils.bit;
 extern (C):
 
 package
-struct rv32_internals_t {
+struct rv32_internals_t { align(1):
 	union {
 		uint op;
-		struct { ushort op1, op2; }
+		struct { align(1):
+			ushort op1, op2;
+		}
 	}
 }
 
+//TODO: Functions to process opcodes by types (C.I, I, C.J, J, etc.)
+//      1. rv32_ci(string, int) e.g. rv32_ci("c.jal", op);
+//      2. rv32_ci(string, string, int) e.g. rv32_ci("c.jal", "x1", 0x20);
+
 /// Disassemble riscv-32.
 /// Params: p = Disassembler parameters
-void disasm_rv32(disasm_params_t *p) {
+void adbg_dasm_rv32(disasm_params_t *p) {
 	rv32_internals_t i = void;
 	p.rv32 = &i;
 
-	// Detect RV32C first
+	// RISC-V fetches by "halfword" (16-bit)
 	i.op1 = *p.addru16;
 	++p.addru16;
 
 	//
-	// RVC
+	// RISC-V Compressed Extension
 	//
-
-	//TODO: Process opcodes by types (C.I, I, C.J, J, etc.)
-	//      rv32_process(string, int) { switch(int) } -> push(str) + more
 
 	switch (i.op1 & 3) {
 	case 0:
 		if (p.mode >= DisasmMode.File)
-			disasm_push_x16(p, i.op1);
+			adbg_dasm_push_x16(p, i.op1);
 		switch (i.op1 & OP_RVC_FUNC_MASK) {
 		case OP_RVC_FUNC_000: // C.ADDI4SPN
 			int imm = i.op1 >> 5;
 			if (imm == 0) {
-				disasm_err(p);
+				adbg_dasm_err(p);
 				return;
 			}
 			if (p.mode < DisasmMode.File)
 				return;
 			int rd = (i.op1 >> 2) & 7;
-			disasm_push_str(p, "c.addi4spn");
-			disasm_push_reg(p, rv32_rvc_abi_reg(rd));
-			disasm_push_imm(p, imm);
+			adbg_dasm_push_str(p, "c.addi4spn");
+			adbg_dasm_push_reg(p, rv32_rvc_abi_reg(rd));
+			adbg_dasm_push_imm(p, imm);
 			return;
 		case OP_RVC_FUNC_110: // C.SW
 			if (p.mode < DisasmMode.File)
@@ -64,16 +67,16 @@ void disasm_rv32(disasm_params_t *p) {
 				imm |= 1;
 			if (i.op1 & BIT!(5))
 				imm = -imm;
-			disasm_push_str(p, "c.sw");
-			disasm_push_reg(p, rv32_rvc_abi_reg(rs1));
-			disasm_push_reg(p, rv32_rvc_abi_reg(rs2));
-			disasm_push_imm(p, imm);
+			adbg_dasm_push_str(p, "c.sw");
+			adbg_dasm_push_reg(p, rv32_rvc_abi_reg(rs1));
+			adbg_dasm_push_reg(p, rv32_rvc_abi_reg(rs2));
+			adbg_dasm_push_imm(p, imm);
 			return;
-		default: disasm_err(p); return; // Yes, 000 is illegal
+		default: adbg_dasm_err(p); return; // Yes, 000 is illegal
 		}
 	case 1:
 		if (p.mode >= DisasmMode.File)
-			disasm_push_x16(p, i.op1);
+			adbg_dasm_push_x16(p, i.op1);
 		switch (i.op1 & OP_RVC_FUNC_MASK) {
 		case OP_RVC_FUNC_000:
 			if (p.mode < DisasmMode.File)
@@ -84,57 +87,69 @@ void disasm_rv32(disasm_params_t *p) {
 				if (i.op1 & BIT!(12)) imm = -imm;
 				const(char) *m = rd == 2 ? "c.addi16sp" : "c.addi";
 				const(char) *rdstr = rv32_abi_reg(rd);
-				disasm_push_str(p, m);
-				disasm_push_reg(p, rdstr);
-				disasm_push_reg(p, rdstr);
-				disasm_push_imm(p, imm);
+				adbg_dasm_push_str(p, m);
+				adbg_dasm_push_reg(p, rdstr);
+				adbg_dasm_push_reg(p, rdstr);
+				adbg_dasm_push_imm(p, imm);
 			} else { // C.NOP (rd == 0)
-				disasm_push_str(p, "c.nop");
+				adbg_dasm_push_str(p, "c.nop");
 			}
 			return;
-		default: disasm_err(p); return;
+		case OP_RVC_FUNC_001: // C.JAL
+			if (p.mode < DisasmMode.File)
+				return;
+			int imm = i.op1; // imm[11|4|9:8|10|6|7|3:1|5]
+			//TODO: Understand C.J operand format type
+//			imm >>= 2; // *2
+//			imm -= 2; // instruction size
+			if (i.op1 & BIT!(12))
+				imm = -imm;
+			adbg_dasm_push_str(p, "c.jal");
+			adbg_dasm_push_imm(p, imm);
+			return;
+		default: adbg_dasm_err(p); return;
 		}
 	case 2:
 		if (p.mode >= DisasmMode.File)
-			disasm_push_x16(p, i.op1);
+			adbg_dasm_push_x16(p, i.op1);
 		switch (i.op1 & OP_RVC_FUNC_MASK) {
 		case OP_RVC_FUNC_010:
 			int rd = (i.op1 >> 7) & 31;
 			if (rd == 0) {
-				disasm_err(p);
+				adbg_dasm_err(p);
 				return;
 			}
 			int imm = (i.op1 >> 2) & 31;
 			if (i.op1 & BIT!(12))
 				imm |= BIT!(5);
-			disasm_push_str(p, "c.lwsp");
-			disasm_push_reg(p, rv32_abi_reg(rd));
-			disasm_push_imm(p, imm);
+			adbg_dasm_push_str(p, "c.lwsp");
+			adbg_dasm_push_reg(p, rv32_abi_reg(rd));
+			adbg_dasm_push_imm(p, imm);
 			return;
 		case OP_RVC_FUNC_100:
 			int rs1 = (i.op1 >> 9) & 31; // or rd
 			int rs2 = (i.op1 >> 2) & 31;
 			if (i.op1 & BIT!(12)) {
 				if (rs2) {
-					disasm_push_str(p, "c.add");
-					disasm_push_reg(p, rv32_rvc_abi_reg(rs1));
-					disasm_push_reg(p, rv32_abi_reg(rs2));
+					adbg_dasm_push_str(p, "c.add");
+					adbg_dasm_push_reg(p, rv32_rvc_abi_reg(rs1));
+					adbg_dasm_push_reg(p, rv32_abi_reg(rs2));
 				} else {
 					if (rs1) {
-						disasm_push_str(p, "c.jalr");
-						disasm_push_reg(p, rv32_abi_reg(rs1));
+						adbg_dasm_push_str(p, "c.jalr");
+						adbg_dasm_push_reg(p, rv32_abi_reg(rs1));
 					} else {
-						disasm_push_str(p, "c.ebreak");
+						adbg_dasm_push_str(p, "c.ebreak");
 					}
 				}
 			} else {
 				if (rs2) {
-					disasm_push_str(p, "c.mv");
-					disasm_push_reg(p, rv32_rvc_abi_reg(rs1));
-					disasm_push_reg(p, rv32_abi_reg(rs2));
+					adbg_dasm_push_str(p, "c.mv");
+					adbg_dasm_push_reg(p, rv32_rvc_abi_reg(rs1));
+					adbg_dasm_push_reg(p, rv32_abi_reg(rs2));
 				} else {
-					disasm_push_str(p, "c.jr");
-					disasm_push_reg(p, rv32_abi_reg(rs1));
+					adbg_dasm_push_str(p, "c.jr");
+					adbg_dasm_push_reg(p, rv32_abi_reg(rs1));
 				}
 			}
 			return;
@@ -143,23 +158,23 @@ void disasm_rv32(disasm_params_t *p) {
 				return;
 			int rs2 = (i.op1 >> 2) & 31;
 			int imm = (i.op1 >> 7) & 63;
-			disasm_push_str(p, "c.swsp");
-			disasm_push_reg(p, rv32_abi_reg(rs2));
-			disasm_push_imm(p, imm);
+			adbg_dasm_push_str(p, "c.swsp");
+			adbg_dasm_push_reg(p, rv32_abi_reg(rs2));
+			adbg_dasm_push_imm(p, imm);
 			return;
-		default: disasm_err(p); return;
+		default: adbg_dasm_err(p); return;
 		}
 	default: // 11 >= 16b
 	}
 
 	//
-	// RV32
+	// RISC-V 32-bit
 	//
 
 	i.op2 = *p.addru16;
 	++p.addru16;
 	if (p.mode >= DisasmMode.File)
-		disasm_push_x32(p, i.op);
+		adbg_dasm_push_x32(p, i.op);
 	switch (i.op & OP_MASK) {
 	case 0b0010011: // (19) RV32I: ADDI/SLTI/SLTIU/XORI/ORI/ANDI
 		const(char) *m = void;
@@ -170,7 +185,7 @@ void disasm_rv32(disasm_params_t *p) {
 		case OP_FUNC_100: m = "xori"; break;
 		case OP_FUNC_110: m = "ori"; break;
 		case OP_FUNC_111: m = "andi"; break;
-		default: disasm_err(p); return;
+		default: adbg_dasm_err(p); return;
 		}
 		if (p.mode < DisasmMode.File)
 			return;
@@ -178,10 +193,10 @@ void disasm_rv32(disasm_params_t *p) {
 		int imm = i.op >> 20;
 		int rs1 = (i.op >> 15) & 31;
 		int rd = (i.op >> 7) & 31;
-		disasm_push_str(p, m);
-		disasm_push_reg(p, rv32_abi_reg(rd));
-		disasm_push_reg(p, rv32_abi_reg(rs1));
-		disasm_push_imm(p, imm);
+		adbg_dasm_push_str(p, m);
+		adbg_dasm_push_reg(p, rv32_abi_reg(rd));
+		adbg_dasm_push_reg(p, rv32_abi_reg(rs1));
+		adbg_dasm_push_imm(p, imm);
 		return;
 	/*case 0b0100011: // RV32I: SB/SH/SW
 		const(char) *m = void;
@@ -189,13 +204,13 @@ void disasm_rv32(disasm_params_t *p) {
 		case OP_FUNC_000: m = "sb"; break;
 		case OP_FUNC_001: m = "sh"; break;
 		case OP_FUNC_010: m = "sw"; break;
-		default: disasm_err(p); return;
+		default: adbg_dasm_err(p); return;
 		}
 		if (p.mode < DisasmMode.File)
 			return;
-		disasm_push_str(p, m);
+		adbg_dasm_push_str(p, m);
 		return;*/
-	default: disasm_err(p);
+	default: adbg_dasm_err(p);
 	}
 }
 

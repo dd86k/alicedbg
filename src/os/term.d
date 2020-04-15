@@ -47,7 +47,7 @@ enum TermType {
 private TermType termtype;
 /// User defined function for resize events
 private
-void function(ushort,ushort) handler_resize;
+void function(ushort,ushort) adbg_term_resize_handler;
 
 //
 // Initiation
@@ -55,12 +55,12 @@ void function(ushort,ushort) handler_resize;
 
 /// Initiates terminal basics
 /// Returns: Error code, non-zero on error
-int term_init() {
+int adbg_term_init() {
 	version (Posix) {
 		tcgetattr(STDIN_FILENO, &old_tio);
 		new_tio = old_tio;
 		new_tio.c_lflag &= TERM_ATTR;
-		
+
 		//TODO: See flags we can put
 		// tty_ioctl TIOCSETD
 	} else {
@@ -73,7 +73,7 @@ int term_init() {
 /// Setup terminal for advanced usage
 /// Params: type = Terminal type
 /// Returns: Error code, non-zero on error
-int term_setup(TermType type = TermType.Normal) {
+int adbg_term_setup(TermType type = TermType.Normal) {
 	termtype = type;
 	version (Windows) {
 		switch (type) {
@@ -92,8 +92,8 @@ int term_setup(TermType type = TermType.Normal) {
 			if (SetConsoleActiveScreenBuffer(handleOut) == FALSE)
 				return 3;
 			WindowSize ws = void;
-			term_wsize(&ws);
-			if (term_buf_init(&ws))
+			adbg_term_size(&ws);
+			if (adbg_term_init_buffer(&ws))
 				return 4;
 			break;
 		default:
@@ -105,7 +105,7 @@ int term_setup(TermType type = TermType.Normal) {
 }
 
 /// Restore console buffer
-/*void term_restore() {
+/*void adbg_term_restore() {
 	version (Windows) {
 		SetConsoleActiveScreenBuffer(hOld);
 	}
@@ -113,24 +113,24 @@ int term_setup(TermType type = TermType.Normal) {
 
 /// Set terminal window resize event handler
 /// Params: f = Handler function
-void term_event_resize(void function(ushort,ushort) f) {
+void adbg_term_event_resize(void function(ushort,ushort) f) {
 	version (Windows) {
-		handler_resize = f;
+		adbg_term_resize_handler = f;
 	} else
 	version (Posix) {
 		//TODO: SIGWINCH : Signal Window change
 		sigaction_t sa;
-		sa.sa_handler = &__term_resize;
+		sa.sa_handler = &adbg_term_event_resize_posix;
 		sigaction(SIGWINCH, &sa, cast(sigaction_t*)0);
 	}
 }
 
 /// Internal Posix function for handling initial resize signal
 version (Posix) private
-void __term_resize(int) {
+void adbg_term_event_resize_posix(int) {
 	WindowSize ws = void;
-	term_wsize(&ws);
-	handler_resize(ws.width, ws.height);
+	adbg_term_size(&ws);
+	adbg_term_resize_handler(ws.width, ws.height);
 }
 
 /**
@@ -140,7 +140,7 @@ void __term_resize(int) {
  * 	s = Terminal window size
  */
 private
-int term_buf_init(WindowSize *s) {
+int adbg_term_init_buffer(WindowSize *s) {
 	import core.stdc.stdlib : realloc, malloc;
 	version (Windows) {
 		const size_t bsize = s.height * s.width;
@@ -172,7 +172,7 @@ int term_buf_init(WindowSize *s) {
 }
 
 /// Invert console color with defaultColor
-/*void term_color_invert() {
+/*void adbg_term_color_invert() {
 	version (Windows)
 		SetConsoleTextAttribute(hOut, COMMON_LVB_REVERSE_VIDEO | defaultColor);
 	version (Posix)
@@ -180,7 +180,7 @@ int term_buf_init(WindowSize *s) {
 }
 
 /// Reset console color to defaultColor
-void term_color_reset() {
+void adbg_term_color_reset() {
 	version (Windows)
 		SetConsoleTextAttribute(hOut, defaultColor);
 	version (Posix)
@@ -188,7 +188,7 @@ void term_color_reset() {
 }*/
 
 /// Clear screen
-void term_clear() {
+void adbg_term_clear() {
 	version (Windows) {
 		with (TermType)
 		final switch (termtype) {
@@ -203,7 +203,7 @@ void term_clear() {
 			DWORD num = void; // kind of ala .NET
 			FillConsoleOutputCharacterA(handleOut, ' ', size, c, &num);
 			FillConsoleOutputAttribute(handleOut, csbi.wAttributes, size, c, &num);
-			term_pos(0, 0);
+			adbg_term_curpos(0, 0);
 			break;
 		case Screen:
 			size_t m = ibuf_w * ibuf_h;
@@ -213,7 +213,7 @@ void term_clear() {
 		}
 	} else version (Posix) {
 		WindowSize ws = void;
-		term_wsize(&ws);
+		adbg_term_size(&ws);
 		//TODO: write 'default' attribute character
 		printf("\033[0;0H%*s\033[0;0H", ws.height * ws.width, cast(char*)"");
 	}
@@ -226,7 +226,7 @@ void term_clear() {
  *
  * Note: A COORD uses SHORT (short) and Linux uses unsigned shorts.
  */
-void term_wsize(WindowSize *ws) {
+void adbg_term_size(WindowSize *ws) {
 	version (Windows) {
 		CONSOLE_SCREEN_BUFFER_INFO c = void;
 		GetConsoleScreenBufferInfo(handleOut, &c);
@@ -250,7 +250,7 @@ void term_wsize(WindowSize *ws) {
  *   x = X position (horizontal)
  *   y = Y position (vertical)
  */
-void term_pos(int x, int y) {
+void adbg_term_curpos(int x, int y) {
 	version (Windows) { // 0-based
 		final switch (termtype) {
 		case TermType.Normal:
@@ -272,7 +272,7 @@ void term_pos(int x, int y) {
  *
  *
  */
-void term_write(const(char) *s) {
+void adbg_term_write(const(char) *s) {
 	version (Windows) {
 		final switch (termtype) {
 		case TermType.Normal:
@@ -295,19 +295,19 @@ void term_write(const(char) *s) {
  *
  *
  */
-void term_writef(const(char) *f, ...) {
+void adbg_term_writef(const(char) *f, ...) {
 	import core.stdc.stdarg : va_list, va_start;
 	char [1024]buf = void;
 	va_list va = void;
 	va_start(va, f);
 	vsnprintf(cast(char*)buf, 1024, f, va);
-	term_write(cast(char*)buf);
+	adbg_term_write(cast(char*)buf);
 }
 
 /**
  *
  */
-void term_flush() {
+void adbg_term_flush() {
 	version (Windows) {
 		final switch (termtype) {
 		case TermType.Normal:
@@ -328,7 +328,7 @@ void term_flush() {
  * via the SIGWINCH signal.
  * Params: ii = InputInfo structure
  */
-void term_read(InputInfo *ii) {
+void adbg_term_read(InputInfo *ii) {
 	//TODO: consider memset
 	ii.type = InputType.None;
 	version (Windows) {
@@ -356,8 +356,8 @@ void term_read(InputInfo *ii) {
 			break;
 		case WINDOW_BUFFER_SIZE_EVENT:
 			with (ir)
-			if (handler_resize)
-				handler_resize(
+			if (adbg_term_resize_handler)
+				adbg_term_resize_handler(
 					WindowBufferSizeEvent.dwSize.X,
 					WindowBufferSizeEvent.dwSize.Y);
 			FlushConsoleInputBuffer(handleIn);

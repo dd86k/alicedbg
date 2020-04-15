@@ -53,7 +53,7 @@ struct x86_64_internals_t {
  * Params: p = Disassembler parameters
  * Returns: DisasmError
  */
-void disasm_x86_64(disasm_params_t *p) {
+void adbg_dasm_x86_64(disasm_params_t *p) {
 	x86_64_internals_t i;
 	p.x86_64 = &i;
 
@@ -62,22 +62,22 @@ L_CONTINUE:
 	++p.addrv;
 
 	if (p.mode >= DisasmMode.File)
-		disasm_push_x8(p, b);
+		adbg_dasm_push_x8(p, b);
 
 	switch (b) {
 	case 0xCC: // int3
 		if (p.mode >= DisasmMode.File)
-			disasm_push_str(p, "int3");
+			adbg_dasm_push_str(p, "int3");
 		break;
 	case 0x40: .. case 0x4F:
 		// Only one REX per instruction
 		if (p.x86_64.rex) {
-			disasm_err(p);
+			adbg_dasm_err(p);
 			return;
 		}
 		p.x86_64.rex = b;
 		goto L_CONTINUE;
-	default: disasm_err(p);
+	default: adbg_dasm_err(p);
 	}
 }
 

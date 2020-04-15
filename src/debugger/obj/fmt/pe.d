@@ -12,7 +12,7 @@ module debugger.file.objs.pe;
 import core.stdc.stdio, core.stdc.inttypes;
 import core.stdc.string : memset;
 import debugger.obj.loader : obj_info_t, ObjType;
-import debugger.disasm.core : DisasmISA, disasm_msbisa; // ISA translation
+import debugger.disasm.core : DisasmISA, adbg_dasm_msb; // ISA translation
 
 extern (C):
 
@@ -444,7 +444,7 @@ struct PE_IMPORT_LTE64 { align(1):
 	}
 }
 
-int file_load_pe(obj_info_t *fi) {
+int adbg_obj_pe_load(obj_info_t *fi) {
 	if (fi.handle == null)
 		return 1;
 	if (fread(&fi.pe.hdr, PE_HEADER.sizeof, 1, fi.handle) == 0)
@@ -472,12 +472,12 @@ int file_load_pe(obj_info_t *fi) {
 	case PE_MACHINE_RISCV32: fi.isa = DisasmISA.rv32; break;
 	default: fi.isa = DisasmISA.Default;
 	}
-	fi.endian = disasm_msbisa(fi.isa);
+	fi.endian = adbg_dasm_msb(fi.isa);
 
 	return 0;
 }
 
-const(char) *file_pe_str_mach(ushort mach) {
+const(char) *adbg_obj_pe_mach(ushort mach) {
 	const(char) *str_mach = void;
 	switch (mach) {
 	case PE_MACHINE_UNKNOWN:	str_mach = "UNKNOWN"; break;
@@ -515,7 +515,7 @@ const(char) *file_pe_str_mach(ushort mach) {
 	return str_mach;
 }
 
-const(char) *file_pe_str_magic(ushort mag) {
+const(char) *adbg_obj_pe_magic(ushort mag) {
 	const(char) *str_mag = void;
 	switch (mag) {
 	case PE_FMT_32: str_mag = "PE32"; break;
@@ -526,7 +526,7 @@ const(char) *file_pe_str_magic(ushort mag) {
 	return str_mag;
 }
 
-const(char) *file_pe_str_subsys(ushort subs) {
+const(char) *adbg_obj_pe_subsys(ushort subs) {
 	const(char) *str_sys = void;
 	switch (subs) {
 	case PE_SUBSYSTEM_NATIVE:	str_sys = "Native"; break;

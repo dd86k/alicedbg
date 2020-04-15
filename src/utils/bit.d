@@ -27,8 +27,8 @@ else
 /// 	v = 16-bit value
 /// 	e = Target endian (0=Little, 1=Big)
 /// Returns: Byte-swapped 16-bit value if TargetEndian is different
-ushort cswap16(ushort v, int e) {
-	return e == TE ? v : bswap16(v);
+ushort adbg_util_cswap16(ushort v, int e) {
+	return e == TE ? v : adbg_util_bswap16(v);
 }
 
 /// Conditionally swap if specified target endian does not match compiled
@@ -37,8 +37,8 @@ ushort cswap16(ushort v, int e) {
 /// 	v = 32-bit value
 /// 	e = Target endian (0=Little, 1=Big)
 /// Returns: Byte-swapped 32-bit value if TargetEndian is different
-uint cswap32(uint v, int e) {
-	return e == TE ? v : bswap32(v);
+uint adbg_util_cswap32(uint v, int e) {
+	return e == TE ? v : adbg_util_bswap32(v);
 }
 
 /// Conditionally swap if specified target endian does not match compiled
@@ -47,8 +47,8 @@ uint cswap32(uint v, int e) {
 /// 	v = 64-bit value
 /// 	e = Target endian (0=Little, 1=Big)
 /// Returns: Byte-swapped 64-bit value if TargetEndian is different
-ulong cswap64(ulong v, int e) {
-	return e == TE ? v : bswap64(v);
+ulong adbg_util_cswap64(ulong v, int e) {
+	return e == TE ? v : adbg_util_bswap64(v);
 }
 
 pragma(inline, true): // Encourage inlining
@@ -56,7 +56,7 @@ pragma(inline, true): // Encourage inlining
 /// Byte-swap an 16-bit value.
 /// Params: v = 16-bit value
 /// Returns: Byte-swapped value
-ushort bswap16(ushort v) {
+ushort adbg_util_bswap16(ushort v) {
 	return cast(ushort)(v >> 8 | v << 8);
 }
 
@@ -66,7 +66,7 @@ ushort bswap16(ushort v) {
 /// Notes:
 /// Shamelessly taken from https://stackoverflow.com/a/19560621
 /// Only LDC is able to pick this up as BSWAP
-uint bswap32(uint v) {
+uint adbg_util_bswap32(uint v) {
 	v = (v >> 16) | (v << 16);
 	return ((v & 0xFF00FF00) >> 8) | ((v & 0x00FF00FF) << 8);
 }
@@ -77,33 +77,33 @@ uint bswap32(uint v) {
 /// Notes:
 /// Shamelessly taken from https://stackoverflow.com/a/19560621
 /// Only LDC is able to pick this up as BSWAP
-ulong bswap64(ulong v) {
+ulong adbg_util_bswap64(ulong v) {
 	v = (v >> 32) | (v << 32);
 	v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
 	return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
 }
 
 unittest {
-	assert(bswap16(0xAABB) == 0xBBAA);
-	assert(bswap32(0xAABBCCDD) == 0xDDCCBBAA);
-	assert(bswap64(0xAABBCCDD_11223344) == 0x44332211_DDCCBBAA);
+	assert(adbg_util_bswap16(0xAABB) == 0xBBAA);
+	assert(adbg_util_bswap32(0xAABBCCDD) == 0xDDCCBBAA);
+	assert(adbg_util_bswap64(0xAABBCCDD_11223344) == 0x44332211_DDCCBBAA);
 	version (LittleEndian) {
 		// LSB matches
-		assert(cswap16(0xAABB, 0) == 0xAABB);
-		assert(cswap32(0xAABBCCDD, 0) == 0xAABBCCDD);
-		assert(cswap64(0xAABBCCDD_11223344, 0) == 0xAABBCCDD_11223344);
+		assert(adbg_util_cswap16(0xAABB, 0) == 0xAABB);
+		assert(adbg_util_cswap32(0xAABBCCDD, 0) == 0xAABBCCDD);
+		assert(adbg_util_cswap64(0xAABBCCDD_11223344, 0) == 0xAABBCCDD_11223344);
 		// MSB does not match
-		assert(cswap16(0xAABB, 1) == 0xBBAA);
-		assert(cswap32(0xAABBCCDD, 1) == 0xDDCCBBAA);
-		assert(cswap64(0xAABBCCDD_11223344, 1) == 0x44332211_DDCCBBAA);
+		assert(adbg_util_cswap16(0xAABB, 1) == 0xBBAA);
+		assert(adbg_util_cswap32(0xAABBCCDD, 1) == 0xDDCCBBAA);
+		assert(adbg_util_cswap64(0xAABBCCDD_11223344, 1) == 0x44332211_DDCCBBAA);
 	} else {
 		// LSB does not match
-		assert(cswap16(0xAABB, 0) == 0xBBAA);
-		assert(cswap32(0xAABBCCDD, 0) == 0xDDCCBBAA);
-		assert(cswap64(0xAABBCCDD_11223344, 0) == 0x44332211_DDCCBBAA);
+		assert(adbg_util_cswap16(0xAABB, 0) == 0xBBAA);
+		assert(adbg_util_cswap32(0xAABBCCDD, 0) == 0xDDCCBBAA);
+		assert(adbg_util_cswap64(0xAABBCCDD_11223344, 0) == 0x44332211_DDCCBBAA);
 		// MSB matches
-		assert(cswap16(0xAABB, 1) == 0xAABB);
-		assert(cswap32(0xAABBCCDD, 1) == 0xAABBCCDD);
-		assert(cswap64(0xAABBCCDD_11223344, 1) == 0xAABBCCDD_11223344);
+		assert(adbg_util_cswap16(0xAABB, 1) == 0xAABB);
+		assert(adbg_util_cswap32(0xAABBCCDD, 1) == 0xAABBCCDD);
+		assert(adbg_util_cswap64(0xAABBCCDD_11223344, 1) == 0xAABBCCDD_11223344);
 	}
 }

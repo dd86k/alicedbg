@@ -47,6 +47,11 @@ buildType "release-inline" {
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" platform="gdc"
 }
 
+buildType "headers" {
+	dflags "-H" "--Hd=dinclude" platform="ldc"
+	dflags "-H" "-Hd=dinclude" platform="dmd"
+}
+
 buildType "afl" {
     toolchainRequirements dmd="no" gdc="no" ldc=">=1.0.0"
     dflags "-plugin=$AFL_ROOT/afl-llvm-pass.so"

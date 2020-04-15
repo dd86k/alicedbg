@@ -88,7 +88,7 @@ struct exception_t {
 		void *addr;
 	}
 	/// Register count in registers field, populated by
-	/// exception_reg_init.
+	/// adbg_ex_reg_init.
 	size_t regcount;
 	/// Register population, this may depend on the OS and CRT
 	register_t [REG_COUNT]registers;
@@ -105,7 +105,7 @@ struct register_t {
 		float  f32;	/// Register alias: float (f32)
 		double f64;	/// Register alias: double (f64)
 	}
-	const(char) *name;	/// Register name from exception_reg_init
+	const(char) *name;	/// Register name from adbg_ex_reg_init
 }
 
 // Windows: Mostly covered in winbase.h or winnt.h
@@ -126,7 +126,7 @@ struct register_t {
  * 	subcode = OS sub-code
  * Returns: ExceptionType enum value
  */
-ExceptionType exception_type_code(uint code, uint subcode = 0) {
+ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
 	version (Windows) {
 		with (ExceptionType)
 		switch (code) {
@@ -260,7 +260,7 @@ ExceptionType exception_type_code(uint code, uint subcode = 0) {
 /// the uppercase.
 /// Params: code = ExceptionType
 /// Returns: String
-const(char) *exception_type_str(ExceptionType code) {
+const(char) *adbg_ex_typestr(ExceptionType code) {
 	with (ExceptionType)
 	final switch (code) {
 	case Unknown:	return "UNKNOWN";
@@ -293,20 +293,20 @@ const(char) *exception_type_str(ExceptionType code) {
 /// Format a register depending on their type as a zero-padded number.
 /// Params: reg = register_t structure
 /// Returns: 
-const(char) *exception_reg_fhex(register_t *reg) {
-	import utils.str : strf;
+const(char) *adbg_ex_reg_fhex(register_t *reg) {
+	import utils.str : adbg_util_strf;
 	with (RegisterType)
 	switch (reg.type) {
-	case U8:  return strf("%02x", reg.u8);
-	case U16: return strf("%04x", reg.u16);
-	case U32, F32: return strf("%08x", reg.u32);
-	case U64, F64: return strf("%016llx", reg.u64);
+	case U8:  return adbg_util_strf("%02x", reg.u8);
+	case U16: return adbg_util_strf("%04x", reg.u16);
+	case U32, F32: return adbg_util_strf("%08x", reg.u32);
+	case U64, F64: return adbg_util_strf("%016llx", reg.u64);
 	default: return "??";
 	}
 }
 /*
 const(char) *exception_reg_fval(register_t *reg) {
-	import utils.str : strf;
+	import utils.str : adbg_util_strf;
 	
 }*/
 
@@ -320,7 +320,7 @@ enum InitPlatform {
 }
 
 // Thanks, Windows, for your silly WOW64
-void exception_reg_init(exception_t *e, InitPlatform plat) {
+void adbg_ex_reg_init(exception_t *e, InitPlatform plat) {
 	if (plat == InitPlatform.Native) {
 		version (X86)
 			plat = InitPlatform.x86;
@@ -382,7 +382,7 @@ void exception_reg_init(exception_t *e, InitPlatform plat) {
 version (Windows) {
 
 /// Populate exception_t.registers array from Windows' CONTEXT
-int exception_ctx_windows(exception_t *e, CONTEXT *c) {
+int adbg_ex_ctx_win(exception_t *e, CONTEXT *c) {
 	version (X86) {
 		e.registers[0].u32 = c.Eip;
 		e.registers[1].u32 = c.EFlags;
@@ -411,7 +411,7 @@ int exception_ctx_windows(exception_t *e, CONTEXT *c) {
 }
 
 version (Win64)
-int exception_ctx_windows_wow64(exception_t *e, WOW64_CONTEXT *c) {
+int adbg_ex_ctx_win_wow64(exception_t *e, WOW64_CONTEXT *c) {
 	e.registers[0].u32 = c.Eip;
 	e.registers[1].u32 = c.EFlags;
 	e.registers[2].u32 = c.Eax;
@@ -429,7 +429,7 @@ int exception_ctx_windows_wow64(exception_t *e, WOW64_CONTEXT *c) {
 version (Posix) {
 
 /// Populate exception_t.registers array from user_regs_struct
-int exception_ctx_user(exception_t *e, user_regs_struct *u) {
+int adbg_ex_ctx_user(exception_t *e, user_regs_struct *u) {
 	version (X86) {
 //		e.addrv = u.regs.eip;
 		e.registers[0].u32 = u.eip;

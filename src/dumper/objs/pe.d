@@ -13,7 +13,7 @@ import core.stdc.string : strcpy;
 import core.stdc.time : time_t, tm, localtime, strftime;
 import dumper.core;
 import debugger.obj.loader : obj_info_t;
-import debugger.disasm.core : disasm_params_t, disasm_line, DisasmMode;
+import debugger.disasm.core : disasm_params_t, adbg_dasm_line, DisasmMode;
 import debugger.file.objs.pe;
 
 extern (C):
@@ -26,9 +26,9 @@ extern (C):
 /// 	dp = Disassembler parameters
 /// 	flags = Show X flags
 /// Returns: Non-zero on error
-int dumper_print_pe32(obj_info_t *fi, disasm_params_t *dp, int flags) {
+int adbg_dmpr_pe_print(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	bool unkmach = void;
-	const(char) *str_mach = file_pe_str_mach(fi.pe.hdr.Machine);
+	const(char) *str_mach = adbg_obj_pe_mach(fi.pe.hdr.Machine);
 	if (str_mach == null) {
 		str_mach = "UNKNOWN";
 		unkmach = true;
@@ -124,12 +124,12 @@ int dumper_print_pe32(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	//
 
 	if (fi.pe.hdr.SizeOfOptionalHeader) { // No gotos here, it could skip declarations
-		const(char)* str_mag = file_pe_str_magic(fi.pe.ohdr.Magic);
+		const(char)* str_mag = adbg_obj_pe_magic(fi.pe.ohdr.Magic);
 		if (str_mag == null) {
 			printf("dumper: (PE32) Unknown Magic: %04X\n", fi.pe.ohdr.Magic);
 			return EXIT_FAILURE;
 		}
-		const(char) *str_sys = file_pe_str_subsys(fi.pe.ohdr.Subsystem);
+		const(char) *str_sys = adbg_obj_pe_subsys(fi.pe.ohdr.Subsystem);
 		if (str_sys == null) {
 			printf("dumper: (PE32) Unknown Subsystem: %04X\n", fi.pe.ohdr.Subsystem);
 			return EXIT_FAILURE;
@@ -872,7 +872,7 @@ L_DISASM:
 			printf("\n<%.8s>\n", &section.Name);
 			dp.addr = mem;
 			for (uint i; i < 32; i += dp.addrv - dp.lastaddr) {
-				disasm_line(dp, DisasmMode.File);
+				adbg_dasm_line(dp, DisasmMode.File);
 				printf("%08X %-30s %-30s\n",
 					cast(uint)i,
 					&dp.mcbuf, &dp.mnbuf);

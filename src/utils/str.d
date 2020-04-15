@@ -23,7 +23,7 @@ private __gshared char [16]hexmapupp = "0123456789ABCDEF";
  * 	upper = Use upper hexadecimal character
  * Returns: Null-terminated hexadecimal string
  */
-const(char) *strx02(ubyte v, bool upper = false) {
+const(char) *adbg_util_strx02(ubyte v, bool upper = false) {
 	__gshared char [3]b = void;
 
 	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
@@ -42,7 +42,7 @@ const(char) *strx02(ubyte v, bool upper = false) {
  * 	upper = Use upper hexadecimal character
  * Returns: Null-terminated hexadecimal string
  */
-const(char) *strx04(ushort v, bool upper = false) {
+const(char) *adbg_util_strx04(ushort v, bool upper = false) {
 	__gshared char [5]b = void;
 
 	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
@@ -63,7 +63,7 @@ const(char) *strx04(ushort v, bool upper = false) {
  * 	upper = Use upper hexadecimal character
  * Returns: Null-terminated hexadecimal string
  */
-const(char) *strx08(uint v, bool upper = false) {
+const(char) *adbg_util_strx08(uint v, bool upper = false) {
 	__gshared char [9]b = void;
 
 	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
@@ -88,7 +88,7 @@ const(char) *strx08(uint v, bool upper = false) {
  * 	upper = Use upper hexadecimal character
  * Returns: Null-terminated hexadecimal string
  */
-const(char) *strx016(ulong v, bool upper = false) {
+const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 	__gshared char [17]b = void;
 
 	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
@@ -123,7 +123,7 @@ const(char) *strx016(ulong v, bool upper = false) {
  * 	str  = String data
  * Returns: Updated buffer index
  */
-size_t stradd(char *buf, size_t size, size_t bufi, const(char) *str) {
+size_t adbg_util_stradd(char *buf, size_t size, size_t bufi, const(char) *str) {
 	size_t stri;
 	while (str[stri] && bufi < size) {
 		buf[bufi] = str[stri];
@@ -133,7 +133,7 @@ size_t stradd(char *buf, size_t size, size_t bufi, const(char) *str) {
 }
 
 /**
- * Append a formatted string to an existing buffer, calls straddva and stradd.
+ * Append a formatted string to an existing buffer, calls adbg_util_straddva and adbg_util_stradd.
  * Params:
  * 	buf  = Existing character buffer
  * 	size = Buffer size
@@ -142,10 +142,10 @@ size_t stradd(char *buf, size_t size, size_t bufi, const(char) *str) {
  * 	... = Additional objects to be formatted
  * Returns: Updated buffer index
  */
-size_t straddf(char *buf, size_t size, size_t bufi, const(char) *f, ...) {
+size_t adbg_util_straddf(char *buf, size_t size, size_t bufi, const(char) *f, ...) {
 	va_list va;
 	va_start(va, f);
-	return straddva(buf, size, bufi, f, va);
+	return adbg_util_straddva(buf, size, bufi, f, va);
 }
 
 /**
@@ -158,10 +158,10 @@ size_t straddf(char *buf, size_t size, size_t bufi, const(char) *f, ...) {
  * 	va = Argument list
  * Returns: Updated buffer index
  */
-size_t straddva(char *buf, size_t size, size_t bufi, const(char) *f, va_list va) {
+size_t adbg_util_straddva(char *buf, size_t size, size_t bufi, const(char) *f, va_list va) {
 	char [128]b = void;
 	vsnprintf(cast(char*)b, 128, f, va);
-	return stradd(buf, size, bufi, cast(char*)b);
+	return adbg_util_stradd(buf, size, bufi, cast(char*)b);
 }
 
 /**
@@ -170,7 +170,7 @@ size_t straddva(char *buf, size_t size, size_t bufi, const(char) *f, va_list va)
  * 	buf  = String buffer
  * 	size = Buffer size
  */
-void strlcase(char *buf, size_t size) {
+void adbg_util_strlcase(char *buf, size_t size) {
 	for (size_t i; buf[i] && i < size; ++i) {
 		if (buf[i] >= 0x41 && buf[i] <= 0x5A)
 			buf[i] += 32;
@@ -197,10 +197,10 @@ enum STR_QUICK_STACKS_LIMIT = STR_QUICK_STACKS_COUNT - 1;
  *
  * Returns: String
  */
-const(char) *strf(const(char) *f, ...) {
+const(char) *adbg_util_strf(const(char) *f, ...) {
 	va_list va;
 	va_start(va, f);
-	return strfva(f, va);
+	return adbg_util_strfva(f, va);
 }
 /**
  * Quick format.
@@ -214,7 +214,7 @@ const(char) *strf(const(char) *f, ...) {
  *
  * Returns: String
  */
-const(char) *strfva(const(char) *f, va_list va) {
+const(char) *adbg_util_strfva(const(char) *f, va_list va) {
 	__gshared size_t strfc; /// buffer selection index
 	__gshared char [STR_QUICK_STACK_SIZE][STR_QUICK_STACKS_COUNT]b = void;
 

@@ -12,8 +12,8 @@ import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
 import consts;
-import ui.loop : loop_enter;
-import ui.tui : tui_enter;
+import ui.loop : adbg_ui_loop_enter;
+import ui.tui : adbg_ui_tui_enter;
 import debugger, dumper;
 import os.err;
 
@@ -412,26 +412,26 @@ L_CLI_DEFAULT:
 	case debug_:
 		with (DebuggerMode)
 		switch (opt.debugtype) {
-		case file: e = dbg_file(opt.file); break;
-		case pid: e = dbg_attach(opt.pid); break;
+		case file: e = adbg_load(opt.file); break;
+		case pid: e = adbg_attach(opt.pid); break;
 		default:
 			puts("cli: No file nor pid were specified.");
 			return EXIT_FAILURE;
 		}
 
 		if (e) {
-			err_print("dbg", e);
+			adbg_err_osprint("dbg", e);
 			return e;
 		}
 
 		with (DebuggerUI)
 		final switch (opt.ui) {
-		case loop: e = loop_enter(&disopt); break;
-		case tui: e = tui_enter(&disopt); break;
+		case loop: e = adbg_ui_loop_enter(&disopt); break;
+		case tui: e = adbg_ui_tui_enter(&disopt); break;
 		}
 		break;
 	case dump:
-		e = dump_file(opt.file, &disopt, opt.dumpopt);
+		e = adbg_dmpr_dump(opt.file, &disopt, opt.dumpopt);
 		break;
 	case profile:
 		puts("Profiling feature not yet implemented");

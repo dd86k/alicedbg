@@ -56,7 +56,7 @@ int function(exception_t*) user_function;
  * 	cmd = Command
  * Returns: Zero on success; Otherwise os error code is returned
  */
-int dbg_file(const(char) *cmd) {
+int adbg_load(const(char) *cmd) {
 	version (Windows) {
 		STARTUPINFOA si = void;
 		PROCESS_INFORMATION pi = void;
@@ -108,7 +108,7 @@ int dbg_file(const(char) *cmd) {
  * Params: pid = Process ID
  * Returns: Non-zero on error: (Posix) errno or (Windows) GetLastError
  */
-int dbg_attach(int pid) {
+int adbg_attach(int pid) {
 	version (Windows) {
 		if (DebugActiveProcess(pid) == FALSE)
 			return GetLastError();
@@ -125,29 +125,29 @@ int dbg_attach(int pid) {
  * Params: f = Function pointer
  * Returns: Zero on success; Otherwise an error occured
  */
-int dbg_sethandle(int function(exception_t*) f) {
+int adbg_sethandler(int function(exception_t*) f) {
 	user_function = f;
 	return 0;
 }
 
 /**
- * Continues the execution of the thread (and/or process) until a new debug
+ * Enter debugging loop. Continues execution of the process until a new debug
  * event occurs. When an exception occurs, the exception_t structure is
  * populated with debugging information.
  * (Windows) Uses WaitForDebugEvent, filters any but EXCEPTION_DEBUG_EVENT
  * (Posix) Uses ptrace(2) and waitpid(2), filters SIGCONT
  * Returns: Zero on success; Otherwise an error occured
  */
-int dbg_loop() {
+int adbg_enterloop() {
 	if (user_function == null)
 		return 4;
 
 	exception_t e = void;
 
 	version (Win64) {
-		exception_reg_init(&e, processWOW64 ? InitPlatform.x86 : InitPlatform.Native);
+		adbg_ex_reg_init(&e, processWOW64 ? InitPlatform.x86 : InitPlatform.Native);
 	} else
-		exception_reg_init(&e, InitPlatform.Native);
+		adbg_ex_reg_init(&e, InitPlatform.Native);
 
 	version (Windows) {
 		DEBUG_EVENT de = void;
@@ -171,12 +171,12 @@ L_DEBUG_LOOP:
 		switch (e.oscode) {
 		case EXCEPTION_IN_PAGE_ERROR:
 		case EXCEPTION_ACCESS_VIOLATION:
-			e.type = exception_type_code(
+			e.type = adbg_ex_oscode(
 				de.Exception.ExceptionRecord.ExceptionCode,
 				cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]);
 			break;
 		default:
-			e.type = exception_type_code(
+			e.type = adbg_ex_oscode(
 				de.Exception.ExceptionRecord.ExceptionCode);
 		}
 
@@ -186,16 +186,16 @@ L_DEBUG_LOOP:
 			if (processWOW64) {
 				ctxwow64.ContextFlags = CONTEXT_ALL;
 				Wow64GetThreadContext(hthread, &ctxwow64);
-				exception_ctx_windows_wow64(&e, &ctxwow64);
+				adbg_ex_ctx_win_wow64(&e, &ctxwow64);
 			} else {
 				ctx.ContextFlags = CONTEXT_ALL;
 				GetThreadContext(hthread, &ctx);
-				exception_ctx_windows(&e, &ctx);
+				adbg_ex_ctx_win(&e, &ctx);
 			}
 		} else {
 			ctx.ContextFlags = CONTEXT_ALL;
 			GetThreadContext(hthread, &ctx);
-			exception_ctx_windows(&e, &ctx);
+			adbg_ex_ctx_win(&e, &ctx);
 		}
 
 		with (DebuggerAction)
@@ -267,13 +267,13 @@ L_DEBUG_LOOP:
 		e.pid = pid;
 		e.tid = 0;
 		e.oscode = chld_signo;
-		e.type = exception_type_code(chld_signo);
+		e.type = adbg_ex_oscode(chld_signo);
 
 		user_regs_struct u = void;
 		if (ptrace(PTRACE_GETREGS, pid, null, &u) == -1)
 			return 6;
 
-		exception_ctx_user(&e, &u);
+		adbg_ex_ctx_user(&e, &u);
 
 		if (chld_signo == SIGTRAP) {
 			//TODO: Find a way to find the fault address

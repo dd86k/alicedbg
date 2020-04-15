@@ -16,17 +16,17 @@ import debugger.exception : exception_t;
 /// 
 /// 
 extern (C)
-public int seh_init(void function(exception_t*) f) {
-	if (SetUnhandledExceptionFilter(cast(void*)&_e_handler) == null)
+public int adbg_seh_init(void function(exception_t*) f) {
+	if (SetUnhandledExceptionFilter(cast(void*)&adbg_seh_action) == null)
 		return 1;
-	externhandler = f;
+	adbg_seh_ehandler = f;
 	return 0;
 }
 
 private:
 
 extern (C)
-void function(exception_t*) externhandler;
+void function(exception_t*) adbg_seh_ehandler;
 
 enum WOW64_SIZE_OF_80387_REGISTERS = 80;
 enum WOW64_MAXIMUM_SUPPORTED_EXTENSION = 512;
@@ -49,7 +49,7 @@ extern (Windows) LPTOP_LEVEL_EXCEPTION_FILTER
 	SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER);
 
 extern (Windows)
-uint _e_handler(_EXCEPTION_POINTERS *e) {
+uint adbg_seh_action(_EXCEPTION_POINTERS *e) {
 	version (X86)
 	printf(
 	"\n"~

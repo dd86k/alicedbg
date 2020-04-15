@@ -16,21 +16,21 @@ __gshared:
 
 /// Initiate TUI and enter input loop
 /// Return: Error code
-int tui_enter(disasm_params_t *p) {
-	term_init;
-	term_wsize(&tui_size);
+int adbg_ui_tui_enter(disasm_params_t *p) {
+	adbg_term_init;
+	adbg_term_size(&tui_size);
 	if (tui_size.width < 80 || tui_size.height < 24) {
 		puts("80x24 terminal minimum size required");
 		return 1;
 	}
-	int e = term_setup(TermType.Screen);
+	int e = adbg_term_setup(TermType.Screen);
 	if (e) {
 		printf("Could not initiate terminal buffer (%d)\n", e);
 		return e;
 	}
 	memcpy(&g_disparams, p, disasm_params_t.sizeof);
-	dbg_sethandle(&tui_handler);
-	return dbg_loop;
+	adbg_sethandler(&adbg_ui_tui_handler);
+	return adbg_enterloop;
 }
 
 private:
@@ -55,11 +55,11 @@ tuiopt_t TUIOptions;
 /// Last windows (console/terminal) size
 WindowSize tui_size;
 
-int tui_loop() {
+int adbg_ui_tui_loop() {
 	// Input loop
 	InputInfo input = void;
 L_READKEY:
-	term_read(&input);
+	adbg_term_read(&input);
 	
 	switch (input.type) {
 	case InputType.Key:
@@ -70,12 +70,12 @@ L_READKEY:
 			
 			goto L_READKEY;
 		case S:
-			tui_status("Proceeding...");
-			term_flush;
+			adbg_ui_tui_status("Proceeding...");
+			adbg_term_flush;
 			return DebuggerAction.step;
 		case C:
-			tui_status("Proceeding...");
-			term_flush;
+			adbg_ui_tui_status("Proceeding...");
+			adbg_term_flush;
 			return DebuggerAction.proceed;
 		default: goto L_READKEY;
 		}
@@ -85,39 +85,39 @@ L_READKEY:
 
 /// Handle exception
 /// Params: e = Exception structure
-int tui_handler(exception_t *e) {
-	term_clear;
+int adbg_ui_tui_handler(exception_t *e) {
+	adbg_term_clear;
 	g_disparams.addr = e.addr;
 	// locals
 	const uint h = tui_size.height / 2;
 	const uint ihmax = tui_size.height - 2;
 	// On-point
-	term_pos(0, h);
-	if (disasm_line(&g_disparams, DisasmMode.File) == DisasmError.None)
-		term_writef("> %zX %-20s %s",
+	adbg_term_curpos(0, h);
+	if (adbg_dasm_line(&g_disparams, DisasmMode.File) == DisasmError.None)
+		adbg_term_writef("> %zX %-20s %s",
 			g_disparams.lastaddr, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	// forward
 	for (uint hi = h + 1; hi < ihmax; ++hi) {
-		term_pos(0, hi);
-		disasm_line(&g_disparams, DisasmMode.File);
-		term_writef("  %zX %-20s %s",
+		adbg_term_curpos(0, hi);
+		adbg_dasm_line(&g_disparams, DisasmMode.File);
+		adbg_term_writef("  %zX %-20s %s",
 			g_disparams.lastaddr, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	}
 	// backward
 	//for (uint ih = h - 1; ih >= 0; ih) {
 	// status
-	tui_status(exception_type_str(e.type));
-	term_flush;
-	return tui_loop();
+	adbg_ui_tui_status(adbg_ex_typestr(e.type));
+	adbg_term_flush;
+	return adbg_ui_tui_loop();
 }
 
 /// Handle a UI resize event
-void tui_event_resize(ushort x, ushort y) {
+void adbg_ui_tui_event_resize(ushort x, ushort y) {
 	
 }
 
 /// Draw into display buffer
-void tui_render(TUIPanel page) {
+void adbg_ui_tui_render(TUIPanel page) {
 	with (TUIPanel)
 	final switch (page) {
 	case disasm:
@@ -134,11 +134,11 @@ void tui_render(TUIPanel page) {
 }
 
 /// Clear display buffer
-void tui_clear() {
+void adbg_ui_tui_clear() {
 }
 
 /// 
-void tui_status(const(char)* msg) {
-	term_pos(0, tui_size.height - 1);
-	term_write(msg);
+void adbg_ui_tui_status(const(char)* msg) {
+	adbg_term_curpos(0, tui_size.height - 1);
+	adbg_term_write(msg);
 }

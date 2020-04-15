@@ -21,11 +21,11 @@ __gshared:
 /// 
 /// 
 /// 
-public int seh_init(void function(exception_t*) f) {
+public int adbg_seh_init(void function(exception_t*) f) {
 	sigaction_t sa;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_SIGINFO;
-	sa.sa_sigaction = &pe_sigaction;
+	sa.sa_sigaction = &adbg_seh_action;
 	if (sigaction(SIGSEGV, &sa, cast(sigaction_t*)0) == -1 ||
 		sigaction(SIGTRAP, &sa, cast(sigaction_t*)0) == -1 ||
 		sigaction(SIGFPE, &sa, cast(sigaction_t*)0) == -1 ||
@@ -33,18 +33,18 @@ public int seh_init(void function(exception_t*) f) {
 		return 1;
 	}
 
-	//externhandler = f;
-	//TODO: Set externhandler
+	//adbg_seh_ehandler = f;
+	//TODO: Set adbg_seh_ehandler
 
 	return 0;
 }
 
 private:
 
-void function(exception_t*) externhandler;
+void function(exception_t*) adbg_seh_ehandler;
 
 /// See http://man7.org/linux/man-pages/man2/sigaction.2.html
-void pe_sigaction(int sig, siginfo_t *si, void *p) {
+void adbg_seh_action(int sig, siginfo_t *si, void *p) {
 	ucontext_t *ctx = cast(ucontext_t*)p;
 	mcontext_t m = ctx.uc_mcontext;
 
