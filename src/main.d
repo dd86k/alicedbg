@@ -11,11 +11,11 @@ module main;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
-import consts;
-import ui.loop : adbg_ui_loop_enter;
-import ui.tui : adbg_ui_tui_enter;
-import debugger, dumper;
-import os.err;
+import adbg.consts;
+import adbg.ui.loop : adbg_ui_loop_enter;
+import adbg.ui.tui : adbg_ui_tui_enter;
+import adbg.debugger, adbg.dumper;
+import adbg.os.err;
 
 extern (C):
 private:
