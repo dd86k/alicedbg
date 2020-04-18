@@ -4357,6 +4357,59 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 			adbg_dasm_push_str(p, i);
 		adbg_dasm_x86_vex_modrm(p, f);
 		return;
+	case 0x58: // 58H-5BH
+		int f = X86_VEX_WREG_128B | X86_DIR_REG;
+		const(char) *i = void;
+		if (dbit) {
+			if (wbit) {
+				switch (p.x86.vex_pp) {
+				case X86_VEX_PP_NONE: i = "vaddps"; break;
+				case X86_VEX_PP_66H:  i = "vaddpd"; break;
+				case X86_VEX_PP_F3H:  i = "vaddss"; break;
+				default: adbg_dasm_err(p); return;
+				}
+			} else {
+				switch (p.x86.vex_pp) {
+				case X86_VEX_PP_NONE: i = "vcvtps2pd"; break;
+				case X86_VEX_PP_66H:
+					if ((*p.addru8 & MODRM_MOD) != MODRM_MOD_11) {
+						adbg_dasm_err(p);
+						return;
+					}
+					i = "vcvtpd2ps";
+					break;
+				case X86_VEX_PP_F3H:
+					i = "vcvtss2sd";
+					f |= X86_VEX_3OPRNDS;
+					break;
+				default:
+					i = "vcvtsd2ss";
+					f |= X86_VEX_3OPRNDS;
+					break;
+				}
+			}
+		} else {
+			f |= X86_VEX_3OPRNDS;
+			if (wbit) {
+				switch (p.x86.vex_pp) {
+				case X86_VEX_PP_NONE: i = "vmulps"; break;
+				case X86_VEX_PP_66H:  i = "vmulpd"; break;
+				case X86_VEX_PP_F3H:  i = "vmulss"; break;
+				default:              i = "vmulsd"; break;
+				}
+			} else {
+				switch (p.x86.vex_pp) {
+				case X86_VEX_PP_NONE: i = "vaddps"; break;
+				case X86_VEX_PP_66H:  i = "vaddpd"; break;
+				case X86_VEX_PP_F3H:  i = "vaddss"; break;
+				default:              i = "vaddsd"; break;
+				}
+			}
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, i);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
 	default: adbg_dasm_err(p); return;
 	}
 }
@@ -4930,7 +4983,7 @@ enum X86_XOP_MAP10	= 0b0_1010;	/// Map 10
 // ||  | +----- ModRM.RM memory pointer width
 // ||  +------- 0=2 operand, 1=3 operand, 2=4 operand
 // ++---------- 0000 0000
-//                      +- Bit 24=Set, VEX.L not accepted
+//                      +- Bit 24=Set: VEX.L not accepted
 //                                       W vvvv L pp
 // 2OPINT REG128, REG128/MEM64           0 1111 0 10
 // 2OPINT REG256, REG128/MEM128          0 1111 1 10
