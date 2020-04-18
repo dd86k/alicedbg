@@ -11,9 +11,9 @@ import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
 import core.stdc.string : strcpy;
 import core.stdc.time : time_t, tm, localtime, strftime;
-import adbg.dumper.core;
+import adbg.dumper.dumper;
 import adbg.debugger.obj.loader : obj_info_t;
-import adbg.debugger.disasm.core : disasm_params_t, adbg_dasm_line, DisasmMode;
+import adbg.debugger.disasm.disasm : disasm_params_t, adbg_dasm_line, DisasmMode;
 import adbg.debugger.file.objs.pe;
 
 extern (C):

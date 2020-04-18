@@ -5,7 +5,7 @@
  */
 module adbg.debugger.disasm.arch.x86_64;
 
-import adbg.debugger.disasm.core;
+import adbg.debugger.disasm.disasm;
 import adbg.debugger.disasm.formatter;
 import adbg.utils.str;
 import adbg.debugger.disasm.arch.x86;

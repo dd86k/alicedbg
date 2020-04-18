@@ -5,7 +5,7 @@
  */
 module adbg.debugger.disasm.arch.x86_16;
 
-import adbg.debugger.disasm.core : disasm_params_t;
+import adbg.debugger.disasm.disasm : disasm_params_t;
 import adbg.debugger.disasm.arch.x86 : adbg_dasm_x86, x86_internals_t;
 
 extern (C):

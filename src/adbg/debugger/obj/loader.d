@@ -6,7 +6,7 @@
 module adbg.debugger.obj.loader;
 
 import core.stdc.stdio;
-import adbg.debugger.disasm.core : DisasmISA; // ISA translation
+import adbg.debugger.disasm.disasm : DisasmISA; // ISA translation
 private import adbg.debugger.file.objs;
 import adbg.os.err;
 

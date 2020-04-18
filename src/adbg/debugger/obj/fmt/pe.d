@@ -12,7 +12,7 @@ module adbg.debugger.file.objs.pe;
 import core.stdc.stdio, core.stdc.inttypes;
 import core.stdc.string : memset;
 import adbg.debugger.obj.loader : obj_info_t, ObjType;
-import adbg.debugger.disasm.core : DisasmISA, adbg_dasm_msb; // ISA translation
+import adbg.debugger.disasm.disasm : DisasmISA, adbg_dasm_msb; // ISA translation
 
 extern (C):
 

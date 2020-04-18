@@ -3,7 +3,7 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.dumper.core;
+module adbg.dumper.dumper;
 
 import core.stdc.stdio;
 import core.stdc.config : c_long;

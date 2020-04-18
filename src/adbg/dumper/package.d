@@ -3,4 +3,4 @@
  */
 module adbg.dumper;
 
-public import adbg.dumper.core;
+public import adbg.dumper.dumper;

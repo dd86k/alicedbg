@@ -3,7 +3,7 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.core;
+module adbg.debugger.debugger;
 
 import core.stdc.string : memset;
 import core.stdc.errno : errno;

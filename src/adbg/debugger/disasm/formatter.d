@@ -32,7 +32,7 @@
 module adbg.debugger.disasm.formatter;
 
 import core.stdc.stdarg;
-import adbg.debugger.disasm.core;
+import adbg.debugger.disasm.disasm;
 import adbg.utils.str;
 
 //TODO: New type: Prefix -- Next thing to print would be a space, not comma

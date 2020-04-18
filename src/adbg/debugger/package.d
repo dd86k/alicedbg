@@ -6,6 +6,6 @@
 module adbg.debugger;
 
 public import
-	adbg.debugger.core,
+	adbg.debugger.debugger,
 	adbg.debugger.disasm,
 	adbg.debugger.exception;

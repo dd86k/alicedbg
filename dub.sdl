@@ -54,9 +54,9 @@ buildType "headers" {
 }
 
 buildType "afl" {
-    toolchainRequirements dmd="no" gdc="no" ldc=">=1.0.0"
-    dflags "-plugin=$AFL_ROOT/afl-llvm-pass.so"
-    sourceFiles "$AFL_ROOT/afl-llvm-rt.o"
-    versions "AFL"
-    buildOptions "debugMode" "debugInfo" "betterC"
+	toolchainRequirements dmd="no" gdc="no" ldc=">=1.0.0"
+	dflags "-plugin=$AFL_ROOT/afl-llvm-pass.so"
+	sourceFiles "$AFL_ROOT/afl-llvm-rt.o"
+	versions "AFL"
+	buildOptions "debugMode" "debugInfo" "betterC"
 }

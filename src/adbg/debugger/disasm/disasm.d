@@ -3,7 +3,7 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.disasm.core;
+module adbg.debugger.disasm.disasm;
 
 import adbg.debugger.disasm.arch;
 import adbg.debugger.disasm.formatter;

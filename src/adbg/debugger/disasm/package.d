@@ -5,4 +5,4 @@
  */
 module adbg.debugger.disasm;
 
-public import adbg.debugger.disasm.core;
+public import adbg.debugger.disasm.disasm;
