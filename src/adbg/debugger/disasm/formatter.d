@@ -74,6 +74,16 @@ enum FormatType {
 	x86_SIB_MemSegBaseIndexScaleImm,	/// x86: SIB MOD=01/10 format
 	x86_SIB_MemSegBaseImm,	/// x86: SIB MOD=01/10 I=100 format
 }
+/// Memory operation width for memory types
+enum MemoryWidth {
+	u8,	/// 8-bit
+	u32,	/// 32-bit
+	u16,	/// 16-bit
+	u64,	/// 64-bit
+	u128,	/// 128-bit
+	u256,	/// 256-bit
+	u512	/// 512-bit
+}
 
 /// Format item structure. Can hold up to 3 integer and 3 string values.
 struct disasm_fmt_item_t {
@@ -102,6 +112,12 @@ private
 __gshared const(char) *DISASM_FMT_TAB	= "\t";
 private
 __gshared const(char) *DISASM_FMT_COMMA_SPACE	= ", ";
+
+//TODO: Missing FWORD (16b:32b or 16b:16b (66H))
+private
+__gshared const(char) *[]MEM_WIDTHS_INTEL = [
+	"byte", "dword", "word", "qword", "oword", "yword", "zword"
+];
 
 //
 // Machine code functions
@@ -214,22 +230,28 @@ void adbg_dasm_push_imm(disasm_params_t *p, int v) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	v = Absolute memory value
-void adbg_dasm_push_mem(disasm_params_t *p, int v) {
+/// 	w = Operation width
+void adbg_dasm_push_mem(disasm_params_t *p,
+	int v, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.Mem;
 	i.ival1 = v;
+	i.ival3 = w;
 }
 /// Push a memory+register value into the formatting stack. This is printed
 /// depending on the memory+register formatter (adbg_dasm_fmt_memreg).
 /// Params:
 /// 	p = Disassembler parameters
 /// 	reg = Register value
-void adbg_dasm_push_memreg(disasm_params_t *p, const(char) *reg) {
+/// 	w = Operation width
+void adbg_dasm_push_memreg(disasm_params_t *p,
+	const(char) *reg, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.MemReg;
 	i.sval1 = reg;
+	i.ival3 = w;
 }
 /// Push a memory+segment+register value into the formatting stack. This is
 /// printed depending on its formatter (adbg_dasm_fmt_memsegreg).
@@ -237,12 +259,15 @@ void adbg_dasm_push_memreg(disasm_params_t *p, const(char) *reg) {
 /// 	p = Disassembler parameters
 /// 	seg = Segment register value
 /// 	reg = Register value
-void adbg_dasm_push_memsegreg(disasm_params_t *p, const(char) *seg, const(char) *reg) {
+/// 	w = Operation width
+void adbg_dasm_push_memsegreg(disasm_params_t *p,
+	const(char) *seg, const(char) *reg, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.MemSegReg;
 	i.sval1 = reg;
 	i.sval2 = seg;
+	i.ival3 = w;
 }
 /// Push a memory+register+immediate value into the formatting stack. This is
 /// printed depending on its formatter (adbg_dasm_fmt_memregimm).
@@ -250,12 +275,15 @@ void adbg_dasm_push_memsegreg(disasm_params_t *p, const(char) *seg, const(char) 
 /// 	p = Disassembler parameters
 /// 	reg = Register value
 /// 	v = Immediate value
-void adbg_dasm_push_memregimm(disasm_params_t *p, const(char) *reg, int v) {
+/// 	w = Operation width
+void adbg_dasm_push_memregimm(disasm_params_t *p,
+	const(char) *reg, int v, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.MemRegImm;
 	i.sval1 = reg;
 	i.ival1 = v;
+	i.ival3 = w;
 }
 /// Push a memory+segment+register+immediate value into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_memsegregimm).
@@ -264,13 +292,16 @@ void adbg_dasm_push_memregimm(disasm_params_t *p, const(char) *reg, int v) {
 /// 	seg = Segment register value
 /// 	reg = Register value
 /// 	v = Immediate value
-void adbg_dasm_push_memsegregimm(disasm_params_t *p, const(char) *seg, const(char) *reg, int v) {
+/// 	w = Operation width
+void adbg_dasm_push_memsegregimm(disasm_params_t *p,
+	const(char) *seg, const(char) *reg, int v, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.MemSegRegImm;
 	i.sval1 = reg;
 	i.sval2 = seg;
 	i.ival1 = v;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=00 into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegbaseindexscale).
@@ -280,8 +311,9 @@ void adbg_dasm_push_memsegregimm(disasm_params_t *p, const(char) *seg, const(cha
 /// 	base = Base register value
 /// 	index = Index register value
 /// 	scale = Scale value
+/// 	w = Operation width
 void adbg_dasm_push_x86_sib_mod00(disasm_params_t *p,
-	const(char) *seg, const(char) *base, const(char) *index, int scale) {
+	const(char) *seg, const(char) *base, const(char) *index, int scale, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegBaseIndexScale;
@@ -289,6 +321,7 @@ void adbg_dasm_push_x86_sib_mod00(disasm_params_t *p,
 	i.sval2 = index;
 	i.sval3 = seg;
 	i.ival1 = scale;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=00 INDEX=100 into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegbase).
@@ -296,13 +329,15 @@ void adbg_dasm_push_x86_sib_mod00(disasm_params_t *p,
 /// 	p = Disassembler parameters
 /// 	seg = Segment register value
 /// 	base = Base register value
+/// 	w = Operation width
 void adbg_dasm_push_x86_sib_m00_i100(disasm_params_t *p,
-	const(char) *seg, const(char) *base) {
+	const(char) *seg, const(char) *base, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegBase;
 	i.sval1 = base;
 	i.sval2 = seg;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=00 BASE=101 into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegindexscaleimm).
@@ -312,8 +347,9 @@ void adbg_dasm_push_x86_sib_m00_i100(disasm_params_t *p,
 /// 	index = Index register value
 /// 	scale = Scale value
 /// 	imm = Displacement value
+/// 	w = Operation width
 void adbg_dasm_push_x86_sib_m00_b101(disasm_params_t *p,
-	const(char) *seg, const(char) *index, int scale, int imm) {
+	const(char) *seg, const(char) *index, int scale, int imm, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegIndexScaleImm;
@@ -321,6 +357,7 @@ void adbg_dasm_push_x86_sib_m00_b101(disasm_params_t *p,
 	i.sval2 = seg;
 	i.ival1 = scale;
 	i.ival2 = imm;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=00 INDEX=100 BASE=101 into the formatting
 /// stack. This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegimm).
@@ -328,13 +365,15 @@ void adbg_dasm_push_x86_sib_m00_b101(disasm_params_t *p,
 /// 	p = Disassembler parameters
 /// 	seg = Segment register value
 /// 	imm = Displacement value
+/// 	w = Operation width
 void adbg_dasm_push_x86_sib_m00_i100_b101(disasm_params_t *p,
-	const(char) *seg, int imm) {
+	const(char) *seg, int imm, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegImm;
 	i.sval1 = seg;
 	i.ival1 = imm;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=01 into the formatting stack.
 /// This is printed depending on its formatter
@@ -346,8 +385,9 @@ void adbg_dasm_push_x86_sib_m00_i100_b101(disasm_params_t *p,
 /// 	index = Index register value
 /// 	scale = Scale value
 /// 	imm = Displacement value
+/// 	w = Operation width
 void adbg_dasm_push_x86_sib_m01(disasm_params_t *p,
-	const(char) *seg, const(char) *base, const(char) *index, int scale, int imm) {
+	const(char) *seg, const(char) *base, const(char) *index, int scale, int imm, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegBaseIndexScaleImm;
@@ -356,6 +396,7 @@ void adbg_dasm_push_x86_sib_m01(disasm_params_t *p,
 	i.sval3 = seg;
 	i.ival1 = scale;
 	i.ival2 = imm;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=01 INDEX=100 into the formatting stack.
 /// This is printed depending on its formatter
@@ -365,14 +406,16 @@ void adbg_dasm_push_x86_sib_m01(disasm_params_t *p,
 /// 	seg = Segment register value
 /// 	base = Base register value
 /// 	imm = Displacement value
+/// 	w = Operation width
 void adbg_dasm_push_x86_sib_m01_i100(disasm_params_t *p,
-	const(char) *seg, const(char) *base, int imm) {
+	const(char) *seg, const(char) *base, int imm, int w) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegBaseImm;
-	i.sval1  = base;
+	i.sval1 = base;
 	i.sval2 = seg;
-	i.ival1  = imm;
+	i.ival1 = imm;
+	i.ival3 = w;
 }
 
 //
@@ -496,33 +539,29 @@ const(char) *adbg_dasm_fmt_item(disasm_params_t *p, disasm_fmt_item_t *i) {
 	final switch (i.type) {
 	case String:	return i.sval1;
 	case Reg:	return adbg_dasm_fmt_reg(p, i.sval1);
-	case SegReg:	return adbg_dasm_fmt_segreg(p, i.sval1, i.sval2);
-	case Imm:	return adbg_dasm_fmt_imm(p, i.ival1);
-	case Mem:	return adbg_dasm_fmt_mem(p, i.ival1);
-	case MemReg:	return adbg_dasm_fmt_memreg(p, i.sval1);
-	case MemSegReg:	return adbg_dasm_fmt_memsegreg(p, i.sval2, i.sval1);
-	case MemRegImm:	return adbg_dasm_fmt_memregimm(p, i.sval1, i.ival1);
+	case SegReg:	return adbg_dasm_fmt_segreg(p, i);
+	case Imm:	return adbg_dasm_fmt_imm(p, i);
+	case Mem:	return adbg_dasm_fmt_mem(p, i);
+	case MemReg:	return adbg_dasm_fmt_memreg(p, i);
+	case MemSegReg:	return adbg_dasm_fmt_memsegreg(p, i);
+	case MemRegImm:	return adbg_dasm_fmt_memregimm(p, i);
 	case MemSegRegImm:
-		return adbg_dasm_fmt_memsegregimm(p, i.sval2, i.sval1, i.ival1);
+		return adbg_dasm_fmt_memsegregimm(p, i);
 	case x86_SIB_MemSegBaseIndexScale:
-		return adbg_dasm_fmt_sib_memsegbaseindexscale(p,
-			i.sval3, i.sval1, i.sval2, i.ival1);
+		return adbg_dasm_fmt_sib_memsegbaseindexscale(p, i);
 	case x86_SIB_MemSegBase:
-		return adbg_dasm_fmt_sib_memsegbase(p, i.sval2, i.sval1);
+		return adbg_dasm_fmt_sib_memsegbase(p, i);
 	case x86_SIB_MemSegIndexScaleImm:
-		return adbg_dasm_fmt_sib_memsegindexscaleimm(p,
-			i.sval2, i.sval1, i.ival1, i.ival2);
+		return adbg_dasm_fmt_sib_memsegindexscaleimm(p, i);
 	case x86_SIB_MemSegImm:
-		return adbg_dasm_fmt_sib_memsegimm(p, i.sval1, i.ival1);
+		return adbg_dasm_fmt_sib_memsegimm(p, i);
 	case x86_SIB_MemSegBaseIndexScaleImm:
-		return adbg_dasm_fmt_sib_memsegbaseindexscaleimm(p,
-			i.sval3, i.sval1, i.sval2, i.ival1, i.ival2);
+		return adbg_dasm_fmt_sib_memsegbaseindexscaleimm(p, i);
 	case x86_SIB_MemSegBaseImm:
-		return adbg_dasm_fmt_sib_memsegbaseimm(p, i.sval2, i.sval1, i.ival1);
+		return adbg_dasm_fmt_sib_memsegbaseimm(p, i);
 	}
 }
-const(char) *adbg_dasm_fmt_reg(disasm_params_t *p,
-	const(char) *v) {
+const(char) *adbg_dasm_fmt_reg(disasm_params_t *p, const(char) *v) {
 	if (v[0] == 0) return v;
 	with (DisasmSyntax)
 	switch (p.style) {
@@ -530,131 +569,119 @@ const(char) *adbg_dasm_fmt_reg(disasm_params_t *p,
 	default:  return v;
 	}
 }
-const(char) *adbg_dasm_fmt_segreg(disasm_params_t *p,
-	const(char) *seg, const(char) *reg) {
-	seg = adbg_dasm_fmt_reg(p, seg);
-	reg = adbg_dasm_fmt_reg(p, reg);
-	return adbg_util_strf("%s%s", seg, reg);
+const(char) *adbg_dasm_fmt_segreg(disasm_params_t *p, disasm_fmt_item_t *i) {
+	i.sval1 = adbg_dasm_fmt_reg(p, i.sval1);
+	i.sval2 = adbg_dasm_fmt_reg(p, i.sval2);
+	return adbg_util_strf("%s%s", i.sval1, i.sval2);
 }
-const(char) *adbg_dasm_fmt_imm(disasm_params_t *f,
-	int v) {
+const(char) *adbg_dasm_fmt_imm(disasm_params_t *f, disasm_fmt_item_t *i) {
 	with (DisasmSyntax)
 	switch (f.style) {
-	case Att: return adbg_util_strf("$%d", v);
-	default:  return adbg_util_strf("%d", v);
+	case Att: return adbg_util_strf("$%d", i.ival1);
+	default:  return adbg_util_strf("%d", i.ival1);
 	}
 }
-const(char) *adbg_dasm_fmt_mem(disasm_params_t *p,
-	int v) {
+const(char) *adbg_dasm_fmt_mem(disasm_params_t *p, disasm_fmt_item_t *i) {
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att: return adbg_util_strf("(%d)", v);
-	default:  return adbg_util_strf("[%d]", v);
+	case Att: return adbg_util_strf("(%d)", i.ival1);
+	default:  return adbg_util_strf("[%d]", i.ival1);
 	}
 }
-const(char) *adbg_dasm_fmt_memreg(disasm_params_t *p,
-	const(char) *v) {
+const(char) *adbg_dasm_fmt_memreg(disasm_params_t *p, disasm_fmt_item_t *i) {
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att: return adbg_util_strf("(%s)", v);
-	default:  return adbg_util_strf("[%s]", v);
+	case Att: return adbg_util_strf("(%s)", i.sval1);
+	default:
+		return adbg_util_strf("%s ptr [%s]", MEM_WIDTHS_INTEL[i.ival3], i.sval1);
 	}
 }
-const(char) *adbg_dasm_fmt_memsegreg(disasm_params_t *p,
-	const(char) *seg, const(char) *reg) {
-	seg = adbg_dasm_fmt_reg(p, seg);
-	reg = adbg_dasm_fmt_reg(p, reg);
+const(char) *adbg_dasm_fmt_memsegreg(disasm_params_t *p, disasm_fmt_item_t *i) {
+	i.sval2 = adbg_dasm_fmt_reg(p, i.sval2);
+	i.sval1 = adbg_dasm_fmt_reg(p, i.sval1);
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att:  return adbg_util_strf("%s(%s)", seg, reg);
-	case Nasm: return adbg_util_strf("[%s%s]", seg, reg);
-	default:   return adbg_util_strf("%s[%s]", seg, reg);
+	case Att:  return adbg_util_strf("%s(%s)", i.sval2, i.sval1);
+	case Nasm: return adbg_util_strf("%s ptr [%s%s]", MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1);
+	default:   return adbg_util_strf("%s ptr %s[%s]", MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1);
 	}
 }
-const(char) *adbg_dasm_fmt_memregimm(disasm_params_t *p,
-	const(char) *reg, int v) {
-	reg = adbg_dasm_fmt_reg(p, reg);
+const(char) *adbg_dasm_fmt_memregimm(disasm_params_t *p, disasm_fmt_item_t *i) {
+	i.sval1 = adbg_dasm_fmt_reg(p, i.sval1);
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att:  return adbg_util_strf("(%s%+d)", reg, v);
-	default:   return adbg_util_strf("[%s%+d]", reg, v);
+	case Att:  return adbg_util_strf("(%s%+d)", i.sval1, i.ival1);
+	default:   return adbg_util_strf("%s ptr [%s%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval1, i.ival1);
 	}
 }
-const(char) *adbg_dasm_fmt_memsegregimm(disasm_params_t *p,
-	const(char) *seg, const(char) *reg, int v) {
-	seg = adbg_dasm_fmt_reg(p, seg);
-	reg = adbg_dasm_fmt_reg(p, reg);
+const(char) *adbg_dasm_fmt_memsegregimm(disasm_params_t *p, disasm_fmt_item_t *i) {
+	i.sval2 = adbg_dasm_fmt_reg(p, i.sval2);
+	i.sval1 = adbg_dasm_fmt_reg(p, i.sval1);
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att:  return adbg_util_strf("%s(%s%+d)", seg, reg, v);
-	case Nasm: return adbg_util_strf("[%s%s%+d]", seg, reg, v);
-	default:   return adbg_util_strf("%s[%s%+d]", seg, reg, v);
+	case Att:  return adbg_util_strf("%s(%s%+d)", i.sval2, i.sval1, i.ival1);
+	case Nasm: return adbg_util_strf("%s ptr [%s%s%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1);
+	default:   return adbg_util_strf("%s ptr %s[%s%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1);
 	}
 }
-const(char) *adbg_dasm_fmt_sib_memsegbaseindexscale(disasm_params_t *p,
-	const(char) *seg, const(char) *base, const(char) *index, int scale) {
-	seg = adbg_dasm_fmt_reg(p, seg);
-	base = adbg_dasm_fmt_reg(p, base);
-	index = adbg_dasm_fmt_reg(p, index);
+const(char) *adbg_dasm_fmt_sib_memsegbaseindexscale(disasm_params_t *p, disasm_fmt_item_t *i) {
+	i.sval3 = adbg_dasm_fmt_reg(p, i.sval3);
+	i.sval1 = adbg_dasm_fmt_reg(p, i.sval1);
+	i.sval2 = adbg_dasm_fmt_reg(p, i.sval2);
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att:  return adbg_util_strf("%s(%s,%s,%d)", seg, base, index, scale);
-	case Nasm: return adbg_util_strf("[%s%s+%s*%d]", seg, base, index, scale);
-	default:   return adbg_util_strf("%s[%s+%s*%d]", seg, base, index, scale);
+	case Att:  return adbg_util_strf("%s(%s,%s,%d)", i.sval3, i.sval1, i.sval2, i.ival1);
+	case Nasm: return adbg_util_strf("%s ptr [%s%s+%s*%d]", MEM_WIDTHS_INTEL[i.ival3], i.sval3, i.sval1, i.sval2, i.ival1);
+	default:   return adbg_util_strf("%s ptr %s[%s+%s*%d]", MEM_WIDTHS_INTEL[i.ival3], i.sval3, i.sval1, i.sval2, i.ival1);
 	}
 }
-const(char) *adbg_dasm_fmt_sib_memsegbase(disasm_params_t *p,
-	const(char) *seg, const(char) *base) {
-	seg = adbg_dasm_fmt_reg(p, seg);
-	base = adbg_dasm_fmt_reg(p, base);
+const(char) *adbg_dasm_fmt_sib_memsegbase(disasm_params_t *p, disasm_fmt_item_t *i) {
+	i.sval2 = adbg_dasm_fmt_reg(p, i.sval2);
+	i.sval1 = adbg_dasm_fmt_reg(p, i.sval1);
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att:  return adbg_util_strf("%s(,%s,)", seg, base);
-	case Nasm: return adbg_util_strf("[%s%s]", seg, base);
-	default:   return adbg_util_strf("%s[%s]", seg, base);
+	case Att:  return adbg_util_strf("%s(,%s,)", i.sval2, i.sval1);
+	case Nasm: return adbg_util_strf("%s ptr [%s%s]", MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1);
+	default:   return adbg_util_strf("%s ptr %s[%s]", MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1);
 	}
 }
-const(char) *adbg_dasm_fmt_sib_memsegindexscaleimm(disasm_params_t *p,
-	const(char) *seg, const(char) *index, ulong scale, int imm) {
-	seg = adbg_dasm_fmt_reg(p, seg);
-	index = adbg_dasm_fmt_reg(p, index);
+const(char) *adbg_dasm_fmt_sib_memsegindexscaleimm(disasm_params_t *p, disasm_fmt_item_t *i) {
+	i.sval2 = adbg_dasm_fmt_reg(p, i.sval2);
+	i.sval1 = adbg_dasm_fmt_reg(p, i.sval1);
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att:  return adbg_util_strf("%s%+d(,%s,%d)", seg, imm, index, scale);
-	case Nasm: return adbg_util_strf("[%s%s*%d%+d]", seg, index, scale, imm);
-	default:   return adbg_util_strf("%s[%s*%d%+d]", seg, index, scale, imm);
+	case Att:  return adbg_util_strf("%s%+d(,%s,%d)", i.sval2, i.sval2, i.sval1, i.ival1);
+	case Nasm: return adbg_util_strf("%s ptr [%s%s*%d%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1, i.sval2);
+	default:   return adbg_util_strf("%s ptr %s[%s*%d%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1, i.sval2);
 	}
 }
-const(char) *adbg_dasm_fmt_sib_memsegimm(disasm_params_t *p,
-	const(char) *seg, int imm) {
-	seg = adbg_dasm_fmt_reg(p, seg);
+const(char) *adbg_dasm_fmt_sib_memsegimm(disasm_params_t *p, disasm_fmt_item_t *i) {
+	i.sval1 = adbg_dasm_fmt_reg(p, i.sval1);
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att:  return adbg_util_strf("%s%+d(,,)", seg, imm);
-	case Nasm: return adbg_util_strf("[%s%+d]", seg, imm);
-	default:   return adbg_util_strf("%s[%+d]", seg, imm);
+	case Att:  return adbg_util_strf("%s%+d(,,)", i.sval1, i.ival1);
+	case Nasm: return adbg_util_strf("%s ptr [%s%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval1, i.ival1);
+	default:   return adbg_util_strf("%s ptr %s[%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval1, i.ival1);
 	}
 }
-const(char) *adbg_dasm_fmt_sib_memsegbaseindexscaleimm(disasm_params_t *p,
-	const(char) *seg, const(char) *base, const(char) *index, int scale, int imm) {
-	seg = adbg_dasm_fmt_reg(p, seg);
-	base = adbg_dasm_fmt_reg(p, base);
-	index = adbg_dasm_fmt_reg(p, index);
+const(char) *adbg_dasm_fmt_sib_memsegbaseindexscaleimm(disasm_params_t *p, disasm_fmt_item_t *i) {
+	i.sval3 = adbg_dasm_fmt_reg(p, i.sval3);
+	i.sval1 = adbg_dasm_fmt_reg(p, i.sval1);
+	i.sval2 = adbg_dasm_fmt_reg(p, i.sval2);
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att:  return adbg_util_strf("%s%+d(%s,%s,%d)", seg, imm, base, index, scale);
-	case Nasm: return adbg_util_strf("[%s%s+%s*%d%+d]", seg, base, index, scale, imm);
-	default:   return adbg_util_strf("%s[%s+%s*%d%+d]", seg, base, index, scale, imm);
+	case Att:  return adbg_util_strf("%s%+d(%s,%s,%d)", i.sval3, i.ival2, i.sval1, i.sval2, i.ival1);
+	case Nasm: return adbg_util_strf("%s ptr [%s%s+%s*%d%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval3, i.sval1, i.sval2, i.ival1, i.ival2);
+	default:   return adbg_util_strf("%s ptr %s[%s+%s*%d%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval3, i.sval1, i.sval2, i.ival1, i.ival2);
 	}
 }
-const(char) *adbg_dasm_fmt_sib_memsegbaseimm(disasm_params_t *p,
-	const(char) *seg, const(char) *base, int imm) {
-	seg = adbg_dasm_fmt_reg(p, seg);
-	base = adbg_dasm_fmt_reg(p, base);
+const(char) *adbg_dasm_fmt_sib_memsegbaseimm(disasm_params_t *p, disasm_fmt_item_t *i) {
+	i.sval2 = adbg_dasm_fmt_reg(p, i.sval2);
+	i.sval1 = adbg_dasm_fmt_reg(p, i.sval1);
 	with (DisasmSyntax)
 	switch (p.style) {
-	case Att:  return adbg_util_strf("%s%+d(%s,,)", seg, imm, base);
-	case Nasm: return adbg_util_strf("[%s%s%+d]", seg, base, imm);
-	default:   return adbg_util_strf("%s[%s%+d]", seg, base, imm);
+	case Att:  return adbg_util_strf("%s%+d(%s,,)", i.sval2, i.ival1, i.sval1);
+	case Nasm: return adbg_util_strf("%s ptr [%s%s%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1);
+	default:   return adbg_util_strf("%s ptr %s[%s%+d]", MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1);
 	}
 }
