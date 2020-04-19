@@ -4296,7 +4296,7 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 				case X86_VEX_PP_NONE: i = "vrsqrtps"; break;
 				case X86_VEX_PP_F3H:
 					i = "vrsqrtss";
-					f |= X86_VEX_3OPRNDS;
+					f |= X86_VEX_3OPRNDS | X86_VEX_WMEM_32B;
 					break;
 				default: adbg_dasm_err(p); return;
 				}
@@ -4449,6 +4449,97 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, i);
 		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	case 0x60: // 60H-63H
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *i = void;
+		if (dbit)
+			i = wbit ? "vpacksswb" : "vpunpckldq";
+		else
+			i = wbit ? "vpunpcklwd" : "vpunpcklbw";
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, i);
+		adbg_dasm_x86_vex_modrm(p,
+			X86_DIR_REG | X86_VEX_WMEM_128B | X86_VEX_WREG_128B | X86_VEX_3OPRNDS);
+		return;
+	case 0x64: // 64H-67H
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *i = void;
+		if (dbit)
+			i = wbit ? "vpackuswb" : "vpcmpgtd";
+		else
+			i = wbit ? "vpcmpgtw" : "vpcmpgtb";
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, i);
+		adbg_dasm_x86_vex_modrm(p,
+			X86_DIR_REG | X86_VEX_WMEM_128B | X86_VEX_WREG_128B | X86_VEX_3OPRNDS);
+		return;
+	case 0x68: // 68H-6BH
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *i = void;
+		if (dbit)
+			i = wbit ? "vpackssdw" : "vpunpckhdq";
+		else
+			i = wbit ? "vpunpckhwd" : "vpunpckhbw";
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, i);
+		adbg_dasm_x86_vex_modrm(p,
+			X86_DIR_REG | X86_VEX_WMEM_128B | X86_VEX_WREG_128B | X86_VEX_3OPRNDS);
+		return;
+	case 0x6C: // 6CH-6FH
+		const(char) *i = void;
+		int f = X86_DIR_REG | X86_VEX_WREG_128B;
+		if (dbit) {
+			switch (p.x86.vex_pp) {
+			case X86_VEX_PP_66H:
+				if (wbit) {
+					i = "vmovdqa";
+					f |= X86_VEX_WMEM_128B;
+				} else {
+					if ((*p.addru8 & MODRM_MOD) == MODRM_MOD_11) {
+						adbg_dasm_err(p);
+						return;
+					}
+					i = "vmovd";
+					//TODO: objdump ignores VEX.L...
+					f |= X86_VEX_WMEM_32B | x86_VEX_FLAG_NO_L;
+				}
+				break;
+			case X86_VEX_PP_F3H:
+				if (wbit == 0) {
+					adbg_dasm_err(p);
+					return;
+				}
+				i = "vmovdqu";
+				f |= X86_VEX_WMEM_128B;
+				break;
+			default:
+				adbg_dasm_err(p);
+				return;
+			}
+		} else {
+			if (p.x86.vex_pp != X86_VEX_PP_66H) {
+				adbg_dasm_err(p);
+				return;
+			}
+			f |= X86_VEX_WMEM_128B | X86_VEX_3OPRNDS;
+			i = wbit ? "vpunpcklqdq" : "vpunpckhqdq";
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, i);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	case 0x70: // 70H-73H
+	
 		return;
 	default: adbg_dasm_err(p); return;
 	}

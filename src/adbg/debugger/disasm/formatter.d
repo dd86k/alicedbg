@@ -54,7 +54,6 @@ enum FORMATTER_O_NO_DIRECTION = 1;
 /// Very useful for instruction prefixes such as LOCK (x86)
 enum FORMATTER_O_PREFIX = 2;
 
-//TODO: Make MemMem type (0000:0000)
 //TODO: Hexadecimal format setting (with width?)
 /// Item type, each item more or less has their own formatting function
 enum FormatType {
@@ -74,7 +73,8 @@ enum FormatType {
 	x86_SIB_MemSegBaseIndexScaleImm,	/// x86: SIB MOD=01/10 format
 	x86_SIB_MemSegBaseImm,	/// x86: SIB MOD=01/10 I=100 format
 }
-/// Memory operation width for memory types
+/// Memory operation pointer width for memory types
+// Internally, always mapped to the ival3 field
 enum MemoryWidth {
 	u8,	/// 8-bit
 	u32,	/// 32-bit
