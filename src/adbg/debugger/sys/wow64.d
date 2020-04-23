@@ -7,15 +7,12 @@ module adbg.debugger.sys.wow64;
 
 version (Win64):
 
-import core.sys.windows.windef;
+import adbg.os.windows.def;
 
 extern (Windows):
 
 BOOL Wow64GetThreadContext(HANDLE, WOW64_CONTEXT*);
 BOOL Wow64SetThreadContext(HANDLE, WOW64_CONTEXT*);
-
-enum WOW64_SIZE_OF_80387_REGISTERS = 80; // um\winnt.h
-enum WOW64_MAXIMUM_SUPPORTED_EXTENSION = 512; // um\winnt.h
 
 struct WOW64_FLOATING_SAVE_AREA {
 	DWORD ControlWord;

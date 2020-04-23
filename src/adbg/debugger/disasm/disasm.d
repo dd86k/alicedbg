@@ -60,8 +60,8 @@ enum DisasmDemangle : ushort {
 /// Character buffer size
 ///
 /// Currently, 64 characters is enough to hold SIB memory references, AVX-512
-/// instructions, or 15 bytes of machine code hexadecimal numbers. If that's
-/// not enough, update it to 80 characters.
+/// instructions, or 15 bytes of machine code hexadecimal numbers.
+/// If that's not enough, update to 80 characters.
 enum DISASM_BUF_SIZE = 64;
 
 version (X86) {
@@ -210,7 +210,6 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 			p.style = DISASM_DEFAULT_SYNTAX;
 		if (p.error == DisasmError.None)
 			adbg_dasm_render(p);
-		adbg_dasm_finalize(p); // leave machine code buffer intact
 	}
 
 	return p.error;

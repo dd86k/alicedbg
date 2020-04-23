@@ -129,6 +129,7 @@ size_t adbg_util_stradd(char *buf, size_t size, size_t bufi, const(char) *str) {
 		buf[bufi] = str[stri];
 		++stri; ++bufi;
 	}
+	buf[bufi] = 0;
 	return bufi;
 }
 

@@ -202,3 +202,12 @@ feature unavailable to profile alicedbg internals.
 For the time being, you will have to use existing profiling tools (ltrace,
 strace, gdb, lldb, etc.). alicedbg's profiling feature (operation mode, not a
 build type) is planned.
+
+## Generating headers
+
+Currently, D compilers are not the best suited to generate "headers" (.di,
+D Import files), so there are some manual tweaks to do.
+
+1. Generate headers: `dub build -b headers`
+2. Navigate to `dinclude`: `cat * > adbg.di` (Windows: `type * > adbg.di`)
+3. Match and remove "`module.+\n|//.+\n|.+import adbg.+\n|import adbg.+\n`"

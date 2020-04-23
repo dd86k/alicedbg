@@ -522,14 +522,6 @@ void adbg_dasm_render(disasm_params_t *p) {
 		adbg_dasm_fadd(p, &p.fmt.items[index]);
 	}
 }
-/// (Internal) Places null characters in buffers
-/// Params: p = Disassembler parameters
-void adbg_dasm_finalize(disasm_params_t *p) {
-	with (p) {
-		if (mcbuf[mcbufi - 1] == ' ') --mcbufi;
-		mcbuf[mcbufi] = mnbuf[mnbufi] = 0;
-	}
-}
 
 //
 // Internal functions

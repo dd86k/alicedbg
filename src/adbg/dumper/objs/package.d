@@ -3,4 +3,4 @@
  */
 module adbg.dumper.objs;
 
-public import adbg.dumper.objs.pe;
+public import adbg.dumper.objs.printpe;

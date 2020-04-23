@@ -3,7 +3,7 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.dumper.objs.mz;
+module adbg.dumper.objs.printmz;
 
 import core.stdc.stdio;
 import core.stdc.config : c_long;
@@ -22,7 +22,7 @@ extern (C):
 /// 	dp = Disassembler parameters
 /// 	flags = Show X flags
 /// Returns: Non-zero on error
-int adbg_dmpr_mz_print(obj_info_t *fi, disasm_params_t *dp, int flags) {
+int adbg_dmpr_print_mz(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	//TODO: MZ
 	
 	return EXIT_SUCCESS;

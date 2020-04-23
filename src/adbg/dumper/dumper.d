@@ -145,7 +145,7 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 
 	with (ObjType)
 	switch (finfo.type) {
-	case PE: return adbg_dmpr_pe_print(&finfo, dp, flags);
+	case PE: return adbg_dmpr_print_pe(&finfo, dp, flags);
 	default:
 		puts("loader: format not supported");
 		return EXIT_FAILURE;

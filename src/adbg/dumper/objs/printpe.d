@@ -3,7 +3,7 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.dumper.objs.pe;
+module adbg.dumper.objs.printpe;
 
 import adbg.etc.ddc : putchar;
 import core.stdc.stdio;
@@ -26,7 +26,7 @@ extern (C):
 /// 	dp = Disassembler parameters
 /// 	flags = Show X flags
 /// Returns: Non-zero on error
-int adbg_dmpr_pe_print(obj_info_t *fi, disasm_params_t *dp, int flags) {
+int adbg_dmpr_print_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	bool unkmach = void;
 	const(char) *str_mach = adbg_obj_pe_mach(fi.pe.hdr.Machine);
 	if (str_mach == null) {
