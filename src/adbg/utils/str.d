@@ -10,7 +10,7 @@ private import core.stdc.stdarg;
 
 extern (C):
 
-/// Hexadecimal map for strx0* functions to provide much faster %X parsing
+/// Hexadecimal map for strx0* functions to provide much faster %x parsing
 private __gshared char [16]hexmaplow = "0123456789abcdef";
 /// Hexadecimal map for strx0* functions to provide much faster %X parsing
 private __gshared char [16]hexmapupp = "0123456789ABCDEF";
