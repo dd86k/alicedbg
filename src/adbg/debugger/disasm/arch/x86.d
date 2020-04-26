@@ -862,7 +862,7 @@ L_CONTINUE:
 				if (p.x86.op & X86_FLAG_WIDE) { // C5H, VEX 2-byte prefix
 					if (p.mode >= DisasmMode.File)
 						adbg_dasm_push_x8(p, modrm);
-					p.x86.vex_vvvv  = ~(modrm & 56); // 3 bits under 32-bit
+					p.x86.vex_vvvv  = ~(modrm & 56) >> 3; // 3 bits under 32-bit
 					p.x86.vex_L = modrm & 4;
 					p.x86.vex_pp  = modrm & 3;
 					++p.addrv;
@@ -873,7 +873,7 @@ L_CONTINUE:
 						adbg_dasm_push_x8(p, modrm);
 						adbg_dasm_push_x8(p, p.x86.vex[2]);
 					}
-					p.x86.vex_vvvv  = ~(p.x86.vex[2] & 56); // 3 bits under 32-bit
+					p.x86.vex_vvvv  = ~(p.x86.vex[2] & 56) >> 3; // 3 bits under 32-bit
 					p.x86.vex_L = p.x86.vex[2] & 4;
 					p.x86.vex_pp  = p.x86.vex[2] & 3;
 					p.addrv += 2;
@@ -4329,7 +4329,6 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 		adbg_dasm_x86_vex_modrm(p, f);
 		return;
 	case 0x54: // 54H-57H
-		int f = X86_FLAG_3OPRND | X86_FLAG_REGW_128B | X86_FLAG_MEMW_128B | X86_FLAG_DIR;
 		const(char) *i = void;
 		switch (p.x86.vex_pp) {
 		case X86_VEX_PP_NONE:
@@ -4350,7 +4349,8 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 		}
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, i);
-		adbg_dasm_x86_vex_modrm(p, f);
+		adbg_dasm_x86_vex_modrm(p,
+			X86_FLAG_3OPRND | X86_FLAG_REGW_128B | X86_FLAG_DIR);
 		return;
 	case 0x58: // 58H-5BH
 		int f = X86_FLAG_REGW_128B | X86_FLAG_DIR;
@@ -4458,7 +4458,7 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, i);
 		adbg_dasm_x86_vex_modrm(p,
-			X86_FLAG_DIR | X86_FLAG_MEMW_128B | X86_FLAG_REGW_128B | X86_FLAG_3OPRND);
+			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0x64: // 64H-67H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
@@ -4473,7 +4473,7 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, i);
 		adbg_dasm_x86_vex_modrm(p,
-			X86_FLAG_DIR | X86_FLAG_MEMW_128B | X86_FLAG_REGW_128B | X86_FLAG_3OPRND);
+			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0x68: // 68H-6BH
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
@@ -4488,7 +4488,7 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, i);
 		adbg_dasm_x86_vex_modrm(p,
-			X86_FLAG_DIR | X86_FLAG_MEMW_128B | X86_FLAG_REGW_128B | X86_FLAG_3OPRND);
+			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0x6C: // 6CH-6FH
 		const(char) *i = void;
@@ -4534,8 +4534,92 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 		adbg_dasm_x86_vex_modrm(p, f);
 		return;
 	case 0x70: // 70H-73H
-	
+		const(char) *m = void;
+		int f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
+		ubyte modrm = void;
+		if (p.x86.op & X86_FLAG_DIR) {
+			modrm = *p.addru8;
+			if (p.x86.vex_pp != X86_VEX_PP_66H ||
+				(modrm & MODRM_MOD) != MODRM_MOD_11) {
+				adbg_dasm_err(p);
+				return;
+			}
+			if (p.x86.op & X86_FLAG_WIDE) {
+				switch (modrm & MODRM_REG) {
+				case MODRM_REG_010: m = "vpsrlq"; break;
+				case MODRM_REG_011: m = "vpsrldq"; break;
+				case MODRM_REG_110: m = "vpsllq"; break;
+				case MODRM_REG_111: m = "vpslldq"; break;
+				default: adbg_dasm_err(p); return;
+				}
+			} else {
+				switch (modrm & MODRM_REG) {
+				case MODRM_REG_010: m = "vpsrld"; break;
+				case MODRM_REG_100: m = "vpsrad"; break;
+				case MODRM_REG_110: m = "vpslld"; break;
+				default: adbg_dasm_err(p); return;
+				}
+			}
+			f |= X86_FLAG_VEX_USEvvvv;
+		} else {
+			if (p.x86.op & X86_FLAG_WIDE) {
+				modrm = *p.addru8;
+				if (p.x86.vex_pp != X86_VEX_PP_66H ||
+					(modrm & MODRM_MOD) != MODRM_MOD_11) {
+					adbg_dasm_err(p);
+					return;
+				}
+				switch (modrm & MODRM_REG) {
+				case MODRM_REG_010: m = "vpsrlw"; break;
+				case MODRM_REG_100: m = "vpsraw"; break;
+				case MODRM_REG_110: m = "vpsllw"; break;
+				default: adbg_dasm_err(p); return;
+				}
+				f |= X86_FLAG_VEX_USEvvvv;
+			} else {
+				switch (p.x86.vex_pp) {
+				case X86_VEX_PP_66H: m = "vpshufd"; break;
+				case X86_VEX_PP_F3H: m = "vpshufhw"; break;
+				case X86_VEX_PP_F2H: m = "vpshuflw"; break;
+				default: adbg_dasm_err(p); return;
+				}
+			}
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		adbg_dasm_x86_u8imm(p);
 		return;
+	case 0x74: // 74H-77H
+		const(char) *m = void;
+		int f = X86_FLAG_DIR | X86_FLAG_3OPRND | X86_FLAG_MODW_128B;
+		if (p.x86.op & X86_FLAG_DIR) {
+			if (p.x86.op & X86_FLAG_WIDE) {
+				if (p.mode >= DisasmMode.File)
+					adbg_dasm_push_str(p, p.x86.vex_L ?
+						"vzeroall" : "vzeroupper");
+				return;
+			} else {
+				if (p.x86.vex_pp != X86_VEX_PP_66H) {
+					adbg_dasm_err(p);
+					return;
+				}
+				m = "vpcmpeqd";
+			}
+		} else {
+			if (p.x86.vex_pp != X86_VEX_PP_66H) {
+				adbg_dasm_err(p);
+				return;
+			}
+			m = p.x86.op & X86_FLAG_WIDE ? "vpcmpeqw" : "vpcmpeqb";
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+/*	case 0x7C: // 7CH-7FH
+	
+		return;*/
 	default: adbg_dasm_err(p); return;
 	}
 }
@@ -4656,8 +4740,10 @@ enum : ubyte {
 // || |  +---------------- Memory pointer width
 // || +------------------- (VEX) Number of operands
 // ++---------- 0000 0000  (bits)
-//                 |
-//                 +------ (VEX) If VEX.L is set, trip bad
+//               |||    +- Use WIDE flag for width
+//               ||+------ (VEX) If VEX.L is set, trip
+//               |+------- (VEX) Ignore VEX.L, proceed as unset
+//               +-------- (VEX) Use VEX.vvvv as ModRM.REG (2OPRND only)
 enum { // Flags for ModRM functions
 	X86_FLAG_WIDE	= 1, /// Set: Instruction is wide (32b instead of 8b)
 	X86_FLAG_DIR	= 2, /// Set: ModRM.REG is destination
@@ -4701,9 +4787,15 @@ enum { // Flags for ModRM functions
 	X86_FLAG_4OPRND	= 0x20_0000,
 	X86_FLAG_OPRNDM	= 0xF0_0000, /// n operand mask
 	// MODRM flags
-	X86_FLAG_USE_OP	= 0x0001_0000,
+	X86_FLAG_USE_OP	= 0x0100_0000,
+//	X86_FLAG_	= 0x0200_0000,
+//	X86_FLAG_	= 0x0400_0000,
+//	X86_FLAG_	= 0x0800_0000,
 	// (VEX) VEX flags
-	X86_FLAG_VEX_NO_L	= 0x1000_0000,
+	X86_FLAG_VEX_NO_L	= 0x1000_0000,	/// Trip on VEX.L if set
+	X86_FLAG_VEX_IGNORE_L	= 0x2000_0000,	/// Force VEX.L as unset
+	X86_FLAG_VEX_USEvvvv	= 0x4000_0000,	/// Use VEX.vvvv instead of ModRM.REG
+//	X86_FLAG_VEX_	= 0x8000_0000
 }
 
 // Prefix combos for 0F
@@ -5213,22 +5305,28 @@ void adbg_dasm_x86_vex_modrm(disasm_params_t *p, int flags) {
 	int dir = flags & X86_FLAG_DIR;
 	int wreg = (flags & X86_FLAG_REGW) >> 8;
 	int wmem = (flags & X86_FLAG_MEMW) >> 12;
-	int sw = p.x86.vex_L ? X86_FLAG_MODW_256B : X86_FLAG_MODW_128B; // RM and vvvv
+	int sw = p.x86.vex_L ? X86_WIDTH_128B : X86_WIDTH_256B; // RM and vvvv
 
 	if (wreg == X86_FLAG_MODW_128B)
 		if (p.x86.vex_L)
-			wreg = X86_FLAG_MODW_256B;
+			wreg = X86_WIDTH_256B;
 
 	// Barbaric, but works
-	switch (flags & X86_FLAG_OPRNDM) {
-	default: // 0, most cases
+	final switch (flags & X86_FLAG_OPRNDM) {
+	case 0: // 0, most cases
 		if (dir) goto L_2REG;
 L_2RM:
 		adbg_dasm_x86_modrm_rm(p, modrm, wmem, sw);
 		if (dir) return;
 L_2REG:
 		if (p.mode >= DisasmMode.File) {
-			adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, modrm, wreg));
+			const(char) *m = void;
+			if (flags & X86_FLAG_VEX_USEvvvv) {
+				m = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, wreg);
+			} else {
+				m = adbg_dasm_x86_modrm_reg(p, modrm >> 3, wreg);
+			}
+			adbg_dasm_push_reg(p, m);
 		}
 		if (dir) goto L_2RM;
 		return;
@@ -5239,13 +5337,16 @@ L_3RM:
 		if (dir) return;
 L_3REG:
 		if (p.mode >= DisasmMode.File) {
+			const(char)* r1 = void, r2 = void;
 			if (dir) {
-				adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, modrm, wreg));
-				adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw));
+				r1 = adbg_dasm_x86_modrm_reg(p, modrm, wreg);
+				r2 = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
 			} else {
-				adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw));
-				adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, modrm, wreg));
+				r1 = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
+				r2 = adbg_dasm_x86_modrm_reg(p, modrm, wreg);
 			}
+			adbg_dasm_push_reg(p, r1);
+			adbg_dasm_push_reg(p, r2);
 		}
 		if (dir) goto L_3RM;
 		return;
