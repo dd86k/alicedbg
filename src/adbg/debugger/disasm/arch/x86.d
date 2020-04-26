@@ -4617,9 +4617,51 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 			adbg_dasm_push_str(p, m);
 		adbg_dasm_x86_vex_modrm(p, f);
 		return;
-/*	case 0x7C: // 7CH-7FH
-	
-		return;*/
+	case 0x7C: // 7CH-7FH
+		const(char) *m = void;
+		int f;
+		if (p.x86.op & X86_FLAG_DIR) {
+			if (p.x86.op & X86_FLAG_WIDE) {
+				switch (p.x86.vex_pp) {
+				case X86_VEX_PP_66H: m = "vmovdqa"; break;
+				case X86_VEX_PP_F3H: m = "vmovdqu"; break;
+				default: adbg_dasm_err(p); return;
+				}
+				f |= X86_FLAG_MODW_128B;
+			} else {
+				switch (p.x86.vex_pp) {
+				case X86_VEX_PP_66H:
+					if ((*p.addru8 & MODRM_MOD) != MODRM_MOD_11) {
+						adbg_dasm_err(p);
+						return;
+					}
+					m = "vmovd";
+					f |= X86_FLAG_REGW_32B | X86_FLAG_MEMW_128B;
+					break;
+				case X86_VEX_PP_F3H:
+					m = "vmovq";
+					f |= X86_FLAG_MODW_128B;
+					break;
+				default: adbg_dasm_err(p); return;
+				}
+				f |= X86_FLAG_DIR | X86_FLAG_VEX_NO_L;
+			}
+		} else {
+			switch (p.x86.vex_pp) {
+			case X86_VEX_PP_66H:
+				m = p.x86.op & X86_FLAG_WIDE ? "vhaddpd" : "vhsubpd";
+				break;
+			case X86_VEX_PP_F2H:
+				m = p.x86.op & X86_FLAG_WIDE ? "vhsubps" : "vhaddps";
+				break;
+			default: adbg_dasm_err(p); return;
+			}
+			f |= X86_FLAG_DIR | X86_FLAG_3OPRND | X86_FLAG_MODW_128B;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
 	default: adbg_dasm_err(p); return;
 	}
 }
@@ -5305,11 +5347,10 @@ void adbg_dasm_x86_vex_modrm(disasm_params_t *p, int flags) {
 	int dir = flags & X86_FLAG_DIR;
 	int wreg = (flags & X86_FLAG_REGW) >> 8;
 	int wmem = (flags & X86_FLAG_MEMW) >> 12;
-	int sw = p.x86.vex_L ? X86_WIDTH_128B : X86_WIDTH_256B; // RM and vvvv
+	int sw = p.x86.vex_L ? X86_WIDTH_256B : X86_WIDTH_128B; // RM and vvvv
 
-	if (wreg == X86_FLAG_MODW_128B)
-		if (p.x86.vex_L)
-			wreg = X86_WIDTH_256B;
+	if (wreg == X86_WIDTH_128B && p.x86.vex_L)
+		wreg = wmem = X86_WIDTH_256B;
 
 	// Barbaric, but works
 	final switch (flags & X86_FLAG_OPRNDM) {
@@ -5322,7 +5363,7 @@ L_2REG:
 		if (p.mode >= DisasmMode.File) {
 			const(char) *m = void;
 			if (flags & X86_FLAG_VEX_USEvvvv) {
-				m = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, wreg);
+				m = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
 			} else {
 				m = adbg_dasm_x86_modrm_reg(p, modrm >> 3, wreg);
 			}
