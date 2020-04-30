@@ -29,8 +29,8 @@ version (Posix) {
 	import core.sys.posix.unistd : fork, execve;
 	import core.sys.posix.signal : kill, SIGKILL;
 	import core.stdc.stdlib : exit;
-	import debugger.sys.ptrace;
-	import debugger.sys.user;
+	import adbg.debugger.sys.ptrace;
+	import adbg.debugger.sys.user;
 	private enum __WALL = 0x40000000;
 	private pid_t hprocess; /// Saved process ID
 }

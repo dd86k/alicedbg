@@ -7,7 +7,7 @@ module adbg.os.posix.seh;
 
 version (Posix):
 
-import debugger.exception : exception_t;
+import adbg.debugger.exception : exception_t;
 
 import core.sys.posix.signal;
 import core.sys.posix.ucontext;

@@ -26,8 +26,8 @@ version (Windows) {
 	}
 } else
 version (Posix) {
-	import debugger.sys.user;
-	import debugger.sys.ptrace : siginfo_t;
+	import adbg.debugger.sys.user;
+	import adbg.debugger.sys.ptrace : siginfo_t;
 	import core.sys.posix.signal;
 }
 

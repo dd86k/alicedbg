@@ -17,6 +17,13 @@ Personal Goals:
 - [ ] Embed, as a library, into an embedded HTTP server to provide a local WebUI
 - [ ] Make a disassembly as a service
 
+Planned versions:
+
+- 0.1: Basics
+  - Disassembler: x86/x86-64 disassembler
+  - UI: loop
+  - OS: Windows and Linux
+
 ## Support Matrix
 
 ### Debugger Support
