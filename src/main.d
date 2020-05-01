@@ -380,7 +380,7 @@ int main(int argc, const(char) **argv) {
 
 		if (strcmp(arg, "version") == 0 || strcmp(arg, "-version") == 0)
 			return cliver;
-		if (strcmp(arg, "help") == 0 || strcmp(arg, "-help") == 0)
+		if (strcmp(arg, "h") == 0 || strcmp(arg, "-help") == 0)
 			return clipage(CLIPage.main);
 		if (strcmp(arg, "-license") == 0)
 			return clipage(CLIPage.license);
