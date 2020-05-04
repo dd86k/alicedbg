@@ -19,10 +19,16 @@ Personal Goals:
 
 Planned versions:
 
-- 0.1: Basics
-  - Disassembler: x86/x86-64 disassembler
-  - UI: loop
+- 0.1: INIT
+  - Disassembler: x86 disassembler
+  - Dumper: PE support
+  - Debug UI: loop
   - OS: Windows and Linux
+  - alicedbg.1
+- 0.2: How is it going, World?
+  - Disassembler: x86-64 disassembler
+  - Dumper: ELF support
+  - alicedbg.3
 
 ## Support Matrix
 
@@ -41,7 +47,7 @@ Planned versions:
 
 | Platform | ~% | Extensions | Notes |
 |---|---|---|---|
-| x86-32 | 60 | x87, MMX, SSE (2, 3, 4.1, 4.2, 4a), AES, SHA, VMX, SVM 1.0, SMX, WAITPKG | Still adding |
+| x86-32 | 60 | x87, MMX, SSE (2/3/4.1/4.2/4a), AES, SHA, VMX, SVM 1.0, SMX, WAITPKG | Still adding |
 | x86-64 | 0 | | Waiting on x86-32 |
 | arm-t32 | 0 | | Waiting on x86-64 |
 | arm-a32 | 0 | | Waiting on x86-64 |
@@ -52,6 +58,7 @@ Planned versions:
 | powerpc-32 | 0 | | |
 | powerpc-64 | 0 | | |
 | webasm | 0 | | Planned |
+| cil | 0 | | Planned |
 
 ### Object Dump Support
 
@@ -104,10 +111,6 @@ any operating modes without an option switch (`-example`). Therefore, it is
 possible to only write examples such as `alicedbg -dump putty.exe -show A`,
 `alicedbg -ui loop debuggee`, and `alicedbg -dump -march x86 -raw test_x86`.
 
-### UI: tui
-
-The Text UI is currently in development, and is currently not ready for use.
-
 ### UI: loop
 
 The loop UI is the simplest implementation, featuring simple output on
@@ -131,6 +134,14 @@ Action [S=Step,C=Continue,Q=Quit]
 Which features the exception counter, process ID, thread ID, short exception
 messsage, OS-specific code, memory location, a brief disassembly (when
 available), and register list (when available).
+
+### UI: cmd
+
+The command interpreter UI is currently in development, and is currently not ready for use.
+
+### UI: tui
+
+The Text UI is currently in development, and is currently not ready for use.
 
 # Build Instructions
 

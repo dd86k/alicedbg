@@ -223,7 +223,7 @@ void adbg_dasm_push_segreg(disasm_params_t *p, const(char) *seg, const(char) *re
 /// on the immediate formatter (adbg_dasm_fmt_addr).
 /// Params:
 /// 	p = Disassembler parameters
-/// 	imm = Immediate value
+/// 	addr = Address value
 void adbg_dasm_push_addr(disasm_params_t *p, ulong addr) {
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
 	if (i == null) return;

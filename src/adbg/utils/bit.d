@@ -13,13 +13,13 @@ module adbg.utils.bit;
 
 extern (C):
 
-/// Create a 1-bit bitmask with a bit position (LSB, 0-based, 1 << a).
+/// Create a 1-bit bitmask with a bit position (0-based, 1 << a).
 template BIT(int n) { enum { BIT = 1 << n } }
 
 version (LittleEndian)
-	private enum TE = 0;
+	private enum TE = 0; /// Target Endian
 else
-	private enum TE = 1;
+	private enum TE = 1; /// Target Endian
 
 /// Conditionally swap if specified target endian does not match compiled
 /// target.
