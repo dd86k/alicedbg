@@ -1,34 +1,53 @@
 /**
- * Object and (executable) image loader.
+ * Object/image loader.
+ *
+ * The goal of the object/image loader is being able to obtain information
+ * from obj/pdb/image files such as:
+ * - Object Type;
+ * - Machine architecture;
+ * - Symbols;
+ * - Debugging information (types, etc.);
+ * - And a few extras for dumping purposes.
+ *
+ * Currently, the entire file is loaded in memory out of keeping the
+ * implementation simple. Future could see MMI/O usage, or a pure "disk" mode.
  *
  * License: BSD 3-Clause
  */
 module adbg.debugger.obj.loader;
 
 import core.stdc.stdio;
-import adbg.debugger.disasm.disasm : DisasmISA; // ISA translation
-private import adbg.debugger.file.objs;
+import adbg.debugger.disasm.disasm : DisasmISA, adbg_dasm_endian; // ISA translation
+import adbg.debugger.file.objs;
 import adbg.os.err;
 
 extern (C):
 
-// Loader flags
-enum {
-	LOADER_FILE_MEM = 1
-}
+/*enum {	// adbg_obj_load flags
+	/// Leave file in memory, used by dumper
+	LOADER_MEM = 0x1000,
+}*/
+
+/*private enum {	// obj_info_t internal flags
+	/// ISA is MSB
+	LOADER_INTERNAL_MSB	= 0x0000_0001,
+	/// Section info is loaded
+	/// Internal buffer is allocated
+	LOADER_INTERNAL_BUF_ALLOC	= 0x4000_0000,
+	/// Structure is loaded included header
+	LOADER_INTERNAL_OBJ_LOADED	= 0x8000_0000
+}*/
 
 /// File operation error code
 enum ObjError {
 	/// Operating was a success, so no error occurred
 	None,
-	/// Operation error (e.g. can't seek, can't read)
-	Operation,
+	/// File operation error (e.g. can't seek, can't read)
+	FileOperation,
 	/// Format not supported
-	Unsupported,
-	/// Requested action/feature is not available (from file)
-	NotAvailable,
-	/// Symbol location not found
-	NotFound,
+	FormatUnsupported,
+	/// Requested action/feature is not available
+	Unavailable,
 }
 
 /// Loaded, or specified, executable/object format
@@ -39,7 +58,7 @@ enum ObjType {
 	MZ,
 	/// New Executable format
 	NE,
-	/// LE/LX
+	/// Linked Executable/LX format
 	LE,
 	/// Portable Executable format
 	PE,
@@ -47,92 +66,182 @@ enum ObjType {
 	ELF,
 	/// Mach Object format
 	MachO,
+	/// Microsoft Program Database format
+	PDB,
+	/// Microsoft Debug format
+	DBG,
+}
+
+/// Symbol entry
+struct obj_symbol_t {
+	size_t address;
+	char *name;
 }
 
 /// Executable file information and headers
-//TODO: Field saying if image or object?
-struct obj_info_t {
-	/// File handle, used internally.
+struct obj_info_t { align(1):
+	//
+	// File fields
+	//
+
+	union {
+		void   *buf;	/// (Internal)
+		char   *bufc8;	/// (Internal)
+		ubyte  *bufu8;	/// (Internal)
+		ushort *bufu16;	/// (Internal)
+		uint   *bufu32;	/// (Internal)
+		ulong  *bufu64;	/// (Internal)
+	}
+	/// File handle, used internally. Copied from supplied FILE structure.
 	FILE *handle;
+	/// File size.
+	uint size;
+
+	//
+	// Object fields
+	//
+
 	/// File type, populated by the respective loading function.
 	ObjType type;
-	/// Unset for little, set for big. Used in cswap functions.
-	int endian;
 	/// Image's ISA translated value for disasm
 	DisasmISA isa;
+	/// A copy of the original loading flags
+	int oflags;
+	/// Number of symbols loaded
+//	uint nsymbols;
+	/// Symbols table
+//	obj_symbol_t *symbols;
+
 	//
-	// Internal fields
+	// Object-specific pointers
 	//
+
 	union {
-		obj_info_pe_t pe;	/// PE headers
+		PE_META pe;
 	}
-}
-struct obj_info_pe_t { // PE32
-	PE_HEADER hdr;
-	union {
-		PE_OPTIONAL_HEADER ohdr;
-		PE_OPTIONAL_HEADER64 ohdr64;
-		PE_OPTIONAL_HEADERROM ohdrrom;
-	}
-	PE_IMAGE_DATA_DIRECTORY dir;
+
+	//
+	// Internals
+	//
+
+	/// Internal status (bits)
+	/// 0: endian (0=little, 1=big)
+	int internal;
+	/// Offset to header data. PE uses this.
+	int offset;
 }
 
-/// Load an executable or object file from path. Uses FILE. If you see
-/// an executable image larger than 2 GiB, do let me know.
+int adbg_obj_open(const(char*) path, obj_info_t *info, int flags) {
+	info.handle = fopen(path, "rb");
+
+	if (info.handle == null)
+		return 1;
+
+	return adbg_obj_load(info.handle, info, flags);
+}
+
+/// Load object from file handle.
+///
+/// Flags are used to indicate what to load. The function is responsible of
+/// allocating data depending on the requested information. The headers
+/// are always loaded.
+///
+/// NOTICE: For the moment being, the LOADER_FILE_MEM is default. No other
+/// modes have been implemented.
+///
+/// If you see an executable image larger than 2 GiB, do let me know.
 /// Params:
 /// 	file = Opened FILE
-/// 	info = file_info_t structure pointer
-/// 	flags = Load options (placeholder)
+/// 	info = obj_info_t structure
+/// 	flags = Load options
 /// Returns: OS error code or a FileError on error
 int adbg_obj_load(FILE *file, obj_info_t *info, int flags) {
+	import core.stdc.config : c_long;
+	import core.stdc.stdlib : malloc;
+
 	if (file == null)
-		return ObjError.Operation;
+		return ObjError.FileOperation;
+
 	info.handle = file;
+	info.oflags = flags;
 
-	//
+	// File size
+
+	if (fseek(info.handle, 0, SEEK_END))
+		return ObjError.FileOperation;
+	info.size = cast(uint)ftell(info.handle);
+	if (info.size == 0xFFFF_FFFF) // -1
+		return ObjError.FileOperation;
+	if (fseek(info.handle, 0, SEEK_SET))
+		return ObjError.FileOperation;
+
+	// Allocate and read
+
+	info.buf = malloc(info.size);
+	if (info.buf == null)
+		return ObjError.FileOperation;
+	if (fread(info.buf, info.size, 1, info.handle) == 0)
+		return ObjError.FileOperation;
+
 	// Auto-detection
-	//
 
-	info.type = ObjType.Unknown;
-	file_sig_t sig = void;
-	if (fread(&sig, 4, 1, info.handle) == 0)
-		return ObjError.Operation;
+	file_sig_t sig = void; // for conveniance
 
-	switch (sig.u16[0]) {
-	case SIG_MZ: // 'ZM' files exist, but very rare (MSDOS 2 era)
-		if (fseek(info.handle, 0x3C, SEEK_SET))
-			return ObjError.Operation;
-		uint hdrloc = void;
-		if (fread(&hdrloc, 4, 1, info.handle) == 0)
-			return ObjError.Operation;
-		if (fseek(info.handle, hdrloc, SEEK_SET))
-			return ObjError.Operation;
-		if (fread(&sig, 4, 1, info.handle) == 0)
-			return ObjError.Operation;
+	int e = void;
+	switch (*cast(ushort*)info.buf) {
+	case SIG_MZ:
+		uint hdrloc = *cast(uint*)(info.buf + 0x3c);
+		if (hdrloc == 0)
+			return ObjError.FileOperation;
+		if (hdrloc >= info.size - 4)
+			return ObjError.FileOperation;
+		sig.u32 = *cast(uint*)(info.buf + hdrloc);
 		switch (sig.u16[0]) {
 		case SIG_PE:
 			if (sig.u16[1]) // "PE\0\0"
-				return ObjError.Unsupported;
-			return adbg_obj_pe_load(info);
+				return ObjError.FormatUnsupported;
+			info.type = ObjType.PE;
+			info.offset = hdrloc;
+			e = adbg_obj_pe_load(info, flags);
+			break;
 		default: // MZ
-			return ObjError.Unsupported;
+			return ObjError.FormatUnsupported;
 		}
-/*	case SIG_ELF_L:
-	
-		break;*/
+		break;
 	default:
-		return ObjError.Unsupported;
+		return ObjError.FormatUnsupported;
+	}
+
+	if (e) return e;
+
+	info.internal = adbg_dasm_endian(info.isa);
+
+	return ObjError.None;
+}
+
+//TODO: adbg_obj_unload
+/*int adbg_obj_unload(obj_info_t *info) {
+	
+	return 0;
+}*/
+
+//ubyte* adbg_obj_load_section(const(char)* sname)
+
+//TODO: adbg_obj_symbol_at_address
+/*char* adbg_obj_symbol_at_address(obj_info_t *info, size_t address) {
+	
+	return null;
+}*/
+
+const(char) *adbg_obj_errmsg(ObjError err) {
+	with (ObjError)
+	final switch (err) {
+	case None:	return "None";
+	case FileOperation:	return "Could not read, seek, or write to file";
+	case FormatUnsupported:	return "Unsupported format";
+	case Unavailable:	return "Unavailable";
 	}
 }
-
-int adbg_obj_cmp_section(const(char)* sname, int ssize, const(char) *tname) {
-	import core.stdc.string : strncmp;
-	return strncmp(sname, tname, ssize) == 0;
-}
-
-//const(char) *file_err(FileError)
-//const(char) *file_type_string(FileType t)
-//uint file_section_fo(file_info_t*,const(char)*)
 
 private:
 

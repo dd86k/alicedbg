@@ -12,19 +12,19 @@ import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
 import core.stdc.string : strcpy;
 import core.stdc.time : time_t, tm, localtime, strftime;
 import adbg.dumper.dumper;
-import adbg.debugger.obj.loader : obj_info_t;
-import adbg.debugger.disasm.disasm : disasm_params_t, adbg_dasm_line, DisasmMode;
+import adbg.debugger.obj.loader;
+import adbg.debugger.disasm.disasm;
 import adbg.debugger.file.objs.pe;
 
 extern (C):
 
-/// Print PE32 info to stdout, a file_info_t structure must be loaded before
+/// Print PE32 info to stdout, a obj_info_t structure must be loaded before
 /// calling this function. If an unknown Machine type is detected, this only
 /// prints the first header. FILE handle must be pointing to section table.
 /// Params:
 /// 	fi = File information
 /// 	dp = Disassembler parameters
-/// 	flags = Show X flags
+/// 	flags = Dumper/Loader flags
 /// Returns: Non-zero on error
 int adbg_dmpr_print_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	bool unkmach = void;
@@ -35,30 +35,22 @@ int adbg_dmpr_print_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	} else
 		unkmach = false;
 
-	//TODO: Fix strftime crash (Windows)
+	//TODO: (Windows) Fix strftime crash
 	// Getting 0xC0000409 (STATUS_STACK_BUFFER_OVERRUN) for high numbers
 	// Should we try FILETIME (8 bytes..) or SYSTEMTIME (16 bytes..)
 	// windbg.exe x86: 1995-01-25
 	// windbg.exe x64: 2068-03-02
-	char[32] tbuffer = void;
+/*	char[32] tbuffer = void;
 	if (strftime(cast(char*)&tbuffer, 32, "%c",
 		localtime(cast(time_t*)&fi.pe.hdr.TimeDateStamp)) == 0) {
 		strcpy(cast(char*)tbuffer, "strftime:err");
-	}
-
-	// variables are declared here because compiler whines about GOTO
-	// skipping declarations
-	ushort OptMagic = fi.pe.ohdr.Magic; /// For future references
-	c_long pos_section = ftell(fi.handle);	/// Saved position for sections
-	uint fo_loadcf, fo_import, fo_importaddr; // file offsets
-	uint sec_import_size = void; // used in calculating offets
-	uint sec_import_fo = void; // used in calculating offets
+	}*/
 
 	//
-	// PE Header
+	// ANCHOR PE Header
 	//
 
-	if ((flags & DUMPER_SHOW_HEADERS) == 0)
+	if ((flags & DUMPER_SHOW_HEADER) == 0)
 		goto L_SECTIONS;
 
 	with (fi.pe.hdr)
@@ -67,14 +59,14 @@ int adbg_dmpr_print_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	"*\n* Header\n*\n\n"~
 	"Machine               %04X\t(%s)\n"~
 	"NumberOfSections      %04X\t(%u)\n"~
-	"TimeDateStamp         %04X\t(%s)\n"~
+	"TimeDateStamp         %04X\n"~
 	"PointerToSymbolTable  %08X\n"~
 	"NumberOfSymbols       %08X\t(%u)\n"~
 	"SizeOfOptionalHeader  %04X\t(%u)\n"~
 	"Characteristics       %04X\t(",
 	Machine, str_mach,
 	NumberOfSections, NumberOfSections,
-	TimeDateStamp, &tbuffer,
+	TimeDateStamp,// &tbuffer,
 	PointerToSymbolTable,
 	NumberOfSymbols, NumberOfSymbols,
 	SizeOfOptionalHeader, SizeOfOptionalHeader,
@@ -120,7 +112,7 @@ int adbg_dmpr_print_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
 		return EXIT_SUCCESS;
 
 	//
-	// PE Optional Header, and Directory
+	// ANCHOR PE Optional Header, and Directory
 	//
 
 	if (fi.pe.hdr.SizeOfOptionalHeader) { // No gotos here, it could skip declarations
@@ -356,7 +348,7 @@ int adbg_dmpr_print_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	}
 
 	//
-	// Sections
+	// ANCHOR Sections
 	//
 L_SECTIONS:
 
@@ -365,10 +357,7 @@ L_SECTIONS:
 
 	puts("\n*\n* Sections\n*");
 	for (ushort si; si < fi.pe.hdr.NumberOfSections; ++si) {
-		PE_SECTION_ENTRY section = void;
-
-		if (fread(&section, section.sizeof, 1, fi.handle) == 0)
-			return EXIT_FAILURE;
+		PE_SECTION_ENTRY section = fi.pe.sections[si];
 
 		with (section)
 		printf(
@@ -382,7 +371,7 @@ L_SECTIONS:
 		"PointerToLinenumbers  %08X\n"~
 		"NumberOfLinenumbers   %04X\t(%u)\n"~
 		"Characteristics       %08X\t(",
-		si + 1, &Name,
+		si + 1, cast(char*)Name,
 		VirtualAddress,
 		VirtualSize, section.VirtualSize,
 		PointerToRawData,
@@ -437,9 +426,10 @@ L_SECTIONS:
 		case PE_SECTION_CHARACTERISTIC_ALIGN_2048BYTES: scn_align = "ALIGN_2048BYTES,"; break;
 		case PE_SECTION_CHARACTERISTIC_ALIGN_4096BYTES: scn_align = "ALIGN_4096BYTES,"; break;
 		case PE_SECTION_CHARACTERISTIC_ALIGN_8192BYTES: scn_align = "ALIGN_8192BYTES,"; break;
-		default: scn_align = ""; break;
+		default: scn_align = null; break;
 		}
-		printf(scn_align);
+		if (scn_align)
+			printf(scn_align);
 		if (Characteristics & PE_SECTION_CHARACTERISTIC_LNK_NRELOC_OVFL)
 			printf("LNK_NRELOC_OVFL,");
 		if (Characteristics & PE_SECTION_CHARACTERISTIC_MEM_DISCARDABLE)
@@ -471,53 +461,78 @@ L_SYMBOLS:
 
 
 	//
-	// LoadConfig, Imports, .NET meta
+	// ANCHOR LoadConfig, Imports, .NET meta
 	//
 	// NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
 	//
 L_IMPORTS:
 
-	if ((flags & (DUMPER_SHOW_IMPORTS | DUMPER_SHOW_LOADCFG)) == 0)
+	if ((flags & (DUMPER_SHOW_IMPORTS | DUMPER_SHOW_LOADCFG)) == 0 ||
+		fi.pe.hdr.SizeOfOptionalHeader == 0)
 		goto L_DISASM;
-	if (fi.pe.hdr.SizeOfOptionalHeader == 0)
-		goto L_DISASM;
 
-	fseek(fi.handle, pos_section, SEEK_SET);
-	for (ushort si; si < fi.pe.hdr.NumberOfSections; ++si) {
-		PE_SECTION_ENTRY section = void;
+	puts("\n*\n* Imports\n*\n");
 
-		if (fread(&section, section.sizeof, 1, fi.handle) == 0)
-			return EXIT_FAILURE;
+	if (fi.pe.fo_imports && fi.pe.hdr.SizeOfOptionalHeader) {
+		char* basename = cast(char*)fi.pe.imports - fi.pe.dir.ImportTable.rva;
 
-		if (fo_loadcf == 0)
-		if (section.VirtualAddress <= fi.pe.dir.LoadConfigurationTable.rva &&
-			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.LoadConfigurationTable.rva) {
-			fo_loadcf = section.PointerToRawData +
-				(fi.pe.dir.LoadConfigurationTable.rva - section.VirtualAddress);
+		for (size_t i; i < 256; ++i) { // 256 is a hardlimit for testing purposes
+			PE_IMPORT_DESCRIPTOR id = fi.pe.imports[i];
+
+			if (id.Characteristics == 0)
+				break;
+
+			with (id)
+			printf(
+			"Characteristics  %08X\n"~
+			"TimeDateStamp    %08X\n"~
+			"ForwarderChain   %08X\n"~
+			"Name             %08X\t%.32s\n"~ // 32 "in case of"
+			"FirstThunk       %08X\n\n",
+			Characteristics,
+			TimeDateStamp,
+			ForwarderChain,
+			Name, basename + Name,
+			FirstThunk
+			);
+
+			void* n = basename + id.Characteristics;
+
+			switch (fi.pe.ohdr.Magic) {
+			case PE_FMT_32:
+				PE_IMPORT_LTE32 *lte32 = cast(PE_IMPORT_LTE32*)n;
+				while (lte32.val) {
+					if (lte32.val & 0x8000_0000) { // Ordinal
+						printf("%04X\t", lte32.num);
+					} else { // RVA
+						ushort *hint = cast(ushort*)(basename + lte32.rva);
+						printf("%08X\t%04X\t%s\n",
+							lte32.rva, *hint, hint + 1);
+					}
+					++lte32;
+				}
+				putchar('\n');
+				break;
+			case PE_FMT_64:
+				PE_IMPORT_LTE64 *lte64 = cast(PE_IMPORT_LTE64*)n;
+				while (lte64.val1) {
+					if (lte64.val2 & 0x8000_0000) { // Ordinal
+						printf("%04X\t", lte64.num);
+					} else { // RVA
+						ushort *hint = cast(ushort*)(basename + lte64.rva);
+						printf("%08X\t%04X\t%s\n",
+							lte64.rva, *hint, hint + 1);
+					}
+					++lte64;
+				}
+				putchar('\n');
+				break;
+			default: return EXIT_FAILURE;
+			}
 		}
+	} else puts("No imports were found");
 
-		if (fo_import == 0)
-		if (section.VirtualAddress <= fi.pe.dir.ImportTable.rva &&
-			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.ImportTable.rva) {
-			fo_import = section.PointerToRawData +
-				(fi.pe.dir.ImportTable.rva - section.VirtualAddress);
-			sec_import_size = section.SizeOfRawData;
-			sec_import_fo = section.PointerToRawData;
-		}
-
-		if (fo_importaddr == 0)
-		if (section.VirtualAddress <= fi.pe.dir.ImportAddressTable.rva &&
-			section.VirtualAddress + section.SizeOfRawData > fi.pe.dir.ImportAddressTable.rva) {
-			fo_importaddr = section.PointerToRawData +
-				(fi.pe.dir.ImportAddressTable.rva - section.VirtualAddress);
-			sec_import_size = section.SizeOfRawData;
-			sec_import_fo = section.PointerToRawData;
-		}
-
-		if (fo_loadcf && fo_import && fo_importaddr)
-			break;
-	}
-	if (fo_loadcf && flags & DUMPER_SHOW_LOADCFG) { // LOAD_CONFIGURATION
+	/*if (fo_loadcf && flags & LOADER_LOAD_LOADCFG) { // LOAD_CONFIGURATION
 		if (fseek(fi.handle, fo_loadcf, SEEK_SET))
 			return EXIT_FAILURE;
 
@@ -748,137 +763,29 @@ L_IMPORTS:
 			EnclaveConfigurationPointer,
 			VolatileMetadataPointer);
 		}
-	} // LOAD_CONFIGURATION
-L_LOADCFG_EXIT:
-
-	//TODO: Load entire section
-	//      Names and stuff can be outside of the selected section
-	//      Only works on mscoff formats, crashes on omf
-	if (fo_import && fo_importaddr && flags & DUMPER_SHOW_IMPORTS) {
-		// Import Directory only contains structs
-		//   Contains Name RVA and ImportAddress RVA
-		// Import Address Directory only contains RVAs
-		// So get lowest file offset, calculate rest of section to read
-		// into memory, calculate offets.
-		// Then ImportDir.ImportAddress.RVA -> RVA -> Hint[2]+Name*
-		uint fo = fo_import < fo_importaddr ? fo_import : fo_importaddr;
-		uint size = sec_import_size - (fo - sec_import_fo);
-
-		uptr_t p = void; /// Import Directory pointer
-		p.vptr = malloc(size);
-		if (p.vptr == null)
-			return EXIT_FAILURE;
-		if (fseek(fi.handle, fo, SEEK_SET))
-			return EXIT_FAILURE;
-		if (fread(p.vptr, size, 1, fi.handle) == 0)
-			return EXIT_FAILURE;
-
-		PE_IMPORT_DESCRIPTOR *idesc = cast(PE_IMPORT_DESCRIPTOR*)p.vptr;
-
-		puts("\n*\n* Imports\n*\n");
-L_IMPORT_READ:
-		if (idesc.Characteristics == 0) {
-			free(p.vptr);
-			goto L_IMPORT_EXIT;
-		}
-
-		with (idesc)
-		printf(
-		"Characteristics  %08X\n"~
-		"TimeDateStamp    %08X\n"~
-		"ForwarderChain   %08X\n"~
-		"Name             %08X\t%s\n"~
-		"FirstThunk       %08X\n\n",
-		Characteristics,
-		TimeDateStamp,
-		ForwarderChain,
-		Name, p.u8ptr + (Name - fi.pe.dir.ImportTable.rva),
-		FirstThunk
-		);
-
-		ubyte *n = p.u8ptr + (idesc.Characteristics - fi.pe.dir.ImportTable.rva);
-
-		switch (OptMagic) {
-		case PE_FMT_32:
-			PE_IMPORT_LTE32 *lte32 = cast(PE_IMPORT_LTE32*)n;
-			while (lte32.val) {
-				if (lte32.val & 0x8000_0000) { // Ordinal
-					printf("%04X\t", lte32.num);
-				} else { // Name
-					ushort *hint = cast(ushort*)(p.u8ptr +
-						(lte32.rva - fi.pe.dir.ImportTable.rva));
-					ubyte *name = (cast(ubyte*)hint) + 2;
-					printf("%08X\t%04X\t%s\n",
-						lte32.rva, *hint, name);
-				}
-				++lte32;
-			}
-			putchar('\n');
-			break;
-		case PE_FMT_64:
-			PE_IMPORT_LTE64 *lte64 = cast(PE_IMPORT_LTE64*)n;
-			while (lte64.val1) {
-				if (lte64.val2 & 0x8000_0000) { // Ordinal
-					printf("%04X\t", lte64.num);
-				} else { // Name
-					ushort *hint = cast(ushort*)(p.u8ptr +
-						(lte64.rva - fi.pe.dir.ImportTable.rva));
-					ubyte *name = (cast(ubyte*)hint) + 2;
-					printf("%08X\t%04X\t%s\n",
-						lte64.rva, *hint, name);
-				}
-				++lte64;
-			}
-			putchar('\n');
-			break;
-		default: return EXIT_FAILURE;
-		}
-
-		++idesc;
-		goto L_IMPORT_READ;
-	}
-L_IMPORT_EXIT:
+	} // LOAD_CONFIGURATION*/
 
 	//
 	// Disassembly
 	//
 L_DISASM:
 
-	if ((flags & DUMPER_SHOW_DISASSEMBLY) == 0)
+	if ((flags & (DUMPER_DISASM_CODE | DUMPER_DISASM_ALL | DUMPER_DISASM_STATS)) == 0)
 		return EXIT_SUCCESS;
 
-	//TODO: Measure by section length
+	extern (C)
+	int function(disasm_params_t*,void*,uint) d = flags & DUMPER_DISASM_STATS ?
+		&adbg_dmpr_disasm_stats : &adbg_dmpr_disasm;
+	int all = flags & DUMPER_DISASM_ALL;
 
 	puts("\n*\n* Disassembly\n*");
-	void *mem = cast(void*)malloc(64);
-	fseek(fi.handle, pos_section, SEEK_SET);
-	for (ushort si; si < fi.pe.hdr.NumberOfSections; ++si) {
-		PE_SECTION_ENTRY section = void;
+	for (size_t si; si < fi.pe.hdr.NumberOfSections; ++si) {
+		PE_SECTION_ENTRY s = fi.pe.sections[si];
 
-		if (fread(&section, section.sizeof, 1, fi.handle) == 0)
-			return EXIT_FAILURE;
-
-		if (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE) {
-			pos_section = ftell(fi.handle);
-
-			if (fseek(fi.handle, section.PointerToRawData, SEEK_SET))
-				return EXIT_FAILURE;
-
-			if (fread(mem, 64, 1, fi.handle) == 0) {
-				puts("cli: could not read file");
-				return EXIT_FAILURE;
-			}
-
-			printf("\n<%.8s>\n", &section.Name);
-			dp.addr = mem;
-			for (uint i; i < 32; i += dp.addrv - dp.lastaddr) {
-				adbg_dasm_line(dp, DisasmMode.File);
-				printf("%08X %-30s %-30s\n",
-					cast(uint)i,
-					&dp.mcbuf, &dp.mnbuf);
-			}
-
-			fseek(fi.handle, pos_section, SEEK_SET);
+		if (s.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
+			printf("\n<%.8s>\n", &s.Name);
+			int e = d(dp, fi.buf + s.PointerToRawData, s.SizeOfRawData);
+			if (e) return e;
 		}
 	}
 

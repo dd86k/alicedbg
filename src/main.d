@@ -361,13 +361,15 @@ int main(int argc, const(char) **argv) {
 				char c = *cf;
 				switch (c) {
 				case 'A': opt.dumpopt |= DUMPER_SHOW_EVERYTHING; break;
-				case 'h': opt.dumpopt |= DUMPER_SHOW_HEADERS; break;
+				case 'h': opt.dumpopt |= DUMPER_SHOW_HEADER; break;
 				case 's': opt.dumpopt |= DUMPER_SHOW_SECTIONS; break;
 				case 'i': opt.dumpopt |= DUMPER_SHOW_IMPORTS; break;
-				case 'd': opt.dumpopt |= DUMPER_SHOW_DISASSEMBLY; break;
-				case 'l': opt.dumpopt |= DUMPER_SHOW_LOADCFG; break;
-				case 'm': opt.dumpopt |= DUMPER_SHOW_SYMBOLS; break;
-				case 'e': opt.dumpopt |= DUMPER_SHOW_SYMBOLS; break;
+				case 'c': opt.dumpopt |= DUMPER_SHOW_LOADCFG; break;
+//				case 'e': opt.dumpopt |= DUMPER_SHOW_EXPORTS; break;
+//				case '': opt.dumpopt |= DUMPER_SHOW_; break;
+				case 'd': opt.dumpopt |= DUMPER_DISASM_CODE; break;
+				case 'D': opt.dumpopt |= DUMPER_DISASM_ALL; break;
+				case 'S': opt.dumpopt |= DUMPER_DISASM_STATS; break;
 				case '?': return clipage(CLIPage.show);
 				default:
 					printf("cli: unknown show flag: %c\n", c);

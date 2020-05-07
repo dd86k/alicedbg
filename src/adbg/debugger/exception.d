@@ -33,7 +33,7 @@ version (Posix) {
 
 extern (C):
 
-/// Register array size, may vary on target platform
+/// Register array size, varies on compile target
 enum REG_COUNT = 32;
 
 /// Register size
@@ -98,12 +98,12 @@ struct exception_t {
 struct register_t {
 	RegisterType type;	/// Register type (size)
 	union {
-		ubyte  u8;	/// Register alias: ubyte (u8)
-		ushort u16;	/// Register alias: ushort (u16)
-		uint   u32;	/// Register alias: uint (u32)
-		ulong  u64;	/// Register alias: ulong (u64)
-		float  f32;	/// Register alias: float (f32)
-		double f64;	/// Register alias: double (f64)
+		ubyte  u8;	/// Register data: ubyte (u8)
+		ushort u16;	/// Register data: ushort (u16)
+		uint   u32;	/// Register data: uint (u32)
+		ulong  u64;	/// Register data: ulong (u64)
+		float  f32;	/// Register data: float (f32)
+		double f64;	/// Register data: double (f64)
 	}
 	const(char) *name;	/// Register name from adbg_ex_reg_init
 }
@@ -297,11 +297,11 @@ const(char) *adbg_ex_reg_fhex(register_t *reg) {
 	import adbg.utils.str : adbg_util_strf;
 	with (RegisterType)
 	switch (reg.type) {
-	case U8:  return adbg_util_strf("%02x", reg.u8);
-	case U16: return adbg_util_strf("%04x", reg.u16);
-	case U32, F32: return adbg_util_strf("%08x", reg.u32);
-	case U64, F64: return adbg_util_strf("%016llx", reg.u64);
-	default: return "??";
+	case U8:	return adbg_util_strf("%02x", reg.u8);
+	case U16:	return adbg_util_strf("%04x", reg.u16);
+	case U32, F32:	return adbg_util_strf("%08x", reg.u32);
+	case U64, F64:	return adbg_util_strf("%016llx", reg.u64);
+	default:	return "??";
 	}
 }
 /*
@@ -380,6 +380,9 @@ void adbg_ex_reg_init(exception_t *e, InitPlatform plat) {
 }
 
 version (Windows) {
+//
+// ANCHOR Windows functions
+//
 
 /// Populate exception_t.registers array from Windows' CONTEXT
 int adbg_ex_ctx_win(exception_t *e, CONTEXT *c) {
@@ -425,8 +428,11 @@ int adbg_ex_ctx_win_wow64(exception_t *e, WOW64_CONTEXT *c) {
 	return 0;
 }
 
-} else // version Windows
+} else
 version (Posix) {
+//
+// ANCHOR Posix functions
+//
 
 /// Populate exception_t.registers array from user_regs_struct
 int adbg_ex_ctx_user(exception_t *e, user_regs_struct *u) {

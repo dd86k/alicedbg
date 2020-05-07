@@ -10,6 +10,13 @@ import adbg.debugger.disasm.formatter;
 
 extern (C):
 
+/// Character buffer size
+///
+/// Currently, 64 characters is enough to hold SIB memory references, AVX-512
+/// instructions, or 15 bytes of machine code hexadecimal numbers.
+/// If that's not enough, update to 80 characters.
+enum DISASM_BUF_SIZE = 64;
+
 /// Disassembler operating mode
 enum DisasmMode : ubyte {
 	Size,	/// Only calculate operation code sizes
@@ -50,19 +57,6 @@ enum DisasmSyntax : ubyte {
 //	Ideal,	/// (Not implemented) Borland Ideal
 //	Hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
 }
-
-/// Disassembler symbol demangling
-enum DisasmDemangle : ushort {
-	None,	/// (Not implemented) Leave symbol as-is
-	C,	/// (Not implemented) C mangling
-}
-
-/// Character buffer size
-///
-/// Currently, 64 characters is enough to hold SIB memory references, AVX-512
-/// instructions, or 15 bytes of machine code hexadecimal numbers.
-/// If that's not enough, update to 80 characters.
-enum DISASM_BUF_SIZE = 64;
 
 version (X86) {
 	enum DISASM_DEFAULT_ISA = DisasmISA.x86;	/// Platform default ABI
@@ -126,11 +120,12 @@ struct disasm_params_t { align(1):
 	/// It serves the client for printing the address and the decoder
 	/// the basis for jump/call address calculations.
 	size_t lastaddr;
+	/// This field is populated by adbg_dasm_line when a CALL-like instruction
+	/// is decoded. Requires Data mode or higher.
+	size_t targetaddr;
 	/// Error code. See DisasmError enumeration for more details. Set by
 	/// adbg_dasm_line or the the decoder.
 	DisasmError error;
-	/// Demangle option. See DisasmDemangle enum.
-	DisasmDemangle demangle;
 	/// Platform to disasm. See the DisasmABI enum for more details.
 	DisasmISA isa;
 	/// Assembler style. See DisasmStyle enums for more details.
@@ -146,10 +141,10 @@ struct disasm_params_t { align(1):
 		rv32_internals_t *rv32;	/// Used internally
 	}
 	disasm_fmt_t *fmt;	/// Formatter structure pointer, used internally
-	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer
 	size_t mcbufi;	/// Machine code buffer index
-	char [DISASM_BUF_SIZE]mnbuf;	/// Mnemonics buffer
+	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer
 	size_t mnbufi;	/// Mnemonics buffer index
+	char [DISASM_BUF_SIZE]mnbuf;	/// Mnemonics buffer
 }
 
 /**
@@ -176,7 +171,7 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 		return p.error;
 	}
 
-	int modefile = mode >= DisasmMode.File;
+	bool modefile = mode >= DisasmMode.File;
 
 	p.mode = mode;
 	p.error = DisasmError.None;
@@ -220,7 +215,7 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 /// if the target is in little-endian, and 1 if the target is big-endian.
 /// Params: isa = DisasmISA value
 /// Returns: Zero if little-endian, non-zero if big-endian
-int adbg_dasm_msb(DisasmISA isa) {
+int adbg_dasm_endian(DisasmISA isa) {
 	with (DisasmISA)
 	switch (isa) {
 	case x86_16, x86, x86_64, rv32, rv64: return 0;
@@ -232,4 +227,12 @@ int adbg_dasm_msb(DisasmISA isa) {
 	}
 }
 
-//TODO: ushort disasm_optstr(const(char)*) -- Interpret string value for disasm option
+const(char) *adbg_dasm_errmsg(DisasmError e) {
+	with (DisasmError)
+	final switch (e) {
+	case None:	return "None";
+	case NullAddress:	return "Received null address";
+	case NotSupported:	return "Architecture not supported";
+	case Illegal:	return "Illegal instruction";
+	}
+}

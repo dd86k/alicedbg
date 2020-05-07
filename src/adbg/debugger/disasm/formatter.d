@@ -437,7 +437,7 @@ void adbg_dasm_push_x86_sib_m01(disasm_params_t *p,
 	i.sval2 = index;
 	i.sval3 = seg;
 	i.ival1 = scale;
-	i.ival2 = imm;
+	i.ival2 = adbg_dasm_su8(imm);
 	i.ival3 = w & 7;
 }
 /// (x86) Push a SIB value when MOD=01 INDEX=100 into the formatting stack.
@@ -456,7 +456,7 @@ void adbg_dasm_push_x86_sib_m01_i100(disasm_params_t *p,
 	i.type = FormatType.x86_SIB_MemSegBaseImm;
 	i.sval1 = base;
 	i.sval2 = seg;
-	i.ival1 = imm;
+	i.ival1 = adbg_dasm_su8(imm);
 	i.ival3 = w & 7;
 }
 
@@ -720,7 +720,8 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		with (DisasmSyntax)
 		switch (p.style) {
 		case Att:
-			p.mnbufi += snprintf(bp, left, "%s%+d(,%s,%d)", i.sval2, i.sval2, i.sval1, i.ival1);
+			p.mnbufi += snprintf(bp, left, "%s%+d(,%s,%d)",
+				i.sval2, i.sval2, i.sval1, i.ival1);
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s*%d%+d]",
@@ -754,7 +755,8 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		with (DisasmSyntax)
 		switch (p.style) {
 		case Att:
-			p.mnbufi += snprintf(bp, left, "%s%+d(%s,%s,%d)", i.sval3, i.ival2, i.sval1, i.sval2, i.ival1);
+			p.mnbufi += snprintf(bp, left, "%s%+d(%s,%s,%d)",
+				i.sval3, i.ival2, i.sval1, i.sval2, i.ival1);
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s+%s*%d%+d]",
@@ -794,4 +796,9 @@ const(char) *adbg_dasm_freg(disasm_params_t *p, const(char) *s, char[256] *buffe
 		return cast(char*)buffer;
 	default:  return s;
 	}
+}
+int adbg_dasm_su8(int n) {
+	if (n > byte.max) // >127
+		return n - 256;
+	return n;
 }

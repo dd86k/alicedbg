@@ -5,6 +5,11 @@
  *
  * Loosely based on Windows Kits\10\Include\10.0.17763.0\um\winnt.h
  *
+ * Sources:
+ * - Microsoft Corporation, Microsoft Portable Executable and Common Object File Format Specification, Revision 6.0 - February 1999
+ * - Microsoft Corporation, Microsoft Portable Executable and Common Object File Format Specification, Revision 8.3 – February 6, 2013
+ * - Microsoft Corporation, PE Format, 2019-08-26
+ *
  * License: BSD 3-Clause
  */
 module adbg.debugger.file.objs.pe;
@@ -12,7 +17,8 @@ module adbg.debugger.file.objs.pe;
 import core.stdc.stdio, core.stdc.inttypes;
 import core.stdc.string : memset;
 import adbg.debugger.obj.loader : obj_info_t, ObjType;
-import adbg.debugger.disasm.disasm : DisasmISA, adbg_dasm_msb; // ISA translation
+import adbg.debugger.disasm.disasm : DisasmISA, adbg_dasm_endian; // ISA translation
+import adbg.debugger.obj.loader;
 
 extern (C):
 
@@ -53,6 +59,7 @@ enum : ushort { // PE_HEADER.Machine, likely all little-endian
 	PE_MACHINE_WCEMIPSV2	= 0x169,
 	// https://en.wikibooks.org/wiki/X86_Disassembly/Windows_Executable_Files
 	PE_MACHINE_CLR	= 0xC0EE,
+	//TODO: Missing CEE machine type "COM+ EE"
 }
 
 enum : ushort { // PE_HEADER.Characteristics flags
@@ -153,20 +160,96 @@ enum : ushort { // PE_HEADER
 	PE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION	= 16,
 }
 
-/// PE32 headers under one neat struct
+/// PE32 META structure for use in the object loader
 struct PE_META { align(1):
-	PE_HEADER hdr;
-	// D can't do unions in functions (i.e. directly on stack)
+	//
+	// Header
+	//
 	union {
-		PE_OPTIONAL_HEADER ohdr;
-		PE_OPTIONAL_HEADER64 ohdr64;
+		PE_HEADER *hdr;
+		uint fo_hdr;
 	}
-	PE_IMAGE_DATA_DIRECTORY dir;
+	union {
+		PE_OPTIONAL_HEADER *ohdr;
+		PE_OPTIONAL_HEADER64 *ohdr64;
+		PE_OPTIONAL_HEADERROM *ohdrrom;
+		uint fo_ohdr;
+	}
+	union {
+		PE_IMAGE_DATA_DIRECTORY *dir;
+		uint fo_dir;
+	}
+	//
+	// Directories
+	//
+	union {
+		PE_EXPORT_DESCRIPTOR *exports;
+		uint fo_exports;
+	}
+	union {
+		PE_IMPORT_DESCRIPTOR *imports;
+		uint fo_imports;
+	}
+	union {
+		uint fo_resources;
+	}
+	union {
+		uint fo_exception;
+	}
+	union {
+		uint fo_certitiface;
+	}
+	union {
+		uint fo_basereloc;
+	}
+	union {
+		uint fo_debug;
+	}
+	union {
+		uint fo_architecture;
+	}
+	union {
+		uint fo_globalptr;
+	}
+	union {
+		uint fo_tls;
+	}
+	union {
+		PE_LOAD_CONFIG_META *loadconf;
+		uint fo_loadcfg;
+	}
+	union {
+		uint fo_boundimport;
+	}
+	union {
+		uint fo_importaddress;	/// "IAT"
+	}
+	union {
+		uint fo_delayimport;
+	}
+	union {
+		uint fo_clr;
+	}
+	union {
+		uint fo_reserved;
+	}
+	//
+	// Data
+	//
+	union {
+		PE_SECTION_ENTRY *sections;
+		uint fo_sections;
+	}
+	
+/*	union {
+		PE_LOAD_CONFIG_CODE_INTEGRITY *loadcfg_integrity;
+		uint fo_loadcfg_integrity;
+	}*/
 }
 
 /// COFF file header (object and image)
 struct PE_HEADER { align(1):
-//	uint8_t  [4]Signature;
+	uint8_t  [4]Signature;
 	uint16_t Machine;
 	uint16_t NumberOfSections;
 	uint32_t TimeDateStamp;
@@ -207,7 +290,7 @@ struct PE_OPTIONAL_HEADER { align(1):
 	uint32_t SizeOfStackCommit;
 	uint32_t SizeOfHeapReserve;
 	uint32_t SizeOfHeapCommit;
-	uint32_t LoaderFlags; // Obsolete
+	uint32_t LoaderFlags;	/// Obsolete
 	uint32_t NumberOfRvaAndSizes;
 }
 struct PE_OPTIONAL_HEADER64 { align(1):
@@ -284,17 +367,54 @@ struct PE_IMAGE_DATA_DIRECTORY { align(1):
 	PE_DIRECTORY_ENTRY Reserved;
 }
 
-struct PE_SECTION_ENTRY { align(1):
-	char[8] Name;
-	uint32_t VirtualSize;
-	uint32_t VirtualAddress;
-	uint32_t SizeOfRawData;
-	uint32_t PointerToRawData;
-	uint32_t PointerToRelocations;
-	uint32_t PointerToLinenumbers;
-	uint16_t NumberOfRelocations;
-	uint16_t NumberOfLinenumbers;
-	uint32_t Characteristics;
+//
+// ANCHOR Directory structures
+//
+
+struct PE_EXPORT_DESCRIPTOR { align(1):
+	uint32_t ExportFlags;
+	uint32_t Timestamp;
+	uint16_t MajorVersion;
+	uint16_t MinorVersion;
+	uint32_t Name;	/// RVA
+	uint32_t OrdinalBase;
+	uint32_t AddressTableEntries;	/// Number of export entries
+	uint32_t NumberOfNamePointers;	/// Same amount for ordinal
+	uint32_t ExportAddressTable;	/// RVA
+	uint32_t NamePointer;	/// RVA, "The address of the export name pointer table"
+	uint32_t OrdinalTable;	/// RVA
+}
+
+struct PE_EXPORT_ENTRY { align(1):
+	uint32_t Export;	/// RVA
+	uint32_t Forwarder;	/// RVA
+}
+
+// IMAGE_IMPORT_DESCRIPTOR
+struct PE_IMPORT_DESCRIPTOR { align(1):
+	uint32_t Characteristics; // used in WINNT.H but no longer descriptive
+	uint32_t TimeDateStamp; // time_t
+	uint32_t ForwarderChain;
+	uint32_t Name;
+	uint32_t FirstThunk;
+}
+
+/// Import Lookup Table entry structure
+struct PE_IMPORT_LTE32 { align(1):
+	union {
+		uint val;
+		ushort num; /// Ordinal Number (val[31] is clear)
+		uint rva; /// Hint/Name Table RVA (val[31] is set)
+	}
+}
+/// Import Lookup Table entry structure
+struct PE_IMPORT_LTE64 { align(1):
+	union {
+		ulong val;
+		struct { uint val1, val2; }
+		ushort num; /// Ordinal Number (val2[31] is clear)
+		uint rva; /// Hint/Name Table RVA (val2[31] is set)
+	}
 }
 
 // Rough guesses for OS limits, offsets+4 since missing Size (already read)
@@ -417,131 +537,143 @@ struct PE_LOAD_CONFIG_META { align(1):
 	}
 }
 
-// IMAGE_IMPORT_DESCRIPTOR
-struct PE_IMPORT_DESCRIPTOR { align(1):
-	uint32_t Characteristics; // used in WINNT.H but no longer descriptive
-	uint32_t TimeDateStamp; // time_t
-	uint32_t ForwarderChain;
-	uint32_t Name;
-	uint32_t FirstThunk;
+struct PE_SECTION_ENTRY { align(1):
+	char[8] Name;
+	uint32_t VirtualSize;
+	uint32_t VirtualAddress;
+	uint32_t SizeOfRawData;
+	uint32_t PointerToRawData;
+	uint32_t PointerToRelocations;
+	uint32_t PointerToLinenumbers;
+	uint16_t NumberOfRelocations;
+	uint16_t NumberOfLinenumbers;
+	uint32_t Characteristics;
 }
 
-/// Import Lookup Table entry structure to help
-struct PE_IMPORT_LTE32 { align(1):
-	union {
-		uint val;
-		ushort num; /// Ordinal Number (FLAG: 0)
-		uint rva; /// Hint/Name Table RVA (FLAG: 1)
+int adbg_obj_pe_load(obj_info_t *info, int flags) {
+	void* offset = info.buf + info.offset;
+	info.pe.hdr = cast(PE_HEADER*)offset;
+	info.pe.ohdr = cast(PE_OPTIONAL_HEADER*)(offset + PE_OFFSET_OPTHDR);
+	switch (info.pe.ohdr.Magic) {
+	case PE_FMT_32:
+		info.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDR32);
+		info.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDR32);
+		break;
+	case PE_FMT_64:
+		info.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDR64);
+		info.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDR64);
+		break;
+	case PE_FMT_ROM:
+		info.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDRROM);
+		info.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDRROM);
+		break;
+	default: return ObjError.FormatUnsupported;
 	}
-}
-/// Import Lookup Table entry structure to help
-struct PE_IMPORT_LTE64 { align(1):
-	union {
-		ulong val;
-		struct { uint val1, val2; }
-		ushort num; /// Ordinal Number (FLAG: 0)
-		uint rva; /// Hint/Name Table RVA (FLAG: 1)
-	}
-}
+	uint secs = info.pe.hdr.NumberOfSections;
+	info.pe.fo_imports = 0;
+	for (uint si; si < secs; ++si) {
+		PE_SECTION_ENTRY s = info.pe.sections[si];
 
-int adbg_obj_pe_load(obj_info_t *fi) {
-	if (fi.handle == null)
-		return 1;
-	if (fread(&fi.pe.hdr, PE_HEADER.sizeof, 1, fi.handle) == 0)
-		return 1;
-
-	// Image only: PE Optional Header + directories
-	//TODO: MS recommends checking Size with Magic (e.g. Size=0xF0 = Magic=PE32+)
-	if (fi.pe.hdr.SizeOfOptionalHeader) {
-		int osz = fi.pe.hdr.SizeOfOptionalHeader -
-			cast(int)PE_IMAGE_DATA_DIRECTORY.sizeof;
-		if (osz <= 0)
-			return 2;
-		if (fread(&fi.pe.ohdr, osz, 1, fi.handle) == 0)
-			return 1;
-		if (fread(&fi.pe.dir, PE_IMAGE_DATA_DIRECTORY.sizeof, 1, fi.handle) == 0)
-			return 1;
+		if (info.pe.fo_imports == 0)
+		if (s.VirtualAddress <= info.pe.dir.ImportTable.rva &&
+			s.VirtualAddress + s.SizeOfRawData > info.pe.dir.ImportTable.rva) {
+			info.pe.imports = cast(PE_IMPORT_DESCRIPTOR*)(info.buf +
+				(s.PointerToRawData +
+				(info.pe.dir.ImportTable.rva - s.VirtualAddress)));
+		}
 	}
 
-	fi.type = ObjType.PE;
-
-	// Translate Machine field into DisasmABI
-	switch (fi.pe.hdr.Machine) {
-	case PE_MACHINE_I386: fi.isa = DisasmISA.x86; break;
-	case PE_MACHINE_AMD64: fi.isa = DisasmISA.x86_64; break;
-	case PE_MACHINE_RISCV32: fi.isa = DisasmISA.rv32; break;
-	default: fi.isa = DisasmISA.Default;
+	switch (info.pe.hdr.Machine) {
+	case PE_MACHINE_I386:	info.isa = DisasmISA.x86; break;
+	case PE_MACHINE_AMD64:	info.isa = DisasmISA.x86_64; break;
+	case PE_MACHINE_RISCV32:	info.isa = DisasmISA.rv32; break;
+	default:	info.isa = DisasmISA.Default;
 	}
-	fi.endian = adbg_dasm_msb(fi.isa);
 
 	return 0;
 }
 
+//TODO: adbg_obj_pe_get_section_by_name
+/*int adbg_obj_pe_get_section_by_name(obj_info_t *info, ubyte *sptr, const(char) *text) {
+}*/
+
+//TODO: adbg_obj_pe_get_section_by_rva
+/*int adbg_obj_pe_get_section_by_rva(obj_info_t *info, ubyte *sptr, uint rva) {
+}*/
+
+//TODO: adbg_obj_pe_get_section_by_index
+/*int adbg_obj_pe_get_section_by_index(obj_info_t *info, ubyte *sptr, uint index) {
+}*/
+
 const(char) *adbg_obj_pe_mach(ushort mach) {
-	const(char) *str_mach = void;
 	switch (mach) {
-	case PE_MACHINE_UNKNOWN:	str_mach = "UNKNOWN"; break;
-	case PE_MACHINE_ALPHA:	str_mach = "ALPHA"; break;
-	case PE_MACHINE_ALPHA64:	str_mach = "ALPHA64"; break;
-	case PE_MACHINE_AM33:	str_mach = "AM33"; break;
-	case PE_MACHINE_AMD64:	str_mach = "AMD64"; break;
-	case PE_MACHINE_ARM:	str_mach = "ARM"; break;
-	case PE_MACHINE_ARMNT:	str_mach = "ARMNT"; break;
-	case PE_MACHINE_ARM64:	str_mach = "ARM64"; break;
-	case PE_MACHINE_EBC:	str_mach = "EBC"; break;
-	case PE_MACHINE_I386:	str_mach = "I386"; break;
-	case PE_MACHINE_IA64:	str_mach = "IA64"; break;
-	case PE_MACHINE_M32R:	str_mach = "M32R"; break;
-	case PE_MACHINE_MIPS16:	str_mach = "MIPS16"; break;
-	case PE_MACHINE_MIPSFPU:	str_mach = "MIPSFPU"; break;
-	case PE_MACHINE_MIPSFPU16:	str_mach = "MIPSFPU16"; break;
-	case PE_MACHINE_POWERPC:	str_mach = "POWERPC"; break;
-	case PE_MACHINE_POWERPCFP:	str_mach = "POWERPCFP"; break;
-	case PE_MACHINE_R3000:	str_mach = "R3000"; break;
-	case PE_MACHINE_R4000:	str_mach = "R4000"; break;
-	case PE_MACHINE_R10000:	str_mach = "R10000"; break;
-	case PE_MACHINE_RISCV32:	str_mach = "RISCV32"; break;
-	case PE_MACHINE_RISCV64:	str_mach = "RISCV64"; break;
-	case PE_MACHINE_RISCV128:	str_mach = "RISCV128"; break;
-	case PE_MACHINE_SH3:	str_mach = "SH3"; break;
-	case PE_MACHINE_SH3DSP:	str_mach = "SH3DSP"; break;
-	case PE_MACHINE_SH4:	str_mach = "SH4"; break;
-	case PE_MACHINE_SH5:	str_mach = "SH5"; break;
-	case PE_MACHINE_THUMB:	str_mach = "THUMB"; break;
-	case PE_MACHINE_WCEMIPSV2:	str_mach = "WCEMIPSV2"; break;
-	case PE_MACHINE_CLR:	str_mach = "CLR"; break;
-	default: str_mach = null;
+	case PE_MACHINE_UNKNOWN:	return "UNKNOWN";
+	case PE_MACHINE_ALPHA:	return "ALPHA";
+	case PE_MACHINE_ALPHA64:	return "ALPHA64";
+	case PE_MACHINE_AM33:	return "AM33";
+	case PE_MACHINE_AMD64:	return "AMD64";
+	case PE_MACHINE_ARM:	return "ARM";
+	case PE_MACHINE_ARMNT:	return "ARMNT";
+	case PE_MACHINE_ARM64:	return "ARM64";
+	case PE_MACHINE_EBC:	return "EBC";
+	case PE_MACHINE_I386:	return "I386";
+	case PE_MACHINE_IA64:	return "IA64";
+	case PE_MACHINE_M32R:	return "M32R";
+	case PE_MACHINE_MIPS16:	return "MIPS16";
+	case PE_MACHINE_MIPSFPU:	return "MIPSFPU";
+	case PE_MACHINE_MIPSFPU16:	return "MIPSFPU16";
+	case PE_MACHINE_POWERPC:	return "POWERPC";
+	case PE_MACHINE_POWERPCFP:	return "POWERPCFP";
+	case PE_MACHINE_R3000:	return "R3000";
+	case PE_MACHINE_R4000:	return "R4000";
+	case PE_MACHINE_R10000:	return "R10000";
+	case PE_MACHINE_RISCV32:	return "RISCV32";
+	case PE_MACHINE_RISCV64:	return "RISCV64";
+	case PE_MACHINE_RISCV128:	return "RISCV128";
+	case PE_MACHINE_SH3:	return "SH3";
+	case PE_MACHINE_SH3DSP:	return "SH3DSP";
+	case PE_MACHINE_SH4:	return "SH4";
+	case PE_MACHINE_SH5:	return "SH5";
+	case PE_MACHINE_THUMB:	return "THUMB";
+	case PE_MACHINE_WCEMIPSV2:	return "WCEMIPSV2";
+	case PE_MACHINE_CLR:	return "CLR";
+	default:	return null;
 	}
-	return str_mach;
 }
 
 const(char) *adbg_obj_pe_magic(ushort mag) {
-	const(char) *str_mag = void;
 	switch (mag) {
-	case PE_FMT_32: str_mag = "PE32"; break;
-	case PE_FMT_64: str_mag = "PE32+"; break;
-	case PE_FMT_ROM: str_mag = "PE-ROM"; break;
-	default: str_mag = null;
+	case PE_FMT_32:	return "PE32";
+	case PE_FMT_64:	return "PE32+";
+	case PE_FMT_ROM:	return "PE-ROM";
+	default:	return null;
 	}
-	return str_mag;
 }
 
 const(char) *adbg_obj_pe_subsys(ushort subs) {
-	const(char) *str_sys = void;
 	switch (subs) {
-	case PE_SUBSYSTEM_NATIVE:	str_sys = "Native"; break;
-	case PE_SUBSYSTEM_WINDOWS_GUI:	str_sys = "Windows GUI"; break;
-	case PE_SUBSYSTEM_WINDOWS_CUI:	str_sys = "Windows Console"; break;
-	case PE_SUBSYSTEM_POSIX_CUI:	str_sys = "Posix Console"; break;
-	case PE_SUBSYSTEM_NATIVE_WINDOWS:	str_sys = "Native Windows 9x Driver"; break;
-	case PE_SUBSYSTEM_WINDOWS_CE_GUI:	str_sys = "Windows CE GUI"; break;
-	case PE_SUBSYSTEM_EFI_APPLICATION:	str_sys = "EFI"; break;
-	case PE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER:	str_sys = "EFI Boot Service Driver"; break;
-	case PE_SUBSYSTEM_EFI_RUNTIME_DRIVER:	str_sys = "EFI Runtime Driver"; break;
-	case PE_SUBSYSTEM_EFI_ROM:	str_sys = "EFI ROM"; break;
-	case PE_SUBSYSTEM_XBOX:	str_sys = "XBOX"; break;
-	case PE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION:	str_sys = "Windows Boot"; break;
-	default: str_sys = null;
+	case PE_SUBSYSTEM_NATIVE:	return "Native";
+	case PE_SUBSYSTEM_WINDOWS_GUI:	return "Windows GUI";
+	case PE_SUBSYSTEM_WINDOWS_CUI:	return "Windows Console";
+	case PE_SUBSYSTEM_POSIX_CUI:	return "Posix Console";
+	case PE_SUBSYSTEM_NATIVE_WINDOWS:	return "Native Windows 9x Driver";
+	case PE_SUBSYSTEM_WINDOWS_CE_GUI:	return "Windows CE GUI";
+	case PE_SUBSYSTEM_EFI_APPLICATION:	return "EFI";
+	case PE_SUBSYSTEM_EFI_BOOT_SERVICE_DRIVER:	return "EFI Boot Service Driver";
+	case PE_SUBSYSTEM_EFI_RUNTIME_DRIVER:	return "EFI Runtime Driver";
+	case PE_SUBSYSTEM_EFI_ROM:	return "EFI ROM";
+	case PE_SUBSYSTEM_XBOX:	return "XBOX";
+	case PE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION:	return "Windows Boot";
+	default:	return null;
 	}
-	return str_sys;
 }
+
+private:
+
+enum PE_OFFSET_OPTHDR        = PE_HEADER.sizeof;
+enum PE_OFFSET_DIR_OPTHDR32  = PE_OFFSET_OPTHDR + PE_OPTIONAL_HEADER.sizeof;
+enum PE_OFFSET_DIR_OPTHDR64  = PE_OFFSET_OPTHDR + PE_OPTIONAL_HEADER64.sizeof;
+enum PE_OFFSET_DIR_OPTHDRROM = PE_OFFSET_OPTHDR + PE_OPTIONAL_HEADERROM.sizeof;
+enum PE_OFFSET_SEC_OPTHDR32  = PE_OFFSET_DIR_OPTHDR32 + PE_IMAGE_DATA_DIRECTORY.sizeof;
+enum PE_OFFSET_SEC_OPTHDR64  = PE_OFFSET_DIR_OPTHDR64 + PE_IMAGE_DATA_DIRECTORY.sizeof;
+enum PE_OFFSET_SEC_OPTHDRROM = PE_OFFSET_DIR_OPTHDRROM + PE_IMAGE_DATA_DIRECTORY.sizeof;
