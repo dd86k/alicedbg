@@ -92,7 +92,7 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 		uint fl = cast(uint)ftell(f);
 		fseek(f, 0, SEEK_SET); // rewind binding is broken
 
-		void *m = malloc(fl);
+		void *m = malloc(fl + 16);
 		if (m == null)
 			return EXIT_FAILURE;
 		if (fread(m, fl, 1, f) == 0) {
@@ -100,7 +100,7 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 			return EXIT_FAILURE;
 		}
 
-		return adbg_dmpr_disasm(dp, m, fl);
+		return adbg_dmpr_disasm(dp, m, fl, flags);
 	}
 
 	// When nothing is set, the default is to show headers
@@ -129,58 +129,56 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 // NOTE: A FILE* could be passed, but Windows bindings often do not correspond
 //       to their CRT equivalent, so this is hard-wired to stdout, since this
 //       is only for the dumping functionality.
-int adbg_dmpr_disasm(disasm_params_t *dp, void* data, uint size) {
+int adbg_dmpr_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
 	dp.addr = data;
-	for (uint i; i < size; i += dp.addrv - dp.lastaddr) {
-		DisasmError e = cast(DisasmError)adbg_dasm_line(dp, DisasmMode.File);
-		with (DisasmError)
-		switch (e) {
-		case None, Illegal:
-			printf("%08X %-30s %-30s\n",
-				i, &dp.mcbuf, &dp.mnbuf);
-			continue;
-		default:
-			printf("disasm: %s\n", adbg_dasm_errmsg(e));
-			return e;
+	if (flags & DUMPER_DISASM_STATS) {
+		uint iavg;	/// instruction average size
+		uint imax;	/// longest instruction size
+		uint icnt;	/// instruction count
+		uint ills;	/// Number of illegal instructions
+		for (uint i, isize = void; i < size; i += isize) {
+			DisasmError e = cast(DisasmError)adbg_dasm_line(dp, DisasmMode.Size);
+			isize = cast(uint)(dp.addrv - dp.lastaddr);
+			with (DisasmError)
+			final switch (e) {
+			case None:
+				iavg += isize;
+				++icnt;
+				if (isize > imax)
+					imax = isize;
+				break;
+			case Illegal: 
+				iavg += isize;
+				++icnt;
+				++ills;
+				break;
+			case NullAddress, NotSupported:
+				printf("disasm: %s\n", adbg_dasm_errmsg(e));
+				return e;
+			}
+		}
+		printf(
+		"Instruction statistics\n"~
+		"avg. size: %f\n"~
+		"max. size: %u\n"~
+		"illegal  : %u\n"~
+		"total    : %u\n",
+		cast(float)iavg / icnt, imax, ills, icnt
+		);
+	} else {
+		for (uint i; i < size; i += dp.addrv - dp.lastaddr) {
+			DisasmError e = cast(DisasmError)adbg_dasm_line(dp, DisasmMode.File);
+			with (DisasmError)
+			switch (e) {
+			case None, Illegal:
+				printf("%08X %-30s %-30s\n",
+					i, &dp.mcbuf, &dp.mnbuf);
+				continue;
+			default:
+				printf("disasm: %s\n", adbg_dasm_errmsg(e));
+				return e;
+			}
 		}
 	}
-	return 0;
-}
-
-int adbg_dmpr_disasm_stats(disasm_params_t *dp, void* data, uint size) {
-	dp.addr = data;
-	uint iavg;	/// instruction average size
-	uint imax;	/// longest instruction size
-	uint icnt;	/// instruction count
-	uint ills;	/// Number of illegal instructions
-	for (uint i, isize = void; i < size; i += isize) {
-		DisasmError e = cast(DisasmError)adbg_dasm_line(dp, DisasmMode.Size);
-		isize = cast(uint)(dp.addrv - dp.lastaddr);
-		with (DisasmError)
-		final switch (e) {
-		case None:
-			iavg += isize;
-			++icnt;
-			if (isize > imax)
-				imax = isize;
-			break;
-		case Illegal: 
-			iavg += isize;
-			++icnt;
-			++ills;
-			break;
-		case NullAddress, NotSupported:
-			printf("disasm: %s\n", adbg_dasm_errmsg(e));
-			return e;
-		}
-	}
-	printf(
-	"Instruction statistics\n"~
-	"avg. size: %f\n"~
-	"max. size: %u\n"~
-	"illegal  : %u\n"~
-	"count    : %u\n",
-	cast(float)iavg / icnt, imax, ills, icnt
-	);
 	return 0;
 }

@@ -773,18 +773,15 @@ L_DISASM:
 	if ((flags & (DUMPER_DISASM_CODE | DUMPER_DISASM_ALL | DUMPER_DISASM_STATS)) == 0)
 		return EXIT_SUCCESS;
 
-	extern (C)
-	int function(disasm_params_t*,void*,uint) d = flags & DUMPER_DISASM_STATS ?
-		&adbg_dmpr_disasm_stats : &adbg_dmpr_disasm;
-	int all = flags & DUMPER_DISASM_ALL;
-
+	bool all = (flags & DUMPER_DISASM_ALL) != 0;
 	puts("\n*\n* Disassembly\n*");
 	for (size_t si; si < fi.pe.hdr.NumberOfSections; ++si) {
 		PE_SECTION_ENTRY s = fi.pe.sections[si];
 
 		if (s.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
 			printf("\n<%.8s>\n", &s.Name);
-			int e = d(dp, fi.buf + s.PointerToRawData, s.SizeOfRawData);
+			int e = adbg_dmpr_disasm(dp,
+				fi.buf + s.PointerToRawData, s.SizeOfRawData, flags);
 			if (e) return e;
 		}
 	}

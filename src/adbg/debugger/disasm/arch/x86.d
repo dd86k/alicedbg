@@ -41,24 +41,19 @@ struct x86_internals_t {
 //	int vex_W;	/// Alias to REX.W, ignored in 32-bit mode
 }
 
-//TODO: Consider group instructions per operand (e.g. all REG8, IMM8)
-//      + Possible binary reduction
-//      - Possible lookup time increase (e.g. case 4,8: + another switch for string)
-//TODO: Consider masking by nibble instead of 6/1/1 pattern
-//      + Possible decreased lookup time for bigger instructions
-//      * 6/1/1 isn't that bad
-//      - Could lead to higher complexity
-//      - Possible increase lookup time for small instructions
 //TODO: Repass all instructions to adjust their reg/mem operation width
-//      [ ] 1-byte
+//      [ ] legacy
 //      [ ] 0f
 //      [ ] 0f38
 //      [x] 0f3a
 //TODO: Verify all maps push machine bytes
-//      [x] 1-byte
+//      [x] legacy
 //      [ ] 0f
 //      [ ] 0f38
 //      [ ] 0f3a
+//TODO: Consider adding two fields in internal structure that pre-checks bit 0/1
+//      + very good binary reduction
+//      - super tiny extra latency
 
 /**
  * x86 disassembler.
@@ -736,15 +731,15 @@ L_CONTINUE:
 		}
 		return;
 	case 0xAC: // ACH-AFH
-		const(char) *m = void, a = void, s = void;
-		if (p.x86.op & X86_FLAG_DIR) {
-			s = p.x86.pf_operand ? "di" : "edi";
-			m = p.x86.op & X86_FLAG_WIDE ? "scasd" : "scasb";
-		} else {
-			s = p.x86.pf_operand ? "si" : "esi";
-			m = p.x86.op & X86_FLAG_WIDE ? "lodsd" : "lodsb";
-		}
 		if (p.mode >= DisasmMode.File) {
+			const(char) *m = void, s = void;
+			if (p.x86.op & X86_FLAG_DIR) {
+				s = p.x86.pf_operand ? "di" : "edi";
+				m = p.x86.op & X86_FLAG_WIDE ? "scasd" : "scasb";
+			} else {
+				s = p.x86.pf_operand ? "si" : "esi";
+				m = p.x86.op & X86_FLAG_WIDE ? "lodsd" : "lodsb";
+			}
 			adbg_dasm_push_str(p, m);
 			adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
 			adbg_dasm_push_segreg(p, "es:", s);
@@ -5015,19 +5010,18 @@ void adbg_dasm_x86_immfar(disasm_params_t *p) {
 	if (p.x86.pf_address) {
 		v = *p.addru16;
 		++p.addru16;
-		if (p.mode >= DisasmMode.File) {
-			adbg_dasm_push_x16(p, sv);
-			adbg_dasm_push_x16(p, cast(ushort)v);
-		}
 	} else {
 		v = *p.addru32;
 		++p.addru32;
-		if (p.mode >= DisasmMode.File) {
-			adbg_dasm_push_x16(p, sv);
-			adbg_dasm_push_x32(p, v);
-		}
 	}
-	adbg_dasm_push_immfar(p, v, sv);
+	if (p.mode >= DisasmMode.File) {
+		adbg_dasm_push_x16(p, sv);
+		if (p.x86.pf_address)
+			adbg_dasm_push_x16(p, cast(ushort)v);
+		else
+			adbg_dasm_push_x32(p, v);
+		adbg_dasm_push_immfar(p, v, sv);
+	}
 }
 
 /// (Internal) Returns a number depending on the set prefixes for the 2-byte
