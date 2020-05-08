@@ -35,6 +35,13 @@ version (Posix) {
 	private pid_t hprocess; /// Saved process ID
 }
 
+version (X86)
+	private enum BREAKPOINT = 0xCC; // INT3
+else version (X86_64)
+	private enum BREAKPOINT = 0xCC; // INT3
+else
+	static assert(0, "Missing BREAKPOINT value for target platform");
+
 /// Actions that a user function handler may return
 public
 enum DebuggerAction {
@@ -42,6 +49,19 @@ enum DebuggerAction {
 	proceed,	/// Continue debugging
 	step,	/// Proceed with a single step
 }
+
+private 
+struct breakpoint_t {
+	size_t address;
+	union {
+		ubyte  ou8;	/// Original instruction
+		ushort ou16;	/// Original instruction
+		int    ou32;	/// Original instruction
+	}
+}
+
+private __gshared
+breakpoint_t [4]breakpoints;
 
 private __gshared
 int function(exception_t*) user_function;
@@ -87,6 +107,7 @@ int adbg_load(const(char) *cmd) {
 		stat_t st = void;
 		if (stat(cmd, &st) == -1)
 			return errno;
+		//TODO: Check executable bit?
 		// Proceed normally
 		hprocess = fork();
 		if (hprocess == -1)
@@ -201,6 +222,7 @@ L_DEBUG_LOOP:
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
 		case exit:
+			//TODO: DebugActiveProcessStop if -pid was used
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
 			return 0;
 		case step:
@@ -307,3 +329,13 @@ L_DEBUG_LOOP:
 		}
 	}
 }
+
+//TODO: adbg_add_breakpoint
+/*int adbg_add_breakpoint(size_t address) {
+	
+}
+int adbg_rm_breakpoint_addr(size_t address) {
+}
+int adbg_rm_breakpoint_index(size_t address) {
+}
+*/

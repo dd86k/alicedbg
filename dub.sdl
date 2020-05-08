@@ -6,8 +6,6 @@ copyright "Copyright © 2019-2020, dd86k"
 license "BSD-3-clause"
 version "0.0.0"
 
-#targetPath "bin"
-
 buildType "profile" {
 	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="ldc"
@@ -59,4 +57,10 @@ buildType "afl" {
 	sourceFiles "$AFL_ROOT/afl-llvm-rt.o"
 	versions "AFL"
 	buildOptions "debugMode" "debugInfo" "betterC"
+}
+
+buildType "loopdisasm" {
+	buildOptions "unittests"
+	versions "TestLoopDisasm"
+	sourceFiles "tests/loop/disasm.d"
 }

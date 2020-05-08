@@ -13,7 +13,7 @@ extern (C):
 
 //TODO: Re-use fields as much as possible
 struct x86_internals_t {
-	ubyte op;	/// Last significant opcode
+	align(4) ubyte op;	/// Last significant opcode
 	int lock;	/// LOCK Prefix
 	int repz;	/// (F3H) REP/REPE/REPZ
 	int repnz;	/// (F2H) REPNE/REPNZ/BND
@@ -2058,28 +2058,26 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 				adbg_dasm_push_reg(p, sr);
 			}
 		} else {
-			if (p.x86.lock)
-				switch (modrm & MODRM_REG) {
-				case MODRM_REG_000: sr = "cr8"; break;
-				case MODRM_REG_001: sr = "cr9"; break;
-				case MODRM_REG_010: sr = "cr10"; break;
-				case MODRM_REG_011: sr = "cr11"; break;
-				case MODRM_REG_100: sr = "cr12"; break;
-				case MODRM_REG_101: sr = "cr13"; break;
-				case MODRM_REG_110: sr = "cr14"; break;
-				default:         sr = "cr15"; break;
-				}
-			else
-				switch (modrm & MODRM_REG) {
-				case MODRM_REG_000: sr = "cr0"; break;
-				case MODRM_REG_001: sr = "cr1"; break;
-				case MODRM_REG_010: sr = "cr2"; break;
-				case MODRM_REG_011: sr = "cr3"; break;
-				case MODRM_REG_100: sr = "cr4"; break;
-				case MODRM_REG_101: sr = "cr5"; break;
-				case MODRM_REG_110: sr = "cr6"; break;
-				default:         sr = "cr7"; break;
-				}
+			int r = modrm & MODRM_REG;
+			if (p.x86.lock) r |= 0b1_000_000;
+			switch (r) {
+			case 0b0_000_000: sr = "cr0"; break;
+			case 0b0_001_000: sr = "cr1"; break;
+			case 0b0_010_000: sr = "cr2"; break;
+			case 0b0_011_000: sr = "cr3"; break;
+			case 0b0_100_000: sr = "cr4"; break;
+			case 0b0_101_000: sr = "cr5"; break;
+			case 0b0_110_000: sr = "cr6"; break;
+			case 0b0_111_000: sr = "cr7"; break;
+			case 0b1_000_000: sr = "cr8"; break;
+			case 0b1_001_000: sr = "cr9"; break;
+			case 0b1_010_000: sr = "cr10"; break;
+			case 0b1_011_000: sr = "cr11"; break;
+			case 0b1_100_000: sr = "cr12"; break;
+			case 0b1_101_000: sr = "cr13"; break;
+			case 0b1_110_000: sr = "cr14"; break;
+			default:          sr = "cr15"; break;
+			}
 			adbg_dasm_push_str(p, "mov");
 			if (p.x86.op & X86_FLAG_DIR) {
 				adbg_dasm_push_reg(p, sr);
@@ -5250,7 +5248,8 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 		if (p.x86.pf_address) {
 			m = *p.addru16;
 			p.addrv += 2;
-			adbg_dasm_push_x16(p, cast(ushort)m);
+			if (p.mode >= DisasmMode.File)
+				adbg_dasm_push_x16(p, cast(ushort)m);
 		} else {
 			if (rm == MODRM_RM_100) {
 				adbg_dasm_x86_sib(p, modrm, wmem);
@@ -5258,7 +5257,8 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 			}
 			m = *p.addru32;
 			p.addrv += 4;
-			adbg_dasm_push_x32(p, m);
+			if (p.mode >= DisasmMode.File)
+				adbg_dasm_push_x32(p, m);
 		}
 		if (p.mode >= DisasmMode.File) {
 			reg = adbg_dasm_x86_modrm_rm_reg(rm, p.x86.pf_address);
@@ -5452,7 +5452,8 @@ L_3REG:
 		if (dir) goto L_3RM;
 		return;
 	case X86_FLAG_4OPRND:
-		adbg_dasm_push_str(p, "todo");
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, "todo");
 		return;
 	}
 }
