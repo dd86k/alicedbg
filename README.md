@@ -25,7 +25,7 @@ Planned versions:
   - Debug UI: loop
   - OS: Windows and Linux
   - alicedbg.1
-- 0.2: How is it going, World?
+- 0.2: Sup, World?
   - Disassembler: x86-64 disassembler
   - Dumper: ELF support
   - alicedbg.3
@@ -197,7 +197,7 @@ remains a good tool for its deterministic behavior.
 To use zzuf, you will require a valid binary program, either flat for the
 disassembler or an image-type for the dumper. The main parameters are `-r`
 (rate) and `-s` (seed). A basic one-time fuzz can be written as
-`zuff -r 0.10 -s 47289 ./alice -dump -raw -march x86 bin/x86`, zuff will
+`zzuf -r 0.10 -s 47289 ./alice -dump -raw -march x86 bin/x86`, zzuf will
 automatically pick up the file opening operating and start fuzzing.
 
 A way to automate this would be using a combination of `--seed=START:STOP`
