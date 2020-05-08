@@ -10,9 +10,16 @@ enum BUFSIZE = 3;
 enum size_t MAX_COUNTER = 10_000;
 enum size_t MAX_STAGE = 6;
 
+/**
+	An absolute simple, idiotic, crappy test to force the disasm to break
+	
+	Due to Windows limiting rand() between 0-32767, the 'random' part
+	with 4 number inputs is XOR-hashed and shifted. 
+*/
 unittest {
 	time_t t = void;
-	srand(time(&t));
+	uint tt = time(&t);
+	srand(tt ^ tt);
 	int[BUFSIZE] b = void;
 	ubyte *bp = cast(ubyte*)&b;
 	disasm_params_t p = void;
