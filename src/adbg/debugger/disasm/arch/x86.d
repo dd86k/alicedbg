@@ -41,19 +41,9 @@ struct x86_internals_t {
 //	int vex_W;	/// Alias to REX.W, ignored in 32-bit mode
 }
 
-//TODO: Repass all instructions to adjust their reg/mem operation width
-//      [ ] legacy
-//      [ ] 0f
-//      [ ] 0f38
-//      [x] 0f3a
-//TODO: Verify all maps push machine bytes
-//      [x] legacy
-//      [ ] 0f
-//      [ ] 0f38
-//      [ ] 0f3a
-//TODO: Consider adding two fields in internal structure that pre-checks bit 0/1
-//      + very good binary reduction
-//      - super tiny extra latency
+//TODO: Condense vex maps into legacy
+//      + Binary size reduction
+//      - One more tiny check
 
 /**
  * x86 disassembler.
@@ -4723,9 +4713,9 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 		adbg_dasm_x86_vex_modrm(p, f);
 		adbg_dasm_x86_u8imm(p);
 		return;
-/*	case 0xC4: // C4H-C7H
+	case 0xC4: // C4H-C7H
 		const(char) *m = void;
-		int f = X86_FLAG_DIR;
+		int f = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				adbg_dasm_err(p);
@@ -4737,16 +4727,38 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 				default: adbg_dasm_err(p); return;
 				}
 			}
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		} else {
 			if (p.x86.vex_pp != X86_VEX_PP_66H) {
 				adbg_dasm_err(p);
 				return;
+			}
+			ubyte modrm = *p.addru8 & MODRM_MOD;
+			if (p.x86.op & X86_FLAG_WIDE) {
+				if (modrm != MODRM_MOD_11) {
+					adbg_dasm_err(p);
+					return;
+				}
+				m = "vpextrw";
+				f = X86_FLAG_DIR | X86_FLAG_REGW_32B | X86_FLAG_MEMW_128B |
+					X86_FLAG_VEX_NO_L;
+			} else {
+				m = "vpinsrw";
+				if (modrm == MODRM_MOD_11)
+					f = X86_FLAG_MEMW_32B | X86_FLAG_REGW_32B
+						| X86_FLAG_VEX_NO_L | X86_FLAG_3OPRND;
+				else
+					f = X86_FLAG_MEMW_16B | X86_FLAG_REGW_128B
+						| X86_FLAG_DIR | X86_FLAG_VEX_NO_L | X86_FLAG_3OPRND;
 			}
 		}
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, m);
 		adbg_dasm_x86_vex_modrm(p, f);
 		adbg_dasm_x86_u8imm(p);
+		return;
+/*	case 0xD0: // D0H-D4H
+	
 		return;*/
 	default: adbg_dasm_err(p); return;
 	}

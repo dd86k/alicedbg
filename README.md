@@ -229,3 +229,8 @@ D Import files), so there are some manual tweaks to do.
 1. Generate headers: `dub build -b headers`
 2. Navigate to `dinclude`: `cat * > adbg.di` (Windows: `type * > adbg.di`)
 3. Match and remove "`module.+\n|//.+\n|.+import adbg.+\n|import adbg.+\n`"
+
+# Homes
+
+- https://git.dd86k.space/dd86k/alicedbg
+- https://github.com/dd86k/alicedbg
