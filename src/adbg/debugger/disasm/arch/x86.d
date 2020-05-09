@@ -65,9 +65,14 @@ L_CONTINUE:
 		adbg_dasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) { // 1111_1100
-	case 0: // 00H-03H
-		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, "add");
+	// 00H-03H, 08H-0BH, 10H-13H, 18-1BH, 20H-23H, 28H-2BH, 30H-33H, 38H-3BH
+	case 0, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38:
+		if (p.mode >= DisasmMode.File) {
+			__gshared const(char)*[] x86_01h = [
+				"add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"
+			];
+			adbg_dasm_push_str(p, x86_01h[p.x86.op >> 2]);
+		}
 		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x04: // 04H-07H
@@ -86,11 +91,6 @@ L_CONTINUE:
 			else
 				adbg_dasm_x86_u8imm(p);
 		}
-		return;
-	case 0x08: // 08H-0BH
-		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, "or");
-		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x0C: // 0CH-0FH
 		if (p.x86.op & X86_FLAG_DIR) {
@@ -113,11 +113,6 @@ L_CONTINUE:
 				adbg_dasm_x86_u8imm(p);
 		}
 		return;
-	case 0x10: // 10H-13H
-		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, "adc");
-		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
-		return;
 	case 0x14: // 14H-17H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= DisasmMode.File) {
@@ -135,11 +130,6 @@ L_CONTINUE:
 				adbg_dasm_x86_u8imm(p);
 		}
 		return;
-	case 0x18: // 18H-1BH
-		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, "sbb");
-		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
-		return;
 	case 0x1C: // 1CH-1FH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= DisasmMode.File) {
@@ -156,11 +146,6 @@ L_CONTINUE:
 			else
 				adbg_dasm_x86_u8imm(p);
 		}
-		return;
-	case 0x20: // 20H-23H
-		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, "and");
-		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x24: // 24H-27H
 		if (p.x86.op & X86_FLAG_DIR) {
@@ -181,11 +166,6 @@ L_CONTINUE:
 			else
 				adbg_dasm_x86_u8imm(p);
 		}
-		return;
-	case 0x28: // 28H-2BH
-		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, "sub");
-		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x2C: // 2CH-2FH
 		if (p.x86.op & X86_FLAG_DIR) {
@@ -208,11 +188,6 @@ L_CONTINUE:
 				adbg_dasm_x86_u8imm(p);
 		}
 		return;
-	case 0x30: // 30H-33H
-		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, "xor");
-		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
-		return;
 	case 0x34: // 34H-37H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
@@ -232,11 +207,6 @@ L_CONTINUE:
 			else
 				adbg_dasm_x86_u8imm(p);
 		}
-		return;
-	case 0x38: // 38H-3BH
-		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, "cmp");
-		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x3C: // 3CH-3FH
 		if (p.x86.op & X86_FLAG_DIR) {
@@ -258,108 +228,14 @@ L_CONTINUE:
 				adbg_dasm_x86_u8imm(p);
 		}
 		return;
-	case 0x40: // 40H-43H
+	case 0x40, 0x44, 0x48, 0x4C, 0x50, 0x54, 0x58, 0x5C: // 40H-5CH
 		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "ax" : "eax"; break;
-			case 1:  m = p.x86.pf_operand ? "cx" : "ecx"; break;
-			case 2:  m = p.x86.pf_operand ? "dx" : "edx"; break;
-			default: m = p.x86.pf_operand ? "bx" : "ebx"; break;
-			}
-			adbg_dasm_push_str(p, "inc");
-			adbg_dasm_push_reg(p, m);
-		}
-		return;
-	case 0x44: // 44H-47H
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "sp" : "esp"; break;
-			case 1:  m = p.x86.pf_operand ? "bp" : "ebp"; break;
-			case 2:  m = p.x86.pf_operand ? "si" : "esi"; break;
-			default: m = p.x86.pf_operand ? "di" : "edi"; break;
-			}
-			adbg_dasm_push_str(p, "inc");
-			adbg_dasm_push_reg(p, m);
-		}
-		return;
-	case 0x48: // 48H-4BH
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "ax" : "eax"; break;
-			case 1:  m = p.x86.pf_operand ? "cx" : "ecx"; break;
-			case 2:  m = p.x86.pf_operand ? "dx" : "edx"; break;
-			default: m = p.x86.pf_operand ? "bx" : "ebx"; break;
-			}
-			adbg_dasm_push_str(p, "dec");
-			adbg_dasm_push_reg(p, m);
-		}
-		return;
-	case 0x4C: // 4CH-4FH
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "sp" : "esp"; break;
-			case 1:  m = p.x86.pf_operand ? "bp" : "ebp"; break;
-			case 2:  m = p.x86.pf_operand ? "si" : "esi"; break;
-			default: m = p.x86.pf_operand ? "di" : "edi"; break;
-			}
-			adbg_dasm_push_str(p, "dec");
-			adbg_dasm_push_reg(p, m);
-		}
-		return;
-	case 0x50: // 50H-53H
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "ax" : "eax"; break;
-			case 1:  m = p.x86.pf_operand ? "cx" : "ecx"; break;
-			case 2:  m = p.x86.pf_operand ? "dx" : "edx"; break;
-			default: m = p.x86.pf_operand ? "bx" : "ebx"; break;
-			}
-			adbg_dasm_push_str(p, "push");
-			adbg_dasm_push_reg(p, m);
-		}
-		return;
-	case 0x54: // 54H-57H
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "sp" : "esp"; break;
-			case 1:  m = p.x86.pf_operand ? "bp" : "ebp"; break;
-			case 2:  m = p.x86.pf_operand ? "si" : "esi"; break;
-			default: m = p.x86.pf_operand ? "di" : "edi"; break;
-			}
-			adbg_dasm_push_str(p, "push");
-			adbg_dasm_push_reg(p, m);
-		}
-		return;
-	case 0x58: // 58H-5BH
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "ax" : "eax"; break;
-			case 1:  m = p.x86.pf_operand ? "cx" : "ecx"; break;
-			case 2:  m = p.x86.pf_operand ? "dx" : "edx"; break;
-			default: m = p.x86.pf_operand ? "bx" : "ebx"; break;
-			}
-			adbg_dasm_push_str(p, "pop");
-			adbg_dasm_push_reg(p, m);
-		}
-		return;
-	case 0x5C: // 5CH-5FH
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "sp" : "esp"; break;
-			case 1:  m = p.x86.pf_operand ? "bp" : "ebp"; break;
-			case 2:  m = p.x86.pf_operand ? "si" : "esi"; break;
-			default: m = p.x86.pf_operand ? "di" : "edi"; break;
-			}
-			adbg_dasm_push_str(p, "pop");
-			adbg_dasm_push_reg(p, m);
+			__gshared const(char)*[] x86_40h = [
+				"inc", "dec", "push", "pop"
+			];
+			adbg_dasm_push_str(p, x86_40h[(p.x86.op - 0x40) >> 3]);
+			adbg_dasm_push_reg(p,
+				adbg_dasm_x86_modrm_reg(p, p.x86.op, X86_WIDTH_32B));
 		}
 		return;
 	case 0x60: // 60H-63H
@@ -440,55 +316,14 @@ L_CONTINUE:
 			}
 		}
 		return;
-	case 0x70: // 70H-73H
+	case 0x70, 0x74, 0x78, 0x7C: // 70H-73H
 		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = "jo"; break;
-			case 1:  m = "jno"; break;
-			case 2:  m = "jb"; break;
-			default: m = "jnb"; break;
-			}
-			adbg_dasm_push_str(p, m);
-		}
-		adbg_dasm_x86_u8imm(p);
-		return;
-	case 0x74: // 74H-77H
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = "jz"; break;
-			case 1:  m = "jnz"; break;
-			case 2:  m = "jbe"; break;
-			default: m = "jnbe"; break;
-			}
-			adbg_dasm_push_str(p, m);
-		}
-		adbg_dasm_x86_u8imm(p);
-		return;
-	case 0x78: // 78H-7BH
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = "js"; break;
-			case 1:  m = "jns"; break;
-			case 2:  m = "jp"; break;
-			default: m = "jnp"; break;
-			}
-			adbg_dasm_push_str(p, m);
-		}
-		adbg_dasm_x86_u8imm(p);
-		return;
-	case 0x7C: // 7CH-7FH
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = "jl"; break;
-			case 1:  m = "jnl"; break;
-			case 2:  m = "jle"; break;
-			default: m = "jnle"; break;
-			}
-			adbg_dasm_push_str(p, m);
+			__gshared const(char)*[] x86_70h = [
+				"jo", "jno", "jb", "jnb",
+				"jz", "jnz", "jbe", "jnbe",
+				"js", "jns", "jp", "jnp"
+			];
+			adbg_dasm_push_str(p, x86_70h[(p.x86.op - 0x70) >> 2]);
 		}
 		adbg_dasm_x86_u8imm(p);
 		return;
@@ -592,31 +427,10 @@ L_CONTINUE:
 			}
 		}
 		return;
-	case 0x90: // 90H-93H
+	case 0x90, 0x94: // 90H-97H
 		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  adbg_dasm_push_str(p, "nop"); return;
-			case 1:  m = p.x86.pf_operand ? "cx" : "ecx"; break;
-			case 2:  m = p.x86.pf_operand ? "dx" : "edx"; break;
-			default: m = p.x86.pf_operand ? "bx" : "ebx"; break;
-			}
 			adbg_dasm_push_str(p, "xchg");
-			adbg_dasm_push_reg(p, m);
-			adbg_dasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
-		}
-		return;
-	case 0x94: // 94H-97H
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "sp" : "esp"; break;
-			case 1:  m = p.x86.pf_operand ? "bp" : "ebp"; break;
-			case 2:  m = p.x86.pf_operand ? "si" : "esi"; break;
-			default: m = p.x86.pf_operand ? "di" : "edi"; break;
-			}
-			adbg_dasm_push_str(p, "xchg");
-			adbg_dasm_push_reg(p, m);
+			adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.op, X86_WIDTH_32B));
 			adbg_dasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 		}
 		return;
@@ -735,59 +549,17 @@ L_CONTINUE:
 			adbg_dasm_push_segreg(p, "es:", s);
 		}
 		return;
-	case 0xB0: // B0H-B3H
+	case 0xB0, 0xB4: // B0H-B7H
 		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = "al"; break;
-			case 1:  m = "cl"; break;
-			case 2:  m = "dl"; break;
-			default: m = "bl"; break;
-			}
 			adbg_dasm_push_str(p, "mov");
-			adbg_dasm_push_reg(p, m);
+			adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.op, X86_WIDTH_8B));
 		}
 		adbg_dasm_x86_u8imm(p);
 		return;
-	case 0xB4: // B4H-B7H
+	case 0xB8, 0xBC: // B8H-BFH
 		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = "ah"; break;
-			case 1:  m = "ch"; break;
-			case 2:  m = "dh"; break;
-			default: m = "bh"; break;
-			}
 			adbg_dasm_push_str(p, "mov");
-			adbg_dasm_push_reg(p, m);
-		}
-		adbg_dasm_x86_u8imm(p);
-		return;
-	case 0xB8: // B8H-BBH
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "ax" : "eax"; break;
-			case 1:  m = p.x86.pf_operand ? "cx" : "ecx"; break;
-			case 2:  m = p.x86.pf_operand ? "dx" : "edx"; break;
-			default: m = p.x86.pf_operand ? "bx" : "ebx"; break;
-			}
-			adbg_dasm_push_str(p, "mov");
-			adbg_dasm_push_reg(p, m);
-		}
-		adbg_dasm_x86_u32imm(p);
-		return;
-	case 0xBC: // BCH-BFH
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = p.x86.pf_operand ? "sp" : "esp"; break;
-			case 1:  m = p.x86.pf_operand ? "bp" : "ebp"; break;
-			case 2:  m = p.x86.pf_operand ? "si" : "esi"; break;
-			default: m = p.x86.pf_operand ? "di" : "edi"; break;
-			}
-			adbg_dasm_push_str(p, "mov");
-			adbg_dasm_push_reg(p, m);
+			adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.op, X86_WIDTH_32B));
 		}
 		adbg_dasm_x86_u32imm(p);
 		return;
