@@ -59,7 +59,7 @@ struct cliopt_t {
 	const(char) *file;
 	const(char) *file_args;
 	const(char) *file_env;
-	int dumpopt;	/// Dumper flags
+	int opts;	/// Flags for dumper
 }
 
 /// Version page
@@ -279,7 +279,7 @@ int main(int argc, const(char) **argv) {
 		// debugger: machine architecture, affects disassembly
 		if (strcmp(arg, "march") == 0) {
 			if (argi + 1 >= argc) {
-				puts("cli: ui argument missing");
+				puts("cli: architecture argument missing");
 				return EXIT_FAILURE;
 			}
 			const(char) *march = argv[++argi];
@@ -314,7 +314,7 @@ int main(int argc, const(char) **argv) {
 		// disassembler: select syntax
 		if (strcmp(arg, "syntax") == 0) {
 			if (argi + 1 >= argc) {
-				puts("cli: ui argument missing");
+				puts("cli: syntax argument missing");
 				return EXIT_FAILURE;
 			}
 			const(char) *syntax = argv[++argi];
@@ -346,7 +346,7 @@ int main(int argc, const(char) **argv) {
 
 		// dumper: file is raw
 		if (strcmp(arg, "raw") == 0) {
-			opt.dumpopt |= DUMPER_FILE_RAW;
+			opt.opts |= DUMPER_FILE_RAW;
 			continue;
 		}
 
@@ -360,16 +360,16 @@ int main(int argc, const(char) **argv) {
 			while (*cf) {
 				char c = *cf;
 				switch (c) {
-				case 'A': opt.dumpopt |= DUMPER_SHOW_EVERYTHING; break;
-				case 'h': opt.dumpopt |= DUMPER_SHOW_HEADER; break;
-				case 's': opt.dumpopt |= DUMPER_SHOW_SECTIONS; break;
-				case 'i': opt.dumpopt |= DUMPER_SHOW_IMPORTS; break;
-				case 'c': opt.dumpopt |= DUMPER_SHOW_LOADCFG; break;
-//				case 'e': opt.dumpopt |= DUMPER_SHOW_EXPORTS; break;
-//				case '': opt.dumpopt |= DUMPER_SHOW_; break;
-				case 'd': opt.dumpopt |= DUMPER_DISASM_CODE; break;
-				case 'D': opt.dumpopt |= DUMPER_DISASM_ALL; break;
-				case 'S': opt.dumpopt |= DUMPER_DISASM_STATS; break;
+				case 'A': opt.opts |= DUMPER_SHOW_EVERYTHING; break;
+				case 'h': opt.opts |= DUMPER_SHOW_HEADER; break;
+				case 's': opt.opts |= DUMPER_SHOW_SECTIONS; break;
+				case 'i': opt.opts |= DUMPER_SHOW_IMPORTS; break;
+				case 'c': opt.opts |= DUMPER_SHOW_LOADCFG; break;
+//				case 'e': opt.opts |= DUMPER_SHOW_EXPORTS; break;
+//				case '': opt.opts |= DUMPER_SHOW_; break;
+				case 'd': opt.opts |= DUMPER_DISASM_CODE; break;
+				case 'D': opt.opts |= DUMPER_DISASM_ALL; break;
+				case 'S': opt.opts |= DUMPER_DISASM_STATS; break;
 				case '?': return clipage(CLIPage.show);
 				default:
 					printf("cli: unknown show flag: %c\n", c);
@@ -433,7 +433,7 @@ L_CLI_DEFAULT:
 		}
 		break;
 	case dump:
-		e = adbg_dmpr_dump(opt.file, &disopt, opt.dumpopt);
+		e = adbg_dmpr_dump(opt.file, &disopt, opt.opts);
 		break;
 	case profile:
 		puts("Profiling feature not yet implemented");
