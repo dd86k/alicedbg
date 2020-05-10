@@ -3,11 +3,11 @@
 **Please note that this is still is very early development!**
 
 The alicedbg project aims to be an easy-to-use, simple debugger, object dumper,
-and profiler.
+and profiler. Either as a stand-alone program or as a library.
 
-_Why not just use GDB?_ One might ask.
+_Why not just use GDB or LLDB?_ One might ask.
 
-_Why not make one myself?_ I asked myself.
+_Why not make one from scratch myself?_ I asked myself.
 
 Personal Goals:
 
