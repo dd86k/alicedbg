@@ -4529,9 +4529,38 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 		adbg_dasm_x86_vex_modrm(p, f);
 		adbg_dasm_x86_u8imm(p);
 		return;
-/*	case 0xD0: // D0H-D4H
-	
-		return;*/
+	case 0xD0: // D0H-D4H
+		const(char) *m = void;
+		int f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
+		if (p.x86.op & X86_FLAG_DIR) {
+			if (p.x86.vex_pp != X86_VEX_PP_66H) {
+				adbg_dasm_err(p);
+				return;
+			}
+			if (p.x86.op & X86_FLAG_WIDE) {
+				m = "vpsrlq";
+			} else {
+				m = "vpsrld";
+			}
+		} else {
+			if (p.x86.op & X86_FLAG_WIDE) {
+				if (p.x86.vex_pp != X86_VEX_PP_66H) {
+					adbg_dasm_err(p);
+					return;
+				}
+				m = "vpsrlw";
+			} else {
+				switch (p.x86.vex_pp) {
+				case X86_VEX_PP_66H: m = "vaddsubpd"; break;
+				case X86_VEX_PP_F2H: m = "vaddsubps"; break;
+				default: adbg_dasm_err(p); return;
+				}
+			}
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
 	default: adbg_dasm_err(p); return;
 	}
 }

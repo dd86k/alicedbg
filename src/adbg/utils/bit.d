@@ -1,11 +1,11 @@
 /**
  * Bit manipulation utility module.
  *
- * This (will) include bit swapping functions, and some extras (such as the
+ * This includes bit swapping functions, and some extras (such as the
  * BIT template to help selecting bits).
  *
- * The cswap functions are not templates, because structure fields are read
- * at runtime.
+ * Most useful being the fswap variants, which depending on the requested
+ * endian (compared to the target's), return a function for bulk processing.
  *
  * License: BSD 3-Clause
  */
@@ -21,37 +21,68 @@ version (LittleEndian)
 else
 	private enum TE = 1; /// Target Endian
 
-/// Conditionally swap if specified target endian does not match compiled
-/// target.
-/// Params:
-/// 	v = 16-bit value
-/// 	e = Target endian (0=Little, 1=Big)
-/// Returns: Byte-swapped 16-bit value if TargetEndian is different
-ushort adbg_util_cswap16(ushort v, int e) {
-	return e == TE ? v : adbg_util_bswap16(v);
+pragma(inline, true): // Encourage inlining whenever possible
+
+/// Return a function pointer depending if requested endian matches target
+/// endian. If it matches identical, this function returns a function that
+/// returns the same value. If it does not match, this function returns
+/// a function that effectively byte swaps the value. This is useful for bulk
+/// operations, such as parsing header data or processing disassembly.
+/// Params: e = Target endian (0=Little, 1=Big)
+/// Returns: Function pointer
+ushort function(ushort) adbg_util_fswap16(int e) {
+	if (e == TE)	// Same endian, send bogus function
+		return &adbg_util_bswap16nop;
+	else	// Different endian, send bswap function
+		return &adbg_util_bswap16;
 }
 
-/// Conditionally swap if specified target endian does not match compiled
-/// target.
-/// Params:
-/// 	v = 32-bit value
-/// 	e = Target endian (0=Little, 1=Big)
-/// Returns: Byte-swapped 32-bit value if TargetEndian is different
-uint adbg_util_cswap32(uint v, int e) {
-	return e == TE ? v : adbg_util_bswap32(v);
+/// Return a function pointer depending if requested endian matches target
+/// endian. If it matches identical, this function returns a function that
+/// returns the same value. If it does not match, this function returns
+/// a function that effectively byte swaps the value. This is useful for bulk
+/// operations, such as parsing header data or processing disassembly.
+/// Params: e = Target endian (0=Little, 1=Big)
+/// Returns: Function pointer
+uint function(uint) adbg_util_fswap32(int e) {
+	if (e == TE)	// Same endian, send bogus function
+		return &adbg_util_bswap32nop;
+	else	// Different endian, send bswap function
+		return &adbg_util_bswap32;
 }
 
-/// Conditionally swap if specified target endian does not match compiled
-/// target.
-/// Params:
-/// 	v = 64-bit value
-/// 	e = Target endian (0=Little, 1=Big)
-/// Returns: Byte-swapped 64-bit value if TargetEndian is different
-ulong adbg_util_cswap64(ulong v, int e) {
-	return e == TE ? v : adbg_util_bswap64(v);
+/// Return a function pointer depending if requested endian matches target
+/// endian. If it matches identical, this function returns a function that
+/// returns the same value. If it does not match, this function returns
+/// a function that effectively byte swaps the value. This is useful for bulk
+/// operations, such as parsing header data or processing disassembly.
+/// Params: e = Target endian (0=Little, 1=Big)
+/// Returns: Function pointer
+ulong function(ulong) adbg_util_fswap64(int e) {
+	if (e == TE)	// Same endian, send bogus function
+		return &adbg_util_bswap64nop;
+	else	// Different endian, send bswap function
+		return &adbg_util_bswap64;
 }
 
-pragma(inline, true): // Encourage inlining
+/// No-op swap for fswap16.
+/// Params: v = 16-bit value
+/// Returns: Same value
+ushort adbg_util_bswap16nop(ushort v) {
+	return v;
+}
+/// No-op swap for fswap32.
+/// Params: v = 32-bit value
+/// Returns: Same value
+uint adbg_util_bswap32nop(uint v) {
+	return v;
+}
+/// No-op swap for fswap64.
+/// Params: v = 64-bit value
+/// Returns: Same value
+ulong adbg_util_bswap64nop(ulong v) {
+	return v;
+}
 
 /// Byte-swap an 16-bit value.
 /// Params: v = 16-bit value

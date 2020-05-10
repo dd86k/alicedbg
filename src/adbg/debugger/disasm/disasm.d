@@ -37,14 +37,14 @@ enum DisasmError {
 enum DisasmISA : ubyte {
 	Default,	/// Platform compiled target default
 	Guess,	/// (Not implemented) Attempt to guess ISA
-	x86_16,	/// 8086, 80186, 80286
-	x86,	/// x86-32, 80386/i386
-	x86_64,	/// AMD64, Intel64, x64 (Windows)
+	x86_16,	/// (WIP) 8086, 80186, 80286
+	x86,	/// (WIP) x86-32, 80386/i386
+	x86_64,	/// (Not implemented) AMD64, Intel64, x64 (Windows)
 	arm_t32,	/// (Not implemented) ARM: Thumb 32-bit
 	arm_a32,	/// (Not implemented) ARM: A32 (formally arm)
 	arm_a64,	/// (Not implemented) ARM: A64 (formally aarch64)
-	rv32,	/// RISC-V 32-bit
-	rv64,	/// RISC-V 64-bit
+	rv32,	/// (Not implemented) RISC-V 32-bit
+	rv64,	/// (Not implemented) RISC-V 64-bit
 }
 
 /// Disassembler x86 styles
@@ -74,8 +74,7 @@ version (AArch64) {
 	enum DISASM_DEFAULT_ISA = DisasmISA.arm_a64;	/// Platform default ABI
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Att;	/// Platform default syntax
 } else {
-	enum DISASM_DEFAULT_ISA = DisasmISA.Default;	/// Platform default ABI
-	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Nasm;	/// Platform default syntax
+	static assert(0, "Platform has no default disassembler settings");
 }
 
 //
