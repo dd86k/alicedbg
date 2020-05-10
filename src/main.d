@@ -45,7 +45,7 @@ enum CLIPage {
 	main,
 	ui,
 	show,
-	dsyntaxess,
+	syntaxes,
 	marchs,
 	license,
 }
@@ -126,7 +126,7 @@ int clipage(CLIPage h) {
 //		"D .. Show disassembly (all sections)"
 		;
 		break;
-	case dsyntaxess:
+	case syntaxes:
 		r =
 		"Available disassembler styles\n"~
 		"intel .... Intel syntax\n"~
@@ -137,15 +137,15 @@ int clipage(CLIPage h) {
 	case marchs:
 		r =
 		"Available architectures\n"~
-		"x86_16 ..... Intel x86 16-bit mode (8086)\n"~
-		"x86 ........ Intel and AMD x86 (i386+)"
-//		"x86_64 ..... EM64T/Intel64 and AMD64\n"
-//		"thumb ...... ARM Thumb 32-bit\n"~
-//		"arm ........ ARM 32-bit\n"~
-//		"aarch64 .... ARM 64-bit\n"~
-//		"rv32 ....... RISC-V 32-bit\n"~
-//		"rv64 ....... RISC-V 64-bit\n"~
-//		"rv128 ...... RISC-V 128-bit\n"~
+		"x86_16 ........ Intel x86 16-bit mode (8086)\n"~
+		"x86 ........... Intel and AMD x86 (i386+)"
+//		"x86_64 ........ EM64T/Intel64 and AMD64\n"
+//		"thumb ......... ARM Thumb 32-bit\n"~
+//		"arm ........... ARM 32-bit\n"~
+//		"aarch64 ....... ARM 64-bit\n"~
+//		"rv32 .......... RISC-V 32-bit\n"~
+//		"rv64 .......... RISC-V 64-bit\n"~
+//		"rv128 ......... RISC-V 128-bit\n"~
 		;
 		break;
 	case license:
@@ -312,22 +312,22 @@ int main(int argc, const(char) **argv) {
 		}
 
 		// disassembler: select syntax
-		if (strcmp(arg, "dsyntax") == 0) {
+		if (strcmp(arg, "syntax") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: ui argument missing");
 				return EXIT_FAILURE;
 			}
-			const(char) *dsyntax = argv[++argi];
-			if (strcmp(dsyntax, "intel") == 0)
+			const(char) *syntax = argv[++argi];
+			if (strcmp(syntax, "intel") == 0)
 				disopt.syntax = DisasmSyntax.Intel;
-			else if (strcmp(dsyntax, "nasm") == 0)
+			else if (strcmp(syntax, "nasm") == 0)
 				disopt.syntax = DisasmSyntax.Nasm;
-			else if (strcmp(dsyntax, "att") == 0)
+			else if (strcmp(syntax, "att") == 0)
 				disopt.syntax = DisasmSyntax.Att;
-			else if (strcmp(dsyntax, "?") == 0)
-				return clipage(CLIPage.dsyntaxess);
+			else if (strcmp(syntax, "?") == 0)
+				return clipage(CLIPage.syntaxes);
 			else {
-				printf("Unknown disassembler syntax: '%s'\n", dsyntax);
+				printf("Unknown disassembler syntax: '%s'\n", syntax);
 				return EXIT_FAILURE;
 			}
 			continue;

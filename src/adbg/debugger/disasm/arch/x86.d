@@ -68,10 +68,10 @@ L_CONTINUE:
 	// 00H-03H, 08H-0BH, 10H-13H, 18-1BH, 20H-23H, 28H-2BH, 30H-33H, 38H-3BH
 	case 0, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38:
 		if (p.mode >= DisasmMode.File) {
-			__gshared const(char)*[] x86_01h = [
+			__gshared const(char)*[] x86_00h = [
 				"add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"
 			];
-			adbg_dasm_push_str(p, x86_01h[p.x86.op >> 2]);
+			adbg_dasm_push_str(p, x86_00h[p.x86.op >> 3]);
 		}
 		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
