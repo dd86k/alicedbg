@@ -4,8 +4,8 @@
  * The formatting engine is designed to format any given pieces of string from
  * the decoder in a given order by the style setting.
  *
- * This module adbg.provides the item and style formatting for the disassembler. The
- * decoder (disassembler) pushes items with their respective types (e.g.
+ * This module provides the item and style formatting functions for the
+ * disassembler. The decoder pushes items with their respective types (e.g.
  * register, immediate, etc.) and the formatter takes take of rendering
  * the final result. Values are referenced (i.e. strings), not copied. For
  * example, adbg_dasm_push_reg pushes a register string value.
@@ -18,9 +18,7 @@
  *
  * The operand ordering is INSTRUCTION TARGET, SOURCE (Intel), this is
  * important to know since this behavior is affected by the disassembler
- * syntax setting (e.g. At&t vs. Intel/Nasm/Masm). This behavior can be
- * bypassed with the FORMATTER_O_NO_DIRECTION formatter setting if the style
- * does not affect the operand ordering.
+ * syntax setting (e.g. At&t vs. Intel/Nasm/Masm).
  *
  * Machine code and mnemonic items are processed differently. The machine code
  * items are immediately processed upon arrival onto the string buffer, so
@@ -35,7 +33,6 @@ import core.stdc.stdarg;
 import adbg.debugger.disasm.disasm;
 import adbg.utils.str;
 
-//TODO: New type: Prefix -- Next thing to print would be a space, not comma
 
 extern (C):
 
@@ -48,13 +45,9 @@ enum FORMATTER_STACK_LIMIT = FORMATTER_STACK_SIZE - 1;
 // Formatter options for decoder
 //
 
-/// Items will be processed in order regardless of style
-enum FORMATTER_O_NO_DIRECTION = 1;
-/// (Not implemented) Second separator will be a space (" ") instead of a comma (", ").
-/// Very useful for instruction prefixes such as LOCK (x86)
-enum FORMATTER_O_PREFIX = 2;
-
-//TODO: Hexadecimal format setting (with width?)
+//TODO: New type -- Prefix
+//      Prefixes are simple strings to process before the normal instruction
+//      Currently not supported because other ISAs (than x86) don't seem to have such thing
 /// Item type, each item more or less has their own formatting function
 enum FormatType {
 	String,	/// Pure string
@@ -80,8 +73,8 @@ enum FormatType {
 // Internally, always mapped to the ival3 field
 enum MemoryWidth {
 	u8,	/// 8-bit
-	u32,	/// 32-bit
 	u16,	/// 16-bit
+	u32,	/// 32-bit
 	u64,	/// 64-bit
 	u128,	/// 128-bit
 	u256,	/// 256-bit
@@ -104,28 +97,27 @@ struct disasm_fmt_item_t {
 struct disasm_fmt_t { align(1):
 	disasm_fmt_item_t [FORMATTER_STACK_SIZE]items;	/// Stack
 	size_t itemno;	/// Current item number
-	/// Formatter settings for current stack/instruction (from decoder)
-	ushort settings;
 }
 
 /// Default string for illegal instructions
-private
-__gshared const(char) *DISASM_FMT_ERR_STR	= "(bad)";
-private
-__gshared const(char) *DISASM_FMT_SPACE	= " ";
-private
-__gshared const(char) *DISASM_FMT_TAB	= "\t";
-private
-__gshared const(char) *DISASM_FMT_COMMA_SPACE	= ", ";
+private __gshared
+const(char) *DISASM_FMT_ERR_STR	= "(bad)";
+private __gshared
+const(char) *DISASM_FMT_SPACE	= " ";
+private __gshared
+const(char) *DISASM_FMT_TAB	= "\t";
+private __gshared
+const(char) *DISASM_FMT_COMMA_SPACE	= ", ";
 
-//TODO: Missing FWORD (16b:32b or 16b:16b (66H))
-private
-__gshared const(char) *[]MEM_WIDTHS_INTEL = [
+//TODO: Missing FWORD (16b:32b or 16b:16b (66H)) and TWORD (80-bit)
+// Currently mapped to the x86 decoder width maps
+private __gshared
+const(char) *[]MEM_WIDTHS_INTEL = [
 	"byte", "dword", "word", "qword", "oword", "yword", "zword"
 ];
 
 //
-// Machine code functions
+// ANCHOR Machine code functions
 //
 
 /// Push an 8-bit value into the machine code buffer.
@@ -166,7 +158,7 @@ void adbg_dasm_push_x64(disasm_params_t *p, ulong v) {
 }
 
 //
-// Pushing functions
+// ANCHOR Pushing functions
 //
 
 //TODO: Consider renaming the push names
@@ -481,45 +473,18 @@ void adbg_dasm_err(disasm_params_t *p, DisasmError err = DisasmError.Illegal) {
 /// Params:
 /// 	p = Disassembler parameters
 void adbg_dasm_render(disasm_params_t *p) {
-	size_t nbitems = p.fmt.itemno; /// number of total items
+	size_t nitems = p.fmt.itemno; /// number of total items
 
-	if (nbitems < 1) return;
+	if (nitems < 1) return;
 
 	adbg_dasm_fadd(p, &p.fmt.items[0]);
 
-	if (nbitems < 2) return;
+	if (nitems < 2) return;
 
-	bool inversedir = void;
-
-	if (p.fmt.settings & FORMATTER_O_NO_DIRECTION) {
-		inversedir = false;
-	} else {
-		with (DisasmSyntax)
-		switch (p.style) {
-		case Att: inversedir = true; break;
-		default:  inversedir = false;
-		}
-	}
-
-	adbg_dasm_madd(p, DISASM_FMT_TAB);
-
-	if (inversedir) {
-		if (nbitems > 2) {
-			adbg_dasm_fadd(p, &p.fmt.items[2]);
-			adbg_dasm_madd(p, DISASM_FMT_COMMA_SPACE);
-		}
-		adbg_dasm_fadd(p, &p.fmt.items[1]);
-	} else {
-		adbg_dasm_fadd(p, &p.fmt.items[1]);
-		if (nbitems > 2) {
-			adbg_dasm_madd(p, DISASM_FMT_COMMA_SPACE);
-			adbg_dasm_fadd(p, &p.fmt.items[2]);
-		}
-	}
-
-	for (size_t index = 3; index < nbitems; ++index) {
-		adbg_dasm_madd(p, DISASM_FMT_COMMA_SPACE);
-		adbg_dasm_fadd(p, &p.fmt.items[index]);
+	with (DisasmSyntax)
+	switch (p.syntax) {
+	case Att: adbg_dasm_render_att(p, nitems); return;
+	default: adbg_dasm_render_intel(p, nitems); return;
 	}
 }
 
@@ -528,6 +493,26 @@ void adbg_dasm_render(disasm_params_t *p) {
 //
 
 private:
+
+void adbg_dasm_render_intel(disasm_params_t *p, size_t nitems) {
+	adbg_dasm_madd(p, DISASM_FMT_TAB);
+	adbg_dasm_fadd(p, &p.fmt.items[1]);
+
+	for (size_t index = 2; index < nitems; ++index) {
+		adbg_dasm_madd(p, DISASM_FMT_COMMA_SPACE);
+		adbg_dasm_fadd(p, &p.fmt.items[index]);
+	}
+}
+void adbg_dasm_render_att(disasm_params_t *p, size_t nitems) {
+	adbg_dasm_madd(p, DISASM_FMT_TAB);
+	size_t index = nitems - 1;
+	adbg_dasm_fadd(p, &p.fmt.items[index]);
+
+	for (--index; index > 0; --index) {
+		adbg_dasm_madd(p, DISASM_FMT_COMMA_SPACE);
+		adbg_dasm_fadd(p, &p.fmt.items[index]);
+	}
+}
 
 /// (Internal) Automatically select next item to be pushed into the stack. This
 /// also increments the stack pointer. Called by pushing functions.
@@ -563,6 +548,7 @@ void adbg_dasm_xadd(disasm_params_t *p, const(char) *s) {
 /// 	p = Disassembler parameters
 /// 	i = Disassembler formatter item
 void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
+	//NOTE: To reduce binary size, this is condensed into this function
 	import core.stdc.stdio : snprintf;
 
 	ptrdiff_t left = DISASM_BUF_SIZE - p.mnbufi;
@@ -586,13 +572,13 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		return;
 	case Addr:
 		if (i.ival2)
-			p.mnbufi += snprintf(bp, left, "<0x%08x>", i.ival1);
-		else
 			p.mnbufi += snprintf(bp, left, "<0x%016llx>", i.lval1);
+		else
+			p.mnbufi += snprintf(bp, left, "<0x%08x>", i.ival1);
 		return;
 	case Imm:
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att: f = "$%d"; break;
 		default:  f = "%d"; break;
 		}
@@ -600,7 +586,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		return;
 	case ImmFar:
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att: f = "$0x%x, $0x%x"; break;
 		default:  f = "0x%x:0x%x"; break;
 		}
@@ -608,7 +594,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		return;
 	case ImmSeg:
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att: f = "%%%s0x%x"; break;
 		default:  f = "%s0x%x"; break;
 		}
@@ -616,7 +602,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		return;
 	case Mem:
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att: f = "(%d)"; break;
 		default:  f = "[%d]"; break;
 		}
@@ -624,7 +610,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		return;
 	case MemReg:
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "(%s)", i.sval1);
 			return;
@@ -637,7 +623,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1); // reg
 		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2); // seg
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "%s(%s)", i.sval2, i.sval1);
 			return;
@@ -653,7 +639,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 	case MemRegImm:
 		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "(%s%+d)", i.sval1, i.ival1);
 			return;
@@ -666,7 +652,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
 		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "%s(%s%+d)", i.sval2, i.sval1, i.ival1);
 			return;
@@ -684,7 +670,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
 		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "%s(%s,%s,%d)", i.sval3, i.sval1, i.sval2, i.ival1);
 			return;
@@ -701,7 +687,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
 		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "%s(,%s,)", i.sval2, i.sval1);
 			return;
@@ -718,7 +704,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
 		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "%s%+d(,%s,%d)",
 				i.sval2, i.sval2, i.sval1, i.ival1);
@@ -735,7 +721,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 	case x86_SIB_MemSegImm:
 		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "%s%+d(,,)", i.sval1, i.ival1);
 			return;
@@ -753,7 +739,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
 		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "%s%+d(%s,%s,%d)",
 				i.sval3, i.ival2, i.sval1, i.sval2, i.ival1);
@@ -771,7 +757,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
 		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
 		with (DisasmSyntax)
-		switch (p.style) {
+		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "%s%+d(%s,,)", i.sval2, i.ival1, i.sval1);
 			return;
@@ -790,7 +776,7 @@ const(char) *adbg_dasm_freg(disasm_params_t *p, const(char) *s, char[256] *buffe
 	import core.stdc.stdio : snprintf;
 	if (s[0] == 0) return "";
 	with (DisasmSyntax)
-	switch (p.style) {
+	switch (p.syntax) {
 	case Att:
 		snprintf(cast(char*)buffer, 16, "%%%s", s);
 		return cast(char*)buffer;

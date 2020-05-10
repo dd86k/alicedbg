@@ -45,7 +45,7 @@ enum CLIPage {
 	main,
 	ui,
 	show,
-	dstyles,
+	dsyntaxess,
 	marchs,
 	license,
 }
@@ -126,7 +126,7 @@ int clipage(CLIPage h) {
 //		"D .. Show disassembly (all sections)"
 		;
 		break;
-	case dstyles:
+	case dsyntaxess:
 		r =
 		"Available disassembler styles\n"~
 		"intel .... Intel syntax\n"~
@@ -311,23 +311,23 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		// disassembler: select style
-		if (strcmp(arg, "dstyle") == 0) {
+		// disassembler: select syntax
+		if (strcmp(arg, "dsyntax") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: ui argument missing");
 				return EXIT_FAILURE;
 			}
-			const(char) *dstyle = argv[++argi];
-			if (strcmp(dstyle, "intel") == 0)
-				disopt.style = DisasmSyntax.Intel;
-			else if (strcmp(dstyle, "nasm") == 0)
-				disopt.style = DisasmSyntax.Nasm;
-			else if (strcmp(dstyle, "att") == 0)
-				disopt.style = DisasmSyntax.Att;
-			else if (strcmp(dstyle, "?") == 0)
-				return clipage(CLIPage.dstyles);
+			const(char) *dsyntax = argv[++argi];
+			if (strcmp(dsyntax, "intel") == 0)
+				disopt.syntax = DisasmSyntax.Intel;
+			else if (strcmp(dsyntax, "nasm") == 0)
+				disopt.syntax = DisasmSyntax.Nasm;
+			else if (strcmp(dsyntax, "att") == 0)
+				disopt.syntax = DisasmSyntax.Att;
+			else if (strcmp(dsyntax, "?") == 0)
+				return clipage(CLIPage.dsyntaxess);
 			else {
-				printf("Unknown disassembler style: '%s'\n", dstyle);
+				printf("Unknown disassembler syntax: '%s'\n", dsyntax);
 				return EXIT_FAILURE;
 			}
 			continue;

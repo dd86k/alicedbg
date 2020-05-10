@@ -47,7 +47,7 @@ enum DisasmISA : ubyte {
 	rv64,	/// (Not implemented) RISC-V 64-bit
 }
 
-/// Disassembler x86 styles
+/// Disassembler x86 syntaxes
 enum DisasmSyntax : ubyte {
 	Default,	/// Platform compiled target default
 	Intel,	/// Intel syntax
@@ -127,8 +127,8 @@ struct disasm_params_t { align(1):
 	DisasmError error;
 	/// Platform to disasm. See the DisasmABI enum for more details.
 	DisasmISA isa;
-	/// Assembler style. See DisasmStyle enums for more details.
-	DisasmSyntax style;
+	/// Assembler syntax style. See DisasmSyntax enum for more details.
+	DisasmSyntax syntax;
 	/// Operation mode.
 	DisasmMode mode;
 	/// Settings flags. See DISASM_O_* flags.
@@ -180,7 +180,6 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 		disasm_fmt_t fmt = void;
 		p.fmt = &fmt;
 		p.fmt.itemno = 0;
-		p.fmt.settings = 0;
 		with (p) mcbufi = mnbufi = 0;
 	}
 
@@ -195,13 +194,13 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 	case rv32:	adbg_dasm_rv32(p); break;
 	default:
 		adbg_dasm_err(p, DisasmError.NotSupported);
-		p.mcbuf[0] = p.mnbuf[0] = 0;
+		p.mcbuf[0] = 0;
 		return p.error;
 	}
 
 	if (modefile) {
-		if (p.style == DisasmSyntax.Default)
-			p.style = DISASM_DEFAULT_SYNTAX;
+		if (p.syntax == DisasmSyntax.Default)
+			p.syntax = DISASM_DEFAULT_SYNTAX;
 		if (p.error == DisasmError.None)
 			adbg_dasm_render(p);
 	}
@@ -226,6 +225,9 @@ int adbg_dasm_endian(DisasmISA isa) {
 	}
 }
 
+/// Get a short message for a DisasmError.
+/// Params: e = DisasmError
+/// Returns: String
 const(char) *adbg_dasm_errmsg(DisasmError e) {
 	with (DisasmError)
 	final switch (e) {

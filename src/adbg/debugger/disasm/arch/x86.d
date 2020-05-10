@@ -4943,7 +4943,7 @@ const(char) *adbg_dasm_x86_segstr(int segreg) {
 const(char) *adbg_dasm_x87_ststr(disasm_params_t *p, int index) {
 	const(char) *st = void;
 	with (DisasmSyntax)
-	switch (p.style) {
+	switch (p.syntax) {
 	case Att:
 		switch (index) {
 		case 0: st = "%st"; break;

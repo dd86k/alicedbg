@@ -95,7 +95,7 @@ from the ffmpeg project (`-option [value]`).
 |---|---|---|---|
 | `-mode` | `debugger`, `dump`, `profile` | `debugger` | Operating mode |
 | `-march` | See `-march ?` | Target dependant | (Disassembler) Set machine architecture |
-| `-dstyle` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
+| `-dsyntax` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
 | `-exec` | File path | | Set mode to Debugger and next argument as `file` |
 | `-pid` | Process ID | | Set mode to Debugger and next argument as `pid` |
 | `-ui` | `tui`, `loop`, `tcp-json` | `tui` | (Debugger) User interface |

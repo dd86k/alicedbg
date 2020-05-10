@@ -6,7 +6,7 @@
  * of the debugger difficult for the client program (e.g. client would have
  * to distinguish an exception type of Fault as EXCEPTION_ACCESS_VIOLATION
  * (0xC00000005) AND SIGSEGV. That'd be hell!). So a "translater" (see function
- * `codetype`) converts those codes to our enumeration.
+ * `codetype`) converts those codes to the enumeration.
  *
  * License: BSD 3-Clause
  */
@@ -16,13 +16,13 @@ version (Windows) {
 	import core.sys.windows.windows;
 	import adbg.debugger.sys.wow64;
 	enum { // NTSTATUS missing D bindings (WOW64)
-		STATUS_WX86_UNSIMULATE = 0x4000001C,	/// WOW64 exception code
-		STATUS_WX86_CONTINUE = 0x4000001D,	/// WOW64 exception code
-		STATUS_WX86_SINGLE_STEP = 0x4000001E,	/// WOW64 exception code
-		STATUS_WX86_BREAKPOINT = 0x4000001F,	/// WOW64 exception code
-		STATUS_WX86_EXCEPTION_CONTINUE = 0x40000020,	/// WOW64 exception code
-		STATUS_WX86_EXCEPTION_LASTCHANCE = 0x40000021,	/// WOW64 exception code
-		STATUS_WX86_EXCEPTION_CHAIN = 0x40000022,	/// WOW64 exception code
+		STATUS_WX86_UNSIMULATE	= 0x4000001C,	/// WOW64 exception code
+		STATUS_WX86_CONTINUE	= 0x4000001D,	/// WOW64 exception code
+		STATUS_WX86_SINGLE_STEP	= 0x4000001E,	/// WOW64 exception code
+		STATUS_WX86_BREAKPOINT	= 0x4000001F,	/// WOW64 exception code
+		STATUS_WX86_EXCEPTION_CONTINUE	= 0x40000020,	/// WOW64 exception code
+		STATUS_WX86_EXCEPTION_LASTCHANCE	= 0x40000021,	/// WOW64 exception code
+		STATUS_WX86_EXCEPTION_CHAIN	= 0x40000022,	/// WOW64 exception code
 	}
 } else
 version (Posix) {
@@ -33,8 +33,10 @@ version (Posix) {
 
 extern (C):
 
-/// Register array size, varies on compile target
-enum REG_COUNT = 32;
+version (X86)
+	enum EX_REG_COUNT = 10;	/// Number of registers available
+else version (X86_64)
+	enum EX_REG_COUNT = 10;	/// Number of registers available
 
 /// Register size
 enum RegisterType {
@@ -75,6 +77,8 @@ enum ExceptionType {
 struct exception_t {
 	/// Exception type, see the ExceptionType enumeration.
 	ExceptionType type;
+	/// Available features
+	uint available;
 	/// Original OS code (exception or signal value).
 	uint oscode;
 	/// Process ID.
@@ -82,16 +86,16 @@ struct exception_t {
 	/// Thread ID, if available; Otherwise zero.
 	uint tid;
 	union {
-		/// Memory address value
-		size_t addrv;
-		/// Memory address pointer
+		/// Memory address pointer for fault
 		void *addr;
+		/// Memory address value for fault
+		size_t addrv;
 	}
 	/// Register count in registers field, populated by
 	/// adbg_ex_reg_init.
 	size_t regcount;
 	/// Register population, this may depend on the OS and CRT
-	register_t [REG_COUNT]registers;
+	register_t [EX_REG_COUNT]registers;
 }
 
 /// Register structure, designs a single register for UI ends to understand
@@ -292,7 +296,7 @@ const(char) *adbg_ex_typestr(ExceptionType code) {
 
 /// Format a register depending on their type as a zero-padded number.
 /// Params: reg = register_t structure
-/// Returns: 
+/// Returns: Formatted hexadecimal value
 const(char) *adbg_ex_reg_fhex(register_t *reg) {
 	import adbg.utils.str : adbg_util_strf;
 	with (RegisterType)
@@ -327,10 +331,10 @@ void adbg_ex_reg_init(exception_t *e, InitPlatform plat) {
 		else version (X86_64)
 			plat = InitPlatform.x86_64;
 	}
+	e.regcount = EX_REG_COUNT;
 	with (InitPlatform)
 	switch (plat) {
 	case x86:
-		e.regcount = 10;
 		e.registers[0].name = "EIP";
 		e.registers[0].type = RegisterType.U32;
 		e.registers[1].name = "EFLAGS";
@@ -353,7 +357,6 @@ void adbg_ex_reg_init(exception_t *e, InitPlatform plat) {
 		e.registers[9].type = RegisterType.U32;
 		return;
 	case x86_64:
-		e.regcount = 10;
 		e.registers[0].name = "RIP";
 		e.registers[0].type = RegisterType.U64;
 		e.registers[1].name = "RFLAGS";
