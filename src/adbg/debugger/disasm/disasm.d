@@ -50,10 +50,9 @@ enum DisasmISA : ubyte {
 /// Disassembler x86 syntaxes
 enum DisasmSyntax : ubyte {
 	Default,	/// Platform compiled target default
-	Intel,	/// Intel syntax
+	Intel,	/// Intel syntax, closest to the Microsoft/Macro Assembler (MASM)
 	Nasm,	/// (NASM) Netwide Assembler syntax
 	Att,	/// AT&T syntax
-//	Masm,	/// (Not implemented) (MASM) Microsoft/Macro Assembler
 //	Ideal,	/// (Not implemented) Borland Ideal
 //	Hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
 }
@@ -81,13 +80,13 @@ version (AArch64) {
 // Option bits
 //
 
-///TODO: Diasm option: Use space instead of a tab between the mnemonic and operands
+/// Disasm option: Use space instead of a tab between the mnemonic and operands
 enum DISASM_O_SPACE	= 0x0001;
-///TODO: Diasm option: Go backwards instead of forward. More expensive to calculate!
+///TODO: Disasm option: Go backwards instead of forward. More expensive to calculate!
 enum DISASM_O_BACKWARD	= 0x0002;
-/// Diasm option: 
+/// Disasm option: 
 //enum DISASM_O_	= 0x0004;
-/// Diasm option: 
+/// Disasm option: 
 //enum DISASM_O_	= 0x0008;
 /// Disasm option: 
 //enum DISASM_O_	= 0x0010;

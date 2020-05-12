@@ -33,13 +33,13 @@ import core.stdc.stdarg;
 import adbg.debugger.disasm.disasm;
 import adbg.utils.str;
 
-
 extern (C):
 
-/// Formatter item stack size
+/// Number of items the formatter can hold
 enum FORMATTER_STACK_SIZE = 8;
 /// Formatter stack limit (size - 1)
 enum FORMATTER_STACK_LIMIT = FORMATTER_STACK_SIZE - 1;
+enum FORMATTER_WIDTH_MASK = 15;
 
 //
 // Formatter options for decoder
@@ -50,9 +50,9 @@ enum FORMATTER_STACK_LIMIT = FORMATTER_STACK_SIZE - 1;
 //      Currently not supported because other ISAs (than x86) don't seem to have such thing
 /// Item type, each item more or less has their own formatting function
 enum FormatType {
-	String,	/// Pure string
+	String,	/// String that will remain unformatted, typically the instruction
 	Reg,	/// Register spec
-	SegReg,	/// Register spec
+	SegReg,	/// Segment:Register spec
 	Addr,	/// Address spec (e.g. jumps)
 	Imm,	/// Immediate spec
 	ImmFar,	/// Immediate far spec (notably for x86), x:x format
@@ -70,15 +70,17 @@ enum FormatType {
 	x86_SIB_MemSegBaseImm,	/// x86: SIB MOD=01/10 I=100 format
 }
 /// Memory operation pointer width for memory types
-// Internally, always mapped to the ival3 field
 enum MemoryWidth {
-	u8,	/// 8-bit
-	u16,	/// 16-bit
-	u32,	/// 32-bit
-	u64,	/// 64-bit
-	u128,	/// 128-bit
-	u256,	/// 256-bit
-	u512	/// 512-bit
+	i8,	/// 8-bit
+	i16,	/// 16-bit
+	i32,	/// 32-bit
+	i64,	/// 64-bit
+	i128,	/// 128-bit
+	i256,	/// 256-bit
+	i512,	/// 512-bit
+	i1024,	/// 1024-bit
+	m32,	/// (x86) fword m16:32 or m16:16
+	f80,	/// (x86) tword 80-bit
 }
 
 /// Format item structure. Can hold up to 3 integer and 3 string values.
@@ -88,32 +90,36 @@ struct disasm_fmt_item_t {
 		ulong lval1;
 		struct { int ival1, ival2; }
 	}
-	int ival3;
+	int ival3;	/// Typically holds memory pointer width
 	const(char) *sval1;
 	const(char) *sval2;
 	const(char) *sval3;
 }
 /// Formatter structure embedded into the disassembler structure
 struct disasm_fmt_t { align(1):
-	disasm_fmt_item_t [FORMATTER_STACK_SIZE]items;	/// Stack
 	size_t itemno;	/// Current item number
+	disasm_fmt_item_t [FORMATTER_STACK_SIZE]items;	/// Stack
 }
 
 /// Default string for illegal instructions
 private __gshared
-const(char) *DISASM_FMT_ERR_STR	= "(bad)";
+const(char) *DISASM_FMT_ERR	= "(bad)";	/// Error function string
 private __gshared
-const(char) *DISASM_FMT_SPACE	= " ";
+const(char) *DISASM_FMT_SPACE	= " ";	/// Between instruction and operands
 private __gshared
-const(char) *DISASM_FMT_TAB	= "\t";
+const(char) *DISASM_FMT_TAB	= "\t";	/// Between instruction and operands
 private __gshared
-const(char) *DISASM_FMT_COMMA_SPACE	= ", ";
+const(char) *DISASM_FMT_COMMA_SPACE	= ", ";	/// Typically in-between operands
 
-//TODO: Missing FWORD (16b:32b or 16b:16b (66H)) and TWORD (80-bit)
-// Currently mapped to the x86 decoder width maps
 private __gshared
 const(char) *[]MEM_WIDTHS_INTEL = [
-	"byte", "dword", "word", "qword", "oword", "yword", "zword"
+	"byte", "word", "dword", "qword", "xmmword", "ymmword", "zmmword", "word?",
+	"fword", "tword", "word?", "word?", "word?", "word?", "word?", "word?"
+];
+private __gshared
+const(char) *[]MEM_WIDTHS_NASM = [
+	"byte", "word", "dword", "qword", "oword", "yword", "zword", "word?",
+	"fword", "tword", "word?", "word?", "word?", "word?", "word?", "word?"
 ];
 
 //
@@ -271,7 +277,7 @@ void adbg_dasm_push_mem(disasm_params_t *p,
 	if (i == null) return;
 	i.type = FormatType.Mem;
 	i.ival1 = v;
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 /// Push a memory+register value into the formatting stack. This is printed
 /// depending on the memory+register formatter (adbg_dasm_fmt_memreg).
@@ -285,7 +291,7 @@ void adbg_dasm_push_memreg(disasm_params_t *p,
 	if (i == null) return;
 	i.type = FormatType.MemReg;
 	i.sval1 = reg;
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 /// Push a memory+segment+register value into the formatting stack. This is
 /// printed depending on its formatter (adbg_dasm_fmt_memsegreg).
@@ -301,7 +307,7 @@ void adbg_dasm_push_memsegreg(disasm_params_t *p,
 	i.type = FormatType.MemSegReg;
 	i.sval1 = reg;
 	i.sval2 = seg;
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 /// Push a memory+register+immediate value into the formatting stack. This is
 /// printed depending on its formatter (adbg_dasm_fmt_memregimm).
@@ -317,7 +323,7 @@ void adbg_dasm_push_memregimm(disasm_params_t *p,
 	i.type = FormatType.MemRegImm;
 	i.sval1 = reg;
 	i.ival1 = v;
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 /// Push a memory+segment+register+immediate value into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_memsegregimm).
@@ -335,7 +341,7 @@ void adbg_dasm_push_memsegregimm(disasm_params_t *p,
 	i.sval1 = reg;
 	i.sval2 = seg;
 	i.ival1 = v;
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 /// (x86) Push a SIB value when MOD=00 into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegbaseindexscale).
@@ -355,7 +361,7 @@ void adbg_dasm_push_x86_sib_mod00(disasm_params_t *p,
 	i.sval2 = index;
 	i.sval3 = seg;
 	i.ival1 = scale;
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 /// (x86) Push a SIB value when MOD=00 INDEX=100 into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegbase).
@@ -371,7 +377,7 @@ void adbg_dasm_push_x86_sib_m00_i100(disasm_params_t *p,
 	i.type = FormatType.x86_SIB_MemSegBase;
 	i.sval1 = base;
 	i.sval2 = seg;
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 /// (x86) Push a SIB value when MOD=00 BASE=101 into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegindexscaleimm).
@@ -391,7 +397,7 @@ void adbg_dasm_push_x86_sib_m00_b101(disasm_params_t *p,
 	i.sval2 = seg;
 	i.ival1 = scale;
 	i.ival2 = imm;
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 /// (x86) Push a SIB value when MOD=00 INDEX=100 BASE=101 into the formatting
 /// stack. This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegimm).
@@ -407,7 +413,7 @@ void adbg_dasm_push_x86_sib_m00_i100_b101(disasm_params_t *p,
 	i.type = FormatType.x86_SIB_MemSegImm;
 	i.sval1 = seg;
 	i.ival1 = imm;
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 /// (x86) Push a SIB value when MOD=01 into the formatting stack.
 /// This is printed depending on its formatter
@@ -430,7 +436,7 @@ void adbg_dasm_push_x86_sib_m01(disasm_params_t *p,
 	i.sval3 = seg;
 	i.ival1 = scale;
 	i.ival2 = adbg_dasm_su8(imm);
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 /// (x86) Push a SIB value when MOD=01 INDEX=100 into the formatting stack.
 /// This is printed depending on its formatter
@@ -449,37 +455,41 @@ void adbg_dasm_push_x86_sib_m01_i100(disasm_params_t *p,
 	i.sval1 = base;
 	i.sval2 = seg;
 	i.ival1 = adbg_dasm_su8(imm);
-	i.ival3 = w & 7;
+	i.ival3 = w & FORMATTER_WIDTH_MASK;
 }
 
 //
 // Core functions
 //
 
-/// Set error code with DisasmError enum and override mnemonic buffer to
-/// DISASM_FMT_ERR_STR (copied string). Does not touch the machine code buffer.
+/// (Internal) Set error code with DisasmError enum and override mnemonic buffer
+/// to DISASM_FMT_ERR (copied string). Does not touch the machine code buffer.
 /// Params:
 /// 	p = Disassembler parameters
 /// 	err = Disassembler error (DisasmError, defaults to Illegal)
 void adbg_dasm_err(disasm_params_t *p, DisasmError err = DisasmError.Illegal) {
 	p.error = err;
 	p.mnbufi =
-	adbg_util_stradd(cast(char*)p.mnbuf, DISASM_BUF_SIZE, 0, DISASM_FMT_ERR_STR);
+	adbg_util_stradd(cast(char*)p.mnbuf, DISASM_BUF_SIZE, 0, DISASM_FMT_ERR);
 }
 
-/// Process items in the formatter stack and output them into the formatter
-/// buffers. Caller is responsible of terminating string buffers. Called by
-/// adbg_dasm_line.
-/// Params:
-/// 	p = Disassembler parameters
+/// (Internal) Process items in the formatter stack and output them into the
+/// formatter buffers. Caller is responsible of terminating string buffers.
+/// Called by adbg_dasm_line.
+/// Params: p = Disassembler parameters
 void adbg_dasm_render(disasm_params_t *p) {
 	size_t nitems = p.fmt.itemno; /// number of total items
 
 	if (nitems < 1) return;
 
+	//TODO: "Prefix" types would be procssed here before the main instruction
+	//      Should start with just one, if need be, make a loop
+
 	adbg_dasm_fadd(p, &p.fmt.items[0]);
 
 	if (nitems < 2) return;
+
+	adbg_dasm_madd(p, p.options & DISASM_O_SPACE ? DISASM_FMT_SPACE : DISASM_FMT_TAB);
 
 	with (DisasmSyntax)
 	switch (p.syntax) {
@@ -495,7 +505,6 @@ void adbg_dasm_render(disasm_params_t *p) {
 private:
 
 void adbg_dasm_render_intel(disasm_params_t *p, size_t nitems) {
-	adbg_dasm_madd(p, DISASM_FMT_TAB);
 	adbg_dasm_fadd(p, &p.fmt.items[1]);
 
 	for (size_t index = 2; index < nitems; ++index) {
@@ -504,7 +513,6 @@ void adbg_dasm_render_intel(disasm_params_t *p, size_t nitems) {
 	}
 }
 void adbg_dasm_render_att(disasm_params_t *p, size_t nitems) {
-	adbg_dasm_madd(p, DISASM_FMT_TAB);
 	size_t index = nitems - 1;
 	adbg_dasm_fadd(p, &p.fmt.items[index]);
 
