@@ -20,10 +20,20 @@ import adbg.os.err;
 extern (C):
 private:
 
-enum OperatingMode {
+enum CLIOperatingMode {
 	debug_,
 	dump,
 	profile
+}
+
+/// "sub-help" screen for cshow
+enum CLIPage {
+	main,
+	ui,
+	show,
+	syntaxes,
+	marchs,
+	license,
 }
 
 // for debugger
@@ -40,44 +50,32 @@ enum DebuggerMode {
 	pid
 }
 
-/// "sub-help" screen for cshow
-enum CLIPage {
-	main,
-	ui,
-	show,
-	syntaxes,
-	marchs,
-	license,
-}
-
 /// CLI options
 struct cliopt_t {
-	OperatingMode mode;
+	CLIOperatingMode mode;
 	DebuggerUI ui;
 	DebuggerMode debugtype;
 	ushort pid;
 	const(char) *file;
 	const(char) *file_args;
 	const(char) *file_env;
-	int opts;	/// Flags for dumper
+	int flags;	/// Flags for dumper
 }
 
 /// Version page
 int cliver() {
-	import ver = std.compiler;
+	import d = std.compiler;
 	printf(
 	"alicedbg-"~__PLATFORM__~" "~PROJECT_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
 	"License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
 	"Home: <https://git.dd86k.space/alicedbg>\n"~
 	"Mirror: <https://github.com/dd86k/alicedbg>\n"~
-	"Compiler: "~__VENDOR__~" %u.%03u, "~
-		__TARGET_OBJ_FORMAT__~" obj format, "~
-		__TARGET_FLOAT_ABI__~" float abi\n"~
+	"Compiler: "~__VENDOR__~" %u.%03u, "~__TARGET_OBJ_FORMAT__~" obj, "~__TARGET_FLOAT_ABI__~" float\n"~
 	"CRT: "~__CRT__~" (cpprt: "~__TARGET_CPP_RT__~") on "~__OS__~"\n"~
 	"CPU: "~__TARGET_CPU__~"\n"~
 	"Features: dbg disasm\n"~
 	"Disasm: x86_16 x86\n",
-	ver.version_major, ver.version_minor
+	d.version_major, d.version_minor
 	);
 	return 0;
 }
@@ -196,7 +194,20 @@ int main(int argc, const(char) **argv) {
 	for (size_t argi = 1; argi < argc; ++argi) {
 		const(char) *arg = argv[argi] + 1;
 
-		if (*argv[argi] != '-') goto L_CLI_DEFAULT;
+		if (*argv[argi] != '-') { // default arguments
+			if (opt.file == null) {
+				opt.debugtype = DebuggerMode.file;
+				opt.file = argv[argi];
+			} else if (opt.file_args == null) {
+				opt.file_args = argv[argi];
+			} else if (opt.file_env == null) {
+				opt.file_env = argv[argi];
+			} else {
+				puts("cli: Out of default parameters");
+				return EXIT_FAILURE;
+			}
+			continue;
+		}
 
 		// choose operating mode
 		if (strcmp(arg, "mode") == 0) {
@@ -206,11 +217,11 @@ int main(int argc, const(char) **argv) {
 			}
 			const(char) *mode = argv[++argi];
 			if (strcmp(mode, "dump") == 0)
-				opt.mode = OperatingMode.dump;
+				opt.mode = CLIOperatingMode.dump;
 			else if (strcmp(mode, "profile") == 0)
-				opt.mode = OperatingMode.profile;
+				opt.mode = CLIOperatingMode.profile;
 			else if (strcmp(mode, "debug") == 0)
-				opt.mode = OperatingMode.debug_;
+				opt.mode = CLIOperatingMode.debug_;
 			else {
 				printf("unknown mode: %s\n", mode);
 				return EXIT_FAILURE;
@@ -220,7 +231,7 @@ int main(int argc, const(char) **argv) {
 
 		// shorthand of "-mode dump"
 		if (strcmp(arg, "dump") == 0) {
-			opt.mode = OperatingMode.dump;
+			opt.mode = CLIOperatingMode.dump;
 			continue;
 		}
 
@@ -285,10 +296,10 @@ int main(int argc, const(char) **argv) {
 			const(char) *march = argv[++argi];
 			if (strcmp(march, "x86") == 0)
 				disopt.isa = DisasmISA.x86;
-			else if (strcmp(march, "x86_64") == 0)
-				disopt.isa = DisasmISA.x86_64;
 			else if (strcmp(march, "x86_16") == 0)
 				disopt.isa = DisasmISA.x86_16;
+/*			else if (strcmp(march, "x86_64") == 0)
+				disopt.isa = DisasmISA.x86_64;
 			else if (strcmp(march, "thumb") == 0)
 				disopt.isa = DisasmISA.arm_t32;
 			else if (strcmp(march, "arm") == 0)
@@ -298,7 +309,7 @@ int main(int argc, const(char) **argv) {
 			else if (strcmp(march, "rv32") == 0)
 				disopt.isa = DisasmISA.rv32;
 			else if (strcmp(march, "rv64") == 0)
-				disopt.isa = DisasmISA.rv64;
+				disopt.isa = DisasmISA.rv64;*/
 			else if (strcmp(march, "guess") == 0) {
 				puts("guess feature not implemented");
 				return EXIT_FAILURE;
@@ -346,7 +357,7 @@ int main(int argc, const(char) **argv) {
 
 		// dumper: file is raw
 		if (strcmp(arg, "raw") == 0) {
-			opt.opts |= DUMPER_FILE_RAW;
+			opt.flags |= DUMPER_FILE_RAW;
 			continue;
 		}
 
@@ -360,16 +371,16 @@ int main(int argc, const(char) **argv) {
 			while (*cf) {
 				char c = *cf;
 				switch (c) {
-				case 'A': opt.opts |= DUMPER_SHOW_EVERYTHING; break;
-				case 'h': opt.opts |= DUMPER_SHOW_HEADER; break;
-				case 's': opt.opts |= DUMPER_SHOW_SECTIONS; break;
-				case 'i': opt.opts |= DUMPER_SHOW_IMPORTS; break;
-				case 'c': opt.opts |= DUMPER_SHOW_LOADCFG; break;
-//				case 'e': opt.opts |= DUMPER_SHOW_EXPORTS; break;
-//				case '': opt.opts |= DUMPER_SHOW_; break;
-				case 'd': opt.opts |= DUMPER_DISASM_CODE; break;
-				case 'D': opt.opts |= DUMPER_DISASM_ALL; break;
-				case 'S': opt.opts |= DUMPER_DISASM_STATS; break;
+				case 'A': opt.flags |= DUMPER_SHOW_EVERYTHING; break;
+				case 'h': opt.flags |= DUMPER_SHOW_HEADER; break;
+				case 's': opt.flags |= DUMPER_SHOW_SECTIONS; break;
+				case 'i': opt.flags |= DUMPER_SHOW_IMPORTS; break;
+				case 'c': opt.flags |= DUMPER_SHOW_LOADCFG; break;
+//				case 'e': opt.flags |= DUMPER_SHOW_EXPORTS; break;
+//				case '': opt.flags |= DUMPER_SHOW_; break;
+				case 'd': opt.flags |= DUMPER_DISASM_CODE; break;
+				case 'D': opt.flags |= DUMPER_DISASM_ALL; break;
+				case 'S': opt.flags |= DUMPER_DISASM_STATS; break;
 				case '?': return clipage(CLIPage.show);
 				default:
 					printf("cli: unknown show flag: %c\n", c);
@@ -389,27 +400,10 @@ int main(int argc, const(char) **argv) {
 
 		printf("cli: unknown option: %s\n", arg);
 		return EXIT_FAILURE;
-
-		//
-		// Default arguments
-		//
-
-L_CLI_DEFAULT:
-		if (opt.file == null) {
-			opt.debugtype = DebuggerMode.file;
-			opt.file = argv[argi];
-		} else if (opt.file_args == null) {
-			opt.file_args = argv[argi];
-		} else if (opt.file_env == null) {
-			opt.file_env = argv[argi];
-		} else {
-			puts("cli: Out of default parameters");
-			return EXIT_FAILURE;
-		}
 	}
 
 	int e = void;
-	with (OperatingMode)
+	with (CLIOperatingMode)
 	final switch (opt.mode) {
 	case debug_:
 		with (DebuggerMode)
@@ -433,7 +427,7 @@ L_CLI_DEFAULT:
 		}
 		break;
 	case dump:
-		e = adbg_dmpr_dump(opt.file, &disopt, opt.opts);
+		e = adbg_dmpr_dump(opt.file, &disopt, opt.flags);
 		break;
 	case profile:
 		puts("Profiling feature not yet implemented");
