@@ -6,51 +6,70 @@ copyright "Copyright © 2019-2020, dd86k"
 license "BSD-3-clause"
 version "0.0.0"
 
+# Currently broken, do not use!
 buildType "profile" {
 	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="ldc"
 	buildOptions "debugMode" "debugInfo" "profile" platform="gdc"
 }
 
+# Make the compiler very verbose, only for compiling diagnostics
 buildType "debugv" {
 	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
 	buildOptions "debugMode" "debugInfo" platform="gdc"
 	dflags "-v" "-vgc" "-vtls" platform="dmd"
 	dflags "-v" "--vgc" platform="ldc"
-	dflags "-v" platform="gdc"
+	dflags "-v" "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
 
+# Debug mode, but make the compiler emit GC and TLS usage
+buildType "debugl" {
+	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
+	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
+	buildOptions "debugMode" "debugInfo" platform="gdc"
+	dflags "-vgc" "-vtls" platform="dmd"
+	dflags "--vgc" platform="ldc"
+	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+}
+
+# Compile debug mode
 buildType "debug" {
 	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
 	buildOptions "debugMode" "debugInfo" platform="gdc"
 }
 
+# Compile release mode
 buildType "release" {
 	buildOptions "releaseMode" "optimize" "betterC" platform="dmd"
 	buildOptions "releaseMode" "optimize" "betterC" platform="ldc"
 	buildOptions "releaseMode" "optimize" platform="gdc"
 }
 
+# Compile release mode with no bound check
 buildType "release-nobounds" {
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "betterC" platform="dmd"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "betterC" platform="ldc"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" platform="gdc"
 }
 
+# Compile release mode with no bound check and inlined functions
+# This is the maximum performance option, but do not use this for compiling the library
 buildType "release-inline" {
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" "betterC" platform="dmd"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" "betterC" platform="ldc"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" platform="gdc"
 }
 
+# Generate headers
 buildType "headers" {
 	buildOptions "syntaxOnly"
 	dflags "-H" "--Hd=dinclude" platform="ldc"
 	dflags "-H" "-Hd=dinclude" platform="dmd"
 }
 
+# AFL fuzzing test
 buildType "afl" {
 	toolchainRequirements dmd="no" gdc="no" ldc=">=1.0.0"
 	dflags "-plugin=$AFL_ROOT/afl-llvm-pass.so"
@@ -59,6 +78,7 @@ buildType "afl" {
 	buildOptions "debugMode" "debugInfo" "betterC"
 }
 
+# Disassembler scrambler test
 buildType "loopdisasm" {
 	buildOptions "unittests"
 	versions "TestLoopDisasm"

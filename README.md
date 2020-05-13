@@ -55,8 +55,8 @@ Planned versions:
 | riscv-32 | 1 | RVC 2.0, RV32I 2.1 | |
 | riscv-64 | 0 | | Waiting on riscv-32 |
 | riscv-128 | 0 | | Waiting on riscv-32 |
-| powerpc-32 | 0 | | |
-| powerpc-64 | 0 | | |
+| powerpc-32 | 0 | | Planned |
+| powerpc-64 | 0 | | Planned |
 | webasm | 0 | | Planned |
 | cil | 0 | | Planned |
 
@@ -73,6 +73,14 @@ Planned versions:
 | Mach-O | 0 | | |
 
 ## FAQ
+
+### Why this?
+
+I've always wanted to make a debugger. Don't get me wrong, GDB and LLDB, among
+other stars like x64dbg and decompilers like Ghidra, are excellent tools.
+
+However, making this project allowed me to learn further more about varying
+aspects of the underlaying operating system and platform.
 
 ### Why D?
 
@@ -95,7 +103,7 @@ from the ffmpeg project (`-option [value]`).
 |---|---|---|---|
 | `-mode` | `debugger`, `dump`, `profile` | `debugger` | Operating mode |
 | `-march` | See `-march ?` | Target dependant | (Disassembler) Set machine architecture |
-| `-dsyntax` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
+| `-syntax` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
 | `-exec` | File path | | Set mode to Debugger and next argument as `file` |
 | `-pid` | Process ID | | Set mode to Debugger and next argument as `pid` |
 | `-ui` | `tui`, `loop`, `tcp-json` | `tui` | (Debugger) User interface |
