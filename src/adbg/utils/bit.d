@@ -11,7 +11,7 @@
  */
 module adbg.utils.bit;
 
-import consts;
+import adbg.consts;
 
 extern (C):
 
