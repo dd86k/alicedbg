@@ -11,6 +11,8 @@
  */
 module adbg.utils.bit;
 
+import consts;
+
 extern (C):
 
 /// Create a 1-bit bitmask with a bit position (0-based, 1 << a).
@@ -21,16 +23,6 @@ version (LittleEndian)
 else
 	private enum TE = 1; /// Target Endian
 
-version (DigitalMars) {
-	version (D_InlineAsm_X86) {
-		version = DMD_ASM_X86;
-		version = DMD_ASM_X86_ANY;
-	}
-	version (D_InlineAsm_X86_64) {
-		version = DMD_ASM_X86_64;
-		version = DMD_ASM_X86_ANY;
-	}
-}
 
 pragma(inline, true): // Encourage inlining whenever possible
 

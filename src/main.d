@@ -96,7 +96,7 @@ int clipage(CLIPage h) {
 		"OPTIONS\n"~
 		"  -mode    Manually select an operating mode (see -mode ?)\n"~
 		"  -march   Select ISA for disassembler (see -march ?)\n"~
-		"  -dstyle  Select disassembler style (see -dstyle ?)\n"~
+		"  -syntax  Select disassembler style (see -syntax ?)\n"~
 		"  -exec    debugger: Load executable file\n"~
 		"  -pid     debugger: Attach to process id\n"~
 		"  -ui      debugger: Choose user interface (default=tui, see -ui ?)\n"~

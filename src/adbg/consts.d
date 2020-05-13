@@ -5,6 +5,10 @@
  */
 module adbg.consts;
 
+//
+// ANCHOR External functions
+//
+
 extern (C):
 
 const(char) *adbg_info_version() {
@@ -19,6 +23,10 @@ const(char) *adbg_info_crt() {
 const(char) *adbg_info_os() {
 	return __OS__;
 }
+
+//
+// ANCHOR Enumerations
+//
 
 /// Project version
 enum PROJECT_VERSION = "0.0.0";
@@ -141,7 +149,7 @@ else
 pragma(msg, "* os: ", __OS__);
 
 //
-// Target additional information strings
+// ANCHOR Additional Target Information
 //
 
 version (DigitalMars) {
@@ -187,4 +195,27 @@ version (COMPILER_TARGETINFO_CPU) {
 } else {
 	/// Target CPU string (LDC-only)
 	enum __TARGET_CPU__ = __PLATFORM__;
+}
+
+//
+// ANCHOR Additional Feature Versions
+//
+
+version (DigitalMars) {
+	version (D_InlineAsm_X86) {
+		version = DMD_ASM_X86;
+		version = DMD_ASM_X86_ANY;
+	}
+	version (D_InlineAsm_X86_64) {
+		version = DMD_ASM_X86_64;
+		version = DMD_ASM_X86_ANY;
+	}
+} else version (GNU_Inline) {
+	version (X86) {
+		version = GDC_ASM_X86;
+		version = GDC_ASM_X86_ANY;
+	} else version (X86_64) {
+		version = GDC_ASM_X86_64;
+		version = GDC_ASM_X86_ANY;
+	}
 }
