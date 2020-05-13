@@ -47,11 +47,11 @@ const(char) *adbg_util_strx04(ushort v, bool upper = false) {
 
 	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
 
+	b[4] = 0;
 	b[3] = h[v & 0xF];
 	b[2] = h[(v >>= 4) & 0xF];
 	b[1] = h[(v >>= 4) & 0xF];
 	b[0] = h[(v >>= 4) & 0xF];
-	b[4] = 0;
 
 	return cast(char*)b;
 }
@@ -68,6 +68,7 @@ const(char) *adbg_util_strx08(uint v, bool upper = false) {
 
 	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
 
+	b[8] = 0;
 	b[7] = h[v & 0xF];
 	b[6] = h[(v >>= 4) & 0xF];
 	b[5] = h[(v >>= 4) & 0xF];
@@ -76,7 +77,6 @@ const(char) *adbg_util_strx08(uint v, bool upper = false) {
 	b[2] = h[(v >>= 4) & 0xF];
 	b[1] = h[(v >>= 4) & 0xF];
 	b[0] = h[(v >>= 4) & 0xF];
-	b[8] = 0;
 
 	return cast(char*)b;
 }
@@ -93,6 +93,7 @@ const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 
 	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
 
+	b[16] = 0;
 	b[15] = h[v & 0xF];
 	b[14] = h[(v >>= 4) & 0xF];
 	b[13] = h[(v >>= 4) & 0xF];
@@ -109,7 +110,6 @@ const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 	b[2]  = h[(v >>= 4) & 0xF];
 	b[1]  = h[(v >>= 4) & 0xF];
 	b[0]  = h[(v >>= 4) & 0xF];
-	b[16] = 0;
 
 	return cast(char*)b;
 }
@@ -144,7 +144,7 @@ size_t adbg_util_stradd(char *buf, size_t size, size_t bufi, const(char) *str) {
  * Returns: Updated buffer index
  */
 size_t adbg_util_straddf(char *buf, size_t size, size_t bufi, const(char) *f, ...) {
-	va_list va;
+	va_list va = void;
 	va_start(va, f);
 	return adbg_util_straddva(buf, size, bufi, f, va);
 }
@@ -199,7 +199,7 @@ enum STR_QUICK_STACKS_LIMIT = STR_QUICK_STACKS_COUNT - 1;
  * Returns: String
  */
 const(char) *adbg_util_strf(const(char) *f, ...) {
-	va_list va;
+	va_list va = void;
 	va_start(va, f);
 	return adbg_util_strfva(f, va);
 }

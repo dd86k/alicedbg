@@ -21,20 +21,32 @@ version (LittleEndian)
 else
 	private enum TE = 1; /// Target Endian
 
+version (DigitalMars) {
+	version (D_InlineAsm_X86) {
+		version = DMD_ASM_X86;
+		version = DMD_ASM_X86_ANY;
+	}
+	version (D_InlineAsm_X86_64) {
+		version = DMD_ASM_X86_64;
+		version = DMD_ASM_X86_ANY;
+	}
+}
+
 pragma(inline, true): // Encourage inlining whenever possible
 
+alias fswap16 = ushort function(ushort);
+alias fswap32 = uint function(uint);
+alias fswap64 = ulong function(ulong);
+
 /// Return a function pointer depending if requested endian matches target
 /// endian. If it matches identical, this function returns a function that
 /// returns the same value. If it does not match, this function returns
 /// a function that effectively byte swaps the value. This is useful for bulk
 /// operations, such as parsing header data or processing disassembly.
-/// Params: e = Target endian (0=Little, 1=Big)
-/// Returns: Function pointer
+/// Params: e = Endian (0=Little, 1=Big)
+/// Returns: fswap16 function pointer
 ushort function(ushort) adbg_util_fswap16(int e) {
-	if (e == TE)	// Same endian, send bogus function
-		return &adbg_util_bswap16nop;
-	else	// Different endian, send bswap function
-		return &adbg_util_bswap16;
+	return e == TE ? &adbg_util_nop16 : &adbg_util_bswap16;
 }
 
 /// Return a function pointer depending if requested endian matches target
@@ -42,13 +54,10 @@ ushort function(ushort) adbg_util_fswap16(int e) {
 /// returns the same value. If it does not match, this function returns
 /// a function that effectively byte swaps the value. This is useful for bulk
 /// operations, such as parsing header data or processing disassembly.
-/// Params: e = Target endian (0=Little, 1=Big)
-/// Returns: Function pointer
+/// Params: e = Endian (0=Little, 1=Big)
+/// Returns: fswap32 function pointer
 uint function(uint) adbg_util_fswap32(int e) {
-	if (e == TE)	// Same endian, send bogus function
-		return &adbg_util_bswap32nop;
-	else	// Different endian, send bswap function
-		return &adbg_util_bswap32;
+	return e == TE ? &adbg_util_nop32 : &adbg_util_bswap32;
 }
 
 /// Return a function pointer depending if requested endian matches target
@@ -56,39 +65,37 @@ uint function(uint) adbg_util_fswap32(int e) {
 /// returns the same value. If it does not match, this function returns
 /// a function that effectively byte swaps the value. This is useful for bulk
 /// operations, such as parsing header data or processing disassembly.
-/// Params: e = Target endian (0=Little, 1=Big)
-/// Returns: Function pointer
+/// Params: e = Endian (0=Little, 1=Big)
+/// Returns: fswap64 function pointer
 ulong function(ulong) adbg_util_fswap64(int e) {
-	if (e == TE)	// Same endian, send bogus function
-		return &adbg_util_bswap64nop;
-	else	// Different endian, send bswap function
-		return &adbg_util_bswap64;
+	return e == TE ? &adbg_util_nop64 : &adbg_util_bswap64;
 }
 
-/// No-op swap for fswap16.
-/// Params: v = 16-bit value
-/// Returns: Same value
-ushort adbg_util_bswap16nop(ushort v) {
-	return v;
-}
-/// No-op swap for fswap32.
-/// Params: v = 32-bit value
-/// Returns: Same value
-uint adbg_util_bswap32nop(uint v) {
-	return v;
-}
-/// No-op swap for fswap64.
-/// Params: v = 64-bit value
-/// Returns: Same value
-ulong adbg_util_bswap64nop(ulong v) {
-	return v;
-}
+private ushort adbg_util_nop16(ushort v) { return v; }
+private uint adbg_util_nop32(uint v) { return v; }
+private ulong adbg_util_nop64(ulong v) { return v; }
 
 /// Byte-swap an 16-bit value.
 /// Params: v = 16-bit value
 /// Returns: Byte-swapped value
+/// Notes:
+/// LDC and GDC transform this into a ROL instruction.
+/// If x86 inline assembly is available, DMD uses the ROL instruction.
 ushort adbg_util_bswap16(ushort v) {
-	return cast(ushort)(v >> 8 | v << 8);
+	version (DMD_ASM_X86) {
+		asm {
+			lea EDI, v;
+			rol word ptr [EDI], 8;
+		}
+		return v;
+	} else version (DMD_ASM_X86_64) {
+		asm {
+			lea RDI, v;
+			rol word ptr [RDI], 8;
+		}
+		return v;
+	} else
+		return cast(ushort)(v >> 8 | v << 8);
 }
 
 /// Byte-swap an 32-bit value.
@@ -96,10 +103,20 @@ ushort adbg_util_bswap16(ushort v) {
 /// Returns: Byte-swapped value
 /// Notes:
 /// Shamelessly taken from https://stackoverflow.com/a/19560621
-/// Only LDC is able to pick this up as BSWAP
+/// Only LDC is able to pick this up as BSWAP.
+/// If x86 inline assembly is available, DMD uses the BSWAP instruction.
 uint adbg_util_bswap32(uint v) {
-	v = (v >> 16) | (v << 16);
-	return ((v & 0xFF00FF00) >> 8) | ((v & 0x00FF00FF) << 8);
+	version (DMD_ASM_X86_ANY) {
+		asm {
+			mov EAX, v;
+			bswap EAX;
+			mov v, EAX;
+		}
+		return v;
+	} else {
+		v = (v >> 16) | (v << 16);
+		return ((v & 0xFF00FF00) >> 8) | ((v & 0x00FF00FF) << 8);
+	}
 }
 
 /// Byte-swap an 64-bit value.
@@ -107,11 +124,32 @@ uint adbg_util_bswap32(uint v) {
 /// Returns: Byte-swapped value
 /// Notes:
 /// Shamelessly taken from https://stackoverflow.com/a/19560621
-/// Only LDC is able to pick this up as BSWAP
+/// Only LDC is able to pick this up as BSWAP.
+/// If x86 inline assembly is available, DMD uses the BSWAP instruction.
 ulong adbg_util_bswap64(ulong v) {
-	v = (v >> 32) | (v << 32);
-	v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
-	return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
+	version (DMD_ASM_X86) {
+		asm {
+			lea EDI, v;
+			mov EAX, [EDI];
+			mov EDX, [EDI+4];
+			bswap EAX;
+			bswap EDX;
+			mov [EDI+4], EAX;
+			mov [EDI], EDX;
+		}
+		return v;
+	} else version (DMD_ASM_X86_64) {
+		asm {
+			mov RAX, v;
+			bswap RAX;
+			mov v, RAX;
+		}
+		return v;
+	} else {
+		v = (v >> 32) | (v << 32);
+		v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
+		return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
+	}
 }
 
 unittest {
@@ -119,22 +157,34 @@ unittest {
 	assert(adbg_util_bswap32(0xAABBCCDD) == 0xDDCCBBAA);
 	assert(adbg_util_bswap64(0xAABBCCDD_11223344) == 0x44332211_DDCCBBAA);
 	version (LittleEndian) {
+		fswap16 lsb16 = adbg_util_fswap16(0);
+		fswap32 lsb32 = adbg_util_fswap32(0);
+		fswap64 lsb64 = adbg_util_fswap64(0);
+		fswap16 msb16 = adbg_util_fswap16(1);
+		fswap32 msb32 = adbg_util_fswap32(1);
+		fswap64 msb64 = adbg_util_fswap64(1);
 		// LSB matches
-		assert(adbg_util_cswap16(0xAABB, 0) == 0xAABB);
-		assert(adbg_util_cswap32(0xAABBCCDD, 0) == 0xAABBCCDD);
-		assert(adbg_util_cswap64(0xAABBCCDD_11223344, 0) == 0xAABBCCDD_11223344);
+		assert(lsb16(0xAABB) == 0xAABB);
+		assert(lsb32(0xAABBCCDD) == 0xAABBCCDD);
+		assert(lsb64(0xAABBCCDD_11223344) == 0xAABBCCDD_11223344);
 		// MSB does not match
-		assert(adbg_util_cswap16(0xAABB, 1) == 0xBBAA);
-		assert(adbg_util_cswap32(0xAABBCCDD, 1) == 0xDDCCBBAA);
-		assert(adbg_util_cswap64(0xAABBCCDD_11223344, 1) == 0x44332211_DDCCBBAA);
+		assert(msb16(0xAABB) == 0xBBAA);
+		assert(msb32(0xAABBCCDD) == 0xDDCCBBAA);
+		assert(msb64(0xAABBCCDD_11223344) == 0x44332211_DDCCBBAA);
 	} else {
+		fswap16 lsb16 = adbg_util_fswap16(0);
+		fswap32 lsb32 = adbg_util_fswap32(0);
+		fswap64 lsb64 = adbg_util_fswap64(0);
+		fswap16 msb16 = adbg_util_fswap16(1);
+		fswap32 msb32 = adbg_util_fswap32(1);
+		fswap64 msb64 = adbg_util_fswap64(1);
 		// LSB does not match
-		assert(adbg_util_cswap16(0xAABB, 0) == 0xBBAA);
-		assert(adbg_util_cswap32(0xAABBCCDD, 0) == 0xDDCCBBAA);
-		assert(adbg_util_cswap64(0xAABBCCDD_11223344, 0) == 0x44332211_DDCCBBAA);
+		assert(lsb16(0xAABB) == 0xBBAA);
+		assert(lsb32(0xAABBCCDD) == 0xDDCCBBAA);
+		assert(lsb64(0xAABBCCDD_11223344) == 0x44332211_DDCCBBAA);
 		// MSB matches
-		assert(adbg_util_cswap16(0xAABB, 1) == 0xAABB);
-		assert(adbg_util_cswap32(0xAABBCCDD, 1) == 0xAABBCCDD);
-		assert(adbg_util_cswap64(0xAABBCCDD_11223344, 1) == 0xAABBCCDD_11223344);
+		assert(msb16(0xAABB) == 0xAABB);
+		assert(msb32(0xAABBCCDD) == 0xAABBCCDD);
+		assert(msb64(0xAABBCCDD_11223344) == 0xAABBCCDD_11223344);
 	}
 }
