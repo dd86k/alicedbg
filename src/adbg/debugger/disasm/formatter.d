@@ -70,7 +70,7 @@ enum FormatType {
 	x86_SIB_MemSegBaseImm,	/// x86: SIB MOD=01/10 I=100 format
 }
 /// Memory operation pointer width for memory types
-enum MemoryWidth {
+enum MemWidth {
 	i8,	/// 8-bit
 	i16,	/// 16-bit
 	i32,	/// 32-bit
@@ -79,7 +79,7 @@ enum MemoryWidth {
 	i256,	/// 256-bit
 	i512,	/// 512-bit
 	i1024,	/// 1024-bit
-	m32,	/// (x86) fword m16:32 or m16:16
+	far,	/// (x86) fword m16:32 or m16:16
 	f80,	/// (x86) tword 80-bit
 }
 
@@ -88,7 +88,10 @@ struct disasm_fmt_item_t {
 	FormatType type;	/// Item type, see FormatType structure
 	union {
 		ulong lval1;
-		struct { int ival1, ival2; }
+		version (LittleEndian)
+			struct { int ival1, ival2; }
+		else
+			struct { int ival2, ival1; }
 	}
 	int ival3;	/// Typically holds memory pointer width
 	const(char) *sval1;
@@ -277,7 +280,7 @@ void adbg_dasm_push_mem(disasm_params_t *p,
 	if (i == null) return;
 	i.type = FormatType.Mem;
 	i.ival1 = v;
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 /// Push a memory+register value into the formatting stack. This is printed
 /// depending on the memory+register formatter (adbg_dasm_fmt_memreg).
@@ -291,7 +294,7 @@ void adbg_dasm_push_memreg(disasm_params_t *p,
 	if (i == null) return;
 	i.type = FormatType.MemReg;
 	i.sval1 = reg;
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 /// Push a memory+segment+register value into the formatting stack. This is
 /// printed depending on its formatter (adbg_dasm_fmt_memsegreg).
@@ -307,7 +310,7 @@ void adbg_dasm_push_memsegreg(disasm_params_t *p,
 	i.type = FormatType.MemSegReg;
 	i.sval1 = reg;
 	i.sval2 = seg;
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 /// Push a memory+register+immediate value into the formatting stack. This is
 /// printed depending on its formatter (adbg_dasm_fmt_memregimm).
@@ -323,7 +326,7 @@ void adbg_dasm_push_memregimm(disasm_params_t *p,
 	i.type = FormatType.MemRegImm;
 	i.sval1 = reg;
 	i.ival1 = v;
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 /// Push a memory+segment+register+immediate value into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_memsegregimm).
@@ -341,7 +344,7 @@ void adbg_dasm_push_memsegregimm(disasm_params_t *p,
 	i.sval1 = reg;
 	i.sval2 = seg;
 	i.ival1 = v;
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=00 into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegbaseindexscale).
@@ -361,7 +364,7 @@ void adbg_dasm_push_x86_sib_mod00(disasm_params_t *p,
 	i.sval2 = index;
 	i.sval3 = seg;
 	i.ival1 = scale;
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=00 INDEX=100 into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegbase).
@@ -377,7 +380,7 @@ void adbg_dasm_push_x86_sib_m00_i100(disasm_params_t *p,
 	i.type = FormatType.x86_SIB_MemSegBase;
 	i.sval1 = base;
 	i.sval2 = seg;
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=00 BASE=101 into the formatting stack.
 /// This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegindexscaleimm).
@@ -397,7 +400,7 @@ void adbg_dasm_push_x86_sib_m00_b101(disasm_params_t *p,
 	i.sval2 = seg;
 	i.ival1 = scale;
 	i.ival2 = imm;
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=00 INDEX=100 BASE=101 into the formatting
 /// stack. This is printed depending on its formatter (adbg_dasm_fmt_sib_memsegimm).
@@ -413,7 +416,7 @@ void adbg_dasm_push_x86_sib_m00_i100_b101(disasm_params_t *p,
 	i.type = FormatType.x86_SIB_MemSegImm;
 	i.sval1 = seg;
 	i.ival1 = imm;
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=01 into the formatting stack.
 /// This is printed depending on its formatter
@@ -436,7 +439,7 @@ void adbg_dasm_push_x86_sib_m01(disasm_params_t *p,
 	i.sval3 = seg;
 	i.ival1 = scale;
 	i.ival2 = adbg_dasm_su8(imm);
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=01 INDEX=100 into the formatting stack.
 /// This is printed depending on its formatter
@@ -455,7 +458,7 @@ void adbg_dasm_push_x86_sib_m01_i100(disasm_params_t *p,
 	i.sval1 = base;
 	i.sval2 = seg;
 	i.ival1 = adbg_dasm_su8(imm);
-	i.ival3 = w & FORMATTER_WIDTH_MASK;
+	i.ival3 = w;
 }
 
 //
@@ -620,7 +623,11 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
-			p.mnbufi += snprintf(bp, left, "(%s)", i.sval1);
+			//TODO: '*' for any call/jmps under at&t
+			//      AT&T syntax emplois '*' for call/jmps with any type (dword/fword)
+			//      Also for far jumps and calls, the instruction prepends 'l'
+			const(char) *fmt = i.ival3 == MemWidth.far ? "*(%s)" : "(%s)";
+			p.mnbufi += snprintf(bp, left, fmt, i.sval1);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s]",
@@ -633,11 +640,12 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
-			p.mnbufi += snprintf(bp, left, "%s(%s)", i.sval2, i.sval1);
+			const(char) *fmt = i.ival3 == MemWidth.far ? "*%s(%s)" : "%s(%s)";
+			p.mnbufi += snprintf(bp, left, fmt, i.sval2, i.sval1);
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s]",
-				MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1);
+				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr %s[%s]",
@@ -649,7 +657,12 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
-			p.mnbufi += snprintf(bp, left, "(%s%+d)", i.sval1, i.ival1);
+			const(char) *fmt = i.ival3 == MemWidth.far ? "*(%s%+d)" : "(%s%+d)";
+			p.mnbufi += snprintf(bp, left, fmt, i.sval1, i.ival1);
+			return;
+		case Nasm:
+			p.mnbufi += snprintf(bp, left, "%s ptr [%s%+d]",
+				MEM_WIDTHS_NASM[i.ival3], i.sval1, i.ival1);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%+d]",
@@ -662,11 +675,12 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
-			p.mnbufi += snprintf(bp, left, "%s(%s%+d)", i.sval2, i.sval1, i.ival1);
+			const(char) *fmt = i.ival3 == MemWidth.far ? "*%s(%s%+d)" : "%s(%s%+d)";
+			p.mnbufi += snprintf(bp, left, fmt, i.sval2, i.sval1, i.ival1);
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s%+d]",
-				MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1);
+				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1, i.ival1);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr %s[%s%+d]",
@@ -684,7 +698,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s+%s*%d]",
-				MEM_WIDTHS_INTEL[i.ival3], i.sval3, i.sval1, i.sval2, i.ival1);
+				MEM_WIDTHS_NASM[i.ival3], i.sval3, i.sval1, i.sval2, i.ival1);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr %s[%s+%s*%d]",
@@ -701,7 +715,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s]",
-				MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1);
+				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr %s[%s]",
@@ -719,7 +733,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s*%d%+d]",
-				MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1, i.sval2);
+				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1, i.ival1, i.sval2);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr %s[%s*%d%+d]",
@@ -735,7 +749,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%+d]",
-				MEM_WIDTHS_INTEL[i.ival3], i.sval1, i.ival1);
+				MEM_WIDTHS_NASM[i.ival3], i.sval1, i.ival1);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr %s[%+d]",
@@ -754,7 +768,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s+%s*%d%+d]",
-				MEM_WIDTHS_INTEL[i.ival3], i.sval3, i.sval1, i.sval2, i.ival1, i.ival2);
+				MEM_WIDTHS_NASM[i.ival3], i.sval3, i.sval1, i.sval2, i.ival1, i.ival2);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr %s[%s+%s*%d%+d]",
@@ -771,7 +785,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s%+d]",
-				MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1);
+				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1, i.ival1);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr %s[%s%+d]",

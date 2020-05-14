@@ -7,7 +7,7 @@ import core.stdc.stdlib, core.stdc.time;
 import std.stdio;
 
 enum BUFSIZE = 3;
-enum size_t MAX_COUNTER = 10_000;
+enum size_t MAX_COUNTER = 50_000;
 enum size_t MAX_STAGE = 6;
 
 /**
@@ -60,8 +60,8 @@ L_BUF:
 	for (size_t i; i < BUFSIZE * 4; ++i)
 		printf("%02X", bp[i]);
 	p.addr = &b;
-	adbg_dasm_line(&p, DisasmMode.Size);
-//	printf(" %s\n",  &p.mnbuf);
-	putchar('\n');
+	adbg_dasm_line(&p, DisasmMode.File);
+	printf(" %s\n",  &p.mnbuf);
+//	putchar('\n');
 	goto L_BUF;
 }

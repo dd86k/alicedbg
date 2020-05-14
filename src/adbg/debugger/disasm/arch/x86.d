@@ -699,14 +699,14 @@ L_CONTINUE:
 		ubyte modrm = *p.addru8;
 		++p.addrv;
 		const(char) *m = void;
-		switch (modrm & MODRM_REG) {
+		switch (modrm & MODRM_REG) { // Group 2
 		case MODRM_REG_000: m = "rol"; break;
 		case MODRM_REG_001: m = "ror"; break;
 		case MODRM_REG_010: m = "rcl"; break;
 		case MODRM_REG_011: m = "rcr"; break;
 		case MODRM_REG_100: m = "shl"; break;
 		case MODRM_REG_101: m = "shr"; break;
-		case MODRM_REG_111: m = "rol"; break;
+		case MODRM_REG_111: m = "sar"; break;
 		default: adbg_dasm_err(p); return;
 		}
 		if (p.mode >= DisasmMode.File)
@@ -1429,10 +1429,10 @@ L_CONTINUE:
 				switch (modrm & MODRM_REG) {
 				case MODRM_REG_000: m = "inc"; break;
 				case MODRM_REG_001: m = "dec"; break;
-				case MODRM_REG_010:
-				case MODRM_REG_011: m = "call"; break; // fword
-				case MODRM_REG_100:
-				case MODRM_REG_101: m = "jmp"; break; // fword
+				case MODRM_REG_010: m = "call"; break;
+				case MODRM_REG_011: w = X86_WIDTH_FAR; m = "call"; break;
+				case MODRM_REG_100: m = "jmp"; break;
+				case MODRM_REG_101: w = X86_WIDTH_FAR; m = "jmp"; break;
 				case MODRM_REG_110: m = "push"; break;
 				default: adbg_dasm_err(p); return;
 				}
@@ -1445,7 +1445,7 @@ L_CONTINUE:
 			}
 			if (p.mode >= DisasmMode.File)
 				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm_rm(p, modrm, w, w);
+			adbg_dasm_x86_modrm_rm(p, modrm, w, 0);
 		} else {
 			if (p.mode >= DisasmMode.File)
 				adbg_dasm_push_str(p, w ? "std" : "cld");
@@ -1549,7 +1549,7 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 					case MODRM_RM_100: m = "stgi"; break;
 					case MODRM_RM_101: m = "clgi"; break;
 					case MODRM_RM_110: m = "skinit"; break;
-					default:        m = "invlpga"; break;
+					default:           m = "invlpga"; break;
 					}
 					adbg_dasm_push_x8(p, modrm);
 					adbg_dasm_push_str(p, m);
@@ -1597,7 +1597,6 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 			case MODRM_REG_101: m = "verw"; break;
 			default: adbg_dasm_err(p); return;
 			}
-
 			if (p.mode >= DisasmMode.File)
 				adbg_dasm_push_str(p, m);
 			adbg_dasm_x86_modrm_rm(p, modrm, X86_WIDTH_32B, X86_WIDTH_32B);
@@ -1813,7 +1812,7 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 			case MODRM_REG_100: sr = "dr4"; break;
 			case MODRM_REG_101: sr = "dr5"; break;
 			case MODRM_REG_110: sr = "dr6"; break;
-			default:         sr = "dr7"; break;
+			default:            sr = "dr7"; break;
 			}
 			adbg_dasm_push_str(p, "mov");
 			if (p.x86.op & X86_FLAG_DIR) {
@@ -2425,7 +2424,7 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 					adbg_dasm_push_reg(p,
 						adbg_dasm_x86_modrm_reg(p, modrm, X86_WIDTH_128B));
 				}
-			} else { // Group 17/GRP17
+			} else { // Group 17
 				if (modrm & MODRM_REG || (modrm & MODRM_MOD) != MODRM_MOD_11) {
 					adbg_dasm_err(p);
 					return;
@@ -4020,10 +4019,11 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 			default: adbg_dasm_err(p); return;
 			}
 		} else {
+			int w = p.x86.op & X86_FLAG_WIDE;
 			f |= X86_FLAG_3OPRND | X86_FLAG_MEMW_128B | X86_FLAG_DIR;
 			switch (p.x86.vex_pp) {
-			case X86_VEX_PP_NONE: i = p.x86.op & X86_FLAG_WIDE ? "vunpckhps" : "vunpcklps"; break;
-			case X86_VEX_PP_66H:  i = p.x86.op & X86_FLAG_WIDE ? "vunpckhpd" : "vunpcklpd"; break;
+			case X86_VEX_PP_NONE: i = w ? "vunpckhps" : "vunpcklps"; break;
+			case X86_VEX_PP_66H:  i = w ? "vunpckhpd" : "vunpcklpd"; break;
 			default: adbg_dasm_err(p); return;
 			}
 		}
@@ -4687,10 +4687,6 @@ void adbg_dasm_x86_xop_10(disasm_params_t *p) {
 // ANCHOR: Internal functions
 //
 
-enum x86SegReg {
-	None, CS, DS, ES, FS, GS, SS
-}
-
 enum : ubyte {
 	MODRM_MOD_00 =   0,	/// MOD 00, Memory Mode, no displacement
 	MODRM_MOD_01 =  64,	/// MOD 01, Memory Mode, 8-bit displacement
@@ -4759,17 +4755,17 @@ enum : ubyte {
 //               |+------- (VEX) Ignore VEX.L, proceed as unset
 //               +-------- (VEX) Use VEX.vvvv as ModRM.REG (2OPRND only)
 enum {	// Flags for ModRM functions
-	// See formatter's MemoryWidth enum, this maps to adbg_dasm_x86_mw
-	X86_WIDTH_8B	= 0,
-	X86_WIDTH_32B	= 1,
-	X86_WIDTH_16B	= 2,
-	X86_WIDTH_64B	= 3,
-	X86_WIDTH_128B	= 4,
-	X86_WIDTH_256B	= 5,
-	X86_WIDTH_512B	= 6,
-	X86_WIDTH_1024B	= 7,
-	X86_WIDTH_MEM	= 8,
-	X86_WIDTH_FLOAT	= 9,
+	// See formatter's MemWidth enum, this maps to adbg_dasm_x86_mw
+	X86_WIDTH_8B	= MemWidth.i8,
+	X86_WIDTH_32B	= MemWidth.i32,
+	X86_WIDTH_16B	= MemWidth.i16,
+	X86_WIDTH_64B	= MemWidth.i64,
+	X86_WIDTH_128B	= MemWidth.i128,
+	X86_WIDTH_256B	= MemWidth.i256,
+	X86_WIDTH_512B	= MemWidth.i512,
+	X86_WIDTH_1024B	= MemWidth.i1024,
+	X86_WIDTH_FAR	= MemWidth.far,
+	X86_WIDTH_F80	= MemWidth.f80,
 	// Bit that maps to the opcode if X86_FLAG_USE_OP is set
 	X86_FLAG_WIDE	= 1,	/// Set: Instruction is wide (32b instead of 8b)
 	X86_FLAG_DIR	= 2,	/// Set: ModRM.REG is destination
@@ -4791,18 +4787,19 @@ enum {	// Flags for ModRM functions
 	X86_FLAG_MEMW_256B	= X86_WIDTH_256B	<< 12,
 	X86_FLAG_MEMW_512B	= X86_WIDTH_512B	<< 12,
 	X86_FLAG_MEMW_1024B	= X86_WIDTH_1024B	<< 12,
-	X86_FLAG_MEMW_MEM	= X86_WIDTH_MEM	<< 12,
-	X86_FLAG_MEMW_FLOAT	= X86_WIDTH_FLOAT	<< 12,
+	X86_FLAG_MEMW_MEM	= X86_WIDTH_FAR	<< 12,
+	X86_FLAG_MEMW_FLOAT	= X86_WIDTH_F80	<< 12,
 	X86_FLAG_MEMW	= 0xF000,
 	// Combined widths for easier writing
-	X86_FLAG_MODW_8B	= 0,
-	X86_FLAG_MODW_16B	= X86_FLAG_REGW_16B | X86_FLAG_MEMW_16B,
-	X86_FLAG_MODW_32B	= X86_FLAG_REGW_32B | X86_FLAG_MEMW_32B,
-	X86_FLAG_MODW_64B	= X86_FLAG_REGW_64B | X86_FLAG_MEMW_64B,
+	X86_FLAG_MODW_8B	= X86_FLAG_REGW_8B   | X86_FLAG_MEMW_8B,
+	X86_FLAG_MODW_16B	= X86_FLAG_REGW_16B  | X86_FLAG_MEMW_16B,
+	X86_FLAG_MODW_32B	= X86_FLAG_REGW_32B  | X86_FLAG_MEMW_32B,
+	X86_FLAG_MODW_64B	= X86_FLAG_REGW_64B  | X86_FLAG_MEMW_64B,
 	X86_FLAG_MODW_128B	= X86_FLAG_REGW_128B | X86_FLAG_MEMW_128B,
 	X86_FLAG_MODW_256B	= X86_FLAG_REGW_256B | X86_FLAG_MEMW_256B,
 	X86_FLAG_MODW_512B	= X86_FLAG_REGW_512B | X86_FLAG_MEMW_512B,
 	// (VEX) n operands
+	// NOTE: Currently excludes 8-bit immediate
 	X86_FLAG_2OPRND	= 0,
 	X86_FLAG_3OPRND	= 0x10_0000,
 	X86_FLAG_4OPRND	= 0x20_0000,
@@ -4843,13 +4840,13 @@ const(char) *adbg_dasm_x86_eax(disasm_params_t *p, int w) {
 }
 
 /// Used to map x86 widths to 
-MemoryWidth adbg_dasm_x86_mw(int width) {
-	with (MemoryWidth) {
-		__gshared MemoryWidth[] w = [
+MemWidth adbg_dasm_x86_mw(int width) {
+	with (MemWidth) {
+		__gshared MemWidth[] w = [
 			i8, i32, i16, i64, i128, i256, i512, i1024,
-			m32, f80, i8, i8, i8, i8, i8, i8
+			far, f80, i8, i8, i8, i8, i8, i8
 		];
-		return w[width & 15];
+		return w[width];
 	}
 }
 
@@ -4930,12 +4927,12 @@ void adbg_dasm_x86_immfar(disasm_params_t *p) {
 /// instructions (0FH). Useful for a switch per-instruction. Does not check
 /// for errors. Unconfirmed with the official order it's supposed to have.
 ///
-/// Enumeration mapping
-/// X86_0F_NONE  (0): No prefixes
-/// X86_0F_66H   (1): 66H
-/// X86_0F_F2H   (2): F2H
-/// X86_0F_F3H   (3): F3H
-/// X86_0F_F266H (4): 66H+F2H
+/// Enumeration mapping:
+/// - X86_0F_NONE  (0): No prefixes
+/// - X86_0F_66H   (1): 66H
+/// - X86_0F_F2H   (2): F2H
+/// - X86_0F_F3H   (3): F3H
+/// - X86_0F_F266H (4): 66H+F2H
 ///
 /// Params: p = Disassembler parameters
 ///
@@ -4948,16 +4945,19 @@ int adbg_dasm_x86_0f_select(disasm_params_t *p) {
 	}
 }
 
+enum x86SegReg { // By official arrangement
+	None, ES, CS, SS, DS, FS, GS
+}
+
 /// (Internal) Return a segment register depending on its opcode.
 /// Returns an empty string if unset.
 /// Params: segreg = Byte opcode
 /// Returns: Segment register string
 const(char) *adbg_dasm_x86_segstr(int segreg) {
 	__gshared const(char) *[]segs = [
-		"", "cs:", "ds:", "es:", "fs:", "gs:", "ss:"
+		"", "es:", "cs:", "ss:", "ds:", "fs:", "gs:"
 	];
-	// Structure gets initated to SegReg.None anyway
-	return segs[segreg];
+	return segs[segreg]; // Structure gets initated to SegReg.None anyway
 }
 
 const(char) *adbg_dasm_x87_ststr(disasm_params_t *p, int index) {
