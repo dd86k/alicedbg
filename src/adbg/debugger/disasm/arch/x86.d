@@ -11,34 +11,30 @@ import adbg.utils.str;
 
 extern (C):
 
-//TODO: Re-use fields as much as possible
 struct x86_internals_t {
-	align(4) ubyte op;	/// Last significant opcode
-	int lock;	/// LOCK Prefix
-	int repz;	/// (F3H) REP/REPE/REPZ
-	int repnz;	/// (F2H) REPNE/REPNZ/BND
-	int last_prefix;	/// Last effective prefix for 0f (F2H/F3H)
-	int segreg;	/// Last selected segment register
-	int pf_operand; /// 66H Operand prefix
-	int pf_address; /// 67H Address prefix
-	/// VEX prefix
-	/// First byte indicates 2-byte VEX (C5H), 3-byte VEX (C4H),
-	/// 3-byte XOP (8FH), or 4-byte EVEX (62H)
-	/// VEX.2B: 11000101 RvvvvLpp
-	/// VEX.3B: 11000100 RXBmmmmm WvvvvLpp
-	/// XOP   : 10001111 RXBmmmmm WvvvvLpp
-	/// EVEX  : No, not yet
+	align(2) ubyte op;	/// Last significant opcode
+	ushort lock;	/// LOCK Prefix
+	ushort last_prefix;	/// Last effective prefix for 0f (F2H/F3H)
+	ushort segreg;	/// Last selected segment register
+	ushort pf_operand; /// 66H Operand prefix
+	ushort pf_address; /// 67H Address prefix
+	/// VEX prefix    [0]      [1]      [2]      [3]
+	/// (C5H) VEX.2B: 11000101 RvvvvLpp
+	/// (C4H) VEX.3B: 11000100 RXBmmmmm WvvvvLpp
+	/// (8FH) XOP   : 10001111 RXBmmmmm WvvvvLpp
+	/// (62H) EVEX  : 01100010 RXBR00mm Wvvvv1pp zLLbVaa
+	//          Note:             R'              L' V'
 	union {
 		uint vex32;
 		ubyte[4] vex;
 	}
 	// VEX pre-calculated values
-	int vex_L;	/// VEX vector length (128b/scalar, 256b)
-	int vex_pp;	/// VEX opcode extension (66H, F2H, F3H)
-	int vex_vvvv;	/// VEX register
-//	int vex_X;	/// Alias to REX.X, set by default in 32-bit mode
-//	int vex_B;	/// Alias to REX.B, set by default in 32-bit mode
-//	int vex_W;	/// Alias to REX.W, ignored in 32-bit mode
+	ushort vex_L;	/// VEX vector length (128b/scalar, 256b)
+	ushort vex_pp;	/// VEX opcode extension (NONE, 66H, F2H, F3H)
+	ushort vex_vvvv;	/// VEX register
+//	ushort vex_X;	/// Alias to REX.X, set by default in 32-bit mode
+//	ushort vex_B;	/// Alias to REX.B, set by default in 32-bit mode
+//	ushort vex_W;	/// Alias to REX.W, ignored in 32-bit mode
 }
 
 //TODO: Condense vex maps into legacy
@@ -1328,12 +1324,12 @@ L_CONTINUE:
 		//TODO: Something about showing prefixes
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) { // REPZ/REPE/REPE
-				p.x86.repz = p.x86.last_prefix = 0xF3;
+				p.x86.last_prefix = 0xF3;
 //				if (p.mode >= DisasmMode.File)
 //					disasm_push_prefix(p, "repz");
 				goto L_CONTINUE;
 			} else { // REPNZ/REPNE
-				p.x86.repnz = p.x86.last_prefix = 0xF2;
+				p.x86.last_prefix = 0xF2;
 //				if (p.mode >= DisasmMode.File)
 //					disasm_push_prefix(p, "repnz");
 				goto L_CONTINUE;
@@ -1454,7 +1450,7 @@ L_CONTINUE:
 	}
 }
 
-private:
+package:
 
 void adbg_dasm_x86_0f(disasm_params_t *p) {
 	p.x86.op = *p.addru8;
@@ -5082,10 +5078,10 @@ const(char) *adbg_dasm_x86_modrm_reg(disasm_params_t *p, int reg, int width) {
 const(char) *adbg_dasm_x86_modrm_rm_reg(int rm, int addrpf) {
 	// This is asking for trouble, hopefully more checks will be added later
 	__gshared const(char) *[][]x86_regs = [
-		[ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi" ],
 		[ "bx+si", "bx+di", "bp+si", "bi+di", "si", "di", "bp", "bx" ],
+		[ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi" ],
 	];
-	return x86_regs[addrpf & 1][rm & 7];
+	return x86_regs[!addrpf][rm & 7];
 }
 
 /// (Internal) Process the R/M field automatically
@@ -5193,7 +5189,7 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 	}
 }
 
-// Process SIB, ignores address prefix
+// Process SIB, trips on address prefix
 void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 	if (p.x86.pf_address) {
 		adbg_dasm_err(p);
