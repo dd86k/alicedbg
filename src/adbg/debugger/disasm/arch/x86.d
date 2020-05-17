@@ -29,12 +29,10 @@ struct x86_internals_t {
 		ubyte[4] vex;
 	}
 	// VEX pre-calculated values
+	// NOTE: REX/VEX.{WRXB} fields are ignored
 	ushort vex_L;	/// VEX vector length (128b/scalar, 256b)
 	ushort vex_pp;	/// VEX opcode extension (NONE, 66H, F2H, F3H)
 	ushort vex_vvvv;	/// VEX register
-//	ushort vex_X;	/// Alias to REX.X, set by default in 32-bit mode
-//	ushort vex_B;	/// Alias to REX.B, set by default in 32-bit mode
-//	ushort vex_W;	/// Alias to REX.W, ignored in 32-bit mode
 }
 
 //TODO: Condense vex maps into legacy
@@ -243,6 +241,7 @@ L_CONTINUE:
 				f |= X86_FLAG_MODW_8B;
 			} else {
 				// ANCHOR EVEX
+				//TODO: EVEX
 				if ((*p.addru8 & MODRM_MOD) == MODRM_MOD_11) {
 					adbg_dasm_err(p);
 					return;
@@ -312,15 +311,9 @@ L_CONTINUE:
 			}
 		}
 		return;
-	case 0x70, 0x74, 0x78, 0x7C: // 70H-73H
-		if (p.mode >= DisasmMode.File) {
-			__gshared const(char)*[] x86_70h = [
-				"jo", "jno", "jb", "jnb",
-				"jz", "jnz", "jbe", "jnbe",
-				"js", "jns", "jp", "jnp"
-			];
-			adbg_dasm_push_str(p, x86_70h[(p.x86.op - 0x70) >> 2]);
-		}
+	case 0x70, 0x74, 0x78, 0x7C: // 70H-7FH
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, x86_70h[p.x86.op - 0x70]);
 		adbg_dasm_x86_u8imm(p);
 		return;
 	case 0x80: // 80H-83H
@@ -786,7 +779,7 @@ L_CONTINUE:
 					case MODRM_REG_100: m = "fsub"; break;
 					case MODRM_REG_101: m = "fsubr"; break;
 					case MODRM_REG_110: m = "fdiv"; break;
-					default:         m = "fdivr"; break;
+					default:            m = "fdivr"; break;
 					}
 					adbg_dasm_push_str(p, m);
 				}
@@ -935,7 +928,7 @@ L_CONTINUE:
 					case MODRM_REG_100: m = "fisub"; break;
 					case MODRM_REG_101: m = "fisubr"; break;
 					case MODRM_REG_110: m = "fidiv"; break;
-					default:         m = "fidivr"; break;
+					default:            m = "fidivr"; break;
 					}
 					adbg_dasm_push_str(p, m);
 				}
@@ -1960,51 +1953,9 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 		else
 			adbg_dasm_x86_0f38(p);
 		return;
-	case 0x40: // 40H-43H
+	case 0x40, 0x44, 0x48, 0x4C: // 40H-4FH
 		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = "cmovo"; break;
-			case 1:  m = "cmovno"; break;
-			case 2:  m = "cmovb"; break;
-			default: m = "cmovae"; break;
-			}
-		}
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
-		return;
-	case 0x44: // 44H-47H
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = "cmove"; break;
-			case 1:  m = "cmovne"; break;
-			case 2:  m = "cmovbe"; break;
-			default: m = "cmova"; break;
-			}
-		}
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
-		return;
-	case 0x48: // 48H-4BH
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = "cmovs"; break;
-			case 1:  m = "cmovns"; break;
-			case 2:  m = "cmovp"; break;
-			default: m = "cmovnp"; break;
-			}
-		}
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
-		return;
-	case 0x4C: // 4CH-4FH
-		if (p.mode >= DisasmMode.File) {
-			const(char) *m = void;
-			switch (p.x86.op & 3) {
-			case 0:  m = "cmovl"; break;
-			case 1:  m = "cmovnl"; break;
-			case 2:  m = "cmovle"; break;
-			default: m = "cmovnle"; break;
-			}
+			adbg_dasm_push_str(p, x86_0f_40[p.x86.op - 0x40]);
 		}
 		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		return;
@@ -3851,7 +3802,7 @@ void adbg_dasm_x86_0f3a(disasm_params_t *p) {
 		adbg_dasm_x86_u8imm(p);
 		return;
 	case 0x44: // 44H-47H
-		if (p.x86.op & X86_FLAG_WIDE || p.x86.op & X86_FLAG_DIR || p.x86.pf_operand == 0) {
+		if (p.x86.op & (X86_FLAG_WIDE | X86_FLAG_DIR) || p.x86.pf_operand == 0) {
 			adbg_dasm_err(p);
 			return;
 		}
@@ -3877,7 +3828,7 @@ void adbg_dasm_x86_0f3a(disasm_params_t *p) {
 		adbg_dasm_x86_u8imm(p);
 		return;
 	case 0xCC: // CCH-CFH
-		if (p.x86.op & X86_FLAG_WIDE || p.x86.op & X86_FLAG_DIR || p.x86.pf_operand) {
+		if (p.x86.op & (X86_FLAG_WIDE | X86_FLAG_DIR) || p.x86.pf_operand) {
 			adbg_dasm_err(p);
 			return;
 		}
@@ -4168,30 +4119,30 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 				switch (p.x86.vex_pp) {
 				case X86_VEX_PP_NONE:
 					i = "vmaxps";
-					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND |X86_FLAG_MEMW_128B;
+					f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 					break;
 				case X86_VEX_PP_66H:
 					i = "vmaxpd";
-					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND |X86_FLAG_MEMW_128B;
+					f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 					break;
 				case X86_VEX_PP_F3H:
 					i = "vmaxss";
-					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND |X86_FLAG_MEMW_32B;
+					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND | X86_FLAG_MEMW_32B;
 					break;
 				default:
 					i = "vmaxsd";
-					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND |X86_FLAG_MEMW_64B;
+					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND | X86_FLAG_MEMW_64B;
 					break;
 				}
 			} else {
 				switch (p.x86.vex_pp) {
 				case X86_VEX_PP_NONE:
 					i = "vdivps";
-					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND | X86_FLAG_MEMW_128B;
+					f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 					break;
 				case X86_VEX_PP_66H:
 					i = "vdivpd";
-					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND | X86_FLAG_MEMW_128B;
+					f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 					break;
 				case X86_VEX_PP_F3H:
 					i = "vdivss";
@@ -4208,11 +4159,11 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 				switch (p.x86.vex_pp) {
 				case X86_VEX_PP_NONE:
 					i = "vminps";
-					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND | X86_FLAG_MEMW_128B;
+					f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 					break;
 				case X86_VEX_PP_66H:
 					i = "vminpd";
-					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND | X86_FLAG_MEMW_128B;
+					f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 					break;
 				case X86_VEX_PP_F3H:
 					i = "vminss";
@@ -4227,11 +4178,11 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 				switch (p.x86.vex_pp) {
 				case X86_VEX_PP_NONE:
 					i = "vsubps";
-					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND | X86_FLAG_MEMW_128B;
+					f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 					break;
 				case X86_VEX_PP_66H:
 					i = "vsubpd";
-					f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND | X86_FLAG_MEMW_128B;
+					f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 					break;
 				case X86_VEX_PP_F3H:
 					i = "vsubss";
@@ -4680,6 +4631,23 @@ void adbg_dasm_x86_xop_10(disasm_params_t *p) {
 }
 
 //
+// ANCHOR: Shared instruction tables
+//
+
+__gshared const(char)*[] x86_70h = [
+	"jo", "jno", "jb", "jnb",
+	"jz", "jnz", "jbe", "jnbe",
+	"js", "jns", "jp", "jnp",
+	"jl", "jnl", "jle", "jnle",
+];
+__gshared const(char) *[]x86_0f_40 = [
+	"cmovo", "cmovno", "cmovb", "cmovae",
+	"cmove", "cmovne", "cmovbe", "cmova",
+	"cmovs", "cmovns", "cmovp", "cmovnp",
+	"cmovl", "cmovnl", "cmovle", "cmovnle"
+];
+
+//
 // ANCHOR: Internal functions
 //
 
@@ -4753,8 +4721,8 @@ enum : ubyte {
 enum {	// Flags for ModRM functions
 	// See formatter's MemWidth enum, this maps to adbg_dasm_x86_mw
 	X86_WIDTH_8B	= MemWidth.i8,
-	X86_WIDTH_32B	= MemWidth.i32,
-	X86_WIDTH_16B	= MemWidth.i16,
+	X86_WIDTH_16B	= MemWidth.i32,
+	X86_WIDTH_32B	= MemWidth.i16,
 	X86_WIDTH_64B	= MemWidth.i64,
 	X86_WIDTH_128B	= MemWidth.i128,
 	X86_WIDTH_256B	= MemWidth.i256,
@@ -4801,7 +4769,7 @@ enum {	// Flags for ModRM functions
 	X86_FLAG_4OPRND	= 0x20_0000,
 	X86_FLAG_OPRNDM	= 0xF0_0000, /// n operand mask
 	// MODRM flags
-	X86_FLAG_USE_OP	= 0x0100_0000,
+	X86_FLAG_USE_OP	= 0x0100_0000,	/// Use the opcode for width (8/32), ignores direction bit
 //	X86_FLAG_	= 0x0200_0000,
 //	X86_FLAG_	= 0x0400_0000,
 //	X86_FLAG_	= 0x0800_0000,
@@ -4835,7 +4803,7 @@ const(char) *adbg_dasm_x86_eax(disasm_params_t *p, int w) {
 	return a;
 }
 
-/// Used to map x86 widths to 
+/// Used to map x86 widths to formatter
 MemWidth adbg_dasm_x86_mw(int width) {
 	with (MemWidth) {
 		__gshared MemWidth[] w = [
@@ -4956,10 +4924,12 @@ const(char) *adbg_dasm_x86_segstr(int segreg) {
 	return segs[segreg]; // Structure gets initated to SegReg.None anyway
 }
 
+/// While it is the formatter's job to format registers, the long legacy of
+/// the syntax wars lead to this
 const(char) *adbg_dasm_x87_ststr(disasm_params_t *p, int index) {
 	const(char) *st = void;
 	with (DisasmSyntax)
-	switch (p.syntax) {
+	final switch (p.syntax) {
 	case Att:
 		switch (index) {
 		case 0: st = "%st"; break;
@@ -4986,7 +4956,7 @@ const(char) *adbg_dasm_x87_ststr(disasm_params_t *p, int index) {
 		default: st = "st?";
 		}
 		break;
-	default:
+	case Intel, Default:
 		switch (index) {
 		case 0: st = "st"; break;
 		case 1: st = "st(1)"; break;
@@ -5015,14 +4985,16 @@ void adbg_dasm_x86_modrm(disasm_params_t *p, int f) {
 	ubyte modrm = *p.addru8;
 	++p.addrv;
 
-	int dir = f & X86_FLAG_DIR;
+	int dir = void;
 	int wreg = void;
 	int wmem = void;
 	if (f & X86_FLAG_USE_OP) {
 		wreg = wmem = p.x86.op & X86_FLAG_WIDE ? X86_WIDTH_32B : X86_WIDTH_8B;
+		dir = p.x86_64.op & X86_FLAG_DIR;
 	} else {
 		wreg = (f & X86_FLAG_REGW) >> 8;
 		wmem = (f & X86_FLAG_MEMW) >> 12;
+		dir = f & X86_FLAG_DIR;
 	}
 	if (dir) goto L_REG;
 L_RM:
@@ -5139,8 +5111,10 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 			if (rm == MODRM_RM_101) {
 				uint m = *p.addru32;
 				p.addrv += 4;
-				if (p.mode >= DisasmMode.File)
+				if (p.mode >= DisasmMode.File) {
+					adbg_dasm_push_x32(p, m);
 					adbg_dasm_push_memregimm(p, reg, m, wmem);
+				}
 			} else {
 				if (p.mode >= DisasmMode.File)
 					adbg_dasm_push_memsegreg(p, seg, reg, wmem);

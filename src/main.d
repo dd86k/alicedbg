@@ -55,11 +55,23 @@ struct cliopt_t {
 	CLIOperatingMode mode;
 	DebuggerUI ui;
 	DebuggerMode debugtype;
-	ushort pid;
-	const(char) *file;
+	union {	// File or PID
+		ushort pid;
+		const(char) *file;
+	}
 	const(char) *file_args;
 	const(char) *file_env;
 	int flags;	/// Flags for dumper
+}
+
+/// CLI option structure, good for looping over
+struct cliopt {
+	const(char)* name;
+	union {
+		int i32;
+		DisasmISA isa;
+		DisasmSyntax syntax;
+	}
 }
 
 /// Version page
@@ -135,15 +147,15 @@ int clipage(CLIPage h) {
 	case marchs:
 		r =
 		"Available architectures\n"~
-		"x86_16 ........ Intel x86 16-bit mode (8086)\n"~
-		"x86 ........... Intel and AMD x86 (i386+)"
-//		"x86_64 ........ EM64T/Intel64 and AMD64\n"
-//		"thumb ......... ARM Thumb 32-bit\n"~
-//		"arm ........... ARM 32-bit\n"~
-//		"aarch64 ....... ARM 64-bit\n"~
-//		"rv32 .......... RISC-V 32-bit\n"~
-//		"rv64 .......... RISC-V 64-bit\n"~
-//		"rv128 ......... RISC-V 128-bit\n"~
+		"x86_16, 8086........ Intel x86 16-bit mode (16-bit)\n"~
+		"x86, i386 .......... Intel and AMD x86 (32-bit)"
+//		"x86_64, amd64 ...... EM64T/Intel64 and AMD64 (64-bit)\n"
+//		"t32, thumb ......... ARM Thumb (16/32-bit)\n"~
+//		"a32, arm ........... ARM (32-bit)\n"~
+//		"a64, aarch64 ....... ARM (64-bit)\n"~
+//		"rv32, riscv32 ...... RISC-V 32-bit\n"~
+//		"rv64, riscv64 ...... RISC-V 64-bit\n"~
+//		"rv128, riscv128 .... RISC-V 128-bit\n"~
 		;
 		break;
 	case license:
@@ -180,7 +192,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
 		break;
 	}
 	puts(r);
-	return 0;
+	return EXIT_SUCCESS;
 }
 
 int main(int argc, const(char) **argv) {
@@ -191,7 +203,7 @@ int main(int argc, const(char) **argv) {
 	disasm_params_t disopt;	/// .init
 
 	// CLI
-	for (size_t argi = 1; argi < argc; ++argi) {
+	cli: for (size_t argi = 1; argi < argc; ++argi) {
 		const(char) *arg = argv[argi] + 1;
 
 		if (*argv[argi] != '-') { // default arguments
@@ -236,7 +248,7 @@ int main(int argc, const(char) **argv) {
 		}
 
 		// debugger: select file
-		if (strcmp(arg, "exec") == 0) {
+		if (strcmp(arg, "exe") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: file argument missing");
 				return EXIT_FAILURE;
@@ -246,11 +258,11 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 		/*
-		if (strcmp(arg, "execarg") == 0) {
+		if (strcmp(arg, "exeargs") == 0) {
 			
 		}
 		// Starting directory for file
-		if (strcmp(arg, "execdir") == 0) {
+		if (strcmp(arg, "exedir") == 0) {
 			
 		}*/
 
@@ -293,33 +305,38 @@ int main(int argc, const(char) **argv) {
 				puts("cli: architecture argument missing");
 				return EXIT_FAILURE;
 			}
+			__gshared cliopt[] isaopts = [
+				{ "i386", DisasmISA.x86 },
+				{ "x86", DisasmISA.x86 },
+				{ "8086", DisasmISA.x86_16 },
+				{ "x86_16", DisasmISA.x86_16 },
+//				{ "amd64", DisasmISA.x86_64 },
+//				{ "x86_64", DisasmISA.x86_64 },
+//				{ "thumb", DisasmISA.arm_t32 },
+//				{ "t32", DisasmISA.arm_t32 },
+//				{ "arm", DisasmISA.arm_a32 },
+//				{ "a32", DisasmISA.arm_a32 },
+//				{ "aarch64", DisasmISA.arm_a64 },
+//				{ "a64", DisasmISA.arm_a64 },
+//				{ "riscv32", DisasmISA.rv32 },
+//				{ "rv32", DisasmISA.rv32 },
+//				{ "riscv64", DisasmISA.rv64 },
+//				{ "rv64", DisasmISA.rv64 },
+//				{ "guess", DisasmISA.Guess },
+//				{ "default", DisasmISA.Default },
+				{ "?", 255 },
+			];
 			const(char) *march = argv[++argi];
-			if (strcmp(march, "x86") == 0)
-				disopt.isa = DisasmISA.x86;
-			else if (strcmp(march, "x86_16") == 0)
-				disopt.isa = DisasmISA.x86_16;
-/*			else if (strcmp(march, "x86_64") == 0)
-				disopt.isa = DisasmISA.x86_64;
-			else if (strcmp(march, "thumb") == 0)
-				disopt.isa = DisasmISA.arm_t32;
-			else if (strcmp(march, "arm") == 0)
-				disopt.isa = DisasmISA.arm_a32;
-			else if (strcmp(march, "aarch64") == 0)
-				disopt.isa = DisasmISA.arm_a64;
-			else if (strcmp(march, "rv32") == 0)
-				disopt.isa = DisasmISA.rv32;
-			else if (strcmp(march, "rv64") == 0)
-				disopt.isa = DisasmISA.rv64;*/
-			else if (strcmp(march, "guess") == 0) {
-				puts("guess feature not implemented");
-				return EXIT_FAILURE;
-			} else if (strcmp(march, "?") == 0)
-				return clipage(CLIPage.marchs);
-			else {
-				printf("Unknown machine architecture: '%s'\n", march);
-				return EXIT_FAILURE;
+			foreach (ref cliopt o; isaopts) {
+				if (strcmp(march, o.name) == 0) {
+					if (o.i32 == 255)
+						return clipage(CLIPage.marchs);
+					disopt.isa = o.isa;
+					continue cli;
+				}
 			}
-			continue;
+			printf("Unknown machine architecture: '%s'\n", march);
+			return EXIT_FAILURE;
 		}
 
 		// disassembler: select syntax
@@ -328,20 +345,23 @@ int main(int argc, const(char) **argv) {
 				puts("cli: syntax argument missing");
 				return EXIT_FAILURE;
 			}
+			__gshared cliopt[] syntaxopts = [
+				{ "intel", DisasmSyntax.Intel },
+				{ "nasm", DisasmSyntax.Nasm },
+				{ "att", DisasmSyntax.Att },
+				{ "?", 255 },
+			];
 			const(char) *syntax = argv[++argi];
-			if (strcmp(syntax, "intel") == 0)
-				disopt.syntax = DisasmSyntax.Intel;
-			else if (strcmp(syntax, "nasm") == 0)
-				disopt.syntax = DisasmSyntax.Nasm;
-			else if (strcmp(syntax, "att") == 0)
-				disopt.syntax = DisasmSyntax.Att;
-			else if (strcmp(syntax, "?") == 0)
-				return clipage(CLIPage.syntaxes);
-			else {
-				printf("Unknown disassembler syntax: '%s'\n", syntax);
-				return EXIT_FAILURE;
+			foreach (ref cliopt o; syntaxopts) {
+				if (strcmp(syntax, o.name) == 0) {
+					if (o.i32 == 255)
+						return clipage(CLIPage.syntaxes);
+					disopt.syntax = o.syntax;
+					continue cli;
+				}
 			}
-			continue;
+			printf("Unknown assembler syntax: '%s'\n", syntax);
+			return EXIT_FAILURE;
 		}
 
 		// Choose demangle settings for symbols
@@ -408,8 +428,8 @@ int main(int argc, const(char) **argv) {
 	case debug_:
 		with (DebuggerMode)
 		switch (opt.debugtype) {
-		case file: e = adbg_load(opt.file); break;
-		case pid: e = adbg_attach(opt.pid); break;
+		case file: e = adbg_load(opt.file, null, null, 0); break;
+		case pid: e = adbg_attach(opt.pid, 0); break;
 		default:
 			puts("cli: No file nor pid were specified.");
 			return EXIT_FAILURE;

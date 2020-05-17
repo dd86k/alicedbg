@@ -587,7 +587,7 @@ int adbg_obj_pe_load(obj_info_t *info, int flags) {
 	case PE_MACHINE_I386:	info.isa = DisasmISA.x86; break;
 	case PE_MACHINE_AMD64:	info.isa = DisasmISA.x86_64; break;
 	case PE_MACHINE_RISCV32:	info.isa = DisasmISA.rv32; break;
-	default:	info.isa = DisasmISA.Default;
+	default:	info.isa = DisasmISA.platform;
 	}
 
 	return 0;

@@ -8,6 +8,7 @@ module adbg.debugger.debugger;
 import core.stdc.string : memset;
 import core.stdc.errno : errno;
 import adbg.debugger.exception;
+import adbg.consts;
 
 extern (C):
 __gshared:
@@ -50,7 +51,7 @@ enum DebuggerAction {
 	step,	/// Proceed with a single step
 }
 
-private 
+private
 struct breakpoint_t {
 	size_t address;
 	union {
@@ -61,7 +62,9 @@ struct breakpoint_t {
 }
 
 private __gshared
-breakpoint_t [4]breakpoints;
+breakpoint_t [DEBUGGER_MAX_BREAKPOINTS]breakpoints;
+private __gshared
+size_t breakpointindex;
 
 private __gshared
 int function(exception_t*) user_function;
@@ -70,18 +73,17 @@ int function(exception_t*) user_function;
  * Load executable image to debug, its starting argument, and starting folder.
  * This does not start the process. On Posix system, stat(2) is used to
  * determine if the file exists beforehand.
- * (Windows) Uses CreateProcessA with DEBUG_ONLY_THIS_PROCESS.
+ * (Windows) Uses CreateProcessA with DEBUG_PROCESS.
  * (Posix) Uses stat(2), fork(2), ptrace(2) (as PTRACE_TRACEME), and execve(2)
  * Params:
  * 	cmd = Command
  * Returns: Zero on success; Otherwise os error code is returned
  */
-int adbg_load(const(char) *cmd) {
+int adbg_load(const(char) *cmd, const(char) *args, const(char) *[]env, int flags) {
 	version (Windows) {
 		STARTUPINFOA si = void;
 		PROCESS_INFORMATION pi = void;
-		memset(&si, 0, si.sizeof); // D init fields might NOT BE zero
-		memset(&pi, 0, pi.sizeof); // Might also be faster to memset
+		memset(&si, 0, si.sizeof + pi.sizeof); // memset faster than _init functions
 		si.cb = STARTUPINFOA.sizeof;
 		// Not using DEBUG_ONLY_THIS_PROCESS because our posix
 		// counterpart is using -1 (all children) for waitpid.
@@ -103,6 +105,13 @@ int adbg_load(const(char) *cmd) {
 		}
 	} else
 	version (Posix) {
+		version (linux) {}
+		else {
+			const(char)* a = void;
+			const(char)** e = void;
+			args = &a;
+			env = &e;
+		}
 		// Verify if file exists and we has access to it
 		stat_t st = void;
 		if (stat(cmd, &st) == -1)
@@ -129,7 +138,7 @@ int adbg_load(const(char) *cmd) {
  * Params: pid = Process ID
  * Returns: Non-zero on error: (Posix) errno or (Windows) GetLastError
  */
-int adbg_attach(int pid) {
+int adbg_attach(int pid, int flags) {
 	version (Windows) {
 		if (DebugActiveProcess(pid) == FALSE)
 			return GetLastError();
@@ -329,13 +338,16 @@ L_DEBUG_LOOP:
 		}
 	}
 }
-
-//TODO: adbg_add_breakpoint
-/*int adbg_add_breakpoint(size_t address) {
+/*
+int adbg_add_breakpoint(size_t address) {
 	
+	breakpoints[breakpointindex].address = address;
+	return 0;
 }
 int adbg_rm_breakpoint_addr(size_t address) {
+	return 1;
 }
 int adbg_rm_breakpoint_index(size_t address) {
+	return 1;
 }
 */

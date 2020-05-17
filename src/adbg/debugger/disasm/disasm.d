@@ -22,7 +22,7 @@ enum DisasmMode : ubyte {
 	Size,	/// Only calculate operation code sizes
 	Data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
 	File,	/// Machine code and instruction mnemonics formatting
-	Full	/// (Not implemented) Add symbols and demangling
+	Full	/// (Not implemented) Add comments
 }
 
 /// Disassembler error
@@ -35,11 +35,11 @@ enum DisasmError {
 
 /// Disassembler ABI
 enum DisasmISA : ubyte {
-	Default,	/// Platform compiled target default
-	Guess,	/// (Not implemented) Attempt to guess ISA
+	platform,	/// (Default) Platform compiled target, see DISASM_DEFAULT_ISA
+	guess,	/// (Not implemented) Attempt to guess ISA
 	x86_16,	/// (WIP) 8086, 80186, 80286
 	x86,	/// (WIP) x86-32, 80386/i386
-	x86_64,	/// (Not implemented) AMD64, Intel64, x64 (Windows)
+	x86_64,	/// (WIP) AMD64, Intel64, x64 (Windows)
 	arm_t32,	/// (Not implemented) ARM: Thumb 32-bit
 	arm_a32,	/// (Not implemented) ARM: A32 (formally arm)
 	arm_a64,	/// (Not implemented) ARM: A64 (formally aarch64)
@@ -182,7 +182,7 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 		with (p) mcbufi = mnbufi = 0;
 	}
 
-	if (p.isa == DisasmISA.Default)
+	if (p.isa == DisasmISA.platform)
 		p.isa = DISASM_DEFAULT_ISA;
 
 	with (DisasmISA)

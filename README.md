@@ -17,17 +17,18 @@ Personal Goals:
 - [ ] Embed, as a library, into an embedded HTTP server to provide a local WebUI
 - [ ] Make a disassembly as a service
 
-Planned versions:
+Roadmap:
 
 - 0.1: INIT
-  - Disassembler: x86 disassembler
+  - Disassembler: x86 and x86-64 disassembler
   - Dumper: PE support
   - Debug UI: loop
   - OS: Windows and Linux
-  - alicedbg.1
 - 0.2: Sup, World?
-  - Disassembler: x86-64 disassembler
   - Dumper: ELF support
+  - Symbols
+  - alicedbg.1
+- 0.3: Useful
   - alicedbg.3
 
 ## Support Matrix
@@ -47,8 +48,8 @@ Planned versions:
 
 | Platform | ~% | Extensions | Notes |
 |---|---|---|---|
-| x86-32 | 60 | x87, MMX, SSE (2/3/4.1/4.2/4a), AES, SHA, VMX, SVM 1.0, SMX, WAITPKG | Still adding |
-| x86-64 | 0 | | Waiting on x86-32 |
+| x86-32 | 60 | x87, MMX, SSE (2/3/4.1/4.2/4a), AES, SHA, VMX, SVM 1.0, SMX, WAITPKG | Still adding and fixing |
+| x86-64 | 30 | See x86-32 | Still fixing |
 | arm-t32 | 0 | | Waiting on x86-64 |
 | arm-a32 | 0 | | Waiting on x86-64 |
 | arm-a64 | 0 | | Waiting on x86-64 |
@@ -104,7 +105,7 @@ from the ffmpeg project (`-option [value]`).
 | `-mode` | `debugger`, `dump`, `profile` | `debugger` | Operating mode |
 | `-march` | See `-march ?` | Target dependant | (Disassembler) Set machine architecture |
 | `-syntax` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
-| `-exec` | File path | | Set mode to Debugger and next argument as `file` |
+| `-exe` | File path | | Set mode to Debugger and next argument as `file` |
 | `-pid` | Process ID | | Set mode to Debugger and next argument as `pid` |
 | `-ui` | `tui`, `loop`, `tcp-json` | `tui` | (Debugger) User interface |
 | `-dump` | | | Alias of `-mode dump` |

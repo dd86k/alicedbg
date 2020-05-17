@@ -55,6 +55,7 @@ enum FormatType {
 	SegReg,	/// Segment:Register spec
 	Addr,	/// Address spec (e.g. jumps)
 	Imm,	/// Immediate spec
+	Imm64,	/// Immediate 64-bit spec
 	ImmFar,	/// Immediate far spec (notably for x86), x:x format
 	ImmSeg,	/// Segment:Immediate spec (notably for x86), s:x format
 	Mem,	/// Memory spec
@@ -241,6 +242,17 @@ void adbg_dasm_push_imm(disasm_params_t *p, int imm) {
 	if (i == null) return;
 	i.type = FormatType.Imm;
 	i.ival1 = imm;
+}
+/// Push an 64-bit immediate value into the formatting stack. This is printed depending
+/// on the immediate formatter (adbg_dasm_fmt_imm64).
+/// Params:
+/// 	p = Disassembler parameters
+/// 	imm = Immediate value
+void adbg_dasm_push_imm64(disasm_params_t *p, long imm) {
+	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
+	if (i == null) return;
+	i.type = FormatType.Imm;
+	i.lval1 = imm;
 }
 /// Push an immediate value into the formatting stack. This is printed depending
 /// on the immediate formatter (adbg_dasm_fmt_immfar).
@@ -594,6 +606,14 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		default:  f = "%d"; break;
 		}
 		p.mnbufi += snprintf(bp, left, f, i.ival1);
+		return;
+	case Imm64:
+		with (DisasmSyntax)
+		switch (p.syntax) {
+		case Att: f = "$%lld"; break;
+		default:  f = "%lld"; break;
+		}
+		p.mnbufi += snprintf(bp, left, f, i.lval1);
 		return;
 	case ImmFar:
 		with (DisasmSyntax)

@@ -5,27 +5,17 @@
  */
 module adbg.consts;
 
-//
-// ANCHOR External functions
-//
-
 extern (C):
 
-const(char) *adbg_info_version() {
-	return PROJECT_VERSION ~ "-" ~ __BUILDTYPE__;
-}
-const(char) *adbg_info_platform() {
-	return __PLATFORM__;
-}
-const(char) *adbg_info_crt() {
-	return __CRT__;
-}
-const(char) *adbg_info_os() {
-	return __OS__;
-}
+//
+// ANCHOR Settings
+//
+
+/// The maximum amount of breakpoints that the debugger can have.
+enum DEBUGGER_MAX_BREAKPOINTS = 4;
 
 //
-// ANCHOR Enumerations
+// Constants
 //
 
 /// Project version
@@ -218,4 +208,21 @@ version (DigitalMars) {
 		version = GDC_ASM_X86_64;
 		version = GDC_ASM_X86_ANY;
 	}
+}
+
+//
+// ANCHOR External functions
+//
+
+const(char) *adbg_info_version() {
+	return PROJECT_VERSION ~ "-" ~ __BUILDTYPE__;
+}
+const(char) *adbg_info_platform() {
+	return __PLATFORM__;
+}
+const(char) *adbg_info_crt() {
+	return __CRT__;
+}
+const(char) *adbg_info_os() {
+	return __OS__;
 }

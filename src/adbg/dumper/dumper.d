@@ -114,7 +114,7 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 		return e;
 	}
 
-	if (dp.isa == DisasmISA.Default)
+	if (dp.isa == DisasmISA.platform)
 		dp.isa = info.isa;
 
 	with (ObjType)

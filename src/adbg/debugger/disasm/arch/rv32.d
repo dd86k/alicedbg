@@ -15,9 +15,10 @@ package
 struct rv32_internals_t { align(1):
 	union {
 		uint op;
-		struct { align(1):
-			ushort op1, op2;
-		}
+		version (LittleEndian)
+			struct { align(1): ushort op1, op2; }
+		else
+			struct { align(1): ushort op2, op1; }
 	}
 }
 
