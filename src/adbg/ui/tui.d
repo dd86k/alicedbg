@@ -30,8 +30,8 @@ int adbg_ui_tui_enter(disasm_params_t *p) {
 	}
 	p.options |= DISASM_O_SPACE;
 	memcpy(&g_disparams, p, disasm_params_t.sizeof);
-	adbg_sethandler(&adbg_ui_tui_handler);
-	return adbg_enterloop;
+	adbg_userfunc(&adbg_ui_tui_handler);
+	return adbg_run;
 }
 
 private:

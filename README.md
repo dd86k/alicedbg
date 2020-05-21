@@ -103,22 +103,20 @@ from the ffmpeg project (`-option [value]`).
 | Option | Possible values | Default | Description |
 |---|---|---|---|
 | `-mode` | `debugger`, `dump`, `profile` | `debugger` | Operating mode |
-| `-march` | See `-march ?` | Target dependant | (Disassembler) Set machine architecture |
-| `-syntax` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
 | `-exe` | File path | | Set mode to Debugger and next argument as `file` |
 | `-pid` | Process ID | | Set mode to Debugger and next argument as `pid` |
-| `-ui` | `tui`, `loop`, `tcp-json` | `tui` | (Debugger) User interface |
-| `-dump` | | | Alias of `-mode dump` |
+| `-ui` | `loop`, `cmd`, `tui` | `loop` (for now!) | (Debugger) User interface, only `loop` is available |
+| `-march` | See `-march ?` | Target dependant | (Disassembler) Set machine architecture |
+| `-syntax` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
+| `-dump` | | | Enables dump operation mode |
 | `-raw` | | | (Dumper) Skip file format detection and process as raw blob |
 | `-show` | `A`,`h`,`s`,`i`,`d` | `h` | (Dumper) Include item(s) into output |
 
 Default operating mode is set to the debugger, and the default UI is set to the
 TUI type.
 
-Default arguments are: `file`, `file_args`, and `file_envs`, which applies to
-any operating modes without an option switch (`-example`). Therefore, it is
-possible to only write examples such as `alicedbg -dump putty.exe -show A`,
-`alicedbg -ui loop debuggee`, and `alicedbg -dump -march x86 -raw test_x86`.
+The only default argument sets the debug type to a file with a file path.
+Example: `alicedbg putty.exe -dump -show s`
 
 ### UI: loop
 

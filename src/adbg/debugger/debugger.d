@@ -1,6 +1,10 @@
 /**
  * Debugger core
  *
+ * This is the only module that contains function names without its module
+ * name. This includes creating processes, attaching to a PID, running the
+ * debugger loop, managing breakpoints, etc.
+ *
  * License: BSD 3-Clause
  */
 module adbg.debugger.debugger;
@@ -70,24 +74,41 @@ private __gshared
 int function(exception_t*) user_function;
 
 /**
- * Load executable image to debug, its starting argument, and starting folder.
- * This does not start the process. On Posix system, stat(2) is used to
- * determine if the file exists beforehand.
- * (Windows) Uses CreateProcessA with DEBUG_PROCESS.
- * (Posix) Uses stat(2), fork(2), ptrace(2) (as PTRACE_TRACEME), and execve(2)
+ * Load executable image into the debugger, with optional null-terminated
+ * argument list and null-terminated environment. While path must not be null,
+ * argv and envp parameters can be null.
+ * This does not start the process, nor the debugger.
+ * On Posix systems, stat(2) is used to check if the file exists.
+ * (Windows) Uses CreateProcessA (DEBUG_PROCESS).
+ * (Posix) Uses stat(2), fork(2), ptrace(2) (PTRACE_TRACEME), and execve(2).
  * Params:
- * 	cmd = Command
+ * 	path = Command, path to executable
+ * 	argv = Argument vector, null-terminated
+ * 	envp = Environment vector, null-terminated
+ * 	flags = Reserved
  * Returns: Zero on success; Otherwise os error code is returned
  */
-int adbg_load(const(char) *cmd, const(char) *args, const(char) *[]env, int flags) {
+int adbg_load(const(char) *path, const(char) **argv, const(char) **envp, int flags) {
+	if (path == null) return 1;
 	version (Windows) {
+		//
+		// Parse argv
+		//
+		
+		//
+		// Parse envp
+		//
+		
+		//
+		// Create process
+		//
 		STARTUPINFOA si = void;
 		PROCESS_INFORMATION pi = void;
 		memset(&si, 0, si.sizeof + pi.sizeof); // memset faster than _init functions
 		si.cb = STARTUPINFOA.sizeof;
 		// Not using DEBUG_ONLY_THIS_PROCESS because our posix
 		// counterpart is using -1 (all children) for waitpid.
-		if (CreateProcessA(cmd, null,
+		if (CreateProcessA(path, null,
 			null, null,
 			FALSE, DEBUG_PROCESS,
 			null, null, &si, &pi) == 0)
@@ -105,16 +126,14 @@ int adbg_load(const(char) *cmd, const(char) *args, const(char) *[]env, int flags
 		}
 	} else
 	version (Posix) {
-		version (linux) {}
-		else {
-			const(char)* a = void;
-			const(char)** e = void;
-			args = &a;
-			env = &e;
+		version (linux) {} else { // For systems that don't check for NULL
+			__gshared const(char) **n = [ null ];
+			if (argv == null) argv = n;
+			if (envp == null) envp = n;
 		}
 		// Verify if file exists and we has access to it
 		stat_t st = void;
-		if (stat(cmd, &st) == -1)
+		if (stat(path, &st) == -1)
 			return errno;
 		//TODO: Check executable bit?
 		// Proceed normally
@@ -124,7 +143,7 @@ int adbg_load(const(char) *cmd, const(char) *args, const(char) *[]env, int flags
 		if (hprocess == 0) {
 			if (ptrace(PTRACE_TRACEME, 0, null, null))
 				return errno;
-			if (execve(cmd, null, null) == -1)
+			if (execve(path, argv, envp) == -1)
 				return errno;
 		}
 	}
@@ -155,9 +174,8 @@ int adbg_attach(int pid, int flags) {
  * Params: f = Function pointer
  * Returns: Zero on success; Otherwise an error occured
  */
-int adbg_sethandler(int function(exception_t*) f) {
+void adbg_userfunc(int function(exception_t*) f) {
 	user_function = f;
-	return 0;
 }
 
 /**
@@ -168,16 +186,16 @@ int adbg_sethandler(int function(exception_t*) f) {
  * (Posix) Uses ptrace(2) and waitpid(2), filters SIGCONT
  * Returns: Zero on success; Otherwise an error occured
  */
-int adbg_enterloop() {
+int adbg_run() {
 	if (user_function == null)
 		return 4;
 
 	exception_t e = void;
 
-	version (Win64) {
-		adbg_ex_reg_init(&e, processWOW64 ? InitPlatform.x86 : InitPlatform.Native);
-	} else
-		adbg_ex_reg_init(&e, InitPlatform.Native);
+	version (Win64)
+		adbg_ex_ctx_init(&e, processWOW64 ? InitPlatform.x86 : InitPlatform.Native);
+	else
+		adbg_ex_ctx_init(&e, InitPlatform.Native);
 
 	version (Windows) {
 		DEBUG_EVENT de = void;
@@ -194,21 +212,7 @@ L_DEBUG_LOOP:
 			goto L_DEBUG_LOOP;
 		}
 
-		e.pid = de.dwProcessId;
-		e.tid = de.dwThreadId;
-		e.addr = de.Exception.ExceptionRecord.ExceptionAddress;
-		e.oscode = de.Exception.ExceptionRecord.ExceptionCode;
-		switch (e.oscode) {
-		case EXCEPTION_IN_PAGE_ERROR:
-		case EXCEPTION_ACCESS_VIOLATION:
-			e.type = adbg_ex_oscode(
-				de.Exception.ExceptionRecord.ExceptionCode,
-				cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]);
-			break;
-		default:
-			e.type = adbg_ex_oscode(
-				de.Exception.ExceptionRecord.ExceptionCode);
-		}
+		adbg_ex_dbg(&e, &de);
 
 		CONTEXT ctx = void;
 		version (Win64) {
@@ -220,12 +224,12 @@ L_DEBUG_LOOP:
 			} else {
 				ctx.ContextFlags = CONTEXT_ALL;
 				GetThreadContext(hthread, &ctx);
-				adbg_ex_ctx_win(&e, &ctx);
+				adbg_ex_ctx(&e, &ctx);
 			}
 		} else {
 			ctx.ContextFlags = CONTEXT_ALL;
 			GetThreadContext(hthread, &ctx);
-			adbg_ex_ctx_win(&e, &ctx);
+			adbg_ex_ctx(&e, &ctx);
 		}
 
 		with (DebuggerAction)
@@ -235,24 +239,18 @@ L_DEBUG_LOOP:
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
 			return 0;
 		case step:
-			// Enable single-stepping via Trap flag
-			version (X86) {
-				ctx.EFlags |= 0x100;
-			} else
-			version (X86_64) {
-				if (processWOW64)
-					ctxwow64.EFlags |= 0x100;
-				else
-					ctx.EFlags |= 0x100;
-			}
 			FlushInstructionCache(hprocess, null, 0);
+			// Enable single-stepping via Trap flag
 			version (Win64) {
 				if (processWOW64) {
+					ctxwow64.EFlags |= 0x100;
 					Wow64SetThreadContext(hthread, &ctxwow64);
 				} else {
+					ctx.EFlags |= 0x100;
 					SetThreadContext(hthread, &ctx);
 				}
 			} else {
+				ctx.EFlags |= 0x100;
 				SetThreadContext(hthread, &ctx);
 			}
 			goto case;
@@ -270,7 +268,7 @@ L_DEBUG_LOOP:
 		if (pid == -1)
 			return 3;
 
-		// Bits  Desc
+		// Bits  Description (Linux)
 		// 6:0   Signo that caused child to exit
 		//       0x7f if child stopped/continued
 		//       or zero if child exited without signal
@@ -285,44 +283,40 @@ L_DEBUG_LOOP:
 		if ((wstatus & 0x7F) != 0x7F)
 			return chld_signo;
 
-		// Filter signals
-		//switch (sig.si_signo) {
+		// Signal filtering
 		switch (chld_signo) {
-//		case SIGSEGV, SIGFPE, SIGILL, SIGBUS, SIGTRAP:
-//		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
-//			break;
 		case SIGCONT: goto L_DEBUG_LOOP;
-		default:
-		}
-
-		e.pid = pid;
-		e.tid = 0;
-		e.oscode = chld_signo;
-		e.type = adbg_ex_oscode(chld_signo);
-
-		user_regs_struct u = void;
-		if (ptrace(PTRACE_GETREGS, pid, null, &u) == -1)
-			return 6;
-
-		adbg_ex_ctx_user(&e, &u);
-
-		if (chld_signo == SIGTRAP) {
-			//TODO: Find a way to find the fault address
-			// And make it readable (via mprotect?)
-			// - linux does not fill si_addr on a SIGTRAP from a ptrace event
-			//   - see sigaction(2)
-			// - linux *only* fills user_regs_struct for "user area"
-			//   - see arch/x86/include/asm/user_64.h
-			// - using EIP/RIP is NOT a good idea
-			//   - IP ALWAYS point to NEXT instruction
-			//   - First SIGTRAP does NOT contain int3 (Windows does, though)
-			e.addr = null;
-		} else {
+		// NOTE: si_addr is NOT populated under ptrace for SIGTRAP
+		// 
+		// - linux does not fill si_addr on a SIGTRAP from a ptrace event
+		//   - see sigaction(2)
+		// - linux *only* fills user_regs_struct for "user area"
+		//   - see arch/x86/include/asm/user_64.h
+		//   - "ptrace does not yet supply these.  Someday...."
+		//   - So yeah, debug registers and "fault_address" not filled
+		//     - No access to ucontext_t from ptrace either
+		// - using EIP/RIP is NOT a good idea
+		//   - IP ALWAYS point to NEXT instruction
+		//   - First SIGTRAP does NOT contain int3
+		//     - Windows does, though, and points to it
+		// - gdbserver and lldb never attempts to do such a thing
+		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 			siginfo_t sig = void;
 			if (ptrace(PTRACE_GETSIGINFO, pid, null, &sig) == -1)
 				return 5;
 			e.addr = sig._sifields._sigfault.si_addr;
+			break;
+//		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
+		default:
+			e.addr = null;
 		}
+
+		adbg_ex_dbg(&e, pid, chld_signo);
+
+		user_regs_struct u = void;
+		if (ptrace(PTRACE_GETREGS, pid, null, &u) == -1)
+			return 6;
+		adbg_ex_ctx(&e, &u);
 
 		with (DebuggerAction)
 		final switch (user_function(&e)) {
@@ -338,16 +332,74 @@ L_DEBUG_LOOP:
 		}
 	}
 }
-/*
-int adbg_add_breakpoint(size_t address) {
-	
-	breakpoints[breakpointindex].address = address;
+
+//
+// Breakpoint handling
+//
+
+int adbg_bp_add(size_t address) {
+	assert(0, "adbg_bp_add not implemented");
+}
+breakpoint_t* adbg_bp_get(size_t address) {
+	assert(0, "adbg_bp_get not implemented");
+}
+int adbg_bp_rm_addr(size_t address) {
+	assert(0, "adbg_bp_rm_addr not implemented");
+}
+int adbg_bp_rm_index(int index) {
+	assert(0, "adbg_bp_rm_index not implemented");
+}
+
+//
+// Memory
+//
+
+enum {	// adbg_mm flags
+	// Basic types
+	MM_U8	= 0x0,
+	MM_U16	= 0x1,
+	MM_U32	= 0x2,
+	MM_U64	= 0x3,
+	MM_U128	= 0x4,
+	MM_U256	= 0x5,
+	MM_U512	= 0x6,
+	MM_U1K	= 0x7,
+	MM_U2K	= 0x8,
+	MM_U4K	= 0x9,
+	MM_U8K	= 0xA,
+	MM_U16K	= 0xB,
+	MM_U32K	= 0xC,
+	MM_U64K	= 0xD,
+	MM_U128K	= 0xE,
+	MM_U256K	= 0xF,
+	// Flags
+	MM_READ	= 0,
+	MM_WRITE	= 0x0100,
+}
+
+/**
+ * Read or write to a memory region from or to the opened debugee process.
+ * This does not include subchildren processes.
+ * Params:
+ * 	addr = Memory address location
+ * 	flags = See MM_ enumerations
+ * 	data = Data pointer
+ * Returns: Zero on success, negative on error
+ */
+int adbg_mm(size_t addr, int flags, void *data) {
+	size_t size = 1 << (flags & 15);
+
+	version (Windows) {
+		if (flags & MM_WRITE) {
+			
+		} else {
+			if (ReadProcessMemory(hprocess, cast(void*)addr, data, size, null) == 0)
+				return -1;
+		}
+	} else
+	version (linux) {
+		// use pread64
+	}
+
 	return 0;
 }
-int adbg_rm_breakpoint_addr(size_t address) {
-	return 1;
-}
-int adbg_rm_breakpoint_index(size_t address) {
-	return 1;
-}
-*/

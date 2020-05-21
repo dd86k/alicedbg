@@ -258,5 +258,7 @@ version (X86_64) {
 		char  [32]u_comm;
 		///
 		ulong [8]u_debugreg;
+		ulong error_code;
+		ulong fault_address;
 	}
 }

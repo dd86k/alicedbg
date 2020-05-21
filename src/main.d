@@ -15,12 +15,12 @@ import adbg.consts;
 import adbg.ui.loop : adbg_ui_loop_enter;
 import adbg.ui.tui : adbg_ui_tui_enter;
 import adbg.debugger, adbg.dumper;
-import adbg.os.err;
+import adbg.os.err, adbg.os.seh;
 
 extern (C):
 private:
 
-enum CLIOperatingMode {
+enum CLIOpMode {
 	debug_,
 	dump,
 	profile
@@ -38,9 +38,9 @@ enum CLIPage {
 
 // for debugger
 enum DebuggerUI {
-	tui,
 	loop,
-//	interpreter,
+//	cmd,
+	tui,
 //	tcp_json,
 }
 
@@ -52,16 +52,22 @@ enum DebuggerMode {
 
 /// CLI options
 struct cliopt_t {
-	CLIOperatingMode mode;
+	CLIOpMode mode;
 	DebuggerUI ui;
 	DebuggerMode debugtype;
 	union {	// File or PID
 		ushort pid;
 		const(char) *file;
 	}
-	const(char) *file_args;
-	const(char) *file_env;
-	int flags;	/// Flags for dumper
+	union {
+		const(char) *file_args;
+		const(char) **argv;
+	}
+	union {
+		const(char) *file_env;
+		const(char) **envp;
+	}
+	int flags;	/// Flags
 }
 
 /// CLI option structure, good for looping over
@@ -99,11 +105,10 @@ int clipage(CLIPage h) {
 	with (CLIPage)
 	final switch (h) {
 	case main:
-		r =
-		"Aiming to be a simple debugger, dumper, and profiler\n"~
+		r = "Aiming to be a simple debugger, dumper, and profiler\n"~
 		"Usage:\n"~
-		"  alicedbg {-pid|-exec|-dump} {FILE|ID} [OPTIONS...]\n"~
-		"  alicedbg {--help|--version|--license}\n"~
+		"  alicedbg {-pid ID|-exec FILE|-dump FILE} [OPTIONS...]\n"~
+		"  alicedbg {-h|--help|--version|--license}\n"~
 		"\n"~
 		"OPTIONS\n"~
 		"  -mode    Manually select an operating mode (see -mode ?)\n"~
@@ -111,24 +116,22 @@ int clipage(CLIPage h) {
 		"  -syntax  Select disassembler style (see -syntax ?)\n"~
 		"  -exec    debugger: Load executable file\n"~
 		"  -pid     debugger: Attach to process id\n"~
-		"  -ui      debugger: Choose user interface (default=tui, see -ui ?)\n"~
+		"  -ui      debugger: Choose user interface (default=loop, see -ui ?)\n"~
 		"  -dump    dumper: Selects dump mode\n"~
-		"  -raw     dumper: Disassemble raw file\n"~
-		"  -show    dumper: Select what to show (default=h, see -show ?)\n";
+		"  -raw     dumper: Disassemble as a raw file\n"~
+		"  -show    dumper: Select parts to show (default=h, see -show ?)\n";
 		break;
 	case ui:
-		r =
-		"Available UIs (default=tui)\n"~
-		"tui ....... (WIP) Text UI with full debugging experience.\n"~
-		"loop ...... Print exceptions, minimum user interaction."
+		r = "Available debug UIs (default=loop)\n"~
+		"loop ...... Print exceptions, minimum user interaction.\n"
 //		"cmd ....... (Experimental) (REPL) Command-based, like a shell.\n"
+//		"tui ....... (WIP) Text UI with full debugging experience.\n"
 //		"tcp-json .. (Experimental) JSON API server via TCP.\n"
 		;
 		break;
 	case show:
-		r =
-		"Available SHOW fields for dumper (default=h)\n"~
-		"A .. Show all fields\n"~
+		r = "Available parts for dumper (default=h)\n"~
+		"A .. Show all fields listed below\n"~
 		"h .. Show headers\n"~
 		"s .. Show sections\n"~
 		"i .. Show imports\n"~
@@ -137,18 +140,16 @@ int clipage(CLIPage h) {
 		;
 		break;
 	case syntaxes:
-		r =
-		"Available disassembler styles\n"~
+		r = "Available disassembler syntaxes\n"~
 		"intel .... Intel syntax\n"~
 		"nasm ..... Netwide Assembler syntax\n"~
 		"att ...... AT&T syntax"
 		;
 		break;
 	case marchs:
-		r =
-		"Available architectures\n"~
-		"x86_16, 8086........ Intel x86 16-bit mode (16-bit)\n"~
-		"x86, i386 .......... Intel and AMD x86 (32-bit)"
+		r = "Available architectures\n"~
+		"x86_16, 8086........ Intel 8086 (16-bit)\n"~
+		"x86, i386 .......... Intel i386+ (32-bit)"
 //		"x86_64, amd64 ...... EM64T/Intel64 and AMD64 (64-bit)\n"
 //		"t32, thumb ......... ARM Thumb (16/32-bit)\n"~
 //		"a32, arm ........... ARM (32-bit)\n"~
@@ -210,18 +211,12 @@ int main(int argc, const(char) **argv) {
 			if (opt.file == null) {
 				opt.debugtype = DebuggerMode.file;
 				opt.file = argv[argi];
-			} else if (opt.file_args == null) {
-				opt.file_args = argv[argi];
-			} else if (opt.file_env == null) {
-				opt.file_env = argv[argi];
-			} else {
-				puts("cli: Out of default parameters");
-				return EXIT_FAILURE;
-			}
-			continue;
+				continue;
+			} 
 		}
 
 		// choose operating mode
+		//TODO: Consider removing, it's redundant
 		if (strcmp(arg, "mode") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: path argument missing");
@@ -229,11 +224,11 @@ int main(int argc, const(char) **argv) {
 			}
 			const(char) *mode = argv[++argi];
 			if (strcmp(mode, "dump") == 0)
-				opt.mode = CLIOperatingMode.dump;
+				opt.mode = CLIOpMode.dump;
 			else if (strcmp(mode, "profile") == 0)
-				opt.mode = CLIOperatingMode.profile;
+				opt.mode = CLIOpMode.profile;
 			else if (strcmp(mode, "debug") == 0)
-				opt.mode = CLIOperatingMode.debug_;
+				opt.mode = CLIOpMode.debug_;
 			else {
 				printf("unknown mode: %s\n", mode);
 				return EXIT_FAILURE;
@@ -241,13 +236,13 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		// shorthand of "-mode dump"
+		// Switches the operation to "dump"
 		if (strcmp(arg, "dump") == 0) {
-			opt.mode = CLIOperatingMode.dump;
+			opt.mode = CLIOpMode.dump;
 			continue;
 		}
 
-		// debugger: select file
+		// debugger: path for debuggee
 		if (strcmp(arg, "exe") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: file argument missing");
@@ -257,12 +252,19 @@ int main(int argc, const(char) **argv) {
 			opt.file = argv[++argi];
 			continue;
 		}
-		/*
-		if (strcmp(arg, "exeargs") == 0) {
+
+		// debugger: debuggee arguments
+		if (strcmp(arg, "args") == 0) {
+			if (argi + 1 >= argc) {
+				puts("cli: args argument missing");
+				return EXIT_FAILURE;
+			}
+		}
+		/*if (strcmp(arg, "env") == 0) {
 			
 		}
 		// Starting directory for file
-		if (strcmp(arg, "exedir") == 0) {
+		if (strcmp(arg, "dir") == 0) {
 			
 		}*/
 
@@ -292,8 +294,7 @@ int main(int argc, const(char) **argv) {
 			else if (strcmp(ui, "?") == 0)
 				return clipage(CLIPage.ui);
 			else {
-				printf("cli: ui \"%s\" not found, query \"-ui ?\" for a list\n",
-					ui);
+				printf("Unknown UI: '%s', query \"-ui ?\" for list\n", ui);
 				return EXIT_FAILURE;
 			}
 			continue;
@@ -335,7 +336,7 @@ int main(int argc, const(char) **argv) {
 					continue cli;
 				}
 			}
-			printf("Unknown machine architecture: '%s'\n", march);
+			printf("Unknown march: '%s', query '-march ?' for list\n", march);
 			return EXIT_FAILURE;
 		}
 
@@ -360,7 +361,7 @@ int main(int argc, const(char) **argv) {
 					continue cli;
 				}
 			}
-			printf("Unknown assembler syntax: '%s'\n", syntax);
+			printf("Unknown syntax: '%s', query '-syntax ?' for list\n", syntax);
 			return EXIT_FAILURE;
 		}
 
@@ -423,7 +424,7 @@ int main(int argc, const(char) **argv) {
 	}
 
 	int e = void;
-	with (CLIOperatingMode)
+	with (CLIOpMode)
 	final switch (opt.mode) {
 	case debug_:
 		with (DebuggerMode)

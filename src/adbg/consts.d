@@ -195,16 +195,28 @@ version (DigitalMars) {
 	version (D_InlineAsm_X86) {
 		version = DMD_ASM_X86;
 		version = DMD_ASM_X86_ANY;
-	}
+	} else
 	version (D_InlineAsm_X86_64) {
 		version = DMD_ASM_X86_64;
 		version = DMD_ASM_X86_ANY;
 	}
-} else version (GNU_Inline) {
+} else
+version (LDC) {
+	version (D_InlineAsm_X86) {
+		version = LDC_ASM_X86;
+		version = LDC_ASM_X86_ANY;
+	} else
+	version (D_InlineAsm_X86_64) {
+		version = LDC_ASM_X86_64;
+		version = LDC_ASM_X86_ANY;
+	}
+}
+version (GNU_Inline) {
 	version (X86) {
 		version = GDC_ASM_X86;
 		version = GDC_ASM_X86_ANY;
-	} else version (X86_64) {
+	} else
+	version (X86_64) {
 		version = GDC_ASM_X86_64;
 		version = GDC_ASM_X86_ANY;
 	}

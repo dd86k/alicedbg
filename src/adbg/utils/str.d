@@ -114,6 +114,23 @@ const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 	return cast(char*)b;
 }
 
+const(char)* adbg_util_strflat(const(char) **p) {
+	if (p == null)
+		return null;
+
+
+
+	return null;
+}
+const(char)** adbg_util_strext(const(char) *str) {
+	if (str == null)
+		return null;
+
+
+
+	return null;
+}
+
 /**
  * Append a constant string to an existing buffer.
  * Params:

@@ -7,13 +7,12 @@ module adbg.os.err;
 
 version (Windows) {
 	import core.sys.windows.windows;
-	/// Error code format
-	enum F_ERR = "0x%08X";
+	import core.stdc.string : strerror;
+	enum ERR_FMT = "0x%08X"; /// Error code format
 } else {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
-	/// Error code format
-	enum F_ERR = "%d";
+	enum ERR_FMT = "%d"; /// Error code format
 }
 
 /// Get error message from the OS (or CRT) by providing the error code
@@ -31,7 +30,7 @@ const(char) *adbg_err_osmsg(int code) {
 			cast(char*)buffer,
 			512,
 			null);
-		return len ? cast(char*)buffer : "(err)";
+		return len ? cast(char*)buffer : "Unknown error";
 	} else {
 		return strerror(code);
 	}
@@ -52,5 +51,5 @@ int adbg_err_oscode() {
 /// 	code = Error code
 void adbg_err_osprint(const(char) *mod, int code) {
 	import core.stdc.stdio : printf;
-	printf("%s: ("~F_ERR~") %s\n", mod, code, adbg_err_osmsg(code));
+	printf("%s: ("~ERR_FMT~") %s\n", mod, code, adbg_err_osmsg(code));
 }

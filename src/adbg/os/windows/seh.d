@@ -6,82 +6,74 @@
 module adbg.os.windows.seh;
 
 version (Windows):
-__gshared:
 
-import core.stdc.stdio : printf, puts;
-//import os.setjmp;
-import adbg.debugger.exception : exception_t;
+import adbg.debugger.exception;
 import adbg.os.windows.def;
+import adbg.os.setjmp;
 
-/// 
-/// 
-/// 
+//TODO: adbg_seh_set (Windows)
+
+struct checkpoint_t {
+	jmp_buf buffer;
+	int value;
+	exception_t exception;
+}
+
 extern (C)
-public int adbg_seh_init(void function(exception_t*) f) {
-	if (SetUnhandledExceptionFilter(cast(void*)&adbg_seh_action) == null)
-		return 1;
-	adbg_seh_ehandler = f;
-	return 0;
+public checkpoint_t* adbg_seh_set() {
+	import core.stdc.string : memcpy;
+	if (sehinit == false) {
+		if (SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX, null) == 0)
+			return null; // 1
+		if (SetUnhandledExceptionFilter(cast(void*)&adbg_seh_handle) == null)
+			return null; // 2
+		sehinit = true;
+	}
+//	mcheckpoint.value = setjmp(mcheckpoint.buffer);
+	return &mcheckpoint;
 }
 
 private:
 
-extern (C)
-void function(exception_t*) adbg_seh_ehandler;
+__gshared checkpoint_t mcheckpoint;
+__gshared bool sehinit;
 
 alias void* LPTOP_LEVEL_EXCEPTION_FILTER;
 alias _CONTEXT* PCONTEXT;
 alias _EXCEPTION_RECORD* PEXCEPTION_RECORD;
 
-extern (Windows) LPTOP_LEVEL_EXCEPTION_FILTER
-	SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER);
+enum SEM_FAILCRITICALERRORS	= 0x0001;
+enum SEM_NOGPFAULTERRORBOX	= 0x0002;
+enum SEM_NOOPENFILEERRORBOX	= 0x8000;
+
+extern (Windows) {
+	LPTOP_LEVEL_EXCEPTION_FILTER SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER);
+	BOOL SetThreadErrorMode(DWORD, LPDWORD);
+	PVOID AddVectoredExceptionHandler(ULONG, PVECTORED_EXCEPTION_HANDLER);
+}
 
 extern (Windows)
-uint adbg_seh_action(_EXCEPTION_POINTERS *e) {
-	version (X86)
-	printf(
-	"\n"~
-	"*************\n" ~
-	"* EXCEPTION *\n" ~
-	"*************\n" ~
-	"Code: %08X  Address: %08X\n" ~
-	"EIP=%08X  EFLAG=%08X\n" ~
-	"EAX=%08X  EBX=%08X  ECX=%08X  EDX=%08X\n" ~
-	"EDI=%08X  ESI=%08X  EBP=%08X  ESP=%08X\n" ~
-	"CS=%04X  DS=%04X  ES=%04X  FS=%04X  GS=%04X  SS=%04X\n",
-	e.ExceptionRecord.ExceptionCode, e.ExceptionRecord.ExceptionAddress,
-	e.ContextRecord.Eip, e.ContextRecord.EFlags,
-	e.ContextRecord.Eax, e.ContextRecord.Ebx,
-	e.ContextRecord.Ecx, e.ContextRecord.Edx,
-	e.ContextRecord.Edi, e.ContextRecord.Esi,
-	e.ContextRecord.Ebp, e.ContextRecord.Esp,
-	e.ContextRecord.SegCs, e.ContextRecord.SegDs, e.ContextRecord.SegEs,
-	e.ContextRecord.SegFs, e.ContextRecord.SegGs, e.ContextRecord.SegSs
-	);
-	else
-	version (X86_64)
-	printf(
-	"\n"~
-	"*************\n" ~
-	"* EXCEPTION *\n" ~
-	"*************\n" ~
-	"Code: %08X  Address: %llX\n" ~
-	"RIP=%016llX  EFLAG=%08X\n" ~
-	"RAX=%016llX  RBX=%016llX  RCX=%016llX  RDX=%016llX\n" ~
-	"RDI=%016llX  RSI=%016llX  RBP=%016llX  RSP=%016llX\n" ~
-	" R8=%016llX   R9=%016llX  R10=%016llX  R11=%016llX\n" ~
-	"R12=%016llX  R13=%016llX  R14=%016llX  R15=%016llX\n" ~
-	"CS=%04X  DS=%04X  ES=%04X  FS=%04X  GS=%04X  SS=%04X\n",
-	e.ExceptionRecord.ExceptionCode, e.ExceptionRecord.ExceptionAddress,
-	e.ContextRecord.Rip, e.ContextRecord.EFlags,
-	e.ContextRecord.Rax, e.ContextRecord.Rbx, e.ContextRecord.Rcx, e.ContextRecord.Rdx,
-	e.ContextRecord.Rdi, e.ContextRecord.Rsi, e.ContextRecord.Rbp, e.ContextRecord.Rsp,
-	e.ContextRecord.R8,  e.ContextRecord.R9,  e.ContextRecord.R10, e.ContextRecord.R11,
-	e.ContextRecord.R12, e.ContextRecord.R13, e.ContextRecord.R14, e.ContextRecord.R15,
-	e.ContextRecord.SegCs, e.ContextRecord.SegDs, e.ContextRecord.SegEs,
-	e.ContextRecord.SegFs, e.ContextRecord.SegGs, e.ContextRecord.SegSs
-	);
-
+uint adbg_seh_handle(_EXCEPTION_POINTERS *e) {
+	import core.stdc.stdio : puts;
+	import core.sys.windows.winbase :
+		EXCEPTION_IN_PAGE_ERROR, EXCEPTION_ACCESS_VIOLATION;
+	mcheckpoint.exception.oscode = e.ExceptionRecord.ExceptionCode;
+	mcheckpoint.exception.addr = e.ExceptionRecord.ExceptionAddress;
+	mcheckpoint.exception.pid = mcheckpoint.exception.tid = 0;
+	switch (mcheckpoint.exception.oscode) {
+	case EXCEPTION_IN_PAGE_ERROR:
+	case EXCEPTION_ACCESS_VIOLATION:
+		mcheckpoint.exception.type = adbg_ex_oscode(
+			e.ExceptionRecord.ExceptionCode,
+			cast(uint)e.ExceptionRecord.ExceptionInformation[0]);
+		break;
+	default:
+		mcheckpoint.exception.type = adbg_ex_oscode(
+			e.ExceptionRecord.ExceptionCode);
+	}
+	adbg_ex_ctx_init(&mcheckpoint.exception, InitPlatform.Native);
+	adbg_ex_ctx(&mcheckpoint.exception, cast(CONTEXT*)e.ContextRecord);
+//	longjmp(mcheckpoint.buffer, 1);
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -139,7 +131,7 @@ version (X86) {
 	}
 } else
 version (X86_64) {
-	struct _XSAVE_FORMAT { align(16):
+	align(16) struct _XSAVE_FORMAT {
 		WORD  ControlWord;
 		WORD  StatusWord;
 		BYTE  TagWord;
@@ -154,17 +146,11 @@ version (X86_64) {
 		DWORD MxCsr;
 		DWORD MxCsr_Mask;
 		M128A [8]FloatRegisters;
-
-		version (Win64) {
-			M128A [16]XmmRegisters;
-			BYTE  [96]Reserved4;
-		} else {
-			M128A [8]XmmRegisters;
-			BYTE  [224]Reserved4;
-		}
+		M128A [16]XmmRegisters;
+		BYTE  [96]Reserved4;
 	}
 	/// Win64 _CONTEXT
-	struct _CONTEXT { // DECLSPEC_ALIGN(16) is a lie
+	align(16) struct _CONTEXT {
 		//
 		// Register parameter home addresses.
 		//
@@ -203,9 +189,7 @@ version (X86_64) {
 			struct {
 				M128A [2]Header;
 				M128A [8]Legacy;
-				M128A Xmm0, Xmm1, Xmm2, Xmm3, Xmm4, Xmm5, Xmm6,
-					Xmm7, Xmm8, Xmm9, Xmm10, Xmm11, Xmm12,
-					Xmm13, Xmm14, Xmm15;
+				M128A [16]Xmm; // Originally called Xmm0 to Xmm15
 			}
 		}
 		//
