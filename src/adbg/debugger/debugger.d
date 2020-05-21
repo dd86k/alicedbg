@@ -83,20 +83,33 @@ int function(exception_t*) user_function;
  * (Posix) Uses stat(2), fork(2), ptrace(2) (PTRACE_TRACEME), and execve(2).
  * Params:
  * 	path = Command, path to executable
- * 	argv = Argument vector, null-terminated
- * 	envp = Environment vector, null-terminated
+ * 	argv = Argument vector, null-terminated, can be null
+ * 	envp = Environment vector, null-terminated, can be null
  * 	flags = Reserved
  * Returns: Zero on success; Otherwise os error code is returned
  */
 int adbg_load(const(char) *path, const(char) **argv, const(char) **envp, int flags) {
 	if (path == null) return 1;
+
 	version (Windows) {
+		import core.stdc.stdlib : malloc, free;
+		import core.stdc.stdio : snprintf;
+		import adbg.utils.str : adbg_util_argv_flatten;
+		int bs = 0x8000; // buffer size, 32,768 bytes
+		ptrdiff_t bi;
+		char *b = cast(char*)malloc(bs);
 		//
-		// Parse argv
+		// Copy path into buffer
 		//
-		
+		bi = snprintf(b, bs, "%s ", path);
+		if (bi < 0) return 1;
 		//
-		// Parse envp
+		// Flatten argv
+		//
+		if (argv)
+			bi += adbg_util_argv_flatten(b + bi, bs, argv);
+		//
+		//TODO: Parse envp
 		//
 		
 		//
@@ -108,7 +121,7 @@ int adbg_load(const(char) *path, const(char) **argv, const(char) **envp, int fla
 		si.cb = STARTUPINFOA.sizeof;
 		// Not using DEBUG_ONLY_THIS_PROCESS because our posix
 		// counterpart is using -1 (all children) for waitpid.
-		if (CreateProcessA(path, null,
+		if (CreateProcessA(null, b,
 			null, null,
 			FALSE, DEBUG_PROCESS,
 			null, null, &si, &pi) == 0)
@@ -124,26 +137,40 @@ int adbg_load(const(char) *path, const(char) **argv, const(char) **envp, int fla
 			if (IsWow64Process(hprocess, &processWOW64))
 				return GetLastError();
 		}
+		free(b);
 	} else
 	version (Posix) {
-		version (linux) {} else { // For systems that don't check for NULL
-			__gshared const(char) **n = [ null ];
-			if (argv == null) argv = n;
-			if (envp == null) envp = n;
-		}
 		// Verify if file exists and we has access to it
 		stat_t st = void;
 		if (stat(path, &st) == -1)
 			return errno;
-		//TODO: Check executable bit?
-		// Proceed normally
+		// Proceed normally, execve performs executable checks
 		hprocess = fork();
-		if (hprocess == -1)
+		if (hprocess < 0)
 			return errno;
 		if (hprocess == 0) {
 			if (ptrace(PTRACE_TRACEME, 0, null, null))
 				return errno;
-			if (execve(path, argv, envp) == -1)
+			const(char)*[16] __argv = void;
+			const(char)*[1]  __envp = void;
+			// Adjust argv
+			if (argv) {
+				size_t i, __i = 1;
+				while (argv[i] && __i < 15)
+					__argv[__i++] = argv[i++];
+				__argv[__i] = null;
+			} else {
+				__argv[1] = null;
+			}
+			__argv[0] = path;
+			// Adjust envp
+			if (envp == null) {
+				envp = cast(const(char)**)&__envp;
+				envp[0] = null;
+			}
+			if (execve(path,
+				cast(const(char)**)__argv,
+				cast(const(char)**)__envp) == -1)
 				return errno;
 		}
 	}

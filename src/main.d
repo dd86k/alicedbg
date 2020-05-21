@@ -8,8 +8,8 @@
  */
 module main;
 
-import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
-import core.stdc.string : strcmp;
+import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
+import core.stdc.string : strcmp, strncpy;
 import core.stdc.stdio;
 import adbg.consts;
 import adbg.ui.loop : adbg_ui_loop_enter;
@@ -59,14 +59,8 @@ struct cliopt_t {
 		ushort pid;
 		const(char) *file;
 	}
-	union {
-		const(char) *file_args;
-		const(char) **argv;
-	}
-	union {
-		const(char) *file_env;
-		const(char) **envp;
-	}
+	const(char) **argv;
+	const(char) **envp;
 	int flags;	/// Flags
 }
 
@@ -84,7 +78,7 @@ struct cliopt {
 int cliver() {
 	import d = std.compiler;
 	printf(
-	"alicedbg-"~__PLATFORM__~" "~PROJECT_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
+	"alicedbg-"~__PLATFORM__~" "~APP_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
 	"License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
 	"Home: <https://git.dd86k.space/dd86k/alicedbg>\n"~
 	"Mirror: <https://github.com/dd86k/alicedbg>\n"~
@@ -202,48 +196,47 @@ int main(int argc, const(char) **argv) {
 
 	cliopt_t opt;	/// Defaults to .init
 	disasm_params_t disopt;	/// .init
+	bool clidis;	/// cli parsing is disabled and fits arguments in argv
 
 	// CLI
 	cli: for (size_t argi = 1; argi < argc; ++argi) {
-		const(char) *arg = argv[argi] + 1;
-
 		if (*argv[argi] != '-') { // default arguments
 			if (opt.file == null) {
 				opt.debugtype = DebuggerMode.file;
 				opt.file = argv[argi];
-				continue;
 			} 
-		}
-
-		// choose operating mode
-		//TODO: Consider removing, it's redundant
-		if (strcmp(arg, "mode") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: path argument missing");
-				return EXIT_FAILURE;
-			}
-			const(char) *mode = argv[++argi];
-			if (strcmp(mode, "dump") == 0)
-				opt.mode = CLIOpMode.dump;
-			else if (strcmp(mode, "profile") == 0)
-				opt.mode = CLIOpMode.profile;
-			else if (strcmp(mode, "debug") == 0)
-				opt.mode = CLIOpMode.debug_;
-			else {
-				printf("unknown mode: %s\n", mode);
-				return EXIT_FAILURE;
-			}
 			continue;
 		}
 
-		// Switches the operation to "dump"
-		if (strcmp(arg, "dump") == 0) {
+		const(char) *arg = argv[argi] + 1;
+
+		// (debugger) --/--args: disable CLI parsing for argv
+		if (strcmp(arg, "-") == 0 || strcmp(arg, "-args") == 0) {
+			if (argi + 1 >= argc) {
+				puts("cli: file argument missing");
+				return EXIT_FAILURE;
+			}
+			opt.argv = cast(const(char)**)malloc(CLI_ARGV_ARRAY_LENGTH);
+			if (opt.argv == null) {
+				puts("cli: could not allocate");
+				return EXIT_FAILURE;
+			}
+			++argi;
+			size_t i;
+			while (argi < argc && i < (CLI_ARGV_ARRAY_SIZE - 1))
+				opt.argv[i++] = argv[argi++];
+			opt.argv[i] = null;
+			break;
+		}
+
+		// (dumper) -D/--dump: Switches the operation to "dump"
+		if (strcmp(arg, "D") == 0 || strcmp(arg, "-dump") == 0) {
 			opt.mode = CLIOpMode.dump;
 			continue;
 		}
 
-		// debugger: path for debuggee
-		if (strcmp(arg, "exe") == 0) {
+		// (debugger) -f/--file: path for debuggee
+		if (strcmp(arg, "f") == 0 || strcmp(arg, "-file") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: file argument missing");
 				return EXIT_FAILURE;
@@ -253,23 +246,8 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		// debugger: debuggee arguments
-		if (strcmp(arg, "args") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: args argument missing");
-				return EXIT_FAILURE;
-			}
-		}
-		/*if (strcmp(arg, "env") == 0) {
-			
-		}
-		// Starting directory for file
-		if (strcmp(arg, "dir") == 0) {
-			
-		}*/
-
-		// debugger: select pid
-		if (strcmp(arg, "pid") == 0) {
+		// (debugger) -p/--pid: select pid
+		if (strcmp(arg, "p") == 0 || strcmp(arg, "-pid") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: pid argument missing");
 				return EXIT_FAILURE;
@@ -280,8 +258,8 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		// debugger: ui
-		if (strcmp(arg, "ui") == 0) {
+		// (debugger) -u/--ui: select UI
+		if (strcmp(arg, "u") == 0 || strcmp(arg, "-ui") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: ui argument missing");
 				return EXIT_FAILURE;
@@ -300,8 +278,8 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		// debugger: machine architecture, affects disassembly
-		if (strcmp(arg, "march") == 0) {
+		// (debugger) -m/--march: machine architecture, affects disassembly
+		if (strcmp(arg, "m") == 0 || strcmp(arg, "-march") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: architecture argument missing");
 				return EXIT_FAILURE;
@@ -340,8 +318,8 @@ int main(int argc, const(char) **argv) {
 			return EXIT_FAILURE;
 		}
 
-		// disassembler: select syntax
-		if (strcmp(arg, "syntax") == 0) {
+		// (disassembler) -s/--syntax: select syntax
+		if (strcmp(arg, "s") == 0 || strcmp(arg, "-syntax") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: syntax argument missing");
 				return EXIT_FAILURE;
@@ -365,25 +343,19 @@ int main(int argc, const(char) **argv) {
 			return EXIT_FAILURE;
 		}
 
-		// Choose demangle settings for symbols
-		/*if (strcmp(arg, "demangle") == 0) {
+		// (debugger) -d/--demangle: demangle symbols
+		/*if (strcmp(arg, "d") == 0 || strcmp(arg, "-demangle") == 0) {
 			
 		}*/
 
-		// Choose debugging backend, currently unsupported and only
-		// embedded option is available
-		/*if (strcmp(arg, "backend") == 0) {
-			
-		}*/
-
-		// dumper: file is raw
-		if (strcmp(arg, "raw") == 0) {
+		// (dumper) --raw: file is raw
+		if (strcmp(arg, "-raw") == 0) {
 			opt.flags |= DUMPER_FILE_RAW;
 			continue;
 		}
 
-		// dumper: show fields
-		if (strcmp(arg, "show") == 0) {
+		// (dumper) -S/--show: show fields
+		if (strcmp(arg, "S") == 0 || strcmp(arg, "-show") == 0) {
 			if (argi + 1 >= argc) {
 				puts("cli: show argument missing");
 				return EXIT_FAILURE;
@@ -412,14 +384,14 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		if (strcmp(arg, "version") == 0 || strcmp(arg, "-version") == 0)
+		if (strcmp(arg, "-version") == 0)
 			return cliver;
 		if (strcmp(arg, "h") == 0 || strcmp(arg, "-help") == 0)
 			return clipage(CLIPage.main);
 		if (strcmp(arg, "-license") == 0)
 			return clipage(CLIPage.license);
 
-		printf("cli: unknown option: %s\n", arg);
+		printf("unknown option: %s\n", arg);
 		return EXIT_FAILURE;
 	}
 
@@ -429,7 +401,7 @@ int main(int argc, const(char) **argv) {
 	case debug_:
 		with (DebuggerMode)
 		switch (opt.debugtype) {
-		case file: e = adbg_load(opt.file, null, null, 0); break;
+		case file: e = adbg_load(opt.file, opt.argv, null, 0); break;
 		case pid: e = adbg_attach(opt.pid, 0); break;
 		default:
 			puts("cli: No file nor pid were specified.");

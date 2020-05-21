@@ -114,21 +114,49 @@ const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 	return cast(char*)b;
 }
 
-const(char)* adbg_util_strflat(const(char) **p) {
-	if (p == null)
-		return null;
+size_t adbg_util_argv_flatten(char *b, int bs, const(char) **argv) {
+	import core.stdc.stdio : snprintf;
+	if (argv == null)
+		return 0;
 
+	ptrdiff_t ai, bi, t;
+	while (argv[ai]) {
+		t = snprintf(b + bi, bs, "%s ", argv[ai]);
+		if (t < 0)
+			return 0;
+		bi += t;
+		++ai;
+	}
 
-
-	return null;
+	return bi;
 }
-const(char)** adbg_util_strext(const(char) *str) {
-	if (str == null)
-		return null;
+int adbg_util_argv_set(char *b, int m, const(char) **argv) {
+	if (argv == null)
+		return 1;
 
+	bool q;	// Within quotation mark, ignore spacing
+	size_t i;	// argv index
+	char c = *b;
+	if (c) argv[i++] = b;
+	while ((c = *b) != 0) {
+		switch (c) {
+		case ' ':
+			if (q == false) {
+				*b = 0;
+				argv[i++] = b + 1;
+			}
+			break;
+		case '"':
+			q = !q;
+			break;
+		default:
+		}
+		++b;
+	}
 
+	argv[i] = null;
 
-	return null;
+	return 0;
 }
 
 /**

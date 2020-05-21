@@ -11,6 +11,12 @@ extern (C):
 // ANCHOR Settings
 //
 
+/// Amount of pointers to allocate
+enum CLI_ARGV_ARRAY_SIZE	= 16;
+/// Length of array for argv parsing
+enum CLI_ARGV_ARRAY_LENGTH	= CLI_ARGV_ARRAY_SIZE * size_t.sizeof;
+/// 
+enum CLI_ARGV_BUFFER_LENGTH	= 0x8000;
 /// The maximum amount of breakpoints that the debugger can have.
 enum DEBUGGER_MAX_BREAKPOINTS = 4;
 
@@ -18,8 +24,8 @@ enum DEBUGGER_MAX_BREAKPOINTS = 4;
 // Constants
 //
 
-/// Project version
-enum PROJECT_VERSION = "0.0.0";
+/// Application version
+enum APP_VERSION = "0.0.0";
 
 debug enum __BUILDTYPE__ = "debug";	/// Build type
 else  enum __BUILDTYPE__ = "release";	/// Build type
@@ -227,7 +233,7 @@ version (GNU_Inline) {
 //
 
 const(char) *adbg_info_version() {
-	return PROJECT_VERSION ~ "-" ~ __BUILDTYPE__;
+	return APP_VERSION ~ "-" ~ __BUILDTYPE__ ~ "-" ~ __PLATFORM__;
 }
 const(char) *adbg_info_platform() {
 	return __PLATFORM__;
