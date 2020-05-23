@@ -3,4 +3,4 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.ui.interpreter;
+module adbg.ui.command;
