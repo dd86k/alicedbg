@@ -375,19 +375,15 @@ L_CONTINUE:
 		} else {
 			ubyte modrm = *p.addru8;
 			++p.addrv;
-			const(char) *seg = void;
-			switch (modrm & MODRM_REG) {
-			case MODRM_REG_000: seg = "es"; break;
-			case MODRM_REG_001: seg = "cs"; break;
-			case MODRM_REG_010: seg = "ss"; break;
-			case MODRM_REG_011: seg = "ds"; break;
-			case MODRM_REG_100: seg = "fs"; break;
-			case MODRM_REG_101: seg = "gs"; break;
-			default: adbg_dasm_err(p); return;
+			int sr = (modrm >> 3) & 7;
+			if (sr > 5) {
+				adbg_dasm_err(p);
+				return;
 			}
 			if (p.mode >= DisasmMode.File) {
 				adbg_dasm_push_x8(p, modrm);
 				adbg_dasm_push_str(p, "mov");
+				const(char) *seg = x86_segs[sr];
 				const(char) *reg = adbg_dasm_x86_modrm_reg(p, modrm, X86_WIDTH_16B);
 				if (p.x86.op & X86_FLAG_DIR) {
 					adbg_dasm_push_reg(p, seg);
@@ -4336,6 +4332,9 @@ void adbg_dasm_x86_xop_10(disasm_params_t *p) {
 // ANCHOR: Shared instruction tables
 //
 
+__gshared const(char) *[]x86_segs = [
+	"es", "cs", "ss", "ds", "fs", "gs"
+];
 __gshared const(char) *[]x86_00h = [
 	"add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"
 ];
@@ -4424,15 +4423,15 @@ enum : ubyte {
 	SIB_SCALE_11 = MODRM_MOD_11,	/// SCALE 11, *8
 	SIB_SCALE    = SIB_SCALE_11,	/// Scale filter
 
-	SIB_INDEX_000 = MODRM_REG_000,	/// INDEX 000, EAX
-	SIB_INDEX_001 = MODRM_REG_001,	/// INDEX 001, ECX
-	SIB_INDEX_010 = MODRM_REG_010,	/// INDEX 010, EDX
-	SIB_INDEX_011 = MODRM_REG_011,	/// INDEX 011, EBX
-	SIB_INDEX_100 = MODRM_REG_100,	/// INDEX 100, (special override)
-	SIB_INDEX_101 = MODRM_REG_101,	/// INDEX 101, EBP
-	SIB_INDEX_110 = MODRM_REG_110,	/// INDEX 110, ESI
-	SIB_INDEX_111 = MODRM_REG_111,	/// INDEX 111, EDI
-	SIB_INDEX     = MODRM_REG,	/// Index filter
+	SIB_INDEX_000 = MODRM_REG_000 >> 3,	/// INDEX 000, EAX
+	SIB_INDEX_001 = MODRM_REG_001 >> 3,	/// INDEX 001, ECX
+	SIB_INDEX_010 = MODRM_REG_010 >> 3,	/// INDEX 010, EDX
+	SIB_INDEX_011 = MODRM_REG_011 >> 3,	/// INDEX 011, EBX
+	SIB_INDEX_100 = MODRM_REG_100 >> 3,	/// INDEX 100, (special override)
+	SIB_INDEX_101 = MODRM_REG_101 >> 3,	/// INDEX 101, EBP
+	SIB_INDEX_110 = MODRM_REG_110 >> 3,	/// INDEX 110, ESI
+	SIB_INDEX_111 = MODRM_REG_111 >> 3,	/// INDEX 111, EDI
+	SIB_INDEX     = MODRM_REG >> 3,	/// Index filter
 
 	SIB_BASE_000 = MODRM_RM_000,	/// BASE 000, EAX
 	SIB_BASE_001 = MODRM_RM_001,	/// BASE 001, ECX
@@ -4660,58 +4659,27 @@ enum x86SegReg { // By official arrangement
 /// Params: segreg = Byte opcode
 /// Returns: Segment register string
 const(char) *adbg_dasm_x86_segstr(int segreg) {
-	__gshared const(char) *[]segs = [
-		"", "es:", "cs:", "ss:", "ds:", "fs:", "gs:"
-	];
-	return segs[segreg]; // Structure gets initated to SegReg.None anyway
+	return segreg == x86SegReg.None ? "" : x86_segs[segreg];
 }
 
 /// While it is the formatter's job to format registers, the long legacy of
 /// the syntax wars lead to this
 const(char) *adbg_dasm_x87_ststr(disasm_params_t *p, int index) {
-	const(char) *st = void;
+	__gshared const(char) *[]att = [
+		"%st", "%st(1)", "%st(2)", "%st(3)", "%st(4)", "%st(5)", "%st(6)", "%st(7)"
+	];
+	__gshared const(char) *[]intel = [
+		"st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
+	];
+	__gshared const(char) *[]nasm = [
+		"st0", "st1", "st2", "st3", "st4", "st5", "st6", "st7"
+	];
 	with (DisasmSyntax)
-	final switch (p.syntax) {
-	case Att:
-		switch (index) {
-		case 0: st = "%st"; break;
-		case 1: st = "%st(1)"; break;
-		case 2: st = "%st(2)"; break;
-		case 3: st = "%st(3)"; break;
-		case 4: st = "%st(4)"; break;
-		case 5: st = "%st(5)"; break;
-		case 6: st = "%st(6)"; break;
-		case 7: st = "%st(7)"; break;
-		default: st = "%st(?)";
-		}
-		break;
-	case Nasm:
-		switch (index) {
-		case 0: st = "st0"; break;
-		case 1: st = "st1"; break;
-		case 2: st = "st2"; break;
-		case 3: st = "st3"; break;
-		case 4: st = "st4"; break;
-		case 5: st = "st5"; break;
-		case 6: st = "st6"; break;
-		case 7: st = "st7"; break;
-		default: st = "st?";
-		}
-		break;
-	case Intel, Default:
-		switch (index) {
-		case 0: st = "st"; break;
-		case 1: st = "st(1)"; break;
-		case 2: st = "st(2)"; break;
-		case 3: st = "st(3)"; break;
-		case 4: st = "st(4)"; break;
-		case 5: st = "st(5)"; break;
-		case 6: st = "st(6)"; break;
-		case 7: st = "st(7)"; break;
-		default: st = "st(?)";
-		}
+	switch (p.syntax) {
+	case Att:	return att[index];
+	case Nasm:	return nasm[index];
+	default:	return intel[index];
 	}
-	return st;
 }
 
 /// (Internal) Process a ModR/M byte automatically.
@@ -4918,7 +4886,7 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 	ubyte sib = *p.addru8;
 	++p.addrv;
 	int scale = 1 << (sib >> 6); // 2 ^ (0b11_000_000 >> 6)
-	int index = sib & SIB_INDEX;
+	int index = (sib & SIB_INDEX) >> 3;
 	int base  = sib & SIB_BASE;
 
 	const(char)* rbase = void, rindex = void, seg = void;
@@ -4938,7 +4906,7 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 						seg, *p.addru32, wmem);
 				else
 					adbg_dasm_push_x86_sib_m00_b101(p, seg,
-						adbg_dasm_x86_modrm_rm_reg(sib, false),
+						adbg_dasm_x86_modrm_rm_reg(base, false),
 						scale, *p.addru32, wmem);
 			}
 			p.addrv += 4;
@@ -4949,7 +4917,7 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 				adbg_dasm_push_x86_sib_m00_i100(p, seg, rbase, wmem);
 			else
 				adbg_dasm_push_x86_sib_mod00(p, seg, rbase,
-					adbg_dasm_x86_modrm_rm_reg(sib, false),
+					adbg_dasm_x86_modrm_rm_reg(base, false),
 					scale, wmem);
 		}
 		return;
@@ -4965,8 +4933,8 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 		} else { // BASE8 + INDEX * SCALE + DISP8
 			if (p.mode >= DisasmMode.File) {
 				adbg_dasm_push_x8(p, *p.addru8);
-				rbase = adbg_dasm_x86_modrm_rm_reg(sib, false);
-				rindex = adbg_dasm_x86_modrm_rm_reg(sib >> 3, false);
+				rbase = adbg_dasm_x86_modrm_rm_reg(base, false);
+				rindex = adbg_dasm_x86_modrm_rm_reg(index, false);
 				adbg_dasm_push_x86_sib_m01(p,
 					seg, rbase, rindex, scale, *p.addru8, wmem);
 			}
@@ -4976,12 +4944,12 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 	default: // MOD=11, last case
 		if (p.mode >= DisasmMode.File) {
 			adbg_dasm_push_x32(p, *p.addru32);
-			rbase = adbg_dasm_x86_modrm_rm_reg(sib, false);
+			rbase = adbg_dasm_x86_modrm_rm_reg(base, false);
 			if (index == SIB_INDEX_100) { // BASE32 + DISP32
 				adbg_dasm_push_x86_sib_m01_i100(p,
 				seg, rbase, *p.addru32, wmem);
 			} else { // BASE32 + INDEX * SCALE + DISP32
-				rindex = adbg_dasm_x86_modrm_rm_reg(sib >> 3, false);
+				rindex = adbg_dasm_x86_modrm_rm_reg(index, false);
 				adbg_dasm_push_x86_sib_m01(p,
 					seg, rbase, rindex, scale, *p.addru32, wmem);
 			}
@@ -5070,16 +5038,15 @@ L_3RM:
 		if (dir) return;
 L_3REG:
 		if (p.mode >= DisasmMode.File) {
-			const(char)* r1 = void, r2 = void;
+			const(char)* r1 = adbg_dasm_x86_modrm_reg(p, modrm, wreg);
+			const(char)* r2 = adbg_dasm_x86_modrm_reg(p, p.x86_64.vex_vvvv, sw);
 			if (dir) {
-				r1 = adbg_dasm_x86_modrm_reg(p, modrm, wreg);
-				r2 = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
+				adbg_dasm_push_reg(p, r1);
+				adbg_dasm_push_reg(p, r2);
 			} else {
-				r1 = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
-				r2 = adbg_dasm_x86_modrm_reg(p, modrm, wreg);
+				adbg_dasm_push_reg(p, r2);
+				adbg_dasm_push_reg(p, r1);
 			}
-			adbg_dasm_push_reg(p, r1);
-			adbg_dasm_push_reg(p, r2);
 		}
 		if (dir) goto L_3RM;
 		return;

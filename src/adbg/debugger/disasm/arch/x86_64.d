@@ -382,21 +382,17 @@ L_CONTINUE:
 		} else {
 			ubyte modrm = *p.addru8;
 			++p.addrv;
-			const(char) *seg = void;
-			switch (modrm & MODRM_REG) {
-			case MODRM_REG_000: seg = "es"; break;
-			case MODRM_REG_001: seg = "cs"; break;
-			case MODRM_REG_010: seg = "ss"; break;
-			case MODRM_REG_011: seg = "ds"; break;
-			case MODRM_REG_100: seg = "fs"; break;
-			case MODRM_REG_101: seg = "gs"; break;
-			default: adbg_dasm_err(p); return;
+			int sr = (modrm >> 3) & 7;
+			if (sr > 5) {
+				adbg_dasm_err(p);
+				return;
 			}
 			if (p.mode >= DisasmMode.File) {
 				adbg_dasm_push_x8(p, modrm);
 				adbg_dasm_push_str(p, "mov");
-				const(char) *reg = adbg_dasm_x86_64_modrm_reg(p, modrm, X86_WIDTH_16B);
-				if (p.x86_64.op & X86_FLAG_DIR) {
+				const(char) *seg = x86_segs[sr];
+				const(char) *reg = adbg_dasm_x86_modrm_reg(p, modrm, X86_WIDTH_16B);
+				if (p.x86.op & X86_FLAG_DIR) {
 					adbg_dasm_push_reg(p, seg);
 					adbg_dasm_push_reg(p, reg);
 				} else {
@@ -4636,7 +4632,7 @@ void adbg_dasm_x86_64_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 	ubyte sib = *p.addru8;
 	++p.addrv;
 	int scale = 1 << (sib >> 6); // 2 ^ (0b11_000_000 >> 6)
-	int index = sib & SIB_INDEX;
+	int index = (sib & SIB_INDEX) >> 3;
 	int base  = sib & SIB_BASE;
 
 	const(char)* rbase = void, rindex = void, seg = void;
@@ -4656,13 +4652,13 @@ void adbg_dasm_x86_64_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 						seg, *p.addru32, wmem);
 				else
 					adbg_dasm_push_x86_sib_m00_b101(p, seg,
-						adbg_dasm_x86_64_modrm_rm_reg(p, sib),
+						adbg_dasm_x86_64_modrm_rm_reg(p, base),
 						scale, *p.addru32, wmem);
 			}
 			p.addrv += 4;
 		} else { // BASE32 + INDEX * SCALE
 			if (p.mode < DisasmMode.File) return;
-			rbase = adbg_dasm_x86_64_modrm_rm_reg(p, sib);
+			rbase = adbg_dasm_x86_64_modrm_rm_reg(p, base);
 			if (index == SIB_INDEX_100)
 				adbg_dasm_push_x86_sib_m00_i100(p, seg, rbase, wmem);
 			else
@@ -4683,8 +4679,8 @@ void adbg_dasm_x86_64_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 		} else { // BASE8 + INDEX * SCALE + DISP8
 			if (p.mode >= DisasmMode.File) {
 				adbg_dasm_push_x8(p, *p.addru8);
-				rbase = adbg_dasm_x86_64_modrm_rm_reg(p, sib);
-				rindex = adbg_dasm_x86_64_modrm_rm_reg(p, sib >> 3);
+				rbase = adbg_dasm_x86_64_modrm_rm_reg(p, base);
+				rindex = adbg_dasm_x86_64_modrm_rm_reg(p, index);
 				adbg_dasm_push_x86_sib_m01(p,
 					seg, rbase, rindex, scale, *p.addru8, wmem);
 			}
@@ -4694,12 +4690,12 @@ void adbg_dasm_x86_64_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 	default: // MOD=11, last case
 		if (p.mode >= DisasmMode.File) {
 			adbg_dasm_push_x32(p, *p.addru32);
-			rbase = adbg_dasm_x86_64_modrm_rm_reg(p, sib);
+			rbase = adbg_dasm_x86_64_modrm_rm_reg(p, base);
 			if (index == SIB_INDEX_100) { // BASE32 + DISP32
 				adbg_dasm_push_x86_sib_m01_i100(p,
 				seg, rbase, *p.addru32, wmem);
 			} else { // BASE32 + INDEX * SCALE + DISP32
-				rindex = adbg_dasm_x86_64_modrm_rm_reg(p, sib >> 3);
+				rindex = adbg_dasm_x86_64_modrm_rm_reg(p, index);
 				adbg_dasm_push_x86_sib_m01(p,
 					seg, rbase, rindex, scale, *p.addru32, wmem);
 			}
@@ -4767,16 +4763,15 @@ L_3RM:
 		if (dir) return;
 L_3REG:
 		if (p.mode >= DisasmMode.File) {
-			const(char)* r1 = void, r2 = void;
+			const(char)* r1 = adbg_dasm_x86_64_modrm_reg(p, modrm, wreg);
+			const(char)* r2 = adbg_dasm_x86_64_modrm_reg(p, p.x86_64.vex_vvvv, sw);
 			if (dir) {
-				r1 = adbg_dasm_x86_64_modrm_reg(p, modrm, wreg);
-				r2 = adbg_dasm_x86_64_modrm_reg(p, p.x86_64.vex_vvvv, sw);
+				adbg_dasm_push_reg(p, r1);
+				adbg_dasm_push_reg(p, r2);
 			} else {
-				r1 = adbg_dasm_x86_64_modrm_reg(p, p.x86_64.vex_vvvv, sw);
-				r2 = adbg_dasm_x86_64_modrm_reg(p, modrm, wreg);
+				adbg_dasm_push_reg(p, r2);
+				adbg_dasm_push_reg(p, r1);
 			}
-			adbg_dasm_push_reg(p, r1);
-			adbg_dasm_push_reg(p, r2);
 		}
 		if (dir) goto L_3RM;
 		return;
