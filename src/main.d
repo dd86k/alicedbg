@@ -9,7 +9,7 @@
 module main;
 
 import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
-import core.stdc.string : strcmp, strncpy;
+import core.stdc.string : strcmp, strncpy, strtok;
 import core.stdc.stdio;
 import adbg.consts;
 import adbg.ui.loop : adbg_ui_loop_enter;
@@ -59,6 +59,7 @@ struct cliopt_t {
 		ushort pid;
 		const(char) *file;
 	}
+	const(char) *dir;
 	const(char) **argv;
 	const(char) **envp;
 	int flags;	/// Flags
@@ -105,15 +106,14 @@ int clipage(CLIPage h) {
 		"  alicedbg {-h|--help|--version|--license}\n"~
 		"\n"~
 		"OPTIONS\n"~
-		"  -mode    Manually select an operating mode (see -mode ?)\n"~
-		"  -march   Select ISA for disassembler (see -march ?)\n"~
-		"  -syntax  Select disassembler style (see -syntax ?)\n"~
-		"  -exec    debugger: Load executable file\n"~
-		"  -pid     debugger: Attach to process id\n"~
-		"  -ui      debugger: Choose user interface (default=loop, see -ui ?)\n"~
-		"  -dump    dumper: Selects dump mode\n"~
-		"  -raw     dumper: Disassemble as a raw file\n"~
-		"  -show    dumper: Select parts to show (default=h, see -show ?)\n";
+		"  -m, --march ..... Select ISA for disassembler (see -march ?)\n"~
+		"  -s, --syntax .... Select disassembler style (see -syntax ?)\n"~
+		"  -f, --file ...... debugger: Load executable file\n"~
+		"  -p, --pid ....... debugger: Attach to process id\n"~
+		"  -u, --ui ........ debugger: Select user interface (default=loop, see -ui ?)\n"~
+		"  -D, -dump ....... dumper: Selects dump mode\n"~
+		"  --raw ........... dumper: Disassemble as a raw file\n"~
+		"  -S, --show ...... dumper: Select parts to show (default=h, see -show ?)\n";
 		break;
 	case ui:
 		r = "Available debug UIs (default=loop)\n"~
@@ -154,8 +154,7 @@ int clipage(CLIPage h) {
 		;
 		break;
 	case license:
-		r =
-`BSD 3-Clause License
+		r = `BSD 3-Clause License
 
 Copyright (c) 2019-2020, dd86k <dd@dax.moe>
 All rights reserved.
@@ -196,42 +195,52 @@ int main(int argc, const(char) **argv) {
 
 	cliopt_t opt;	/// Defaults to .init
 	disasm_params_t disopt;	/// .init
-	bool clidis;	/// cli parsing is disabled and fits arguments in argv
 
-	// CLI
 	cli: for (size_t argi = 1; argi < argc; ++argi) {
-		if (*argv[argi] != '-') { // default arguments
-			if (opt.file == null) {
-				opt.debugtype = DebuggerMode.file;
-				opt.file = argv[argi];
-			} 
-			continue;
-		}
-
 		const(char) *arg = argv[argi] + 1;
+
+		//
+		// Debugger switches
+		//
 
 		// (debugger) --/--args: disable CLI parsing for argv
 		if (strcmp(arg, "-") == 0 || strcmp(arg, "-args") == 0) {
 			if (argi + 1 >= argc) {
-				puts("cli: file argument missing");
+				puts("cli: args missing");
 				return EXIT_FAILURE;
 			}
 			opt.argv = cast(const(char)**)malloc(CLI_ARGV_ARRAY_LENGTH);
 			if (opt.argv == null) {
-				puts("cli: could not allocate");
+				puts("cli: could not allocate (args)");
 				return EXIT_FAILURE;
 			}
 			++argi;
 			size_t i;
-			while (argi < argc && i < (CLI_ARGV_ARRAY_SIZE - 1))
+			while (argi < argc && i < CLI_ARGV_ARRAY_SIZE - 1)
 				opt.argv[i++] = argv[argi++];
 			opt.argv[i] = null;
 			break;
 		}
 
-		// (dumper) -D/--dump: Switches the operation to "dump"
-		if (strcmp(arg, "D") == 0 || strcmp(arg, "-dump") == 0) {
-			opt.mode = CLIOpMode.dump;
+		// (debugger) -E/--env: environment string
+		if (strcmp(arg, "E") == 0 || strcmp(arg, "-env") == 0) {
+			if (argi + 1 >= argc) {
+				puts("cli: env argument missing");
+				return EXIT_FAILURE;
+			}
+			opt.envp = cast(const(char)**)malloc(CLI_ARGV_ARRAY_LENGTH);
+			if (opt.envp == null) {
+				puts("cli: could not allocate (envp)");
+				return EXIT_FAILURE;
+			}
+			++argi;
+			opt.envp[0] = strtok(cast(char*)argv[argi], ",");
+			size_t ti;
+			while (++ti < CLI_ARGV_ARRAY_LENGTH - 1) {
+				char* t = strtok(null, ",");
+				opt.envp[ti] = t;
+				if (t == null) break;
+			}
 			continue;
 		}
 
@@ -318,6 +327,61 @@ int main(int argc, const(char) **argv) {
 			return EXIT_FAILURE;
 		}
 
+		// (debugger) -d/--demangle: demangle symbols
+		/*if (strcmp(arg, "d") == 0 || strcmp(arg, "-demangle") == 0) {
+			
+		}*/
+
+		//
+		// Dumper switches
+		//
+
+		// (dumper) -D/--dump: Switches the operation to "dump"
+		if (strcmp(arg, "D") == 0 || strcmp(arg, "-dump") == 0) {
+			opt.mode = CLIOpMode.dump;
+			continue;
+		}
+
+		// (dumper) --raw: file is raw
+		if (strcmp(arg, "-raw") == 0) {
+			opt.flags |= DUMPER_FILE_RAW;
+			continue;
+		}
+
+		// (dumper) -S/--show: show fields
+		if (strcmp(arg, "S") == 0 || strcmp(arg, "-show") == 0) {
+			if (argi + 1 >= argc) {
+				puts("cli: show argument missing");
+				return EXIT_FAILURE;
+			}
+			const(char)* cf = argv[++argi];
+			while (*cf) {
+				char c = *cf;
+				switch (c) {
+				case 'h': opt.flags |= DUMPER_SHOW_HEADER; break;
+				case 's': opt.flags |= DUMPER_SHOW_SECTIONS; break;
+				case 'i': opt.flags |= DUMPER_SHOW_IMPORTS; break;
+				case 'c': opt.flags |= DUMPER_SHOW_LOADCFG; break;
+//				case 'e': opt.flags |= DUMPER_SHOW_EXPORTS; break;
+//				case '': opt.flags |= DUMPER_SHOW_; break;
+				case 'd': opt.flags |= DUMPER_DISASM_CODE; break;
+				case 'D': opt.flags |= DUMPER_DISASM_ALL; break;
+				case 'S': opt.flags |= DUMPER_DISASM_STATS; break;
+				case 'A': opt.flags |= DUMPER_SHOW_EVERYTHING; break;
+				case '?': return clipage(CLIPage.show);
+				default:
+					printf("cli: unknown show flag: %c\n", c);
+					return EXIT_FAILURE;
+				}
+				++cf;
+			}
+			continue;
+		}
+
+		//
+		// Disassembler switches
+		//
+
 		// (disassembler) -s/--syntax: select syntax
 		if (strcmp(arg, "s") == 0 || strcmp(arg, "-syntax") == 0) {
 			if (argi + 1 >= argc) {
@@ -343,44 +407,11 @@ int main(int argc, const(char) **argv) {
 			return EXIT_FAILURE;
 		}
 
-		// (debugger) -d/--demangle: demangle symbols
-		/*if (strcmp(arg, "d") == 0 || strcmp(arg, "-demangle") == 0) {
-			
-		}*/
-
-		// (dumper) --raw: file is raw
-		if (strcmp(arg, "-raw") == 0) {
-			opt.flags |= DUMPER_FILE_RAW;
-			continue;
-		}
-
-		// (dumper) -S/--show: show fields
-		if (strcmp(arg, "S") == 0 || strcmp(arg, "-show") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: show argument missing");
-				return EXIT_FAILURE;
-			}
-			const(char)* cf = argv[++argi];
-			while (*cf) {
-				char c = *cf;
-				switch (c) {
-				case 'A': opt.flags |= DUMPER_SHOW_EVERYTHING; break;
-				case 'h': opt.flags |= DUMPER_SHOW_HEADER; break;
-				case 's': opt.flags |= DUMPER_SHOW_SECTIONS; break;
-				case 'i': opt.flags |= DUMPER_SHOW_IMPORTS; break;
-				case 'c': opt.flags |= DUMPER_SHOW_LOADCFG; break;
-//				case 'e': opt.flags |= DUMPER_SHOW_EXPORTS; break;
-//				case '': opt.flags |= DUMPER_SHOW_; break;
-				case 'd': opt.flags |= DUMPER_DISASM_CODE; break;
-				case 'D': opt.flags |= DUMPER_DISASM_ALL; break;
-				case 'S': opt.flags |= DUMPER_DISASM_STATS; break;
-				case '?': return clipage(CLIPage.show);
-				default:
-					printf("cli: unknown show flag: %c\n", c);
-					return EXIT_FAILURE;
-				}
-				++cf;
-			}
+		if (*argv[argi] != '-') { // default arguments
+			if (opt.file == null) {
+				opt.debugtype = DebuggerMode.file;
+				opt.file = argv[argi];
+			} 
 			continue;
 		}
 
@@ -401,7 +432,7 @@ int main(int argc, const(char) **argv) {
 	case debug_:
 		with (DebuggerMode)
 		switch (opt.debugtype) {
-		case file: e = adbg_load(opt.file, opt.argv, null, 0); break;
+		case file: e = adbg_load(opt.file, null, opt.argv, null, 0); break;
 		case pid: e = adbg_attach(opt.pid, 0); break;
 		default:
 			puts("cli: No file nor pid were specified.");

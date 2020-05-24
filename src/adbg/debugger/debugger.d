@@ -1,9 +1,11 @@
 /**
  * Debugger core
  *
+ * This is the core of the debugger API. It provides APIs to start a new
+ * process, attach itself onto a process, manage breakpoints, etc.
+ *
  * This is the only module that contains function names without its module
- * name. This includes creating processes, attaching to a PID, running the
- * debugger loop, managing breakpoints, etc.
+ * name.
  *
  * License: BSD 3-Clause
  */
@@ -74,21 +76,23 @@ private __gshared
 int function(exception_t*) user_function;
 
 /**
- * Load executable image into the debugger, with optional null-terminated
- * argument list and null-terminated environment. While path must not be null,
- * argv and envp parameters can be null.
+ * Load executable image into the debugger.
+ *
+ * Loads an executable into the debugger, with optional null-terminated
+ * argument list and null-terminated environment.
  * This does not start the process, nor the debugger.
  * On Posix systems, stat(2) is used to check if the file exists.
  * (Windows) Uses CreateProcessA (DEBUG_PROCESS).
  * (Posix) Uses stat(2), fork(2), ptrace(2) (PTRACE_TRACEME), and execve(2).
  * Params:
  * 	path = Command, path to executable
+ * 	dir = New directory for the debuggee, null for current directory
  * 	argv = Argument vector, null-terminated, can be null
  * 	envp = Environment vector, null-terminated, can be null
  * 	flags = Reserved
  * Returns: Zero on success; Otherwise os error code is returned
  */
-int adbg_load(const(char) *path, const(char) **argv, const(char) **envp, int flags) {
+int adbg_load(const(char) *path, const(char) *dir, const(char) **argv, const(char) **envp, int flags) {
 	if (path == null) return 1;
 
 	version (Windows) {
@@ -124,7 +128,8 @@ int adbg_load(const(char) *path, const(char) **argv, const(char) **envp, int fla
 		if (CreateProcessA(null, b,
 			null, null,
 			FALSE, DEBUG_PROCESS,
-			null, null, &si, &pi) == 0)
+			envp, null,
+			&si, &pi) == 0)
 			return GetLastError();
 		hthread = pi.hThread;
 		hprocess = pi.hProcess;
@@ -181,7 +186,9 @@ int adbg_load(const(char) *path, const(char) **argv, const(char) **envp, int fla
  * Attach the debugger to a process ID.
  * (Windows) Uses DebugActiveProcess
  * (Posix) Uses ptrace(PTRACE_SEIZE)
- * Params: pid = Process ID
+ * Params:
+ * 	pid = Process ID
+ * 	flags = Reserved
  * Returns: Non-zero on error: (Posix) errno or (Windows) GetLastError
  */
 int adbg_attach(int pid, int flags) {
@@ -206,8 +213,8 @@ void adbg_userfunc(int function(exception_t*) f) {
 }
 
 /**
- * Enter debugging loop. Continues execution of the process until a new debug
- * event occurs. When an exception occurs, the exception_t structure is
+ * Enter the debugging loop. Continues execution of the process until a new
+ * debug event occurs. When an exception occurs, the exception_t structure is
  * populated with debugging information.
  * (Windows) Uses WaitForDebugEvent, filters any but EXCEPTION_DEBUG_EVENT
  * (Posix) Uses ptrace(2) and waitpid(2), filters SIGCONT
@@ -383,25 +390,25 @@ int adbg_bp_rm_index(int index) {
 
 enum {	// adbg_mm flags
 	// Basic types
-	MM_U8	= 0x0,
-	MM_U16	= 0x1,
-	MM_U32	= 0x2,
-	MM_U64	= 0x3,
-	MM_U128	= 0x4,
-	MM_U256	= 0x5,
-	MM_U512	= 0x6,
-	MM_U1K	= 0x7,
-	MM_U2K	= 0x8,
-	MM_U4K	= 0x9,
-	MM_U8K	= 0xA,
-	MM_U16K	= 0xB,
-	MM_U32K	= 0xC,
-	MM_U64K	= 0xD,
-	MM_U128K	= 0xE,
-	MM_U256K	= 0xF,
+	MM_1B	= 0x0,	/// Move 1 byte (8 bits)
+	MM_2B	= 0x1,	/// Move 2 bytes (16 bits)
+	MM_4B	= 0x2,	/// Move 4 bytes (32 bits)
+	MM_8B	= 0x3,	/// Move 8 bytes (64 bits)
+	MM_16B	= 0x4,	/// Move 16 bytes (128 bits)
+	MM_32B	= 0x5,	/// Move 32 bytes (256 bits)
+	MM_64B	= 0x6,	/// Move 64 bytes (512 bits)
+	MM_128B	= 0x7,	/// Move 128 bytes (1024 bits)
+	MM_256B	= 0x8,	/// Move 256 bytes (2048 bits)
+	MM_512B	= 0x9,	/// Move 512 bytes (4096 bits)
+	MM_1KB	= 0xA,	/// Move 1 KiB bytes (8192 bits)
+	MM_2KB	= 0xB,	/// Move 2 KiB bytes
+	MM_4KB	= 0xC,	/// Move 4 KiB bytes
+	MM_8KB	= 0xD,	/// Move 8 KiB bytes
+	MM_16KB	= 0xE,	/// Move 16 KiB bytes
+	MM_32KB	= 0xF,	/// Move 32 KiB bytes
 	// Flags
-	MM_READ	= 0,
-	MM_WRITE	= 0x0100,
+	MM_READ	= 0,	/// Read from memory to data pointer
+	MM_WRITE	= 0x0100,	/// Write to memory from data pointer
 }
 
 /**
@@ -411,17 +418,18 @@ enum {	// adbg_mm flags
  * 	addr = Memory address location
  * 	flags = See MM_ enumerations
  * 	data = Data pointer
- * Returns: Zero on success, negative on error
+ * Returns: Zero on success, oscode on error
  */
 int adbg_mm(size_t addr, int flags, void *data) {
 	size_t size = 1 << (flags & 15);
 
 	version (Windows) {
 		if (flags & MM_WRITE) {
-			
+			if (WriteProcessMemory(hprocess, cast(void*)addr, data, size, null) == 0)
+				return GetLastError();
 		} else {
 			if (ReadProcessMemory(hprocess, cast(void*)addr, data, size, null) == 0)
-				return -1;
+				return GetLastError();
 		}
 	} else
 	version (linux) {

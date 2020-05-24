@@ -4845,7 +4845,9 @@ void adbg_dasm_x86_u32imm(disasm_params_t *p) {
 /// (Internal) Fetch variable 16+16/32-bit as immediate, affected by address
 /// prefix. Handles machine code and mnemonics, including the segment register.
 /// Modifies memory pointer.
-/// Params: p = disassembler structure
+/// Params:
+/// 	p = disassembler structure
+/// 	seg = Segment register string
 void adbg_dasm_x86_segimm(disasm_params_t *p, const(char) *seg) {
 	if (p.x86.pf_address) { // 16-bit
 		if (p.mode >= DisasmMode.File) {
@@ -5013,7 +5015,7 @@ L_REG:
 /// (66H) when the width is X86_FLAG_MODW_32B.
 /// Params:
 /// 	p = Disassembler parameters
-/// 	modrm = ModR/M byte
+/// 	reg = Register selector
 /// 	width = Register width (byte, wide, mm, xmm, etc.)
 /// Returns: Register string or null if out of bound
 const(char) *adbg_dasm_x86_modrm_reg(disasm_params_t *p, int reg, int width) {
@@ -5044,8 +5046,8 @@ const(char) *adbg_dasm_x86_modrm_reg(disasm_params_t *p, int reg, int width) {
 /// (Internal) Retrieve a register name from a ModR/M byte (RM field) and
 /// conditionally returns the 16-bit addressing 
 /// Params:
-/// 	p = Disassembler parameters
-/// 	modrm = ModR/M byte
+/// 	rm = Disassembler parameters
+/// 	addrpf = If the address prefix is applied
 /// Returns: Register string
 const(char) *adbg_dasm_x86_modrm_rm_reg(int rm, int addrpf) {
 	// This is asking for trouble, hopefully more checks will be added later

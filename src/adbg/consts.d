@@ -15,8 +15,6 @@ extern (C):
 enum CLI_ARGV_ARRAY_SIZE	= 16;
 /// Length of array for argv parsing
 enum CLI_ARGV_ARRAY_LENGTH	= CLI_ARGV_ARRAY_SIZE * size_t.sizeof;
-/// 
-enum CLI_ARGV_BUFFER_LENGTH	= 0x8000;
 /// The maximum amount of breakpoints that the debugger can have.
 enum DEBUGGER_MAX_BREAKPOINTS = 4;
 
