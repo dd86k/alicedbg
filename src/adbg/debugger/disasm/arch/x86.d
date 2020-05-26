@@ -522,11 +522,12 @@ L_CONTINUE:
 		}
 		return;
 	case 0xB0, 0xB4, 0xB8, 0xBC: // B0H-B7H
-		int w = p.x86.op > 0xB7;
+		int w = p.x86.op & 0b00_001_000;
 		if (p.mode >= DisasmMode.File) {
 			adbg_dasm_push_str(p, "mov");
 			w = w ? X86_WIDTH_32B : X86_WIDTH_8B;
-			adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.op, w));
+			adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.op,
+				w ? X86_WIDTH_32B : X86_WIDTH_8B));
 		}
 		if (w)
 			adbg_dasm_x86_u32imm(p);
