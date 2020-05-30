@@ -25,7 +25,7 @@ private import core.stdc.config : c_long;
 
 extern (C):
 
-version (Windows) {
+version (Windows) { // 14.15
 	version (X86) {
 		enum _JBLEN = 16;
 		alias int _JBTYPE;
@@ -85,7 +85,7 @@ version (Windows) {
 	// typedef _JBTYPE jmp_buf[_JBLEN];
 	public alias _JBTYPE[_JBLEN] jmp_buf;
 } else
-version (CRuntime_Glibc) {
+version (CRuntime_Glibc) { // 2.25
 	version (X86) {
 		struct __jmp_buf {
 			uint ebx, esi, edi, ebp, esp, eip;
@@ -134,11 +134,26 @@ version (CRuntime_Glibc) {
 	} else
 	static assert(0, "Missing setjmp definitions (Glibc)");
 } else
-version (CRuntime_Musl) {
+version (CRuntime_Musl) { // 1.20
+	import core.stdc.config : c_long;
+	version (X86) {
+		alias c_long[6] __jmp_buf;
+	} else
+	version (X86_64) {
+		alias c_long[8] __jmp_buf;
+	} else
+	version (ARM) {
+		alias ulong[32] __jmp_buf;
+	} else
+	version (AArch64) {
+		alias c_long[22] __jmp_buf;
+	} else
+	static assert(0, "Missing setjmp definitions (Musl)");
+
 	struct __jmp_buf_tag {
 		__jmp_buf __jb;
 		ulong __fl;
-		ulong[128/long.sizeof] __ss;
+		ulong[128 / c_long.sizeof] __ss;
 	}
 	alias __jmp_buf_tag jmp_buf;
 } else
