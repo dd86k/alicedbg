@@ -135,7 +135,6 @@ version (CRuntime_Glibc) { // 2.25
 	static assert(0, "Missing setjmp definitions (Glibc)");
 } else
 version (CRuntime_Musl) { // 1.20
-	import core.stdc.config : c_long;
 	version (X86) {
 		alias c_long[6] __jmp_buf;
 	} else
