@@ -25,9 +25,6 @@ private import core.stdc.config : c_long;
 
 extern (C):
 
-int setjmp(ref jmp_buf e);
-void longjmp(ref jmp_buf e, int s);
-
 version (Windows) {
 	version (X86) {
 		enum _JBLEN = 16;
@@ -137,7 +134,18 @@ version (CRuntime_Glibc) {
 	} else
 	static assert(0, "Missing setjmp definitions (Glibc)");
 } else
+version (CRuntime_Musl) {
+	struct __jmp_buf_tag {
+		__jmp_buf __jb;
+		ulong __fl;
+		ulong[128/long.sizeof] __ss;
+	}
+	alias __jmp_buf_tag jmp_buf;
+} else
 static assert(0, "Missing setjmp definitions");
+
+int setjmp(ref jmp_buf e);
+void longjmp(ref jmp_buf e, int s);
 
 unittest {
 	jmp_buf j = void;

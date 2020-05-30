@@ -31,6 +31,24 @@ version (Posix) {
 	private import core.sys.posix.termios;
 	private import core.sys.posix.signal;
 	private import core.sys.posix.ucontext;
+	version (CRuntime_Musl) {
+		alias uint tcflag_t;
+		alias uint speed_t;
+		alias char cc_t;
+		enum NCCS = 32;
+		enum ICANON = 2;
+		enum ECHO = 10;
+		struct termios {
+			tcflag_t c_iflag;
+			tcflag_t c_oflag;
+			tcflag_t c_cflag;
+			tcflag_t c_lflag;
+			cc_t c_line;
+			cc_t[NCCS] c_cc;
+			speed_t __c_ispeed;
+			speed_t __c_ospeed;
+		}
+	}
 	private enum TERM_ATTR = ~ICANON & ~ECHO;
 	private termios old_tio = void, new_tio = void;
 	private enum SIGWINCH = 28;
