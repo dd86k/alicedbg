@@ -88,7 +88,7 @@ L_READKEY:
 /// Params: e = Exception structure
 int adbg_ui_tui_handler(exception_t *e) {
 	adbg_term_clear;
-	g_disparams.addr = e.addr;
+	g_disparams.a = e.addr;
 	// locals
 	const uint h = tui_size.height / 2;
 	const uint ihmax = tui_size.height - 2;
@@ -96,13 +96,13 @@ int adbg_ui_tui_handler(exception_t *e) {
 	adbg_term_curpos(0, h);
 	if (adbg_dasm_line(&g_disparams, DisasmMode.File) == DisasmError.None)
 		adbg_term_writef("> %zX %-20s %s",
-			g_disparams.lastaddr, &g_disparams.mcbuf, &g_disparams.mnbuf);
+			g_disparams.la, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	// forward
 	for (uint hi = h + 1; hi < ihmax; ++hi) {
 		adbg_term_curpos(0, hi);
 		adbg_dasm_line(&g_disparams, DisasmMode.File);
 		adbg_term_writef("  %zX %-20s %s",
-			g_disparams.lastaddr, &g_disparams.mcbuf, &g_disparams.mnbuf);
+			g_disparams.la, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	}
 	// backward
 	//for (uint ih = h - 1; ih >= 0; ih) {

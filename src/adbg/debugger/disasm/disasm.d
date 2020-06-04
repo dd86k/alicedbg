@@ -80,19 +80,19 @@ version (AArch64) {
 // Option bits
 //
 
-/// Disasm option: Use space instead of a tab between the mnemonic and operands
+/// Disassembler: Use space instead of a tab between the mnemonic and operands
 enum DISASM_O_SPACE	= 0x0001;
-///TODO: Disasm option: Go backwards instead of forward. More expensive to calculate!
+///TODO: Disassembler: Go backwards instead of forward. More expensive to calculate!
 enum DISASM_O_BACKWARD	= 0x0002;
-/// Disasm option: 
-//enum DISASM_O_	= 0x0004;
-/// Disasm option: 
+///TODO: Disassembler: When calculating target addresses, use the internal counter
+//enum DISASM_O_BASEZERO	= 0x0004;
+/// Disassembler: 
 //enum DISASM_O_	= 0x0008;
-/// Disasm option: 
+/// Disassembler: 
 //enum DISASM_O_	= 0x0010;
-///TODO: Disasm option: Do not group machine code integers
+///TODO: Disassembler: Do not group machine code integers
 enum DISASM_O_MC_INT_SEP	= 0x0020;
-/// Disasm option: Do not add an extra space
+/// Disassembler: Do not add an extra space
 enum DISASM_O_MC_NOSPACE	= 0x0040;
 
 /// Disassembler parameters structure
@@ -101,36 +101,49 @@ struct disasm_params_t { align(1):
 		/// Memory address entry point. This value is modified to point
 		/// to the current instruction address for the disassembler.
 		/// Acts as instruction pointer/program counter.
-		void   *addr;
-		size_t addrv;	/// Non-pointer format for calculations
-		ubyte  *addru8; 	/// Used internally
-		ushort *addru16;	/// Used internally
-		uint   *addru32;	/// Used internally
-		ulong  *addru64;	/// Used internally
-		byte   *addri8; 	/// Used internally
-		short  *addri16;	/// Used internally
-		int    *addri32;	/// Used internally
-		long   *addri64;	/// Used internally
-		float  *addrf32;	/// Used internally
-		double *addrf64;	/// Used internally
+		void   *a;
+		size_t av;	/// Non-pointer format for calculations
+		ubyte  *ai8; 	/// Used internally
+		ushort *ai16;	/// Used internally
+		uint   *ai32;	/// Used internally
+		ulong  *ai64;	/// Used internally
+		float  *af32;	/// Used internally
+		double *af64;	/// Used internally
 	}
-	/// This field is populated by adbg_dasm_line before calling the decoder.
-	/// It serves the client for printing the address and the decoder
-	/// the basis for jump/call address calculations.
-	size_t lastaddr;
-	/// This field is populated by adbg_dasm_line when a CALL-like instruction
-	/// is decoded. Requires Data mode or higher.
-	size_t targetaddr;
-	/// Error code. See DisasmError enumeration for more details. Set by
-	/// adbg_dasm_line or the the decoder.
+	/// Last Address.
+	///
+	/// This field is populated with the entry address, making it useful
+	/// for printing purposes or calculating the address size.
+	size_t la;
+	/// Target Address.
+	///
+	/// This field is populated when the disassembler encounters an
+	/// instruction capable of changing the control flow (jump and call
+	/// instructions) and the disassembly mode is higher than File.
+	size_t ta;
+	/// Error code.
+	///
+	/// If this field is non-zero, it indicates a decoding error. See the
+	/// DisasmError enumeration for more details.
 	DisasmError error;
-	/// Platform to disasm. See the DisasmABI enum for more details.
+	/// Disassembling Platform.
+	///
+	/// Instruction set architecture to disassemble. See the DisasmISA
+	/// enumeration for more details.
 	DisasmISA isa;
-	/// Assembler syntax style. See DisasmSyntax enum for more details.
+	/// Assembler syntax.
+	///
+	/// Assembler style when formatting instructions. See the DisasmSyntax
+	/// enumeration for more details.
 	DisasmSyntax syntax;
 	/// Operation mode.
+	///
+	/// Disassembler operating mode. See the DisasmMode enumeration for
+	/// more details.
 	DisasmMode mode;
-	/// Settings flags. See DISASM_O_* flags.
+	/// Settings flags.
+	///
+	/// Bitwise flag. See DISASM_O_* flags.
 	uint options;
 	union {
 		void *internal;	/// Used internally
@@ -146,7 +159,7 @@ struct disasm_params_t { align(1):
 }
 
 /**
- * Disassemble instructions from a memory pointer given in disasm_params_t.
+ * Disassemble one instruction from a buffer pointer given in disasm_params_t.
  * Caller must ensure memory pointer points to readable regions and givens
  * bounds are respected. The error field is always set.
  *
@@ -163,7 +176,7 @@ struct disasm_params_t { align(1):
  * Returns: Error code; Non-zero indicating an error
  */
 int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
-	if (p.addr == null) {
+	if (p.a == null) {
 		adbg_dasm_err(p, DisasmError.NullAddress);
 		p.mcbuf[0] = 0;
 		return p.error;
@@ -173,7 +186,7 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 
 	p.mode = mode;
 	p.error = DisasmError.None;
-	p.lastaddr = p.addrv;
+	p.la = p.av;
 
 	if (modefile) {
 		disasm_fmt_t fmt = void;

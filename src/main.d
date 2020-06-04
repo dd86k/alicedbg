@@ -102,7 +102,7 @@ int clipage(CLIPage h) {
 	case main:
 		r = "Aiming to be a simple debugger, dumper, and profiler\n"~
 		"Usage:\n"~
-		"  alicedbg {-pid ID|-exec FILE|-dump FILE} [OPTIONS...]\n"~
+		"  alicedbg {--pid ID|--file FILE|--dump FILE} [OPTIONS...]\n"~
 		"  alicedbg {-h|--help|--version|--license}\n"~
 		"\n"~
 		"OPTIONS\n"~
@@ -111,7 +111,7 @@ int clipage(CLIPage h) {
 		"  -f, --file ...... debugger: Load executable file\n"~
 		"  -p, --pid ....... debugger: Attach to process id\n"~
 		"  -u, --ui ........ debugger: Select user interface (default=loop, see -ui ?)\n"~
-		"  -D, -dump ....... dumper: Selects dump mode\n"~
+		"  -D, --dump ...... dumper: Selects dump mode\n"~
 		"  --raw ........... dumper: Disassemble as a raw file\n"~
 		"  -S, --show ...... dumper: Select parts to show (default=h, see -show ?)\n";
 		break;
@@ -305,11 +305,13 @@ int main(int argc, const(char) **argv) {
 //				{ "arm", DisasmISA.arm_a32 },
 //				{ "a32", DisasmISA.arm_a32 },
 //				{ "aarch64", DisasmISA.arm_a64 },
-//				{ "a64", DisasmISA.arm_a64 },
-//				{ "riscv32", DisasmISA.rv32 },
+//				{ "arm64", DisasmISA.arm_a64 },
 //				{ "rv32", DisasmISA.rv32 },
-//				{ "riscv64", DisasmISA.rv64 },
+//				{ "riscv32", DisasmISA.rv32 },
+//				{ "risc:rv32", DisasmISA.rv32 },
 //				{ "rv64", DisasmISA.rv64 },
+//				{ "riscv64", DisasmISA.rv64 },
+//				{ "risc:rv64", DisasmISA.rv64 },
 //				{ "guess", DisasmISA.Guess },
 //				{ "default", DisasmISA.Default },
 				{ "?", 255 },

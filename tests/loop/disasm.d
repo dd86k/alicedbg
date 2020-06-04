@@ -59,7 +59,7 @@ L_BUF:
 	printf("%u/%4u:", cast(uint)stage, cast(uint)counter);
 	for (size_t i; i < BUFSIZE * 4; ++i)
 		printf("%02X", bp[i]);
-	p.addr = &b;
+	p.a = &b;
 	adbg_dasm_line(&p, DisasmMode.File);
 	printf(" %s\n",  &p.mnbuf);
 //	putchar('\n');

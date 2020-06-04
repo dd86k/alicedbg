@@ -33,8 +33,8 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 	p.rv32 = &i;
 
 	// RISC-V fetches by "halfword" (16-bit)
-	i.op1 = *p.addru16;
-	++p.addru16;
+	i.op1 = *p.ai16;
+	++p.ai16;
 
 	//
 	// RISC-V Compressed Extension
@@ -86,9 +86,8 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 			if (rd) { // C.ADDI
 				int imm = (i.op1 >> 2) & 31;
 				if (i.op1 & BIT!(12)) imm = -imm;
-				const(char) *m = rd == 2 ? "c.addi16sp" : "c.addi";
 				const(char) *rdstr = rv32_abi_reg(rd);
-				adbg_dasm_push_str(p, m);
+				adbg_dasm_push_str(p, rd == 2 ? "c.addi16sp" : "c.addi");
 				adbg_dasm_push_reg(p, rdstr);
 				adbg_dasm_push_reg(p, rdstr);
 				adbg_dasm_push_imm(p, imm);
@@ -97,14 +96,25 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 			}
 			return;
 		case OP_RVC_FUNC_001: // C.JAL
+			// bits taken from objdump 2.28 (include/opcode/riscv.h)
+			pragma(inline, true)
+			int RV_X(int x, int s, int n) {
+				return (x >> s) & ((1 << n) - 1);
+			}
+			pragma(inline, true)
+			int EXTRACT_RVC_J_IMM(int x) {
+				return (RV_X(x, 3, 3) << 1) |
+					(RV_X(x, 11, 1) << 4) |
+					(RV_X(x, 2, 1) << 5) |
+					(RV_X(x, 7, 1) << 6) |
+					(RV_X(x, 6, 1) << 7) |
+					(RV_X(x, 9, 2) << 8) |
+					(RV_X(x, 8, 1) << 10) |
+					(-RV_X(x, 12, 1) << 11);
+			}
 			if (p.mode < DisasmMode.File)
 				return;
-			int imm = i.op1; // imm[11|4|9:8|10|6|7|3:1|5]
-			//TODO: Understand C.J operand format type
-//			imm >>= 2; // *2
-//			imm -= 2; // instruction size
-			if (i.op1 & BIT!(12))
-				imm = -imm;
+			int imm = EXTRACT_RVC_J_IMM(i.op1);
 			adbg_dasm_push_str(p, "c.jal");
 			adbg_dasm_push_imm(p, imm);
 			return;
@@ -172,8 +182,8 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 	// RISC-V 32-bit
 	//
 
-	i.op2 = *p.addru16;
-	++p.addru16;
+	i.op2 = *p.ai16;
+	++p.ai16;
 	if (p.mode >= DisasmMode.File)
 		adbg_dasm_push_x32(p, i.op);
 	switch (i.op & OP_MASK) {
