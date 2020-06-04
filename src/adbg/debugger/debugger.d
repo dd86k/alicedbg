@@ -34,7 +34,8 @@ version (Posix) {
 	import core.sys.posix.sys.wait :
 		waitpid, SIGCONT, WUNTRACED;
 	import core.sys.posix.unistd : fork, execve;
-	import core.sys.posix.signal : kill, SIGKILL;
+	import core.sys.posix.signal : kill, SIGKILL, siginfo_t, raise;
+	import core.sys.posix.sys.uio;
 	import core.stdc.stdlib : exit;
 	import adbg.debugger.sys.ptrace;
 	import adbg.debugger.sys.user;
@@ -154,8 +155,11 @@ int adbg_load(const(char) *path, const(char) *dir, const(char) **argv, const(cha
 		if (hprocess < 0)
 			return errno;
 		if (hprocess == 0) {
-			if (ptrace(PTRACE_TRACEME, 0, null, null))
+			if (ptrace(PTRACE_TRACEME, 0, 0, 0))
 				return errno;
+			version (CRuntime_Musl)
+				if (raise(SIGSTOP))
+					return errno;
 			const(char)*[16] __argv = void;
 			const(char)*[1]  __envp = void;
 			// Adjust argv
@@ -289,9 +293,9 @@ L_DEBUG_LOOP:
 			}
 			goto case;
 		case proceed:
-			if (ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE) == 0)
-				return GetLastError();
-			goto L_DEBUG_LOOP;
+			if (ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE))
+				goto L_DEBUG_LOOP;
+			return GetLastError();
 		}
 	} else
 	version (Posix) {
@@ -300,7 +304,7 @@ L_DEBUG_LOOP:
 		int pid = waitpid(-1, &wstatus, 0);
 
 		if (pid == -1)
-			return 3;
+			return errno;
 
 		// Bits  Description (Linux)
 		// 6:0   Signo that caused child to exit
@@ -314,8 +318,8 @@ L_DEBUG_LOOP:
 		// Only interested if child is continuing or stopped; Otherwise
 		// it exited and there's nothing more we can do about it.
 		// So return its status code
-		if ((wstatus & 0x7F) != 0x7F)
-			return chld_signo;
+//		if ((wstatus & 0x7F) != 0x7F)
+//			return chld_signo;
 
 		// Signal filtering
 		switch (chld_signo) {
@@ -333,12 +337,18 @@ L_DEBUG_LOOP:
 		//   - IP ALWAYS point to NEXT instruction
 		//   - First SIGTRAP does NOT contain int3
 		//     - Windows does, though, and points to it
-		// - gdbserver and lldb never attempts to do such a thing
+		// - gdbserver and lldb never attempt to do such thing anyway
 		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 			siginfo_t sig = void;
-			if (ptrace(PTRACE_GETSIGINFO, pid, null, &sig) == -1)
-				return 5;
-			e.addr = sig._sifields._sigfault.si_addr;
+			if (ptrace(PTRACE_GETSIGINFO, pid, null, &sig) < 0) {
+				e.addr = null;
+			} else {
+				version (CRuntime_Glibc)
+					e.addr = sig._sifields._sigfault.si_addr;
+				else version (CRuntime_Musl)
+					e.addr = sig.__si_fields.__sigfault.si_addr;
+				else static assert(0, "hack me");
+			}
 			break;
 //		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
 		default:
@@ -348,9 +358,14 @@ L_DEBUG_LOOP:
 		adbg_ex_dbg(&e, pid, chld_signo);
 
 		user_regs_struct u = void;
-		if (ptrace(PTRACE_GETREGS, pid, null, &u) == -1)
-			return 6;
-		adbg_ex_ctx(&e, &u);
+		if (ptrace(PTRACE_GETREGS, pid, null, &u) < 0)
+			e.regcount = 0;
+		else
+			adbg_ex_ctx(&e, &u);
+
+//		iovec v = void;
+//		if (ptrace(PTRACE_GETREGSET, pid, NT_PRSTATUS, &v))
+//			return errno;
 
 		with (DebuggerAction)
 		final switch (user_function(&e)) {

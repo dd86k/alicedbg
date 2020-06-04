@@ -27,14 +27,13 @@ version (Windows) {
 } else
 version (Posix) {
 	import adbg.debugger.sys.user;
-	import adbg.debugger.sys.ptrace : siginfo_t;
 	import core.sys.posix.signal;
 }
 
 extern (C):
 
 version (X86) {
-	enum EX_REG_COUNT = 10;	/// Number of registers 
+	enum EX_REG_COUNT = 10;	/// Number of registers available
 } else version (X86_64) {
 	enum EX_REG_COUNT = 18;	/// Number of registers available
 }

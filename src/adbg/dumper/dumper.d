@@ -130,7 +130,7 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 //       to their CRT equivalent, so this is hard-wired to stdout, since this
 //       is only for the dumping functionality.
 int adbg_dmpr_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
-	dp.addr = data;
+	dp.a = data;
 	if (flags & DUMPER_DISASM_STATS) {
 		uint iavg;	/// instruction average size
 		uint imax;	/// longest instruction size
@@ -138,7 +138,7 @@ int adbg_dmpr_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
 		uint ills;	/// Number of illegal instructions
 		for (uint i, isize = void; i < size; i += isize) {
 			DisasmError e = cast(DisasmError)adbg_dasm_line(dp, DisasmMode.Size);
-			isize = cast(uint)(dp.addrv - dp.lastaddr);
+			isize = cast(uint)(dp.av - dp.la);
 			with (DisasmError)
 			final switch (e) {
 			case None:
@@ -166,7 +166,7 @@ int adbg_dmpr_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
 		cast(float)iavg / icnt, imax, ills, icnt
 		);
 	} else {
-		for (uint i; i < size; i += dp.addrv - dp.lastaddr) {
+		for (uint i; i < size; i += dp.av - dp.la) {
 			DisasmError e = cast(DisasmError)adbg_dasm_line(dp, DisasmMode.File);
 			with (DisasmError)
 			switch (e) {

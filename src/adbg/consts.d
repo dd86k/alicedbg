@@ -173,11 +173,11 @@ version (COMPILER_TARGETINFO) {
 	enum __TARGET_FLOAT_ABI__  = "unknown";
 	version (CppRuntime_Gcc)
 		/// Target C++ Runtime string
-		enum __TARGET_CPP_RT__ = "gcc";
+		enum __TARGET_CPP_RT__ = "libstdc++";
 	else
 	version (CppRuntime_Microsoft)
 		/// Target C++ Runtime string
-		enum __TARGET_CPP_RT__ = "microsoft";
+		enum __TARGET_CPP_RT__ = "libcmt";
 	else
 		/// Target C++ Runtime string
 		enum __TARGET_CPP_RT__ = "none"; // assuming none

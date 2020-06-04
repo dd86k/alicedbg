@@ -35,9 +35,11 @@ version (Posix) {
 		alias uint tcflag_t;
 		alias uint speed_t;
 		alias char cc_t;
-		enum NCCS = 32;
-		enum ICANON = 2;
-		enum ECHO = 10;
+		enum TCSANOW	= 0;
+		enum NCCS	= 32;
+		enum ICANON	= 2;
+		enum ECHO	= 10;
+		enum TIOCGWINSZ	= 0x5413;
 		struct termios {
 			tcflag_t c_iflag;
 			tcflag_t c_oflag;
@@ -48,6 +50,15 @@ version (Posix) {
 			speed_t __c_ispeed;
 			speed_t __c_ospeed;
 		}
+		struct winsize {
+			ushort ws_row;
+			ushort ws_col;
+			ushort ws_xpixel;
+			ushort ws_ypixel;
+		}
+		int tcgetattr(int fd, termios *termios_p);
+		int tcsetattr(int fd, int a, termios *termios_p);
+		int ioctl(int fd, ulong request, ...);
 	}
 	private enum TERM_ATTR = ~ICANON & ~ECHO;
 	private termios old_tio = void, new_tio = void;
@@ -391,7 +402,7 @@ void adbg_term_read(InputInfo *ii) {
 
 		ii.type = InputType.Key;
 
-		tcsetattr(STDIN_FILENO,TCSANOW, &new_tio);
+		tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
 
 		uint c = getchar;
 
