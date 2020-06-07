@@ -3025,11 +3025,10 @@ void adbg_dasm_x86_0f38(disasm_params_t *p) {
 	switch (p.x86.op & 252) { // 1111_1100
 	case 0: // 00H-03H
 		const(char) *m = void;
-		if (p.x86.op & X86_FLAG_DIR) {
+		if (p.x86.op & X86_FLAG_DIR)
 			m = p.x86.op & X86_FLAG_WIDE ? "phaddsw" : "phaddd";
-		} else {
+		else
 			m = p.x86.op & X86_FLAG_WIDE ? "phaddw" : "pshufb";
-		}
 		int w = p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, m);
@@ -3037,11 +3036,10 @@ void adbg_dasm_x86_0f38(disasm_params_t *p) {
 		return;
 	case 0x04: // 04H-07H
 		const(char) *m = void;
-		if (p.x86.op & X86_FLAG_DIR) {
+		if (p.x86.op & X86_FLAG_DIR)
 			m = p.x86.op & X86_FLAG_WIDE ? "phsubsw" : "phsubd";
-		} else {
+		else
 			m = p.x86.op & X86_FLAG_WIDE ? "phsubw" : "pmaddubsw";
-		}
 		int w = p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, m);
@@ -3111,11 +3109,10 @@ void adbg_dasm_x86_0f38(disasm_params_t *p) {
 			return;
 		}
 		const(char) *m = void;
-		if (p.x86.op & X86_FLAG_DIR) {
+		if (p.x86.op & X86_FLAG_DIR)
 			m = p.x86.op & X86_FLAG_WIDE ? "pmovsxwd" : "pmovsxbq";
-		} else {
+		else
 			m = p.x86.op & X86_FLAG_WIDE ? "pmovsxbd" : "pmovsxbw";
-		}
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, m);
 		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
@@ -3228,22 +3225,20 @@ void adbg_dasm_x86_0f38(disasm_params_t *p) {
 			return;
 		}
 		const(char) *m = void;
-		if (p.x86.op & X86_FLAG_DIR) {
+		if (p.x86.op & X86_FLAG_DIR)
 			m = "invpcid";
-		} else {
+		else
 			m = p.x86.op & X86_FLAG_WIDE ? "invvpid" : "invept";
-		}
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "phminposuw" : "pmulld");
 		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		return;
 	case 0xC8: // C8H-CBH
 		const(char) *m = void;
-		if (p.x86.op & X86_FLAG_DIR) {
+		if (p.x86.op & X86_FLAG_DIR)
 			m = p.x86.op & X86_FLAG_WIDE ? "sha256rnds2" : "sha1msg2";
-		} else {
+		else
 			m = p.x86.op & X86_FLAG_WIDE ? "sha1msg1" : "sha1nexte";
-		}
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, m);
 		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
@@ -3273,11 +3268,10 @@ void adbg_dasm_x86_0f38(disasm_params_t *p) {
 			return;
 		}
 		const(char) *m = void;
-		if (p.x86.op & X86_FLAG_DIR) {
+		if (p.x86.op & X86_FLAG_DIR)
 			m = p.x86.op & X86_FLAG_WIDE ? "aesdeclast" : "aesdec";
-		} else {
+		else
 			m = p.x86.op & X86_FLAG_WIDE ? "aesenclast" : "aesenc";
-		}
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, m);
 		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
@@ -4203,7 +4197,6 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 			return;
 		}
 		const(char) *m = void;
-		int f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		if (p.x86.op & X86_FLAG_DIR) {
 			m = p.x86.op & X86_FLAG_WIDE ? "vpand" : "vpminub";
 		} else {
@@ -4211,7 +4204,7 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 		}
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xDC: // DCH-DFH
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
@@ -4219,15 +4212,13 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 			return;
 		}
 		const(char) *m = void;
-		int f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
-		if (p.x86.op & X86_FLAG_DIR) {
+		if (p.x86.op & X86_FLAG_DIR)
 			m = p.x86.op & X86_FLAG_WIDE ? "vpandn" : "vpmaxub";
-		} else {
+		else
 			m = p.x86.op & X86_FLAG_WIDE ? "vpaddusw" : "vpaddusb";
-		}
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xE0: // E0H-E3H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
@@ -4235,11 +4226,47 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 			return;
 		}
 		const(char) *m = void;
-		int f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
-		if (p.x86.op & X86_FLAG_DIR) {
+		if (p.x86.op & X86_FLAG_DIR)
 			m = p.x86.op & X86_FLAG_WIDE ? "vpavgw" : "vpsrad";
-		} else {
+		else
 			m = p.x86.op & X86_FLAG_WIDE ? "vpsraw" : "vpavgb";
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
+	case 0xE4: // E4H-E7H
+		const(char) *m = void;
+		int f = void;
+		if (p.x86.op & X86_FLAG_DIR)
+			if (p.x86.op & X86_FLAG_WIDE) {
+				if (p.x86.vex_pp != X86_VEX_PP_66H) {
+					adbg_dasm_err(p);
+					return;
+				}
+				m = "vmovntdq";
+				f = X86_FLAG_MODW_128B;
+			} else {
+				if ((*p.ai8 & MODRM_MOD) != MODRM_MOD_11) {
+					adbg_dasm_err(p);
+					return;
+				}
+				switch (p.x86.vex_pp) {
+				case X86_VEX_PP_66H: m = "vcvttpd2dq"; break;
+				case X86_VEX_PP_F3H: m = "vcvtdq2pd"; break;
+				case X86_VEX_PP_F2H: m = "vcvtpd2dq"; break;
+				default:
+					adbg_dasm_err(p);
+					return;
+				}
+				f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
+			}
+		else {
+			if (p.x86.vex_pp != X86_VEX_PP_66H) {
+				adbg_dasm_err(p);
+				return;
+			}
+			m = p.x86.op & X86_FLAG_WIDE ? "vpmulhw" : "vpmulhuw";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		}
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, m);
@@ -4467,8 +4494,8 @@ enum {	// Flags for ModRM functions
 	X86_FLAG_DIR	= 2,	/// Set: ModRM.REG is destination
 	// Register width
 	X86_FLAG_REGW_8B	= MemWidth.i8	<< 8,
-	X86_FLAG_REGW_32B	= MemWidth.i32	<< 8,
 	X86_FLAG_REGW_16B	= MemWidth.i16	<< 8,
+	X86_FLAG_REGW_32B	= MemWidth.i32	<< 8,
 	X86_FLAG_REGW_64B	= MemWidth.i64	<< 8,
 	X86_FLAG_REGW_128B	= MemWidth.i128	<< 8,
 	X86_FLAG_REGW_256B	= MemWidth.i256	<< 8,
@@ -4476,8 +4503,8 @@ enum {	// Flags for ModRM functions
 	X86_FLAG_REGW	= 0x0F00,
 	// Memory pointer width
 	X86_FLAG_MEMW_8B	= MemWidth.i8	<< 12,
-	X86_FLAG_MEMW_32B	= MemWidth.i32	<< 12,
 	X86_FLAG_MEMW_16B	= MemWidth.i16	<< 12,
+	X86_FLAG_MEMW_32B	= MemWidth.i32	<< 12,
 	X86_FLAG_MEMW_64B	= MemWidth.i64	<< 12,
 	X86_FLAG_MEMW_128B	= MemWidth.i128	<< 12,
 	X86_FLAG_MEMW_256B	= MemWidth.i256	<< 12,
@@ -4502,7 +4529,9 @@ enum {	// Flags for ModRM functions
 	X86_FLAG_OPRNDM	= 0xF0_0000, /// n operand mask
 	// MODRM flags
 	X86_FLAG_USE_OP	= 0x0100_0000,	/// Use the opcode for width (8/32), ignores direction bit
-//	X86_FLAG_	= 0x0200_0000,
+	//TODO: Flag to disallow MOD=00|01|10
+	//      Will be useful to remove some reduntant code.
+//	X86_FLAG_REGONLY	= 0x0200_0000,
 //	X86_FLAG_	= 0x0400_0000,
 //	X86_FLAG_	= 0x0800_0000,
 	// (VEX) VEX flags
