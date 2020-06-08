@@ -677,8 +677,8 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
-			const(char) *fmt = i.ival3 == MemWidth.far ? "*(%s%+d)" : "(%s%+d)";
-			p.mnbufi += snprintf(bp, left, fmt, i.sval1, i.ival1);
+			const(char) *fmt = i.ival3 == MemWidth.far ? "*%d(%s)" : "%d(%s)";
+			p.mnbufi += snprintf(bp, left, fmt, i.ival1, i.sval1);
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%+d]",
@@ -695,8 +695,8 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
-			const(char) *fmt = i.ival3 == MemWidth.far ? "*%s(%s%+d)" : "%s(%s%+d)";
-			p.mnbufi += snprintf(bp, left, fmt, i.sval2, i.sval1, i.ival1);
+			const(char) *fmt = i.ival3 == MemWidth.far ? "*%s+%d(%s)" : "%s%+d(%s)";
+			p.mnbufi += snprintf(bp, left, fmt, i.ival1, i.sval2, i.sval1);
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s%+d]",
