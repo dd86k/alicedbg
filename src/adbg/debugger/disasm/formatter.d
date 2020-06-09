@@ -36,10 +36,10 @@ import adbg.utils.str;
 extern (C):
 
 /// Number of items the formatter can hold
-enum FORMATTER_STACK_SIZE = 8;
+private enum FORMATTER_STACK_SIZE = 8;
 /// Formatter stack limit (size - 1)
-enum FORMATTER_STACK_LIMIT = FORMATTER_STACK_SIZE - 1;
-enum FORMATTER_WIDTH_MASK = 15;
+private enum FORMATTER_STACK_LIMIT = FORMATTER_STACK_SIZE - 1;
+private enum FORMATTER_WIDTH_MASK = 15;
 
 //
 // Formatter options for decoder
@@ -85,6 +85,7 @@ enum MemWidth {
 }
 
 /// Format item structure. Can hold up to 3 integer and 3 string values.
+package
 struct disasm_fmt_item_t {
 	FormatType type;	/// Item type, see FormatType structure
 	union {
@@ -498,7 +499,7 @@ void adbg_dasm_render(disasm_params_t *p) {
 	if (nitems < 1) return;
 
 	//TODO: "Prefix" types would be procssed here before the main instruction
-	//      Should start with just one, if need be, make a loop
+	//      If need be, peek the first value
 
 	adbg_dasm_fadd(p, &p.fmt.items[0]);
 
@@ -696,7 +697,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		switch (p.syntax) {
 		case Att:
 			const(char) *fmt = i.ival3 == MemWidth.far ? "*%s+%d(%s)" : "%s%+d(%s)";
-			p.mnbufi += snprintf(bp, left, fmt, i.ival1, i.sval2, i.sval1);
+			p.mnbufi += snprintf(bp, left, fmt, i.sval2, i.ival1, i.sval1);
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s%+d]",
