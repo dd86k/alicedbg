@@ -30,20 +30,22 @@
 module adbg.debugger.disasm.formatter;
 
 import core.stdc.stdarg;
+import core.stdc.stdio : snprintf;
 import adbg.debugger.disasm.disasm;
-import adbg.utils.str;
+import adbg.utils.str, adbg.consts;
 
 extern (C):
+
+//
+// Formatter options for decoder
+//
 
 /// Number of items the formatter can hold
 private enum FORMATTER_STACK_SIZE = 8;
 /// Formatter stack limit (size - 1)
 private enum FORMATTER_STACK_LIMIT = FORMATTER_STACK_SIZE - 1;
-private enum FORMATTER_WIDTH_MASK = 15;
-
-//
-// Formatter options for decoder
-//
+/// Formatter register buffers size
+private enum FORMATTER_REGBUF_SIZE = 16;
 
 //TODO: New type -- Prefix
 //      Prefixes are simple strings to process before the normal instruction
@@ -180,8 +182,9 @@ void adbg_dasm_push_x64(disasm_params_t *p, ulong v) {
 /// 	p = Disassembler parameters
 /// 	v = String value
 void adbg_dasm_push_str(disasm_params_t *p, const(char) *v) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.String;
 	i.sval1 = v;
 }
@@ -191,11 +194,12 @@ void adbg_dasm_push_str(disasm_params_t *p, const(char) *v) {
 /// 	f = String format
 ///     ... = Arguments
 void adbg_dasm_push_strf(disasm_params_t *p, const(char) *f, ...) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
+	i.type = FormatType.String;
 	va_list va;
 	va_start(va, f);
-	i.type = FormatType.String;
 	i.sval1 = adbg_util_strfva(f, va);
 }
 /// Push a register value into the formatting stack. This is printed depending
@@ -204,8 +208,9 @@ void adbg_dasm_push_strf(disasm_params_t *p, const(char) *f, ...) {
 /// 	p = Disassembler parameters
 /// 	reg = Register value
 void adbg_dasm_push_reg(disasm_params_t *p, const(char) *reg) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.Reg;
 	i.sval1 = reg;
 }
@@ -216,9 +221,10 @@ void adbg_dasm_push_reg(disasm_params_t *p, const(char) *reg) {
 /// 	seg = Segment register value
 /// 	reg = Register value
 void adbg_dasm_push_segreg(disasm_params_t *p, const(char) *seg, const(char) *reg) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
-	i.type = FormatType.Reg;
+	i.type = FormatType.SegReg;
 	i.sval1 = seg;
 	i.sval2 = reg;
 }
@@ -228,8 +234,9 @@ void adbg_dasm_push_segreg(disasm_params_t *p, const(char) *seg, const(char) *re
 /// 	p = Disassembler parameters
 /// 	addr = Address value
 void adbg_dasm_push_addr(disasm_params_t *p, ulong addr) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.Addr;
 	i.lval1 = addr;
 }
@@ -239,8 +246,9 @@ void adbg_dasm_push_addr(disasm_params_t *p, ulong addr) {
 /// 	p = Disassembler parameters
 /// 	imm = Immediate value
 void adbg_dasm_push_imm(disasm_params_t *p, int imm) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.Imm;
 	i.ival1 = imm;
 }
@@ -250,8 +258,9 @@ void adbg_dasm_push_imm(disasm_params_t *p, int imm) {
 /// 	p = Disassembler parameters
 /// 	imm = Immediate value
 void adbg_dasm_push_imm64(disasm_params_t *p, long imm) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.Imm;
 	i.lval1 = imm;
 }
@@ -262,8 +271,9 @@ void adbg_dasm_push_imm64(disasm_params_t *p, long imm) {
 /// 	imm = Immediate value
 /// 	seg = segment value
 void adbg_dasm_push_immfar(disasm_params_t *p, int imm, int seg) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.ImmFar;
 	i.ival1 = imm;
 	i.ival2 = seg;
@@ -275,8 +285,9 @@ void adbg_dasm_push_immfar(disasm_params_t *p, int imm, int seg) {
 /// 	imm = Immediate value
 /// 	seg = Segment string
 void adbg_dasm_push_immseg(disasm_params_t *p, int imm, const(char) *seg) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.ImmSeg;
 	i.ival1 = imm;
 	i.sval1 = seg;
@@ -287,10 +298,10 @@ void adbg_dasm_push_immseg(disasm_params_t *p, int imm, const(char) *seg) {
 /// 	p = Disassembler parameters
 /// 	v = Absolute memory value
 /// 	w = Operation width
-void adbg_dasm_push_mem(disasm_params_t *p,
-	int v, int w) {
+void adbg_dasm_push_mem(disasm_params_t *p, int v, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.Mem;
 	i.ival1 = v;
 	i.ival3 = w;
@@ -301,10 +312,10 @@ void adbg_dasm_push_mem(disasm_params_t *p,
 /// 	p = Disassembler parameters
 /// 	reg = Register value
 /// 	w = Operation width
-void adbg_dasm_push_memreg(disasm_params_t *p,
-	const(char) *reg, int w) {
+void adbg_dasm_push_memreg(disasm_params_t *p, const(char) *reg, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.MemReg;
 	i.sval1 = reg;
 	i.ival3 = w;
@@ -316,10 +327,10 @@ void adbg_dasm_push_memreg(disasm_params_t *p,
 /// 	seg = Segment register value
 /// 	reg = Register value
 /// 	w = Operation width
-void adbg_dasm_push_memsegreg(disasm_params_t *p,
-	const(char) *seg, const(char) *reg, int w) {
+void adbg_dasm_push_memsegreg(disasm_params_t *p, const(char) *seg, const(char) *reg, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.MemSegReg;
 	i.sval1 = reg;
 	i.sval2 = seg;
@@ -330,15 +341,15 @@ void adbg_dasm_push_memsegreg(disasm_params_t *p,
 /// Params:
 /// 	p = Disassembler parameters
 /// 	reg = Register value
-/// 	v = Immediate value
+/// 	imm = Immediate value
 /// 	w = Operation width
-void adbg_dasm_push_memregimm(disasm_params_t *p,
-	const(char) *reg, int v, int w) {
+void adbg_dasm_push_memregimm(disasm_params_t *p, const(char) *reg, int imm, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.MemRegImm;
 	i.sval1 = reg;
-	i.ival1 = v;
+	i.ival1 = imm;
 	i.ival3 = w;
 }
 /// Push a memory+segment+register+immediate value into the formatting stack.
@@ -347,16 +358,16 @@ void adbg_dasm_push_memregimm(disasm_params_t *p,
 /// 	p = Disassembler parameters
 /// 	seg = Segment register value
 /// 	reg = Register value
-/// 	v = Immediate value
+/// 	imm = Immediate value
 /// 	w = Operation width
-void adbg_dasm_push_memsegregimm(disasm_params_t *p,
-	const(char) *seg, const(char) *reg, int v, int w) {
+void adbg_dasm_push_memsegregimm(disasm_params_t *p, const(char) *seg, const(char) *reg, int imm, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.MemSegRegImm;
 	i.sval1 = reg;
 	i.sval2 = seg;
-	i.ival1 = v;
+	i.ival1 = imm;
 	i.ival3 = w;
 }
 /// (x86) Push a SIB value when MOD=00 into the formatting stack.
@@ -370,8 +381,9 @@ void adbg_dasm_push_memsegregimm(disasm_params_t *p,
 /// 	w = Operation width
 void adbg_dasm_push_x86_sib_mod00(disasm_params_t *p,
 	const(char) *seg, const(char) *base, const(char) *index, int scale, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegBaseIndexScale;
 	i.sval1 = base;
 	i.sval2 = index;
@@ -388,8 +400,9 @@ void adbg_dasm_push_x86_sib_mod00(disasm_params_t *p,
 /// 	w = Operation width
 void adbg_dasm_push_x86_sib_m00_i100(disasm_params_t *p,
 	const(char) *seg, const(char) *base, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegBase;
 	i.sval1 = base;
 	i.sval2 = seg;
@@ -406,8 +419,9 @@ void adbg_dasm_push_x86_sib_m00_i100(disasm_params_t *p,
 /// 	w = Operation width
 void adbg_dasm_push_x86_sib_m00_b101(disasm_params_t *p,
 	const(char) *seg, const(char) *index, int scale, int imm, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegIndexScaleImm;
 	i.sval1 = index;
 	i.sval2 = seg;
@@ -424,8 +438,9 @@ void adbg_dasm_push_x86_sib_m00_b101(disasm_params_t *p,
 /// 	w = Operation width
 void adbg_dasm_push_x86_sib_m00_i100_b101(disasm_params_t *p,
 	const(char) *seg, int imm, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegImm;
 	i.sval1 = seg;
 	i.ival1 = imm;
@@ -444,8 +459,9 @@ void adbg_dasm_push_x86_sib_m00_i100_b101(disasm_params_t *p,
 /// 	w = Operation width
 void adbg_dasm_push_x86_sib_m01(disasm_params_t *p,
 	const(char) *seg, const(char) *base, const(char) *index, int scale, int imm, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegBaseIndexScaleImm;
 	i.sval1 = base;
 	i.sval2 = index;
@@ -465,8 +481,9 @@ void adbg_dasm_push_x86_sib_m01(disasm_params_t *p,
 /// 	w = Operation width
 void adbg_dasm_push_x86_sib_m01_i100(disasm_params_t *p,
 	const(char) *seg, const(char) *base, int imm, int w) {
+	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
+		return;
 	disasm_fmt_item_t *i = adbg_dasm_fmt_select(p);
-	if (i == null) return;
 	i.type = FormatType.x86_SIB_MemSegBaseImm;
 	i.sval1 = base;
 	i.sval2 = seg;
@@ -542,9 +559,8 @@ void adbg_dasm_render_att(disasm_params_t *p, size_t nitems) {
 /// also increments the stack pointer. Called by pushing functions.
 /// Params:
 /// 	p = Disassembler parameters
-/// Returns: Formatter item if there is still space; Otherwise null
+/// Returns: Formatter item
 disasm_fmt_item_t *adbg_dasm_fmt_select(disasm_params_t *p) {
-	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT) return null;
 	return &p.fmt.items[p.fmt.itemno++];
 }
 /// (Internal) Add string into the formatter's mnemonic string buffer. Called
@@ -572,26 +588,27 @@ void adbg_dasm_xadd(disasm_params_t *p, const(char) *s) {
 /// 	p = Disassembler parameters
 /// 	i = Disassembler formatter item
 void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
-	//NOTE: To reduce binary size, this is condensed into this function
-	import core.stdc.stdio : snprintf;
+	//NOTE: Final switch
+	//      + Ensures all enumeration values are used
+	//      + Barely makes a different by using functions
 
 	ptrdiff_t left = DISASM_BUF_SIZE - p.mnbufi;
 	if (left <= 0) return;
 
 	char *bp = cast(char*)&p.mnbuf + p.mnbufi;
 	const(char) *f = void;
-	char[256] b1 = void, b2 = void, b3 = void;
+	char[FORMATTER_REGBUF_SIZE] b1 = void, b2 = void, b3 = void;
 
 	with (FormatType)
 	final switch (i.type) {
 	case String:	adbg_dasm_madd(p, i.sval1); return;
 	case Reg:
 		if (i.sval1[0] == 0) return;
-		adbg_dasm_madd(p, adbg_dasm_freg(p, i.sval1, &b1));
+		adbg_dasm_madd(p, adbg_dasm_fmtreg(p, i.sval1, &b1));
 		return;
 	case SegReg:
-		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
-		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
+		i.sval1 = adbg_dasm_fmtreg(p, i.sval1, &b1);
+		i.sval2 = adbg_dasm_fmtreg(p, i.sval2, &b2);
 		p.mnbufi += snprintf(bp, left, "%s%s", i.sval1, i.sval2);
 		return;
 	case Addr:
@@ -656,8 +673,8 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		}
 	case MemSegReg:
-		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1); // reg
-		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2); // seg
+		i.sval1 = adbg_dasm_fmtreg(p, i.sval1, &b1); // reg
+		i.sval2 = adbg_dasm_fmtreg(p, i.sval2, &b2); // seg
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
@@ -674,7 +691,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		}
 	case MemRegImm:
-		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
+		i.sval1 = adbg_dasm_fmtreg(p, i.sval1, &b1);
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
@@ -691,8 +708,8 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		}
 	case MemSegRegImm:
-		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
-		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
+		i.sval2 = adbg_dasm_fmtreg(p, i.sval2, &b2);
+		i.sval1 = adbg_dasm_fmtreg(p, i.sval1, &b1);
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
@@ -709,9 +726,9 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		}
 	case x86_SIB_MemSegBaseIndexScale:
-		i.sval3 = adbg_dasm_freg(p, i.sval3, &b3);
-		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
-		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
+		i.sval1 = adbg_dasm_fmtreg(p, i.sval1, &b1);
+		i.sval2 = adbg_dasm_fmtreg(p, i.sval2, &b2);
+		i.sval3 = adbg_dasm_fmtreg(p, i.sval3, &b3);
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
@@ -727,8 +744,8 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		}
 	case x86_SIB_MemSegBase:
-		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
-		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
+		i.sval2 = adbg_dasm_fmtreg(p, i.sval2, &b2);
+		i.sval1 = adbg_dasm_fmtreg(p, i.sval1, &b1);
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
@@ -744,8 +761,8 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		}
 	case x86_SIB_MemSegIndexScaleImm:
-		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
-		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
+		i.sval2 = adbg_dasm_fmtreg(p, i.sval2, &b2);
+		i.sval1 = adbg_dasm_fmtreg(p, i.sval1, &b1);
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
@@ -762,7 +779,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		}
 	case x86_SIB_MemSegImm:
-		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
+		i.sval1 = adbg_dasm_fmtreg(p, i.sval1, &b1);
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
@@ -778,9 +795,9 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		}
 	case x86_SIB_MemSegBaseIndexScaleImm:
-		i.sval3 = adbg_dasm_freg(p, i.sval3, &b3);
-		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
-		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
+		i.sval3 = adbg_dasm_fmtreg(p, i.sval3, &b3);
+		i.sval1 = adbg_dasm_fmtreg(p, i.sval1, &b1);
+		i.sval2 = adbg_dasm_fmtreg(p, i.sval2, &b2);
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
@@ -797,8 +814,8 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 			return;
 		}
 	case x86_SIB_MemSegBaseImm:
-		i.sval2 = adbg_dasm_freg(p, i.sval2, &b2);
-		i.sval1 = adbg_dasm_freg(p, i.sval1, &b1);
+		i.sval2 = adbg_dasm_fmtreg(p, i.sval2, &b2);
+		i.sval1 = adbg_dasm_fmtreg(p, i.sval1, &b1);
 		with (DisasmSyntax)
 		switch (p.syntax) {
 		case Att:
@@ -815,7 +832,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		}
 	}
 }
-const(char) *adbg_dasm_freg(disasm_params_t *p, const(char) *s, char[256] *buffer) {
+const(char) *adbg_dasm_fmtreg(disasm_params_t *p, const(char) *s, char[FORMATTER_REGBUF_SIZE] *buffer) {
 	import core.stdc.stdio : snprintf;
 	if (s[0] == 0) return "";
 	with (DisasmSyntax)
@@ -823,7 +840,7 @@ const(char) *adbg_dasm_freg(disasm_params_t *p, const(char) *s, char[256] *buffe
 	case Att:
 		snprintf(cast(char*)buffer, 16, "%%%s", s);
 		return cast(char*)buffer;
-	default:  return s;
+	default: return s;
 	}
 }
 int adbg_dasm_su8(int n) {

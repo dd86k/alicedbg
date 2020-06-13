@@ -43,11 +43,13 @@ enum DisasmISA : ubyte {
 	arm_t32,	/// (Not implemented) ARM: Thumb 32-bit
 	arm_a32,	/// (Not implemented) ARM: A32 (formally arm)
 	arm_a64,	/// (Not implemented) ARM: A64 (formally aarch64)
-	rv32,	/// (Not implemented) RISC-V 32-bit
+	rv32,	/// (WIP) RISC-V 32-bit
 	rv64,	/// (Not implemented) RISC-V 64-bit
 }
 
-/// Disassembler x86 syntaxes
+/// Disassembler syntaxes
+//TODO: Native syntax
+//      A custom ISA-dependant format
 enum DisasmSyntax : ubyte {
 	Default,	/// Platform compiled target default
 	Intel,	/// Intel syntax, closest to the Microsoft/Macro Assembler (MASM)
@@ -121,6 +123,12 @@ struct disasm_params_t { align(1):
 	/// instruction capable of changing the control flow (jump and call
 	/// instructions) and the disassembly mode is higher than File.
 	size_t ta;
+	/// Base Address;
+	///
+	/// Currently, this field is not used.
+	///
+	/// Used in calculating the target address.
+	size_t ba;
 	/// Error code.
 	///
 	/// If this field is non-zero, it indicates a decoding error. See the
@@ -145,6 +153,13 @@ struct disasm_params_t { align(1):
 	///
 	/// Bitwise flag. See DISASM_O_* flags.
 	uint options;
+	size_t mcbufi;	/// Machine code buffer index
+	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer
+	size_t mnbufi;	/// Mnemonics buffer index
+	char [DISASM_BUF_SIZE]mnbuf;	/// Mnemonics buffer
+	//
+	// Internal fields
+	//
 	union {
 		void *internal;	/// Used internally
 		x86_internals_t *x86;	/// Used internally
@@ -152,11 +167,11 @@ struct disasm_params_t { align(1):
 		rv32_internals_t *rv32;	/// Used internally
 	}
 	disasm_fmt_t *fmt;	/// Formatter structure pointer, used internally
-	size_t mcbufi;	/// Machine code buffer index
-	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer
-	size_t mnbufi;	/// Mnemonics buffer index
-	char [DISASM_BUF_SIZE]mnbuf;	/// Mnemonics buffer
 }
+
+//TODO: adbg_dasm_setup
+//      Should greatly help as a library function and speed up a few things.
+//      Namely, with function pointers, and memory allocations (option?)
 
 /**
  * Disassemble one instruction from a buffer pointer given in disasm_params_t.
