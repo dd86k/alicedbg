@@ -91,14 +91,14 @@ Usage:
 
 | Option | Possible values | Default | Description |
 |---|---|---|---|
-| `-f|--file` | File path | | Set file path |
-| `-p|--pid` | Process ID | | Set mode to `debugger` and its process ID |
-| `-u|--ui` | `loop`, `cmd` (WIP), `tui` (WIP) | `loop` (will change) | (Debugger) User interface |
-| `-m|--march` | See `-march ?` | Compilation target | (Disassembler) Set machine architecture |
-| `-s|--syntax` | `intel`, `nasm`, `att` | Platform-dependant | (Disassembler) Syntax style |
-| `-D|--dump` | | | Enables dump operation mode, depends on file path |
+| `-f`, `--file` | File path | | Set file path |
+| `-p`, `--pid` | Process ID | | Set mode to `debugger` and its process ID |
+| `-u`, `--ui` | `loop`, `cmd` (WIP), `tui` (WIP) | `loop` (will change) | (Debugger) User interface |
+| `-m`, `--march` | See `-march ?` | Compilation target | (Disassembler) Set machine architecture |
+| `-s`, `--syntax` | `intel`, `nasm`, `att` | Platform-dependant | (Disassembler) Syntax style |
+| `-D`, `--dump` | | | Enables dump operation mode, depends on file path |
 | `--raw` | | | (Dumper) Skip file format detection and process as raw blob |
-| `-S|--show` | `A`,`h`,`s`,`i`,`d` | `h` | (Dumper) Include item(s) into output |
+| `-S`, `--show` | `A`,`h`,`s`,`i`,`d` | `h` | (Dumper) Include item(s) into output |
 
 The only default argument, one that does not need an option switch, is the file
 path. This file path argument can be used in any modes (debugger, dumper, and
