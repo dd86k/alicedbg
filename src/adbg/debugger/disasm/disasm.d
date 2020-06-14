@@ -26,7 +26,7 @@ enum DisasmMode : ubyte {
 }
 
 /// Disassembler error
-enum DisasmError {
+enum DisasmError : ubyte {
 	None,	/// Nothing to report
 	NullAddress,	/// Address given is null (0)
 	NotSupported,	/// Selected ISA is not currently supported

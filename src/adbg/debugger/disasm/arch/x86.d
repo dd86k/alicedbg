@@ -40,7 +40,7 @@ struct x86_internals_t {
 //      - One more tiny check
 //TODO: Adjust float memory widths
 //TODO: Consider making templates to inline certain oprations
-//TODO: Opcode function table
+//TODO: Opcode function table (see version ADBG_DASM_X86_NEW)
 
 //version = ADBG_DASM_X86_NEW;
 
@@ -1544,7 +1544,7 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 			}
 			int w = p.x86.op & X86_FLAG_WIDE;
 			if (p.mode >= DisasmMode.File)
-				adbg_dasm_push_str(p, x86_t_0f_18h[w][mi]);
+				adbg_dasm_push_str(p, x86_t_0F_18h[w][mi]);
 			if (w) {
 				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				if (p.mode >= DisasmMode.File)
@@ -1836,7 +1836,7 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 		}
 		if (p.mode >= DisasmMode.File) {
 			s |= (p.x86.op & 3) << 2;
-			adbg_dasm_push_str(p, x86_t_0f_5ch[s]);
+			adbg_dasm_push_str(p, x86_t_0F_5Ch[s]);
 		}
 		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -4254,6 +4254,15 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 			adbg_dasm_push_str(p, m);
 		adbg_dasm_x86_vex_modrm(p, f);
 		return;
+	case 0xE8, 0xEC: // E8H-EFH
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, x86_t_VEX_0F_E8h[p.x86.op & 7]);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
 	default: adbg_dasm_err(p); return;
 	}
 }
@@ -4337,6 +4346,20 @@ __gshared const(char) *[]x86_t_F4h = [
 __gshared const(char) *[]x86_t_F8h = [
 	"clc", "stc", "cli", "sti"
 ];
+__gshared const(char) *[][]x86_t_0F_18h = [
+	[ "bndldx", "bndmov", "bndcu", "bndcl" ],
+	[ "bndstx", "bndmov", "bndcn", "bndmk" ]
+];
+__gshared const(char) *[]x86_t_0F_5Ch = [
+	"subps", "subpd", "subsd", "subss", // D=0 W=0
+	"minps", "minpd", "minsd", "minss", // D=0 W=1
+	"divps", "divpd", "divsd", "divss", // D=1 W=0
+	"maxps", "maxpd", "maxsd", "maxss"  // D=1 W=1
+];
+__gshared const(char) *[]x86_t_VEX_0F_E8h = [
+	"vpsubsb", "vpsubsw", "vpminsw", "vpor",
+	"vpaddsb", "vpaddsw", "vpmaxsw", "vpxor"
+];
 __gshared const(char) *[]x86_t_Jcc = [
 	"jo", "jno", "jb", "jnb",
 	"jz", "jnz", "jbe", "jnbe",
@@ -4387,16 +4410,6 @@ __gshared const(char) *[]x86_t_DR = [
 __gshared const(char) *[]x86_t_CR = [
 	"cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7",
 	"cr8", "cr9", "cr10", "cr11", "cr12", "cr13", "cr14", "cr15"
-];
-__gshared const(char) *[][]x86_t_0f_18h = [
-	[ "bndldx", "bndmov", "bndcu", "bndcl" ],
-	[ "bndstx", "bndmov", "bndcn", "bndmk" ]
-];
-__gshared const(char) *[]x86_t_0f_5ch = [
-	"subps", "subpd", "subsd", "subss", // D=0 W=0
-	"minps", "minpd", "minsd", "minss", // D=0 W=1
-	"divps", "divpd", "divsd", "divss", // D=1 W=0
-	"maxps", "maxpd", "maxsd", "maxss"  // D=1 W=1
 ];
 
 //

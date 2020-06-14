@@ -1878,7 +1878,7 @@ void adbg_dasm_x86_64_0f(disasm_params_t *p) {
 		if (p.x86.op & X86_FLAG_WIDE) s |= 0b01_00;
 		if (p.x86.op & X86_FLAG_DIR)  s |= 0b10_00;
 		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, x86_t_0f_5ch[s]);
+			adbg_dasm_push_str(p, x86_t_0F_5Ch[s]);
 		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x60: // 60H-63H
