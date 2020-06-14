@@ -75,7 +75,7 @@ I love the D programming language for so many reason I could go on forever
 talking about it, so I'll just say that I love it for its practical approach
 and technical reasons. It gets the job well done.
 
-### What about the GC?
+### What about the Garbage Collector?
 
 The project is compiled with the BetterC mode, so no druntime and no GC. The
 functions are also marked with a C extern so that hopefully C programs (or
@@ -83,23 +83,26 @@ others) use its functions as a library (static or dynamically).
 
 # Usage
 
-The command-line interface processes items from left to right and was inspired
-from the ffmpeg project (`-option [value]`).
+```
+Usage:
+  alicedbg [OPTIONS]
+  alicedbg {-h|--help|--version|--license}
+```
 
 | Option | Possible values | Default | Description |
 |---|---|---|---|
-| `-mode` | `debugger`, `dump`, `profile` | `debugger` | Operating mode |
-| `-exe` | File path | | Set mode to Debugger and next argument as `file` |
-| `-pid` | Process ID | | Set mode to Debugger and next argument as `pid` |
-| `-ui` | `loop`, `cmd`, `tui` | `loop` (for now!) | (Debugger) User interface, only `loop` is available |
-| `-march` | See `-march ?` | Target dependant | (Disassembler) Set machine architecture |
-| `-syntax` | `intel`, `nasm`, `att` | Platform dependant | (Disassembler) Syntax style |
-| `-dump` | | | Enables dump operation mode |
-| `-raw` | | | (Dumper) Skip file format detection and process as raw blob |
-| `-show` | `A`,`h`,`s`,`i`,`d` | `h` | (Dumper) Include item(s) into output |
+| `-f|--file` | File path | | Set file path |
+| `-p|--pid` | Process ID | | Set mode to `debugger` and its process ID |
+| `-u|--ui` | `loop`, `cmd` (WIP), `tui` (WIP) | `loop` (will change) | (Debugger) User interface |
+| `-m|--march` | See `-march ?` | Compilation target | (Disassembler) Set machine architecture |
+| `-s|--syntax` | `intel`, `nasm`, `att` | Platform-dependant | (Disassembler) Syntax style |
+| `-D|--dump` | | | Enables dump operation mode, depends on file path |
+| `--raw` | | | (Dumper) Skip file format detection and process as raw blob |
+| `-S|--show` | `A`,`h`,`s`,`i`,`d` | `h` | (Dumper) Include item(s) into output |
 
-The only default argument sets the debug type to a file with a file path.
-Example: `alicedbg putty.exe --dump -S s`
+The only default argument, one that does not need an option switch, is the file
+path. This file path argument can be used in any modes (debugger, dumper, and
+profiler). Example: `alicedbg putty.exe --dump --show s`
 
 ### UI: loop
 
@@ -127,29 +130,53 @@ available), and register list (when available).
 
 ### UI: cmd
 
-The command interpreter UI is currently in development, and is currently not ready for use.
+The command interpreter is currently in development, and is currently not ready for use.
 
 ### UI: tui
 
-The Text UI is currently in development, and is currently not ready for use.
+The text UI is currently in development, and is currently not ready for use.
 
 # Build Instructions
 
 ## With DUB
 
-DUB often comes with a D compiler and is the recommended way to build the
-project. A compiler can be chosen with the `--compiler=` option. I try to
-support DMD, GDC, and LDC as much as possible.
+DUB often comes alongside a D compiler and is the recommended way to build the
+project.
+
+A compiler can be chosen with the `--compiler=` option. DMD, GDC, and LDC
+support are on an best-effort basis.
 
 Do note that the `betterC` mode is activated for normal builds and
 documentation. Unittesting (and the rest) uses the druntime library so any
 Phobos functions may be used.
 
-| Build type | Command |
-|---|---|
-| Debug | `dub build` |
-| Release | `dub build -b release-nobounds` |
-| AFL Fuzz | `dub build -b afl --compiler=ldc2` |
+Most common commands:
+- `run` (default): build and run
+- `build`
+- `test`: run unittests
+
+Build types (`-b|--build=`):
+- `plain`
+- `debug` (default)
+- `release`
+- `release-debug`
+- `release-nobounds`
+- `unitest`, use `dub test` instead
+- `docs`, build documentation using DDOC
+- `ddox`, build documentation using DDOX
+- `profile`, currently not applicable
+- `profile-gc`, currently not applicable
+- `cov`
+- `unittest-cov`
+- `syntax`
+- `afl` (custom), requires LDC to be invoked
+
+Configurations (`-c|--config=`):
+- `executable` (default)
+- `library`
+
+**NOTE**: On Windows, DMD and LDC come with the MinGW libraries, and so these
+libraries are used when compiling and linking.
 
 ## With make(1)
 
