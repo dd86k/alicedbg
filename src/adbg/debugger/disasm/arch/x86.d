@@ -81,7 +81,7 @@ private:
 
 void adbg_dasm_x86_grp1(disasm_params_t *p) {
 	if (p.mode >= DisasmMode.File)
-		adbg_dasm_push_str(p, x86_t_grp1[p.x86.op >> 3]);
+		adbg_dasm_push_str(p, x86_T_grp1[p.x86.op >> 3]);
 	adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
 }
 
@@ -95,11 +95,11 @@ void adbg_dasm_x86_grp2(disasm_params_t *p) {
 		}
 		if (p.mode >= DisasmMode.File) {
 			adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
-			adbg_dasm_push_reg(p, x86_t_segs[opr]);
+			adbg_dasm_push_reg(p, x86_T_segs[opr]);
 		}
 	} else {
 		if (p.mode >= DisasmMode.File) {
-			adbg_dasm_push_str(p, x86_t_grp1[opr]);
+			adbg_dasm_push_str(p, x86_T_grp1[opr]);
 			adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
 		}
 		if (p.x86.op & X86_FLAG_WIDE)
@@ -111,7 +111,7 @@ void adbg_dasm_x86_grp2(disasm_params_t *p) {
 
 void adbg_dasm_x86_grp3(disasm_params_t *p) {
 	if (p.mode >= DisasmMode.File) {
-		adbg_dasm_push_str(p, x86_t_40h[(p.x86.op >> 4) & 3]);
+		adbg_dasm_push_str(p, x86_T_40h[(p.x86.op >> 4) & 3]);
 		adbg_dasm_push_reg(p,
 			adbg_dasm_x86_modrm_reg(p, p.x86.op, MemWidth.i32));
 	}
@@ -120,7 +120,7 @@ void adbg_dasm_x86_grp3(disasm_params_t *p) {
 
 void adbg_dasm_x86_grp7(disasm_params_t *p) {
 	if (p.mode >= DisasmMode.File)
-		adbg_dasm_push_str(p, x86_t_Jcc[p.x86.op & 15]);
+		adbg_dasm_push_str(p, x86_T_Jcc[p.x86.op & 15]);
 	adbg_dasm_x86_u8imm(p);
 }
 
@@ -148,7 +148,7 @@ L_CONTINUE:
 	// 00H-03H, 08H-0BH, 10H-13H, 18-1BH, 20H-23H, 28H-2BH, 30H-33H, 38H-3BH
 	case 0, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38:
 		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, x86_t_grp1[p.x86.op >> 3]);
+			adbg_dasm_push_str(p, x86_T_grp1[p.x86.op >> 3]);
 		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x04: // 04H-07H
@@ -306,7 +306,7 @@ L_CONTINUE:
 		return;
 	case 0x40, 0x44, 0x48, 0x4C, 0x50, 0x54, 0x58, 0x5C: // 40H-5CH
 		if (p.mode >= DisasmMode.File) {
-			adbg_dasm_push_str(p, x86_t_40h[(p.x86.op >> 4) & 3]);
+			adbg_dasm_push_str(p, x86_T_40h[(p.x86.op >> 4) & 3]);
 			adbg_dasm_push_reg(p,
 				adbg_dasm_x86_modrm_reg(p, p.x86.op, MemWidth.i32));
 		}
@@ -383,7 +383,7 @@ L_CONTINUE:
 		return;
 	case 0x70, 0x74, 0x78, 0x7C: // 70H-7FH
 		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, x86_t_Jcc[p.x86.op & 15]);
+			adbg_dasm_push_str(p, x86_T_Jcc[p.x86.op & 15]);
 		adbg_dasm_x86_u8imm(p);
 		return;
 	case 0x80: // 80H-83H
@@ -391,7 +391,7 @@ L_CONTINUE:
 		++p.ai8;
 		if (p.mode >= DisasmMode.File) {
 			adbg_dasm_push_x8(p, modrm);
-			adbg_dasm_push_str(p, x86_t_grp1[(modrm >> 3) & 7]);
+			adbg_dasm_push_str(p, x86_T_grp1[(modrm >> 3) & 7]);
 		}
 		int w = p.x86.op & X86_FLAG_WIDE;
 		if (p.mode >= DisasmMode.File)
@@ -454,7 +454,7 @@ L_CONTINUE:
 			if (p.mode >= DisasmMode.File) {
 				adbg_dasm_push_x8(p, modrm);
 				adbg_dasm_push_str(p, "mov");
-				const(char) *seg = x86_t_segs[sr];
+				const(char) *seg = x86_T_segs[sr];
 				const(char) *reg = adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i16);
 				if (p.x86.op & X86_FLAG_DIR) {
 					adbg_dasm_push_reg(p, seg);
@@ -494,7 +494,7 @@ L_CONTINUE:
 		return;
 	case 0x9C: // 9CH-9FH
 		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, x86_t_9Ch[p.x86.op & 3]);
+			adbg_dasm_push_str(p, x86_T_9Ch[p.x86.op & 3]);
 		return;
 	case 0xA0: // A0H-A3H
 		const(char) *s = void, a = void;
@@ -502,7 +502,7 @@ L_CONTINUE:
 			if (p.x86.segreg == x86SegReg.None)
 				p.x86.segreg = x86SegReg.DS;
 			adbg_dasm_push_str(p, "mov");
-			s = adbg_dasm_x86_t_segstr(p.x86.segreg);
+			s = adbg_dasm_x86_T_segstr(p.x86.segreg);
 			a = adbg_dasm_x86_eax(p, p.x86.op);
 		}
 		if (p.x86.op & X86_FLAG_DIR) {
@@ -603,7 +603,7 @@ L_CONTINUE:
 		} else { // GRP2 R/M, IMM8
 			ubyte modrm = *p.ai8;
 			++p.ai8;
-			const(char) *r = x86_t_grp2[(modrm >> 3) & 7];
+			const(char) *r = x86_T_grp2[(modrm >> 3) & 7];
 			if (r == null) {
 				adbg_dasm_err(p);
 				return;
@@ -645,13 +645,12 @@ L_CONTINUE:
 					++p.ai8;
 					adbg_dasm_x86_vex_0f(p);
 				} else { // C4H, VEX 3-byte prefix
-					int u8 = *(p.ai8 + 1);
-					p.x86.vex[2] = cast(ubyte)u8;
+					ubyte u8 = p.x86.vex[2] = *(p.ai8 + 1);
 					if (p.mode >= DisasmMode.File) {
 						adbg_dasm_push_x8(p, modrm);
 						adbg_dasm_push_x8(p, p.x86.vex[2]);
 					}
-					p.x86.vex_vvvv = (~u8 & 56) >> 3; // 3 bits under 32-bit
+					p.x86.vex_vvvv = (~cast(uint)u8 & 56) >> 3; // 3 bits under 32-bit
 					p.x86.vex_L    = u8 & 4;
 					p.x86.vex_pp   = u8 & 3;
 					++p.ai16;
@@ -714,7 +713,7 @@ L_CONTINUE:
 	case 0xD0: // D0H-D3H
 		ubyte modrm = *p.ai8;
 		++p.ai8;
-		const(char) *m = x86_t_grp2[(modrm >> 3) & 7];
+		const(char) *m = x86_T_grp2[(modrm >> 3) & 7];
 		if (m == null) {
 			adbg_dasm_err(p);
 			return;
@@ -749,7 +748,7 @@ L_CONTINUE:
 		switch (p.x86.op & 7) {
 		case 0:	// D8H
 			if (p.mode >= DisasmMode.File)
-				adbg_dasm_push_str(p, x86_t_FLT1[(modrm >> 3) & 7]);
+				adbg_dasm_push_str(p, x86_T_FLT1[(modrm >> 3) & 7]);
 			if (modrm > 0xBF) { // operand is FP
 				if (p.mode < DisasmMode.File)
 					return;
@@ -788,7 +787,7 @@ L_CONTINUE:
 						adbg_dasm_err(p);
 					return;
 				case 0xE0:
-					m = x86_t_FLT5[sti];
+					m = x86_T_FLT5[sti];
 					if (m == null) {
 						adbg_dasm_err(p);
 						return;
@@ -802,11 +801,11 @@ L_CONTINUE:
 					if (p.mode < DisasmMode.File)
 						return;
 					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, x86_t_FLT4[sti]);
+					adbg_dasm_push_str(p, x86_T_FLT4[sti]);
 					return;
 				}
 			} else { // operand is memory pointer
-				m = x86_t_FLT6[(modrm >> 3) & 7];
+				m = x86_T_FLT6[(modrm >> 3) & 7];
 				if (m == null) {
 					adbg_dasm_err(p);
 					return;
@@ -862,7 +861,7 @@ L_CONTINUE:
 				}
 			} else { // operand is memory pointer
 				if (p.mode >= DisasmMode.File)
-					adbg_dasm_push_str(p, x86_t_FLT2[(modrm >> 3) & 7]);
+					adbg_dasm_push_str(p, x86_T_FLT2[(modrm >> 3) & 7]);
 				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 			}
 			return;
@@ -929,7 +928,7 @@ L_CONTINUE:
 					return;
 				}
 			} else { // operand is memory pointer
-				m = x86_t_FLT7[(modrm >> 3) & 7];
+				m = x86_T_FLT7[(modrm >> 3) & 7];
 				if (m == null) {
 					adbg_dasm_err(p);
 					return;
@@ -948,13 +947,13 @@ L_CONTINUE:
 				}
 				if (p.mode >= DisasmMode.File) {
 					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, x86_t_FLT1[reg >> 3]);
+					adbg_dasm_push_str(p, x86_T_FLT1[reg >> 3]);
 					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, modrm & 7));
 					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
 				}
 			} else { // operand is memory pointer
 				if (p.mode >= DisasmMode.File)
-					adbg_dasm_push_str(p, x86_t_FLT1[(modrm >> 3) & 7]);
+					adbg_dasm_push_str(p, x86_T_FLT1[(modrm >> 3) & 7]);
 				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
 			}
 			return;
@@ -1005,7 +1004,7 @@ L_CONTINUE:
 					return;
 				}
 			} else { // operand is memory pointer
-				m = x86_t_FLT8[(modrm >> 3) & 7];
+				m = x86_T_FLT8[(modrm >> 3) & 7];
 				if (m == null) {
 					adbg_dasm_err(p);
 					return;
@@ -1061,7 +1060,7 @@ L_CONTINUE:
 				}
 			} else { // operand is memory pointer
 				if (p.mode >= DisasmMode.File)
-					adbg_dasm_push_str(p, x86_t_FLT2[(modrm >> 3) & 7]);
+					adbg_dasm_push_str(p, x86_T_FLT2[(modrm >> 3) & 7]);
 				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i16);
 			}
 			return;
@@ -1113,14 +1112,14 @@ L_CONTINUE:
 				}
 			} else { // operand is memory pointer
 				if (p.mode >= DisasmMode.File)
-					adbg_dasm_push_str(p, x86_t_FLT3[(modrm >> 3) & 7]);
+					adbg_dasm_push_str(p, x86_T_FLT3[(modrm >> 3) & 7]);
 				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
 			}
 			return;
 		}
 	case 0xE0: // E0H-E3H
 		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, x86_t_E0h[p.x86.op & 3]);
+			adbg_dasm_push_str(p, x86_T_E0h[p.x86.op & 3]);
 		adbg_dasm_x86_u8imm(p);
 		return;
 	case 0xE4: // E4H-E7H
@@ -1212,7 +1211,7 @@ L_CONTINUE:
 				return;
 			}
 			if (p.mode >= DisasmMode.File)
-				adbg_dasm_push_str(p, x86_t_F4h[mreg >> 3]);
+				adbg_dasm_push_str(p, x86_T_F4h[mreg >> 3]);
 			adbg_dasm_x86_modrm_rm(p, modrm, w, w);
 			if (mreg >= MODRM_REG_100) {
 				if (p.mode >= DisasmMode.File)
@@ -1227,7 +1226,7 @@ L_CONTINUE:
 		return;
 	case 0xF8: // F8H-FBH
 		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, x86_t_F8h[p.x86.op & 3]);
+			adbg_dasm_push_str(p, x86_T_F8h[p.x86.op & 3]);
 		return;
 	default: // FCH-FFH
 		MemWidth w = adbg_dasm_x86_modrm_width(p, p.x86.op);
@@ -1544,7 +1543,7 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 			}
 			int w = p.x86.op & X86_FLAG_WIDE;
 			if (p.mode >= DisasmMode.File)
-				adbg_dasm_push_str(p, x86_t_0F_18h[w][mi]);
+				adbg_dasm_push_str(p, x86_T_0F_18h[w][mi]);
 			if (w) {
 				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				if (p.mode >= DisasmMode.File)
@@ -1601,10 +1600,10 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 		int r = (modrm & MODRM_REG) >> 3;
 		const(char) *sr = void; // special reg
 		if (p.x86.op & X86_FLAG_WIDE) {
-			sr = x86_t_DR[r];
+			sr = x86_T_DR[r];
 		} else {
 			if (p.x86.lock) r |= 0b1000;
-			sr = x86_t_CR[r];
+			sr = x86_T_CR[r];
 		}
 		const(char) *reg = adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i32);
 		if (p.x86.op & X86_FLAG_DIR) {
@@ -1728,7 +1727,7 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 		return;
 	case 0x40, 0x44, 0x48, 0x4C: // 40H-4FH
 		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, x86_t_CMOVcc[p.x86.op & 15]);
+			adbg_dasm_push_str(p, x86_T_CMOVcc[p.x86.op & 15]);
 		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		return;
 	case 0x50: // 50H-53H
@@ -1836,7 +1835,7 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 		}
 		if (p.mode >= DisasmMode.File) {
 			s |= (p.x86.op & 3) << 2;
-			adbg_dasm_push_str(p, x86_t_0F_5Ch[s]);
+			adbg_dasm_push_str(p, x86_T_0F_5Ch[s]);
 		}
 		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -2235,14 +2234,14 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 		return;
 	case 0x80, 0x84, 0x88, 0x8C: // 80H-83H
 		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, x86_t_Jcc[p.x86.op & 15]);
+			adbg_dasm_push_str(p, x86_T_Jcc[p.x86.op & 15]);
 		adbg_dasm_x86_u32imm(p);
 		return;
 	case 0x90, 0x94, 0x98, 0x9C: // 90H-93H
 		ubyte modrm = *p.ai8;
 		++p.ai8;
 		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, x86_t_SETcc[p.x86.op & 15]);
+			adbg_dasm_push_str(p, x86_T_SETcc[p.x86.op & 15]);
 		adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i8, MemWidth.i8);
 		return;
 	case 0xA0: // A0H-A3H
@@ -4260,7 +4259,69 @@ void adbg_dasm_x86_vex_0f(disasm_params_t *p) {
 			return;
 		}
 		if (p.mode >= DisasmMode.File)
-			adbg_dasm_push_str(p, x86_t_VEX_0F_E8h[p.x86.op & 7]);
+			adbg_dasm_push_str(p, x86_T_VEX_0F_E8h[p.x86.op & 7]);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
+	case 0xF0:
+		const(char) *m = void;
+		int f = void;
+		if (p.x86.op & X86_FLAG_DIR) {
+			if (p.x86.vex_pp != X86_VEX_PP_66H) {
+				adbg_dasm_err(p);
+				return;
+			}
+			m = p.x86.op & X86_FLAG_WIDE ? "vpsllq" : "vpslld";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
+		} else {
+			if (p.x86.op & X86_FLAG_WIDE) {
+				if (p.x86.vex_pp != X86_VEX_PP_66H) {
+					adbg_dasm_err(p);
+					return;
+				}
+				m = "vpsllw";
+				f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
+			} else {
+				if (p.x86.vex_pp != X86_VEX_PP_F2H) {
+					adbg_dasm_err(p);
+					return;
+				}
+				m = "vlddqu";
+				f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
+			}
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, x86_T_VEX_0F_E8h[p.x86.op & 7]);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	case 0xF4, 0xF8:
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		int i = p.x86.op & 7;
+		int f = void;
+		if (i == 0b111) {
+			if ((*p.ai8 & MODRM_MOD) != MODRM_MOD_11) {
+				adbg_dasm_err(p);
+				return;
+			}
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
+		} else f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, x86_T_VEX_0F_F4h[i]);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	case 0xFB:
+		int i = p.x86.op & 3;
+		const(char) *m = void;
+		switch (i) {
+		case 0: m = "vpaddb"; break;
+		case 1: m = "vpaddw"; break;
+		case 2: m = "vpaddd"; break;
+		default: adbg_dasm_err(p); return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
 		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	default: adbg_dasm_err(p); return;
@@ -4273,7 +4334,18 @@ void adbg_dasm_x86_vex_0f38(disasm_params_t *p) {
 
 	if (p.mode >= DisasmMode.File)
 		adbg_dasm_push_x8(p, p.x86.op);
-	
+
+	switch (p.x86.op & 252) {
+	case 0, 0x04, 0x08, 0x0C:
+		int f = p.x86.op >= 0x0E ?
+			X86_FLAG_DIR | X86_FLAG_MODW_128B :
+			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, x86_T_VEX_0F38_00h[p.x86.op & 15]);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	default: adbg_dasm_err(p); return;
+	}
 }
 
 void adbg_dasm_x86_vex_0f3a(disasm_params_t *p) {
@@ -4316,98 +4388,108 @@ void adbg_dasm_x86_xop_10(disasm_params_t *p) {
 // ANCHOR: Shared instruction tables
 //
 
-__gshared const(char) *[]x86_t_segs = [
+__gshared const(char) *[]x86_T_segs = [
 	"es:", "cs:", "ss:", "ds:", "fs:", "gs:"
 ];
-__gshared const(char) *[]x86_t_grp1 = [
+__gshared const(char) *[]x86_T_grp1 = [
 	"add", "or", "adc", "sbb", "and", "sub", "xor", "cmp"
 ];
-__gshared const(char) *[]x86_t_grp2 = [
+__gshared const(char) *[]x86_T_grp2 = [
 	"ror", "rcl", "rcr", "shl", "shr", "ror", null, "sar"
 ];
-__gshared const(char) *[]x86_t_bcd = [
+__gshared const(char) *[]x86_T_bcd = [
 	"daa", "das", "aaa", "aas"
 ];
-__gshared const(char) *[]x86_t_6Ch = [
+__gshared const(char) *[]x86_T_6Ch = [
 	"insb", "insd", "outsb", "outsd"
 ];
-__gshared const(char) *[]x86_t_40h = [
+__gshared const(char) *[]x86_T_40h = [
 	"inc", "dec", "push", "pop"
 ];
-__gshared const(char) *[]x86_t_9Ch = [
+__gshared const(char) *[]x86_T_9Ch = [
 	"pushf", "popf", "sahf", "lahf"
 ];
-__gshared const(char) *[]x86_t_E0h = [
+__gshared const(char) *[]x86_T_E0h = [
 	"loopne", "loope", "loop", "jecxz"
 ];
-__gshared const(char) *[]x86_t_F4h = [
+__gshared const(char) *[]x86_T_F4h = [
 	"test", null, "not", "neg", "mul", "imul", "div", "idiv"
 ];
-__gshared const(char) *[]x86_t_F8h = [
+__gshared const(char) *[]x86_T_F8h = [
 	"clc", "stc", "cli", "sti"
 ];
-__gshared const(char) *[][]x86_t_0F_18h = [
+__gshared const(char) *[][]x86_T_0F_18h = [
 	[ "bndldx", "bndmov", "bndcu", "bndcl" ],
 	[ "bndstx", "bndmov", "bndcn", "bndmk" ]
 ];
-__gshared const(char) *[]x86_t_0F_5Ch = [
+__gshared const(char) *[]x86_T_0F_5Ch = [
 	"subps", "subpd", "subsd", "subss", // D=0 W=0
 	"minps", "minpd", "minsd", "minss", // D=0 W=1
 	"divps", "divpd", "divsd", "divss", // D=1 W=0
 	"maxps", "maxpd", "maxsd", "maxss"  // D=1 W=1
 ];
-__gshared const(char) *[]x86_t_VEX_0F_E8h = [
+__gshared const(char) *[]x86_T_VEX_0F_E8h = [
 	"vpsubsb", "vpsubsw", "vpminsw", "vpor",
 	"vpaddsb", "vpaddsw", "vpmaxsw", "vpxor"
 ];
-__gshared const(char) *[]x86_t_Jcc = [
+__gshared const(char) *[]x86_T_VEX_0F_F4h = [
+	"vpsubb", "vpsubw", "vpsubd", "vpsubq",          // F8H-FBH
+	"vpmuludq", "vpmaddwd", "vpsadbw", "vmaskmovdqu" // F4H-F7H
+];
+__gshared const(char) *[]x86_T_VEX_0F38_00h = [
+	"vpshufb", "vphaddw", "vphaddd", "vphaddsw",
+	"vpmaddubsw", "vphsubw", "vphsubd", "vphsubsw",
+	"vpsignb", "vpsignw", "vpsignd", "vpmulhrsw",
+	"vpermilps", "vpermilpd", "vtestps", "vtestpd"
+];
+__gshared const(char) *[]x86_T_Jcc = [
 	"jo", "jno", "jb", "jnb",
 	"jz", "jnz", "jbe", "jnbe",
 	"js", "jns", "jp", "jnp",
 	"jl", "jnl", "jle", "jnle",
 ];
-__gshared const(char) *[]x86_t_CMOVcc = [
+__gshared const(char) *[]x86_T_CMOVcc = [
 	"cmovo", "cmovno", "cmovb", "cmovae",
 	"cmove", "cmovne", "cmovbe", "cmova",
 	"cmovs", "cmovns", "cmovp", "cmovnp",
 	"cmovl", "cmovnl", "cmovle", "cmovnle"
 ];
-__gshared const(char) *[]x86_t_SETcc = [
+__gshared const(char) *[]x86_T_SETcc = [
 	"seto", "setno", "setb", "setae",
 	"sete", "setne", "setbe", "seta",
 	"sets", "setns", "setp", "setnp",
 	"setl", "setnl", "setle", "setnle"
 ];
-__gshared const(char) *[]x86_t_FLT1 = [
+__gshared const(char) *[]x86_T_FLT1 = [
 	"fadd", "fmul", "fcom", "fcomp", "fsub", "fsubr", "fdiv", "fdivr"
 ];
-__gshared const(char) *[]x86_t_FLT2 = [
+__gshared const(char) *[]x86_T_FLT2 = [
 	"fiadd", "fimul", "ficom", "ficomp", "fisub", "fisubr", "fidiv", "fidivr"
 ];
-__gshared const(char) *[]x86_t_FLT3 = [
+__gshared const(char) *[]x86_T_FLT3 = [
 	"fild", "fisttp", "fist", "fistp", "fbld", "fild", "fbstp", "fistp"
 ];
-__gshared const(char) *[]x86_t_FLT4 = [
+__gshared const(char) *[]x86_T_FLT4 = [
 	"f2xm1", "fyl2x", "fptan", "fpatan", "fxtract", "fprem1", "fdecstp", "fincstp",
 	"fprem", "fyl2xp1", "fsqrt", "fsincos", "frndint", "fscale", "fsin", "fcos"
 ];
-__gshared const(char) *[]x86_t_FLT5 = [
+__gshared const(char) *[]x86_T_FLT5 = [
 	"fchs", "fabs", null, null, "ftst", "fxam", null, null,
 	"fld1", "fldl2t", "fldl2e", "fldpi", "fldlg2", "fldln2", "fldz", null
 ];
-__gshared const(char) *[]x86_t_FLT6 = [
+__gshared const(char) *[]x86_T_FLT6 = [
 	"fld", null, "fst", "fstp", "fldenv", "fldcw", "fstenv", "fstcw"
 ];
-__gshared const(char) *[]x86_t_FLT7 = [
+__gshared const(char) *[]x86_T_FLT7 = [
 	"fild", "fisttp", "fist", "fistp", null, "fld", null, "fstp"
 ];
-__gshared const(char) *[]x86_t_FLT8 = [
+__gshared const(char) *[]x86_T_FLT8 = [
 	"fild", "fisttp", "fst", "fstp", "frstor", null, "fsave", "fstsw"
 ];
-__gshared const(char) *[]x86_t_DR = [
+__gshared const(char) *[]x86_T_DR = [
 	"dr0", "dr1", "dr2", "dr3", "dr4", "dr5", "dr6", "dr7"
 ];
-__gshared const(char) *[]x86_t_CR = [
+__gshared const(char) *[]x86_T_CR = [
 	"cr0", "cr1", "cr2", "cr3", "cr4", "cr5", "cr6", "cr7",
 	"cr8", "cr9", "cr10", "cr11", "cr12", "cr13", "cr14", "cr15"
 ];
@@ -4672,8 +4754,8 @@ enum x86SegReg { // By official arrangement
 /// Returns an empty string if unset.
 /// Params: segreg = Byte opcode
 /// Returns: Segment register string
-const(char) *adbg_dasm_x86_t_segstr(int segreg) {
-	return segreg ? x86_t_segs[segreg] : "";
+const(char) *adbg_dasm_x86_T_segstr(int segreg) {
+	return segreg ? x86_T_segs[segreg] : "";
 }
 
 /// While it is the formatter's job to format registers, the long legacy of
@@ -4795,7 +4877,7 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 
 	if (filemode) {
 		adbg_dasm_push_x8(p, modrm);
-		seg = adbg_dasm_x86_t_segstr(p.x86.segreg);
+		seg = adbg_dasm_x86_T_segstr(p.x86.segreg);
 	}
 
 	int mode = modrm & MODRM_MOD;
@@ -4906,7 +4988,7 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 
 	if (p.mode >= DisasmMode.File) {
 		adbg_dasm_push_x8(p, sib);
-		seg = adbg_dasm_x86_t_segstr(p.x86.segreg);
+		seg = adbg_dasm_x86_T_segstr(p.x86.segreg);
 	}
 
 	switch (modrm & MODRM_MOD) { // Mode
@@ -5052,7 +5134,7 @@ L_3RM:
 L_3REG:
 		if (p.mode >= DisasmMode.File) {
 			const(char)* r1 = adbg_dasm_x86_modrm_reg(p, modrm, wreg);
-			const(char)* r2 = adbg_dasm_x86_modrm_reg(p, p.x86_64.vex_vvvv, sw);
+			const(char)* r2 = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
 			if (dir) {
 				adbg_dasm_push_reg(p, r1);
 				adbg_dasm_push_reg(p, r2);
