@@ -11,25 +11,12 @@ _Why not make one from scratch myself?_ I asked myself.
 
 Personal Goals:
 
+- [ ] Make the debugging engine available to D user applications via templates.
 - [ ] Make a usable Text UI close to a professional debugger
 - [ ] Debug an application on my Raspberry Pi 3B+ and my Purism Librem 5
 - [ ] Disassemble ARM instructions with the Intel syntax
 - [ ] Embed, as a library, into an embedded HTTP server to provide a local WebUI
 - [ ] Make a disassembly as a service
-
-Roadmap:
-
-- 0.1: INIT
-  - Disassembler: x86 and x86-64 disassembler
-  - Dumper: PE support
-  - Debug UI: loop
-  - OS: Windows and Linux
-- 0.2: Sup, World?
-  - Dumper: ELF support
-  - Symbols
-  - alicedbg.1
-- 0.3: Useful
-  - alicedbg.3
 
 ## Support Matrix
 
@@ -38,11 +25,10 @@ Roadmap:
 | Platform | OS | CRT | Debugging core |
 |---|---|---|:-:|
 | x86 | Windows 7 and up | Microsoft (+WOW64) | ✔️ |
-| | Linux | Glibc | ✔️* |
+| | Linux | Glibc | WIP |
+| | Linux | Musl | WIP |
 | ARM | Windows 10 | Microsoft |  |
 | | Linux | Glibc | Planned! |
-
-\* Currently unstable
 
 ### Disassembler Support
 
@@ -55,11 +41,11 @@ Roadmap:
 | arm-a64 | 0 | | Waiting on x86-64 |
 | riscv-32 | 1 | RVC 2.0, RV32I 2.1 | |
 | riscv-64 | 0 | | Waiting on riscv-32 |
-| riscv-128 | 0 | | Waiting on riscv-32 |
-| powerpc-32 | 0 | | Planned |
-| powerpc-64 | 0 | | Planned |
+| riscv-128 | 0 | | Planned |
+| power-32 | 0 | | Planned |
+| power-64 | 0 | | Planned |
 | webasm | 0 | | Planned |
-| cil | 0 | | Planned |
+| msil/cil | 0 | | Planned |
 
 ### Object Dump Support
 
@@ -112,11 +98,8 @@ from the ffmpeg project (`-option [value]`).
 | `-raw` | | | (Dumper) Skip file format detection and process as raw blob |
 | `-show` | `A`,`h`,`s`,`i`,`d` | `h` | (Dumper) Include item(s) into output |
 
-Default operating mode is set to the debugger, and the default UI is set to the
-TUI type.
-
 The only default argument sets the debug type to a file with a file path.
-Example: `alicedbg putty.exe -dump -show s`
+Example: `alicedbg putty.exe --dump -S s`
 
 ### UI: loop
 
@@ -172,11 +155,6 @@ Phobos functions may be used.
 
 Planned.
 
-## Manually
-
-It's still possible to compile the project by referencing every source files.
-The `-betterC` switch is optional, but recommended.
-
 ## Fuzzing with AFL
 
 In order to preform a fuzz, ldc version 1.0.0 or newer and AFL 2.50 or newer
@@ -204,7 +182,7 @@ remains a good tool for its deterministic behavior.
 To use zzuf, you will require a valid binary program, either flat for the
 disassembler or an image-type for the dumper. The main parameters are `-r`
 (rate) and `-s` (seed). A basic one-time fuzz can be written as
-`zzuf -r 0.10 -s 47289 ./alice -dump -raw -march x86 bin/x86`, zzuf will
+`zzuf -r 0.10 -s 47289 ./alice --dump --raw --march x86 bin/x86`, zzuf will
 automatically pick up the file opening operating and start fuzzing.
 
 A way to automate this would be using a combination of `--seed=START:STOP`
