@@ -8,7 +8,7 @@ module adbg.consts;
 extern (C):
 
 //
-// ANCHOR Settings
+// ANCHOR Compile settings
 //
 
 /// Amount of pointers to allocate
@@ -16,7 +16,7 @@ enum CLI_ARGV_ARRAY_SIZE	= 16;
 /// Length of array for argv parsing
 enum CLI_ARGV_ARRAY_LENGTH	= CLI_ARGV_ARRAY_SIZE * size_t.sizeof;
 /// The maximum amount of breakpoints that the debugger can have.
-enum DEBUGGER_MAX_BREAKPOINTS = 4;
+enum DEBUGGER_MAX_BREAKPOINTS	= 4;
 
 //
 // Constants
@@ -57,21 +57,18 @@ pragma(msg, "* isa: ", __PLATFORM__);
 
 version (CRuntime_Microsoft)
 	enum __CRT__ = "Microsoft";	/// Platform CRT string
-else
-version (CRuntime_Bionic)
+else version (CRuntime_Bionic)
 	enum __CRT__ = "Bionic";	/// Platform CRT string
-else
-version (CRuntime_DigitalMars)
+else version (CRuntime_DigitalMars)
 	enum __CRT__ = "DigitalMars";	/// Platform CRT string
-else
-version (CRuntime_Glibc)
+else version (CRuntime_Glibc)
 	enum __CRT__ = "Glibc";	/// Platform CRT string
-else
-version (CRuntime_Musl)
+else version (CRuntime_Musl)
 	enum __CRT__ = "Musl";	/// Platform CRT string
-else
-version (CRuntime_UClibc)
+else version (CRuntime_UClibc)
 	enum __CRT__ = "UClibc";	/// Platform CRT string
+else version (CRuntime_WASI)
+	enum __CRT__ = "WASI";	/// Platform CRT string
 else
 	enum __CRT__ = "Unknown";	/// Platform CRT string
 
@@ -83,62 +80,43 @@ pragma(msg, "* crt: ", __CRT__);
 
 version (Win64)
 	enum __OS__ = "Win64";	/// Platform OS string
-else
-version (Win32)
+else version (Win32)
 	enum __OS__ = "Win32";	/// Platform OS string
-else
-version (linux)
+else version (linux)
 	enum __OS__ = "Linux";	/// Platform OS string
-else
-version (OSX)
+else version (OSX)
 	enum __OS__ = "macOS";	/// Platform OS string
-else
-version (FreeBSD)
+else version (FreeBSD)
 	enum __OS__ = "FreeBSD";	/// Platform OS string
-else
-version (OpenBSD)
+else version (OpenBSD)
 	enum __OS__ = "OpenBSD";	/// Platform OS string
-else
-version (NetBSD)
+else version (NetBSD)
 	enum __OS__ = "NetBSD";	/// Platform OS string
-else
-version (DragonflyBSD)
+else version (DragonflyBSD)
 	enum __OS__ = "DragonflyBSD";	/// Platform OS string
-else
-version (BSD)
+else version (BSD)
 	enum __OS__ = "BSD";	/// Platform OS string
-else
-version (Solaris)
+else version (Solaris)
 	enum __OS__ = "Solaris";	/// Platform OS string
-else
-version (AIX)
+else version (AIX)
 	enum __OS__ = "AIX";	/// Platform OS string
-else
-version (SkyOS)
+else version (SkyOS)
 	enum __OS__ = "SkyOS";	/// Platform OS string
-else
-version (SysV3)
+else version (SysV3)
 	enum __OS__ = "SysV3";	/// Platform OS string
-else
-version (SysV4)
+else version (SysV4)
 	enum __OS__ = "SysV4";	/// Platform OS string
-else
-version (Hurd)
+else version (Hurd)
 	enum __OS__ = "GNU Hurd";	/// Platform OS string
-else
-version (Android)
+else version (Android)
 	enum __OS__ = "Android";	/// Platform OS string
-else
-version (Emscripten)
+else version (Emscripten)
 	enum __OS__ = "Emscripten";	/// Platform OS string
-else
-version (PlayStation)
+else version (PlayStation)
 	enum __OS__ = "PlayStation";	/// Platform OS string
-else
-version (PlayStation3)
+else version (PlayStation3)
 	enum __OS__ = "PlayStation3";	/// Platform OS string
-else
-	enum __OS__ = "Unknown";	/// Platform OS string
+else enum __OS__ = "Unknown";	/// Platform OS string
 
 pragma(msg, "* os: ", __OS__);
 
@@ -172,23 +150,23 @@ version (COMPILER_TARGETINFO) {
 	/// Target float ABI string
 	enum __TARGET_FLOAT_ABI__  = "unknown";
 	version (CppRuntime_Gcc)
-		/// Target C++ Runtime string
-		enum __TARGET_CPP_RT__ = "libstdc++";
-	else
-	version (CppRuntime_Microsoft)
-		/// Target C++ Runtime string
-		enum __TARGET_CPP_RT__ = "libcmt";
-	else
-		/// Target C++ Runtime string
-		enum __TARGET_CPP_RT__ = "none"; // assuming none
+		enum __TARGET_CPP_RT__ = "libstdc++"; /// Target C++ Runtime string
+	else version (CppRuntime_Microsoft)
+		enum __TARGET_CPP_RT__ = "libcmt"; /// Target C++ Runtime string
+	else version (CppRuntime_Clang)
+		enum __TARGET_CPP_RT__ = "clang"; /// Target C++ Runtime string
+	else version (CppRuntime_DigitalMars)
+		enum __TARGET_CPP_RT__ = "dmc++"; /// Target C++ Runtime string
+	else version (CppRuntime_Sun)
+		enum __TARGET_CPP_RT__ = "sun"; /// Target C++ Runtime string
+	else // assuming none
+		enum __TARGET_CPP_RT__ = "none"; /// Target C++ Runtime string
 }
 
 version (COMPILER_TARGETINFO_CPU) {
-	/// Target CPU string (LDC-only)
-	enum __TARGET_CPU__ = __traits(targetCPU);
+	enum __TARGET_CPU__ = __traits(targetCPU); /// Target CPU string (LDC-only)
 } else {
-	/// Target CPU string (LDC-only)
-	enum __TARGET_CPU__ = __PLATFORM__;
+	enum __TARGET_CPU__ = __PLATFORM__; /// Target CPU string (LDC-only)
 }
 
 //
@@ -199,8 +177,7 @@ version (DigitalMars) {
 	version (D_InlineAsm_X86) {
 		version = DMD_ASM_X86;
 		version = DMD_ASM_X86_ANY;
-	} else
-	version (D_InlineAsm_X86_64) {
+	} else version (D_InlineAsm_X86_64) {
 		version = DMD_ASM_X86_64;
 		version = DMD_ASM_X86_ANY;
 	}
@@ -209,8 +186,7 @@ version (LDC) {
 	version (D_InlineAsm_X86) {
 		version = LDC_ASM_X86;
 		version = LDC_ASM_X86_ANY;
-	} else
-	version (D_InlineAsm_X86_64) {
+	} else version (D_InlineAsm_X86_64) {
 		version = LDC_ASM_X86_64;
 		version = LDC_ASM_X86_ANY;
 	}
@@ -219,8 +195,7 @@ version (GNU_Inline) {
 	version (X86) {
 		version = GDC_ASM_X86;
 		version = GDC_ASM_X86_ANY;
-	} else
-	version (X86_64) {
+	} else version (X86_64) {
 		version = GDC_ASM_X86_64;
 		version = GDC_ASM_X86_ANY;
 	}
@@ -230,15 +205,31 @@ version (GNU_Inline) {
 // ANCHOR External functions
 //
 
+/**
+ * Get library version string
+ * Returns: version-buildtype-platform string
+ */
 const(char) *adbg_info_version() {
 	return APP_VERSION ~ "-" ~ __BUILDTYPE__ ~ "-" ~ __PLATFORM__;
 }
+/**
+ * Get library compilation platform
+ * Returns: __PLATFORM__ string
+ */
 const(char) *adbg_info_platform() {
 	return __PLATFORM__;
 }
+/**
+ * Get library compilation crt
+ * Returns: __CRT__ string
+ */
 const(char) *adbg_info_crt() {
 	return __CRT__;
 }
+/**
+ * Get library compilation os
+ * Returns: __OS__ string
+ */
 const(char) *adbg_info_os() {
 	return __OS__;
 }
