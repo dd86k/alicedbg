@@ -34,6 +34,7 @@ enum CLIPage {
 	syntaxes,
 	marchs,
 	license,
+	surprise
 }
 
 // for debugger
@@ -51,7 +52,7 @@ enum DebuggerMode {
 }
 
 /// CLI options
-struct cliopt_t {
+struct mainopt_t {
 	CLIOpMode mode;
 	DebuggerUI ui;
 	DebuggerMode debugtype;
@@ -66,7 +67,7 @@ struct cliopt_t {
 }
 
 /// CLI option structure, good for looping over
-struct cliopt {
+struct mainopt {
 	const(char)* name;
 	union {
 		int i32;
@@ -81,8 +82,9 @@ int cliver() {
 	printf(
 	"alicedbg-"~__PLATFORM__~" "~APP_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
 	"License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
-	"Home: <https://git.dd86k.space/dd86k/alicedbg>\n"~
-	"Mirror: <https://github.com/dd86k/alicedbg>\n"~
+	"Homes:\n"~
+	" - <https://git.dd86k.space/dd86k/alicedbg>\n"~
+	" - <https://github.com/dd86k/alicedbg>\n"~
 	"Compiler: "~__VENDOR__~" %u.%03u, "~__TARGET_OBJ_FORMAT__~" obj, "~__TARGET_FLOAT_ABI__~" float\n"~
 	"CRT: "~__CRT__~" (cpprt: "~__TARGET_CPP_RT__~") on "~__OS__~"\n"~
 	"CPU: "~__TARGET_CPU__~"\n"~
@@ -184,6 +186,18 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
 		break;
+	case surprise:
+		r = `
++------------------+
+| Meow, I hate x86 |
++--+---------------+
+   |    A_A
+   +-  (-.-)
+       /   \    _
+      /     \__/
+      \_||__/
+`;
+		break;
 	}
 	puts(r);
 	return EXIT_SUCCESS;
@@ -193,7 +207,7 @@ int main(int argc, const(char) **argv) {
 	if (argc <= 1)
 		return clipage(CLIPage.main);
 
-	cliopt_t opt;	/// Defaults to .init
+	mainopt_t opt;	/// Defaults to .init
 	disasm_params_t disopt;	/// .init
 
 	cli: for (size_t argi = 1; argi < argc; ++argi) {
@@ -293,7 +307,7 @@ int main(int argc, const(char) **argv) {
 				puts("cli: architecture argument missing");
 				return EXIT_FAILURE;
 			}
-			__gshared cliopt[] isaopts = [
+			__gshared mainopt[] isaopts = [
 				{ "i386", DisasmISA.x86 },
 				{ "x86", DisasmISA.x86 },
 				{ "8086", DisasmISA.x86_16 },
@@ -306,7 +320,7 @@ int main(int argc, const(char) **argv) {
 //				{ "a32", DisasmISA.arm_a32 },
 //				{ "aarch64", DisasmISA.arm_a64 },
 //				{ "arm64", DisasmISA.arm_a64 },
-//				{ "rv32", DisasmISA.rv32 },
+				{ "rv32", DisasmISA.rv32 },
 //				{ "riscv32", DisasmISA.rv32 },
 //				{ "risc:rv32", DisasmISA.rv32 },
 //				{ "rv64", DisasmISA.rv64 },
@@ -317,7 +331,7 @@ int main(int argc, const(char) **argv) {
 				{ "?", 255 },
 			];
 			const(char) *march = argv[++argi];
-			foreach (ref cliopt o; isaopts) {
+			foreach (ref mainopt o; isaopts) {
 				if (strcmp(march, o.name) == 0) {
 					if (o.i32 == 255)
 						return clipage(CLIPage.marchs);
@@ -344,8 +358,8 @@ int main(int argc, const(char) **argv) {
 			continue;
 		}
 
-		// (dumper) --raw: file is raw
-		if (strcmp(arg, "-raw") == 0) {
+		// (dumper) -R/--raw: file is raw
+		if (strcmp(arg, "R") == 0 || strcmp(arg, "-raw") == 0) {
 			opt.flags |= DUMPER_FILE_RAW;
 			continue;
 		}
@@ -390,14 +404,14 @@ int main(int argc, const(char) **argv) {
 				puts("cli: syntax argument missing");
 				return EXIT_FAILURE;
 			}
-			__gshared cliopt[] syntaxopts = [
+			__gshared mainopt[] syntaxopts = [
 				{ "intel", DisasmSyntax.Intel },
 				{ "nasm", DisasmSyntax.Nasm },
 				{ "att", DisasmSyntax.Att },
 				{ "?", 255 },
 			];
 			const(char) *syntax = argv[++argi];
-			foreach (ref cliopt o; syntaxopts) {
+			foreach (ref mainopt o; syntaxopts) {
 				if (strcmp(syntax, o.name) == 0) {
 					if (o.i32 == 255)
 						return clipage(CLIPage.syntaxes);
@@ -423,6 +437,8 @@ int main(int argc, const(char) **argv) {
 			return clipage(CLIPage.main);
 		if (strcmp(arg, "-license") == 0)
 			return clipage(CLIPage.license);
+		if (strcmp(arg, "-meow") == 0)
+			return clipage(CLIPage.surprise);
 
 		printf("unknown option: %s\n", arg);
 		return EXIT_FAILURE;
