@@ -503,7 +503,7 @@ void adbg_dasm_push_x86_sib_m01_i100(disasm_params_t *p,
 void adbg_dasm_err(disasm_params_t *p, DisasmError err = DisasmError.Illegal) {
 	p.error = err;
 	p.mnbufi =
-	adbg_util_stradd(cast(char*)p.mnbuf, DISASM_BUF_SIZE, 0, DISASM_FMT_ERR);
+	adbg_util_stradd(cast(char*)p.mnbuf, DISASM_CBUF_SIZE, 0, DISASM_FMT_ERR);
 }
 
 /// (Internal) Process items in the formatter stack and output them into the
@@ -570,7 +570,7 @@ disasm_fmt_item_t *adbg_dasm_fmt_select(disasm_params_t *p) {
 /// 	s = String
 void adbg_dasm_madd(disasm_params_t *p, const(char) *s) {
 	with (p)
-	mnbufi = adbg_util_stradd(cast(char*)mnbuf, DISASM_BUF_SIZE, mnbufi, s);
+	mnbufi = adbg_util_stradd(cast(char*)mnbuf, DISASM_CBUF_SIZE, mnbufi, s);
 }
 /// (Internal) Add string into the formatter's machine code string buffer.
 /// Called by disasm_push_x* functions.
@@ -579,7 +579,7 @@ void adbg_dasm_madd(disasm_params_t *p, const(char) *s) {
 /// 	s = String
 void adbg_dasm_xadd(disasm_params_t *p, const(char) *s) {
 	with (p)
-	mcbufi = adbg_util_stradd(cast(char*)mcbuf, DISASM_BUF_SIZE, mcbufi, s);
+	mcbufi = adbg_util_stradd(cast(char*)mcbuf, DISASM_CBUF_SIZE, mcbufi, s);
 }
 
 /// (Internal) Format and add item to mnemonic buffer. No-op if
@@ -592,7 +592,7 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 	//      + Ensures all enumeration values are used
 	//      + Barely makes a different by using functions
 
-	ptrdiff_t left = DISASM_BUF_SIZE - p.mnbufi;
+	ptrdiff_t left = DISASM_CBUF_SIZE - p.mnbufi;
 	if (left <= 0) return;
 
 	char *bp = cast(char*)&p.mnbuf + p.mnbufi;

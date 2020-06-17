@@ -7,6 +7,4 @@ module adbg.debugger.disasm.arch;
 
 public import
 	adbg.debugger.disasm.arch.x86,
-	adbg.debugger.disasm.arch.x86_16,
-	adbg.debugger.disasm.arch.x86_64,
-	adbg.debugger.disasm.arch.rv32;
+	adbg.debugger.disasm.arch.riscv;

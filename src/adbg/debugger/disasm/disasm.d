@@ -7,6 +7,7 @@ module adbg.debugger.disasm.disasm;
 
 import adbg.debugger.disasm.arch;
 import adbg.debugger.disasm.formatter;
+import adbg.utils.bit : fswap16, fswap32, fswap64;
 
 extern (C):
 
@@ -15,7 +16,7 @@ extern (C):
 /// Currently, 64 characters is enough to hold SIB memory references, AVX-512
 /// instructions, or 15 bytes of machine code hexadecimal numbers.
 /// If that's not enough, update to 80 characters.
-enum DISASM_BUF_SIZE = 64;
+enum DISASM_CBUF_SIZE = 64;
 
 /// Disassembler operating mode
 enum DisasmMode : ubyte {
@@ -36,7 +37,6 @@ enum DisasmError : ubyte {
 /// Disassembler ABI
 enum DisasmISA : ubyte {
 	platform,	/// (Default) Platform compiled target, see DISASM_DEFAULT_ISA
-	guess,	/// (Not implemented) Attempt to guess ISA
 	x86_16,	/// (WIP) 8086, 80186, 80286
 	x86,	/// (WIP) x86-32, 80386/i386
 	x86_64,	/// (WIP) AMD64, Intel64, x64 (Windows)
@@ -75,7 +75,7 @@ version (AArch64) {
 	enum DISASM_DEFAULT_ISA = DisasmISA.arm_a64;	/// Platform default ABI
 	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Att;	/// Platform default syntax
 } else {
-	static assert(0, "Platform has no default disassembler settings");
+	static assert(0, "Missing default platform disassembler settings");
 }
 
 //
@@ -129,6 +129,11 @@ struct disasm_params_t { align(1):
 	///
 	/// Used in calculating the target address.
 	size_t ba;
+	/// Operation mode.
+	///
+	/// Disassembler operating mode. See the DisasmMode enumeration for
+	/// more details.
+	DisasmMode mode; // placed first for cache-related performance reasons
 	/// Error code.
 	///
 	/// If this field is non-zero, it indicates a decoding error. See the
@@ -144,45 +149,40 @@ struct disasm_params_t { align(1):
 	/// Assembler style when formatting instructions. See the DisasmSyntax
 	/// enumeration for more details.
 	DisasmSyntax syntax;
-	/// Operation mode.
-	///
-	/// Disassembler operating mode. See the DisasmMode enumeration for
-	/// more details.
-	DisasmMode mode;
 	/// Settings flags.
 	///
 	/// Bitwise flag. See DISASM_O_* flags.
 	uint options;
 	size_t mcbufi;	/// Machine code buffer index
-	char [DISASM_BUF_SIZE]mcbuf;	/// Machine code buffer
+	char [DISASM_CBUF_SIZE]mcbuf;	/// Machine code buffer
 	size_t mnbufi;	/// Mnemonics buffer index
-	char [DISASM_BUF_SIZE]mnbuf;	/// Mnemonics buffer
+	char [DISASM_CBUF_SIZE]mnbuf;	/// Mnemonics buffer
 	//
 	// Internal fields
 	//
 	union {
 		void *internal;	/// Used internally
 		x86_internals_t *x86;	/// Used internally
-		x86_64_internals_t *x86_64;	/// Used internally
-		rv32_internals_t *rv32;	/// Used internally
+		riscv_internals_t *rv;	/// Used internally
 	}
 	disasm_fmt_t *fmt;	/// Formatter structure pointer, used internally
+	fswap16 si16;	/// Used internally
+	fswap32 si32;	/// Used internally
+	fswap64 si64;	/// Used internally
 }
 
-//TODO: adbg_dasm_setup
-//      Should greatly help as a library function and speed up a few things.
-//      Namely, with function pointers, and memory allocations (option?)
+//TODO: int adbg_dasm_setup(disasm_params_t *p, int options, DisasmISA isa, DisasmSyntax syntax)
+//      Initiate function pointers (isa and fswap)
+//      Set value for .syntax field
+//      + Setup options and functions once
+//      + Formatter structure pointer can stay (in _line for decoder lifetime)
 
 /**
+ * Populate machine mnemonic and machine code buffers.
+ *
  * Disassemble one instruction from a buffer pointer given in disasm_params_t.
  * Caller must ensure memory pointer points to readable regions and givens
  * bounds are respected. The error field is always set.
- *
- * Disassembling modes go by the following: Size only traverses the instruction
- * stream. (Not implemented) Data fills the newloc field with the calculated
- * value from jumps, branches, and calls. File disassembles the instruction
- * stream and formats the output depending on the syntax/style. (Not
- * implemented) Full also adds labels, and source code (when available).
  *
  * Params:
  * 	p = Disassembler parameters
@@ -215,10 +215,12 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 
 	with (DisasmISA)
 	switch (p.isa) {
-	case x86_16:	adbg_dasm_x86_16(p); break;
-	case x86:	adbg_dasm_x86(p); break;
-	case x86_64:	adbg_dasm_x86_64(p); break;
-	case rv32:	adbg_dasm_rv32(p); break;
+	case x86_16, x86, x86_64:
+		adbg_dasm_x86(p);
+		break;
+	case rv32:
+		adbg_dasm_riscv(p);
+		break;
 	default:
 		adbg_dasm_err(p, DisasmError.NotSupported);
 		p.mcbuf[0] = 0;
@@ -235,9 +237,13 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 	return p.error;
 }
 
-/// See if platform is big-endian (useful for cswap functions). Default values,
-/// such as Default and Guess, return the value for the compiled target, so 0
-/// if the target is in little-endian, and 1 if the target is big-endian.
+//TODO: DisasmISA adbg_dasm_guess(void *p, int size)
+//      Returns Default if really nothing found or errors
+//      Sets .isa
+//      Score system (On min 50 instructions or before size is reached)
+
+/// See if platform is big-endian (useful for fswap functions). The platform
+/// value returns the compilation target's endianness.
 /// Params: isa = DisasmISA value
 /// Returns: Zero if little-endian, non-zero if big-endian
 int adbg_dasm_endian(DisasmISA isa) {
@@ -245,10 +251,8 @@ int adbg_dasm_endian(DisasmISA isa) {
 	switch (isa) {
 	case x86_16, x86, x86_64, rv32, rv64: return 0;
 	default:
-		version (LittleEndian)
-			return 0;
-		else
-			return 1;
+		version (BigEndian) return 1;
+		else return 0;
 	}
 }
 
@@ -264,3 +268,13 @@ const(char) *adbg_dasm_errmsg(DisasmError e) {
 	case Illegal:	return "Illegal instruction";
 	}
 }
+
+// Status: Waiting on _setup function
+//TODO: byte  adbg_dasm_fi8(disasm_params_t*)
+//TODO: short adbg_dasm_fi16(disasm_params_t*)
+//TODO: int   adbg_dasm_fi32(disasm_params_t*)
+//TODO: long  adbg_dasm_fi64(disasm_params_t*)
+//      Add automatically to machine code buffer
+//      Automatically increment pointer
+//      Use structure fswap functions
+//      + Removes the need to add _x8 in _modrm_rm functions

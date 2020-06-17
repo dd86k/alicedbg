@@ -1,9 +1,9 @@
 /**
- * RISC-V 32-bit decoder.
+ * RISC-V decoder
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.disasm.arch.rv32;
+module adbg.debugger.disasm.arch.riscv;
 
 import adbg.debugger.disasm.disasm;
 import adbg.debugger.disasm.formatter;
@@ -12,7 +12,7 @@ import adbg.utils.bit;
 extern (C):
 
 package
-struct rv32_internals_t { align(1):
+struct riscv_internals_t { align(1):
 	union {
 		uint op;
 		version (LittleEndian)
@@ -26,13 +26,14 @@ struct rv32_internals_t { align(1):
 //      1. rv32_ci(string, int) e.g. rv32_ci("c.jal", op);
 //      2. rv32_ci(string, string, int) e.g. rv32_ci("c.jal", "x1", 0x20);
 
-/// Disassemble riscv-32.
+/// Disassemble RISC-V
+/// Note: So far only does risc-v-32
 /// Params: p = Disassembler parameters
-void adbg_dasm_rv32(disasm_params_t *p) {
-	rv32_internals_t i = void;
-	p.rv32 = &i;
+void adbg_dasm_riscv(disasm_params_t *p) {
+	riscv_internals_t i = void;
+//	p.rv = &i;
 
-	// RISC-V fetches by "halfword" (16-bit)
+	// RISC-V C ext. fetches by "halfword" (16-bit)
 	i.op1 = *p.ai16;
 	++p.ai16;
 
@@ -55,7 +56,7 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 				return;
 			int rd = (i.op1 >> 2) & 7;
 			adbg_dasm_push_str(p, "c.addi4spn");
-			adbg_dasm_push_reg(p, adbg_dasm_rv32_rvc_abi_reg(rd));
+			adbg_dasm_push_reg(p, adbg_dasm_riscv_rvc_abi_reg(rd));
 			adbg_dasm_push_imm(p, imm);
 			return;
 		case OP_RVC_FUNC_110: // C.SW
@@ -69,8 +70,8 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 			if (i.op1 & BIT!(5))
 				imm = -imm;
 			adbg_dasm_push_str(p, "c.sw");
-			adbg_dasm_push_reg(p, adbg_dasm_rv32_rvc_abi_reg(rs1));
-			adbg_dasm_push_reg(p, adbg_dasm_rv32_rvc_abi_reg(rs2));
+			adbg_dasm_push_reg(p, adbg_dasm_riscv_rvc_abi_reg(rs1));
+			adbg_dasm_push_reg(p, adbg_dasm_riscv_rvc_abi_reg(rs2));
 			adbg_dasm_push_imm(p, imm);
 			return;
 		default: adbg_dasm_err(p); return; // Yes, 000 is illegal
@@ -86,7 +87,7 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 			if (rd) { // C.ADDI
 				int imm = (i.op1 >> 2) & 31;
 				if (i.op1 & BIT!(12)) imm = -imm;
-				const(char) *rdstr = adbg_dasm_rv32_abi_reg(rd);
+				const(char) *rdstr = adbg_dasm_riscv_abi_reg(rd);
 				adbg_dasm_push_str(p, rd == 2 ? "c.addi16sp" : "c.addi");
 				adbg_dasm_push_reg(p, rdstr);
 				adbg_dasm_push_reg(p, rdstr);
@@ -99,7 +100,7 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 			if (p.mode < DisasmMode.File)
 				return;
 			adbg_dasm_push_str(p, "c.jal");
-			adbg_dasm_push_imm(p, adbg_dasm_rv32_imm_cj(i.op1));
+			adbg_dasm_push_imm(p, adbg_dasm_riscv_imm_cj(i.op1));
 			return;
 		case OP_RVC_FUNC_100: // C.GRP1_1
 			int rd = (i.op1 >> 7) & 7;
@@ -128,9 +129,9 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 				if (p.mode < DisasmMode.File)
 					return;
 				adbg_dasm_push_str(p, m);
-				adbg_dasm_push_reg(p, adbg_dasm_rv32_rvc_abi_reg(rd));
-				adbg_dasm_push_reg(p, adbg_dasm_rv32_rvc_abi_reg(rd));
-				adbg_dasm_push_reg(p, adbg_dasm_rv32_rvc_abi_reg(rs2));
+				adbg_dasm_push_reg(p, adbg_dasm_riscv_rvc_abi_reg(rd));
+				adbg_dasm_push_reg(p, adbg_dasm_riscv_rvc_abi_reg(rd));
+				adbg_dasm_push_reg(p, adbg_dasm_riscv_rvc_abi_reg(rs2));
 				return;
 			}
 		default: adbg_dasm_err(p); return;
@@ -151,7 +152,7 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 			if (i.op1 & BIT!(12))
 				imm |= BIT!(5);
 			adbg_dasm_push_str(p, "c.lwsp");
-			adbg_dasm_push_reg(p, adbg_dasm_rv32_abi_reg(rd));
+			adbg_dasm_push_reg(p, adbg_dasm_riscv_abi_reg(rd));
 			adbg_dasm_push_imm(p, imm);
 			return;
 		case OP_RVC_FUNC_100:
@@ -162,12 +163,12 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 			if (i.op1 & BIT!(12)) {
 				if (rs2) {
 					adbg_dasm_push_str(p, "c.add");
-					adbg_dasm_push_reg(p, adbg_dasm_rv32_rvc_abi_reg(rd));
-					adbg_dasm_push_reg(p, adbg_dasm_rv32_abi_reg(rs2));
+					adbg_dasm_push_reg(p, adbg_dasm_riscv_rvc_abi_reg(rd));
+					adbg_dasm_push_reg(p, adbg_dasm_riscv_abi_reg(rs2));
 				} else {
 					if (rd) {
 						adbg_dasm_push_str(p, "c.jalr");
-						adbg_dasm_push_reg(p, adbg_dasm_rv32_abi_reg(rd));
+						adbg_dasm_push_reg(p, adbg_dasm_riscv_abi_reg(rd));
 					} else {
 						adbg_dasm_push_str(p, "c.ebreak");
 					}
@@ -175,11 +176,11 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 			} else {
 				if (rs2) {
 					adbg_dasm_push_str(p, "c.mv");
-					adbg_dasm_push_reg(p, adbg_dasm_rv32_abi_reg(rd));
-					adbg_dasm_push_reg(p, adbg_dasm_rv32_abi_reg(rs2));
+					adbg_dasm_push_reg(p, adbg_dasm_riscv_abi_reg(rd));
+					adbg_dasm_push_reg(p, adbg_dasm_riscv_abi_reg(rs2));
 				} else {
 					adbg_dasm_push_str(p, "c.jr");
-					adbg_dasm_push_reg(p, adbg_dasm_rv32_abi_reg(rd));
+					adbg_dasm_push_reg(p, adbg_dasm_riscv_abi_reg(rd));
 				}
 			}
 			return;
@@ -189,7 +190,7 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 			int rs2 = (i.op1 >> 2) & 31;
 			int imm = (i.op1 >> 7) & 63;
 			adbg_dasm_push_str(p, "c.swsp");
-			adbg_dasm_push_memregimm(p, adbg_dasm_rv32_abi_reg(rs2), imm, MemWidth.i32);
+			adbg_dasm_push_memregimm(p, adbg_dasm_riscv_abi_reg(rs2), imm, MemWidth.i32);
 			return;
 		default: adbg_dasm_err(p); return;
 		}
@@ -222,8 +223,8 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 		int rs1 = (i.op >> 15) & 31;
 		int rd = (i.op >> 7) & 31;
 		adbg_dasm_push_str(p, m);
-		adbg_dasm_push_reg(p, adbg_dasm_rv32_abi_reg(rd));
-		adbg_dasm_push_reg(p, adbg_dasm_rv32_abi_reg(rs1));
+		adbg_dasm_push_reg(p, adbg_dasm_riscv_abi_reg(rd));
+		adbg_dasm_push_reg(p, adbg_dasm_riscv_abi_reg(rs1));
 		adbg_dasm_push_imm(p, imm);
 		return;
 	case 35: // (0100011) RV32I: SB/SH/SW
@@ -237,12 +238,12 @@ void adbg_dasm_rv32(disasm_params_t *p) {
 		}
 		if (p.mode < DisasmMode.File)
 			return;
-		int imm = adbg_dasm_rv32_imm_s(i.op);
+		int imm = adbg_dasm_riscv_imm_s(i.op);
 		int rs1 = (i.op >> 15) & 31;
 		int rs2 = (i.op >> 20) & 31;
 		adbg_dasm_push_str(p, m);
-		adbg_dasm_push_memregimm(p, adbg_dasm_rv32_abi_reg(rs1), imm, w);
-		adbg_dasm_push_reg(p, adbg_dasm_rv32_abi_reg(rs2));
+		adbg_dasm_push_memregimm(p, adbg_dasm_riscv_abi_reg(rs1), imm, w);
+		adbg_dasm_push_reg(p, adbg_dasm_riscv_abi_reg(rs2));
 		return;
 	default: adbg_dasm_err(p);
 	}
@@ -283,7 +284,7 @@ enum OP_RVC_FUNC_111 = 0xE000;
 /// Caller is responsible for masking the input value.
 /// Params: s = 5-bit selector
 /// Returns: Register string
-const(char) *adbg_dasm_rv32_abi_reg(int s) {
+const(char) *adbg_dasm_riscv_abi_reg(int s) {
 	__gshared const(char) *[]rv32_regs = [
 		"zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", // x0-x7
 		"s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",   // x8-15
@@ -297,15 +298,15 @@ const(char) *adbg_dasm_rv32_abi_reg(int s) {
 /// Caller is responsible for masking the input value.
 /// Params: s = 3-bit value
 /// Returns: Register string
-const(char) *adbg_dasm_rv32_rvc_abi_reg(int s) {
-	return adbg_dasm_rv32_abi_reg(s + 8);
+const(char) *adbg_dasm_riscv_rvc_abi_reg(int s) {
+	return adbg_dasm_riscv_abi_reg(s + 8);
 }
 
 //
 // Helpers
 //
 
-int adbg_dasm_rv32_imm_cj(ushort op) {	// C.J type
+int adbg_dasm_riscv_imm_cj(ushort op) {	// C.J type
 	// inspired by objdump 2.28 (include/opcode/riscv.h)
 	return	((op & 0x38) >> 2) |
 		((op & BIT!(11)) >> 7) |
@@ -317,7 +318,7 @@ int adbg_dasm_rv32_imm_cj(ushort op) {	// C.J type
 		(-(op & BIT!(12)) >> 1);
 }
 
-int adbg_dasm_rv32_imm_s(uint op) {	// S type
+int adbg_dasm_riscv_imm_s(uint op) {	// S type
 	return	((op >> 7) & 31 |
 		((op >> 20) & 4095) |
 		(-((op >> 19) & 0x8_0000)));
