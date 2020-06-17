@@ -295,7 +295,7 @@ int main(int argc, const(char) **argv) {
 			else if (strcmp(ui, "?") == 0)
 				return clipage(CLIPage.ui);
 			else {
-				printf("Unknown UI: '%s', query \"-ui ?\" for list\n", ui);
+				printf("Unknown UI: '%s', query \"--ui ?\" for list\n", ui);
 				return EXIT_FAILURE;
 			}
 			continue;
@@ -339,7 +339,7 @@ int main(int argc, const(char) **argv) {
 					continue cli;
 				}
 			}
-			printf("Unknown march: '%s', query '-march ?' for list\n", march);
+			printf("Unknown march: '%s', query '--march ?' for list\n", march);
 			return EXIT_FAILURE;
 		}
 
@@ -419,7 +419,7 @@ int main(int argc, const(char) **argv) {
 					continue cli;
 				}
 			}
-			printf("Unknown syntax: '%s', query '-syntax ?' for list\n", syntax);
+			printf("Unknown syntax: '%s', query '--syntax ?' for list\n", syntax);
 			return EXIT_FAILURE;
 		}
 

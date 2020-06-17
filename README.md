@@ -18,36 +18,32 @@ Personal Goals:
 - [ ] Embed, as a library, into an embedded HTTP server to provide a local WebUI
 - [ ] Make a disassembly as a service
 
-## Support Matrix
+# Support Matrix
 
-### Debugger Support
+## Debugger Support
 
 | Platform | OS | CRT | Debugging core |
 |---|---|---|:-:|
-| x86 | Windows 7 and up | Microsoft (+WOW64) | ✔️ |
+| x86 | Windows 7 and up | Microsoft | ✔️ (+WOW64) |
 | | Linux | Glibc | WIP |
 | | Linux | Musl | WIP |
-| ARM | Windows 10 | Microsoft |  |
-| | Linux | Glibc | Planned! |
+| ARM | Windows 10 | Microsoft | Planned |
+| | Linux | Glibc | Planned |
 
-### Disassembler Support
+## Disassembler Support
 
-| Platform | ~% | Extensions | Notes |
-|---|---|---|---|
-| x86-32 | 60 | x87, MMX, SSE (2/3/4.1/4.2/4a), AES, SHA, VMX, SVM 1.0, SMX, WAITPKG | Still adding and fixing |
-| x86-64 | 30 | See x86-32 | Still fixing |
-| arm-t32 | 0 | | Waiting on x86-64 |
-| arm-a32 | 0 | | Waiting on x86-64 |
-| arm-a64 | 0 | | Waiting on x86-64 |
-| riscv-32 | 1 | RVC 2.0, RV32I 2.1 | |
-| riscv-64 | 0 | | Waiting on riscv-32 |
-| riscv-128 | 0 | | Planned |
-| power-32 | 0 | | Planned |
-| power-64 | 0 | | Planned |
-| webasm | 0 | | Planned |
-| msil/cil | 0 | | Planned |
+| Platform | Extensions | Notes |
+|---|---|---|
+| x86 | x87, MMX, SSE (2/3/4.1/4.2/4a), AES, SHA, VMX, SVM 1.0, SMX, WAITPKG, AVX, AVX2 | Mostly done, still WIP |
+| arm-t32 | | Planned |
+| arm-a32 | | Planned |
+| arm-a64 | | Planned |
+| risc-v | RVC 2.0, RV32I 2.1 | Only rv32 so far, not ready |
+| power | | Planned |
+| webasm | | Planned |
+| msil/cil | | Planned |
 
-### Object Dump Support
+## Object Dump Support
 
 | Type | ~% | Extensions | Notes |
 |---|---|---|---|
@@ -59,9 +55,9 @@ Personal Goals:
 | ELF | 0 | | |
 | Mach-O | 0 | | |
 
-## FAQ
+# FAQ
 
-### Why this?
+## Why this?
 
 I've always wanted to make a debugger. Don't get me wrong, GDB and LLDB, among
 other stars like x64dbg and decompilers like Ghidra, are excellent tools.
@@ -69,13 +65,13 @@ other stars like x64dbg and decompilers like Ghidra, are excellent tools.
 However, making this project allowed me to learn further more about varying
 aspects of the underlaying operating system and platform.
 
-### Why D?
+## Why D?
 
 I love the D programming language for so many reason I could go on forever
 talking about it, so I'll just say that I love it for its practical approach
 and technical reasons. It gets the job well done.
 
-### What about the Garbage Collector?
+## What about the Garbage Collector?
 
 The project is compiled with the BetterC mode, so no druntime and no GC. The
 functions are also marked with a C extern so that hopefully C programs (or
@@ -104,7 +100,7 @@ The only default argument, one that does not need an option switch, is the file
 path. This file path argument can be used in any modes (debugger, dumper, and
 profiler). Example: `alicedbg putty.exe --dump --show s`
 
-### UI: loop
+## loop UI
 
 The loop UI is the simplest implementation, featuring simple output on
 exceptions. On an exception, a prompt asks if you wish to continue,
@@ -128,11 +124,11 @@ Which features the exception counter, process ID, thread ID, short exception
 messsage, OS-specific code, memory location, a brief disassembly (when
 available), and register list (when available).
 
-### UI: cmd
+## cmd UI
 
 The command interpreter is currently in development, and is currently not ready for use.
 
-### UI: tui
+## tui UI
 
 The text UI is currently in development, and is currently not ready for use.
 
@@ -150,7 +146,9 @@ Do note that the `betterC` mode is activated for normal builds and
 documentation. Unittesting (and the rest) uses the druntime library so any
 Phobos functions may be used.
 
-Most common commands:
+Usage: `dub COMMAND [-b TYPE] [-c CONFIG] [--compiler={dmd|gdc|ldc2}]`
+
+Common commands:
 - `run` (default): build and run
 - `build`
 - `test`: run unittests
@@ -240,7 +238,7 @@ D Import files), so there are some manual tweaks to do.
 
 1. Generate headers: `dub build -b headers`
 2. Navigate to `dinclude`: `cat * > adbg.di` (Windows: `type * > adbg.di`)
-3. Match and remove "`module.+\n|//.+\n|.+import adbg.+\n|import adbg.+\n`"
+3. Match and remove: `module.+\n|//.+\n|.+import adbg.+\n|import adbg.+\n`
 
 # Homes
 
