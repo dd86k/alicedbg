@@ -1,5 +1,5 @@
 /**
- * x86-32 disassembler.
+ * x86 decoder.
  *
  * License: BSD 3-Clause
  */
@@ -13,12 +13,12 @@ extern (C):
 /// x86 internals structure
 struct x86_internals_t { align(2):
 	ubyte op;	/// Last significant opcode
-	bool modrm;	/// Was modrm involved?
+	bool modrm;	/// Was modrm involved? (Currently MOD!=11 only)
 	ubyte lock;	/// LOCK Prefix
 	ubyte last_prefix;	/// Last effective prefix for 0f (F2H/F3H)
 	ubyte segreg;	/// Last selected segment register
-	ubyte pf_operand; /// 66H Operand prefix
-	ubyte pf_address; /// 67H Address prefix
+	ubyte pf_operand; /// 66H Operand prefix active
+	ubyte pf_address; /// 67H Address prefix active
 	/// VEX byte pos  [0]      [1]      [2]      [3]
 	/// (C5H) VEX.2B: 11000101 RvvvvLpp
 	/// (C4H) VEX.3B: 11000100 RXBmmmmm WvvvvLpp
@@ -310,6 +310,7 @@ L_CONTINUE:
 		}
 		return;
 	case 0x40, 0x44, 0x48, 0x4C: // 40H-4FH
+		// ANCHOR REX prefix
 		if (p.isa == DisasmISA.x86_64) {
 			ushort op = p.x86.vex[0] = p.x86.op;
 			p.x86.vex_W = op & 8;
@@ -341,8 +342,7 @@ L_CONTINUE:
 				m = "arpl";
 				f = X86_FLAG_DIR | X86_FLAG_MODW_8B;
 			} else {
-				// ANCHOR EVEX
-				//TODO: EVEX
+				//TODO: EVEX prefix
 				if ((*p.ai8 & MODRM_MOD) == MODRM_MOD_11) {
 					adbg_dasm_err(p);
 					return;
@@ -601,7 +601,7 @@ L_CONTINUE:
 			adbg_dasm_push_segreg(p, seg, reg);
 		}
 		return;
-	case 0xB0, 0xB4, 0xB8, 0xBC: // B0H-B7H
+	case 0xB0, 0xB4, 0xB8, 0xBC: // B0H-BFH
 		int w = p.x86.op & 0b00_001_000;
 		if (p.mode >= DisasmMode.File) {
 			adbg_dasm_push_str(p, "mov");
@@ -638,7 +638,8 @@ L_CONTINUE:
 		}
 		return;
 	case 0xC4: // C4H-C7H
-		ubyte modrm = *p.ai8;
+		int w = p.x86.op & X86_FLAG_WIDE;
+		align(4) ubyte modrm = *p.ai8;
 		if (p.x86.op & X86_FLAG_DIR) { // GRP11
 			++p.ai8;
 			if (modrm & MODRM_REG) {
@@ -647,49 +648,61 @@ L_CONTINUE:
 			}
 			if (p.mode >= DisasmMode.File)
 				adbg_dasm_push_str(p, "mov");
-			int w = p.x86.op & X86_FLAG_WIDE;
 			adbg_dasm_x86_modrm_rm(p, modrm, w, w);
-			if (p.x86.op & X86_FLAG_WIDE)
-				adbg_dasm_x86_u32imm(p);
-			else
-				adbg_dasm_x86_u8imm(p);
+			if (w)	adbg_dasm_x86_u32imm(p);
+			else	adbg_dasm_x86_u8imm(p);
 		} else { // MOD=11 checking is only in x86-32
-			if ((modrm & MODRM_MOD) == MODRM_MOD_11) {
-				// ANCHOR: VEX prefixes
-				p.x86.vex[0] = p.x86.op;
-				p.x86.vex[1] = modrm;
-				if (p.x86.op & X86_FLAG_WIDE) { // C5H, VEX 2-byte prefix
+			bool x64 = p.isa == DisasmISA.x86_64;
+			if (x64 == false) {
+				if ((modrm & MODRM_MOD) != MODRM_MOD_11) {
 					if (p.mode >= DisasmMode.File)
-						adbg_dasm_push_x8(p, modrm);
-					int mask = p.isa == DisasmISA.x86_64 ? 120 : 56;
-					p.x86.vex_vvvv = cast(ubyte)((~cast(int)modrm & mask) >> 3);
-					p.x86.vex_L    = modrm & 4;
-					p.x86.vex_pp   = modrm & 3;
-					++p.ai8;
-					adbg_dasm_x86_vex_0f(p);
-				} else { // C4H, VEX 3-byte prefix
-					ubyte u8 = p.x86.vex[2] = *(p.ai8 + 1);
-					if (p.mode >= DisasmMode.File) {
-						adbg_dasm_push_x8(p, modrm);
-						adbg_dasm_push_x8(p, p.x86.vex[2]);
-					}
-					int mask = p.isa == DisasmISA.x86_64 ? 120 : 56;
-					p.x86.vex_vvvv = cast(ubyte)((~cast(int)u8 & mask) >> 3);
-					p.x86.vex_L    = u8 & 4;
-					p.x86.vex_pp   = u8 & 3;
-					++p.ai16;
-					switch (p.x86.vex[1] & X86_VEX_MAP) {
-					case X86_VEX_MAP_0F: adbg_dasm_x86_vex_0f(p); return;
-					case X86_VEX_MAP_0F38: adbg_dasm_x86_vex_0f38(p); return;
-					case X86_VEX_MAP_0F3A: adbg_dasm_x86_vex_0f3a(p); return;
-					default: adbg_dasm_err(p); return;
-					}
+						adbg_dasm_push_str(p, w ? "lds" : "les");
+					adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
+					return;
 				}
+			}
+			if (p.x86.vex32) { // e.g. REX
+				adbg_dasm_err(p);
 				return;
 			}
-			if (p.mode >= DisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "lds" : "les");
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
+			// ANCHOR: VEX prefixes
+			p.x86.vex[0] = p.x86.op;
+			p.x86.vex[1] = modrm;
+			int mask = x64 ? 120 : 56;
+			if (w) { // C5H, VEX 2-byte prefix
+				if (p.mode >= DisasmMode.File)
+					adbg_dasm_push_x8(p, modrm);
+				p.x86.vex_vvvv = cast(ubyte)((~cast(int)modrm & mask) >> 3);
+				p.x86.vex_L    = modrm & 4;
+				p.x86.vex_pp   = modrm & 3;
+				if (x64)
+					p.x86.vex_R = !(modrm & 128);
+				++p.ai8;
+				adbg_dasm_x86_vex_0f(p);
+			} else { // C4H, VEX 3-byte prefix
+				ubyte u8 = p.x86.vex[2] = *(p.ai8 + 1);
+				if (p.mode >= DisasmMode.File) {
+					adbg_dasm_push_x8(p, modrm);
+					adbg_dasm_push_x8(p, u8);
+				}
+				p.x86.vex_vvvv = cast(ubyte)((~cast(int)u8 & mask) >> 3);
+				p.x86.vex_L    = u8 & 4;
+				p.x86.vex_pp   = u8 & 3;
+				if (x64) {
+					p.x86.vex_R = !(modrm & 128);
+					p.x86.vex_X = !(modrm & 64);
+					p.x86.vex_B = !(modrm & 32);
+					p.x86.vex_W = u8 & 128;
+				}
+				++p.ai16;
+				switch (p.x86.vex[1] & X86_VEX_MAP) {
+				case X86_VEX_MAP_0F: adbg_dasm_x86_vex_0f(p); return;
+				case X86_VEX_MAP_0F38: adbg_dasm_x86_vex_0f38(p); return;
+				case X86_VEX_MAP_0F3A: adbg_dasm_x86_vex_0f3a(p); return;
+				default: adbg_dasm_err(p); return;
+				}
+			}
+			return;
 		}
 		return;
 	case 0xC8: // C8H-CBH
@@ -1200,6 +1213,7 @@ L_CONTINUE:
 		return;
 	case 0xF0: // F0H-F3H
 		//TODO: Something about showing prefixes
+		//      Hard to actually do: behavior depends by opcode
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) { // REPZ/REPE/REPE
 				p.x86.last_prefix = 0xF3;
@@ -4391,12 +4405,47 @@ void adbg_dasm_x86_vex_0f38(disasm_params_t *p) {
 			int w = p.x86.op & X86_FLAG_WIDE;
 			if (p.mode >= DisasmMode.File)
 				adbg_dasm_push_str(p, w ? "vptest" : "vpermps");
-		adbg_dasm_x86_vex_modrm(p, w ?
-			X86_FLAG_DIR | X86_FLAG_MODW_128B :
-			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_dasm_x86_vex_modrm(p, w ?
+				X86_FLAG_DIR | X86_FLAG_MODW_128B :
+				X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		} else
 			adbg_dasm_err(p);
 		return;
+	case 0x18: // 18H-1BH
+		int o = p.x86.op & 3;
+		if (p.x86.vex_pp != X86_VEX_PP_66H || o == 3) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		int f = void;
+		switch (o) {
+		case 0:
+			m = "vbroadcastss";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_32B;
+			break;
+		case 1:
+			if (p.x86.vex_L == 0) {
+				adbg_dasm_err(p);
+				return;
+			}
+			m = "vbroadcastsd";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_64B;
+			break;
+		default: // 2
+			if (p.x86.vex_L == 0) {
+				adbg_dasm_err(p);
+				return;
+			}
+			m = "vbroadcastf128";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
+			break;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	//TODO: Continue the x86 decoder! (Marker)
 	default: adbg_dasm_err(p); return;
 	}
 }
@@ -4892,7 +4941,6 @@ const(char) *adbg_dasm_x87_ststr(disasm_params_t *p, int index) {
 /// 	flags = ModRM parameters
 void adbg_dasm_x86_modrm(disasm_params_t *p, int flags) {
 	ubyte modrm = *p.ai8;
-	p.x86.modrm = true;
 	++p.ai8;
 
 	int dir = void;
@@ -4914,10 +4962,8 @@ L_RM:
 	if (dir) return;
 
 L_REG:
-	if (p.mode >= DisasmMode.File) {
-		//TODO: Once modrm_rm only has the flags parameter
+	if (p.mode >= DisasmMode.File)
 		adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, modrm >> 3, wreg));
-	}
 	if (dir) goto L_RM;
 }
 
@@ -4930,11 +4976,12 @@ L_REG:
 /// 	width = Register width (byte, wide, mm, xmm, etc.)
 /// Returns: Register string or null if out of bound
 const(char) *adbg_dasm_x86_modrm_reg(disasm_params_t *p, int reg, int width) {
+	size_t i = reg & 7;
 	if (p.isa == DisasmISA.x86_64) {
 		if (p.x86.modrm == false && p.x86.vex_B)
-			reg |= 0b1000;
+			i |= 0b1000;
 		if (p.x86.vex_W) {
-			width = 3;
+			width = 3;  // Forces it to 64-bit
 			goto L_RET; // Unaffected by 66H
 		}
 		if (p.x86.pf_operand) {
@@ -4944,7 +4991,7 @@ const(char) *adbg_dasm_x86_modrm_reg(disasm_params_t *p, int reg, int width) {
 			default:
 			}
 		}
-L_RET:		return x86_regs[width][reg & 15];
+L_RET:		return x86_regs[width][i];
 	} else {
 		if (p.x86.pf_operand) {
 			switch (width) {
@@ -4953,7 +5000,7 @@ L_RET:		return x86_regs[width][reg & 15];
 			default:
 			}
 		}
-		return x86_regs[width][reg & 7];
+		return x86_regs[width][i];
 	}
 }
 
@@ -4994,6 +5041,7 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 
 	int mode = modrm & MODRM_MOD;
 	int rm   = modrm & MODRM_RM;
+	p.x86.modrm = true;
 
 	if (mode != MODRM_MOD_11) {
 		if (p.x86.pf_operand) {
@@ -5214,7 +5262,7 @@ void adbg_dasm_x86_vex_modrm(disasm_params_t *p, int flags) {
 	int sw = p.x86.vex_L ? MemWidth.i256 : MemWidth.i128; // RM and vvvv
 
 	if (wreg == MemWidth.i128 && p.x86.vex_L)
-		wreg = wmem = MemWidth.i256;
+		wreg = MemWidth.i256;
 
 	// NOTE: Currently, the imm8 operand is not include in this operation
 	final switch (flags & X86_FLAG_OPRNDM) {
