@@ -41,8 +41,7 @@ struct x86_internals_t { align(2):
 
 //TODO: Adjust float memory widths
 //TODO: Opcode function table (see version ADBG_DASM_X86_NEW)
-//TODO: Merge x86-64 decoder into x86 decoder
-//      Call x86-64 functions depending on p.isa
+//TODO: Consider adjusting op masks to be >> 2 instead of & 252
 
 //version = ADBG_DASM_X86_NEW;
 
@@ -656,13 +655,14 @@ L_CONTINUE:
 				adbg_dasm_x86_u8imm(p);
 		} else { // MOD=11 checking is only in x86-32
 			if ((modrm & MODRM_MOD) == MODRM_MOD_11) {
-				// ANCHOR: VEX 2-byte/3-byte prefix
+				// ANCHOR: VEX prefixes
 				p.x86.vex[0] = p.x86.op;
 				p.x86.vex[1] = modrm;
 				if (p.x86.op & X86_FLAG_WIDE) { // C5H, VEX 2-byte prefix
 					if (p.mode >= DisasmMode.File)
 						adbg_dasm_push_x8(p, modrm);
-					p.x86.vex_vvvv = (~cast(uint)modrm & 56) >> 3; // 3 bits under 32-bit
+					int mask = p.isa == DisasmISA.x86_64 ? 120 : 56;
+					p.x86.vex_vvvv = cast(ubyte)((~cast(int)modrm & mask) >> 3);
 					p.x86.vex_L    = modrm & 4;
 					p.x86.vex_pp   = modrm & 3;
 					++p.ai8;
@@ -673,7 +673,8 @@ L_CONTINUE:
 						adbg_dasm_push_x8(p, modrm);
 						adbg_dasm_push_x8(p, p.x86.vex[2]);
 					}
-					p.x86.vex_vvvv = (~cast(uint)u8 & 56) >> 3; // 3 bits under 32-bit
+					int mask = p.isa == DisasmISA.x86_64 ? 120 : 56;
+					p.x86.vex_vvvv = cast(ubyte)((~cast(int)u8 & mask) >> 3);
 					p.x86.vex_L    = u8 & 4;
 					p.x86.vex_pp   = u8 & 3;
 					++p.ai16;
@@ -2083,16 +2084,16 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 				}
 				ubyte imm = *p.ai8;
 				++p.ai8;
-				if (p.mode >= DisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_x8(p, imm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm >> 3, w));
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm, w));
-					adbg_dasm_push_imm(p, imm);
-				}
+				if (p.mode < DisasmMode.File) 
+					return;
+				adbg_dasm_push_x8(p, modrm);
+				adbg_dasm_push_x8(p, imm);
+				adbg_dasm_push_str(p, m);
+				adbg_dasm_push_reg(p,
+					adbg_dasm_x86_modrm_reg(p, modrm >> 3, w));
+				adbg_dasm_push_reg(p,
+					adbg_dasm_x86_modrm_reg(p, modrm, w));
+				adbg_dasm_push_imm(p, imm);
 			}
 		}
 		return;
@@ -4358,14 +4359,43 @@ void adbg_dasm_x86_vex_0f38(disasm_params_t *p) {
 	if (p.mode >= DisasmMode.File)
 		adbg_dasm_push_x8(p, p.x86.op);
 
-	switch (p.x86.op >> 2) {
-	case 0: .. case 3:
+	switch (p.x86.op & 252) {
+	case 0, 0x04, 0x08, 0x0C: // 00H-0FH
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
 		int f = p.x86.op >= 0x0E ?
 			X86_FLAG_DIR | X86_FLAG_MODW_128B :
 			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, x86_T_VEX_0F38_00h[p.x86.op & 15]);
 		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	case 0x10: // 10H-13H
+		if (p.x86.vex_pp != X86_VEX_PP_66H ||
+			(p.x86.op & (X86_FLAG_DIR | X86_FLAG_WIDE)) < 0b11) {
+			adbg_dasm_err(p);
+			return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, "vcvtph2ps");
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+		return;
+	case 0x14: // 14-17H
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		if (p.x86.op & X86_FLAG_DIR) {
+			int w = p.x86.op & X86_FLAG_WIDE;
+			if (p.mode >= DisasmMode.File)
+				adbg_dasm_push_str(p, w ? "vptest" : "vpermps");
+		adbg_dasm_x86_vex_modrm(p, w ?
+			X86_FLAG_DIR | X86_FLAG_MODW_128B :
+			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		} else
+			adbg_dasm_err(p);
 		return;
 	default: adbg_dasm_err(p); return;
 	}
@@ -4617,6 +4647,8 @@ enum : ubyte {
 	SIB_BASE_111 = MODRM_RM_111,	/// BASE 111, EDI
 	SIB_BASE     = MODRM_RM,	/// Base filter
 }
+
+enum X86_WIDTH_MM = 7;
 
 // ANCHOR modrm function flags
 // 00 00 00 00
@@ -4889,8 +4921,6 @@ L_REG:
 	if (dir) goto L_RM;
 }
 
-enum X86_WIDTH_MM = 7;
-
 /// (Internal) Retrieve a register name from a ModR/M byte (REG field) and a
 /// specified width. This function conditionally honors the operand prefix
 /// (66H).
@@ -5066,7 +5096,8 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 
 	const(char)* rbase = void, rindex = void, seg = void;
 
-	if (p.mode >= DisasmMode.File) {
+	bool filemode = p.mode >= DisasmMode.File;
+	if (filemode) {
 		adbg_dasm_push_x8(p, sib);
 		seg = adbg_dasm_x86_segstr(p.x86.segreg);
 	}
@@ -5074,7 +5105,7 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 	switch (modrm & MODRM_MOD) { // Mode
 	case MODRM_MOD_00:
 		if (base == SIB_BASE_101) { // INDEX * SCALE + D32
-			if (p.mode >= DisasmMode.File) {
+			if (filemode) {
 				adbg_dasm_push_x32(p, *p.ai32);
 				if (index == SIB_INDEX_100)
 					adbg_dasm_push_x86_sib_m00_i100_b101(p,
@@ -5097,7 +5128,7 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 		}
 		return;
 	case MODRM_MOD_01:
-		if (p.mode >= DisasmMode.File) {
+		if (filemode) {
 			if (index == SIB_INDEX_100) { // BASE32 + DISP8
 				adbg_dasm_push_x8(p, *p.ai8);
 				adbg_dasm_push_x86_sib_m01_i100(p,
@@ -5113,9 +5144,9 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 			}
 		}
 		++p.ai8;
-		break;
+		return;
 	default: // MOD=11, last case
-		if (p.mode >= DisasmMode.File) {
+		if (filemode) {
 			adbg_dasm_push_x32(p, *p.ai32);
 			rbase = adbg_dasm_x86_modrm_rm_reg(p, base);
 			if (index == SIB_INDEX_100) { // BASE32 + DISP32
@@ -5128,7 +5159,7 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 			}
 		}
 		++p.ai32;
-		break;
+		return;
 	}
 }
 
@@ -5164,7 +5195,7 @@ enum X86_XOP_MAP10	= 0b0_1010;	/// Map 10
  * 	flags = Direction, Memory/Register widths, Scalar
  */
 void adbg_dasm_x86_vex_modrm(disasm_params_t *p, int flags) {
-	// NOTE: VEX ModRM decoding notes
+	// VEX ModRM decoding notes
 	// vsqrtss xmm0, xmm0, [eax]
 	//         ||||  ||||  +++++-- ModRM.RM stays as-is, (MOD=11) forced to VEX.L
 	//         ||||  ++++--------- VEX.vvvv (affected by VEX.L), source, by instruction
@@ -5185,7 +5216,7 @@ void adbg_dasm_x86_vex_modrm(disasm_params_t *p, int flags) {
 	if (wreg == MemWidth.i128 && p.x86.vex_L)
 		wreg = wmem = MemWidth.i256;
 
-	// Barbaric, but works
+	// NOTE: Currently, the imm8 operand is not include in this operation
 	final switch (flags & X86_FLAG_OPRNDM) {
 	case 0: // 0, most cases
 		if (dir) goto L_2REG;
