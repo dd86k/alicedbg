@@ -37,6 +37,7 @@ struct x86_internals_t { align(2):
 	ubyte vex_R;	/// REX.R alias, affects ModRM.REG
 	ubyte vex_X;	/// REX.X alias, affects SIB.INDEX
 	ubyte vex_B;	/// REX.B alias, affects ModRM.RM, SIB.BASE, or opcode
+	bool vsib;	/// If Vector SIB addressing is used
 	//TODO: AVX-512 supplements
 }
 
@@ -4591,6 +4592,196 @@ void adbg_dasm_x86_vex_0f38(disasm_params_t *p) {
 			adbg_dasm_push_str(p, m);
 		adbg_dasm_x86_vex_modrm(p, f);
 		return;
+	case 0x34: // 34H-37H
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		int f = void;
+		switch (p.x86.op & 3) {
+		case 0:
+			m = "vpmovzxwq";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_32B;
+			break;
+		case 1:
+			m = "vpmovzxdq";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_64B;
+			break;
+		case 2:
+			if (p.x86.vex_L == 0) {
+				adbg_dasm_err(p);
+				return;
+			}
+			m = "vpermd";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
+			break;
+		default:
+			m = "vpcmpgtq";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
+			break;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	case 0x38, 0x3C: // 38H-3FH
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, x86_T_VEX_0F38_38h[p.x86.op & 7]);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
+	case 0x40: // 40H-43H
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		int f = void;
+		switch (p.x86.op & 3) {
+		case 0:
+			m = "vpmulld";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
+			break;
+		case 1:
+			if (p.x86.vex_L) {
+				adbg_dasm_err(p);
+				return;
+			}
+			m = "vphminposuw";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
+			break;
+		default:
+			adbg_dasm_err(p);
+			return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	case 0x44: // 44H-47H
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		switch (p.x86.op & 3) {
+		case 1: m = p.x86.vex_W ? "vpsrlvq" : "vpsrlvd"; break;
+		case 2: m = "vpsravd"; break;
+		case 3: m = p.x86.vex_W ? "vpsllvq" : "vpsllvd"; break;
+		default: adbg_dasm_err(p); return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
+	case 0x58: // 58H-5BH
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		int f = void;
+		switch (p.x86.op & 3) {
+		case 0:
+			m = "vpbroadcastd";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_32B;
+			break;
+		case 1:
+			m = "vpbroadcastq";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_64B;
+			break;
+		case 2:
+			if (p.x86.vex_L == 0 || *p.ai8 >= MODRM_MOD_11) {
+				adbg_dasm_err(p);
+				return;
+			}
+			m = "vbroadcasti128";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
+			break;
+		default:
+			adbg_dasm_err(p);
+			return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	case 0x78:
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		int f = void;
+		switch (p.x86.op & 3) {
+		case 0:
+			m = "vpbroadcastb";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_8B;
+			break;
+		case 1:
+			m = "vpbroadcastw";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_16B;
+			break;
+		default:
+			adbg_dasm_err(p);
+			return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	case 0x80:
+		if (p.x86.vex_pp != X86_VEX_PP_66H || *p.ai8 >= MODRM_MOD_11) {
+			adbg_dasm_err(p);
+			return;
+		}
+		int f = void;
+		switch (p.x86.op & 3) {
+		case 0: f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_8B; break;
+		case 2: f = X86_FLAG_REGW_128B | X86_FLAG_MEMW_16B; break;
+		default: adbg_dasm_err(p); return;
+		}
+		const(char) *m = p.x86.vex_W ? "vpmaskmovq" : "vpmaskmovd";
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;
+	/*case 0x90:
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		//TODO: VSIB addressing (AVX2)
+		//      Example:
+		//      vgatherdpd xmm1,QWORD PTR [rsi+xmm0*8],xmm3
+		const(char) *m = void;
+		int f = void;
+		switch (p.x86.op & 3) {
+		case 0:
+			m = p.x86.vex_W ? "vpgatherdq" : "vpgatherdd";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_64B;
+			break;
+		case 1:
+			m = p.x86.vex_W ? "vpgatherqq" : "vpgatherqd";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_32B;
+			break;
+		case 2:
+			m = p.x86.vex_W ? "vgatherdpd" : "vgatherdps";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_16B;
+			break;
+		default:
+			m = p.x86.vex_W ? "vgatherqpd" : "vgatherqps";
+			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_64B;
+			break;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		return;*/
 	//TODO: -- Continue the x86 decoder!
 	default: adbg_dasm_err(p); return;
 	}
@@ -4696,6 +4887,10 @@ __gshared const(char) *[]x86_T_VEX_0F38_00h = [
 __gshared const(char) *[]x86_T_VEX_0F38_28h = [
 	"vpmuldq", "vpcmpeqq", "vmovntdqa", "vpackusdw"
 ];
+__gshared const(char) *[]x86_T_VEX_0F38_38h = [
+	"vpminsb", "vpminsd", "vpminuw", "vpminud",
+	"vpmaxsb", "vpmaxsd", "vpmaxuw", "vpmaxud",
+];
 __gshared const(char) *[]x86_T_Jcc = [
 	"jo", "jno", "jb", "jnb",
 	"jz", "jnz", "jbe", "jnbe",
@@ -4763,20 +4958,28 @@ __gshared const(char) *[]x86_T_CR = [ // Control registers
 
 
 __gshared const(char) *[][]x86_regs = [
+	// i8
 	[ "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh",
 		"r8b", "r9b", "r10b", "r11b", "r12b", "r13b", "r14b", "r15b" ],
+	// i16
 	[ "ax", "cx", "dx", "cx", "sp", "bp", "si", "di",
 		"r8w", "r9w", "r10w", "r11w", "r12w", "r13w", "r14w", "r15w" ],
+	// i32
 	[ "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi",
 		"r8d", "r9d", "r10d", "r11d", "r12d", "r13d", "r14d", "r15d" ],
+	// i64
 	[ "rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi",
 		"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" ],
+	// i128
 	[ "xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7",
 		"xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15" ],
+	// i256
 	[ "ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7",
 		"ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15" ],
+	// i512
 	[ "zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7",
 		"xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15" ],
+	// custom
 	[ "mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7" ],
 ];
 
@@ -4867,7 +5070,7 @@ enum X86_WIDTH_MM = 7;
 //              |||+------ (VEX) If VEX.L is set, trip
 //              ||+------- (VEX) Ignore VEX.L, proceed as unset
 //              |+-------- (VEX) Use VEX.vvvv as ModRM.REG (2OPRND only)
-//              +--------- (Currently unused)
+//              +--------- (VEX) VSIB is enforced (AVX2)
 enum {	// Flags for ModRM functions
 	// Bit that maps to the opcode if X86_FLAG_USE_OP is set
 	X86_FLAG_WIDE	= 1,	/// Set: Instruction is wide (32b/16b instead of 8b)
@@ -4918,7 +5121,8 @@ enum {	// Flags for ModRM functions
 	X86_FLAG_VEX_NO_L	= 0x1000_0000,	/// Trip on VEX.L if set
 	X86_FLAG_VEX_IGNORE_L	= 0x2000_0000,	/// Force VEX.L as unset
 	X86_FLAG_VEX_USEvvvv	= 0x4000_0000,	/// Use VEX.vvvv instead of ModRM.REG
-//	X86_FLAG_VEX_	= 0x8000_0000
+	//TODO: X86_FLAG_VEX_VSIB
+	X86_FLAG_VEX_VSIB	= 0x8000_0000	/// VSIB is used
 }
 
 // Prefix combos for 0F
@@ -5142,24 +5346,15 @@ const(char) *adbg_dasm_x86_modrm_reg(disasm_params_t *p, int reg, int width) {
 			width = 3;  // Forces it to 64-bit
 			goto L_RET; // Unaffected by 66H
 		}
-		if (p.x86.pf_operand) {
-			switch (width) {
-			case MemWidth.i64: width = MemWidth.i16; break;
-			case MemWidth.i16: width = MemWidth.i64; break;
-			default:
-			}
-		}
-L_RET:		return x86_regs[width][i];
-	} else {
-		if (p.x86.pf_operand) {
-			switch (width) {
-			case MemWidth.i16: width = MemWidth.i32; break;
-			case MemWidth.i32: width = MemWidth.i16; break;
-			default:
-			}
-		}
-		return x86_regs[width][i];
 	}
+	if (p.x86.pf_operand) {
+		switch (width) {
+		case MemWidth.i16: width = MemWidth.i32; break;
+		case MemWidth.i32: width = MemWidth.i16; break;
+		default:
+		}
+	}
+L_RET:	return x86_regs[width][i];
 }
 
 /// (Internal) Retrieve a register name from a ModR/M byte (RM field) and
@@ -5197,7 +5392,7 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 		seg = adbg_dasm_x86_segstr(p.x86.segreg);
 	}
 
-	int rm   = modrm & MODRM_RM;
+	int rm = modrm & MODRM_RM;
 	p.x86.modrm = true;
 
 	if (modrm >= MODRM_MOD_11) { // Register mode
@@ -5216,7 +5411,7 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 		}
 		switch (modrm >> 6) {
 		case 0:	// Memory Mode, no displacement
-			if (p.x86.pf_address) {
+			if (p.isa != DisasmISA.x86_64 && p.x86.pf_address) {
 				if (rm == MODRM_RM_110) {
 					ushort m = *p.ai16;
 					++p.ai16;
@@ -5228,59 +5423,62 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 						adbg_dasm_push_memsegreg(p, seg, regstr, wmem);
 					}
 				}
-			} else {
-				if (rm == MODRM_RM_100) {
-					adbg_dasm_x86_sib(p, modrm, wmem);
-					return;
-				}
+				return;
+			}
+			if (rm == MODRM_RM_100) {
+				adbg_dasm_x86_sib(p, modrm, wmem);
+				return;
+			}
+			if (filemode)
 				regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
-				if (rm == MODRM_RM_101) {
-					uint m = *p.ai32;
-					++p.ai32;
-					if (filemode) {
-						adbg_dasm_push_x32(p, m);
-						adbg_dasm_push_memregimm(p, regstr, m, wmem);
-					}
-				} else {
-					if (filemode)
-						adbg_dasm_push_memsegreg(p, seg, regstr, wmem);
+			if (rm == MODRM_RM_101) {
+				uint m = *p.ai32;
+				++p.ai32;
+				if (filemode) {
+					adbg_dasm_push_x32(p, m);
+					adbg_dasm_push_memregimm(p, regstr, m, wmem);
 				}
+			} else {
+				if (filemode)
+					adbg_dasm_push_memsegreg(p, seg, regstr, wmem);
 			}
 			return;
 		case 1:	// Memory Mode, 8-bit displacement
+			//TODO: Check if address prefix affects MOD=01 under x86 and x86_64
 			if (rm == MODRM_RM_100) {
 				adbg_dasm_x86_sib(p, modrm, wmem);
 				return;
 			}
 			if (filemode) {
-				adbg_dasm_push_x8(p, *p.ai8);
+				ubyte m = *p.ai8;
+				adbg_dasm_push_x8(p, m);
 				regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
-				adbg_dasm_push_memsegregimm(p, seg, regstr, *p.ai8, wmem);
+				adbg_dasm_push_memsegregimm(p, seg, regstr, adbg_dasm_adj_i8(m), wmem);
 			}
 			++p.ai8;
 			return;
 		default:	// Memory Mode, 32/16-bit displacement
-			uint m = void;
-			if (p.x86.pf_address) {
-				m = *p.ai16;
+			if (p.isa != DisasmISA.x86_64 && p.x86.pf_address) {
+				if (filemode) {
+					ushort m = *p.ai16;
+					adbg_dasm_push_x16(p, m);
+					regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
+					adbg_dasm_push_memsegregimm(p, seg, regstr, adbg_dasm_adj_i16(m), wmem);
+				}
 				++p.ai16;
-				if (filemode)
-					adbg_dasm_push_x16(p, cast(ushort)m);
 			} else {
 				if (rm == MODRM_RM_100) {
 					adbg_dasm_x86_sib(p, modrm, wmem);
 					return;
 				}
-				m = *p.ai32;
-				++p.ai32;
-				if (filemode)
+				if (filemode) {
+					uint m = *p.ai32;
 					adbg_dasm_push_x32(p, m);
+					regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
+					adbg_dasm_push_memsegregimm(p, seg, regstr, m, wmem);
+				}
+				++p.ai32;
 			}
-			if (filemode) {
-				regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
-				adbg_dasm_push_memsegregimm(p, seg, regstr, m, wmem);
-			}
-			++p.ai32;
 			return;
 		}
 	}
@@ -5288,10 +5486,6 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 
 // Process SIB, trips on address prefix
 void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
-	if (p.x86.pf_address) {
-		adbg_dasm_err(p);
-		return;
-	}
 	ubyte sib = *p.ai8; // SCALE=MOD, INDEX=REG, BASE=RM
 	++p.ai8;
 	int scale = 1 << (sib >> 6); // 2 ^ (0b11_000_000 >> 6)
@@ -5320,7 +5514,7 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 						scale, *p.ai32, wmem);
 			}
 			++p.ai32;
-		} else { // BASE32 + INDEX * SCALE
+		} else { // BASE + INDEX * SCALE
 			if (p.mode < DisasmMode.File) return;
 			rbase = adbg_dasm_x86_modrm_rm_reg(p, sib);
 			if (index == SIB_INDEX_100)
@@ -5333,13 +5527,13 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 		return;
 	case MODRM_MOD_01:
 		if (filemode) {
-			if (index == SIB_INDEX_100) { // BASE32 + DISP8
+			if (index == SIB_INDEX_100) { // BASE + DISP8
 				adbg_dasm_push_x8(p, *p.ai8);
 				adbg_dasm_push_x86_sib_m01_i100(p,
 					seg,
 					adbg_dasm_x86_modrm_rm_reg(p, sib),
 					*p.ai8, wmem);
-			} else { // BASE8 + INDEX * SCALE + DISP8
+			} else { // BASE + INDEX * SCALE + DISP8
 				adbg_dasm_push_x8(p, *p.ai8);
 				rbase = adbg_dasm_x86_modrm_rm_reg(p, base);
 				rindex = adbg_dasm_x86_modrm_rm_reg(p, index);
@@ -5353,10 +5547,10 @@ void adbg_dasm_x86_sib(disasm_params_t *p, ubyte modrm, int wmem) {
 		if (filemode) {
 			adbg_dasm_push_x32(p, *p.ai32);
 			rbase = adbg_dasm_x86_modrm_rm_reg(p, base);
-			if (index == SIB_INDEX_100) { // BASE32 + DISP32
+			if (index == SIB_INDEX_100) { // BASE + DISP32
 				adbg_dasm_push_x86_sib_m01_i100(p,
-				seg, rbase, *p.ai32, wmem);
-			} else { // BASE32 + INDEX * SCALE + DISP32
+					seg, rbase, *p.ai32, wmem);
+			} else { // BASE + INDEX * SCALE + DISP32
 				rindex = adbg_dasm_x86_modrm_rm_reg(p, index);
 				adbg_dasm_push_x86_sib_m01(p,
 					seg, rbase, rindex, scale, *p.ai32, wmem);
