@@ -2682,7 +2682,7 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 		if (p.mode < DisasmMode.File)
 			return;
 		adbg_dasm_push_str(p, "bswap");
-		adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.op, X86_FLAG_MODW_32B));
+		adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.op, MemWidth.i32));
 		return;
 	case 0xD0: // D0H-D3H
 		if (p.x86.op & X86_FLAG_DIR) {
@@ -5269,7 +5269,7 @@ enum x86SegReg { // By official arrangement
 /// Params: segreg = Byte opcode
 /// Returns: Segment register string
 const(char) *adbg_dasm_x86_segstr(int segreg) {
-	return segreg ? x86_T_segs[segreg] : "";
+	return segreg ? x86_T_segs[segreg - 1] : "";
 }
 
 /// While it is the formatter's job to format registers, the long legacy of
@@ -5308,9 +5308,7 @@ void adbg_dasm_x86_modrm(disasm_params_t *p, int flags) {
 	int dir = void;
 	int wreg = void;
 	int wmem = void;
-	if (p.x86.vex_W) {
-		wreg = wmem = MemWidth.i64;
-	} else if (flags & X86_FLAG_USE_OP) {
+	if (flags & X86_FLAG_USE_OP) {
 		wreg = wmem = p.x86.op & X86_FLAG_WIDE ? MemWidth.i32 : MemWidth.i8;
 		dir = p.x86.op & X86_FLAG_DIR;
 	} else {
