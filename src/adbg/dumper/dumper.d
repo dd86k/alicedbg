@@ -17,21 +17,21 @@ enum {
 	//
 	// Dumper flags
 	//
-	DUMPER_SHOW_HEADER	= 0x0001,
-	DUMPER_SHOW_EXPORTS	= 0x0002,
-	DUMPER_SHOW_IMPORTS	= 0x0004,
-	DUMPER_SHOW_RESOURCES	= 0x0008,
-	DUMPER_SHOW_SEH	= 0x0010,
-	DUMPER_SHOW_CERTS	= 0x0020,
-	DUMPER_SHOW_RELOCS	= 0x0040,
-	DUMPER_SHOW_DEBUG	= 0x0080,
-	DUMPER_SHOW_ARCH	= 0x0100,
-	DUMPER_SHOW_GLOBALPTR	= 0x0200,
+	DUMPER_SHOW_HEADER	= 0x0001,	/// Show header
+	DUMPER_SHOW_EXPORTS	= 0x0002,	/// Show symbol exports
+	DUMPER_SHOW_IMPORTS	= 0x0004,	/// Show shared library imports
+	DUMPER_SHOW_RESOURCES	= 0x0008,	/// Show resources (e.g. icons)
+	DUMPER_SHOW_SEH	= 0x0010,	/// Show SEH information
+	DUMPER_SHOW_CERTS	= 0x0020,	/// Show certificates information
+	DUMPER_SHOW_RELOCS	= 0x0040,	/// Show relocations
+	DUMPER_SHOW_DEBUG	= 0x0080,	/// Show debugging information
+	DUMPER_SHOW_ARCH	= 0x0100,	/// Show architecture-specific information
+	DUMPER_SHOW_GLOBALPTR	= 0x0200,	/// Show global pointer information
 	DUMPER_SHOW_TLS	= 0x0400,	/// Thead Local Storage
-	DUMPER_SHOW_LOADCFG	= 0x0800,
+	DUMPER_SHOW_LOADCFG	= 0x0800,	/// Show load configuration
 	DUMPER_SHOW_VM	= 0x1000,	/// VM-related stuff, like CLR
-	DUMPER_SHOW_SECTIONS	= 0x2000,
-	DUMPER_SHOW_EVERYTHING	= 0x0F_FFFF,
+	DUMPER_SHOW_SECTIONS	= 0x2000,	/// Show section information
+	DUMPER_SHOW_EVERYTHING	= 0x0F_FFFF,	/// Show absolutely everything
 
 	/// ('d') Include section disassembly in output.
 	DUMPER_DISASM_CODE	= 0x01_0000,
@@ -57,18 +57,6 @@ enum {
 	DUMPER_EXPORT_RESOURCES	= 0x0100_0000,
 	///TODO: ('C') Export certificates into current directory.
 	DUMPER_EXPORT_CERTS	= 0x0200_0000,
-}
-
-/// This struct exists avoid casting all the time
-struct uptr_t {
-	union {
-		size_t val;
-		void   *vptr;
-		ubyte  *u8ptr;
-		ushort *u16ptr;
-		uint   *u32ptr;
-		ulong  *u64ptr;
-	}
 }
 
 /// Dump given file to stdout.
@@ -108,7 +96,7 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 		flags |= DUMPER_SHOW_HEADER;
 
 	obj_info_t info = void;
-	ObjError e = cast(ObjError)adbg_obj_load(f, &info, 0);
+	ObjError e = cast(ObjError)adbg_obj_load(&info, f, 0);
 	if (e) {
 		printf("loader: %s\n", adbg_obj_errmsg(e));
 		return e;
@@ -129,6 +117,13 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 // NOTE: A FILE* could be passed, but Windows bindings often do not correspond
 //       to their CRT equivalent, so this is hard-wired to stdout, since this
 //       is only for the dumping functionality.
+/// Disassemble data to stdout
+/// Params:
+/// 	dp = Disassembler parameters
+/// 	data = Data pointer
+/// 	size = Data size
+/// 	flags = Configuration flags
+/// Returns: Status code
 int adbg_dmpr_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
 	dp.a = data;
 	if (flags & DUMPER_DISASM_STATS) {

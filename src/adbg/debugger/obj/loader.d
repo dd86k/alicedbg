@@ -85,12 +85,12 @@ struct obj_info_t { align(1):
 	//
 
 	union {
-		void   *buf;	/// (Internal)
-		char   *bufc8;	/// (Internal)
-		ubyte  *bufu8;	/// (Internal)
-		ushort *bufu16;	/// (Internal)
-		uint   *bufu32;	/// (Internal)
-		ulong  *bufu64;	/// (Internal)
+		void   *b;	/// (Internal)
+		char   *bc8;	/// (Internal)
+		ubyte  *bi8;	/// (Internal)
+		ushort *bi16;	/// (Internal)
+		uint   *bi32;	/// (Internal)
+		ulong  *bi64;	/// (Internal)
 	}
 	/// File handle, used internally. Copied from supplied FILE structure.
 	FILE *handle;
@@ -117,8 +117,15 @@ struct obj_info_t { align(1):
 	//
 
 	union {
-		PE_META pe;
+		PE_META pe;	/// PE32 data
 	}
+
+	//
+	// Symbols
+	//
+
+	obj_symbol_t *symbols;	/// Symbols pointer (for internal use)
+	uint symbols_count;	/// Number of symbols available
 
 	//
 	// Internals
@@ -131,17 +138,27 @@ struct obj_info_t { align(1):
 	int offset;
 }
 
-int adbg_obj_open(const(char*) path, obj_info_t *info, int flags) {
+/// Open object from file path.
+///
+/// This uses fopen and adbg_obj_load to load a file from a file path.
+///
+/// Params:
+/// 	info = Object info structure
+/// 	path = File path
+/// 	flags = Configuration flags
+/// Returns: OS error code or a FileError on error
+int adbg_obj_open(obj_info_t *info, const(char*) path, int flags) {
 	info.handle = fopen(path, "rb");
 
 	if (info.handle == null)
 		return 1;
 
-	return adbg_obj_load(info.handle, info, flags);
+	return adbg_obj_load(info, info.handle, flags);
 }
 
 /// Load object from file handle.
 ///
+/// This populates the obj_info_t structure provided to this function.
 /// Flags are used to indicate what to load. The function is responsible of
 /// allocating data depending on the requested information. The headers
 /// are always loaded.
@@ -155,7 +172,7 @@ int adbg_obj_open(const(char*) path, obj_info_t *info, int flags) {
 /// 	info = obj_info_t structure
 /// 	flags = Load options
 /// Returns: OS error code or a FileError on error
-int adbg_obj_load(FILE *file, obj_info_t *info, int flags) {
+int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 	import core.stdc.config : c_long;
 	import core.stdc.stdlib : malloc;
 
@@ -177,10 +194,10 @@ int adbg_obj_load(FILE *file, obj_info_t *info, int flags) {
 
 	// Allocate and read
 
-	info.buf = malloc(info.size);
-	if (info.buf == null)
+	info.b = malloc(info.size);
+	if (info.b == null)
 		return ObjError.FileOperation;
-	if (fread(info.buf, info.size, 1, info.handle) == 0)
+	if (fread(info.b, info.size, 1, info.handle) == 0)
 		return ObjError.FileOperation;
 
 	// Auto-detection
@@ -188,14 +205,14 @@ int adbg_obj_load(FILE *file, obj_info_t *info, int flags) {
 	file_sig_t sig = void; // for conveniance
 
 	int e = void;
-	switch (*cast(ushort*)info.buf) {
+	switch (*info.bi16) {
 	case SIG_MZ:
-		uint hdrloc = *cast(uint*)(info.buf + 0x3c);
+		uint hdrloc = *(info.bi32 + 15); // 0x3c / 4
 		if (hdrloc == 0)
 			return ObjError.FileOperation;
 		if (hdrloc >= info.size - 4)
 			return ObjError.FileOperation;
-		sig.u32 = *cast(uint*)(info.buf + hdrloc);
+		sig.u32 = *cast(uint*)(info.b + hdrloc);
 		switch (sig.u16[0]) {
 		case SIG_PE:
 			if (sig.u16[1]) // "PE\0\0"
@@ -225,14 +242,18 @@ int adbg_obj_load(FILE *file, obj_info_t *info, int flags) {
 	return 0;
 }*/
 
-//ubyte* adbg_obj_load_section(const(char)* sname)
-
 //TODO: adbg_obj_symbol_at_address
 /*char* adbg_obj_symbol_at_address(obj_info_t *info, size_t address) {
 	
 	return null;
 }*/
 
+//TODO: int adbg_obj_src_line(source_t *?)
+//      Return line of source code
+
+/// Return a short error message for an ObjError.
+/// Params: err = ObjError number
+/// Returns: String
 const(char) *adbg_obj_errmsg(ObjError err) {
 	with (ObjError)
 	final switch (err) {
@@ -246,15 +267,15 @@ const(char) *adbg_obj_errmsg(ObjError err) {
 private:
 
 version (LittleEndian) {
-	enum ushort SIG_MZ = 0x5A4D;	// "MZ"
-	enum ushort SIG_PE = 0x4550;	// "PE"
-	enum ushort SIG_ELF_L = 0x4C45; // "EL", low 2-byte
-	enum ushort SIG_ELF_H = 0x7F46; // "F\x7F", high 2-byte
+	enum ushort SIG_MZ	= 0x5A4D; // "MZ"
+	enum ushort SIG_PE	= 0x4550; // "PE"
+	enum ushort SIG_ELF_L	= 0x4C45; // "EL", low 2-byte
+	enum ushort SIG_ELF_H	= 0x7F46; // "F\x7F", high 2-byte
 } else {
-	enum ushort SIG_MZ = 0x4D5A;	// "MZ"
-	enum ushort SIG_PE = 0x5045;	// "PE"
-	enum ushort SIG_ELF_L = 0x454C; // "EL", low 2-byte
-	enum ushort SIG_ELF_H = 0x467F; // "F\x7F", high 2-byte
+	enum ushort SIG_MZ	= 0x4D5A; // "MZ"
+	enum ushort SIG_PE	= 0x5045; // "PE"
+	enum ushort SIG_ELF_L	= 0x454C; // "EL", low 2-byte
+	enum ushort SIG_ELF_H	= 0x467F; // "F\x7F", high 2-byte
 }
 
 struct file_sig_t { align(1):

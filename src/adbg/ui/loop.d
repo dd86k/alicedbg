@@ -18,6 +18,7 @@ extern (C):
 int adbg_ui_loop_enter(disasm_params_t *p) {
 	if (adbg_term_init)
 		return 1;
+	p.options = DISASM_O_SPACE;
 	memcpy(&g_disparams, p, disasm_params_t.sizeof);
 	adbg_userfunc(&adbg_ui_loop_handler);
 	return adbg_run;
@@ -39,7 +40,7 @@ int adbg_ui_loop_handler(exception_t *e) {
 	if (e.addr) {
 		g_disparams.a = e.addr;
 		if (adbg_dasm_line(&g_disparams, DisasmMode.File) == 0) {
-			printf("> %p: %s\t%s\n",
+			printf("> %p: %s| %s\n",
 				e.addr, &g_disparams.mcbuf, &g_disparams.mnbuf);
 		}
 	}

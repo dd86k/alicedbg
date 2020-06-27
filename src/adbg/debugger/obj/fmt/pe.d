@@ -551,7 +551,7 @@ struct PE_SECTION_ENTRY { align(1):
 }
 
 int adbg_obj_pe_load(obj_info_t *info, int flags) {
-	void* offset = info.buf + info.offset;
+	void* offset = info.b + info.offset;
 	info.pe.hdr = cast(PE_HEADER*)offset;
 	info.pe.ohdr = cast(PE_OPTIONAL_HEADER*)(offset + PE_OFFSET_OPTHDR);
 	switch (info.pe.ohdr.Magic) {
@@ -577,7 +577,7 @@ int adbg_obj_pe_load(obj_info_t *info, int flags) {
 		if (info.pe.fo_imports == 0)
 		if (s.VirtualAddress <= info.pe.dir.ImportTable.rva &&
 			s.VirtualAddress + s.SizeOfRawData > info.pe.dir.ImportTable.rva) {
-			info.pe.imports = cast(PE_IMPORT_DESCRIPTOR*)(info.buf +
+			info.pe.imports = cast(PE_IMPORT_DESCRIPTOR*)(info.b +
 				(s.PointerToRawData +
 				(info.pe.dir.ImportTable.rva - s.VirtualAddress)));
 		}

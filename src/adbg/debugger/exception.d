@@ -15,7 +15,7 @@ module adbg.debugger.exception;
 version (Windows) {
 	import core.sys.windows.windows;
 	import adbg.debugger.sys.wow64;
-	enum {	// NTSTATUS missing D bindings (WOW64)
+	enum {	// missing D bindings (NTSTATUS, winbase.h)
 		STATUS_WX86_UNSIMULATE	= 0x4000001C,	/// WOW64 exception code
 		STATUS_WX86_CONTINUE	= 0x4000001D,	/// WOW64 exception code
 		STATUS_WX86_SINGLE_STEP	= 0x4000001E,	/// WOW64 exception code
@@ -23,6 +23,10 @@ version (Windows) {
 		STATUS_WX86_EXCEPTION_CONTINUE	= 0x40000020,	/// WOW64 exception code
 		STATUS_WX86_EXCEPTION_LASTCHANCE	= 0x40000021,	/// WOW64 exception code
 		STATUS_WX86_EXCEPTION_CHAIN	= 0x40000022,	/// WOW64 exception code
+		// See https://devblogs.microsoft.com/oldnewthing/20190108-00/?p=100655
+		// tl;dr: Soft stack overflow (with a cookie on stack) within MSCRT,
+		// for prevention measures. Implies /GS (MSVC)
+		STATUS_STACK_BUFFER_OVERRUN	= 0xc0000409,	/// Soft stack overflow
 	}
 } else
 version (Posix) {
@@ -33,9 +37,9 @@ version (Posix) {
 extern (C):
 
 version (X86) {
-	enum EX_REG_COUNT = 10;	/// Number of registers available
+	enum EX_REG_COUNT = 10;	/// Number of registers for platform
 } else version (X86_64) {
-	enum EX_REG_COUNT = 18;	/// Number of registers available
+	enum EX_REG_COUNT = 18;	/// Number of registers for platform
 }
 
 /// Register size
@@ -55,7 +59,7 @@ enum ExceptionType {
 	Illegal,	/// Illegal opcode
 	DivZero,	/// Integer divide by zero
 	PageError,	/// In-page error
-	Overflow,	/// Integer overflow
+	IntOverflow,	/// Integer overflow
 	StackOverflow,	/// Stack overflow
 	PrivilegedOpcode,	/// Priviled instruction
 	// FPU
@@ -69,8 +73,11 @@ enum ExceptionType {
 	// OS specific-ish
 	Disposition,	/// OS reports invalid disposition to exception handler
 	NoContinue,	/// Debugger tried to continue on after non-continuable error
-//	OSError,	/// OS error (WaitForDebugEvent returned FALSE or waitid returned -1)
 }
+
+//TODO: Severity levels depending on exception type
+//      Essentially it'll be for a "can or cannot continue"
+//      This would also allow the removal of Disposition/NoContinue
 
 /// Represents an exception. Upon creation, these are populated depending on
 /// the platform with their respective function.
@@ -132,10 +139,11 @@ struct register_t {
  */
 ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
 	version (Windows) {
+		//NOTE: Prefer STATUS_ over EXCEPION_ names when possible
 		with (ExceptionType)
 		switch (code) {
-		case EXCEPTION_ACCESS_VIOLATION:
-			switch (subcode) {
+		case STATUS_ACCESS_VIOLATION:
+			/*switch (subcode) {
 			case 0: // Read access error
 				return Fault;
 			case 1: // Write access error
@@ -143,16 +151,17 @@ ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
 			case 8: // DEP violation
 				return Fault;
 			default: return Unknown;
-			}
-		case EXCEPTION_ARRAY_BOUNDS_EXCEEDED:	return BoundExceeded;
-		case EXCEPTION_BREAKPOINT, STATUS_WX86_BREAKPOINT:
+			}*/
+			return Fault;
+		case STATUS_ARRAY_BOUNDS_EXCEEDED:	return BoundExceeded;
+		case STATUS_BREAKPOINT, STATUS_WX86_BREAKPOINT:
 			return Breakpoint;
-		case EXCEPTION_SINGLE_STEP, STATUS_WX86_SINGLE_STEP:
+		case STATUS_SINGLE_STEP, STATUS_WX86_SINGLE_STEP:
 			return Step;
-		case EXCEPTION_DATATYPE_MISALIGNMENT:	return Misalignment;
-		case EXCEPTION_ILLEGAL_INSTRUCTION:	return Illegal;
-		case EXCEPTION_IN_PAGE_ERROR:
-			switch (subcode) {
+		case STATUS_DATATYPE_MISALIGNMENT:	return Misalignment;
+		case STATUS_ILLEGAL_INSTRUCTION:	return Illegal;
+		case STATUS_IN_PAGE_ERROR:
+			/*switch (subcode) {
 			case 0: // Read access error
 				return PageError;
 			case 1: // Write access error
@@ -160,13 +169,14 @@ ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
 			case 8: // DEP violation
 				return PageError;
 			default: return PageError;
-			}
+			}*/
+			return PageError;
 		case EXCEPTION_INT_DIVIDE_BY_ZERO:	return DivZero;
-		case EXCEPTION_INT_OVERFLOW:	return Overflow;
-		case EXCEPTION_INVALID_DISPOSITION:	return Disposition;
-		case EXCEPTION_NONCONTINUABLE_EXCEPTION:	return NoContinue;
+		case EXCEPTION_INT_OVERFLOW:	return IntOverflow;
+		case STATUS_INVALID_DISPOSITION:	return Disposition;
 		case EXCEPTION_PRIV_INSTRUCTION:	return PrivilegedOpcode;
-		case EXCEPTION_STACK_OVERFLOW:	return StackOverflow;
+		case STATUS_STACK_OVERFLOW, STATUS_STACK_BUFFER_OVERRUN:
+			return StackOverflow;
 		// FPU
 		case EXCEPTION_FLT_DENORMAL_OPERAND:	return FPUDenormal;
 		case EXCEPTION_FLT_DIVIDE_BY_ZERO:	return FPUDivZero;
@@ -175,6 +185,7 @@ ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
 		case EXCEPTION_FLT_OVERFLOW:	return FPUOverflow;
 		case EXCEPTION_FLT_STACK_CHECK:	return FPUStackOverflow;
 		case EXCEPTION_FLT_UNDERFLOW:	return FPUUnderflow;
+		case STATUS_NONCONTINUABLE_EXCEPTION:	return NoContinue;
 		default:	return Unknown;
 		}
 	} else {
@@ -253,6 +264,7 @@ ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
 			case POLL_HUP: return Unknown;
 			default: return Unknown;
 			}
+		case SIGSTOP: return Breakpoint;
 		case SIGSYS: return Unknown;	// SYS_SECCOMP
 		default: return Unknown;
 		}
@@ -276,12 +288,12 @@ const(char) *adbg_ex_typestr(ExceptionType code) {
 		else return "SEGMENTATION FAULT";
 	case BoundExceeded:	return "OUT OF BOUNDS";
 	case Misalignment:	return "MISALIGNMENT";
-	case Illegal:	return "ILLEGAL OPCODE";
+	case Illegal:	return "ILLEGAL INSTRUCTION";
 	case DivZero:	return "ZERO DIVISION";
 	case PageError:	return "PAGE ERROR";
-	case Overflow:	return "INTEGER OVERFLOW";
+	case IntOverflow:	return "INTEGER OVERFLOW";
 	case StackOverflow:	return "STACK OVERFLOW";
-	case PrivilegedOpcode:	return "PRIVILEGED OPCODE";
+	case PrivilegedOpcode:	return "PRIVILEGED INSTRUCTION";
 	case FPUDenormal:	return "FPU: DEFORMAL";
 	case FPUDivZero:	return "FPU: ZERO DIVISION";
 	case FPUInexact:	return "FPU: INEXACT";
@@ -290,7 +302,7 @@ const(char) *adbg_ex_typestr(ExceptionType code) {
 	case FPUUnderflow:	return "FPU: UNDERFLOW";
 	case FPUStackOverflow:	return "FPU: STACK OVERFLOW";
 	case Disposition:	return "OS: DISPOSITION";
-	case NoContinue:	return "OS: NO CONTINUE";
+	case NoContinue:	return "OS: COULD NOT CONTINUE";
 	}
 }
 

@@ -56,7 +56,7 @@ int adbg_dmpr_print_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	with (fi.pe.hdr)
 	printf(
 	"Microsoft Portable Executable format\n\n"~
-	"*\n* Header\n*\n\n"~
+	"# Header\n\n"~
 	"Machine               %04X\t(%s)\n"~
 	"NumberOfSections      %04X\t(%u)\n"~
 	"TimeDateStamp         %04X\n"~
@@ -133,7 +133,7 @@ int adbg_dmpr_print_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
 
 		with (fi.pe.ohdr)
 		printf(
-		"*\n* Optional Header\n*\n\n"~
+		"# Optional Header\n\n"~
 		"Type                         Image\n"~
 		"Magic                        %04X\t(%s)\n"~
 		"MajorLinkerVersion           %02X\t(%u)\n"~
@@ -307,7 +307,7 @@ int adbg_dmpr_print_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
 
 		with (fi.pe.dir)
 		printf(	// Directory
-		")\n\n*\n* Directories\n*\n\n"~
+		")\n\n# Directories\n\n"~
 		"Directory                RVA       Size\n"~
 		"Export Table             %08X  %08X  (%u)\n"~
 		"Import Table             %08X  %08X  (%u)\n"~
@@ -781,7 +781,7 @@ L_DISASM:
 		if (s.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
 			printf("\n<%.8s>\n", &s.Name);
 			int e = adbg_dmpr_disasm(dp,
-				fi.buf + s.PointerToRawData, s.SizeOfRawData, flags);
+				fi.b + s.PointerToRawData, s.SizeOfRawData, flags);
 			if (e) return e;
 		}
 	}
