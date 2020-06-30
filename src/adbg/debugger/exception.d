@@ -14,7 +14,7 @@ module adbg.debugger.exception;
 
 version (Windows) {
 	import core.sys.windows.windows;
-	import adbg.debugger.sys.wow64;
+	import adbg.sys.windows.wow64;
 	enum {	// missing D bindings (NTSTATUS, winbase.h)
 		STATUS_WX86_UNSIMULATE	= 0x4000001C,	/// WOW64 exception code
 		STATUS_WX86_CONTINUE	= 0x4000001D,	/// WOW64 exception code
@@ -30,7 +30,7 @@ version (Windows) {
 	}
 } else
 version (Posix) {
-	import adbg.debugger.sys.user;
+	import adbg.sys.linux.user;
 	import core.sys.posix.signal;
 }
 

@@ -8,7 +8,7 @@
  */
 module adbg.ui.common;
 
-import adbg.debugger.disasm;
+import adbg.disasm;
 
 public:
 

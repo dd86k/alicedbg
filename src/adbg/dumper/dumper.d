@@ -8,8 +8,8 @@ module adbg.dumper.dumper;
 import core.stdc.stdio;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
-import adbg.debugger.disasm, adbg.dumper.objs;
-public import adbg.debugger.obj.loader;
+import adbg.disasm, adbg.dumper.objs;
+public import adbg.obj.loader;
 
 extern (C):
 

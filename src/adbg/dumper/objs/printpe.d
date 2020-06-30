@@ -12,9 +12,9 @@ import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
 import core.stdc.string : strcpy;
 import core.stdc.time : time_t, tm, localtime, strftime;
 import adbg.dumper.dumper;
-import adbg.debugger.obj.loader;
-import adbg.debugger.disasm.disasm;
-import adbg.debugger.file.objs.pe;
+import adbg.obj.loader;
+import adbg.disasm.disasm;
+import adbg.obj.fmt.pe;
 
 extern (C):
 

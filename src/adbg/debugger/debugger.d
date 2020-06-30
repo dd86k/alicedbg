@@ -18,7 +18,7 @@ import adbg.consts;
 
 version (Windows) {
 	import core.sys.windows.windows;
-	import adbg.debugger.sys.wow64;
+	import adbg.sys.windows.wow64;
 	//SymInitialize, GetFileNameFromHandle, SymGetModuleInfo64,
 	//StackWalk64, SymGetSymFromAddr64, SymFromName
 	private __gshared HANDLE g_tid;	/// Saved thread handle, DEBUG_INFO doesn't contain one
@@ -34,18 +34,12 @@ version (Posix) {
 	import core.sys.linux.fcntl : open;
 	import core.stdc.stdlib : exit, malloc, free;
 	import core.stdc.stdio : snprintf;
-	import adbg.debugger.sys.ptrace;
-	import adbg.debugger.sys.user;
+	import adbg.sys.posix.ptrace;
+	import adbg.sys.linux.user;
+	import adbg.sys.posix.unistd;
 	private enum __WALL = 0x40000000;
 	private __gshared pid_t g_pid;	/// Saved process ID
 	private __gshared int g_mhandle;	/// Saved memory file handle
-	version (CRuntime_Musl) {
-		import core.sys.posix.unistd : fork, execve, pipe;
-		extern (C) ssize_t pread(int, void *, size_t, off_t);
-		extern (C) ssize_t pwrite(int, const void *, size_t, off_t);
-	} else {
-		import core.sys.posix.unistd : fork, execve, pread, pwrite, pipe;
-	}
 }
 
 extern (C):

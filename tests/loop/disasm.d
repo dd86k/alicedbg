@@ -2,7 +2,7 @@ module test.loop.disasm;
 
 extern (C) int putchar(int);
 
-import adbg.debugger.disasm;
+import adbg.disasm;
 import core.stdc.stdlib, core.stdc.time;
 import std.stdio;
 

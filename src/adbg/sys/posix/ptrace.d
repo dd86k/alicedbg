@@ -6,7 +6,7 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.sys.ptrace;
+module adbg.sys.posix.ptrace;
 
 version (Posix):
 

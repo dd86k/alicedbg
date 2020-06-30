@@ -14,7 +14,7 @@ import core.stdc.stdio;
 import adbg.consts;
 import adbg.ui.loop : adbg_ui_loop_enter;
 import adbg.ui.tui : adbg_ui_tui_enter;
-import adbg.debugger, adbg.dumper;
+import adbg.debugger, adbg.dumper, adbg.disasm;
 import adbg.os.err, adbg.os.seh;
 
 extern (C):

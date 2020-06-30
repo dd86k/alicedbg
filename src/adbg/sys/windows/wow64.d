@@ -3,7 +3,7 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.sys.wow64;
+module adbg.sys.windows.wow64;
 
 version (Win64):
 

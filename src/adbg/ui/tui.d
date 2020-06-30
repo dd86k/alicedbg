@@ -9,6 +9,7 @@ module adbg.ui.tui;
 import core.stdc.stdio, core.stdc.string : memcpy;
 import adbg.os.term;
 import adbg.debugger;
+import adbg.disasm;
 import adbg.ui.common;
 
 extern (C):

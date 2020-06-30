@@ -3,10 +3,10 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.disasm.disasm;
+module adbg.disasm.disasm;
 
-import adbg.debugger.disasm.arch;
-import adbg.debugger.disasm.formatter;
+import adbg.disasm.arch;
+import adbg.disasm.formatter;
 import adbg.utils.bit : fswap16, fswap32, fswap64;
 
 extern (C):

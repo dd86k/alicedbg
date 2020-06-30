@@ -3,4 +3,4 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.disasm.arch.s390;
+module adbg.disasm.arch.s390;

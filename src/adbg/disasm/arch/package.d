@@ -3,8 +3,8 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.disasm.arch;
+module adbg.disasm.arch;
 
 public import
-	adbg.debugger.disasm.arch.x86,
-	adbg.debugger.disasm.arch.riscv;
+	adbg.disasm.arch.x86,
+	adbg.disasm.arch.riscv;

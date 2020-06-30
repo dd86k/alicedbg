@@ -27,11 +27,11 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.disasm.formatter;
+module adbg.disasm.formatter;
 
 import core.stdc.stdarg;
 import core.stdc.stdio : snprintf;
-import adbg.debugger.disasm.disasm;
+import adbg.disasm.disasm;
 import adbg.utils.str, adbg.consts;
 
 extern (C):

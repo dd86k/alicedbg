@@ -11,7 +11,7 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.sys.user;
+module adbg.sys.linux.user;
 
 version (Posix):
 

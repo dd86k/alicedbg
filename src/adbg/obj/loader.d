@@ -14,12 +14,11 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.obj.loader;
+module adbg.obj.loader;
 
 import core.stdc.stdio;
-import adbg.debugger.disasm.disasm : DisasmISA, adbg_dasm_endian; // ISA translation
-import adbg.debugger.file.objs;
-import adbg.os.err;
+import adbg.disasm.disasm : DisasmISA, adbg_dasm_endian; // ISA translation
+import adbg.obj.fmt, adbg.os.err;
 
 extern (C):
 

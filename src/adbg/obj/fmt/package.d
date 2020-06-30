@@ -1,3 +1,3 @@
-module adbg.debugger.file.objs;
+module adbg.obj.fmt;
 
-public import adbg.debugger.file.objs.pe;
+public import adbg.obj.fmt.pe;

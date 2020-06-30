@@ -9,9 +9,9 @@ import core.stdc.stdio;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
 import core.stdc.time : time_t, tm, localtime, strftime;
-import adbg.debugger.obj.loader : obj_info_t;
-import adbg.debugger.disasm.disasm : disasm_params_t, adbg_dasm_line, DisasmMode;
-import adbg.debugger.file.objs.pe;
+import adbg.obj.loader : obj_info_t;
+import adbg.disasm.disasm : disasm_params_t, adbg_dasm_line, DisasmMode;
+import adbg.obj.fmt.pe;
 
 extern (C):
 

@@ -3,6 +3,6 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.disasm;
+module adbg.disasm;
 
-public import adbg.debugger.disasm.disasm;
+public import adbg.disasm.disasm;

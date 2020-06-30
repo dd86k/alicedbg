@@ -3,10 +3,10 @@
  *
  * License: BSD 3-Clause
  */
-module adbg.debugger.disasm.arch.riscv;
+module adbg.disasm.arch.riscv;
 
-import adbg.debugger.disasm.disasm;
-import adbg.debugger.disasm.formatter;
+import adbg.disasm.disasm;
+import adbg.disasm.formatter;
 import adbg.utils.bit;
 
 extern (C):
