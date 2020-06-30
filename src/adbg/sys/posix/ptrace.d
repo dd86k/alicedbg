@@ -4,7 +4,7 @@
  * based on Glibc 2.25. Support for more runtimes will be implemented
  * here with time.
  *
- * License: BSD 3-Clause
+ * License: BSD 3-clause
  */
 module adbg.sys.posix.ptrace;
 

@@ -10,7 +10,7 @@
  * - Microsoft Corporation, Microsoft Portable Executable and Common Object File Format Specification, Revision 8.3 – February 6, 2013
  * - Microsoft Corporation, PE Format, 2019-08-26
  *
- * License: BSD 3-Clause
+ * License: BSD 3-clause
  */
 module adbg.obj.fmt.pe;
 

@@ -4,7 +4,7 @@
  * This module provides a non-pragmatic approach of configurating the debugger,
  * dumper, or profiler settings via a command-line interface.
  *
- * License: BSD 3-Clause
+ * License: BSD 3-clause
  */
 module main;
 
@@ -156,7 +156,7 @@ int clipage(CLIPage h) {
 		;
 		break;
 	case license:
-		r = `BSD 3-Clause License
+		r = `BSD 3-clause License
 
 Copyright (c) 2019-2020, dd86k <dd@dax.moe>
 All rights reserved.

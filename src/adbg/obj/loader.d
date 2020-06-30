@@ -12,7 +12,7 @@
  * Currently, the entire file is loaded in memory out of keeping the
  * implementation simple. Future could see MMI/O usage, or a pure "disk" mode.
  *
- * License: BSD 3-Clause
+ * License: BSD 3-clause
  */
 module adbg.obj.loader;
 

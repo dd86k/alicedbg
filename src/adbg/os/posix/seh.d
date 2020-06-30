@@ -1,7 +1,7 @@
 /**
  * SEH wrapper for Posix
  *
- * License: BSD 3-Clause
+ * License: BSD 3-clause
  */
 module adbg.os.posix.seh;
 

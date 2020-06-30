@@ -25,7 +25,7 @@
  * machine code and mnemonic items can be pushed in any order, only the
  * mnemonic items use the formatter's stack.
  *
- * License: BSD 3-Clause
+ * License: BSD 3-clause
  */
 module adbg.disasm.formatter;
 

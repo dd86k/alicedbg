@@ -5,7 +5,7 @@
  * `_D4core4stdc5stdio7putcharFiZi` which is NOT the C runtime definition of
  * `_putchar`. Which would lead to a crash. D people rejected this 'bug' as well.
  *
- * License: BSD 3-Clause
+ * License: BSD 3-clause
  */
 module adbg.etc.ddc;
 

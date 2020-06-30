@@ -7,7 +7,7 @@
  * (TCP) Defaults to listen on localhost:3549. Input receives commands and
  * output is done via printf.
  *
- * License: BSD 3-Clause
+ * License: BSD 3-clause
  */
 module adbg.ui.json;
 

@@ -1,7 +1,7 @@
 /**
  * Loop on exceptions and continue whenever possible. No user input for this UI.
  *
- * License: BSD 3-Clause
+ * License: BSD 3-clause
  */
 module adbg.ui.loop;
 

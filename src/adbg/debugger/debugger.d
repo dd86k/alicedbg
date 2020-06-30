@@ -7,7 +7,7 @@
  * This is the only module that contains function names without its module
  * name.
  *
- * License: BSD 3-Clause
+ * License: BSD 3-clause
  */
 module adbg.debugger.debugger;
 
@@ -35,8 +35,8 @@ version (Posix) {
 	import core.stdc.stdlib : exit, malloc, free;
 	import core.stdc.stdio : snprintf;
 	import adbg.sys.posix.ptrace;
-	import adbg.sys.linux.user;
 	import adbg.sys.posix.unistd;
+	import adbg.sys.linux.user;
 	private enum __WALL = 0x40000000;
 	private __gshared pid_t g_pid;	/// Saved process ID
 	private __gshared int g_mhandle;	/// Saved memory file handle
