@@ -2,24 +2,16 @@ name "alicedbg"
 description "Aiming to be a simple debugger, object dumper, and profiler"
 homepage "http://github.com/dd86k/alicedbg"
 authors "dd86k <dd@dax.moe>"
-copyright "Copyright © 2019-2020, dd86k"
+copyright "Copyright © 2019-2020 dd86k <dd@dax.moe>"
 license "BSD 3-clause"
 version "0.0.0"
 
-configuration "library" {
-	versions "library"
-	excludedSourceFiles "src/ui/*" "src/main.d"
-}
+#
+# Common build types
+#
 
-# Currently broken, do not use!
-buildType "profile" {
-	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="dmd"
-	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="ldc"
-	buildOptions "debugMode" "debugInfo" "profile" platform="gdc"
-}
-
-# Make the compiler very verbose, only for compiling diagnostics
-buildType "debugv" {
+# Make the compiler very verbose, only for diagnostics when compiling.
+buildType "debugvv" {
 	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
 	buildOptions "debugMode" "debugInfo" platform="gdc"
@@ -28,8 +20,10 @@ buildType "debugv" {
 	dflags "-v" "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
 
-# Debug mode, but make the compiler emit GC and TLS usage
-buildType "debugl" {
+# Compile in debug mode and make the compiler emit GC and TLS usage.
+# Mostly interested in the latter, as betterC does not attach the druntime at
+# compile-time, thus rending the GC point moot, but just in case.
+buildType "debugv" {
 	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
 	buildOptions "debugMode" "debugInfo" platform="gdc"
@@ -38,33 +32,43 @@ buildType "debugl" {
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
 
-# Compile debug mode
+# Compile in debug mode.
 buildType "debug" {
 	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
 	buildOptions "debugMode" "debugInfo" platform="gdc"
 }
 
-# Compile release mode
+# Compile in release mode.
 buildType "release" {
 	buildOptions "releaseMode" "optimize" "betterC" platform="dmd"
 	buildOptions "releaseMode" "optimize" "betterC" platform="ldc"
 	buildOptions "releaseMode" "optimize" platform="gdc"
 }
 
-# Compile release mode with no bound check
+# Compile in release mode with no bound checking.
 buildType "release-nobounds" {
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "betterC" platform="dmd"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "betterC" platform="ldc"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" platform="gdc"
 }
 
-# Compile release mode with no bound check and inlined functions
-# This is the maximum performance option, but do not use this for compiling the library
+# Compile in release mode with no bound checking and inlined functions.
+# This is the maximum performance option, may take much longer to compile.
+# Highly discouraged for building as a library and official release builds.
 buildType "release-inline" {
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" "betterC" platform="dmd"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" "betterC" platform="ldc"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" platform="gdc"
+}
+
+#
+# Library-related
+#
+
+configuration "library" {
+	versions "library"
+	excludedSourceFiles "src/ui/*" "src/main.d"
 }
 
 # Generate headers
@@ -74,6 +78,10 @@ buildType "headers" {
 	dflags "-H" "-Hd=dinclude" platform="dmd"
 }
 
+#
+# Fuzzers
+#
+
 # AFL fuzzing test
 buildType "afl" {
 	toolchainRequirements dmd="no" gdc="no" ldc=">=1.0.0"
@@ -82,6 +90,26 @@ buildType "afl" {
 	versions "AFL"
 	buildOptions "debugMode" "debugInfo" "betterC"
 }
+
+#
+# Profilers
+#
+
+# Build in profile-debug mode, this permits self-profiling. Not related to
+# future profiling feature within alicedbg.
+#NOTICE: Currently broken, do not use!
+#TODO: add dmain.d as a wrapper and manually call main.
+#      This will permit using the profiler from the druntime (for hooks).
+#      If that doesn't work, exclude main.d and try something else.
+buildType "profile" {
+	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="dmd"
+	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="ldc"
+	buildOptions "debugMode" "debugInfo" "profile" platform="gdc"
+}
+
+#
+# Tests
+#
 
 # Disassembler scrambler test
 buildType "loopdisasm" {
