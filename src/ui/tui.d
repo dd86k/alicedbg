@@ -3,14 +3,13 @@
  *
  * License: BSD 3-clause
  */
-module adbg.ui.tui;
+module ui.tui;
 
-//import misc.ddc;
-import core.stdc.stdio, core.stdc.string : memcpy;
 import adbg.os.term;
 import adbg.debugger;
 import adbg.disasm;
-import adbg.ui.common;
+import core.stdc.stdio, core.stdc.string : memcpy;
+import ui.common;
 
 extern (C):
 __gshared:

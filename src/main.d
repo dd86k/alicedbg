@@ -12,10 +12,13 @@ import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp, strncpy, strtok;
 import core.stdc.stdio;
 import adbg.consts;
-import adbg.ui.loop : adbg_ui_loop_enter;
-import adbg.ui.tui : adbg_ui_tui_enter;
 import adbg.debugger, adbg.dumper, adbg.disasm;
 import adbg.os.err, adbg.os.seh;
+
+version (Build_Application) {
+	import ui.loop : adbg_ui_loop_enter;
+	import ui.tui : adbg_ui_tui_enter;
+}
 
 extern (C):
 private:

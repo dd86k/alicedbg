@@ -6,7 +6,7 @@
  *
  * License: BSD 3-clause
  */
-module adbg.ui.common;
+module ui.common;
 
 import adbg.disasm;
 

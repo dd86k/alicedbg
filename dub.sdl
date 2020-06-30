@@ -13,6 +13,7 @@ version "0.0.0"
 # Default configuration.
 configuration "application" {
 	targetType "executable"
+	versions "Build_Application"
 }
 
 # Make the compiler very verbose, only for diagnostics when compiling.
@@ -87,7 +88,7 @@ configuration "staticlibrary" {
 	excludedSourceFiles "src/ui/*" "src/main.d"
 }
 # Force output to a dynamic/shared library.
-# NOTICE: Broken on windows-dmd, windows-ldc seems fine (imports UCRTBASE.DLL).
+# NOTICE: Broken on windows, regardless of compiler used.
 configuration "dynamicLibrary" {
 	targetType "dynamicLibrary"
 	excludedSourceFiles "src/ui/*" "src/main.d"

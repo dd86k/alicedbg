@@ -9,5 +9,5 @@
  *
  * License: BSD 3-clause
  */
-module adbg.ui.json;
+module ui.json;
 

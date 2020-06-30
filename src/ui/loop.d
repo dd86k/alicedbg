@@ -3,15 +3,15 @@
  *
  * License: BSD 3-clause
  */
-module adbg.ui.loop;
+module ui.loop;
 
 import adbg.etc.ddc;
-import core.stdc.stdio : printf, puts;
-import core.stdc.string : memcpy;
 import adbg.debugger, adbg.os.err : ERR_FMT;
 import adbg.disasm;
 import adbg.os.term;
-import adbg.ui.common;
+import core.stdc.stdio : printf, puts;
+import core.stdc.string : memcpy;
+import ui.common;
 
 extern (C):
 

@@ -3,4 +3,4 @@
  *
  * License: BSD 3-clause
  */
-module adbg.ui.command;
+module ui.cmd;
