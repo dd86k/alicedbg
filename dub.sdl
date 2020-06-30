@@ -3,8 +3,13 @@ description "Aiming to be a simple debugger, object dumper, and profiler"
 homepage "http://github.com/dd86k/alicedbg"
 authors "dd86k <dd@dax.moe>"
 copyright "Copyright © 2019-2020, dd86k"
-license "BSD-3-clause"
+license "BSD 3-clause"
 version "0.0.0"
+
+configuration "library" {
+	versions "library"
+	excludedSourceFiles "src/ui/*" "src/main.d"
+}
 
 # Currently broken, do not use!
 buildType "profile" {
