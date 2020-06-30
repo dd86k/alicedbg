@@ -45,25 +45,25 @@ version (Posix) {
 extern (C):
 
 version (X86)
-	private enum BREAKPOINT = 0xCC; // INT3
+	private enum opcode_t BREAKPOINT = 0xCC; // INT3
 else version (X86_64)
-	private enum BREAKPOINT = 0xCC; // INT3
+	private enum opcode_t BREAKPOINT = 0xCC; // INT3
 else version (ARM_Thumb)
-	version (BigEndian)
-		private enum BREAKPOINT = 0xBEDD; // BKPT #221 (0xdd)
+	version (LittleEndian)
+		private enum opcode_t BREAKPOINT = 0xDDBE; // BKPT #221 (0xdd)
 	else
-		private enum BREAKPOINT = 0xDDBE; // BKPT #221 (0xdd)
+		private enum opcode_t BREAKPOINT = 0xBEDD; // BKPT #221 (0xdd)
 else version (ARM) {
-	version (BigEndian)
-		private enum BREAKPOINT = 0xE1200D7D; // BKPT #221 (0xdd)
+	version (LittleEndian)
+		private enum opcode_t BREAKPOINT = 0x7D0D20E1; // BKPT #221 (0xdd)
 	else
-		private enum BREAKPOINT = 0x7D0D20E1; // BKPT #221 (0xdd)
+		private enum opcode_t BREAKPOINT = 0xE1200D7D; // BKPT #221 (0xdd)
 } else version (AArch64) {
 	//NOTE: Checked under ODA, endianness seems to be moot
-	version (BigEndian)
-		private enum BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
+	version (LittleEndian)
+		private enum opcode_t BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
 	else
-		private enum BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
+		private enum opcode_t BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
 } else
 	static assert(0, "Missing BREAKPOINT value for target platform");
 
@@ -78,11 +78,7 @@ enum DebuggerAction {
 private
 struct breakpoint_t {
 	size_t address;
-	union {
-		ubyte  ou8;	/// Original instruction
-		ushort ou16;	/// Original instruction
-		int    ou32;	/// Original instruction
-	}
+	opcode_t opcode;
 }
 
 private __gshared breakpoint_t [DEBUGGER_MAX_BREAKPOINTS]breakpoints;

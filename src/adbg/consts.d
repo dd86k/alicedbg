@@ -5,8 +5,6 @@
  */
 module adbg.consts;
 
-extern (C):
-
 //
 // ANCHOR Compile settings
 //
@@ -40,14 +38,22 @@ else
 version (X86) {
 	enum __PLATFORM__ = "x86";	/// Platform ABI string
 	version = X86_ANY;
-} else
-version (X86_64) {
-	enum __PLATFORM__ = "x86-64";	/// Platform ABI string
+	public alias ubyte opcode_t;
+} else version (X86_64) {
+	enum __PLATFORM__ = "x86_64";	/// Platform ABI string
 	version = X86_ANY;
-} else {
-	static assert(0,
-		"Platform not supported");
-}
+	public alias ubyte opcode_t;
+/*} else version (ARM_Thumb) {
+	enum __PLATFORM__ = "arm_t32";	/// Platform ABI string
+	public alias ushort opcode_t;
+} else version (ARM) {
+	enum __PLATFORM__ = "arm_a32";	/// Platform ABI string
+	public alias uint opcode_t;
+} else version (X86_64) {
+	enum __PLATFORM__ = "arm_a64";	/// Platform ABI string
+	public alias uint opcode_t;*/
+} else
+	static assert(0, "Platform not supported");
 
 pragma(msg, "* isa: ", __PLATFORM__);
 
@@ -116,7 +122,8 @@ else version (PlayStation)
 	enum __OS__ = "PlayStation";	/// Platform OS string
 else version (PlayStation3)
 	enum __OS__ = "PlayStation3";	/// Platform OS string
-else enum __OS__ = "Unknown";	/// Platform OS string
+else
+	enum __OS__ = "Unknown";	/// Platform OS string
 
 pragma(msg, "* os: ", __OS__);
 
@@ -204,6 +211,8 @@ version (GNU_Inline) {
 //
 // ANCHOR External functions
 //
+
+extern (C):
 
 /**
  * Get library version string

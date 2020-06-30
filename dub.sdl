@@ -10,6 +10,11 @@ version "0.0.0"
 # Common build types
 #
 
+# Default configuration.
+configuration "application" {
+	targetType "executable"
+}
+
 # Make the compiler very verbose, only for diagnostics when compiling.
 buildType "debugvv" {
 	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
@@ -66,8 +71,25 @@ buildType "release-inline" {
 # Library-related
 #
 
+# Generate a library.
 configuration "library" {
-	versions "library"
+	targetType "library"
+	excludedSourceFiles "src/ui/*" "src/main.d"
+}
+# Ditto as dub docs.
+configuration "sourceLibrary" {
+	targetType "sourceLibrary"
+	excludedSourceFiles "src/ui/*" "src/main.d"
+}
+# Force output to a static library.
+configuration "staticlibrary" {
+	targetType "library"
+	excludedSourceFiles "src/ui/*" "src/main.d"
+}
+# Force output to a dynamic/shared library.
+# NOTICE: Broken on windows-dmd, windows-ldc seems fine (imports UCRTBASE.DLL).
+configuration "dynamicLibrary" {
+	targetType "dynamicLibrary"
 	excludedSourceFiles "src/ui/*" "src/main.d"
 }
 
@@ -97,10 +119,10 @@ buildType "afl" {
 
 # Build in profile-debug mode, this permits self-profiling. Not related to
 # future profiling feature within alicedbg.
-#NOTICE: Currently broken, do not use!
-#TODO: add dmain.d as a wrapper and manually call main.
-#      This will permit using the profiler from the druntime (for hooks).
-#      If that doesn't work, exclude main.d and try something else.
+# NOTICE: Currently broken, do not use!
+# TODO: add dmain.d as a wrapper and manually call main.
+#       This will permit using the profiler from the druntime (for hooks).
+#       If that doesn't work, exclude main.d and try something else.
 buildType "profile" {
 	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="ldc"

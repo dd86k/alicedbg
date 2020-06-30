@@ -89,7 +89,7 @@ int cliver() {
 	"CRT: "~__CRT__~" (cpprt: "~__TARGET_CPP_RT__~") on "~__OS__~"\n"~
 	"CPU: "~__TARGET_CPU__~"\n"~
 	"Features: dbg disasm\n"~
-	"Disasm: x86_16 x86\n",
+	"Disasm: x86_16 x86 x86_64\n",
 	d.version_major, d.version_minor
 	);
 	return 0;
@@ -145,8 +145,8 @@ int clipage(CLIPage h) {
 	case marchs:
 		r = "Available architectures\n"~
 		"x86_16, 8086........ Intel 8086 (16-bit)\n"~
-		"x86, i386 .......... Intel i386+ (32-bit)"
-//		"x86_64, amd64 ...... EM64T/Intel64 and AMD64 (64-bit)\n"
+		"x86, i386 .......... Intel i386+ (32-bit)"~
+		"x86_64, amd64 ...... EM64T/Intel64 and AMD64 (64-bit)\n"
 //		"t32, thumb ......... ARM Thumb (16/32-bit)\n"~
 //		"a32, arm ........... ARM (32-bit)\n"~
 //		"a64, aarch64 ....... ARM (64-bit)\n"~
@@ -156,7 +156,7 @@ int clipage(CLIPage h) {
 		;
 		break;
 	case license:
-		r = `BSD 3-clause License
+		r = `BSD 3-Clause License
 
 Copyright (c) 2019-2020, dd86k <dd@dax.moe>
 All rights reserved.
