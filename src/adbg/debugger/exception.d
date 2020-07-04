@@ -94,9 +94,9 @@ struct exception_t {
 	uint tid;
 	union {
 		/// Memory address pointer for fault
-		void *addr;
+		void *faultaddr;
 		/// Memory address value for fault
-		size_t addrv;
+		size_t faultaddrv;
 	}
 	/// Register count in registers field, populated by
 	/// adbg_ex_reg_init.
@@ -418,7 +418,7 @@ version (Windows) {
 	void adbg_ex_dbg(exception_t *e, DEBUG_EVENT *de) {
 		e.pid = de.dwProcessId;
 		e.tid = de.dwThreadId;
-		e.addr = de.Exception.ExceptionRecord.ExceptionAddress;
+		e.faultaddr = de.Exception.ExceptionRecord.ExceptionAddress;
 		e.oscode = de.Exception.ExceptionRecord.ExceptionCode;
 		switch (e.oscode) {
 		case EXCEPTION_IN_PAGE_ERROR:

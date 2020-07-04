@@ -88,7 +88,7 @@ L_READKEY:
 /// Params: e = Exception structure
 int adbg_ui_tui_handler(exception_t *e) {
 	adbg_term_clear;
-	g_disparams.a = e.addr;
+	g_disparams.a = e.faultaddr;
 	// locals
 	const uint h = tui_size.height / 2;
 	const uint ihmax = tui_size.height - 2;

@@ -42,8 +42,9 @@ struct x86_internals_t { align(2):
 }
 
 //TODO: Adjust float memory widths
-//TODO: Change mask to xx111xxx (ADBG_DASM_X86_NEW_MASK version)
+//TODO: Change mask to 00_111_000 (ADBG_DASM_X86_NEW_MASK version)
 //      https://sandpile.org/x86/opc_grp.htm
+//      Or try 11_111_000 mask
 
 /**
  * x86 disassembler.
@@ -4720,7 +4721,203 @@ void adbg_dasm_x86_vex_0f38(disasm_params_t *p) {
 			adbg_dasm_push_str(p, m);
 		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
-//	case 0x98:
+	case 0x98, 0x9C:
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		switch (p.x86.op & 7) {
+		case 0:
+			m = p.x86.vex_W ? "vfmadd132pd" : "vfmadd132ps";
+			break;
+		case 1:
+			m = p.x86.vex_W ? "vfmadd132sd" : "vfmadd132ss";
+			break;
+		case 2:
+			m = p.x86.vex_W ? "vfmsub132pd" : "vfmsub132ps";
+			break;
+		case 3:
+			m = p.x86.vex_W ? "vfmsub132sd" : "vfmsub132ss";
+			break;
+		case 4:
+			m = p.x86.vex_W ? "vfnmadd132pd" : "vfnmadd132ps";
+			break;
+		case 5:
+			m = p.x86.vex_W ? "vfnmadd132sd" : "vfnmadd132ss";
+			break;
+		case 6:
+			m = p.x86.vex_W ? "vfnmsub132psd" : "vfnmsub132ps";
+			break;
+		default:
+			m = p.x86.vex_W ? "vfnmsub132sd" : "vfnmsub132ss";
+			break;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
+	case 0xA0:
+		if (p.x86.vex_pp != X86_VEX_PP_66H || p.x86.op < 0xA2) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		if (p.x86.op > 0xA3)
+			m = p.x86.vex_W ? "vfmsubadd213pd" : "vfmsubadd213ps";
+		else
+			m = p.x86.vex_W ? "vfmaddsub213pd" : "vfmaddsub213ps";
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
+	case 0xA8, 0xAC:
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		switch (p.x86.op & 7) {
+		case 0:
+			m = p.x86.vex_W ? "vfmadd213pd" : "vfmadd213ps";
+			break;
+		case 1:
+			m = p.x86.vex_W ? "vfmadd213sd" : "vfmadd213ss";
+			break;
+		case 2:
+			m = p.x86.vex_W ? "vfmsub213pd" : "vfmsub213ps";
+			break;
+		case 3:
+			m = p.x86.vex_W ? "vfmsub213sd" : "vfmsub213ss";
+			break;
+		case 4:
+			m = p.x86.vex_W ? "vfnmadd213pd" : "vfnmadd213ps";
+			break;
+		case 5:
+			m = p.x86.vex_W ? "vfnmadd213sd" : "vfnmadd213ss";
+			break;
+		case 6:
+			m = p.x86.vex_W ? "vfnmsub213pd" : "vfnmsub213ps";
+			break;
+		default:
+			m = p.x86.vex_W ? "vfnmsub213sd" : "vfnmsub213ss";
+			break;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
+	case 0xB4:
+		if (p.x86.vex_pp != X86_VEX_PP_66H || p.x86.op < 0xB6) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		if (p.x86.op > 0xB7)
+			m = p.x86.vex_W ? "vfmsubadd231pd" : "vfmsubadd231ps";
+		else
+			m = p.x86.vex_W ? "vfmaddsub231pd" : "vfmaddsub231ps";
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
+	case 0xB8, 0xBC:
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		switch (p.x86.op & 7) {
+		case 0:
+			m = p.x86.vex_W ? "vfmadd231pd" : "vfmadd231ps";
+			break;
+		case 1:
+			m = p.x86.vex_W ? "vfmadd231sd" : "vfmadd231ss";
+			break;
+		case 2:
+			m = p.x86.vex_W ? "vfmsub231pd" : "vfmsub231ps";
+			break;
+		case 3:
+			m = p.x86.vex_W ? "vfmsub231ss" : "vfmsub231ss";
+			break;
+		case 4:
+			m = p.x86.vex_W ? "vfnmadd231pd" : "vfnmadd231ps";
+			break;
+		case 5:
+			m = p.x86.vex_W ? "vfnmadd231sd" : "vfnmadd231ss";
+			break;
+		case 6:
+			m = p.x86.vex_W ? "vfnmsub231pd" : "vfnmsub231ps";
+			break;
+		default:
+			m = p.x86.vex_W ? "vfnmsub231ss" : "vfnmsub231ss";
+			break;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
+	case 0xD8:
+		if (p.x86.vex_pp != X86_VEX_PP_66H || p.x86.op < 0xDB) {
+			adbg_dasm_err(p);
+			return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, "vaesimc");
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+		return;
+	case 0xDC:
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		switch (p.x86.op & 3) {
+		case 0: m = "vaesenc"; break;
+		case 1: m = "vaesenclast"; break;
+		case 2: m = "vaesdec"; break;
+		default: m = "vaesdeclast"; break;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+		return;
+	case 0xF0:
+		if (p.x86.op < 0xF2) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		int f = void;
+		if (p.x86.op == 0xF2) {
+			if (p.x86.vex_pp != X86_VEX_PP_NONE) {
+				adbg_dasm_err(p);
+				return;
+			}
+			m = "andn";
+			f = p.x86.vex_W ?
+				X86_FLAG_DIR | X86_FLAG_MODW_64B | X86_FLAG_3OPRND | X86_FLAG_VEX_SWvvvvREG :
+				X86_FLAG_DIR | X86_FLAG_MODW_32B | X86_FLAG_3OPRND | X86_FLAG_VEX_SWvvvvREG;
+			if (p.mode >= DisasmMode.File)
+				adbg_dasm_push_str(p, m);
+			adbg_dasm_x86_vex_modrm(p, f);
+		} else {
+			ubyte modrm = *p.ai8;
+			++p.ai8;
+			switch (modrm & MODRM_REG) { // Group 17
+			case MODRM_REG_001: m = "blsr"; break;
+			case MODRM_REG_010: m = "blsmsk"; break;
+			case MODRM_REG_011: m = "blsi"; break;
+			default: adbg_dasm_err(p); return;
+			}
+			int w = p.x86.vex_W ? MemWidth.i64 : MemWidth.i32;
+			if (p.mode >= DisasmMode.File) {
+				adbg_dasm_push_str(p, m);
+				adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, w));
+			}
+			adbg_dasm_x86_modrm_rm(p, modrm, w, w);
+		}
+		return;
 	//TODO: -- Continue the x86 decoder!
 	default: adbg_dasm_err(p); return;
 	}
@@ -5001,15 +5198,14 @@ enum X86_WIDTH_MM = 7;
 // || || ||            +-- DIR bit, ModRM.REG is destination
 // || || |+--------------- Register width
 // || || +---------------- Memory pointer width
-// || |+------------------ (Currently unused)
-// || +-------- 0000 0000 b
+// || ++------- 0000 0000 b
 // ||           |||| ||++- (VEX) Number of operands
-// ||           ++++-++--- (Currently unused)
+// ||           ++++-++--- (Reserved EVEX flags)
 // ++---------- 0000 0000 b
 //              |||| |||+- Use opcode for direction and width
 //              |||| ||+-- Trip if mode is register
 //              |||| |+--- Trip if mode is memory
-//              |||| +---- (Currently unused)
+//              |||| +---- (VEX) ModRM.REG and VEX.vvvv are of the same width
 //              |||+------ (VEX) If VEX.L is set, trip
 //              ||+------- (VEX) Ignore VEX.L, proceed as unset
 //              |+-------- (VEX) Use VEX.vvvv as ModRM.REG (2OPRND only)
@@ -5062,10 +5258,9 @@ enum {	// Flags for ModRM functions
 //	X86_FLAG_	= 0x0800_0000,
 	// MODRM VEX flags
 	X86_FLAG_VEX_NO_L	= 0x1000_0000,	/// Trip on VEX.L if set
-	X86_FLAG_VEX_IGNORE_L	= 0x2000_0000,	/// Force VEX.L as unset
-	X86_FLAG_VEX_USEvvvv	= 0x4000_0000,	/// Use VEX.vvvv instead of ModRM.REG
-	//TODO: X86_FLAG_VEX_VSIB
-	X86_FLAG_VEX_VSIB	= 0x8000_0000	/// VSIB is used
+	X86_FLAG_VEX_SWvvvvREG	= 0x2000_0000,	/// VEX.vvvv takes its width from ModRM.REG
+	X86_FLAG_VEX_USEvvvv	= 0x4000_0000,	/// Use VEX.vvvv instead of ModRM.REG (2OPRND only)
+	X86_FLAG_VEX_VSIB	= 0x8000_0000	/// Vector SIB is used (REG,RM,REG + SIB.Index=XMM/YMM)
 }
 
 // Prefix combos for 0F
@@ -5553,6 +5748,7 @@ void adbg_dasm_x86_vex_modrm(disasm_params_t *p, int flags) {
 	ubyte modrm = *p.ai8;
 	++p.ai8;
 
+	//TODO: Make it so X86_FLAG_VEX_NO_L is ignored and width is forced to i128
 	if (flags & X86_FLAG_VEX_NO_L && p.x86.vex_L) {
 		adbg_dasm_err(p);
 		return;
@@ -5561,15 +5757,19 @@ void adbg_dasm_x86_vex_modrm(disasm_params_t *p, int flags) {
 	int dir = flags & X86_FLAG_DIR;
 	int wreg = (flags & X86_FLAG_REGW) >> 8;
 	int wmem = (flags & X86_FLAG_MEMW) >> 12;
-	int sw = p.x86.vex_L ? MemWidth.i256 : MemWidth.i128; // RM and vvvv
+	int sw = void;
+	if (flags & X86_FLAG_VEX_SWvvvvREG) // Mostly VEX.0f.0f38.f0-f7 opcodes
+		sw = wreg;
+	else
+		sw = p.x86.vex_L ? MemWidth.i256 : MemWidth.i128; // RM and vvvv
 
-	if (wreg == MemWidth.i128 && p.x86.vex_L)
+	if (wreg == MemWidth.i128 && p.x86.vex_L) // VEX.L
 		wreg = MemWidth.i256;
 
 	bool filemode = p.mode >= DisasmMode.File;
 	// NOTE: Currently, the imm8 operand is not include in this operation
 	final switch (flags & X86_FLAG_OPRNDM) {
-	case 0: // 0, most cases
+	case 0: // 0, includes 2 operands
 		if (dir) goto L_2REG;
 L_2RM:
 		adbg_dasm_x86_modrm_rm(p, modrm, wmem, sw);
@@ -5592,9 +5792,10 @@ L_2REG:
 			r1 = adbg_dasm_x86_modrm_reg(p, modrm >> 3, wreg);
 			r2 = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
 		}
-		if (flags & X86_FLAG_VEX_VSIB) { // e.g. vgatherdps xmm0,dword [rax+xmm0],xmm0
+		// e.g. vgatherdps xmm0,dword [rax+xmm0],xmm0
+		if (flags & X86_FLAG_VEX_VSIB) {
 			p.x86.vsib = true;
-			//TODO: Direction flag?
+			//TODO: Direction flag affected here?
 			if (filemode)
 				adbg_dasm_push_reg(p, r1);
 			adbg_dasm_x86_modrm_rm(p, modrm, wmem, sw);

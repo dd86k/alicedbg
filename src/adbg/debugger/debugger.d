@@ -78,12 +78,13 @@ enum DebuggerAction {
 private
 struct breakpoint_t {
 	size_t address;
-	opcode_t opcode;
+	align(2) opcode_t opcode;
 }
 
-private __gshared breakpoint_t [DEBUGGER_MAX_BREAKPOINTS]breakpoints;
-private __gshared size_t breakpointindex;
-private __gshared int function(exception_t*) user_function;
+private __gshared breakpoint_t [DEBUGGER_MAX_BREAKPOINTS]g_bp_list;
+private __gshared size_t g_bp_index;
+private __gshared immutable(opcode_t) g_bp_opcode = BREAKPOINT;
+private __gshared int function(exception_t*) g_user_function;
 
 /**
  * Load executable image into the debugger.
@@ -237,7 +238,7 @@ int adbg_attach(int pid, int flags) {
  * Returns: Zero on success; Otherwise an error occured
  */
 void adbg_userfunc(int function(exception_t*) f) {
-	user_function = f;
+	g_user_function = f;
 }
 
 /**
@@ -249,7 +250,7 @@ void adbg_userfunc(int function(exception_t*) f) {
  * Returns: Zero on success; Otherwise an error occured
  */
 int adbg_run() {
-	if (user_function == null)
+	if (g_user_function == null)
 		return 4;
 
 	exception_t e = void;
@@ -295,7 +296,7 @@ L_DEBUG_LOOP:
 		}
 
 		with (DebuggerAction)
-		final switch (user_function(&e)) {
+		final switch (g_user_function(&e)) {
 		case exit:
 			//TODO: DebugActiveProcessStop if -pid was used
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
@@ -364,14 +365,14 @@ L_DEBUG_LOOP:
 		// - gdbserver and lldb never attempt to do such thing anyway
 		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 			siginfo_t sig = void;
-			if (ptrace(PTRACE_GETSIGINFO, g_pid, null, &sig) < 0) {
-				e.addr = null;
-			} else {
+			if (ptrace(PTRACE_GETSIGINFO, g_pid, null, &sig) >= 0) {
 				version (CRuntime_Glibc)
 					e.addr = sig._sifields._sigfault.si_addr;
 				else version (CRuntime_Musl)
 					e.addr = sig.__si_fields.__sigfault.si_addr;
 				else static assert(0, "hack me");
+			} else {
+				e.addr = null;
 			}
 			break;
 //		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
@@ -392,7 +393,7 @@ L_DEBUG_LOOP:
 //			return errno;
 
 		with (DebuggerAction)
-		final switch (user_function(&e)) {
+		final switch (g_user_function(&e)) {
 		case exit:
 			kill(g_pid, SIGKILL); // PTRACE_KILL is deprecated
 			return 0;
@@ -411,7 +412,12 @@ L_DEBUG_LOOP:
 //
 
 int adbg_bp_add(size_t addr) {
-	assert(0, "adbg_bp_add not implemented");
+	if (g_bp_index >= DEBUGGER_MAX_BREAKPOINTS - 1)
+		return 2;
+	breakpoint_t *bp = &g_bp_list[g_bp_index];
+	if (adbg_mm(MM_READ, addr, &bp.opcode, cast(uint)opcode_t.sizeof))
+		return 1;
+	return adbg_mm(MM_WRITE, addr, cast(void*)&g_bp_opcode, cast(uint)opcode_t.sizeof);
 }
 breakpoint_t* adbg_bp(int index) {
 	assert(0, "adbg_bp not implemented");
@@ -419,14 +425,14 @@ breakpoint_t* adbg_bp(int index) {
 breakpoint_t* adbg_bp_addr(size_t addr) {
 	assert(0, "adbg_bp_addr not implemented");
 }
-uint adbg_bp_opcode(breakpoint_t* bp) {
-	assert(0, "adbg_bp_opcode not implemented");
+int adbg_bp_list(breakpoint_t **l, uint *n) {
+	assert(0, "adbg_bp_list not implemented");
+}
+int adbg_bp_rm(int index) {
+	assert(0, "adbg_bp_rm not implemented");
 }
 int adbg_bp_rm_addr(size_t addr) {
 	assert(0, "adbg_bp_rm_addr not implemented");
-}
-int adbg_bp_rm_index(int index) {
-	assert(0, "adbg_bp_rm_index not implemented");
 }
 
 //
@@ -468,13 +474,15 @@ int adbg_mm(int op, size_t addr, void *data, uint size) {
 			int n = snprintf(cb, 4096, "/proc/%d/mem", g_pid);
 			if (n < 0)
 				return errno;
-			open(cb, 0);
+			g_mhandle = open(cb, 0);
 			free(cb);
 		}
-		// Let's not use process_vm_readv, okay?
 		if (op >= MM_WRITE) {
-			
+			if (pwrite(g_mhandle, data, size, addr) == -1)
+				return errno;
 		} else {
+			if (pread(g_mhandle, data, size, addr) == -1)
+				return errno;
 		}
 	}
 

@@ -38,11 +38,11 @@ int adbg_ui_loop_handler(exception_t *e) {
 	);
 
 	// * Print disassembly, if available
-	if (e.addr) {
-		g_disparams.a = e.addr;
+	if (e.faultaddr) {
+		g_disparams.a = e.faultaddr;
 		if (adbg_dasm_line(&g_disparams, DisasmMode.File) == 0) {
 			printf("> %p: %s| %s\n",
-				e.addr, &g_disparams.mcbuf, &g_disparams.mnbuf);
+				e.faultaddr, &g_disparams.mcbuf, &g_disparams.mnbuf);
 		}
 	}
 
