@@ -34,6 +34,11 @@ version (Posix) {
 	import core.sys.posix.signal;
 }
 
+version (X86)
+	version = X86_ANY;
+else version (X86_64)
+	version = X86_ANY;
+
 extern (C):
 
 version (X86) {
@@ -337,15 +342,25 @@ const(char) *exception_reg_fval(register_t *reg) {
 	
 }*/
 
-// This is only here due to Windows' WOW64
-enum InitPlatform {
-	Native,
-	x86,
-	x86_64
+/// (Internal) Initiate register fields with their names and sizes.
+/// Params: e = Exception structure
+void adbg_ex_ctx_init(exception_t *e) {
+	version (X86) {
+		adbg_ex_ctx_init_x86(e);
+	} else version (X86_64) {
+		version (Win64) {
+			import adbg.debugger.debugger : processWOW64;
+			if (processWOW64)
+				adbg_ex_ctx_init_x86(e);
+			else
+				adbg_ex_ctx_init_x86_64(e);
+		} else
+			adbg_ex_ctx_init_x86_64(e);
+	}
 }
 
-// Thanks, Windows, for your silly WOW64
-void adbg_ex_ctx_init_x86(exception_t *e) {
+version (X86_ANY)
+private void adbg_ex_ctx_init_x86(exception_t *e) {
 	e.regcount = 10;
 	e.registers[0].name = "EIP";
 	e.registers[0].type = RegisterType.u32;
@@ -368,13 +383,14 @@ void adbg_ex_ctx_init_x86(exception_t *e) {
 	e.registers[9].name = "EDI";
 	e.registers[9].type = RegisterType.u32;
 }
+
 version (X86_64)
-void adbg_ex_ctx_init_x86_64(exception_t *e) {
+private void adbg_ex_ctx_init_x86_64(exception_t *e) {
 	e.regcount = 18;
 	e.registers[0].name = "RIP";
 	e.registers[0].type = RegisterType.u64;
 	e.registers[1].name = "RFLAGS";
-	e.registers[1].type = RegisterType.u32;
+	e.registers[1].type = RegisterType.u64;
 	e.registers[2].name = "RAX";
 	e.registers[2].type = RegisterType.u64;
 	e.registers[3].name = "RBX";
@@ -414,7 +430,7 @@ version (Windows) {
 	// ANCHOR Windows functions
 	//
 
-	void adbg_ex_dbg(exception_t *e, DEBUG_EVENT *de) {
+	package void adbg_ex_dbg(exception_t *e, DEBUG_EVENT *de) {
 		e.pid = de.dwProcessId;
 		e.tid = de.dwThreadId;
 		e.faultaddr = de.Exception.ExceptionRecord.ExceptionAddress;
@@ -430,7 +446,7 @@ version (Windows) {
 		}
 	}
 
-	/// Populate exception_t.registers array from Windows' CONTEXT
+	// Populate exception_t.registers array from Windows' CONTEXT
 	void adbg_ex_ctx(exception_t *e, CONTEXT *c) {
 		version (X86) {
 			e.nextaddrv = c.Eip;
@@ -448,7 +464,7 @@ version (Windows) {
 		version (X86_64) {
 			e.nextaddrv = c.Rip;
 			e.registers[0].u64 = c.Rip;
-			e.registers[1].u32 = c.EFlags;
+			e.registers[1].u64 = c.EFlags;
 			e.registers[2].u64 = c.Rax;
 			e.registers[3].u64 = c.Rbx;
 			e.registers[4].u64 = c.Rcx;
@@ -457,11 +473,19 @@ version (Windows) {
 			e.registers[7].u64 = c.Rbp;
 			e.registers[8].u64 = c.Rsi;
 			e.registers[9].u64 = c.Rdi;
+			e.registers[10].u64 = c.R8;
+			e.registers[11].u64 = c.R9;
+			e.registers[12].u64 = c.R10;
+			e.registers[13].u64 = c.R11;
+			e.registers[14].u64 = c.R12;
+			e.registers[15].u64 = c.R13;
+			e.registers[16].u64 = c.R14;
+			e.registers[17].u64 = c.R15;
 		}
 	}
 
 	version (Win64)
-	void adbg_ex_ctx_win_wow64(exception_t *e, WOW64_CONTEXT *c) {
+	package void adbg_ex_ctx_win_wow64(exception_t *e, WOW64_CONTEXT *c) {
 		e.nextaddrv = c.Eip;
 		e.registers[0].u32 = c.Eip;
 		e.registers[1].u32 = c.EFlags;
@@ -474,8 +498,7 @@ version (Windows) {
 		e.registers[8].u32 = c.Esi;
 		e.registers[9].u32 = c.Edi;
 	}
-} else
-version (Posix) {
+} else version (Posix) {
 	//
 	// ANCHOR Posix functions
 	//
@@ -505,7 +528,7 @@ version (Posix) {
 		version (X86_64) {
 			e.nextaddrv = u.rip;
 			e.registers[0].u64 = u.rip;
-			e.registers[1].u32 = cast(uint)u.eflags;
+			e.registers[1].u64 = u.eflags;
 			e.registers[2].u64 = u.rax;
 			e.registers[3].u64 = u.rbx;
 			e.registers[4].u64 = u.rcx;

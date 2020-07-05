@@ -37,11 +37,9 @@ else
 
 version (X86) {
 	enum __PLATFORM__ = "x86";	/// Platform ABI string
-	version = X86_ANY;
 	public alias ubyte opcode_t;
 } else version (X86_64) {
 	enum __PLATFORM__ = "x86_64";	/// Platform ABI string
-	version = X86_ANY;
 	public alias ubyte opcode_t;
 /*} else version (ARM_Thumb) {
 	enum __PLATFORM__ = "arm_t32";	/// Platform ABI string

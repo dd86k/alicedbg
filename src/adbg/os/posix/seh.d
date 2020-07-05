@@ -59,13 +59,13 @@ void adbg_seh_action(int sig, siginfo_t *si, void *p) {
 	mexception.oscode = sig;
 	// HACK: Missing ref'd D bindings to Musl
 	version (CRuntime_Glibc)
-		mexception.addr = si._sifields._sigfault.si_addr;
+		mexception.faultaddr = si._sifields._sigfault.si_addr;
 	else version (CRuntime_Musl)
-		mexception.addr = si.__si_fields.__sigfault.si_addr;
+		mexception.faultaddr = si.__si_fields.__sigfault.si_addr;
 	else static assert(0, "hack me");
 
 	mexception.pid = mexception.tid = 0;
-	adbg_ex_ctx_init(&mexception, InitPlatform.Native);
+	adbg_ex_ctx_init(&mexception);
 	version (X86) {
 		mexception.regcount = 10;
 		version (CRuntime_Glibc) {

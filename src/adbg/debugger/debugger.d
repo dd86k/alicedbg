@@ -24,7 +24,7 @@ version (Windows) {
 	private __gshared HANDLE g_tid;	/// Saved thread handle, DEBUG_INFO doesn't contain one
 	private __gshared HANDLE g_pid;	/// Saved process handle
 	version (Win64)
-		private __gshared int processWOW64;
+		package __gshared int processWOW64;
 } else
 version (Posix) {
 	import core.sys.posix.sys.stat;
@@ -254,18 +254,7 @@ int adbg_run() {
 		return 4;
 
 	exception_t e = void;
-
-	version (X86) {
-		adbg_ex_ctx_init_x86(&e);
-	} else version (X86_64) {
-		version (Win64) {
-			if (processWOW64)
-				adbg_ex_ctx_init_x86(&e);
-			else
-				adbg_ex_ctx_init_x86_64(&e);
-		} else
-			adbg_ex_ctx_init_x86_64(&e);
-	}
+	adbg_ex_ctx_init(&e);
 
 	version (Windows) {
 		DEBUG_EVENT de = void;
@@ -374,17 +363,17 @@ L_DEBUG_LOOP:
 			siginfo_t sig = void;
 			if (ptrace(PTRACE_GETSIGINFO, g_pid, null, &sig) >= 0) {
 				version (CRuntime_Glibc)
-					e.addr = sig._sifields._sigfault.si_addr;
+					e.faultaddr = sig._sifields._sigfault.si_addr;
 				else version (CRuntime_Musl)
-					e.addr = sig.__si_fields.__sigfault.si_addr;
+					e.faultaddr = sig.__si_fields.__sigfault.si_addr;
 				else static assert(0, "hack me");
 			} else {
-				e.addr = null;
+				e.faultaddr = null;
 			}
 			break;
 //		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
 		default:
-			e.addr = null;
+			e.faultaddr = null;
 		}
 
 		adbg_ex_dbg(&e, g_pid, chld_signo);
