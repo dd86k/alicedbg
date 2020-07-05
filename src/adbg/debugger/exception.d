@@ -78,6 +78,8 @@ enum ExceptionType {
 //TODO: Severity levels depending on exception type
 //      Essentially it'll be for a "can or cannot continue"
 //      This would also allow the removal of Disposition/NoContinue
+//      OR
+//      Focus on providing "Exit" translations, which debugger should rely upon
 
 /// Represents an exception. Upon creation, these are populated depending on
 /// the platform with their respective function.
@@ -85,7 +87,7 @@ struct exception_t {
 	/// Exception type, see the ExceptionType enumeration.
 	ExceptionType type;
 	/// Available features
-	uint available;
+	uint features;
 	/// Original OS code (exception or signal value).
 	uint oscode;
 	/// Process ID.
@@ -93,15 +95,23 @@ struct exception_t {
 	/// Thread ID, if available; Otherwise zero.
 	uint tid;
 	union {
-		/// Memory address pointer for fault
+		/// Memory address pointer for next instruction.
+		/// Typically the Instruction Pointer or Program Counter.
+		void *nextaddr;
+		/// Memory address value for next instruction.
+		/// Typically the Instruction Pointer or Program Counter.
+		size_t nextaddrv;
+	}
+	union {
+		/// Memory address pointer for fault. Otherwise null.
 		void *faultaddr;
-		/// Memory address value for fault
+		/// Memory address value for fault. Otherwise null.
 		size_t faultaddrv;
 	}
 	/// Register count in registers field, populated by
 	/// adbg_ex_reg_init.
-	size_t regcount;
-	/// Register population, this may depend on the OS and CRT
+	uint regcount;
+	/// Register population, this may depends by platform.
 	register_t [EX_REG_COUNT]registers;
 }
 
@@ -156,6 +166,7 @@ ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
 		case STATUS_ARRAY_BOUNDS_EXCEEDED:	return BoundExceeded;
 		case STATUS_BREAKPOINT, STATUS_WX86_BREAKPOINT:
 			return Breakpoint;
+		// NOTE: A step may also indicate a trace operation
 		case STATUS_SINGLE_STEP, STATUS_WX86_SINGLE_STEP:
 			return Step;
 		case STATUS_DATATYPE_MISALIGNMENT:	return Misalignment;
@@ -266,6 +277,7 @@ ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
 			}
 		case SIGSTOP: return Breakpoint;
 		case SIGSYS: return Unknown;	// SYS_SECCOMP
+		//TODO: case SIGKILL:
 		default: return Unknown;
 		}
 	}
@@ -333,81 +345,68 @@ enum InitPlatform {
 }
 
 // Thanks, Windows, for your silly WOW64
-void adbg_ex_ctx_init(exception_t *e, InitPlatform plat) {
-	if (plat == InitPlatform.Native) {
-		version (X86)
-			plat = InitPlatform.x86;
-		else version (X86_64)
-			plat = InitPlatform.x86_64;
-	}
-	with (InitPlatform)
-	switch (plat) {
-	case x86:
-		e.regcount = 10;
-		e.registers[0].name = "EIP";
-		e.registers[0].type = RegisterType.u32;
-		e.registers[1].name = "EFLAGS";
-		e.registers[1].type = RegisterType.u32;
-		e.registers[2].name = "EAX";
-		e.registers[2].type = RegisterType.u32;
-		e.registers[3].name = "EBX";
-		e.registers[3].type = RegisterType.u32;
-		e.registers[4].name = "ECX";
-		e.registers[4].type = RegisterType.u32;
-		e.registers[5].name = "EDX";
-		e.registers[5].type = RegisterType.u32;
-		e.registers[6].name = "ESP";
-		e.registers[6].type = RegisterType.u32;
-		e.registers[7].name = "EBP";
-		e.registers[7].type = RegisterType.u32;
-		e.registers[8].name = "ESI";
-		e.registers[8].type = RegisterType.u32;
-		e.registers[9].name = "EDI";
-		e.registers[9].type = RegisterType.u32;
-		return;
-	case x86_64:
-		e.regcount = 18;
-		e.registers[0].name = "RIP";
-		e.registers[0].type = RegisterType.u64;
-		e.registers[1].name = "RFLAGS";
-		e.registers[1].type = RegisterType.u32;
-		e.registers[2].name = "RAX";
-		e.registers[2].type = RegisterType.u64;
-		e.registers[3].name = "RBX";
-		e.registers[3].type = RegisterType.u64;
-		e.registers[4].name = "RCX";
-		e.registers[4].type = RegisterType.u64;
-		e.registers[5].name = "RDX";
-		e.registers[5].type = RegisterType.u64;
-		e.registers[6].name = "RSP";
-		e.registers[6].type = RegisterType.u64;
-		e.registers[7].name = "RBP";
-		e.registers[7].type = RegisterType.u64;
-		e.registers[8].name = "RSI";
-		e.registers[8].type = RegisterType.u64;
-		e.registers[9].name = "RDI";
-		e.registers[9].type = RegisterType.u64;
-		version (X86_64) {
-			e.registers[10].name = "R8";
-			e.registers[10].type = RegisterType.u64;
-			e.registers[11].name = "R9";
-			e.registers[11].type = RegisterType.u64;
-			e.registers[12].name = "R10";
-			e.registers[12].type = RegisterType.u64;
-			e.registers[13].name = "R11";
-			e.registers[13].type = RegisterType.u64;
-			e.registers[14].name = "R12";
-			e.registers[14].type = RegisterType.u64;
-			e.registers[15].name = "R13";
-			e.registers[15].type = RegisterType.u64;
-			e.registers[16].name = "R14";
-			e.registers[16].type = RegisterType.u64;
-			e.registers[17].name = "R15";
-			e.registers[17].type = RegisterType.u64;
-		}
-		return;
-	default:
-	}
+void adbg_ex_ctx_init_x86(exception_t *e) {
+	e.regcount = 10;
+	e.registers[0].name = "EIP";
+	e.registers[0].type = RegisterType.u32;
+	e.registers[1].name = "EFLAGS";
+	e.registers[1].type = RegisterType.u32;
+	e.registers[2].name = "EAX";
+	e.registers[2].type = RegisterType.u32;
+	e.registers[3].name = "EBX";
+	e.registers[3].type = RegisterType.u32;
+	e.registers[4].name = "ECX";
+	e.registers[4].type = RegisterType.u32;
+	e.registers[5].name = "EDX";
+	e.registers[5].type = RegisterType.u32;
+	e.registers[6].name = "ESP";
+	e.registers[6].type = RegisterType.u32;
+	e.registers[7].name = "EBP";
+	e.registers[7].type = RegisterType.u32;
+	e.registers[8].name = "ESI";
+	e.registers[8].type = RegisterType.u32;
+	e.registers[9].name = "EDI";
+	e.registers[9].type = RegisterType.u32;
+}
+version (X86_64)
+void adbg_ex_ctx_init_x86_64(exception_t *e) {
+	e.regcount = 18;
+	e.registers[0].name = "RIP";
+	e.registers[0].type = RegisterType.u64;
+	e.registers[1].name = "RFLAGS";
+	e.registers[1].type = RegisterType.u32;
+	e.registers[2].name = "RAX";
+	e.registers[2].type = RegisterType.u64;
+	e.registers[3].name = "RBX";
+	e.registers[3].type = RegisterType.u64;
+	e.registers[4].name = "RCX";
+	e.registers[4].type = RegisterType.u64;
+	e.registers[5].name = "RDX";
+	e.registers[5].type = RegisterType.u64;
+	e.registers[6].name = "RSP";
+	e.registers[6].type = RegisterType.u64;
+	e.registers[7].name = "RBP";
+	e.registers[7].type = RegisterType.u64;
+	e.registers[8].name = "RSI";
+	e.registers[8].type = RegisterType.u64;
+	e.registers[9].name = "RDI";
+	e.registers[9].type = RegisterType.u64;
+	e.registers[10].name = "R8";
+	e.registers[10].type = RegisterType.u64;
+	e.registers[11].name = "R9";
+	e.registers[11].type = RegisterType.u64;
+	e.registers[12].name = "R10";
+	e.registers[12].type = RegisterType.u64;
+	e.registers[13].name = "R11";
+	e.registers[13].type = RegisterType.u64;
+	e.registers[14].name = "R12";
+	e.registers[14].type = RegisterType.u64;
+	e.registers[15].name = "R13";
+	e.registers[15].type = RegisterType.u64;
+	e.registers[16].name = "R14";
+	e.registers[16].type = RegisterType.u64;
+	e.registers[17].name = "R15";
+	e.registers[17].type = RegisterType.u64;
 }
 
 version (Windows) {
@@ -423,19 +422,18 @@ version (Windows) {
 		switch (e.oscode) {
 		case EXCEPTION_IN_PAGE_ERROR:
 		case EXCEPTION_ACCESS_VIOLATION:
-			e.type = adbg_ex_oscode(
-				de.Exception.ExceptionRecord.ExceptionCode,
+			e.type = adbg_ex_oscode(e.oscode,
 				cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]);
 			break;
 		default:
-			e.type = adbg_ex_oscode(
-				de.Exception.ExceptionRecord.ExceptionCode);
+			e.type = adbg_ex_oscode(e.oscode);
 		}
 	}
 
 	/// Populate exception_t.registers array from Windows' CONTEXT
 	void adbg_ex_ctx(exception_t *e, CONTEXT *c) {
 		version (X86) {
+			e.nextaddrv = c.Eip;
 			e.registers[0].u32 = c.Eip;
 			e.registers[1].u32 = c.EFlags;
 			e.registers[2].u32 = c.Eax;
@@ -448,6 +446,7 @@ version (Windows) {
 			e.registers[9].u32 = c.Edi;
 		} else
 		version (X86_64) {
+			e.nextaddrv = c.Rip;
 			e.registers[0].u64 = c.Rip;
 			e.registers[1].u32 = c.EFlags;
 			e.registers[2].u64 = c.Rax;
@@ -463,6 +462,7 @@ version (Windows) {
 
 	version (Win64)
 	void adbg_ex_ctx_win_wow64(exception_t *e, WOW64_CONTEXT *c) {
+		e.nextaddrv = c.Eip;
 		e.registers[0].u32 = c.Eip;
 		e.registers[1].u32 = c.EFlags;
 		e.registers[2].u32 = c.Eax;
@@ -490,6 +490,7 @@ version (Posix) {
 	/// Populate exception_t.registers array from user_regs_struct
 	void adbg_ex_ctx(exception_t *e, user_regs_struct *u) {
 		version (X86) {
+			e.nextaddrv = u.eip;
 			e.registers[0].u32 = u.eip;
 			e.registers[1].u32 = u.eflags;
 			e.registers[2].u32 = u.eax;
@@ -502,6 +503,7 @@ version (Posix) {
 			e.registers[9].u32 = u.edi;
 		} else
 		version (X86_64) {
+			e.nextaddrv = u.rip;
 			e.registers[0].u64 = u.rip;
 			e.registers[1].u32 = cast(uint)u.eflags;
 			e.registers[2].u64 = u.rax;
@@ -512,6 +514,14 @@ version (Posix) {
 			e.registers[7].u64 = u.rbp;
 			e.registers[8].u64 = u.rsi;
 			e.registers[9].u64 = u.rdi;
+			e.registers[10].u64 = u.r8;
+			e.registers[11].u64 = u.r9;
+			e.registers[12].u64 = u.r10;
+			e.registers[13].u64 = u.r11;
+			e.registers[14].u64 = u.r12;
+			e.registers[15].u64 = u.r13;
+			e.registers[16].u64 = u.r14;
+			e.registers[17].u64 = u.r15;
 		}
 	}
 } // version Posix

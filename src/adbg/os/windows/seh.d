@@ -71,7 +71,12 @@ uint adbg_seh_handle(_EXCEPTION_POINTERS *e) {
 		mcheckpoint.exception.type = adbg_ex_oscode(
 			e.ExceptionRecord.ExceptionCode);
 	}
-	adbg_ex_ctx_init(&mcheckpoint.exception, InitPlatform.Native);
+	version (X86)
+		adbg_ex_ctx_init_x86(&mcheckpoint.exception);
+	else version (X86_64)
+		adbg_ex_ctx_init_x86_64(&mcheckpoint.exception);
+	else
+		static assert(0);
 	adbg_ex_ctx(&mcheckpoint.exception, cast(CONTEXT*)e.ContextRecord);
 //	longjmp(mcheckpoint.buffer, 1);
 	return EXCEPTION_EXECUTE_HANDLER;

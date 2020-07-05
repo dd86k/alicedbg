@@ -255,10 +255,17 @@ int adbg_run() {
 
 	exception_t e = void;
 
-	version (Win64)
-		adbg_ex_ctx_init(&e, processWOW64 ? InitPlatform.x86 : InitPlatform.Native);
-	else
-		adbg_ex_ctx_init(&e, InitPlatform.Native);
+	version (X86) {
+		adbg_ex_ctx_init_x86(&e);
+	} else version (X86_64) {
+		version (Win64) {
+			if (processWOW64)
+				adbg_ex_ctx_init_x86(&e);
+			else
+				adbg_ex_ctx_init_x86_64(&e);
+		} else
+			adbg_ex_ctx_init_x86_64(&e);
+	}
 
 	version (Windows) {
 		DEBUG_EVENT de = void;
