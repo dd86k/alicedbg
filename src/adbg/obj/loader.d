@@ -17,7 +17,7 @@
 module adbg.obj.loader;
 
 import core.stdc.stdio;
-import adbg.disasm.disasm : DisasmISA, adbg_dasm_endian; // ISA translation
+import adbg.disasm.disasm : DisasmISA, adbg_dasm_msb; // ISA translation
 import adbg.obj.fmt, adbg.os.err;
 
 extern (C):
@@ -230,7 +230,7 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 
 	if (e) return e;
 
-	info.internal = adbg_dasm_endian(info.isa);
+	info.internal = adbg_dasm_msb(info.isa);
 
 	return ObjError.None;
 }

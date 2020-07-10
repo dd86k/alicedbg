@@ -242,11 +242,11 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 //      Sets .isa
 //      Score system (On min 50 instructions or before size is reached)
 
-/// See if platform is big-endian (useful for fswap functions). The platform
-/// value returns the compilation target's endianness.
+/// See if platform is big-endian (useful for swap functions) from an ISA enum
+/// value. The default returns the compilation platform endianness value.
 /// Params: isa = DisasmISA value
 /// Returns: Zero if little-endian, non-zero if big-endian
-int adbg_dasm_endian(DisasmISA isa) {
+int adbg_dasm_msb(DisasmISA isa) {
 	with (DisasmISA)
 	switch (isa) {
 	case x86_16, x86, x86_64, rv32, rv64: return 0;

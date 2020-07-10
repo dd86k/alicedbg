@@ -17,7 +17,7 @@ module adbg.obj.fmt.pe;
 import core.stdc.stdio, core.stdc.inttypes;
 import core.stdc.string : memset;
 import adbg.obj.loader : obj_info_t, ObjType;
-import adbg.disasm.disasm : DisasmISA, adbg_dasm_endian; // ISA translation
+import adbg.disasm.disasm : DisasmISA; // ISA translation
 import adbg.obj.loader;
 
 extern (C):

@@ -521,7 +521,7 @@ int adbg_dasm_adj_i16(ushort n) {
 void adbg_dasm_err(disasm_params_t *p, DisasmError err = DisasmError.Illegal) {
 	p.error = err;
 	p.mnbufi =
-	adbg_util_stradd(cast(char*)p.mnbuf, DISASM_CBUF_SIZE, 0, DISASM_FMT_ERR);
+		adbg_util_stradd(cast(char*)p.mnbuf, DISASM_CBUF_SIZE, 0, DISASM_FMT_ERR);
 }
 
 /// (Internal) Process items in the formatter stack and output them into the
