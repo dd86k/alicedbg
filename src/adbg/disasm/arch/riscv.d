@@ -11,7 +11,6 @@ import adbg.utils.bit;
 
 extern (C):
 
-package
 struct riscv_internals_t { align(1):
 	union {
 		uint op;

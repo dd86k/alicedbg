@@ -42,19 +42,22 @@ struct x86_internals_t { align(2):
 }
 
 //TODO: Adjust float memory widths
-//TODO: Change mask to 00_111_000 (ADBG_DASM_X86_NEW_MASK version)
+//TODO: Consider changing mask to 1111_0000
+//      Or a mix of ranges (<40H=11_111_00, idk)
+//      Version: ADBG_DASM_X86_MASK_F0
 //      https://sandpile.org/x86/opc_grp.htm
-//      Or try 11_111_000 mask
+
+//version = ADBG_DASM_X86_MASK_F0;
 
 /**
  * x86 disassembler.
  * Params:
  * 	p = Disassembler parameters
- * 	init = Initiate structure (x86_16 sets this to false and preps its own)
  */
 void adbg_dasm_x86(disasm_params_t *p) {
 	x86_internals_t i;
 	p.x86 = &i;
+
 	if (p.isa == DisasmISA.x86_16) {
 		i.pf_operand = 0x66;
 		i.pf_address = 0x67;
@@ -388,9 +391,9 @@ L_CONTINUE:
 				}
 				// ANCHOR: XOP prefix
 				switch (xop_map) {
-				case X86_XOP_MAP8:  adbg_dasm_x86_xop_8(p);  return;
-				case X86_XOP_MAP9:  adbg_dasm_x86_xop_9(p);  return;
-				case X86_XOP_MAP10: adbg_dasm_x86_xop_10(p); return;
+				case X86_VEX_MAP_XOP8:  adbg_dasm_x86_xop_8(p);  return;
+				case X86_VEX_MAP_XOP9:  adbg_dasm_x86_xop_9(p);  return;
+				case X86_VEX_MAP_XOP10: adbg_dasm_x86_xop_10(p); return;
 				default: adbg_dasm_err(p); return;
 				}
 			} else { // LEA REG32, MEM32
@@ -4974,7 +4977,6 @@ void adbg_dasm_x86_vex_0f3a(disasm_params_t *p) {
 	switch (p.x86.op & 252) {
 	case 0:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-L_0F3A_00_ERR:
 			adbg_dasm_err(p);
 			return;
 		}
@@ -4982,14 +4984,18 @@ L_0F3A_00_ERR:
 		int f = void;
 		switch (p.x86.op) {
 		case 0:
-			if (p.x86.vex_L == 0)
-				goto L_0F3A_00_ERR;
+			if (p.x86.vex_L == 0) {
+				adbg_dasm_err(p);
+				return;
+			}
 			m = "vpermq";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 			break;
 		case 1:
-			if (p.x86.vex_L == 0)
-				goto L_0F3A_00_ERR;
+			if (p.x86.vex_L == 0) {
+				adbg_dasm_err(p);
+				return;
+			}
 			m = "vpermpd";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 			break;
@@ -4997,7 +5003,84 @@ L_0F3A_00_ERR:
 			m = "vpblendd";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 			break;
-		default: goto L_0F3A_00_ERR;
+		default: adbg_dasm_err(p); return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		adbg_dasm_x86_u8imm(p);
+		return;
+	case 0x04:
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		int f = void;
+		switch (p.x86.op) {
+		case 0:
+			m = "vpermilps";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
+			break;
+		case 1:
+			m = "vpermilpd";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
+			break;
+		case 2:
+			if (p.x86.vex_L == 0) {
+				adbg_dasm_err(p);
+				return;
+			}
+			m = "vperm2f128";
+			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
+			break;
+		default: adbg_dasm_err(p); return;
+		}
+		if (p.mode >= DisasmMode.File)
+			adbg_dasm_push_str(p, m);
+		adbg_dasm_x86_vex_modrm(p, f);
+		adbg_dasm_x86_u8imm(p);
+		return;
+	case 0x14:
+		if (p.x86.vex_pp != X86_VEX_PP_66H) {
+			adbg_dasm_err(p);
+			return;
+		}
+		const(char) *m = void;
+		int f = void;
+		bool regop = *p.ai8 >= MODRM_MOD_11;
+		switch (p.x86.op) {
+		case 0x14:
+			m = "vpextrb";
+			f = regop ?
+				X86_FLAG_DIR | X86_FLAG_MEMW_8B | X86_FLAG_REGW_32B :
+				X86_FLAG_MEMW_8B | X86_FLAG_REGW_128B;
+			break;
+		case 0x15:
+			m = "vpextrw";
+			f = regop ?
+				X86_FLAG_DIR | X86_FLAG_MEMW_16B | X86_FLAG_REGW_32B :
+				X86_FLAG_MEMW_16B | X86_FLAG_REGW_128B;
+			break;
+		case 0x16:
+			if (regop == false) {
+				adbg_dasm_err(p);
+				return;
+			}
+			if (p.x86.vex_W) {
+				m = "vpextrq";
+				f = X86_FLAG_DIR | X86_FLAG_REGW_64B;
+			} else {
+				m = "vpextrd";
+				f = X86_FLAG_DIR | X86_FLAG_REGW_32B;
+			}
+			break;
+		default:
+			m = "vextractps";
+			f = regop ?
+				X86_FLAG_DIR | X86_FLAG_MEMW_32B | X86_FLAG_REGW_32B :
+				X86_FLAG_MEMW_32B | X86_FLAG_REGW_128B;
+			break;
 		}
 		if (p.mode >= DisasmMode.File)
 			adbg_dasm_push_str(p, m);
@@ -5806,9 +5889,22 @@ enum X86_VEX_MAP	= 0b1_1111;	/// Map filter
 enum X86_VEX_MAP_0F	= 0b0_0001;	/// Map 1
 enum X86_VEX_MAP_0F38	= 0b0_0010;	/// Map 2
 enum X86_VEX_MAP_0F3A	= 0b0_0011;	/// Map 3
-enum X86_XOP_MAP8	= 0b0_1000;	/// Map 8
-enum X86_XOP_MAP9	= 0b0_1001;	/// Map 9
-enum X86_XOP_MAP10	= 0b0_1010;	/// Map 10
+enum X86_VEX_MAP_XOP8	= 0b0_1000;	/// Map 8
+enum X86_VEX_MAP_XOP9	= 0b0_1001;	/// Map 9
+enum X86_VEX_MAP_XOP10	= 0b0_1010;	/// Map 10
+
+//TODO: Consider redoing _vex_modrm
+//	xmm:imm = imm8[7:4]
+//
+//	Enum	Dispositions		W.vvvv	D
+//	RM	reg,rm			x.1111	1
+//	MR	rm,reg			x.1111	0
+//	RMI	reg,rm,imm8		0.1111	0
+//	RMv	reg,rm,vvvv		0.src	x
+//	RvM	reg,vvvv,rm		1.src	x
+//	vRM	vvvv,reg,rm		VEX.128.66.0F.71-73
+//	RvMx	reg,vvvv,rm,xmm:imm8	0.src	x	(FMA4)
+//	RvxM	reg,vvvv,xmm:imm8,rm	1.src	x	(FMA4)
 
 /**
  * (Internal) Automatically process a ModR/M byte under a VEX map.
@@ -5817,11 +5913,6 @@ enum X86_XOP_MAP10	= 0b0_1010;	/// Map 10
  * 	flags = Direction, Memory/Register widths, Scalar
  */
 void adbg_dasm_x86_vex_modrm(disasm_params_t *p, int flags) {
-	// VEX ModRM decoding notes
-	// vsqrtss xmm0, xmm0, [eax]
-	//         ||||  ||||  +++++-- ModRM.RM stays as-is, (MOD=11) forced to VEX.L
-	//         ||||  ++++--------- VEX.vvvv (affected by VEX.L), source, by instruction
-	//         ++++--------------- ModRM.REG, affected by VEX.L if XMM/YMM
 	ubyte modrm = *p.ai8;
 	++p.ai8;
 
@@ -5835,6 +5926,7 @@ void adbg_dasm_x86_vex_modrm(disasm_params_t *p, int flags) {
 	int wreg = (flags & X86_FLAG_REGW) >> 8;
 	int wmem = (flags & X86_FLAG_MEMW) >> 12;
 	int sw = void;
+
 	if (flags & X86_FLAG_VEX_SWvvvvREG) // Mostly VEX.0f.0f38.f0-f7 opcodes
 		sw = wreg;
 	else
@@ -5895,7 +5987,7 @@ L_3REG:
 			if (dir) goto L_3RM;
 		}
 		return;
-	case X86_FLAG_4OPRND:
+	case X86_FLAG_4OPRND: // FMA4 including xmm0:imm8[7:4]
 		if (filemode)
 			adbg_dasm_push_str(p, "todo");
 		return;
