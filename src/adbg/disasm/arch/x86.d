@@ -43,11 +43,13 @@ struct x86_internals_t { align(2):
 
 //TODO: Adjust float memory widths
 //TODO: Consider changing mask to 1111_0000
-//      Or a mix of ranges (<40H=11_111_00, idk)
-//      Version: ADBG_DASM_X86_MASK_F0
-//      https://sandpile.org/x86/opc_grp.htm
+//	Mix 1111_0000 (<40H) and 11_111_000
+//	Version: ADBG_DASM_X86_NEW_MASK
+//	https://sandpile.org/x86/opc_grp.htm
+//	version (ADBG_DASM_X86_NEW_MASK) {
+//	} else // version (ADBG_DASM_X86_MASK_F0)
 
-//version = ADBG_DASM_X86_MASK_F0;
+//version = ADBG_DASM_X86_NEW_MASK;
 
 /**
  * x86 disassembler.
@@ -1263,7 +1265,7 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 		ubyte modrm = *p.ai8;
 		++p.ai8;
 		if (p.x86.op & X86_FLAG_WIDE) {
-			ubyte mod11 = modrm >= MODRM_MOD_11;
+			bool mod11 = modrm >= MODRM_MOD_11;
 			const(char) *m = void;
 			switch (modrm & MODRM_REG) {
 			case MODRM_REG_000:
@@ -1352,6 +1354,16 @@ void adbg_dasm_x86_0f(disasm_params_t *p) {
 				if (p.mode >= DisasmMode.File)
 					adbg_dasm_push_str(p, "smsw");
 				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+				return;
+			case MODRM_REG_101: // SERIALIZE/?
+				if (mod11 == false) {
+					adbg_dasm_err(p);
+					return;
+				}
+				if (p.mode >= DisasmMode.File) {
+					adbg_dasm_push_x8(p, modrm);
+					adbg_dasm_push_str(p, "serialize");
+				}
 				return;
 			case MODRM_REG_110: // LMSW
 				if (p.mode >= DisasmMode.File)
@@ -5440,20 +5452,17 @@ enum {
 const(char) *adbg_dasm_x86_eax(disasm_params_t *p, int w) {
 	const(char) *a = void;
 	if (w & 1) {
-		if (p.isa == DisasmISA.x86_64) {
-			if (p.x86.vex_W)
-				a = "rax";
-			else
-				a = p.x86.pf_operand ? "eax" : "rax";
-		} else
-			a = p.x86.pf_operand ? "ax" : "eax";
+		if (p.x86.vex_W)
+			a = "rax";
+		else
+			a = p.x86.pf_operand ? "eax" : "rax";
 	} else {
 		a = "al";
 	}
 	return a;
 }
 
-// Also serves as "default widths"
+// Also serves as "default widths" for a opcode (byte)
 MemWidth adbg_dasm_x86_modrm_width(disasm_params_t *p, int op) {
 	if (op & 1)
 		return p.x86.pf_operand ? MemWidth.i16 : MemWidth.i32;
@@ -5511,13 +5520,11 @@ void adbg_dasm_x86_segimm(disasm_params_t *p, const(char) *seg) {
 	}
 }
 
-/// (Internal) Fetch variable 16+16/32-bit as immediate far, affected by address
+/// (Internal) Fetch variable 16/32+16-bit as immediate far, affected by address
 /// prefix. Handles machine code and mnemonics, including the segment register.
 /// Modifies memory pointer.
 /// Params: p = disassembler structure
 void adbg_dasm_x86_immfar(disasm_params_t *p) {
-	ushort sv = *p.ai16;
-	++p.ai16;
 	uint v = void;
 	if (p.x86.pf_address) {
 		v = *p.ai16;
@@ -5526,12 +5533,14 @@ void adbg_dasm_x86_immfar(disasm_params_t *p) {
 		v = *p.ai32;
 		++p.ai32;
 	}
+	ushort sv = *p.ai16;
+	++p.ai16;
 	if (p.mode >= DisasmMode.File) {
-		adbg_dasm_push_x16(p, sv);
 		if (p.x86.pf_address)
 			adbg_dasm_push_x16(p, cast(ushort)v);
 		else
 			adbg_dasm_push_x32(p, v);
+		adbg_dasm_push_x16(p, sv);
 		adbg_dasm_push_immfar(p, v, sv);
 	}
 }
@@ -5645,6 +5654,9 @@ const(char) *adbg_dasm_x86_modrm_reg(disasm_params_t *p, int reg, int width) {
 			width = 3;  // Forces it to 64-bit
 			goto L_RET; // Unaffected by 66H
 		}
+	} else {
+		if (width == MemWidth.i64)
+			width = X86_WIDTH_MM;
 	}
 	if (p.x86.pf_operand) {
 		switch (width) {
@@ -5713,23 +5725,25 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 		}
 		switch (modrm >> 6) {
 		case 0:	// Memory Mode, no displacement
-			if (p.isa != DisasmISA.x86_64 && p.x86.pf_address) {
-				if (rm == MODRM_RM_110) {
-					ushort m = *p.ai16;
-					++p.ai16;
-					if (filemode)
-						adbg_dasm_push_memregimm(p, seg, m, wmem);
-				} else {
-					if (filemode) {
-						regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
-						adbg_dasm_push_memsegreg(p, seg, regstr, wmem);
+			if (p.isa > DisasmISA.x86_16) {
+				if (p.isa < DisasmISA.x86_64 && p.x86.pf_address) {
+					if (rm == MODRM_RM_110) {
+						ushort m = *p.ai16;
+						++p.ai16;
+						if (filemode)
+							adbg_dasm_push_memregimm(p, seg, m, wmem);
+					} else {
+						if (filemode) {
+							regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
+							adbg_dasm_push_memsegreg(p, seg, regstr, wmem);
+						}
 					}
+					return;
 				}
-				return;
-			}
-			if (rm == MODRM_RM_100) {
-				adbg_dasm_x86_sib(p, modrm, wmem);
-				return;
+				if (rm == MODRM_RM_100) {
+					adbg_dasm_x86_sib(p, modrm, wmem);
+					return;
+				}
 			}
 			if (filemode)
 				regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
@@ -5747,7 +5761,7 @@ void adbg_dasm_x86_modrm_rm(disasm_params_t *p, ubyte modrm, int wmem, int wreg)
 			return;
 		case 1:	// Memory Mode, 8-bit displacement
 			//TODO: Check if address prefix affects MOD=01 under x86 and x86_64
-			if (rm == MODRM_RM_100) {
+			if (p.isa != DisasmISA.x86_16 && rm == MODRM_RM_100) {
 				adbg_dasm_x86_sib(p, modrm, wmem);
 				return;
 			}
