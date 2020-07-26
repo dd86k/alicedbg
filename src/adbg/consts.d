@@ -10,11 +10,13 @@ module adbg.consts;
 //
 
 /// Amount of pointers to allocate
-enum CLI_ARGV_ARRAY_SIZE	= 16;
+enum ADBG_CLI_ARGV_ARRAY_COUNT	= 16;
 /// Length of array for argv parsing
-enum CLI_ARGV_ARRAY_LENGTH	= CLI_ARGV_ARRAY_SIZE * size_t.sizeof;
+enum ADBG_CLI_ARGV_ARRAY_LENGTH	= ADBG_CLI_ARGV_ARRAY_COUNT * size_t.sizeof;
 /// The maximum amount of breakpoints that the debugger can have.
-enum DEBUGGER_MAX_BREAKPOINTS	= 4;
+enum ADBG_MAX_BREAKPOINTS	= 4;
+/// Child stack size if USE_CLONE is specified.
+enum ADBG_CHILD_STACK_SIZE	= 1024 * 1024 * 8;
 
 //
 // Constants
@@ -29,11 +31,6 @@ else  enum __BUILDTYPE__ = "release";	/// Build type
 //
 // ABI string
 //
-
-version (D_LP64)
-	version = ABI64;
-else
-	version = ABI32;
 
 version (X86) {
 	enum __PLATFORM__ = "x86";	/// Platform ABI string

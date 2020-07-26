@@ -34,6 +34,7 @@ version (Posix) {
 	import core.sys.linux.fcntl : open;
 	import core.stdc.stdlib : exit, malloc, free;
 	import core.stdc.stdio : snprintf;
+	import adbg.sys.posix.mann;
 	import adbg.sys.posix.ptrace;
 	import adbg.sys.posix.unistd;
 	import adbg.sys.linux.user;
@@ -41,6 +42,9 @@ version (Posix) {
 	private __gshared pid_t g_pid;	/// Saved process ID
 	private __gshared int g_mhandle;	/// Saved memory file handle
 }
+
+version (linux)
+	version = USE_CLONE;
 
 extern (C):
 
@@ -81,7 +85,13 @@ struct breakpoint_t {
 	align(2) opcode_t opcode;
 }
 
-private __gshared breakpoint_t [DEBUGGER_MAX_BREAKPOINTS]g_bp_list;
+version(USE_CLONE) private
+struct __adbg_child_t {
+	const(char) *dev;
+	const(char) **argv, envp;
+}
+
+private __gshared breakpoint_t [ADBG_MAX_BREAKPOINTS]g_bp_list;
 private __gshared size_t g_bp_index;
 private __gshared immutable(opcode_t) g_bp_opcode = BREAKPOINT;
 private __gshared int function(exception_t*) g_user_function;
@@ -114,7 +124,7 @@ int adbg_load(const(char) *path, const(char) *dir, const(char) **argv, const(cha
 		ptrdiff_t bi;
 		char *b = cast(char*)malloc(bs);
 		//
-		// Copy path into buffer
+		// Copy execultable path into buffer
 		//
 		bi = snprintf(b, bs, "%s ", path);
 		if (bi < 0) return 1;
@@ -161,17 +171,18 @@ int adbg_load(const(char) *path, const(char) *dir, const(char) **argv, const(cha
 		if (stat(path, &st) == -1)
 			return errno;
 		// Proceed normally, execve performs executable checks
-		g_pid = fork();
-		if (g_pid < 0)
-			return errno;
-		if (g_pid == 0) {
-			if (ptrace(PTRACE_TRACEME, 0, 0, 0))
+		version (USE_CLONE) {
+			void *chld_stack = mmap(null, ADBG_CHILD_STACK_SIZE,
+				PROT_READ | PROT_WRITE,
+				MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
+				-1, 0);
+			if (chld_stack == MAP_FAILED)
 				return errno;
+
 			const(char)*[16] __argv = void;
 			const(char)*[1]  __envp = void;
-			//
+
 			// Adjust argv
-			//
 			if (argv) {
 				size_t i, __i = 1;
 				while (argv[i] && __i < 15)
@@ -181,31 +192,70 @@ int adbg_load(const(char) *path, const(char) *dir, const(char) **argv, const(cha
 				__argv[1] = null;
 			}
 			__argv[0] = path;
-			//
+
 			// Adjust envp
-			//
 			if (envp == null) {
 				envp = cast(const(char)**)&__envp;
 				envp[0] = null;
 			}
-			version (CRuntime_Musl) {
-				//TODO: Setup pipes
-				//      musl doesn't seem to give the child
-				//      the parents's stdin/stdout pipe, leading
-				//      to a SIGPIPE (13)
-				/*int[2] p = void;
-				if (pipe(p) == -1)
-					return errno;*/
-				if (raise(SIGTRAP))
+
+			// Child struct and clone
+			__adbg_child_t chld = void;
+			chld.envp = cast(const(char)**)&__envp;
+			chld.argv = cast(const(char)**)&__argv;
+			g_pid = clone(&__adbg_chld, chld_stack + ADBG_CHILD_STACK_SIZE, CLONE_PTRACE, &chld); // tid
+			if (g_pid < 0)
+				return errno;
+		} else {
+			g_pid = fork();
+			if (g_pid < 0)
+				return errno;
+			if (g_pid == 0) { // Child process
+				const(char)*[16] __argv = void;
+				const(char)*[1]  __envp = void;
+				//
+				// Adjust argv
+				//
+				if (argv) {
+					size_t i, __i = 1;
+					while (argv[i] && __i < 15)
+						__argv[__i++] = argv[i++];
+					__argv[__i] = null;
+				} else {
+					__argv[1] = null;
+				}
+				__argv[0] = path;
+				//
+				// Adjust envp
+				//
+				if (envp == null) {
+					envp = cast(const(char)**)&__envp;
+					envp[0] = null;
+				}
+				if (ptrace(PTRACE_TRACEME, 0, 0, 0))
+					return errno;
+				version (CRuntime_Musl) {
+					if (raise(SIGTRAP))
+						return errno;
+				}
+				if (execve(path,
+					cast(const(char)**)__argv,
+					cast(const(char)**)__envp) == -1)
 					return errno;
 			}
-			if (execve(path,
-				cast(const(char)**)__argv,
-				cast(const(char)**)__envp) == -1)
-				return errno;
-		}
+		} // USE_CLONE
 	}
 	return 0;
+}
+
+version (Posix)
+version (USE_CLONE)
+int __adbg_chld(void* arg) {
+	__adbg_child_t *c = cast(__adbg_child_t*)arg;
+	if (ptrace(PTRACE_TRACEME, 0, 0, 0))
+		return errno;
+	execve(c.argv[0], c.argv, c.envp);
+	return errno;
 }
 
 /**
@@ -408,7 +458,7 @@ L_DEBUG_LOOP:
 //
 
 int adbg_bp_add(size_t addr) {
-	if (g_bp_index >= DEBUGGER_MAX_BREAKPOINTS - 1)
+	if (g_bp_index >= ADBG_MAX_BREAKPOINTS - 1)
 		return 2;
 	breakpoint_t *bp = &g_bp_list[g_bp_index];
 	if (adbg_mm(MM_READ, addr, &bp.opcode, cast(uint)opcode_t.sizeof))

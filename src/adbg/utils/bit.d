@@ -13,6 +13,13 @@ module adbg.utils.bit;
 
 import adbg.consts;
 
+version (DigitalMars) {
+	version (X86)
+		version = DMD_ASM_X86;
+	else version (X86_64)
+		version = DMD_ASM_X86_64;
+}
+
 extern (C):
 
 /// Create a 1-bit bitmask with a bit position (0-based, 1 << a).
@@ -73,15 +80,15 @@ private ulong adbg_util_nop64(ulong v) { return v; }
 /// Notes:
 /// LDC and GDC transform this into a ROL instruction.
 /// If x86 inline assembly is available, DMD uses the ROL instruction.
-ushort adbg_util_bswap16(ushort v) {
+ushort adbg_util_bswap16(ushort v) pure nothrow @nogc {
 	version (DMD_ASM_X86) {
-		asm {
+		asm pure nothrow @nogc {
 			lea EDI, v;
 			rol word ptr [EDI], 8;
 		}
 		return v;
 	} else version (DMD_ASM_X86_64) {
-		asm {
+		asm pure nothrow @nogc {
 			lea RDI, v;
 			rol word ptr [RDI], 8;
 		}
@@ -97,9 +104,9 @@ ushort adbg_util_bswap16(ushort v) {
 /// Shamelessly taken from https://stackoverflow.com/a/19560621
 /// Only LDC is able to pick this up as BSWAP.
 /// If x86 inline assembly is available, DMD uses the BSWAP instruction.
-uint adbg_util_bswap32(uint v) {
+uint adbg_util_bswap32(uint v) pure nothrow @nogc {
 	version (DMD_ASM_X86_ANY) {
-		asm {
+		asm pure nothrow @nogc {
 			mov EAX, v;
 			bswap EAX;
 			mov v, EAX;
@@ -118,9 +125,9 @@ uint adbg_util_bswap32(uint v) {
 /// Shamelessly taken from https://stackoverflow.com/a/19560621
 /// Only LDC is able to pick this up as BSWAP.
 /// If x86 inline assembly is available, DMD uses the BSWAP instruction.
-ulong adbg_util_bswap64(ulong v) {
+ulong adbg_util_bswap64(ulong v) pure nothrow @nogc {
 	version (DMD_ASM_X86) {
-		asm {
+		asm pure nothrow @nogc {
 			lea EDI, v;
 			mov EAX, [EDI];
 			mov EDX, [EDI+4];
@@ -131,7 +138,7 @@ ulong adbg_util_bswap64(ulong v) {
 		}
 		return v;
 	} else version (DMD_ASM_X86_64) {
-		asm {
+		asm pure nothrow @nogc {
 			mov RAX, v;
 			bswap RAX;
 			mov v, RAX;

@@ -226,15 +226,15 @@ int main(int argc, const(char) **argv) {
 				puts("cli: args missing");
 				return EXIT_FAILURE;
 			}
-			opt.argv = cast(const(char)**)malloc(CLI_ARGV_ARRAY_LENGTH);
+			opt.argv = cast(const(char)**)malloc(ADBG_CLI_ARGV_ARRAY_LENGTH);
 			if (opt.argv == null) {
 				puts("cli: could not allocate (args)");
 				return EXIT_FAILURE;
 			}
 			++argi;
 			size_t i;
-			while (argi < argc && i < CLI_ARGV_ARRAY_SIZE - 1)
-				opt.argv[i++] = argv[argi++];
+			for (; argi < argc && i < ADBG_CLI_ARGV_ARRAY_COUNT - 1; ++i, ++argi)
+				opt.argv[i] = argv[argi];
 			opt.argv[i] = null;
 			break;
 		}
@@ -245,7 +245,7 @@ int main(int argc, const(char) **argv) {
 				puts("cli: env argument missing");
 				return EXIT_FAILURE;
 			}
-			opt.envp = cast(const(char)**)malloc(CLI_ARGV_ARRAY_LENGTH);
+			opt.envp = cast(const(char)**)malloc(ADBG_CLI_ARGV_ARRAY_LENGTH);
 			if (opt.envp == null) {
 				puts("cli: could not allocate (envp)");
 				return EXIT_FAILURE;
@@ -253,7 +253,7 @@ int main(int argc, const(char) **argv) {
 			++argi;
 			opt.envp[0] = strtok(cast(char*)argv[argi], ",");
 			size_t ti;
-			while (++ti < CLI_ARGV_ARRAY_LENGTH - 1) {
+			while (++ti < ADBG_CLI_ARGV_ARRAY_LENGTH - 1) {
 				char* t = strtok(null, ",");
 				opt.envp[ti] = t;
 				if (t == null) break;
