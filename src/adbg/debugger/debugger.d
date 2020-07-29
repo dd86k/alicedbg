@@ -142,7 +142,8 @@ int adbg_load(const(char) *path, const(char) *dir, const(char) **argv, const(cha
 		//
 		STARTUPINFOA si = void;
 		PROCESS_INFORMATION pi = void;
-		memset(&si, 0, si.sizeof + pi.sizeof); // memset faster than _init functions
+		memset(&si, 0, si.sizeof); // memset faster than _init functions
+		memset(&pi, 0, pi.sizeof); // memset faster than _init functions
 		si.cb = STARTUPINFOA.sizeof;
 		// Not using DEBUG_ONLY_THIS_PROCESS because our posix
 		// counterpart is using -1 (all children) for waitpid.
