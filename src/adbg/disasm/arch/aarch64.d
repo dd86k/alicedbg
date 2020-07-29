@@ -21,10 +21,6 @@ struct aarch64_internals_t { align(1):
 	}
 }
 
-//TODO: Functions to process opcodes by types (C.I, I, C.J, J, etc.)
-//      1. rv32_ci(string, int) e.g. rv32_ci("c.jal", op);
-//      2. rv32_ci(string, string, int) e.g. rv32_ci("c.jal", "x1", 0x20);
-
 /// Disassemble Aarch64
 /// Params: p = Disassembler parameters
 void adbg_dasm_aarch64(disasm_params_t *p) {
