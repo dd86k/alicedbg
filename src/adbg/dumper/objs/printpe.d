@@ -469,7 +469,7 @@ L_IMPORTS:
 
 	if ((flags & (DUMPER_SHOW_IMPORTS | DUMPER_SHOW_LOADCFG)) == 0 ||
 		fi.pe.hdr.SizeOfOptionalHeader == 0)
-		goto L_DISASM;
+		goto L_DEBUG;
 
 	puts("\n*\n* Imports\n*\n");
 
@@ -766,6 +766,95 @@ L_IMPORTS:
 	} // LOAD_CONFIGURATION*/
 
 	//
+	// DEBUG
+	//
+L_DEBUG:
+
+	if ((flags & DUMPER_SHOW_DEBUG) == 0)
+		goto L_DISASM;
+
+	puts("\n*\n* Debug\n*\n");
+
+	if (fi.pe.fo_debug) {
+		size_t count = fi.pe.dir.DebugDirectory.size / PE_DEBUG_DIRECTORY.sizeof;
+
+		for (size_t i; i < count; ++i) {
+			PE_DEBUG_DIRECTORY id = fi.pe.debugs[i];
+
+			with (id)
+			printf(
+			"Characteristics  %08X\n"~
+			"TimeDateStamp    %08X\n"~
+			"MajorVersion     %02X (%u)\n"~
+			"MinorVersion     %02X (%u)\n"~
+			"Type             0x%02X (%s)\n"~
+			"SizeOfData       %08X (%u)\n"~
+			"AddressOfRawData %08X\n"~
+			"PointerToRawData %08X\n\n",
+			Characteristics,
+			TimeDateStamp,
+			MajorVersion, MajorVersion,
+			MinorVersion, MinorVersion,
+			Type, adbg_obj_debug_type(Type),
+			SizeOfData, SizeOfData,
+			AddressOfRawData,
+			PointerToRawData
+			);
+
+			void* d = fi.b + id.PointerToRawData;
+
+			switch (id.Type) {
+			case IMAGE_DEBUG_TYPE_CODEVIEW:
+				// TODO: we might want to check MajorVersion/MinorVersion here
+				// (was both 0 linking a D program in 2020)
+
+				uint signature = *cast(uint*)d;
+				switch (signature) {
+				case adbg_pdb_signature!"RSDS":
+					PE_DEBUG_DATA_CODEVIEW_PDB70* pdb = cast(PE_DEBUG_DATA_CODEVIEW_PDB70*)d;
+					printf("                 PDB 7.0 File (RSDS)\n");
+					printf("GUID             "); print_guid(pdb.PDB_GUID); putchar('\n');
+					printf("Age              %d\n", pdb.Age);
+					printf("Path             %s\n", pdb.Path.ptr);
+					break;
+				case adbg_pdb_signature!"NB09":
+					printf("                 PDB 2.0+ File (CodeView 4.10)\n");
+					goto PDB20;
+				case adbg_pdb_signature!"NB10":
+					printf("                 PDB 2.0+ File (NB10)\n");
+					goto PDB20;
+				case adbg_pdb_signature!"NB11":
+					printf("                 PDB 2.0+ File (CodeView 5.0)\n");
+					goto PDB20;
+				PDB20:
+					PE_DEBUG_DATA_CODEVIEW_PDB20* pdb = cast(PE_DEBUG_DATA_CODEVIEW_PDB20*)d;
+					printf("Offset           %08X (%d)\n", pdb.Offset, pdb.Offset);
+					printf("Timestamp        %d\n", pdb.Timestamp);
+					printf("Age              %d\n", pdb.Age);
+					printf("Path             %s\n", pdb.Path.ptr);
+					break;
+				default:
+					printf("Unknown signature %.4s\n", cast(char*)d);
+					break;
+				}
+				putchar('\n');
+				break;
+			case IMAGE_DEBUG_TYPE_MISC:
+				// TODO: not observed/tested yet, but documented on msdn
+				// used for separate .DBG files
+				break;
+			case IMAGE_DEBUG_TYPE_FPO:
+				// TODO: not observed/tested yet, but documented on msdn
+				break;
+			case IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:
+				// TODO: not observed/tested yet, but documented on msdn
+				break;
+			default: break;
+			}
+		}
+	} else puts("No debug information was found");
+
+	//
 	// Disassembly
 	//
 L_DISASM:
@@ -787,4 +876,11 @@ L_DISASM:
 	}
 
 	return EXIT_SUCCESS;
+}
+
+private void print_guid(GUID guid) {
+	printf("{%08lX-%04hX-%04hX-%02hhX%02hhX-%02hhX%02hhX%02hhX%02hhX%02hhX%02hhX}",
+		guid.Data1, guid.Data2, guid.Data3, 
+		guid.Data4[0], guid.Data4[1], guid.Data4[2], guid.Data4[3],
+		guid.Data4[4], guid.Data4[5], guid.Data4[6], guid.Data4[7]);
 }

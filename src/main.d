@@ -134,6 +134,7 @@ int clipage(CLIPage h) {
 		"h .. Show headers\n"~
 		"s .. Show sections\n"~
 		"i .. Show imports\n"~
+		"g .. Show debug directories\n"~
 		"d .. Show disassembly (code sections only)"
 //		"D .. Show disassembly (all sections)"
 		;
@@ -382,6 +383,7 @@ int main(int argc, const(char) **argv) {
 				case 'i': opt.flags |= DUMPER_SHOW_IMPORTS; break;
 				case 'c': opt.flags |= DUMPER_SHOW_LOADCFG; break;
 //				case 'e': opt.flags |= DUMPER_SHOW_EXPORTS; break;
+				case 'g': opt.flags |= DUMPER_SHOW_DEBUG; break;
 //				case '': opt.flags |= DUMPER_SHOW_; break;
 				case 'd': opt.flags |= DUMPER_DISASM_CODE; break;
 				case 'D': opt.flags |= DUMPER_DISASM_ALL; break;

@@ -203,6 +203,7 @@ struct PE_META { align(1):
 		uint fo_basereloc;
 	}
 	union {
+		PE_DEBUG_DIRECTORY *debugs;
 		uint fo_debug;
 	}
 	union {
@@ -417,6 +418,85 @@ struct PE_IMPORT_LTE64 { align(1):
 	}
 }
 
+// DEBUG Directory
+struct PE_DEBUG_DIRECTORY { align(1):
+	uint32_t Characteristics; /// reserved, must be zero
+	uint32_t TimeDateStamp; /// time and date that the debug data was created
+	uint16_t MajorVersion; /// The major version number of the debug data format
+	uint16_t MinorVersion; /// The minor version number of the debug data format
+	uint32_t Type; /// The format of debugging information
+	uint32_t SizeOfData; /// The size of the debug data (not including the debug directory itself)
+	uint32_t AddressOfRawData; /// The address of the debug data relative to the image base
+	uint32_t PointerToRawData; /// The file pointer to the debug data
+}
+
+// Debug Types
+enum : uint32_t {
+	/// An unknown value that is ignored by all tools
+	IMAGE_DEBUG_TYPE_UNKNOWN	= 0,
+	/// The COFF debug information (line numbers, symbol table, and string table).
+	/// This type of debug information is also pointed to by fields in the file headers.
+	IMAGE_DEBUG_TYPE_COFF	= 1,
+	/// The Visual C++ debug information
+	IMAGE_DEBUG_TYPE_CODEVIEW	= 2,
+	/// The frame pointer omission (FPO) information. This information tells the
+	/// debugger how to interpret nonstandard stack frames, which use the EBP
+	/// register for a purpose other than as a frame pointer.
+	IMAGE_DEBUG_TYPE_FPO	= 3,
+	IMAGE_DEBUG_TYPE_MISC	= 4, /// The location of DBG file.
+	IMAGE_DEBUG_TYPE_EXCEPTION	= 5, /// A copy of .pdata section.
+	IMAGE_DEBUG_TYPE_FIXUP	= 6, /// Reserved.
+	IMAGE_DEBUG_TYPE_OMAP_TO_SRC	= 7, /// The mapping from an RVA in image to an RVA in source image.
+	IMAGE_DEBUG_TYPE_OMAP_FROM_SRC	= 8, /// The mapping from an RVA in source image to an RVA in image.
+	IMAGE_DEBUG_TYPE_BORLAND	= 9, /// Reserved for Borland.
+	IMAGE_DEBUG_TYPE_RESERVED10	= 10, /// Reserved.
+	IMAGE_DEBUG_TYPE_CLSID	= 11, /// Reserved.
+	IMAGE_DEBUG_TYPE_VC_FEATURE	= 12, // undocumented, from winnt.h
+	IMAGE_DEBUG_TYPE_POGO	= 13, // undocumented, from winnt.h
+	IMAGE_DEBUG_TYPE_ILTCG	= 14, // undocumented, from winnt.h
+	IMAGE_DEBUG_TYPE_MPX	= 15, // undocumented, from winnt.h
+	IMAGE_DEBUG_TYPE_REPRO	= 16, /// PE determinism or reproducibility.
+	IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS	= 20, /// Extended DLL characteristics bits.
+}
+
+/// Standard GUID type, copied from Win32 basetyps
+align(1) struct GUID { // size is 16
+	align(1):
+	uint32_t Data1;
+	uint16_t Data2;
+	uint16_t Data3;
+	ubyte[8] Data4;
+}
+
+/// Converts a 4 character byte/char string to the platform-native uint
+template adbg_pdb_signature(char[4] s)
+{
+	version (BigEndian)
+		enum uint adbg_pdb_signature = (s[0] << 24) | (s[1] << 16) | (s[2] << 8) | (s[3]);
+	else
+		enum uint adbg_pdb_signature = (s[3] << 24) | (s[2] << 16) | (s[1] << 8) | (s[0]);
+}
+
+// CodeView format for PDB 2.0 and above
+// See http://www.debuginfo.com/articles/debuginfomatch.html
+struct PE_DEBUG_DATA_CODEVIEW_PDB20 { align(1):
+	uint8_t[4] Signature; // "NB09"/"NB10"/"NB11" bytes
+	uint32_t Offset; // offset to the start of the actual debug information from the beginning of the CodeView data
+	uint32_t Timestamp;
+	uint32_t Age; // incremented each time the executable is remade by the linker
+	char[1] Path; // Path to PDB (0-terminated)
+}
+
+// CodeView format for PDB 7.0
+// See http://www.godevtool.com/Other/pdb.htm
+// and http://www.debuginfo.com/articles/debuginfomatch.html
+struct PE_DEBUG_DATA_CODEVIEW_PDB70 { align(1):
+	uint8_t[4] Signature; // "RSDS" bytes
+	GUID PDB_GUID; // GUID of PDB file, matches with PDB file
+	uint32_t Age; // incremented each time the executable is remade by the linker
+	char[1] Path; // Path to PDB (0-terminated)
+}
+
 // Rough guesses for OS limits, offsets+4 since missing Size (already read)
 // If the count is still misleading, the size check will be performed by field
 // Examples:
@@ -571,6 +651,7 @@ int adbg_obj_pe_load(obj_info_t *info, int flags) {
 	}
 	uint secs = info.pe.hdr.NumberOfSections;
 	info.pe.fo_imports = 0;
+	info.pe.fo_debug = 0;
 	for (uint si; si < secs; ++si) {
 		PE_SECTION_ENTRY s = info.pe.sections[si];
 
@@ -580,6 +661,14 @@ int adbg_obj_pe_load(obj_info_t *info, int flags) {
 			info.pe.imports = cast(PE_IMPORT_DESCRIPTOR*)(info.b +
 				(s.PointerToRawData +
 				(info.pe.dir.ImportTable.rva - s.VirtualAddress)));
+		}
+
+		if (info.pe.fo_debug == 0)
+		if (s.VirtualAddress <= info.pe.dir.DebugDirectory.rva &&
+			s.VirtualAddress + s.SizeOfRawData > info.pe.dir.DebugDirectory.rva) {
+			info.pe.debugs = cast(PE_DEBUG_DIRECTORY*)(info.b +
+				(s.PointerToRawData +
+				(info.pe.dir.DebugDirectory.rva - s.VirtualAddress)));
 		}
 	}
 
@@ -664,6 +753,30 @@ const(char) *adbg_obj_pe_subsys(ushort subs) {
 	case PE_SUBSYSTEM_EFI_ROM:	return "EFI ROM";
 	case PE_SUBSYSTEM_XBOX:	return "XBOX";
 	case PE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION:	return "Windows Boot";
+	default:	return null;
+	}
+}
+
+const(char) *adbg_obj_debug_type(uint32_t type) {
+	switch (type) {
+	case IMAGE_DEBUG_TYPE_UNKNOWN: return "Unknown";
+	case IMAGE_DEBUG_TYPE_COFF: return "COFF";
+	case IMAGE_DEBUG_TYPE_CODEVIEW: return "CodeView / VC++";
+	case IMAGE_DEBUG_TYPE_FPO: return "FPO (Frame Pointer Omission) Information";
+	case IMAGE_DEBUG_TYPE_MISC: return "DBG File Location";
+	case IMAGE_DEBUG_TYPE_EXCEPTION: return "Exception";
+	case IMAGE_DEBUG_TYPE_FIXUP: return "FIXUP";
+	case IMAGE_DEBUG_TYPE_OMAP_TO_SRC: return "Map RVA to source image RVA";
+	case IMAGE_DEBUG_TYPE_OMAP_FROM_SRC: return "Map source image RVA to RVA";
+	case IMAGE_DEBUG_TYPE_BORLAND: return "Borland";
+	case IMAGE_DEBUG_TYPE_RESERVED10: return "RESERVED10";
+	case IMAGE_DEBUG_TYPE_CLSID: return "CLSID";
+	case IMAGE_DEBUG_TYPE_VC_FEATURE: return "VC FEATURE";
+	case IMAGE_DEBUG_TYPE_POGO: return "POGO";
+	case IMAGE_DEBUG_TYPE_ILTCG: return "ILTCG";
+	case IMAGE_DEBUG_TYPE_MPX: return "MPX";
+	case IMAGE_DEBUG_TYPE_REPRO: return "PE Reproducibility";
+	case IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS: return "DLL characteristics";
 	default:	return null;
 	}
 }
