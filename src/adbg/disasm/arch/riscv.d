@@ -1,5 +1,5 @@
 /**
- * RISC-V decoder
+ * RISC-V RV32/RV64 decoder.
  *
  * License: BSD 3-clause
  */

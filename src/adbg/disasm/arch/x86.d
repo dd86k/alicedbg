@@ -1,5 +1,5 @@
 /**
- * x86 decoder.
+ * 8086/x86/amd64 decoder.
  *
  * License: BSD 3-clause
  */
