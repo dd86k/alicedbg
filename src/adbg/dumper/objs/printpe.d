@@ -783,14 +783,14 @@ L_IMPORTS:
 
 			with (id)
 			printf(
-			"Characteristics  %08X\n"~
-			"TimeDateStamp    %08X\n"~
-			"MajorVersion     %02X (%u)\n"~
-			"MinorVersion     %02X (%u)\n"~
-			"Type             %02X (%s)\n"~
-			"SizeOfData       %08X (%u)\n"~
-			"AddressOfRawData %08X\n"~
-			"PointerToRawData %08X\n",
+			"Characteristics   %08X\n"~
+			"TimeDateStamp     %08X\n"~
+			"MajorVersion      %02X (%u)\n"~
+			"MinorVersion      %02X (%u)\n"~
+			"Type              %02X (%s)\n"~
+			"SizeOfData        %08X (%u)\n"~
+			"AddressOfRawData  %08X\n"~
+			"PointerToRawData  %08X\n",
 			Characteristics,
 			TimeDateStamp,
 			MajorVersion, MajorVersion,
@@ -817,32 +817,32 @@ L_IMPORTS:
 					UID_TEXT uidt = void;
 					uid_str(pdb.PDB_GUID, uidt, UID_GUID);
 					printf(
-					"Type             PDB 7.0 File (RSDS)\n"~
-					"GUID             %s\n"~
-					"Age              %d\n"~
-					"Path             %s\n",
+					"Type              PDB 7.0 File (RSDS)\n"~
+					"GUID              %s\n"~
+					"Age               %d\n"~
+					"Path              %s\n",
 					cast(char*)uidt, pdb.Age, pdb.Path.ptr);
 					break;
 				case char4i32!"NB09":
-					printf("Type             PDB 2.0+ File (CodeView 4.10)\n");
+					printf("Type              PDB 2.0+ File (CodeView 4.10)\n");
 					goto L_DEBUG_PDB20;
 				case char4i32!"NB10":
-					printf("Type             PDB 2.0+ File (NB10)\n");
+					printf("Type              PDB 2.0+ File (NB10)\n");
 					goto L_DEBUG_PDB20;
 				case char4i32!"NB11":
-					printf("Type             PDB 2.0+ File (CodeView 5.0)\n");
+					printf("Type              PDB 2.0+ File (CodeView 5.0)\n");
 L_DEBUG_PDB20:
 					PE_DEBUG_DATA_CODEVIEW_PDB20* pdb =
 						cast(PE_DEBUG_DATA_CODEVIEW_PDB20*)rawdata;
 					printf(
-					"Offset           %08X (%d)\n"~
-					"Timestamp        %d\n"~
-					"Age              %d\n"~
-					"Path             %s\n",
+					"Offset            %08X (%d)\n"~
+					"Timestamp         %d\n"~
+					"Age               %d\n"~
+					"Path              %s\n",
 					pdb.Offset, pdb.Offset, pdb.Timestamp, pdb.Age, pdb.Path.ptr);
 					break;
 				default:
-					printf("Type             Unknown (%.4s)\n", cast(char*)rawdata);
+					printf("Type              Unknown (%.4s)\n", cast(char*)rawdata);
 					break;
 				}
 				putchar('\n');
