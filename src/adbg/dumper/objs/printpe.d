@@ -11,10 +11,9 @@ import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
 import core.stdc.string : strcpy;
 import core.stdc.time : time_t, tm, localtime, strftime;
-import adbg.dumper.dumper;
-import adbg.obj.loader;
-import adbg.disasm.disasm;
-import adbg.obj.fmt.pe;
+import adbg.dumper.dumper, adbg.disasm.disasm;
+import adbg.obj.loader, adbg.obj.fmt.pe;
+import adbg.utils.uid, adbg.utils.bit;
 
 extern (C):
 
@@ -469,7 +468,7 @@ L_IMPORTS:
 
 	if ((flags & (DUMPER_SHOW_IMPORTS | DUMPER_SHOW_LOADCFG)) == 0 ||
 		fi.pe.hdr.SizeOfOptionalHeader == 0)
-		goto L_DISASM;
+		goto L_DEBUG;
 
 	puts("\n*\n* Imports\n*\n");
 
@@ -764,6 +763,103 @@ L_IMPORTS:
 			VolatileMetadataPointer);
 		}
 	} // LOAD_CONFIGURATION*/
+
+	//
+	// Debug information
+	//
+
+	L_DEBUG:
+
+	if ((flags & DUMPER_SHOW_DEBUG) == 0)
+		goto L_DISASM;
+
+	puts("\n*\n* Debug\n*\n");
+
+	if (fi.pe.fo_debug) {
+		size_t count = fi.pe.dir.DebugDirectory.size / PE_DEBUG_DIRECTORY.sizeof;
+
+		for (size_t i; i < count; ++i) {
+			PE_DEBUG_DIRECTORY id = fi.pe.debugs[i];
+
+			with (id)
+			printf(
+			"Characteristics  %08X\n"~
+			"TimeDateStamp    %08X\n"~
+			"MajorVersion     %02X (%u)\n"~
+			"MinorVersion     %02X (%u)\n"~
+			"Type             %02X (%s)\n"~
+			"SizeOfData       %08X (%u)\n"~
+			"AddressOfRawData %08X\n"~
+			"PointerToRawData %08X\n",
+			Characteristics,
+			TimeDateStamp,
+			MajorVersion, MajorVersion,
+			MinorVersion, MinorVersion,
+			Type, adbg_obj_debug_type(Type),
+			SizeOfData, SizeOfData,
+			AddressOfRawData,
+			PointerToRawData
+			);
+
+			void *rawdata = fi.b + id.PointerToRawData;
+
+			switch (id.Type) {
+			case IMAGE_DEBUG_TYPE_CODEVIEW:
+				// TODO: Check MajorVersion/MinorVersion
+				//       For example, a modern D program use 0.0
+				//       Probably meaningless
+
+				uint sig = *cast(uint*)rawdata;
+				switch (sig) {
+				case char4i32!"RSDS":
+					PE_DEBUG_DATA_CODEVIEW_PDB70* pdb =
+						cast(PE_DEBUG_DATA_CODEVIEW_PDB70*)rawdata;
+					UID_TEXT uidt = void;
+					uid_str(pdb.PDB_GUID, uidt, UID_GUID);
+					printf(
+					"Type             PDB 7.0 File (RSDS)\n"~
+					"GUID             %s\n"~
+					"Age              %d\n"~
+					"Path             %s\n",
+					cast(char*)uidt, pdb.Age, pdb.Path.ptr);
+					break;
+				case char4i32!"NB09":
+					printf("Type             PDB 2.0+ File (CodeView 4.10)\n");
+					goto L_DEBUG_PDB20;
+				case char4i32!"NB10":
+					printf("Type             PDB 2.0+ File (NB10)\n");
+					goto L_DEBUG_PDB20;
+				case char4i32!"NB11":
+					printf("Type             PDB 2.0+ File (CodeView 5.0)\n");
+L_DEBUG_PDB20:
+					PE_DEBUG_DATA_CODEVIEW_PDB20* pdb =
+						cast(PE_DEBUG_DATA_CODEVIEW_PDB20*)rawdata;
+					printf(
+					"Offset           %08X (%d)\n"~
+					"Timestamp        %d\n"~
+					"Age              %d\n"~
+					"Path             %s\n",
+					pdb.Offset, pdb.Offset, pdb.Timestamp, pdb.Age, pdb.Path.ptr);
+					break;
+				default:
+					printf("Type             Unknown (%.4s)\n", cast(char*)rawdata);
+					break;
+				}
+				putchar('\n');
+				break;
+			case IMAGE_DEBUG_TYPE_MISC:
+				// TODO: See MSDN doc. Used for separate .DBG files
+				break;
+			case IMAGE_DEBUG_TYPE_FPO:
+				// TODO: See MSDN doc.
+				break;
+			case IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:
+				// TODO: See MSDN doc.
+				break;
+			default: break;
+			}
+		}
+	}
 
 	//
 	// Disassembly

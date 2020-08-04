@@ -382,7 +382,7 @@ int main(int argc, const(char) **argv) {
 				case 'i': opt.flags |= DUMPER_SHOW_IMPORTS; break;
 				case 'c': opt.flags |= DUMPER_SHOW_LOADCFG; break;
 //				case 'e': opt.flags |= DUMPER_SHOW_EXPORTS; break;
-//				case '': opt.flags |= DUMPER_SHOW_; break;
+				case 'p': opt.flags |= DUMPER_SHOW_DEBUG; break;
 				case 'd': opt.flags |= DUMPER_DISASM_CODE; break;
 				case 'D': opt.flags |= DUMPER_DISASM_ALL; break;
 				case 'S': opt.flags |= DUMPER_DISASM_STATS; break;

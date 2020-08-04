@@ -25,6 +25,13 @@ extern (C):
 /// Create a 1-bit bitmask with a bit position (0-based, 1 << a).
 template BIT(int n) { enum { BIT = 1 << n } }
 
+template char4i32(char[4] s) {
+	version (BigEndian)
+		enum { char4i32 = (s[0] << 24) | (s[1] << 16) | (s[2] << 8) | (s[3]) }
+	else
+		enum { char4i32 = (s[3] << 24) | (s[2] << 16) | (s[1] << 8) | (s[0]) }
+}
+
 version (LittleEndian)
 	private enum TE = 0; /// Target Endian
 else
