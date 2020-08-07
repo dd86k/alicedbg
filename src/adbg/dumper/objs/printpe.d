@@ -506,7 +506,7 @@ L_IMPORTS:
 					} else { // RVA
 						ushort *hint = cast(ushort*)(basename + lte32.rva);
 						printf("%08X\t%04X\t%s\n",
-							lte32.rva, *hint, hint + 1);
+							lte32.rva, *hint, cast(char*)hint + 1);
 					}
 					++lte32;
 				}
@@ -520,7 +520,7 @@ L_IMPORTS:
 					} else { // RVA
 						ushort *hint = cast(ushort*)(basename + lte64.rva);
 						printf("%08X\t%04X\t%s\n",
-							lte64.rva, *hint, hint + 1);
+							lte64.rva, *hint, cast(char*)hint + 1);
 					}
 					++lte64;
 				}
@@ -875,7 +875,7 @@ L_DISASM:
 		PE_SECTION_ENTRY s = fi.pe.sections[si];
 
 		if (s.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
-			printf("\n<%.8s>\n", &s.Name);
+			printf("\n<%.8s>\n", s.Name.ptr);
 			int e = adbg_dmpr_disasm(dp,
 				fi.b + s.PointerToRawData, s.SizeOfRawData, flags);
 			if (e) return e;

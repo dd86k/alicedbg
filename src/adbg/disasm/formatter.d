@@ -785,15 +785,15 @@ void adbg_dasm_fadd(disasm_params_t *p, disasm_fmt_item_t *i) {
 		switch (p.syntax) {
 		case Att:
 			p.mnbufi += snprintf(bp, left, "%s%+d(,%s,%d)",
-				i.sval2, i.sval2, i.sval1, i.ival1);
+				i.sval2, i.ival2, i.sval1, i.ival1);
 			return;
 		case Nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s*%d%+d]",
-				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1, i.ival1, i.sval2);
+				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1, i.ival1, i.ival2);
 			return;
 		default:
 			p.mnbufi += snprintf(bp, left, "%s ptr %s[%s*%d%+d]",
-				MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1, i.sval2);
+				MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1, i.ival2);
 			return;
 		}
 	case x86_SIB_MemSegImm:

@@ -167,7 +167,7 @@ int adbg_dmpr_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
 			switch (e) {
 			case None, Illegal:
 				printf("%08X %-30s %-30s\n",
-					i, &dp.mcbuf, &dp.mnbuf);
+					i, dp.mcbuf.ptr, dp.mnbuf.ptr);
 				continue;
 			default:
 				printf("disasm: %s\n", adbg_dasm_errmsg(e));
