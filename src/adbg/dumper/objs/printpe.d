@@ -805,9 +805,9 @@ L_IMPORTS:
 
 			switch (id.Type) {
 			case IMAGE_DEBUG_TYPE_CODEVIEW:
-				// TODO: Check MajorVersion/MinorVersion
-				//       For example, a modern D program use 0.0
-				//       Probably meaningless
+				//TODO: Check MajorVersion/MinorVersion
+				//      For example, a modern D program use 0.0
+				//      Probably meaningless
 
 				uint sig = *cast(uint*)rawdata;
 				switch (sig) {

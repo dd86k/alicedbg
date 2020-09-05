@@ -125,24 +125,24 @@ int clipage(CLIPage h) {
 		"loop ...... Print exceptions, minimum user interaction.\n"
 //		"cmd ....... (Experimental) (REPL) Command-based, like a shell.\n"
 //		"tui ....... (WIP) Text UI with full debugging experience.\n"
-//		"tcp-json .. (Experimental) JSON API server via TCP.\n"
+//		"server .... (Experimental) JSON API server via TCP.\n"
 		;
 		break;
 	case show:
 		r = "Available parts for dumper (default=h)\n"~
-		"A .. Show all fields listed below\n"~
-		"h .. Show headers\n"~
-		"s .. Show sections\n"~
-		"i .. Show imports\n"~
-		"d .. Show disassembly (code sections only)"
-//		"D .. Show disassembly (all sections)"
+		"A	Show all fields listed below\n"~
+		"h	Show headers\n"~
+		"s	Show sections\n"~
+		"i	Show imports\n"~
+		"d	Show disassembly (code sections only)"
+//		"D	Show disassembly (all sections)"
 		;
 		break;
 	case syntaxes:
 		r = "Available disassembler syntaxes\n"~
-		"intel .... Intel syntax\n"~
-		"nasm ..... Netwide Assembler syntax\n"~
-		"att ...... AT&T syntax"
+		"intel	Intel syntax\n"~
+		"nasm	Netwide Assembler syntax\n"~
+		"att	AT&T syntax"
 		;
 		break;
 	case marchs:
@@ -192,7 +192,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
 	case surprise:
 		r = `
 +------------------+
-| Meow, I hate x86 |
+| I hate x86, meow |
 +--+---------------+
    |    A_A
    +-  (-.-)
