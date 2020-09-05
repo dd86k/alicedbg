@@ -506,7 +506,7 @@ L_IMPORTS:
 					} else { // RVA
 						ushort *hint = cast(ushort*)(basename + lte32.rva);
 						printf("%08X\t%04X\t%s\n",
-							lte32.rva, *hint, cast(char*)hint + 1);
+							lte32.rva, *hint, cast(char*)hint + 2);
 					}
 					++lte32;
 				}
@@ -520,7 +520,7 @@ L_IMPORTS:
 					} else { // RVA
 						ushort *hint = cast(ushort*)(basename + lte64.rva);
 						printf("%08X\t%04X\t%s\n",
-							lte64.rva, *hint, cast(char*)hint + 1);
+							lte64.rva, *hint, cast(char*)hint + 2);
 					}
 					++lte64;
 				}
