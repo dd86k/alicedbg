@@ -90,7 +90,6 @@ int cliver() {
 	" - <https://github.com/dd86k/alicedbg>\n"~
 	"Compiler: "~__VENDOR__~" %u.%03u, "~__TARGET_OBJ_FORMAT__~" obj, "~__TARGET_FLOAT_ABI__~" float\n"~
 	"CRT: "~__CRT__~" (cpprt: "~__TARGET_CPP_RT__~") on "~__OS__~"\n"~
-	"CPU: "~__TARGET_CPU__~"\n"~
 	"Features: dbg disasm\n"~
 	"Disasm: x86_16 x86 x86_64\n",
 	d.version_major, d.version_minor

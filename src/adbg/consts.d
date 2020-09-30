@@ -38,19 +38,21 @@ version (X86) {
 } else version (X86_64) {
 	enum __PLATFORM__ = "x86_64";	/// Platform ABI string
 	public alias ubyte opcode_t;
-/*} else version (ARM_Thumb) {
+} else version (ARM_Thumb) {
 	enum __PLATFORM__ = "arm_t32";	/// Platform ABI string
 	public alias ushort opcode_t;
 } else version (ARM) {
 	enum __PLATFORM__ = "arm_a32";	/// Platform ABI string
 	public alias uint opcode_t;
-} else version (X86_64) {
+} else version (AArch64a) {
 	enum __PLATFORM__ = "arm_a64";	/// Platform ABI string
-	public alias uint opcode_t;*/
-} else
-	static assert(0, "Platform not supported");
+	public alias uint opcode_t;
+}
 
-pragma(msg, "* isa: ", __PLATFORM__);
+static if (__traits(compiles, __PLATFORM__))
+	pragma(msg, "* isa: ", __PLATFORM__);
+else
+	static assert(0, "Platforn not support (__PLATFORM__ not defined).");
 
 //
 // CRT string
@@ -163,12 +165,6 @@ version (COMPILER_TARGETINFO) {
 		enum __TARGET_CPP_RT__ = "sun"; /// Target C++ Runtime string
 	else // assuming none
 		enum __TARGET_CPP_RT__ = "none"; /// Target C++ Runtime string
-}
-
-version (COMPILER_TARGETINFO_CPU) {
-	enum __TARGET_CPU__ = __traits(targetCPU); /// Target CPU string (LDC-only)
-} else {
-	enum __TARGET_CPU__ = __PLATFORM__; /// Target CPU string (LDC-only)
 }
 
 //
