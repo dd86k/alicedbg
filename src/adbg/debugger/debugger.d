@@ -14,7 +14,7 @@ module adbg.debugger.debugger;
 import core.stdc.string : memset;
 import core.stdc.errno : errno;
 import adbg.debugger.exception;
-import adbg.consts;
+import adbg.platform;
 
 version (Windows) {
 	import core.sys.windows.windows;

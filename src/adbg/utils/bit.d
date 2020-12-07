@@ -11,7 +11,7 @@
  */
 module adbg.utils.bit;
 
-import adbg.consts;
+import adbg.platform;
 
 version (DigitalMars) {
 	version (X86)

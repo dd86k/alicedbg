@@ -32,7 +32,7 @@ module adbg.disasm.formatter;
 import core.stdc.stdarg;
 import core.stdc.stdio : snprintf;
 import adbg.disasm.disasm;
-import adbg.utils.str, adbg.consts;
+import adbg.utils.str, adbg.platform;
 
 extern (C):
 

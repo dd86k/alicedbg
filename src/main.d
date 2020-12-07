@@ -11,7 +11,8 @@ module main;
 import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp, strncpy, strtok;
 import core.stdc.stdio;
-import adbg.consts;
+import d = std.compiler;
+import adbg.platform;
 import adbg.debugger, adbg.dumper, adbg.disasm;
 import adbg.os.err, adbg.os.seh;
 
@@ -20,8 +21,8 @@ version (Build_Application) {
 	import ui.tui : adbg_ui_tui_enter;
 }
 
-extern (C):
 private:
+extern (C):
 
 enum CLIOpMode {
 	debug_,
@@ -37,7 +38,7 @@ enum CLIPage {
 	syntaxes,
 	marchs,
 	license,
-	surprise
+	meow
 }
 
 // for debugger
@@ -79,21 +80,20 @@ struct mainopt {
 	}
 }
 
+immutable(char) *fmt_version =
+"alicedbg "~APP_VERSION~" (built: "~__TIMESTAMP__~")\n"~
+"License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
+"Homes:\n"~
+" - <https://git.dd86k.space/dd86k/alicedbg>\n"~
+" - <https://github.com/dd86k/alicedbg>\n"~
+"Compiler: "~__VENDOR__~" %u.%03u, "~TARGET_OBJFMT~" obj, "~TARGET_FLTABI~" float\n"~
+"CRT: "~TARGET_CRT~" (C++RT: "~TARGET_CPPRT~") on "~TARGET_OS~"/"~TARGET_PLATFORM~"\n"~
+"Features: dbg disasm\n"~
+"Disasm: x86_16 x86 x86_64\n";
+
 /// Version page
 int cliver() {
-	import d = std.compiler;
-	printf(
-	"alicedbg-"~__PLATFORM__~" "~APP_VERSION~"-"~__BUILDTYPE__~"  ("~__TIMESTAMP__~")\n"~
-	"License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
-	"Homes:\n"~
-	" - <https://git.dd86k.space/dd86k/alicedbg>\n"~
-	" - <https://github.com/dd86k/alicedbg>\n"~
-	"Compiler: "~__VENDOR__~" %u.%03u, "~__TARGET_OBJ_FORMAT__~" obj, "~__TARGET_FLOAT_ABI__~" float\n"~
-	"CRT: "~__CRT__~" (cpprt: "~__TARGET_CPP_RT__~") on "~__OS__~"\n"~
-	"Features: dbg disasm\n"~
-	"Disasm: x86_16 x86 x86_64\n",
-	d.version_major, d.version_minor
-	);
+	printf(fmt_version, d.version_major, d.version_minor);
 	return 0;
 }
 
@@ -120,6 +120,7 @@ int clipage(CLIPage h) {
 		"  -S, --show ...... dumper: Select parts to show (default=h, see -show ?)\n";
 		break;
 	case ui:
+		//TODO: Show values from a structure
 		r = "Available debug UIs (default=loop)\n"~
 		"loop ...... Print exceptions, minimum user interaction.\n"
 //		"cmd ....... (Experimental) (REPL) Command-based, like a shell.\n"
@@ -128,6 +129,7 @@ int clipage(CLIPage h) {
 		;
 		break;
 	case show:
+		//TODO: Show values from a structure
 		r = "Available parts for dumper (default=h)\n"~
 		"A	Show all fields listed below\n"~
 		"h	Show headers\n"~
@@ -138,6 +140,7 @@ int clipage(CLIPage h) {
 		;
 		break;
 	case syntaxes:
+		//TODO: Show values from a structure
 		r = "Available disassembler syntaxes\n"~
 		"intel	Intel syntax\n"~
 		"nasm	Netwide Assembler syntax\n"~
@@ -145,6 +148,7 @@ int clipage(CLIPage h) {
 		;
 		break;
 	case marchs:
+		//TODO: Show values from a structure
 		r = "Available architectures\n"~
 		"x86_16, 8086........ Intel 8086 (16-bit)\n"~
 		"x86, i386 .......... Intel i386+ (32-bit)"~
@@ -188,7 +192,7 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
 		break;
-	case surprise:
+	case meow:
 		r = `
 +------------------+
 | I hate x86, meow |
@@ -435,12 +439,14 @@ int main(int argc, const(char) **argv) {
 
 		if (strcmp(arg, "-version") == 0)
 			return cliver;
+		if (strcmp(arg, "-ver") == 0)
+			return puts(APP_VERSION);
 		if (strcmp(arg, "h") == 0 || strcmp(arg, "-help") == 0)
 			return clipage(CLIPage.main);
 		if (strcmp(arg, "-license") == 0)
 			return clipage(CLIPage.license);
 		if (strcmp(arg, "-meow") == 0)
-			return clipage(CLIPage.surprise);
+			return clipage(CLIPage.meow);
 
 		printf("unknown option: %s\n", arg);
 		return EXIT_FAILURE;
