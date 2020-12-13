@@ -28,6 +28,8 @@ enum ADBG_VERSION = "0.0.0";
 debug enum __BUILDTYPE__ = "debug";	/// Build type
 else  enum __BUILDTYPE__ = "release";	/// Build type
 
+private enum VERSION_TARGET_INFO = 2083;
+
 //
 // ABI string
 //
@@ -129,15 +131,19 @@ pragma(msg, "* os: ", TARGET_OS);
 //
 
 version (DigitalMars) {
-	version = COMPILER_TARGETINFO;
+	static if (__VERSION__ >= VERSION_TARGET_INFO)
+		private enum FEATURE_TARGETINFO = true;
+	else
+		private enum FEATURE_TARGETINFO = false;
+} else version (LDC) {
+	static if (__VERSION__ >= VERSION_TARGET_INFO)
+		private enum FEATURE_TARGETINFO = true;
+	else
+		private enum FEATURE_TARGETINFO = false;
 } else
-version (LDC) {
-	version = COMPILER_TARGETINFO;
-	version = COMPILER_TARGETINFO_CPU;
-}
+	private enum FEATURE_TARGETINFO = false;
 
-// DMD, LDC
-version (COMPILER_TARGETINFO) {
+static if (FEATURE_TARGETINFO) {
 	/// Target object format string
 	enum TARGET_OBJFMT = __traits(getTargetInfo, "objectFormat");
 	/// Target float ABI string
@@ -148,7 +154,7 @@ version (COMPILER_TARGETINFO) {
 		enum TARGET_CPPRT = "none"; /// Target C++ Runtime string
 	else
 		enum TARGET_CPPRT = __tinfo; /// Target C++ Runtime string
-} else { // GDC
+} else {
 	/// Target object format string
 	enum TARGET_OBJFMT = "unknown";
 	/// Target float ABI string
