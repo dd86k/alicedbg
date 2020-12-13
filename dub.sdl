@@ -1,5 +1,5 @@
 name "alicedbg"
-description "Aiming to be a simple debugger, object dumper, and profiler"
+description "Aiming to be a simple debugger"
 homepage "http://github.com/dd86k/alicedbg"
 authors "dd86k <dd@dax.moe>"
 copyright "Copyright © 2019-2020 dd86k <dd@dax.moe>"
@@ -18,11 +18,11 @@ configuration "application" {
 
 # Make the compiler very verbose, only for diagnostics when compiling.
 buildType "debugvv" {
-	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
-	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
+	buildOptions "debugMode" "debugInfo" platform="dmd"
+	buildOptions "debugMode" "debugInfo" platform="ldc"
 	buildOptions "debugMode" "debugInfo" platform="gdc"
-	dflags "-v" "-vgc" "-vtls" platform="dmd"
-	dflags "-v" "--vgc" platform="ldc"
+	dflags "-betterC" "-v" "-vgc" "-vtls" platform="dmd"
+	dflags "-betterC" "-v" "--vgc" platform="ldc"
 	dflags "-v" "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
 
@@ -30,42 +30,50 @@ buildType "debugvv" {
 # Mostly interested in the latter, as betterC does not attach the druntime at
 # compile-time, thus rending the GC point moot, but just in case.
 buildType "debugv" {
-	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
-	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
+	buildOptions "debugMode" "debugInfo" platform="dmd"
+	buildOptions "debugMode" "debugInfo" platform="ldc"
 	buildOptions "debugMode" "debugInfo" platform="gdc"
-	dflags "-vgc" "-vtls" platform="dmd"
-	dflags "--vgc" platform="ldc"
+	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
+	dflags "-betterC" "--vgc" platform="ldc"
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
 
 # Compile in debug mode.
 buildType "debug" {
-	buildOptions "debugMode" "debugInfo" "betterC" platform="dmd"
-	buildOptions "debugMode" "debugInfo" "betterC" platform="ldc"
+	buildOptions "debugMode" "debugInfo" platform="dmd"
+	buildOptions "debugMode" "debugInfo" platform="ldc"
 	buildOptions "debugMode" "debugInfo" platform="gdc"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
 }
 
 # Compile in release mode.
 buildType "release" {
-	buildOptions "releaseMode" "optimize" "betterC" platform="dmd"
-	buildOptions "releaseMode" "optimize" "betterC" platform="ldc"
+	buildOptions "releaseMode" "optimize" platform="dmd"
+	buildOptions "releaseMode" "optimize" platform="ldc"
 	buildOptions "releaseMode" "optimize" platform="gdc"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
 }
 
 # Compile in release mode with no bound checking.
 buildType "release-nobounds" {
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" "betterC" platform="dmd"
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" "betterC" platform="ldc"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck" platform="dmd"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck" platform="ldc"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" platform="gdc"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
 }
 
 # Compile in release mode with no bound checking and inlined functions.
 # This is the maximum performance option, may take much longer to compile.
 # Highly discouraged for building as a library and official release builds.
 buildType "release-inline" {
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" "betterC" platform="dmd"
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" "betterC" platform="ldc"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" platform="dmd"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" platform="ldc"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" platform="gdc"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
 }
 
 #
@@ -111,7 +119,9 @@ buildType "afl" {
 	dflags "-plugin=$AFL_ROOT/afl-llvm-pass.so"
 	sourceFiles "$AFL_ROOT/afl-llvm-rt.o"
 	versions "AFL"
-	buildOptions "debugMode" "debugInfo" "betterC"
+	buildOptions "debugMode" "debugInfo"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
 }
 
 #
@@ -125,9 +135,11 @@ buildType "afl" {
 #       This will permit using the profiler from the druntime (for hooks).
 #       If that doesn't work, exclude main.d and try something else.
 buildType "profile" {
-	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="dmd"
-	buildOptions "debugMode" "debugInfo" "betterC" "profile" platform="ldc"
+	buildOptions "debugMode" "debugInfo" "profile" platform="dmd"
+	buildOptions "debugMode" "debugInfo" "profile" platform="ldc"
 	buildOptions "debugMode" "debugInfo" "profile" platform="gdc"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
 }
 
 #
