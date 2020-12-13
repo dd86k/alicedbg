@@ -81,7 +81,7 @@ struct mainopt {
 }
 
 immutable(char) *fmt_version =
-"alicedbg "~APP_VERSION~" (built: "~__TIMESTAMP__~")\n"~
+"alicedbg "~ADBG_VERSION~" (built: "~__TIMESTAMP__~")\n"~
 "License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
 "Homes:\n"~
 " - <https://git.dd86k.space/dd86k/alicedbg>\n"~
