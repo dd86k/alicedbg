@@ -113,7 +113,9 @@ private __gshared int function(exception_t*) g_user_function;
  * 	flags = Reserved
  * Returns: Zero on success; Otherwise os error code is returned
  */
-int adbg_load(const(char) *path, const(char) *dir, const(char) **argv, const(char) **envp, int flags) {
+int adbg_load(const(char) *path, const(char) *dir = null,
+	const(char) **argv = null, const(char) **envp = null,
+	int flags = 0) {
 	if (path == null) return 1;
 
 	version (Windows) {
@@ -268,7 +270,7 @@ int __adbg_chld(void* arg) {
  * 	flags = Reserved
  * Returns: Non-zero on error: (Posix) errno or (Windows) GetLastError
  */
-int adbg_attach(int pid, int flags) {
+int adbg_attach(int pid, int flags = 0) {
 	version (Windows) {
 		if (DebugActiveProcess(pid) == FALSE)
 			return GetLastError();
