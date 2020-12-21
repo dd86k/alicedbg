@@ -440,7 +440,7 @@ int main(int argc, const(char) **argv) {
 		if (strcmp(arg, "-version") == 0)
 			return cliver;
 		if (strcmp(arg, "-ver") == 0)
-			return puts(APP_VERSION);
+			return puts(ADBG_VERSION);
 		if (strcmp(arg, "h") == 0 || strcmp(arg, "-help") == 0)
 			return clipage(CLIPage.main);
 		if (strcmp(arg, "-license") == 0)

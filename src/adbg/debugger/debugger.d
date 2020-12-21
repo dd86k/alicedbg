@@ -79,6 +79,15 @@ enum DebuggerAction {
 	step,	/// Proceed with a single step
 }
 
+/// States the currently debugger state
+public
+enum DebuggerState {
+	idle,	/// Waiting for input
+	waiting,	/// Program loaded, waiting to run
+	running,	/// Executing debuggee
+	paused,	/// Exception occured
+}
+
 private
 struct breakpoint_t {
 	size_t address;
@@ -91,10 +100,12 @@ struct __adbg_child_t {
 	const(char) **argv, envp;
 }
 
+/// breakpoint opcode for platform
+private __gshared immutable(opcode_t) g_bp_opcode = BREAKPOINT;
 private __gshared breakpoint_t [ADBG_MAX_BREAKPOINTS]g_bp_list;
 private __gshared size_t g_bp_index;
-private __gshared immutable(opcode_t) g_bp_opcode = BREAKPOINT;
 private __gshared int function(exception_t*) g_user_function;
+private __gshared DebuggerState g_state;
 
 /**
  * Load executable image into the debugger.
@@ -117,14 +128,15 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 	const(char) **argv = null, const(char) **envp = null,
 	int flags = 0) {
 	if (path == null) return 1;
+	import core.stdc.stdio : puts;
 
 	version (Windows) {
 		import core.stdc.stdlib : malloc, free;
 		import core.stdc.stdio : snprintf;
 		import adbg.utils.str : adbg_util_argv_flatten;
-		int bs = 0x8000; // buffer size, 32,768 bytes
+		int bs = 0x4000; // buffer size, 16 KiB
 		ptrdiff_t bi;
-		char *b = cast(char*)malloc(bs);
+		char *b = cast(char*)malloc(bs); /// flat buffer
 		//
 		// Copy execultable path into buffer
 		//
@@ -155,6 +167,7 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 			envp, null,
 			&si, &pi) == 0)
 			return GetLastError();
+		free(b);
 		g_tid = pi.hThread;
 		g_pid = pi.hProcess;
 		// Microsoft recommends getting function pointer with
@@ -162,11 +175,9 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 		// only 64-bit versions of Windows really have WOW64.
 		// Nevertheless, required to support 32-bit processes under
 		// 64-bit builds.
-		version (Win64) {
-			if (IsWow64Process(g_pid, &processWOW64))
-				return GetLastError();
-		}
-		free(b);
+		version (Win64)
+		if (IsWow64Process(g_pid, &processWOW64) == 0)
+			return GetLastError();
 	} else
 	version (Posix) {
 		// Verify if file exists and we has access to it
@@ -248,12 +259,13 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 			}
 		} // USE_CLONE
 	}
+	g_state = DebuggerState.waiting;
 	return 0;
 }
 
 version (Posix)
 version (USE_CLONE)
-int __adbg_chld(void* arg) {
+private int __adbg_chld(void* arg) {
 	__adbg_child_t *c = cast(__adbg_child_t*)arg;
 	if (ptrace(PTRACE_TRACEME, 0, 0, 0))
 		return errno;
@@ -279,11 +291,17 @@ int adbg_attach(int pid, int flags = 0) {
 		if (ptrace(PTRACE_SEIZE, pid, null, null) == -1)
 			return errno;
 	}
+	g_state = DebuggerState.paused;
 	return 0;
 }
 
-//TODO: adbg_debug_self()
-//      Either a template (preferred) or a function that allows debugging D user code
+/**
+ * Get the debugger's current state.
+ * Returns: DebuggerState enum
+ */
+DebuggerState adbg_state() {
+	return g_state;
+}
 
 /**
  * Set the user event handle for handling exceptions.
@@ -306,6 +324,7 @@ int adbg_run() {
 	if (g_user_function == null)
 		return 4;
 
+	g_state = DebuggerState.running;
 	exception_t e = void;
 	adbg_ex_ctx_init(&e);
 
@@ -344,6 +363,7 @@ L_DEBUG_LOOP:
 			adbg_ex_ctx(&e, &ctx);
 		}
 
+		g_state = DebuggerState.paused;
 		with (DebuggerAction)
 		final switch (g_user_function(&e)) {
 		case exit:
