@@ -10,9 +10,10 @@ version (Windows) {
 } else
 version (Posix) {
 	import adbg.sys.linux.user;
+	import adbg.sys.posix.ptrace;
 	import core.sys.posix.signal;
+	import adbg.debugger.debugger : g_pid;
 }
-
 
 version (X86)
 	version = X86_ANY;
@@ -81,7 +82,7 @@ void adbg_context_init(thread_context_t *e) {
 	}
 }
 
-void adbg_context_fill(thread_context_t *ctx) {
+void adbg_context_get(thread_context_t *ctx) {
 	version (Windows) {
 		CONTEXT winctx = void;
 		version (Win64) {
@@ -104,13 +105,15 @@ void adbg_context_fill(thread_context_t *ctx) {
 	version (Posix) {
 		user_regs_struct u = void;
 		if (ptrace(PTRACE_GETREGS, g_pid, null, &u) < 0)
-			e.regcount = 0;
+			ctx.count = 0;
 		else
-			adbg_context_os(&e, &u);
+			adbg_context_os(ctx, &u);
 	}
 }
 
-//TODO: compile-init these init functions
+//TODO: adbg_context_set
+
+//TODO: compile-init these init functions?
 
 version (X86_ANY)
 private void adbg_context_os_init_x86(thread_context_t *ctx) {
@@ -238,40 +241,38 @@ version (Windows) {
 	//
 
 	/// Populate exception_t.registers array from user_regs_struct
-	void adbg_context_os(exception_t *e, user_regs_struct *u) {
+	void adbg_context_os(thread_context_t *ctx, user_regs_struct *u) {
 		version (X86) {
-			e.nextaddrv = u.eip;
-			e.registers[0].u32 = u.eip;
-			e.registers[1].u32 = u.eflags;
-			e.registers[2].u32 = u.eax;
-			e.registers[3].u32 = u.ebx;
-			e.registers[4].u32 = u.ecx;
-			e.registers[5].u32 = u.edx;
-			e.registers[6].u32 = u.esp;
-			e.registers[7].u32 = u.ebp;
-			e.registers[8].u32 = u.esi;
-			e.registers[9].u32 = u.edi;
+			ctx.items[0].u32 = ctx.nextaddrv = u.eip;
+			ctx.items[1].u32 = u.eflags;
+			ctx.items[2].u32 = u.eax;
+			ctx.items[3].u32 = u.ebx;
+			ctx.items[4].u32 = u.ecx;
+			ctx.items[5].u32 = u.edx;
+			ctx.items[6].u32 = u.esp;
+			ctx.items[7].u32 = u.ebp;
+			ctx.items[8].u32 = u.esi;
+			ctx.items[9].u32 = u.edi;
 		} else
 		version (X86_64) {
-			e.nextaddrv = u.rip;
-			e.registers[0].u64 = u.rip;
-			e.registers[1].u64 = u.eflags;
-			e.registers[2].u64 = u.rax;
-			e.registers[3].u64 = u.rbx;
-			e.registers[4].u64 = u.rcx;
-			e.registers[5].u64 = u.rdx;
-			e.registers[6].u64 = u.rsp;
-			e.registers[7].u64 = u.rbp;
-			e.registers[8].u64 = u.rsi;
-			e.registers[9].u64 = u.rdi;
-			e.registers[10].u64 = u.r8;
-			e.registers[11].u64 = u.r9;
-			e.registers[12].u64 = u.r10;
-			e.registers[13].u64 = u.r11;
-			e.registers[14].u64 = u.r12;
-			e.registers[15].u64 = u.r13;
-			e.registers[16].u64 = u.r14;
-			e.registers[17].u64 = u.r15;
+			ctx.items[0].u64 = ctx.nextaddrv = u.rip;
+			ctx.items[1].u64 = u.eflags;
+			ctx.items[2].u64 = u.rax;
+			ctx.items[3].u64 = u.rbx;
+			ctx.items[4].u64 = u.rcx;
+			ctx.items[5].u64 = u.rdx;
+			ctx.items[6].u64 = u.rsp;
+			ctx.items[7].u64 = u.rbp;
+			ctx.items[8].u64 = u.rsi;
+			ctx.items[9].u64 = u.rdi;
+			ctx.items[10].u64 = u.r8;
+			ctx.items[11].u64 = u.r9;
+			ctx.items[12].u64 = u.r10;
+			ctx.items[13].u64 = u.r11;
+			ctx.items[14].u64 = u.r12;
+			ctx.items[15].u64 = u.r13;
+			ctx.items[16].u64 = u.r14;
+			ctx.items[17].u64 = u.r15;
 		}
 	}
 } // version Posix
