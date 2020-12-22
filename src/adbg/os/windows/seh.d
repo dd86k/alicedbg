@@ -72,8 +72,8 @@ uint adbg_seh_handle(_EXCEPTION_POINTERS *e) {
 			e.ExceptionRecord.ExceptionCode);
 	}
 	
-	adbg_ex_ctx_init(&mcheckpoint.exception);
-	adbg_ex_ctx(&mcheckpoint.exception, cast(CONTEXT*)e.ContextRecord);
+	adbg_context_init(&mcheckpoint.exception.registers);
+	adbg_context_os(&mcheckpoint.exception.registers, cast(CONTEXT*)e.ContextRecord);
 //	longjmp(mcheckpoint.buffer, 1);
 	return EXCEPTION_EXECUTE_HANDLER;
 }

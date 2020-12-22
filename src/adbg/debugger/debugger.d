@@ -21,8 +21,8 @@ version (Windows) {
 	import adbg.sys.windows.wow64;
 	//SymInitialize, GetFileNameFromHandle, SymGetModuleInfo64,
 	//StackWalk64, SymGetSymFromAddr64, SymFromName
-	private __gshared HANDLE g_tid;	/// Saved thread handle, DEBUG_INFO doesn't contain one
-	private __gshared HANDLE g_pid;	/// Saved process handle
+	package __gshared HANDLE g_tid;	/// Saved thread handle, DEBUG_INFO doesn't contain one
+	package __gshared HANDLE g_pid;	/// Saved process handle
 	version (Win64)
 		package __gshared int processWOW64;
 } else
@@ -128,7 +128,6 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 	const(char) **argv = null, const(char) **envp = null,
 	int flags = 0) {
 	if (path == null) return 1;
-	import core.stdc.stdio : puts;
 
 	version (Windows) {
 		import core.stdc.stdlib : malloc, free;
@@ -175,8 +174,10 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 		// only 64-bit versions of Windows really have WOW64.
 		// Nevertheless, required to support 32-bit processes under
 		// 64-bit builds.
+		//TODO: GetProcAddress("kernel32", "IsWow64Process2")
+		//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 		version (Win64)
-		if (IsWow64Process(g_pid, &processWOW64) == 0)
+		if (IsWow64Process(g_pid, &processWOW64) == FALSE)
 			return GetLastError();
 	} else
 	version (Posix) {
@@ -217,10 +218,13 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 			__adbg_child_t chld = void;
 			chld.envp = cast(const(char)**)&__envp;
 			chld.argv = cast(const(char)**)&__argv;
-			g_pid = clone(&__adbg_chld, chld_stack + ADBG_CHILD_STACK_SIZE, CLONE_PTRACE, &chld); // tid
+			g_pid = clone(&__adbg_chld,
+				chld_stack + ADBG_CHILD_STACK_SIZE,
+				CLONE_PTRACE,
+				&chld); // tid
 			if (g_pid < 0)
 				return errno;
-		} else {
+		} else { // fork(2) instead of clone(2)
 			g_pid = fork();
 			if (g_pid < 0)
 				return errno;
@@ -308,7 +312,7 @@ DebuggerState adbg_state() {
  * Params: f = Function pointer
  * Returns: Zero on success; Otherwise an error occured
  */
-void adbg_userfunc(int function(exception_t*) f) {
+void adbg_event_exception(int function(exception_t*) f) {
 	g_user_function = f;
 }
 
@@ -326,7 +330,7 @@ int adbg_run() {
 
 	g_state = DebuggerState.running;
 	exception_t e = void;
-	adbg_ex_ctx_init(&e);
+	adbg_context_init(&e.registers);
 
 	version (Windows) {
 		DEBUG_EVENT de = void;
@@ -344,23 +348,23 @@ L_DEBUG_LOOP:
 		}
 
 		adbg_ex_dbg(&e, &de);
-
-		CONTEXT ctx = void;
+		
+		CONTEXT winctx = void;
 		version (Win64) {
-			WOW64_CONTEXT ctxwow64 = void;
+			WOW64_CONTEXT winctxwow64 = void;
 			if (processWOW64) {
-				ctxwow64.ContextFlags = CONTEXT_ALL;
-				Wow64GetThreadContext(g_tid, &ctxwow64);
-				adbg_ex_ctx_win_wow64(&e, &ctxwow64);
+				winctxwow64.ContextFlags = CONTEXT_ALL;
+				Wow64GetThreadContext(g_tid, &winctxwow64);
+				adbg_context_os_win_wow64(&e.registers, &winctxwow64);
 			} else {
-				ctx.ContextFlags = CONTEXT_ALL;
-				GetThreadContext(g_tid, &ctx);
-				adbg_ex_ctx(&e, &ctx);
+				winctx.ContextFlags = CONTEXT_ALL;
+				GetThreadContext(g_tid, &winctx);
+				adbg_context_os(&e.registers, &winctx);
 			}
 		} else {
-			ctx.ContextFlags = CONTEXT_ALL;
-			GetThreadContext(g_tid, &ctx);
-			adbg_ex_ctx(&e, &ctx);
+			winctx.ContextFlags = CONTEXT_ALL;
+			GetThreadContext(g_tid, &winctx);
+			adbg_context_os(&e.registers, &winctx);
 		}
 
 		g_state = DebuggerState.paused;
@@ -375,15 +379,15 @@ L_DEBUG_LOOP:
 			// Enable single-stepping via Trap flag
 			version (Win64) {
 				if (processWOW64) {
-					ctxwow64.EFlags |= 0x100;
-					Wow64SetThreadContext(g_tid, &ctxwow64);
+					winctxwow64.EFlags |= 0x100;
+					Wow64SetThreadContext(g_tid, &winctxwow64);
 				} else {
-					ctx.EFlags |= 0x100;
-					SetThreadContext(g_tid, &ctx);
+					winctx.EFlags |= 0x100;
+					SetThreadContext(g_tid, &winctx);
 				}
 			} else {
-				ctx.EFlags |= 0x100;
-				SetThreadContext(g_tid, &ctx);
+				winctx.EFlags |= 0x100;
+				SetThreadContext(g_tid, &winctx);
 			}
 			goto case;
 		case proceed:
@@ -451,12 +455,6 @@ L_DEBUG_LOOP:
 
 		adbg_ex_dbg(&e, g_pid, chld_signo);
 
-		user_regs_struct u = void;
-		if (ptrace(PTRACE_GETREGS, g_pid, null, &u) < 0)
-			e.regcount = 0;
-		else
-			adbg_ex_ctx(&e, &u);
-
 //		iovec v = void;
 //		if (ptrace(PTRACE_GETREGSET, g_pid, NT_PRSTATUS, &v))
 //			return errno;
@@ -488,24 +486,24 @@ int adbg_bp_add(size_t addr) {
 		return 1;
 	return adbg_mm(MM_WRITE, addr, cast(void*)&g_bp_opcode, cast(uint)opcode_t.sizeof);
 }
-breakpoint_t* adbg_bp(int index) {
-	assert(0, "adbg_bp not implemented");
+breakpoint_t* adbg_bp_index(int index) {
+	assert(0, "adbg_bp_index not implemented");
 }
 breakpoint_t* adbg_bp_addr(size_t addr) {
 	assert(0, "adbg_bp_addr not implemented");
 }
-int adbg_bp_list(breakpoint_t **l, uint *n) {
+int adbg_bp_list(breakpoint_t [ADBG_MAX_BREAKPOINTS]*l, uint *n) {
 	assert(0, "adbg_bp_list not implemented");
 }
-int adbg_bp_rm(int index) {
-	assert(0, "adbg_bp_rm not implemented");
+int adbg_bp_rm_index(int index) {
+	assert(0, "adbg_bp_rm_index not implemented");
 }
 int adbg_bp_rm_addr(size_t addr) {
 	assert(0, "adbg_bp_rm_addr not implemented");
 }
 
 //
-// Memory
+// Memory handling
 //
 
 enum {	// adbg_mm flags

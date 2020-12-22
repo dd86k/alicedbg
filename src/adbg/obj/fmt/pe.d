@@ -432,7 +432,7 @@ struct PE_DEBUG_DIRECTORY { align(1):
 }
 
 // Debug Types
-enum : uint32_t {
+enum : uint {
 	/// An unknown value that is ignored by all tools
 	IMAGE_DEBUG_TYPE_UNKNOWN	= 0,
 	/// The COFF debug information (line numbers, symbol table, and string table).

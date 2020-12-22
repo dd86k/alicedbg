@@ -21,7 +21,7 @@ int adbg_ui_loop_enter(disasm_params_t *p) {
 		return 1;
 	p.options = DISASM_O_SPACE;
 	memcpy(&g_disparams, p, disasm_params_t.sizeof);
-	adbg_userfunc(&adbg_ui_loop_handler);
+	adbg_event_exception(&adbg_ui_loop_handler);
 	return adbg_run;
 }
 
@@ -47,10 +47,9 @@ int adbg_ui_loop_handler(exception_t *e) {
 	}
 
 	// * Print registers, print in pairs
-	for (size_t i; i < e.regcount; ++i) {
-		printf("%8s=%s",
-			e.registers[i].name,
-			adbg_ex_reg_fhex(&e.registers[i]));
+	for (size_t i; i < e.registers.count; ++i) {
+		register_t *reg = &e.registers.items[i];
+		printf("%8s=%s", reg.name, adbg_ex_reg_fhex(reg));
 		if (i & 1)
 			putchar('\n');
 	}

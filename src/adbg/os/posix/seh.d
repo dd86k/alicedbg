@@ -65,7 +65,7 @@ void adbg_seh_action(int sig, siginfo_t *si, void *p) {
 	else static assert(0, "hack me");
 
 	mexception.pid = mexception.tid = 0;
-	adbg_ex_ctx_init(&mexception);
+	adbg_context_os_init(&mexception);
 	version (X86) {
 		mexception.regcount = 10;
 		version (CRuntime_Glibc) {
