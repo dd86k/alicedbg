@@ -26,7 +26,8 @@ version (X86) {
 	enum EX_REG_COUNT = 10;	/// Number of registers for platform
 } else version (X86_64) {
 	enum EX_REG_COUNT = 18;	/// Number of registers for platform
-}
+} else
+	static assert(0, "EX_REG_COUNT not defined");
 
 /// Register size
 enum RegisterType {
