@@ -326,7 +326,7 @@ void adbg_event_exception(int function(exception_t*) f) {
  */
 int adbg_run() {
 	if (g_user_function == null)
-		return 4;
+		return 1;
 
 	exception_t e = void;
 	adbg_context_init(&e.registers);
@@ -336,7 +336,7 @@ int adbg_run() {
 L_DEBUG_LOOP:
 		g_state = DebuggerState.running;
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
-			return 3;
+			return GetLastError();
 		g_state = DebuggerState.paused;
 
 		// Filter events
