@@ -114,14 +114,14 @@ private __gshared DebuggerState g_state;
  * argument list and null-terminated environment.
  * This does not start the process, nor the debugger.
  * On Posix systems, stat(2) is used to check if the file exists.
- * (Windows) Uses CreateProcessA (DEBUG_PROCESS).
- * (Posix) Uses stat(2), fork(2), ptrace(2) (PTRACE_TRACEME), and execve(2).
+ * Windows: CreateProcessA (DEBUG_PROCESS).
+ * Posix: stat(2), fork(2) or clone(2), ptrace(2) (PTRACE_TRACEME), and execve(2).
  * Params:
- * 	path = Command, path to executable
- * 	dir = New directory for the debuggee, null for current directory
- * 	argv = Argument vector, null-terminated, can be null
- * 	envp = Environment vector, null-terminated, can be null
- * 	flags = Reserved
+ * 	 path = Command, path to executable
+ * 	 dir = New directory for the debuggee, null for current directory
+ * 	 argv = Argument vector, null-terminated, can be null
+ * 	 envp = Environment vector, null-terminated, can be null
+ * 	 flags = Reserved
  * Returns: Zero on success; Otherwise os error code is returned
  */
 int adbg_load(const(char) *path, const(char) *dir = null,
@@ -164,7 +164,7 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 			null, null,
 			FALSE, DEBUG_PROCESS,
 			envp, null,
-			&si, &pi) == 0)
+			&si, &pi) == FALSE)
 			return GetLastError();
 		free(b);
 		g_tid = pi.hThread;
@@ -279,8 +279,8 @@ private int __adbg_chld(void* arg) {
 
 /**
  * Attach the debugger to a process ID.
- * (Windows) Uses DebugActiveProcess
- * (Posix) Uses ptrace(PTRACE_SEIZE)
+ * Windows: Uses DebugActiveProcess
+ * Posix: Uses ptrace(PTRACE_SEIZE)
  * Params:
  * 	pid = Process ID
  * 	flags = Reserved
@@ -328,15 +328,16 @@ int adbg_run() {
 	if (g_user_function == null)
 		return 4;
 
-	g_state = DebuggerState.running;
 	exception_t e = void;
 	adbg_context_init(&e.registers);
 
 	version (Windows) {
 		DEBUG_EVENT de = void;
 L_DEBUG_LOOP:
+		g_state = DebuggerState.running;
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
 			return 3;
+		g_state = DebuggerState.paused;
 
 		// Filter events
 		switch (de.dwDebugEventCode) {
@@ -399,7 +400,9 @@ L_DEBUG_LOOP:
 	version (Posix) {
 		int wstatus = void;
 L_DEBUG_LOOP:
+		g_state = DebuggerState.running;
 		g_pid = waitpid(-1, &wstatus, 0);
+		g_state = DebuggerState.paused;
 
 		if (g_pid == -1)
 			return errno;
