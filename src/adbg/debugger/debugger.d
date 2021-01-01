@@ -373,6 +373,7 @@ L_DEBUG_LOOP:
 		final switch (g_user_function(&e)) {
 		case exit:
 			//TODO: DebugActiveProcessStop if -pid was used
+			g_state = DebuggerState.idle;
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
 			return 0;
 		case step:
@@ -394,6 +395,7 @@ L_DEBUG_LOOP:
 		case proceed:
 			if (ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE))
 				goto L_DEBUG_LOOP;
+			g_state = DebuggerState.idle;
 			return GetLastError();
 		}
 	} else
@@ -402,10 +404,13 @@ L_DEBUG_LOOP:
 L_DEBUG_LOOP:
 		g_state = DebuggerState.running;
 		g_pid = waitpid(-1, &wstatus, 0);
-		g_state = DebuggerState.paused;
 
-		if (g_pid == -1)
+		if (g_pid == -1) {
+			g_state = DebuggerState.idle;
 			return errno;
+		}
+		
+		g_state = DebuggerState.paused;
 
 		// Bits  Description (Linux)
 		// 6:0   Signo that caused child to exit
@@ -419,8 +424,10 @@ L_DEBUG_LOOP:
 		// Only interested if child is continuing or stopped; Otherwise
 		// it exited and there's nothing more we can do about it.
 		// So return its status code
-		if ((wstatus & 0x7F) != 0x7F)
+		if ((wstatus & 0x7F) != 0x7F) {
+			g_state = DebuggerState.idle;
 			return chld_signo;
+		}
 
 		// Signal filtering
 		switch (chld_signo) {
@@ -465,6 +472,7 @@ L_DEBUG_LOOP:
 		with (DebuggerAction)
 		final switch (g_user_function(&e)) {
 		case exit:
+			g_state = DebuggerState.idle;
 			kill(g_pid, SIGKILL); // PTRACE_KILL is deprecated
 			return 0;
 		case step:
