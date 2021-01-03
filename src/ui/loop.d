@@ -62,7 +62,7 @@ L_INPUT:
 	adbg_term_read(&input);
 	if (input.type != InputType.Key)
 		goto L_INPUT;
-	with (DebuggerAction)
+	with (AdbgAction)
 	switch (input.key.keyCode) {
 	case Key.S: puts("Stepping...");	return step;
 	case Key.C: puts("Continuing...");	return proceed;

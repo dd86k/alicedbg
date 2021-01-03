@@ -73,7 +73,7 @@ else version (ARM) {
 
 /// Actions that a user function handler may return
 public
-enum DebuggerAction {
+enum AdbgAction {
 	exit,	/// Cause the debugger to close the process and stop debugging
 	proceed,	/// Continue debugging
 	step,	/// Proceed with a single step
@@ -81,7 +81,7 @@ enum DebuggerAction {
 
 /// States the currently debugger state
 public
-enum DebuggerState {
+enum AdbgState {
 	idle,	/// Waiting for input
 	waiting,	/// Program loaded, waiting to run
 	running,	/// Executing debuggee
@@ -105,7 +105,7 @@ private __gshared immutable(opcode_t) g_bp_opcode = BREAKPOINT;
 private __gshared breakpoint_t [ADBG_MAX_BREAKPOINTS]g_bp_list;
 private __gshared size_t g_bp_index;
 private __gshared int function(exception_t*) g_user_function;
-private __gshared DebuggerState g_state;
+private __gshared AdbgState g_state;
 
 /**
  * Load executable image into the debugger.
@@ -263,7 +263,7 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 			}
 		} // USE_CLONE
 	}
-	g_state = DebuggerState.waiting;
+	g_state = AdbgState.waiting;
 	return 0;
 }
 
@@ -295,15 +295,15 @@ int adbg_attach(int pid, int flags = 0) {
 		if (ptrace(PTRACE_SEIZE, pid, null, null) == -1)
 			return errno;
 	}
-	g_state = DebuggerState.paused;
+	g_state = AdbgState.paused;
 	return 0;
 }
 
 /**
  * Get the debugger's current state.
- * Returns: DebuggerState enum
+ * Returns: AdbgState enum
  */
-DebuggerState adbg_state() {
+AdbgState adbg_state() {
 	return g_state;
 }
 
@@ -334,10 +334,10 @@ int adbg_run() {
 	version (Windows) {
 		DEBUG_EVENT de = void;
 L_DEBUG_LOOP:
-		g_state = DebuggerState.running;
+		g_state = AdbgState.running;
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
 			return GetLastError();
-		g_state = DebuggerState.paused;
+		g_state = AdbgState.paused;
 
 		// Filter events
 		switch (de.dwDebugEventCode) {
@@ -368,12 +368,12 @@ L_DEBUG_LOOP:
 			adbg_context_os(&e.registers, &winctx);
 		}
 
-		g_state = DebuggerState.paused;
-		with (DebuggerAction)
+		g_state = AdbgState.paused;
+		with (AdbgAction)
 		final switch (g_user_function(&e)) {
 		case exit:
 			//TODO: DebugActiveProcessStop if -pid was used
-			g_state = DebuggerState.idle;
+			g_state = AdbgState.idle;
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
 			return 0;
 		case step:
@@ -395,22 +395,22 @@ L_DEBUG_LOOP:
 		case proceed:
 			if (ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE))
 				goto L_DEBUG_LOOP;
-			g_state = DebuggerState.idle;
+			g_state = AdbgState.idle;
 			return GetLastError();
 		}
 	} else
 	version (Posix) {
 		int wstatus = void;
 L_DEBUG_LOOP:
-		g_state = DebuggerState.running;
+		g_state = AdbgState.running;
 		g_pid = waitpid(-1, &wstatus, 0);
 
 		if (g_pid == -1) {
-			g_state = DebuggerState.idle;
+			g_state = AdbgState.idle;
 			return errno;
 		}
 		
-		g_state = DebuggerState.paused;
+		g_state = AdbgState.paused;
 
 		// Bits  Description (Linux)
 		// 6:0   Signo that caused child to exit
@@ -425,7 +425,7 @@ L_DEBUG_LOOP:
 		// it exited and there's nothing more we can do about it.
 		// So return its status code
 		if ((wstatus & 0x7F) != 0x7F) {
-			g_state = DebuggerState.idle;
+			g_state = AdbgState.idle;
 			return chld_signo;
 		}
 
@@ -469,10 +469,10 @@ L_DEBUG_LOOP:
 //		if (ptrace(PTRACE_GETREGSET, g_pid, NT_PRSTATUS, &v))
 //			return errno;
 
-		with (DebuggerAction)
+		with (AdbgAction)
 		final switch (g_user_function(&e)) {
 		case exit:
-			g_state = DebuggerState.idle;
+			g_state = AdbgState.idle;
 			kill(g_pid, SIGKILL); // PTRACE_KILL is deprecated
 			return 0;
 		case step:

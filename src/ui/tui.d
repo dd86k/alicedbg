@@ -66,18 +66,18 @@ L_READKEY:
 	case InputType.Key:
 		with (Key)
 		switch (input.key.keyCode) {
-		case Q: return DebuggerAction.exit;
+		case Q: return AdbgAction.exit;
 		case Escape:
 			
 			goto L_READKEY;
 		case S:
 			adbg_ui_tui_status("Proceeding...");
 			adbg_term_flush;
-			return DebuggerAction.step;
+			return AdbgAction.step;
 		case C:
 			adbg_ui_tui_status("Proceeding...");
 			adbg_term_flush;
-			return DebuggerAction.proceed;
+			return AdbgAction.proceed;
 		default: goto L_READKEY;
 		}
 	default: goto L_READKEY;
