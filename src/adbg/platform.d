@@ -5,6 +5,8 @@
  */
 module adbg.platform;
 
+extern (C):
+
 //
 // ANCHOR Compile settings
 //
@@ -50,11 +52,8 @@ version (X86) {
 	enum TARGET_PLATFORM = "arm-a64";	/// Platform ABI string
 	public alias opcode_t = uint;
 }
-
-static if (__traits(compiles, TARGET_PLATFORM))
-	pragma(msg, "* isa: ", TARGET_PLATFORM);
 else
-	static assert(0, "Platforn not support (TARGET_PLATFORM not defined).");
+	static assert(0, "Platform not supported.");
 
 //
 // CRT string
@@ -76,8 +75,6 @@ else version (CRuntime_WASI) // WebAssembly
 	enum TARGET_CRT = "WASI";	/// Platform CRT string
 else
 	enum TARGET_CRT = "Unknown";	/// Platform CRT string
-
-pragma(msg, "* crt: ", TARGET_CRT);
 
 //
 // OS string
@@ -123,8 +120,6 @@ else version (PlayStation3)
 	enum TARGET_OS = "PlayStation3";	/// Platform OS string
 else
 	enum TARGET_OS = "Unknown";	/// Platform OS string
-
-pragma(msg, "* os: ", TARGET_OS);
 
 //
 // ANCHOR Additional Target Information
@@ -208,8 +203,6 @@ version (GNU_Inline) {
 //
 // ANCHOR External functions
 //
-
-extern (C):
 
 /**
  * Get library version string
