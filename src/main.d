@@ -8,77 +8,324 @@
  */
 module main;
 
-import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
+import core.stdc.stdlib : malloc, strtol, exit, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp, strncpy, strtok;
 import core.stdc.stdio;
-import d = std.compiler;
 import adbg.platform;
-import adbg.debugger, adbg.dumper, adbg.disasm;
-import adbg.os.err, adbg.os.seh;
-
-version (Build_Application) {
-	import ui.loop : adbg_ui_loop_enter;
-	import ui.tui : adbg_ui_tui_enter;
-}
+import adbg.debugger : adbg_attach, adbg_load;
+import adbg.disasm : disasm_params_t, DisasmISA, DisasmSyntax;
+import adbg.dumper;
+import adbg.os.err : adbg_err_osprint;
+import d = std.compiler;
+import adbg.ui;
 
 private:
 extern (C):
 
-enum CLIOpMode {
-	debug_,
-	dump,
-	profile
-}
+//
+// CLI utils
+//
 
-/// "sub-help" screen for cshow
-enum CLIPage {
-	main,
-	ui,
-	show,
-	syntaxes,
-	marchs,
-	license,
-	meow
-}
-
-// for debugger
-enum DebuggerUI {
-	loop,
-//	cmd,
-	tui,
-//	tcp_json,
-}
-
-enum DebuggerMode {
-	undecided,
-	file,
-	pid
-}
-
-/// CLI options
-struct mainopt_t {
-	CLIOpMode mode;
-	DebuggerUI ui;
-	DebuggerMode debugtype;
-	union {	// File or PID
-		ushort pid;
-		const(char) *file;
+bool askhelp(const(char) *query) {
+	switch (query[0]) {
+	case '?': return true;
+	default: return strcmp(query, "help") == 0;
 	}
-	const(char) *dir;
-	const(char) **argv;
-	const(char) **envp;
-	int flags;	/// Flags
 }
 
-/// CLI option structure, good for looping over
-struct mainopt {
-	const(char)* name;
+enum size_t psize = size_t.sizeof;
+immutable(char)* ARG    = "<arg>";
+immutable(char)* NOARG  = "     ";
+
+//TODO: Consider adding 'bool avoidopt' field
+//      Acts as "--", to stop processing options
+struct settings_t {
+	SettingUI ui;	/// Debugger user interface
+	disasm_params_t disasm;	/// Disassembler settings
+	bool dump;	/// Dump instead of debugging
+	const(char) *file;	/// Debuggee: file
+//	const(char) *dir;	/// Debuggee: directory
+	const(char) **argv;	/// Debuggee: argument vector
+	const(char) **env;	/// Debuggee: environement
+	uint pid;	/// Debuggee: PID
+	uint flags;	/// 
+}
+
+//TODO: Consider adding 'bool processed' field
+//      Avoids repeating options, may speed-up parsing
+struct option_t {
+	align(psize) char alt;
+	immutable(char) *val;
+	immutable(char) *desc;
+	align(psize) bool arg;	/// if it takes an argument
 	union {
-		int i32;
-		DisasmISA isa;
-		DisasmSyntax syntax;
+		extern(C) int function(settings_t*) f;
+		extern(C) int function(settings_t*, const(char)*) farg;
 	}
 }
+immutable option_t[] options = [
+	// general
+	{ 'm', "march",  "Select architecture for disassembler", true, farg: &climarch },
+	{ 's', "syntax", "Select disassembler syntax", true, farg: &clisyntax },
+	// debugger
+	{ 'f', "file", "Debugger: Load file (default parameter)", true, farg: &clifile },
+	{ 0,   "args", "Debugger: Supply arguments to file", true, farg: &cliargs },
+	{ 0,   "env",  "Debugger: Supply environment to file", true, farg: &clienv },
+	{ 'p', "pid",  "Debugger: Attach to process", true, farg: &clipid },
+	{ 0,   "ui",   "Debugger: Select user interface (default=loop)", true, farg: &cliui },
+	// dumper
+	{ 'D', "dump", "Dumper: Select the object dump mode", false, &clidump },
+	{ 'R', "raw",  "Dumper: File is not an object, but raw", false, &cliraw },
+	{ 'S', "show", "Dumper: Select which portions to output (default=h)", true, farg: &clishow },
+	// pages
+	{ 'h', "help",    "Show this help screen and exit", false, &clihelp },
+	{ 0,   "version", "Show the version screen and exit", false, &cliver },
+	{ 0,   "license", "Show the license page and exit", false, &clilicense },
+	{ 0,   "meow",    "Meow and exit", false, &climeow },
+];
+
+//
+// ANCHOR --march
+//
+
+struct setting_isa_t {
+	DisasmISA val;
+	immutable(char)* opt, alt, desc;
+}
+immutable setting_isa_t[] isas = [
+	{ DisasmISA.x86_16, "x86_16", "8086",    "x86 16-bit (real-mode)" },
+	{ DisasmISA.x86,    "x86",    "i386",    "x86 32-bit (extended mode)" },
+	{ DisasmISA.x86_64, "x86_64", "amd64",   "x86 64-bit (long mode)" },
+	{ DisasmISA.rv32,   "rv32",   "riscv32", "RISC-V 32-bit"},
+];
+int climarch(settings_t *settings, const(char) *val) {
+	if (askhelp(val)) {
+		puts("Available machine architectures:");
+		foreach (setting_isa_t isa; isas) {
+			with (isa)
+			printf("%8s, %12s%s", opt, alt, desc);
+		}
+		exit(0);
+	}
+	foreach (setting_isa_t isa; isas) {
+		if (strcmp(val, isa.opt) == 0 || strcmp(val, isa.alt) == 0) {
+			settings.disasm.isa = isa.val;
+			return EXIT_SUCCESS;
+		}
+	}
+	return EXIT_FAILURE;
+}
+
+//
+// ANCHOR --syntax
+//
+
+struct setting_syntax_t {
+	DisasmSyntax val;
+	immutable(char)* opt, desc;
+}
+immutable setting_syntax_t[] syntaxes = [
+	{ DisasmSyntax.Att, "att",   "AT&T syntax" },
+	{ DisasmSyntax.Att, "intel", "Intel syntax" },
+	{ DisasmSyntax.Att, "nasm",  "Netwide Assembler syntax" },
+];
+int clisyntax(settings_t *settings, const(char) *val) {
+	if (askhelp(val)) {
+		puts("Available disassembler syntaxes:");
+		foreach (setting_syntax_t syntax; syntaxes) {
+			with (syntax)
+			printf("%8s %s", opt, desc);
+		}
+		exit(0);
+	}
+	foreach (setting_syntax_t syntax; syntaxes) {
+		if (strcmp(val, syntax.opt) == 0) {
+			settings.disasm.syntax = syntax.val;
+			return EXIT_SUCCESS;
+		}
+	}
+	return EXIT_FAILURE;
+}
+
+//
+// ANCHOR --file
+//
+
+int clifile(settings_t *settings, const(char) *val) {
+	settings.file = val;
+	return EXIT_SUCCESS;
+}
+
+//
+// ANCHOR --args
+//
+
+int cliargs(settings_t *settings, const(char) *val) {
+	puts("todo");
+	return EXIT_FAILURE;
+	//TODO: cliargs
+	//      Seperate per space, "--example=33"
+	/*settings.argv = cast(const(char)**)malloc(ADBG_CLI_ARGV_ARRAY_LENGTH);
+	if (settings.argv == null) {
+		puts("cli: could not allocate (args)");
+		return EXIT_FAILURE;
+	}
+	size_t i;
+	for (; argi < argc && i < ADBG_CLI_ARGV_ARRAY_COUNT - 1; ++i, ++argi)
+		settings.argv[i] = argv[argi];
+	settings.argv[i] = null;
+	return EXIT_SUCCESS;*/
+}
+
+//
+// ANCHOR --env
+//
+
+int clienv(settings_t *settings, const(char) *val) {
+	puts("todo");
+	return EXIT_FAILURE;
+	/*opt.envp = cast(const(char)**)malloc(ADBG_CLI_ARGV_ARRAY_LENGTH);
+	if (opt.envp == null) {
+		puts("cli: could not allocate (envp)");
+		return EXIT_FAILURE;
+	}
+	opt.envp[0] = strtok(cast(char*)argv[argi], ",");
+	size_t ti;
+	while (++ti < ADBG_CLI_ARGV_ARRAY_LENGTH - 1) {
+		char* t = strtok(null, ",");
+		opt.envp[ti] = t;
+		if (t == null) break;
+	}*/
+}
+
+//
+// ANCHOR --pid
+//
+
+int clipid(settings_t *settings, const(char) *val) {
+	settings.pid = cast(ushort)strtol(val, null, 10);
+	return EXIT_SUCCESS;
+}
+
+//
+// ANCHOR --ui
+//
+
+enum SettingUI { loop, cmd, tui, server }
+struct setting_ui_t {
+	SettingUI val;
+	immutable(char)* opt, desc;
+}
+immutable setting_ui_t[] uis = [
+	{ SettingUI.loop,   "loop",   "Simple loop interface with single-button choices (default)" },
+	{ SettingUI.cmd,    "cmd",    "Command-line for more advanced sessions" },
+	{ SettingUI.loop,   "tui",    "Text User Interface" },
+//	{ SettingUI.server, "server", "Work In Progress" },
+];
+int cliui(settings_t* settings, const(char)* val) {
+	if (askhelp(val)) {
+		puts("Available UIs:");
+		foreach (setting_ui_t ui; uis) {
+			printf("%-10s%s\n", ui.opt, ui.desc);
+		}
+		exit(0);
+	}
+	foreach (setting_ui_t ui; uis) {
+		if (strcmp(val, ui.opt) == 0) {
+			settings.ui = ui.val;
+			return 0;
+		}
+	}
+	return 1;
+}
+
+//
+// ANCHOR --dump
+//
+
+int clidump(settings_t *settings) {
+	settings.dump = true;
+	return EXIT_SUCCESS;
+}
+
+//
+// ANCHOR --raw
+//
+
+int cliraw(settings_t *settings) {
+	settings.flags |= DUMPER_FILE_RAW;
+	return EXIT_SUCCESS;
+}
+
+//
+// ANCHOR --show
+//
+
+struct setting_show_t {
+	align(4) char opt;	/// option character
+	immutable(char) *desc;
+	int val;	/// dumper flag
+}
+immutable setting_show_t[] showflags = [
+	{ 'h', "Show header metadata (default)", DUMPER_SHOW_HEADER },
+	{ 's', "Show sections metadata", DUMPER_SHOW_SECTIONS },
+	{ 'i', "Show imports", DUMPER_SHOW_IMPORTS },
+	{ 'c', "Show load configuration", DUMPER_SHOW_LOADCFG },
+//	{ 'e', "Show exports", DUMPER_SHOW_EXPORTS },
+	{ 'p', "Show debug information", DUMPER_SHOW_DEBUG },
+	{ 'd', "Disassemble code (e.g., .text)", DUMPER_DISASM_CODE },
+	{ 'D', "Disassemble all sections", DUMPER_DISASM_ALL },
+	{ 'S', "Show disassembler statistics", DUMPER_SHOW_HEADER },
+	{ 'A', "Show everything (hsicpd)", DUMPER_SHOW_EVERYTHING },
+];
+int clishow(settings_t *settings, const(char) *val) {
+	if (askhelp(val)) {
+		puts("Available dumper-show options:");
+		foreach (setting_show_t show; showflags) {
+			printf("%c   %s\n", show.opt, show.desc);
+		}
+		exit(0);
+	}
+	l_val: while (*val) {
+		char c = *val;
+		++val;
+		foreach (setting_show_t show; showflags) {
+			if (c == show.opt) {
+				settings.flags |= show.val;
+				continue l_val;
+			}
+		}
+		printf("main: show flag '%c' unknown", c);
+	}
+	return EXIT_SUCCESS;
+}
+
+//
+// ANCHOR --help
+//
+
+int clihelp(settings_t*) {
+	puts(
+		"Aiming to be a simple debugger, dumper, and profiler\n"~
+		"Usage:\n"~
+		"  alicedbg {--pid ID|--file FILE|--dump FILE} [OPTIONS...]\n"~
+		"  alicedbg {-h|--help|--version|--license}\n"~
+		"\n"~
+		"OPTIONS"
+	);
+	foreach (option_t opt; options) {
+		if (opt.alt)
+			printf("%c, %-12s%s\n", opt.alt, opt.val, opt.desc);
+		else
+			printf("%-15s%s\n", opt.val, opt.desc);
+	}
+	exit(0);
+	return 0;
+}
+
+//
+// ANCHOR --version
+//
 
 immutable(char) *fmt_version =
 "alicedbg "~ADBG_VERSION~" (built: "~__TIMESTAMP__~")\n"~
@@ -90,81 +337,21 @@ immutable(char) *fmt_version =
 "CRT: "~TARGET_CRT~" (C++RT: "~TARGET_CPPRT~") on "~TARGET_OS~"/"~TARGET_PLATFORM~"\n"~
 "Features: dbg disasm\n"~
 "Disasm: x86_16 x86 x86_64\n";
-
-/// Version page
-int cliver() {
+int cliver(settings_t*) {
 	printf(fmt_version, d.version_major, d.version_minor);
+	exit(0);
 	return 0;
 }
 
-/// "sub-help" pages, such as -ui ? and the rest
-/// Main advantage is that it's all in one place
-int clipage(CLIPage h) {
-	const(char) *r = void;
-	with (CLIPage)
-	final switch (h) {
-	case main:
-		r = "Aiming to be a simple debugger, dumper, and profiler\n"~
-		"Usage:\n"~
-		"  alicedbg {--pid ID|--file FILE|--dump FILE} [OPTIONS...]\n"~
-		"  alicedbg {-h|--help|--version|--license}\n"~
-		"\n"~
-		"OPTIONS\n"~
-		"  -m, --march ..... Select ISA for disassembler (see -march ?)\n"~
-		"  -s, --syntax .... Select disassembler style (see -syntax ?)\n"~
-		"  -f, --file ...... debugger: Load executable file\n"~
-		"  -p, --pid ....... debugger: Attach to process id\n"~
-		"  -u, --ui ........ debugger: Select user interface (default=loop, see -ui ?)\n"~
-		"  -D, --dump ...... dumper: Selects dump mode\n"~
-		"  --raw ........... dumper: Disassemble as a raw file\n"~
-		"  -S, --show ...... dumper: Select parts to show (default=h, see -show ?)\n";
-		break;
-	case ui:
-		//TODO: Show values from a structure
-		r = "Available debug UIs (default=loop)\n"~
-		"loop ...... Print exceptions, minimum user interaction.\n"
-//		"cmd ....... (Experimental) (REPL) Command-based, like a shell.\n"
-//		"tui ....... (WIP) Text UI with full debugging experience.\n"
-//		"server .... (Experimental) JSON API server via TCP.\n"
-		;
-		break;
-	case show:
-		//TODO: Show values from a structure
-		r = "Available parts for dumper (default=h)\n"~
-		"A	Show all fields listed below\n"~
-		"h	Show headers\n"~
-		"s	Show sections\n"~
-		"i	Show imports\n"~
-		"d	Show disassembly (code sections only)"
-//		"D	Show disassembly (all sections)"
-		;
-		break;
-	case syntaxes:
-		//TODO: Show values from a structure
-		r = "Available disassembler syntaxes\n"~
-		"intel	Intel syntax\n"~
-		"nasm	Netwide Assembler syntax\n"~
-		"att	AT&T syntax"
-		;
-		break;
-	case marchs:
-		//TODO: Show values from a structure
-		r = "Available architectures\n"~
-		"x86_16, 8086........ Intel 8086 (16-bit)\n"~
-		"x86, i386 .......... Intel i386+ (32-bit)"~
-		"x86_64, amd64 ...... EM64T/Intel64 and AMD64 (64-bit)\n"
-//		"t32, thumb ......... ARM Thumb (16/32-bit)\n"~
-//		"a32, arm ........... ARM (32-bit)\n"~
-//		"a64, aarch64 ....... ARM (64-bit)\n"~
-//		"rv32, riscv32 ...... RISC-V 32-bit\n"~
-//		"rv64, riscv64 ...... RISC-V 64-bit\n"~
-//		"rv128, riscv128 .... RISC-V 128-bit\n"~
-		;
-		break;
-	case license:
-		r = `BSD 3-Clause License
+//
+// ANCHOR --license
+//
 
-Copyright (c) 2019-2020, dd86k <dd@dax.moe>
+int clilicense(settings_t*) {
+	puts(
+	`BSD 3-Clause License
+
+Copyright (c) 2019-2021, dd86k <dd@dax.moe>
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -190,10 +377,19 @@ DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
 SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
-		break;
-	case meow:
-		r = `
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`
+	);
+	exit(0);
+	return 0;
+}
+
+//
+// --meow
+//
+
+int climeow(settings_t*) {
+	puts(
+`
 +------------------+
 | I hate x86, meow |
 +--+---------------+
@@ -202,287 +398,113 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
        /   \    _
       /     \__/
       \_||__/
-`;
-		break;
-	}
-	puts(r);
-	return EXIT_SUCCESS;
+`
+	);
+	exit(0);
+	return 0;
 }
 
-int main(int argc, const(char) **argv) {
+//
+// Main
+//
+
+int main(int argc, const(char)** argv) {
 	if (argc <= 1)
-		return clipage(CLIPage.main);
-
-	mainopt_t opt;	/// Defaults to .init
-	disasm_params_t disopt;	/// .init
-
-	cli: for (size_t argi = 1; argi < argc; ++argi) {
-		const(char) *arg = argv[argi] + 1;
-
-		//
-		// Debugger switches
-		//
-
-		// (debugger) --/--args: disable CLI parsing for argv
-		if (strcmp(arg, "-") == 0 || strcmp(arg, "-args") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: args missing");
-				return EXIT_FAILURE;
-			}
-			opt.argv = cast(const(char)**)malloc(ADBG_CLI_ARGV_ARRAY_LENGTH);
-			if (opt.argv == null) {
-				puts("cli: could not allocate (args)");
-				return EXIT_FAILURE;
-			}
-			++argi;
-			size_t i;
-			for (; argi < argc && i < ADBG_CLI_ARGV_ARRAY_COUNT - 1; ++i, ++argi)
-				opt.argv[i] = argv[argi];
-			opt.argv[i] = null;
-			break;
-		}
-
-		// (debugger) -E/--env: environment string
-		if (strcmp(arg, "E") == 0 || strcmp(arg, "-env") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: env argument missing");
-				return EXIT_FAILURE;
-			}
-			opt.envp = cast(const(char)**)malloc(ADBG_CLI_ARGV_ARRAY_LENGTH);
-			if (opt.envp == null) {
-				puts("cli: could not allocate (envp)");
-				return EXIT_FAILURE;
-			}
-			++argi;
-			opt.envp[0] = strtok(cast(char*)argv[argi], ",");
-			size_t ti;
-			while (++ti < ADBG_CLI_ARGV_ARRAY_LENGTH - 1) {
-				char* t = strtok(null, ",");
-				opt.envp[ti] = t;
-				if (t == null) break;
-			}
-			continue;
-		}
-
-		// (debugger) -f/--file: path for debuggee
-		if (strcmp(arg, "f") == 0 || strcmp(arg, "-file") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: file argument missing");
-				return EXIT_FAILURE;
-			}
-			opt.debugtype = DebuggerMode.file;
-			opt.file = argv[++argi];
-			continue;
-		}
-
-		// (debugger) -p/--pid: select pid
-		if (strcmp(arg, "p") == 0 || strcmp(arg, "-pid") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: pid argument missing");
-				return EXIT_FAILURE;
-			}
-			opt.debugtype = DebuggerMode.pid;
-			const(char) *id = argv[++argi];
-			opt.pid = cast(ushort)strtol(id, null, 10);
-			continue;
-		}
-
-		// (debugger) -u/--ui: select UI
-		if (strcmp(arg, "u") == 0 || strcmp(arg, "-ui") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: ui argument missing");
-				return EXIT_FAILURE;
-			}
-			const(char) *ui = argv[++argi];
-			if (strcmp(ui, "tui") == 0)
-				opt.ui = DebuggerUI.tui;
-			else if (strcmp(ui, "loop") == 0)
-				opt.ui = DebuggerUI.loop;
-			else if (strcmp(ui, "?") == 0)
-				return clipage(CLIPage.ui);
-			else {
-				printf("Unknown UI: '%s', query \"--ui ?\" for list\n", ui);
-				return EXIT_FAILURE;
-			}
-			continue;
-		}
-
-		// (debugger) -m/--march: machine architecture, affects disassembly
-		if (strcmp(arg, "m") == 0 || strcmp(arg, "-march") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: architecture argument missing");
-				return EXIT_FAILURE;
-			}
-			__gshared mainopt[] isaopts = [
-				{ "i386", DisasmISA.x86 },
-				{ "x86", DisasmISA.x86 },
-				{ "8086", DisasmISA.x86_16 },
-				{ "x86_16", DisasmISA.x86_16 },
-				{ "amd64", DisasmISA.x86_64 },
-				{ "x86_64", DisasmISA.x86_64 },
-//				{ "thumb", DisasmISA.arm_t32 },
-//				{ "t32", DisasmISA.arm_t32 },
-//				{ "arm", DisasmISA.arm_a32 },
-//				{ "a32", DisasmISA.arm_a32 },
-//				{ "aarch64", DisasmISA.arm_a64 },
-//				{ "arm64", DisasmISA.arm_a64 },
-				{ "rv32", DisasmISA.rv32 },
-//				{ "riscv32", DisasmISA.rv32 },
-//				{ "risc:rv32", DisasmISA.rv32 },
-//				{ "rv64", DisasmISA.rv64 },
-//				{ "riscv64", DisasmISA.rv64 },
-//				{ "risc:rv64", DisasmISA.rv64 },
-//				{ "guess", DisasmISA.Guess },
-//				{ "default", DisasmISA.Default },
-				{ "?", 255 },
-			];
-			const(char) *march = argv[++argi];
-			foreach (ref mainopt o; isaopts) {
-				if (strcmp(march, o.name) == 0) {
-					if (o.i32 == 255)
-						return clipage(CLIPage.marchs);
-					disopt.isa = o.isa;
-					continue cli;
-				}
-			}
-			printf("Unknown march: '%s', query '--march ?' for list\n", march);
-			return EXIT_FAILURE;
-		}
-
-		// (debugger) -d/--demangle: demangle symbols
-		/*if (strcmp(arg, "d") == 0 || strcmp(arg, "-demangle") == 0) {
-			
-		}*/
-
-		//
-		// Dumper switches
-		//
-
-		// (dumper) -D/--dump: Switches the operation to "dump"
-		if (strcmp(arg, "D") == 0 || strcmp(arg, "-dump") == 0) {
-			opt.mode = CLIOpMode.dump;
-			continue;
-		}
-
-		// (dumper) -R/--raw: file is raw
-		if (strcmp(arg, "R") == 0 || strcmp(arg, "-raw") == 0) {
-			opt.flags |= DUMPER_FILE_RAW;
-			continue;
-		}
-
-		// (dumper) -S/--show: show fields
-		if (strcmp(arg, "S") == 0 || strcmp(arg, "-show") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: show argument missing");
-				return EXIT_FAILURE;
-			}
-			const(char)* cf = argv[++argi];
-			while (*cf) {
-				char c = *cf;
-				switch (c) {
-				case 'h': opt.flags |= DUMPER_SHOW_HEADER; break;
-				case 's': opt.flags |= DUMPER_SHOW_SECTIONS; break;
-				case 'i': opt.flags |= DUMPER_SHOW_IMPORTS; break;
-				case 'c': opt.flags |= DUMPER_SHOW_LOADCFG; break;
-//				case 'e': opt.flags |= DUMPER_SHOW_EXPORTS; break;
-				case 'p': opt.flags |= DUMPER_SHOW_DEBUG; break;
-				case 'd': opt.flags |= DUMPER_DISASM_CODE; break;
-				case 'D': opt.flags |= DUMPER_DISASM_ALL; break;
-				case 'S': opt.flags |= DUMPER_DISASM_STATS; break;
-				case 'A': opt.flags |= DUMPER_SHOW_EVERYTHING; break;
-				case '?': return clipage(CLIPage.show);
-				default:
-					printf("cli: unknown show flag: %c\n", c);
+		clihelp(null);
+		
+	// .init automatically take the defaults
+	settings_t settings;	/// cli settings
+	int lasterr;	/// last cli error
+	
+	for (int argi = 1; argi < argc; ++argi) {
+		const(char) *argLong = argv[argi];
+		
+		if (argLong[0] == 0) continue;
+		
+		char argShort = void;
+		bool isopt  = argLong[0] == '-';
+		
+		if (isopt) {
+			bool islong = argLong[1] == '-';
+			const(char) *argval = void;
+			if (islong) {
+				if (argLong[2] == 0) { // "--"
+					//TODO: force isopt to false
+					puts("main: -- not supported");
 					return EXIT_FAILURE;
 				}
-				++cf;
-			}
-			continue;
-		}
-
-		//
-		// Disassembler switches
-		//
-
-		// (disassembler) -s/--syntax: select syntax
-		if (strcmp(arg, "s") == 0 || strcmp(arg, "-syntax") == 0) {
-			if (argi + 1 >= argc) {
-				puts("cli: syntax argument missing");
-				return EXIT_FAILURE;
-			}
-			__gshared mainopt[] syntaxopts = [
-				{ "intel", DisasmSyntax.Intel },
-				{ "nasm", DisasmSyntax.Nasm },
-				{ "att", DisasmSyntax.Att },
-				{ "?", 255 },
-			];
-			const(char) *syntax = argv[++argi];
-			foreach (ref mainopt o; syntaxopts) {
-				if (strcmp(syntax, o.name) == 0) {
-					if (o.i32 == 255)
-						return clipage(CLIPage.syntaxes);
-					disopt.syntax = o.syntax;
-					continue cli;
+				argLong = argLong + 2;
+				foreach (option_t opt; options) {
+					if (strcmp(argLong, opt.val)) continue;
+					if (opt.arg == false) {
+						lasterr = opt.f(&settings);
+						continue;
+					}
+					if (argi + 1 >= argc) {
+						printf("missing argument for --%s", opt.val);
+						return EXIT_FAILURE;
+					}
+					argval = argv[++argi];
+					lasterr = opt.farg(&settings, argval);
+					if (lasterr) {
+						printf("main: '%s' failed with --%s", argval, opt.val);
+						return lasterr;
+					}
+				}
+			} else { // short opt
+				argShort = argLong[1];
+				if (argShort == 0) { // "-"
+					puts("main: standard input not supported");
+					return EXIT_FAILURE;
+				}
+				foreach (option_t opt; options) {
+					if (argShort != opt.alt) continue;
+					if (opt.arg == false) {
+						lasterr = opt.f(&settings);
+						continue;
+					}
+					if (argi + 1 >= argc) {
+						printf("missing argument for -%c", opt.alt);
+						return EXIT_FAILURE;
+					}
+					argval = argv[++argi];
+					lasterr = opt.farg(&settings, argval);
+					if (lasterr) {
+						printf("main: '%s' failed with -%c", argval, opt.alt);
+						return lasterr;
+					}
 				}
 			}
-			printf("Unknown syntax: '%s', query '--syntax ?' for list\n", syntax);
-			return EXIT_FAILURE;
-		}
-
-		if (*argv[argi] != '-') { // default arguments
-			if (opt.file == null) {
-				opt.debugtype = DebuggerMode.file;
-				opt.file = argv[argi];
-			} 
-			continue;
-		}
-
-		if (strcmp(arg, "-version") == 0)
-			return cliver;
-		if (strcmp(arg, "-ver") == 0)
-			return puts(ADBG_VERSION);
-		if (strcmp(arg, "h") == 0 || strcmp(arg, "-help") == 0)
-			return clipage(CLIPage.main);
-		if (strcmp(arg, "-license") == 0)
-			return clipage(CLIPage.license);
-		if (strcmp(arg, "-meow") == 0)
-			return clipage(CLIPage.meow);
-
-		printf("unknown option: %s\n", arg);
+			if (islong)
+				printf("main: unknown option '--%s'\n", argLong);
+			else
+				printf("main: unknown option '-%c'\n", argShort);
+		} // not an option
+		
+		//TODO: Defaults
+	}
+	
+	if (settings.dump)
+		return adbg_dmpr_dump(settings.file, &settings.disasm, settings.flags);
+	
+	lasterr = settings.pid ?
+		adbg_attach(settings.pid, 0) :
+		adbg_load(settings.file, null, settings.argv, null, 0);
+	
+	if (lasterr) {
+		adbg_err_osprint("dbg", lasterr);
+		return lasterr;
+	}
+	
+	adbg_ui_common_params(&settings.disasm);
+	with (SettingUI)
+	switch (settings.ui) {
+	case loop: lasterr = adbg_ui_loop(); break;
+	case cmd:  lasterr = adbg_ui_cmd(); break;
+	case tui:  lasterr = adbg_ui_tui(); break;
+	default:
+		puts("main: ui not selected");
 		return EXIT_FAILURE;
 	}
-
-	int e = void;
-	with (CLIOpMode)
-	final switch (opt.mode) {
-	case debug_:
-		with (DebuggerMode)
-		switch (opt.debugtype) {
-		case file: e = adbg_load(opt.file, null, opt.argv, null, 0); break;
-		case pid: e = adbg_attach(opt.pid, 0); break;
-		default:
-			puts("cli: No file nor pid were specified.");
-			return EXIT_FAILURE;
-		}
-
-		if (e) {
-			adbg_err_osprint("dbg", e);
-			return e;
-		}
-
-		with (DebuggerUI)
-		final switch (opt.ui) {
-		case loop: e = adbg_ui_loop_enter(&disopt); break;
-		case tui: e = adbg_ui_tui_enter(&disopt); break;
-		}
-		break;
-	case dump:
-		e = adbg_dmpr_dump(opt.file, &disopt, opt.flags);
-		break;
-	case profile:
-		puts("Profiling feature not yet implemented");
-		return EXIT_FAILURE;
-	}
-
-	return e;
+	return lasterr;
 }
