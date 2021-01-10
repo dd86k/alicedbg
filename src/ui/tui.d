@@ -3,20 +3,20 @@
  *
  * License: BSD 3-clause
  */
-module ui.tui;
+module adbg.ui.tui;
 
 import adbg.os.term;
 import adbg.debugger;
 import adbg.disasm;
 import core.stdc.stdio, core.stdc.string : memcpy;
-import ui.common;
+import adbg.ui.common;
 
 extern (C):
 __gshared:
 
 /// Initiate TUI and enter input loop
 /// Return: Error code
-int adbg_ui_tui_enter(disasm_params_t *p) {
+int adbg_ui_tui() {
 	adbg_term_init;
 	adbg_term_size(&tui_size);
 	if (tui_size.width < 80 || tui_size.height < 24) {
@@ -28,8 +28,7 @@ int adbg_ui_tui_enter(disasm_params_t *p) {
 		printf("Could not initiate terminal buffer (%d)\n", e);
 		return e;
 	}
-	p.options |= DISASM_O_SPACE;
-	memcpy(&g_disparams, p, disasm_params_t.sizeof);
+	g_disparams.options |= DISASM_O_SPACE;
 	adbg_event_exception(&adbg_ui_tui_handler);
 	return adbg_run;
 }

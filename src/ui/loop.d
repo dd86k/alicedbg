@@ -3,7 +3,7 @@
  *
  * License: BSD 3-clause
  */
-module ui.loop;
+module adbg.ui.loop;
 
 import adbg.etc.ddc;
 import adbg.debugger, adbg.os.err : ERR_FMT;
@@ -11,16 +11,15 @@ import adbg.disasm;
 import adbg.os.term;
 import core.stdc.stdio : printf, puts;
 import core.stdc.string : memcpy;
-import ui.common;
+import adbg.ui.common;
 
 extern (C):
 
 /// Starts plain UI
-int adbg_ui_loop_enter(disasm_params_t *p) {
+int adbg_ui_loop() {
 	if (adbg_term_init)
 		return 1;
-	p.options = DISASM_O_SPACE;
-	memcpy(&g_disparams, p, disasm_params_t.sizeof);
+	g_disparams.options = DISASM_O_SPACE;
 	adbg_event_exception(&adbg_ui_loop_handler);
 	return adbg_run;
 }
