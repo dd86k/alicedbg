@@ -217,7 +217,7 @@ struct setting_ui_t {
 	immutable(char)* opt, desc;
 }
 immutable setting_ui_t[] uis = [
-	{ SettingUI.loop,   "loop",   "Simple loop interface with single-button choices (default)" },
+	{ SettingUI.loop,   "loop",   "Simple loop interface with single-character choices (default)" },
 	{ SettingUI.cmd,    "cmd",    "Command-line for more advanced sessions" },
 	{ SettingUI.loop,   "tui",    "Text User Interface" },
 //	{ SettingUI.server, "server", "Work In Progress" },
@@ -315,9 +315,9 @@ int clihelp(settings_t*) {
 	);
 	foreach (option_t opt; options) {
 		if (opt.alt)
-			printf("%c, %-12s%s\n", opt.alt, opt.val, opt.desc);
+			printf("-%c, --%-11s%s\n", opt.alt, opt.val, opt.desc);
 		else
-			printf("%-15s%s\n", opt.val, opt.desc);
+			printf("--%-15s%s\n", opt.val, opt.desc);
 	}
 	exit(0);
 	return 0;
