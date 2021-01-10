@@ -236,7 +236,7 @@ int cliui(settings_t* settings, const(char)* val) {
 			return 0;
 		}
 	}
-	return 1;
+	return EXIT_FAILURE;
 }
 
 //
@@ -282,7 +282,7 @@ int clishow(settings_t *settings, const(char) *val) {
 	if (askhelp(val)) {
 		puts("Available dumper-show options:");
 		foreach (setting_show_t show; showflags) {
-			printf("%c   %s\n", show.opt, show.desc);
+			printf("%c\t%s\n", show.opt, show.desc);
 		}
 		exit(0);
 	}
@@ -313,7 +313,7 @@ int clihelp(settings_t*) {
 		"\n"~
 		"OPTIONS"
 	);
-	foreach (option_t opt; options) {
+	foreach (option_t opt; options[0..$-1]) {
 		if (opt.alt)
 			printf("-%c, --%-11s%s\n", opt.alt, opt.val, opt.desc);
 		else
