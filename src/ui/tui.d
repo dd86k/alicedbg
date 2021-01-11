@@ -5,10 +5,10 @@
  */
 module adbg.ui.tui;
 
+import core.stdc.stdio, core.stdc.string : memcpy;
 import adbg.os.term;
 import adbg.debugger;
 import adbg.disasm;
-import core.stdc.stdio, core.stdc.string : memcpy;
 import adbg.ui.common;
 
 extern (C):
@@ -23,7 +23,7 @@ int adbg_ui_tui() {
 		puts("80x24 terminal minimum size required");
 		return 1;
 	}
-	int e = adbg_term_setup(TermType.Screen);
+	int e = adbg_term_tui_init();
 	if (e) {
 		printf("Could not initiate terminal buffer (%d)\n", e);
 		return e;
@@ -45,6 +45,7 @@ enum TUIPanel {
 	notepad,
 	processes,	// and threads
 	info,	// os/cpu/console/debug/settings info
+	about,
 }
 
 struct tuiopt_t {
@@ -71,11 +72,11 @@ L_READKEY:
 			goto L_READKEY;
 		case S:
 			adbg_ui_tui_status("Proceeding...");
-			adbg_term_flush;
+			adbg_term_tui_flush;
 			return AdbgAction.step;
 		case C:
 			adbg_ui_tui_status("Proceeding...");
-			adbg_term_flush;
+			adbg_term_tui_flush;
 			return AdbgAction.proceed;
 		default: goto L_READKEY;
 		}
@@ -94,20 +95,20 @@ int adbg_ui_tui_handler(exception_t *e) {
 	// On-point
 	adbg_term_curpos(0, h);
 	if (adbg_dasm_line(&g_disparams, DisasmMode.File) == DisasmError.None)
-		adbg_term_writef("> %zX %-20s %s",
+		adbg_term_tui_writef("> %zX %-20s %s",
 			g_disparams.la, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	// forward
 	for (uint hi = h + 1; hi < ihmax; ++hi) {
 		adbg_term_curpos(0, hi);
 		adbg_dasm_line(&g_disparams, DisasmMode.File);
-		adbg_term_writef("  %zX %-20s %s",
+		adbg_term_tui_writef("  %zX %-20s %s",
 			g_disparams.la, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	}
 	// backward
 	//for (uint ih = h - 1; ih >= 0; ih) {
 	// status
 	adbg_ui_tui_status(adbg_ex_typestr(e.type));
-	adbg_term_flush;
+	adbg_term_tui_flush;
 	return adbg_ui_tui_loop();
 }
 
@@ -130,6 +131,7 @@ void adbg_ui_tui_render(TUIPanel page) {
 	case notepad: break;
 	case processes: break;
 	case info: break;
+	case about: break;
 	}
 }
 
@@ -140,5 +142,5 @@ void adbg_ui_tui_clear() {
 /// 
 void adbg_ui_tui_status(const(char)* msg) {
 	adbg_term_curpos(0, tui_size.height - 1);
-	adbg_term_write(msg);
+	adbg_term_tui_write(msg);
 }

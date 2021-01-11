@@ -5,15 +5,71 @@
  */
 module adbg.utils.str;
 
-private import core.stdc.stdio;
-private import core.stdc.stdarg;
+import core.stdc.stdio;
+import core.stdc.stdarg;
+import core.stdc.string;
 
 extern (C):
+__gshared:
+
+size_t adbg_util_argv_flatten(char *b, int bs, const(char) **argv) {
+	import core.stdc.stdio : snprintf;
+	if (argv == null)
+		return 0;
+
+	ptrdiff_t ai, bi, t;
+	while (argv[ai]) {
+		t = snprintf(b + bi, bs, "%s ", argv[ai]);
+		if (t < 0)
+			return 0;
+		bi += t;
+		++ai;
+	}
+
+	return bi;
+}
+
+int adbg_util_argv_expand(char *buf, size_t buflen, char **argv) {
+	size_t j;
+	int a;
+
+	char* mloc = buf;
+
+	for (size_t i; i < buflen; ++i) { // was <=
+		const char c = buf[i];
+		if (c == 0 || c == ' ' || c == '\n') {
+			argv[a] = mloc;
+			strncpy(mloc, buf + j, i - j);
+			mloc += i - j + 1;
+			argv[a][i - j] = 0;
+			while (buf[i + 1] == ' ' || buf[i + 1] == '\t') ++i;
+			j = i + 1;
+			++a;
+		} else if (c == '"') {
+			j = ++i;
+			while (c != '"' && c != 0) ++i;
+			if (c == 0) continue;
+			argv[a] = mloc;
+			strncpy(mloc, buf + j, i - j);
+			mloc += i - j + 1;
+			argv[a][i - j] = 0;
+			while(buf[i + 1] == ' ' || buf[i + 1] == '\t') ++i;
+			j = ++i;
+			++a;
+		}
+	}
+
+	return --a;
+}
+
+//
+// Fast hexadecimal formatting
+//
 
 /// Hexadecimal map for strx0* functions to provide much faster %x parsing
-private __gshared char [16]hexmaplow = "0123456789abcdef";
+private char [16]hexmaplow = "0123456789abcdef";
 /// Hexadecimal map for strx0* functions to provide much faster %X parsing
-private __gshared char [16]hexmapupp = "0123456789ABCDEF";
+private char [16]hexmapupp = "0123456789ABCDEF";
 
 /**
  * Quick and dirty conversion function to convert an ubyte value to a
@@ -55,6 +111,7 @@ const(char) *adbg_util_strx04(ushort v, bool upper = false) {
 
 	return cast(char*)b;
 }
+
 /**
  * Quick and dirty conversion function to convert an uint value to a
  * '0'-padded hexadecimal string. Faster than using vsnprintf.
@@ -80,6 +137,7 @@ const(char) *adbg_util_strx08(uint v, bool upper = false) {
 
 	return cast(char*)b;
 }
+
 /**
  * Quick and dirty conversion function to convert an ulong value to a
  * '0'-padded hexadecimal string. Faster than using vsnprintf.
@@ -114,50 +172,9 @@ const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 	return cast(char*)b;
 }
 
-size_t adbg_util_argv_flatten(char *b, int bs, const(char) **argv) {
-	import core.stdc.stdio : snprintf;
-	if (argv == null)
-		return 0;
-
-	ptrdiff_t ai, bi, t;
-	while (argv[ai]) {
-		t = snprintf(b + bi, bs, "%s ", argv[ai]);
-		if (t < 0)
-			return 0;
-		bi += t;
-		++ai;
-	}
-
-	return bi;
-}
-int adbg_util_argv_set(char *b, int m, const(char) **argv) {
-	if (argv == null)
-		return 1;
-
-	bool q;	// Within quotation mark, ignore spacing
-	size_t i;	// argv index
-	char c = *b;
-	if (c) argv[i++] = b;
-	while ((c = *b) != 0) {
-		switch (c) {
-		case ' ':
-			if (q == false) {
-				*b = 0;
-				argv[i++] = b + 1;
-			}
-			break;
-		case '"':
-			q = !q;
-			break;
-		default:
-		}
-		++b;
-	}
-
-	argv[i] = null;
-
-	return 0;
-}
+//
+// Generic string formatting
+//
 
 /**
  * Append a constant string to an existing buffer.

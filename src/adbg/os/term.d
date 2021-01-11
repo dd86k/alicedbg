@@ -7,8 +7,10 @@ module adbg.os.term;
 
 private import core.stdc.stdio;
 private import core.stdc.stdlib;
-//private import misc.ddc;
+public import adbg.etc.c : putchar;
 private alias sys = core.stdc.stdlib.system;
+
+//TODO: Consider using PDCurses instead
 
 extern (C):
 __gshared:
@@ -18,9 +20,9 @@ version (Windows) {
 	private enum ALT_PRESSED =  RIGHT_ALT_PRESSED  | LEFT_ALT_PRESSED;
 	private enum CTRL_PRESSED = RIGHT_CTRL_PRESSED | LEFT_CTRL_PRESSED;
 	private HANDLE handleIn, handleOut, handleOld;
-//	alias CONCHAR = CHAR_INFO;
-	private ushort ibuf_x, ibuf_y, ibuf_w, ibuf_h;
 	// Internal buffer
+	//TODO: structure
+	private ushort ibuf_x, ibuf_y, ibuf_w, ibuf_h;
 	private CHAR_INFO *ibuf;
 	private COORD ibuf_size, ibuf_pos;
 	private SMALL_RECT ibuf_rect;
@@ -35,12 +37,12 @@ version (Posix) {
 		alias uint tcflag_t;
 		alias uint speed_t;
 		alias char cc_t;
-		enum TCSANOW	= 0;
-		enum NCCS	= 32;
-		enum ICANON	= 2;
-		enum ECHO	= 10;
-		enum TIOCGWINSZ	= 0x5413;
-		struct termios {
+		private enum TCSANOW	= 0;
+		private enum NCCS	= 32;
+		private enum ICANON	= 2;
+		private enum ECHO	= 10;
+		private enum TIOCGWINSZ	= 0x5413;
+		private struct termios {
 			tcflag_t c_iflag;
 			tcflag_t c_oflag;
 			tcflag_t c_cflag;
@@ -50,15 +52,15 @@ version (Posix) {
 			speed_t __c_ispeed;
 			speed_t __c_ospeed;
 		}
-		struct winsize {
+		private struct winsize {
 			ushort ws_row;
 			ushort ws_col;
 			ushort ws_xpixel;
 			ushort ws_ypixel;
 		}
-		int tcgetattr(int fd, termios *termios_p);
-		int tcsetattr(int fd, int a, termios *termios_p);
-		int ioctl(int fd, ulong request, ...);
+		private int tcgetattr(int fd, termios *termios_p);
+		private int tcsetattr(int fd, int a, termios *termios_p);
+		private int ioctl(int fd, ulong request, ...);
 	}
 	private enum TERM_ATTR = ~ICANON & ~ECHO;
 	private termios old_tio = void, new_tio = void;
@@ -66,20 +68,12 @@ version (Posix) {
 //	alias CONCHAR = char;
 }
 
-/// Terminal init type
-enum TermType {
-	Normal,	/// Normal behavior (default)
-	Screen,	/// When possible, create an intermediate character buffer
-}
-
-/// Current/last set term type
-private TermType termtype;
 /// User defined function for resize events
 private
 void function(ushort,ushort) adbg_term_resize_handler;
 
 //
-// Initiation
+// ANCHOR Initiation
 //
 
 /// Initiates terminal basics
@@ -99,36 +93,25 @@ int adbg_term_init() {
 	return 0;
 }
 
-/// Setup terminal for advanced usage
-/// Params: type = Terminal type
-/// Returns: Error code, non-zero on error
-int adbg_term_setup(TermType type = TermType.Normal) {
-	termtype = type;
+int adbg_term_tui_init() {
 	version (Windows) {
-		switch (type) {
-		case TermType.Screen:
-			handleOld = handleOut;
-			handleOut = CreateConsoleScreenBuffer(
-				GENERIC_READ | GENERIC_WRITE,
-				FILE_SHARE_READ | FILE_SHARE_WRITE,
-				NULL,
-				CONSOLE_TEXTMODE_BUFFER,
-				NULL);
-			if (handleOut == INVALID_HANDLE_VALUE || handleOut == NULL)
-				return 1;
-			if (SetConsoleMode(handleOut, 0) == FALSE)
-				return 2;
-			if (SetConsoleActiveScreenBuffer(handleOut) == FALSE)
-				return 3;
-			WindowSize ws = void;
-			adbg_term_size(&ws);
-			if (adbg_term_init_buffer(&ws))
-				return 4;
-			break;
-		default:
-		}
-	} else
-	version (Posix) {
+		handleOld = handleOut;
+		handleOut = CreateConsoleScreenBuffer(
+			GENERIC_READ | GENERIC_WRITE,
+			FILE_SHARE_READ | FILE_SHARE_WRITE,
+			NULL,
+			CONSOLE_TEXTMODE_BUFFER,
+			NULL);
+		if (handleOut == INVALID_HANDLE_VALUE || handleOut == NULL)
+			return 1;
+		if (SetConsoleMode(handleOut, 0) == FALSE)
+			return 2;
+		if (SetConsoleActiveScreenBuffer(handleOut) == FALSE)
+			return 3;
+		WindowSize ws = void;
+		adbg_term_size(&ws);
+		if (adbg_term_init_buffer(&ws))
+			return 4;
 	}
 	return 0;
 }
@@ -219,27 +202,17 @@ void adbg_term_color_reset() {
 /// Clear screen
 void adbg_term_clear() {
 	version (Windows) {
-		with (TermType)
-		final switch (termtype) {
-		case Normal:
-			CONSOLE_SCREEN_BUFFER_INFO csbi = void;
-			COORD c; // 0, 0
-			GetConsoleScreenBufferInfo(handleOut, &csbi);
-			//const int size = csbi.dwSize.X * csbi.dwSize.Y; buffer size
-			const int size = // window size
-				(csbi.srWindow.Right - csbi.srWindow.Left + 1)* // width
-				(csbi.srWindow.Bottom - csbi.srWindow.Top + 1); // height
-			DWORD num = void; // kind of ala .NET
-			FillConsoleOutputCharacterA(handleOut, ' ', size, c, &num);
-			FillConsoleOutputAttribute(handleOut, csbi.wAttributes, size, c, &num);
-			adbg_term_curpos(0, 0);
-			break;
-		case Screen:
-			size_t m = ibuf_w * ibuf_h;
-			for (size_t i; i < m; ++i) {
-				ibuf[i].AsciiChar = ' ';
-			}
-		}
+		CONSOLE_SCREEN_BUFFER_INFO csbi = void;
+		COORD c; // 0, 0
+		GetConsoleScreenBufferInfo(handleOut, &csbi);
+		//const int size = csbi.dwSize.X * csbi.dwSize.Y; buffer size
+		const int size = // window size
+			(csbi.srWindow.Right - csbi.srWindow.Left + 1)* // width
+			(csbi.srWindow.Bottom - csbi.srWindow.Top + 1); // height
+		DWORD num = void; // kind of ala .NET
+		FillConsoleOutputCharacterA(handleOut, ' ', size, c, &num);
+		FillConsoleOutputAttribute(handleOut, csbi.wAttributes, size, c, &num);
+		adbg_term_curpos(0, 0);
 	} else version (Posix) {
 		WindowSize ws = void;
 		adbg_term_size(&ws);
@@ -281,19 +254,50 @@ void adbg_term_size(WindowSize *ws) {
  */
 void adbg_term_curpos(int x, int y) {
 	version (Windows) { // 0-based
-		final switch (termtype) {
-		case TermType.Normal:
-			COORD c = { cast(SHORT)x, cast(SHORT)y };
-			SetConsoleCursorPosition(handleOut, c);
-			break;
-		case TermType.Screen:
-			ibuf_x = cast(ushort)x;
-			ibuf_y = cast(ushort)y;
-			break;
-		}
+		COORD c = { cast(SHORT)x, cast(SHORT)y };
+		SetConsoleCursorPosition(handleOut, c);
 	} else
 	version (Posix) { // 1-based
 		printf("\033[u;%uH", y + 1, x + 1);
+	}
+}
+
+void adbg_term_get_curpos(int *x, int *y) {
+	version (Windows) { // 0-based
+		CONSOLE_SCREEN_BUFFER_INFO csbi = void;
+		GetConsoleScreenBufferInfo(handleOut, &csbi);
+		*x = csbi.dwCursorPosition.X;
+		*y = csbi.dwCursorPosition.Y;
+	} else
+	version (Posix) { // 1-based
+		printf("\033[6n");
+		fscanf(stdin, "\033[%d;%dmR", y, x);
+		--*y; --*x;
+	}
+}
+
+
+//
+// ANCHOR TUI specifics
+//
+
+void adbg_term_tui_curpos(int x, int y) {
+	version (Windows) { // 0-based
+		ibuf_x = cast(ushort)x;
+		ibuf_y = cast(ushort)y;
+	} else
+	version (Posix) { // 1-based
+		printf("\033[u;%uH", y + 1, x + 1);
+	}
+}
+
+void adbg_term_tui_get_curpos(int *x, int *y) {
+	version (Windows) { // 0-based
+		*x = ibuf_x;
+		*y = ibuf_y;
+	} else
+	version (Posix) { // 1-based
+		adbg_term_get_curpos(x, y);
 	}
 }
 
@@ -301,19 +305,12 @@ void adbg_term_curpos(int x, int y) {
  *
  *
  */
-void adbg_term_write(const(char) *s) {
+void adbg_term_tui_write(const(char) *s) {
 	version (Windows) {
-		final switch (termtype) {
-		case TermType.Normal:
-			printf(s);//fputs(s, stdout);
-			break;
-		case TermType.Screen:
-			size_t si, bi = (ibuf_w * ibuf_y) + ibuf_x;
-			while (s[si]) {
-				ibuf[bi].AsciiChar = s[si];
-				++bi; ++si;
-			}
-			break;
+		size_t si, bi = (ibuf_w * ibuf_y) + ibuf_x;
+		while (s[si]) {
+			ibuf[bi].AsciiChar = s[si];
+			++bi; ++si;
 		}
 	} else {
 		fputs(s, stdout);
@@ -324,31 +321,40 @@ void adbg_term_write(const(char) *s) {
  *
  *
  */
-void adbg_term_writef(const(char) *f, ...) {
+void adbg_term_tui_writef(const(char) *f, ...) {
 	import core.stdc.stdarg : va_list, va_start;
 	char [1024]buf = void;
 	va_list va = void;
 	va_start(va, f);
 	vsnprintf(cast(char*)buf, 1024, f, va);
-	adbg_term_write(cast(char*)buf);
+	adbg_term_tui_write(cast(char*)buf);
 }
 
 /**
  *
  */
-void adbg_term_flush() {
+void adbg_term_tui_flush() {
 	version (Windows) {
-		final switch (termtype) {
-		case TermType.Normal:
-			//fflush(stdout);
-			break;
-		case TermType.Screen:
-			WriteConsoleOutputA(handleOut,
-				ibuf, ibuf_size, ibuf_pos, &ibuf_rect);
-			break;
-		}
+		WriteConsoleOutputA(handleOut,
+			ibuf, ibuf_size, ibuf_pos, &ibuf_rect);
 	} else fflush(stdout);
 }
+
+void adbg_term_tui_clear() {
+	version (Windows) {
+		size_t m = ibuf_w * ibuf_h;
+		for (size_t i; i < m; ++i) {
+			ibuf[i].AsciiChar = ' ';
+		}
+	} else version (Posix) {
+		adbg_term_clear;
+	}
+	else static assert(0, "Clear: Not implemented");
+}
+
+//
+// ANCHOR Terminal input
+//
 
 /**
  * Read a single terminal event (keyboard or mouse). Window resize events
@@ -373,7 +379,7 @@ void adbg_term_read(InputInfo *ii) {
 			if (ir.KeyEvent.bKeyDown) {
 				type = InputType.Key;
 				key.keyChar  = ir.KeyEvent.AsciiChar;
-				key.keyCode  = ir.KeyEvent.wVirtualKeyCode;
+				key.keyCode  = cast(Key)ir.KeyEvent.wVirtualKeyCode;
 				const DWORD state = ir.KeyEvent.dwControlKeyState;
 				key.alt   = (state & ALT_PRESSED)   != 0;
 				key.ctrl  = (state & CTRL_PRESSED)  != 0;
@@ -410,57 +416,97 @@ void adbg_term_read(InputInfo *ii) {
 		switch (c) {
 		case '\n', 'M': // \n (RETURN) or M (ENTER)
 			keyCode = Key.Enter;
-			goto _READKEY_END;
+			goto L_END;
 		case 27: // ESC
 			switch (c = getchar) {
 			case '[':
 				switch (c = getchar) {
-				case 'A': keyCode = Key.UpArrow; goto _READKEY_END;
-				case 'B': keyCode = Key.DownArrow; goto _READKEY_END;
-				case 'C': keyCode = Key.RightArrow; goto _READKEY_END;
-				case 'D': keyCode = Key.LeftArrow; goto _READKEY_END;
-				case 'F': keyCode = Key.End; goto _READKEY_END;
-				case 'H': keyCode = Key.Home; goto _READKEY_END;
+				case 'A': keyCode = Key.UpArrow; goto L_END;
+				case 'B': keyCode = Key.DownArrow; goto L_END;
+				case 'C': keyCode = Key.RightArrow; goto L_END;
+				case 'D': keyCode = Key.LeftArrow; goto L_END;
+				case 'F': keyCode = Key.End; goto L_END;
+				case 'H': keyCode = Key.Home; goto L_END;
 				// There is an additional getchar due to the pending '~'
-				case '2': keyCode = Key.Insert; getchar; goto _READKEY_END;
-				case '3': keyCode = Key.Delete; getchar; goto _READKEY_END;
-				case '5': keyCode = Key.PageUp; getchar; goto _READKEY_END;
-				case '6': keyCode = Key.PageDown; getchar; goto _READKEY_END;
-				default: goto _READKEY_DEFAULT;
+				case '2': keyCode = Key.Insert; getchar; goto L_END;
+				case '3': keyCode = Key.Delete; getchar; goto L_END;
+				case '5': keyCode = Key.PageUp; getchar; goto L_END;
+				case '6': keyCode = Key.PageDown; getchar; goto L_END;
+				default: goto L_DEFAULT;
 				} // [
-			default: goto _READKEY_DEFAULT;
+			default: goto L_DEFAULT;
 			} // ESC
 		case 0x08, 0x7F: // backspace
 			keyCode = Key.Backspace;
-			goto _READKEY_END;
+			goto L_END;
 		case 23: // #
 			keyCode = Key.NoName;
 			keyChar = '#';
-			goto _READKEY_END;
+			goto L_END;
 		default:
 			if (c >= 'a' && c <= 'z') {
 				keyCode = cast(Key)(c - 32);
 				keyChar = cast(char)c;
-				goto _READKEY_END;
+				goto L_END;
 			} else if (c >= 20 && c <= 126) {
 				keyCode = cast(Key)c;
 				keyChar = cast(char)c;
-				goto _READKEY_END;
+				goto L_END;
 			}
 		}
 
-_READKEY_DEFAULT:
+L_DEFAULT:
 		ii.key.keyCode = cast(ushort)c;
 
-_READKEY_END:
+L_END:
 		tcsetattr(STDIN_FILENO,TCSANOW, &old_tio);
 	}
 }
 
+size_t adbg_term_readline(char *buffer, const size_t size) {
+	size_t index, len;
+	InputInfo input = void;
+	int curx, cury;
+	adbg_term_get_curpos(&curx, &cury);
+L_READKEY:
+	adbg_term_read(&input);
+	if (input.type != InputType.Key) goto L_READKEY;
+	with (Key)
+	switch (input.key.keyCode) {
+	case LeftArrow:
+	
+		break;
+	case RightArrow:
+	
+		break;
+	case Backspace:
+		if (index > 0) {
+			buffer[index--] = 0;
+			--len;
+		}
+		break;
+	case Enter:
+		putchar('\n');
+		buffer[len] = 0;
+		return len;
+	default:
+		char c = input.key.keyChar;
+		if (c >= 20 && c <= 126) {
+			if (index + 1 < size) {
+				buffer[index++] = c;
+				++len;
+				putchar(c);
+			}
+		}
+	}
+	
+	goto L_READKEY;
+}
+
 /// Key information structure
 struct KeyInfo {
-	ushort keyCode;	/// Key code.
-	char keyChar;	/// Character.
+	Key   keyCode;	/// Key code.
+	char  keyChar;	/// Character.
 	ubyte ctrl;	/// If either CTRL was held down.
 	ubyte alt;	/// If either ALT was held down.
 	ubyte shift;	/// If SHIFT was held down.
@@ -504,7 +550,7 @@ enum MouseEventType { // Windows compilant
 }
 */
 /// Key codes mapping.
-enum Key : ubyte {
+enum Key : ushort {
 	Backspace = 8,
 	Tab = 9,
 	Clear = 12,

@@ -7,7 +7,7 @@
  *
  * License: BSD 3-clause
  */
-module adbg.etc.ddc;
+module adbg.etc.c;
 
 extern:
 extern (C):

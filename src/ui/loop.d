@@ -5,7 +5,7 @@
  */
 module adbg.ui.loop;
 
-import adbg.etc.ddc;
+import adbg.etc.c;
 import adbg.debugger, adbg.os.err : ERR_FMT;
 import adbg.disasm;
 import adbg.os.term;

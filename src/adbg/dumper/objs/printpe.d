@@ -5,7 +5,7 @@
  */
 module adbg.dumper.objs.printpe;
 
-import adbg.etc.ddc : putchar;
+import adbg.etc.c : putchar;
 import core.stdc.stdio;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
