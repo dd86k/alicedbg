@@ -34,8 +34,8 @@ bool askhelp(const(char) *query) {
 }
 
 enum size_t psize = size_t.sizeof;
-immutable(char)* ARG    = "<arg>";
-immutable(char)* NOARG  = "     ";
+//immutable(char)* ARG    = "<arg>";
+//immutable(char)* NOARG  = "     ";
 
 //TODO: Consider adding 'bool avoidopt' field
 //      Acts as "--", to stop processing options
@@ -103,7 +103,7 @@ int climarch(settings_t *settings, const(char) *val) {
 		puts("Available machine architectures:");
 		foreach (setting_isa_t isa; isas) {
 			with (isa)
-			printf("%8s, %12s%s", opt, alt, desc);
+			printf("%8s, %-12s%s\n", opt, alt, desc);
 		}
 		exit(0);
 	}
@@ -134,7 +134,7 @@ int clisyntax(settings_t *settings, const(char) *val) {
 		puts("Available disassembler syntaxes:");
 		foreach (setting_syntax_t syntax; syntaxes) {
 			with (syntax)
-			printf("%8s %s", opt, desc);
+			printf("%-8s %s\n", opt, desc);
 		}
 		exit(0);
 	}
@@ -416,7 +416,7 @@ int main(int argc, const(char)** argv) {
 	settings_t settings;	/// cli settings
 	int lasterr;	/// last cli error
 	
-	for (int argi = 1; argi < argc; ++argi) {
+	l_cli: for (int argi = 1; argi < argc; ++argi) {
 		const(char) *argLong = argv[argi];
 		
 		if (argLong[0] == 0) continue;
@@ -438,18 +438,19 @@ int main(int argc, const(char)** argv) {
 					if (strcmp(argLong, opt.val)) continue;
 					if (opt.arg == false) {
 						lasterr = opt.f(&settings);
-						continue;
+						continue l_cli;
 					}
 					if (argi + 1 >= argc) {
-						printf("missing argument for --%s", opt.val);
+						printf("missing argument for --%s\n", opt.val);
 						return EXIT_FAILURE;
 					}
 					argval = argv[++argi];
 					lasterr = opt.farg(&settings, argval);
 					if (lasterr) {
-						printf("main: '%s' failed with --%s", argval, opt.val);
+						printf("main: '%s' failed with --%s\n", argval, opt.val);
 						return lasterr;
 					}
+					continue l_cli;
 				}
 			} else { // short opt
 				argShort = argLong[1];
@@ -461,18 +462,19 @@ int main(int argc, const(char)** argv) {
 					if (argShort != opt.alt) continue;
 					if (opt.arg == false) {
 						lasterr = opt.f(&settings);
-						continue;
+						continue l_cli;
 					}
 					if (argi + 1 >= argc) {
-						printf("missing argument for -%c", opt.alt);
+						printf("missing argument for -%c\n", opt.alt);
 						return EXIT_FAILURE;
 					}
 					argval = argv[++argi];
 					lasterr = opt.farg(&settings, argval);
 					if (lasterr) {
-						printf("main: '%s' failed with -%c", argval, opt.alt);
+						printf("main: '%s' failed with -%c\n", argval, opt.alt);
 						return lasterr;
 					}
+					continue l_cli;
 				}
 			}
 			if (islong)
@@ -482,6 +484,8 @@ int main(int argc, const(char)** argv) {
 		} // not an option
 		
 		//TODO: Defaults
+		
+		printf("main: unknown option '%s'\n", argLong);
 	}
 	
 	if (settings.dump)
