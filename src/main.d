@@ -21,6 +21,7 @@ import adbg.ui;
 
 private:
 extern (C):
+__gshared:
 
 //
 // CLI utils
