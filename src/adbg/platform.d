@@ -41,7 +41,7 @@ struct adbg_info_t {
 	const(char) *cpprt   = TARGET_CPPRT;
 	const(char) *objfmt  = TARGET_OBJFMT;
 	const(char) *fltabi  = TARGET_FLTABI;
-	const(char) *asmhint = INLINE_ASM_STRING;
+	const(char) *asmhint = IN_ASM_STR;
 }
 
 //
@@ -196,46 +196,46 @@ enum InlineAsm {
 
 version (DigitalMars) {
 	version (D_InlineAsm_X86) {
-		enum INLINE_ASM = InlineAsm.DMD_x86;
+		enum IN_ASM = InlineAsm.DMD_x86;
 	} else version (D_InlineAsm_X86_64) {
-		enum INLINE_ASM = InlineAsm.DMD_x86_64;
+		enum IN_ASM = InlineAsm.DMD_x86_64;
 	}
 } else
 version (GNU_Inline) {
 	//TODO: Check which FE version implemented inlined asm
 	version (X86) {
-		enum INLINE_ASM = InlineAsm.GDC_x86;
+		enum IN_ASM = InlineAsm.GDC_x86;
 	} else version (X86_64) {
-		enum INLINE_ASM = InlineAsm.GDC_x86_64;
+		enum IN_ASM = InlineAsm.GDC_x86_64;
 	} else version (D_InlineAsm_X86) {
-		enum INLINE_ASM = InlineAsm.GDC_x86;
+		enum IN_ASM = InlineAsm.GDC_x86;
 	} else version (D_InlineAsm_X86_64) {
-		enum INLINE_ASM = InlineAsm.GDC_x86_64;
+		enum IN_ASM = InlineAsm.GDC_x86_64;
 	}
 } else
 version (LDC) {
 	version (D_InlineAsm_X86) {
-		enum INLINE_ASM = InlineAsm.LDC_x86;
+		enum IN_ASM = InlineAsm.LDC_x86;
 	} else version (D_InlineAsm_X86_64) {
-		enum INLINE_ASM = InlineAsm.LDC_x86_64;
+		enum IN_ASM = InlineAsm.LDC_x86_64;
 	}
 } else
-	enum INLINE_ASM = InlineAsm.None;
+	enum IN_ASM = InlineAsm.None;
 
-static if (INLINE_ASM == InlineAsm.DMD_x86)
-	enum INLINE_ASM_STRING = "dmd-x86";
-else static if (INLINE_ASM == InlineAsm.DMD_x86_64)
-	enum INLINE_ASM_STRING = "dmd-x86_64";
-else static if (INLINE_ASM == InlineAsm.GDC_x86)
-	enum INLINE_ASM_STRING = "gdc-x86";
-else static if (INLINE_ASM == InlineAsm.GDC_x86_64)
-	enum INLINE_ASM_STRING = "gdc-x86_64";
-else static if (INLINE_ASM == InlineAsm.LDC_x86)
-	enum INLINE_ASM_STRING = "ldc-x86";
-else static if (INLINE_ASM == InlineAsm.LDC_x86_64)
-	enum INLINE_ASM_STRING = "ldc-x86_64";
+static if (IN_ASM == InlineAsm.DMD_x86)
+	enum IN_ASM_STR = "dmd-x86";
+else static if (IN_ASM == InlineAsm.DMD_x86_64)
+	enum IN_ASM_STR = "dmd-x86_64";
+else static if (IN_ASM == InlineAsm.GDC_x86)
+	enum IN_ASM_STR = "gdc-x86";
+else static if (IN_ASM == InlineAsm.GDC_x86_64)
+	enum IN_ASM_STR = "gdc-x86_64";
+else static if (IN_ASM == InlineAsm.LDC_x86)
+	enum IN_ASM_STR = "ldc-x86";
+else static if (IN_ASM == InlineAsm.LDC_x86_64)
+	enum IN_ASM_STR = "ldc-x86_64";
 else
-	enum INLINE_ASM_STRING = "none";
+	enum IN_ASM_STR = "none";
 
 //
 // ANCHOR External functions

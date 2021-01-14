@@ -19,7 +19,7 @@ extern (C):
 enum DISASM_CBUF_SIZE = 64;
 
 /// Disassembler operating mode
-enum DisasmMode : ubyte {
+enum AdbgDisasmMode : ubyte {
 	Size,	/// Only calculate operation code sizes
 	Data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
 	File,	/// Machine code and instruction mnemonics formatting
@@ -27,7 +27,8 @@ enum DisasmMode : ubyte {
 }
 
 /// Disassembler error
-enum DisasmError : ubyte {
+deprecated
+enum AdbgDisasmError : ubyte {
 	None,	/// Nothing to report
 	NullAddress,	/// Address given is null (0)
 	NotSupported,	/// Selected ISA is not currently supported
@@ -35,8 +36,8 @@ enum DisasmError : ubyte {
 }
 
 /// Disassembler ABI
-enum DisasmISA : ubyte {
-	platform,	/// (Default) Platform compiled target, see DISASM_DEFAULT_ISA
+enum AdbgDisasmPlatform : ubyte {
+	native,	/// (Default) Platform compiled target, see DISASM_DEFAULT_ISA
 	x86_16,	/// (WIP) 8086, 80186, 80286
 	x86,	/// (WIP) x86-32, 80386/i386
 	x86_64,	/// (WIP) AMD64, Intel64, x64 (Windows)
@@ -50,7 +51,7 @@ enum DisasmISA : ubyte {
 /// Disassembler syntaxes
 //TODO: Native syntax
 //      A custom ISA-dependant format
-enum DisasmSyntax : ubyte {
+enum AdbgDisasmSyntax : ubyte {
 	Default,	/// Platform compiled target default
 	Intel,	/// Intel syntax, closest to the Microsoft/Macro Assembler (MASM)
 	Nasm,	/// (NASM) Netwide Assembler syntax
@@ -60,20 +61,20 @@ enum DisasmSyntax : ubyte {
 }
 
 version (X86) {
-	enum DISASM_DEFAULT_ISA = DisasmISA.x86;	/// Platform default ABI
-	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Intel;	/// Platform default syntax
+	enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.x86;	/// Platform default ABI
+	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.Intel;	/// Platform default syntax
 } else
 version (X86_64) {
-	enum DISASM_DEFAULT_ISA = DisasmISA.x86_64;	/// Platform default ABI
-	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Intel;	/// Platform default syntax
+	enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.x86_64;	/// Platform default ABI
+	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.Intel;	/// Platform default syntax
 } else
 version (ARM) {
-	enum DISASM_DEFAULT_ISA = DisasmISA.arm_a32;	/// Platform default ABI
-	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Att;	/// Platform default syntax
+	enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.arm_a32;	/// Platform default ABI
+	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.Att;	/// Platform default syntax
 } else
 version (AArch64) {
-	enum DISASM_DEFAULT_ISA = DisasmISA.arm_a64;	/// Platform default ABI
-	enum DISASM_DEFAULT_SYNTAX = DisasmSyntax.Att;	/// Platform default syntax
+	enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.arm_a64;	/// Platform default ABI
+	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.Att;	/// Platform default syntax
 } else {
 	static assert(0, "Missing default platform disassembler settings");
 }
@@ -98,7 +99,7 @@ enum DISASM_O_MC_INT_SEP	= 0x0020;
 enum DISASM_O_MC_NOSPACE	= 0x0040;
 
 /// Disassembler parameters structure
-struct disasm_params_t { align(1):
+struct adbg_disasm_t { align(1):
 	union {
 		/// Memory address entry point. This value is modified to point
 		/// to the current instruction address for the disassembler.
@@ -131,24 +132,24 @@ struct disasm_params_t { align(1):
 	size_t ba;
 	/// Operation mode.
 	///
-	/// Disassembler operating mode. See the DisasmMode enumeration for
+	/// Disassembler operating mode. See the AdbgDisasmMode enumeration for
 	/// more details.
-	DisasmMode mode; // placed first for cache-related performance reasons
+	AdbgDisasmMode mode; // placed first for cache-related performance reasons
 	/// Error code.
 	///
 	/// If this field is non-zero, it indicates a decoding error. See the
 	/// DisasmError enumeration for more details.
-	DisasmError error;
+	AdbgDisasmError error;
 	/// Disassembling Platform.
 	///
-	/// Instruction set architecture to disassemble. See the DisasmISA
-	/// enumeration for more details.
-	DisasmISA isa;
+	/// Instruction set architecture platform to disassemble from. See the
+	/// AdbgDisasmPlatform enumeration for more details.
+	AdbgDisasmPlatform platform;
 	/// Assembler syntax.
 	///
-	/// Assembler style when formatting instructions. See the DisasmSyntax
+	/// Assembler style when formatting instructions. See the AdbgDisasmSyntax
 	/// enumeration for more details.
-	DisasmSyntax syntax;
+	AdbgDisasmSyntax syntax;
 	/// Settings flags.
 	///
 	/// Bitwise flag. See DISASM_O_* flags.
@@ -171,7 +172,7 @@ struct disasm_params_t { align(1):
 	fswap64 si64;	/// Used internally
 }
 
-//TODO: int adbg_dasm_setup(disasm_params_t *p, int options, DisasmISA isa, DisasmSyntax syntax)
+//TODO: int adbg_dasm_setup(adbg_disasm_t *p, int options, AdbgDisasmPlatform isa, AdbgDisasmSyntax syntax)
 //      Initiate function pointers (isa and fswap)
 //      Set value for .syntax field
 //      + Setup options and functions once
@@ -180,7 +181,7 @@ struct disasm_params_t { align(1):
 /**
  * Populate machine mnemonic and machine code buffers.
  *
- * Disassemble one instruction from a buffer pointer given in disasm_params_t.
+ * Disassemble one instruction from a buffer pointer given in adbg_disasm_t.
  * Caller must ensure memory pointer points to readable regions and givens
  * bounds are respected. The error field is always set.
  *
@@ -190,17 +191,17 @@ struct disasm_params_t { align(1):
  *
  * Returns: Error code; Non-zero indicating an error
  */
-int adbg_disasm(disasm_params_t *p, DisasmMode mode) {
+int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	if (p.a == null) {
-		adbg_dasm_err(p, DisasmError.NullAddress);
+		adbg_dasm_err(p, AdbgDisasmError.NullAddress);
 		p.mcbuf[0] = 0;
 		return p.error;
 	}
 
-	bool modefile = mode >= DisasmMode.File;
+	bool modefile = mode >= AdbgDisasmMode.File;
 
 	p.mode = mode;
-	p.error = DisasmError.None;
+	p.error = AdbgDisasmError.None;
 	p.la = p.av;
 
 	if (modefile) {
@@ -210,11 +211,11 @@ int adbg_disasm(disasm_params_t *p, DisasmMode mode) {
 		with (p) mcbufi = mnbufi = 0;
 	}
 
-	if (p.isa == DisasmISA.platform)
-		p.isa = DISASM_DEFAULT_ISA;
+	if (p.platform == AdbgDisasmPlatform.native)
+		p.platform = DISASM_DEFAULT_ISA;
 
-	with (DisasmISA)
-	switch (p.isa) {
+	with (AdbgDisasmPlatform)
+	switch (p.platform) {
 	case x86_16, x86, x86_64:
 		adbg_dasm_x86(p);
 		break;
@@ -222,32 +223,32 @@ int adbg_disasm(disasm_params_t *p, DisasmMode mode) {
 		adbg_dasm_riscv(p);
 		break;
 	default:
-		adbg_dasm_err(p, DisasmError.NotSupported);
+		adbg_dasm_err(p, AdbgDisasmError.NotSupported);
 		p.mcbuf[0] = 0;
 		return p.error;
 	}
 
 	if (modefile) {
-		if (p.syntax == DisasmSyntax.Default)
+		if (p.syntax == AdbgDisasmSyntax.Default)
 			p.syntax = DISASM_DEFAULT_SYNTAX;
-		if (p.error == DisasmError.None)
+		if (p.error == AdbgDisasmError.None)
 			adbg_dasm_render(p);
 	}
 
 	return p.error;
 }
 
-//TODO: DisasmISA adbg_dasm_guess(void *p, int size)
+//TODO: AdbgDisasmPlatform adbg_dasm_guess(void *p, int size)
 //      Returns Default if really nothing found or errors
 //      Sets .isa
 //      Score system (On min 50 instructions or before size is reached)
 
 /// See if platform is big-endian (useful for swap functions) from an ISA enum
 /// value. The default returns the compilation platform endianness value.
-/// Params: isa = DisasmISA value
+/// Params: isa = AdbgDisasmPlatform value
 /// Returns: Zero if little-endian, non-zero if big-endian
-int adbg_disasm_msb(DisasmISA isa) {
-	with (DisasmISA)
+int adbg_disasm_msb(AdbgDisasmPlatform isa) {
+	with (AdbgDisasmPlatform)
 	switch (isa) {
 	case x86_16, x86, x86_64, rv32, rv64: return 0;
 	default:
@@ -260,8 +261,8 @@ int adbg_disasm_msb(DisasmISA isa) {
 /// Params: e = DisasmError
 /// Returns: String
 deprecated("use adbg.error module instead")
-const(char) *adbg_dasm_errmsg(DisasmError e) {
-	with (DisasmError)
+const(char) *adbg_dasm_errmsg(AdbgDisasmError e) {
+	with (AdbgDisasmError)
 	final switch (e) {
 	case None:	return "None";
 	case NullAddress:	return "Received null address";
@@ -271,10 +272,10 @@ const(char) *adbg_dasm_errmsg(DisasmError e) {
 }
 
 // Status: Waiting on _setup function
-//TODO: byte  adbg_dasm_fi8(disasm_params_t*)
-//TODO: short adbg_dasm_fi16(disasm_params_t*)
-//TODO: int   adbg_dasm_fi32(disasm_params_t*)
-//TODO: long  adbg_dasm_fi64(disasm_params_t*)
+//TODO: byte  adbg_dasm_fi8(adbg_disasm_t*)
+//TODO: short adbg_dasm_fi16(adbg_disasm_t*)
+//TODO: int   adbg_dasm_fi32(adbg_disasm_t*)
+//TODO: long  adbg_dasm_fi64(adbg_disasm_t*)
 //      Add automatically to machine code buffer
 //      Automatically increment pointer
 //      Use structure fswap functions

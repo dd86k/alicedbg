@@ -67,7 +67,7 @@ enum {
 /// 	dp = Disassembler settings
 /// 	flags = Dumper options
 /// Returns: Error code if non-zero
-int adbg_dump(const(char) *file, disasm_params_t *dp, int flags) {
+int adbg_dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 	FILE *f = fopen(file, "rb"); // Handles null file pointers
 	if (f == null) {
 		perror("dump");
@@ -104,8 +104,8 @@ int adbg_dump(const(char) *file, disasm_params_t *dp, int flags) {
 		return e;
 	}
 
-	if (dp.isa == DisasmISA.platform)
-		dp.isa = info.isa;
+	if (dp.platform == AdbgDisasmPlatform.native)
+		dp.platform = info.platform;
 
 	with (ObjType)
 	switch (info.type) {
@@ -126,7 +126,7 @@ int adbg_dump(const(char) *file, disasm_params_t *dp, int flags) {
 /// 	size = Data size
 /// 	flags = Configuration flags
 /// Returns: Status code
-int adbg_dump_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
+int adbg_dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 	dp.a = data;
 	if (flags & DUMPER_DISASM_STATS) {
 		uint iavg;	/// instruction average size
@@ -134,9 +134,9 @@ int adbg_dump_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
 		uint icnt;	/// instruction count
 		uint ills;	/// Number of illegal instructions
 		for (uint i, isize = void; i < size; i += isize) {
-			DisasmError e = cast(DisasmError)adbg_disasm(dp, DisasmMode.Size);
+			AdbgDisasmError e = cast(AdbgDisasmError)adbg_disasm(dp, AdbgDisasmMode.Size);
 			isize = cast(uint)(dp.av - dp.la);
-			with (DisasmError)
+			with (AdbgDisasmError)
 			final switch (e) {
 			case None:
 				iavg += isize;
@@ -164,8 +164,8 @@ int adbg_dump_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
 		);
 	} else {
 		for (uint i; i < size; i += dp.av - dp.la) {
-			DisasmError e = cast(DisasmError)adbg_disasm(dp, DisasmMode.File);
-			with (DisasmError)
+			AdbgDisasmError e = cast(AdbgDisasmError)adbg_disasm(dp, AdbgDisasmMode.File);
+			with (AdbgDisasmError)
 			switch (e) {
 			case None, Illegal:
 				printf("%08X %-30s %-30s\n",

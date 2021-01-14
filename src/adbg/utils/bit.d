@@ -13,13 +13,6 @@ module adbg.utils.bit;
 
 import adbg.platform;
 
-version (DigitalMars) {
-	version (X86)
-		version = DMD_ASM_X86;
-	else version (X86_64)
-		version = DMD_ASM_X86_64;
-}
-
 extern (C):
 
 /// Create a 1-bit bitmask with a bit position (0-based, 1 << a).
@@ -89,13 +82,13 @@ private ulong adbg_util_nop64(ulong v) { return v; }
 /// LDC and GDC transform this into a ROL instruction.
 /// If x86 inline assembly is available, DMD uses the ROL instruction.
 ushort adbg_util_bswap16(ushort v) pure nothrow @nogc {
-	version (DMD_ASM_X86) {
+	static if (IN_ASM == InlineAsm.DMD_x86) {
 		asm pure nothrow @nogc {
 			lea EDI, v;
 			rol word ptr [EDI], 8;
 		}
 		return v;
-	} else version (DMD_ASM_X86_64) {
+	} else static if (IN_ASM == InlineAsm.DMD_x86_64) {
 		asm pure nothrow @nogc {
 			lea RDI, v;
 			rol word ptr [RDI], 8;
@@ -113,7 +106,7 @@ ushort adbg_util_bswap16(ushort v) pure nothrow @nogc {
 /// Only LDC is able to pick this up as BSWAP.
 /// If x86 inline assembly is available, DMD uses the BSWAP instruction.
 uint adbg_util_bswap32(uint v) pure nothrow @nogc {
-	version (DMD_ASM_X86_ANY) {
+	static if (IN_ASM == InlineAsm.DMD_x86 || IN_ASM == InlineAsm.DMD_x86_64) {
 		asm pure nothrow @nogc {
 			mov EAX, v;
 			bswap EAX;

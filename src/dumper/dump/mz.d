@@ -10,7 +10,7 @@ import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
 import core.stdc.time : time_t, tm, localtime, strftime;
 import adbg.obj.loader : obj_info_t;
-import adbg.disasm.disasm : disasm_params_t, adbg_disasm, DisasmMode;
+import adbg.disasm.disasm : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
 import adbg.obj.pe;
 
 extern (C):
@@ -22,7 +22,7 @@ extern (C):
 /// 	dp = Disassembler parameters
 /// 	flags = Show X flags
 /// Returns: Non-zero on error
-int adbg_dump_mz(obj_info_t *fi, disasm_params_t *dp, int flags) {
+int adbg_dump_mz(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
 	//TODO: MZ
 	assert(0, "adbg_dmpr_print_mz: todo");
 }

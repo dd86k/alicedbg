@@ -39,7 +39,7 @@ int adbg_ui_loop_handler(exception_t *e) {
 	// * Print disassembly, if available
 	if (e.faultaddr) {
 		g_disparams.a = e.faultaddr;
-		if (adbg_disasm(&g_disparams, DisasmMode.File) == 0) {
+		if (adbg_disasm(&g_disparams, AdbgDisasmMode.File) == 0) {
 			printf("> %p: %s| %s\n",
 				e.faultaddr, g_disparams.mcbuf.ptr, g_disparams.mnbuf.ptr);
 		}

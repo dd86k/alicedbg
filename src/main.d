@@ -13,7 +13,7 @@ import core.stdc.string : strcmp, strncpy, strtok;
 import core.stdc.stdio;
 import adbg.platform;
 import adbg.debugger : adbg_attach, adbg_load;
-import adbg.disasm : disasm_params_t, DisasmISA, DisasmSyntax;
+import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax;
 import adbg.sys.err : adbg_sys_perror;
 import d = std.compiler;
 import debugger, dumper;
@@ -41,7 +41,7 @@ enum size_t ptrsize = size_t.sizeof;
 //      Acts as "--", to stop processing options
 struct settings_t {
 	SettingUI ui;	/// Debugger user interface
-	disasm_params_t disasm;	/// Disassembler settings
+	adbg_disasm_t disasm;	/// Disassembler settings
 	bool dump;	/// Dump instead of debugging
 	const(char) *file;	/// Debuggee: file
 //	const(char) *dir;	/// Debuggee: directory
@@ -90,28 +90,28 @@ immutable option_t[] options = [
 // ANCHOR --march
 //
 
-struct setting_isa_t {
-	DisasmISA val;
+struct setting_platform_t {
+	AdbgDisasmPlatform val;
 	immutable(char)* opt, alt, desc;
 }
-immutable setting_isa_t[] isas = [
-	{ DisasmISA.x86_16, "x86_16", "8086",    "x86 16-bit (real-mode)" },
-	{ DisasmISA.x86,    "x86",    "i386",    "x86 32-bit (extended mode)" },
-	{ DisasmISA.x86_64, "x86_64", "amd64",   "x86 64-bit (long mode)" },
-	{ DisasmISA.rv32,   "rv32",   "riscv32", "RISC-V 32-bit"},
+immutable setting_platform_t[] platforms = [
+	{ AdbgDisasmPlatform.x86_16, "x86_16", "8086",    "x86 16-bit (real-mode)" },
+	{ AdbgDisasmPlatform.x86,    "x86",    "i386",    "x86 32-bit (extended mode)" },
+	{ AdbgDisasmPlatform.x86_64, "x86_64", "amd64",   "x86 64-bit (long mode)" },
+	{ AdbgDisasmPlatform.rv32,   "rv32",   "riscv32", "RISC-V 32-bit"},
 ];
 int climarch(settings_t *settings, const(char) *val) {
 	if (askhelp(val)) {
 		puts("Available machine architectures:");
-		foreach (setting_isa_t isa; isas) {
-			with (isa)
+		foreach (setting_platform_t p; platforms) {
+			with (p)
 			printf("%8s, %-12s%s\n", opt, alt, desc);
 		}
 		exit(0);
 	}
-	foreach (setting_isa_t isa; isas) {
-		if (strcmp(val, isa.opt) == 0 || strcmp(val, isa.alt) == 0) {
-			settings.disasm.isa = isa.val;
+	foreach (setting_platform_t p; platforms) {
+		if (strcmp(val, p.opt) == 0 || strcmp(val, p.alt) == 0) {
+			settings.disasm.platform = p.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -123,13 +123,13 @@ int climarch(settings_t *settings, const(char) *val) {
 //
 
 struct setting_syntax_t {
-	DisasmSyntax val;
+	AdbgDisasmSyntax val;
 	immutable(char)* opt, desc;
 }
 immutable setting_syntax_t[] syntaxes = [
-	{ DisasmSyntax.Att, "att",   "AT&T syntax" },
-	{ DisasmSyntax.Att, "intel", "Intel syntax" },
-	{ DisasmSyntax.Att, "nasm",  "Netwide Assembler syntax" },
+	{ AdbgDisasmSyntax.Att, "att",   "AT&T syntax" },
+	{ AdbgDisasmSyntax.Att, "intel", "Intel syntax" },
+	{ AdbgDisasmSyntax.Att, "nasm",  "Netwide Assembler syntax" },
 ];
 int clisyntax(settings_t *settings, const(char) *val) {
 	if (askhelp(val)) {
@@ -337,7 +337,7 @@ immutable(char) *fmt_version =
 " - <https://github.com/dd86k/alicedbg>\n"~
 "Compiler: "~__VENDOR__~" %u.%03u, "~TARGET_OBJFMT~" obj, "~TARGET_FLTABI~" float\n"~
 "CRT: "~TARGET_CRT~" (C++RT: "~TARGET_CPPRT~") on "~TARGET_PLATFORM~"/"~TARGET_OS~"\n"~
-"InlineAsm: "~INLINE_ASM_STRING~"\n"~
+"InlineAsm: "~IN_ASM_STR~"\n"~
 "Features: dbg disasm\n"~
 "Disasm: x86_16 x86 x86_64\n";
 int cliver(settings_t*) {
@@ -489,7 +489,10 @@ int main(int argc, const(char)** argv) {
 			}
 		} // not an option
 		
-		//TODO: Defaults
+		if (settings.file == null) {
+			settings.file = argLong;
+			continue;
+		}
 		
 		printf("main: unknown option '%s'\n", argLong);
 		return EXIT_FAILURE;

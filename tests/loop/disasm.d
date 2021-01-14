@@ -22,8 +22,8 @@ unittest {
 	srand(tt ^ tt);
 	int[BUFSIZE] b = void;
 	ubyte *bp = cast(ubyte*)&b;
-	disasm_params_t p = void;
-	p.isa = DisasmISA.x86;
+	adbg_disasm_t p = void;
+	p.isa = AdbgDisasmPlatform.x86;
 	size_t counter;
 	size_t stage;
 L_BUF:
@@ -60,7 +60,7 @@ L_BUF:
 	for (size_t i; i < BUFSIZE * 4; ++i)
 		printf("%02X", bp[i]);
 	p.a = &b;
-	adbg_dasm_line(&p, DisasmMode.File);
+	adbg_dasm_line(&p, AdbgDisasmMode.File);
 	printf(" %s\n",  &p.mnbuf);
 //	putchar('\n');
 	goto L_BUF;

@@ -20,8 +20,8 @@ __gshared:
 exception_t g_lastexception;
 
 /// Disassembler parameters
-disasm_params_t g_disparams;
+adbg_disasm_t g_disparams;
 
-void adbg_ui_common_params(disasm_params_t *params) {
-	memcpy(&g_disparams, params, disasm_params_t.sizeof);
+void adbg_ui_common_params(adbg_disasm_t *params) {
+	memcpy(&g_disparams, params, adbg_disasm_t.sizeof);
 }

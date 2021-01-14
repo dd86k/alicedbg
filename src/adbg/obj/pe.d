@@ -17,7 +17,7 @@ module adbg.obj.pe;
 import core.stdc.stdio, core.stdc.inttypes;
 import core.stdc.string : memset;
 import adbg.obj.loader : obj_info_t, ObjType;
-import adbg.disasm.disasm : DisasmISA; // ISA translation
+import adbg.disasm.disasm : AdbgDisasmPlatform; // ISA translation
 import adbg.obj.loader;
 import adbg.utils.uid : UID;
 
@@ -660,10 +660,10 @@ int adbg_obj_pe_load(obj_info_t *info, int flags) {
 	}
 
 	switch (info.pe.hdr.Machine) {
-	case PE_MACHINE_I386:	info.isa = DisasmISA.x86; break;
-	case PE_MACHINE_AMD64:	info.isa = DisasmISA.x86_64; break;
-	case PE_MACHINE_RISCV32:	info.isa = DisasmISA.rv32; break;
-	default:	info.isa = DisasmISA.platform;
+	case PE_MACHINE_I386:	info.platform = AdbgDisasmPlatform.x86; break;
+	case PE_MACHINE_AMD64:	info.platform = AdbgDisasmPlatform.x86_64; break;
+	case PE_MACHINE_RISCV32:	info.platform = AdbgDisasmPlatform.rv32; break;
+	default:	info.platform = AdbgDisasmPlatform.native;
 	}
 
 	return 0;

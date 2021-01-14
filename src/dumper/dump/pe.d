@@ -25,7 +25,7 @@ extern (C):
 /// 	dp = Disassembler parameters
 /// 	flags = Dumper/Loader flags
 /// Returns: Non-zero on error
-int adbg_dump_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
+int adbg_dump_pe(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
 	bool unkmach = void;
 	const(char) *str_mach = adbg_obj_pe_mach(fi.pe.hdr.Machine);
 	if (str_mach == null) {

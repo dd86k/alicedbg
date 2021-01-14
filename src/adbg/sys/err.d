@@ -52,7 +52,7 @@ int adbg_sys_errno() {
 /// Params:
 /// 	mod = module adbg.name
 /// 	code = Error code
-void adbg_sys_perror(const(char) *mod)(int code) {
+void adbg_sys_perror(string mod)(int code) {
 	import core.stdc.stdio : printf;
-	printf("%s: ("~ERR_FMT~") %s\n", mod, code, adbg_sys_error(code));
+	printf(mod~": ("~ERR_FMT~") %s\n", code, adbg_sys_error(code));
 }

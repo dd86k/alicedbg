@@ -28,7 +28,7 @@ struct riscv_internals_t { align(1):
 /// Disassemble RISC-V
 /// Note: So far only does risc-v-32
 /// Params: p = Disassembler parameters
-void adbg_dasm_riscv(disasm_params_t *p) {
+void adbg_dasm_riscv(adbg_disasm_t *p) {
 	riscv_internals_t i = void;
 //	p.rv = &i;
 
@@ -42,7 +42,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 
 	switch (i.op1 & 3) {
 	case 0:
-		if (p.mode >= DisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.File)
 			adbg_dasm_push_x16(p, i.op1);
 		switch (i.op1 & OP_RVC_FUNC_MASK) {
 		case OP_RVC_FUNC_000: // C.ADDI4SPN
@@ -51,7 +51,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 				adbg_dasm_err(p);
 				return;
 			}
-			if (p.mode < DisasmMode.File)
+			if (p.mode < AdbgDisasmMode.File)
 				return;
 			int rd = (i.op1 >> 2) & 7;
 			adbg_dasm_push_str(p, "c.addi4spn");
@@ -59,7 +59,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 			adbg_dasm_push_imm(p, imm);
 			return;
 		case OP_RVC_FUNC_110: // C.SW
-			if (p.mode < DisasmMode.File)
+			if (p.mode < AdbgDisasmMode.File)
 				return;
 			int rs1 = (i.op1 >> 7) & 7;
 			int rs2 = (i.op1 >> 2) & 7;
@@ -76,11 +76,11 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 		default: adbg_dasm_err(p); return; // Yes, 000 is illegal
 		}
 	case 1:
-		if (p.mode >= DisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.File)
 			adbg_dasm_push_x16(p, i.op1);
 		switch (i.op1 & OP_RVC_FUNC_MASK) {
 		case OP_RVC_FUNC_000:
-			if (p.mode < DisasmMode.File)
+			if (p.mode < AdbgDisasmMode.File)
 				return;
 			int rd = (i.op1 >> 7) & 31; /// rd/rs1 (op[11:7])
 			if (rd) { // C.ADDI
@@ -96,7 +96,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 			}
 			return;
 		case OP_RVC_FUNC_001: // C.JAL
-			if (p.mode < DisasmMode.File)
+			if (p.mode < AdbgDisasmMode.File)
 				return;
 			adbg_dasm_push_str(p, "c.jal");
 			adbg_dasm_push_imm(p, adbg_dasm_riscv_imm_cj(i.op1));
@@ -125,7 +125,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 				case 0x1020: m = "c.addw"; break;
 				default: adbg_dasm_err(p); return;
 				}
-				if (p.mode < DisasmMode.File)
+				if (p.mode < AdbgDisasmMode.File)
 					return;
 				adbg_dasm_push_str(p, m);
 				adbg_dasm_push_reg(p, adbg_dasm_riscv_rvc_abi_reg(rd));
@@ -136,7 +136,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 		default: adbg_dasm_err(p); return;
 		}
 	case 2:
-		if (p.mode >= DisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.File)
 			adbg_dasm_push_x16(p, i.op1);
 		switch (i.op1 & OP_RVC_FUNC_MASK) {
 		case OP_RVC_FUNC_010:
@@ -145,7 +145,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 				adbg_dasm_err(p);
 				return;
 			}
-			if (p.mode < DisasmMode.File)
+			if (p.mode < AdbgDisasmMode.File)
 				return;
 			int imm = (i.op1 >> 2) & 31;
 			if (i.op1 & BIT!(12))
@@ -155,7 +155,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 			adbg_dasm_push_imm(p, imm);
 			return;
 		case OP_RVC_FUNC_100:
-			if (p.mode < DisasmMode.File)
+			if (p.mode < AdbgDisasmMode.File)
 				return;
 			int rd  = (i.op1 >> 7) & 31; // or rd
 			int rs2 = (i.op1 >> 2) & 31;
@@ -184,7 +184,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 			}
 			return;
 		case OP_RVC_FUNC_110:
-			if (p.mode < DisasmMode.File)
+			if (p.mode < AdbgDisasmMode.File)
 				return;
 			int rs2 = (i.op1 >> 2) & 31;
 			int imm = (i.op1 >> 7) & 63;
@@ -202,7 +202,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 
 	i.op2 = *p.ai16;
 	++p.ai16;
-	if (p.mode >= DisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.File)
 		adbg_dasm_push_x32(p, i.op);
 	switch (i.op & OP_MASK) {
 	case 19: // (0010011) RV32I: ADDI/SLTI/SLTIU/XORI/ORI/ANDI
@@ -216,7 +216,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 		case OP_FUNC_111: m = "andi"; break;
 		default: adbg_dasm_err(p); return;
 		}
-		if (p.mode < DisasmMode.File)
+		if (p.mode < AdbgDisasmMode.File)
 			return;
 		int imm = i.op >> 20;
 		int rs1 = (i.op >> 15) & 31;
@@ -235,7 +235,7 @@ void adbg_dasm_riscv(disasm_params_t *p) {
 		case OP_FUNC_010: m = "sw"; w = MemWidth.i32; break;
 		default: adbg_dasm_err(p); return;
 		}
-		if (p.mode < DisasmMode.File)
+		if (p.mode < AdbgDisasmMode.File)
 			return;
 		int imm = adbg_dasm_riscv_imm_s(i.op);
 		int rs1 = (i.op >> 15) & 31;

@@ -5,18 +5,20 @@ module adbg.error;
 
 extern (C):
 
-// Error code structure
-// 00000000
-// ||||++++- Errorcode
-// ||++----- Module
-// ++------- Reserved
+// NOTE: Work in progress
 
-//TODO: AdbgErrModule
-//      enum AdbgErrorModule
-//      << 16
-//      00 Application (cli, front-ends)
-//      01 System
-//      02 Debugger
-//      03 Disassembler
-//      04 Object
-//      05 Utilities
+private enum modshift = 16;
+
+enum AdbgErrorModule : ushort {
+	Application,
+	System, /// CRT/OS
+	Debugger,
+	Disassembler,
+	Object,
+	Utilities,
+}
+
+struct adbg_err_t {
+	ushort mod;
+	int code;
+}

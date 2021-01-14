@@ -17,7 +17,7 @@
 module adbg.obj.loader;
 
 import core.stdc.stdio;
-import adbg.disasm.disasm : DisasmISA, adbg_disasm_msb;
+import adbg.disasm.disasm : AdbgDisasmPlatform, adbg_disasm_msb;
 import adbg.obj.pe, adbg.sys.err;
 
 extern (C):
@@ -102,8 +102,8 @@ struct obj_info_t { align(1):
 
 	/// File type, populated by the respective loading function.
 	ObjType type;
-	/// Image's ISA translated value for disasm
-	DisasmISA isa;
+	/// Image's platform translated value for disasm
+	AdbgDisasmPlatform platform;
 	/// A copy of the original loading flags
 	int oflags;
 	/// Number of symbols loaded
@@ -230,7 +230,7 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 
 	if (e) return e;
 
-	info.internal = adbg_disasm_msb(info.isa); // ISA translation
+	info.internal = adbg_disasm_msb(info.platform); // ISA translation
 
 	return ObjError.None;
 }
