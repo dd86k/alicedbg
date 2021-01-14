@@ -3,13 +3,13 @@
  *
  * License: BSD 3-clause
  */
-module adbg.os.windows.seh;
+module adbg.sys.windows.seh;
 
 version (Windows):
 
 import adbg.debugger.exception;
-import adbg.os.windows.def;
-import adbg.os.setjmp;
+import adbg.sys.windows.def;
+import adbg.sys.setjmp;
 
 //TODO: adbg_seh_set (Windows)
 

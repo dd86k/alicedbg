@@ -1,5 +1,5 @@
 /**
- * Portable Executable loader.
+ * Microsoft Portable Executable loader.
  *
  * PE32 format for both images (executables) and objects (mscoff object files).
  *
@@ -12,7 +12,7 @@
  *
  * License: BSD 3-clause
  */
-module adbg.obj.fmt.pe;
+module adbg.obj.pe;
 
 import core.stdc.stdio, core.stdc.inttypes;
 import core.stdc.string : memset;

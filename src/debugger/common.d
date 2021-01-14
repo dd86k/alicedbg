@@ -6,15 +6,21 @@
  *
  * License: BSD 3-clause
  */
-module adbg.ui.common;
+module debugger.common;
 
+import adbg.debugger.exception;
 import adbg.disasm;
 import core.stdc.string : memcpy;
 
 public:
+extern (C):
+__gshared:
+
+/// Last exception
+exception_t g_lastexception;
 
 /// Disassembler parameters
-__gshared disasm_params_t g_disparams;
+disasm_params_t g_disparams;
 
 void adbg_ui_common_params(disasm_params_t *params) {
 	memcpy(&g_disparams, params, disasm_params_t.sizeof);

@@ -1,5 +1,5 @@
 /**
- * JSON UI for external debugging, either locally or remotely, via TCP.
+ * Server UI for external debugging, either locally or remotely, via TCP.
  *
  * This acts as a debugging server, useful for external applications, if
  * supported.
@@ -9,5 +9,5 @@
  *
  * License: BSD 3-clause
  */
-module ui.json;
+module debugger.ui.server;
 

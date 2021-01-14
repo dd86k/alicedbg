@@ -14,10 +14,9 @@ import core.stdc.stdio;
 import adbg.platform;
 import adbg.debugger : adbg_attach, adbg_load;
 import adbg.disasm : disasm_params_t, DisasmISA, DisasmSyntax;
-import adbg.dumper;
-import adbg.os.err : adbg_err_osprint;
+import adbg.sys.err : adbg_sys_perror;
 import d = std.compiler;
-import adbg.ui;
+import debugger, dumper;
 
 private:
 extern (C):
@@ -34,7 +33,7 @@ bool askhelp(const(char) *query) {
 	}
 }
 
-enum size_t psize = size_t.sizeof;
+enum size_t ptrsize = size_t.sizeof;
 //immutable(char)* ARG    = "<arg>";
 //immutable(char)* NOARG  = "     ";
 
@@ -54,11 +53,12 @@ struct settings_t {
 
 //TODO: Consider adding 'bool processed' field
 //      Avoids repeating options, may speed-up parsing
+//      * Could be an issue for repeatable options (unless another field added..)
 struct option_t {
-	align(psize) char alt;
+	align(ptrsize) char alt;
 	immutable(char) *val;
 	immutable(char) *desc;
-	align(psize) bool arg;	/// if it takes an argument
+	align(ptrsize) bool arg;	/// if it takes an argument
 	union {
 		extern(C) int function(settings_t*) f;
 		extern(C) int function(settings_t*, const(char)*) farg;
@@ -68,6 +68,7 @@ immutable option_t[] options = [
 	// general
 	{ 'm', "march",  "Select architecture for disassembler", true, farg: &climarch },
 	{ 's', "syntax", "Select disassembler syntax", true, farg: &clisyntax },
+	//TODO: --debug/--no-debug: Disable/enable internal SEH from main
 	// debugger
 	{ 'f', "file", "Debugger: Load file (default parameter)", true, farg: &clifile },
 	{ 0,   "args", "Debugger: Supply arguments to file", true, farg: &cliargs },
@@ -335,7 +336,8 @@ immutable(char) *fmt_version =
 " - <https://git.dd86k.space/dd86k/alicedbg>\n"~
 " - <https://github.com/dd86k/alicedbg>\n"~
 "Compiler: "~__VENDOR__~" %u.%03u, "~TARGET_OBJFMT~" obj, "~TARGET_FLTABI~" float\n"~
-"CRT: "~TARGET_CRT~" (C++RT: "~TARGET_CPPRT~") on "~TARGET_OS~"/"~TARGET_PLATFORM~"\n"~
+"CRT: "~TARGET_CRT~" (C++RT: "~TARGET_CPPRT~") on "~TARGET_PLATFORM~"/"~TARGET_OS~"\n"~
+"InlineAsm: "~INLINE_ASM_STRING~"\n"~
 "Features: dbg disasm\n"~
 "Disasm: x86_16 x86 x86_64\n";
 int cliver(settings_t*) {
@@ -417,7 +419,7 @@ int main(int argc, const(char)** argv) {
 	settings_t settings;	/// cli settings
 	int lasterr;	/// last cli error
 	
-	l_cli: for (int argi = 1; argi < argc; ++argi) {
+	A: for (int argi = 1; argi < argc; ++argi) {
 		const(char) *argLong = argv[argi];
 		
 		if (argLong[0] == 0) continue;
@@ -439,7 +441,7 @@ int main(int argc, const(char)** argv) {
 					if (strcmp(argLong, opt.val)) continue;
 					if (opt.arg == false) {
 						lasterr = opt.f(&settings);
-						continue l_cli;
+						continue A;
 					}
 					if (argi + 1 >= argc) {
 						printf("missing argument for --%s\n", opt.val);
@@ -451,7 +453,7 @@ int main(int argc, const(char)** argv) {
 						printf("main: '%s' failed with --%s\n", argval, opt.val);
 						return lasterr;
 					}
-					continue l_cli;
+					continue A;
 				}
 			} else { // short opt
 				argShort = argLong[1];
@@ -463,7 +465,7 @@ int main(int argc, const(char)** argv) {
 					if (argShort != opt.alt) continue;
 					if (opt.arg == false) {
 						lasterr = opt.f(&settings);
-						continue l_cli;
+						continue A;
 					}
 					if (argi + 1 >= argc) {
 						printf("missing argument for -%c\n", opt.alt);
@@ -475,40 +477,46 @@ int main(int argc, const(char)** argv) {
 						printf("main: '%s' failed with -%c\n", argval, opt.alt);
 						return lasterr;
 					}
-					continue l_cli;
+					continue A;
 				}
 			}
-			if (islong)
+			if (islong) {
 				printf("main: unknown option '--%s'\n", argLong);
-			else
+				return EXIT_FAILURE;
+			} else {
 				printf("main: unknown option '-%c'\n", argShort);
+				return EXIT_FAILURE;
+			}
 		} // not an option
 		
 		//TODO: Defaults
 		
 		printf("main: unknown option '%s'\n", argLong);
+		return EXIT_FAILURE;
 	}
 	
+	// app: dumper
 	if (settings.dump)
-		return adbg_dmpr_dump(settings.file, &settings.disasm, settings.flags);
+		return adbg_dump(settings.file, &settings.disasm, settings.flags);
 	
+	// app: debugger
 	lasterr = settings.pid ?
 		adbg_attach(settings.pid, 0) :
 		adbg_load(settings.file, null, settings.argv, null, 0);
 	
 	if (lasterr) {
-		adbg_err_osprint("dbg", lasterr);
+		adbg_sys_perror!"dbg"(lasterr);
 		return lasterr;
 	}
 	
 	adbg_ui_common_params(&settings.disasm);
 	with (SettingUI)
-	switch (settings.ui) {
+	final switch (settings.ui) {
 	case loop: lasterr = adbg_ui_loop(); break;
 	case cmd:  lasterr = adbg_ui_cmd(); break;
 	case tui:  lasterr = adbg_ui_tui(); break;
-	default:
-		puts("main: ui not selected");
+	case server:
+		puts("main: server ui not yet supported");
 		return EXIT_FAILURE;
 	}
 	return lasterr;

@@ -190,7 +190,7 @@ struct disasm_params_t { align(1):
  *
  * Returns: Error code; Non-zero indicating an error
  */
-int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
+int adbg_disasm(disasm_params_t *p, DisasmMode mode) {
 	if (p.a == null) {
 		adbg_dasm_err(p, DisasmError.NullAddress);
 		p.mcbuf[0] = 0;
@@ -246,7 +246,7 @@ int adbg_dasm_line(disasm_params_t *p, DisasmMode mode) {
 /// value. The default returns the compilation platform endianness value.
 /// Params: isa = DisasmISA value
 /// Returns: Zero if little-endian, non-zero if big-endian
-int adbg_dasm_msb(DisasmISA isa) {
+int adbg_disasm_msb(DisasmISA isa) {
 	with (DisasmISA)
 	switch (isa) {
 	case x86_16, x86, x86_64, rv32, rv64: return 0;
@@ -259,6 +259,7 @@ int adbg_dasm_msb(DisasmISA isa) {
 /// Get a short message for a DisasmError.
 /// Params: e = DisasmError
 /// Returns: String
+deprecated("use adbg.error module instead")
 const(char) *adbg_dasm_errmsg(DisasmError e) {
 	with (DisasmError)
 	final switch (e) {

@@ -26,6 +26,7 @@ extern (C):
 template BIT(int n) { enum { BIT = 1 << n } }
 
 /// Turn a 4-character string into a 4-byte number
+/// Params: s = 4-character string
 template char4i32(char[4] s) {
 	version (BigEndian)
 		enum { char4i32 = (s[0] << 24) | (s[1] << 16) | (s[2] << 8) | (s[3]) }

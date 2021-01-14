@@ -3,13 +3,13 @@
  *
  * License: BSD 3-clause
  */
-module adbg.ui.tui;
+module debugger.ui.tui;
 
 import core.stdc.stdio, core.stdc.string : memcpy;
-import adbg.os.term;
+import adbg.sys.term;
 import adbg.debugger;
 import adbg.disasm;
-import adbg.ui.common;
+import debugger.common;
 
 extern (C):
 __gshared:
@@ -94,13 +94,13 @@ int adbg_ui_tui_handler(exception_t *e) {
 	const uint ihmax = tui_size.height - 2;
 	// On-point
 	adbg_term_curpos(0, h);
-	if (adbg_dasm_line(&g_disparams, DisasmMode.File) == DisasmError.None)
+	if (adbg_disasm(&g_disparams, DisasmMode.File) == DisasmError.None)
 		adbg_term_tui_writef("> %zX %-20s %s",
 			g_disparams.la, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	// forward
 	for (uint hi = h + 1; hi < ihmax; ++hi) {
 		adbg_term_curpos(0, hi);
-		adbg_dasm_line(&g_disparams, DisasmMode.File);
+		adbg_disasm(&g_disparams, DisasmMode.File);
 		adbg_term_tui_writef("  %zX %-20s %s",
 			g_disparams.la, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	}

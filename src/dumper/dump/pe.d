@@ -3,7 +3,7 @@
  *
  * License: BSD 3-clause
  */
-module adbg.dumper.objs.printpe;
+module dumper.dump.pe;
 
 import adbg.etc.c : putchar;
 import core.stdc.stdio;
@@ -11,8 +11,8 @@ import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
 import core.stdc.string : strcpy;
 import core.stdc.time : time_t, tm, localtime, strftime;
-import adbg.dumper.dumper, adbg.disasm.disasm;
-import adbg.obj.loader, adbg.obj.fmt.pe;
+import dumper.dumper, adbg.disasm.disasm;
+import adbg.obj.loader, adbg.obj.pe;
 import adbg.utils.uid, adbg.utils.bit;
 
 extern (C):
@@ -25,7 +25,7 @@ extern (C):
 /// 	dp = Disassembler parameters
 /// 	flags = Dumper/Loader flags
 /// Returns: Non-zero on error
-int adbg_dmpr_print_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
+int adbg_dump_pe(obj_info_t *fi, disasm_params_t *dp, int flags) {
 	bool unkmach = void;
 	const(char) *str_mach = adbg_obj_pe_mach(fi.pe.hdr.Machine);
 	if (str_mach == null) {
@@ -876,7 +876,7 @@ L_DISASM:
 
 		if (s.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
 			printf("\n<%.8s>\n", s.Name.ptr);
-			int e = adbg_dmpr_disasm(dp,
+			int e = adbg_dump_disasm(dp,
 				fi.b + s.PointerToRawData, s.SizeOfRawData, flags);
 			if (e) return e;
 		}

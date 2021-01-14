@@ -7,7 +7,7 @@ module adbg.sys.windows.wow64;
 
 version (Win64):
 
-import adbg.os.windows.def;
+private import adbg.sys.windows.def;
 
 extern (Windows):
 

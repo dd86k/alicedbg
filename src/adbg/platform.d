@@ -32,6 +32,18 @@ else  enum __BUILDTYPE__ = "release";	/// Build type
 
 private enum VERSION_TARGET_INFO = 2083;
 
+struct adbg_info_t {
+	const(char) *adbgver = ADBG_VERSION;
+	const(char) *build   = __BUILDTYPE__;
+	const(char) *arch    = TARGET_PLATFORM;
+	const(char) *os      = TARGET_OS;
+	const(char) *crt     = TARGET_CRT;
+	const(char) *cpprt   = TARGET_CPPRT;
+	const(char) *objfmt  = TARGET_OBJFMT;
+	const(char) *fltabi  = TARGET_FLTABI;
+	const(char) *asmhint = INLINE_ASM_STRING;
+}
+
 //
 // ABI string
 //
@@ -40,16 +52,16 @@ version (X86) {
 	enum TARGET_PLATFORM = "x86";	/// Platform ABI string
 	public alias opcode_t = ubyte;
 } else version (X86_64) {
-	enum TARGET_PLATFORM = "x86-64";	/// Platform ABI string
+	enum TARGET_PLATFORM = "x86_64";	/// Platform ABI string
 	public alias opcode_t = ubyte;
 } else version (ARM_Thumb) {
-	enum TARGET_PLATFORM = "arm-t32";	/// Platform ABI string
+	enum TARGET_PLATFORM = "arm_t32";	/// Platform ABI string
 	public alias opcode_t = ushort;
 } else version (ARM) {
-	enum TARGET_PLATFORM = "arm-a32";	/// Platform ABI string
+	enum TARGET_PLATFORM = "arm_a32";	/// Platform ABI string
 	public alias opcode_t = uint;
 } else version (AArch64) {
-	enum TARGET_PLATFORM = "arm-a64";	/// Platform ABI string
+	enum TARGET_PLATFORM = "arm_a64";	/// Platform ABI string
 	public alias opcode_t = uint;
 }
 else
@@ -172,63 +184,68 @@ static if (FEATURE_TARGETINFO) {
 // ANCHOR Additional Feature Versions
 //
 
+enum InlineAsm {
+	None,
+	DMD_x86,
+	DMD_x86_64,
+	LDC_x86,
+	LDC_x86_64,
+	GDC_x86,
+	GDC_x86_64,
+}
+
 version (DigitalMars) {
 	version (D_InlineAsm_X86) {
-		version = DMD_ASM_X86;
-		version = DMD_ASM_X86_ANY;
+		enum INLINE_ASM = InlineAsm.DMD_x86;
 	} else version (D_InlineAsm_X86_64) {
-		version = DMD_ASM_X86_64;
-		version = DMD_ASM_X86_ANY;
+		enum INLINE_ASM = InlineAsm.DMD_x86_64;
+	}
+} else
+version (GNU_Inline) {
+	//TODO: Check which FE version implemented inlined asm
+	version (X86) {
+		enum INLINE_ASM = InlineAsm.GDC_x86;
+	} else version (X86_64) {
+		enum INLINE_ASM = InlineAsm.GDC_x86_64;
+	} else version (D_InlineAsm_X86) {
+		enum INLINE_ASM = InlineAsm.GDC_x86;
+	} else version (D_InlineAsm_X86_64) {
+		enum INLINE_ASM = InlineAsm.GDC_x86_64;
 	}
 } else
 version (LDC) {
 	version (D_InlineAsm_X86) {
-		version = LDC_ASM_X86;
-		version = LDC_ASM_X86_ANY;
+		enum INLINE_ASM = InlineAsm.LDC_x86;
 	} else version (D_InlineAsm_X86_64) {
-		version = LDC_ASM_X86_64;
-		version = LDC_ASM_X86_ANY;
+		enum INLINE_ASM = InlineAsm.LDC_x86_64;
 	}
-}
-version (GNU_Inline) {
-	version (X86) {
-		version = GDC_ASM_X86;
-		version = GDC_ASM_X86_ANY;
-	} else version (X86_64) {
-		version = GDC_ASM_X86_64;
-		version = GDC_ASM_X86_ANY;
-	}
-}
+} else
+	enum INLINE_ASM = InlineAsm.None;
+
+static if (INLINE_ASM == InlineAsm.DMD_x86)
+	enum INLINE_ASM_STRING = "dmd-x86";
+else static if (INLINE_ASM == InlineAsm.DMD_x86_64)
+	enum INLINE_ASM_STRING = "dmd-x86_64";
+else static if (INLINE_ASM == InlineAsm.GDC_x86)
+	enum INLINE_ASM_STRING = "gdc-x86";
+else static if (INLINE_ASM == InlineAsm.GDC_x86_64)
+	enum INLINE_ASM_STRING = "gdc-x86_64";
+else static if (INLINE_ASM == InlineAsm.LDC_x86)
+	enum INLINE_ASM_STRING = "ldc-x86";
+else static if (INLINE_ASM == InlineAsm.LDC_x86_64)
+	enum INLINE_ASM_STRING = "ldc-x86_64";
+else
+	enum INLINE_ASM_STRING = "none";
 
 //
 // ANCHOR External functions
 //
 
 /**
- * Get library version string
- * Returns: version-buildtype-platform string
+ * Get compilation information structure.
+ * Returns: AdbgInfo structure pointer
  */
-const(char) *adbg_info_version() {
-	return ADBG_VERSION ~ "-" ~ __BUILDTYPE__ ~ "-" ~ TARGET_PLATFORM;
-}
-/**
- * Get library compilation platform
- * Returns: TARGET_PLATFORM string
- */
-const(char) *adbg_info_platform() {
-	return TARGET_PLATFORM;
-}
-/**
- * Get library compilation crt
- * Returns: TARGET_CRT string
- */
-const(char) *adbg_info_crt() {
-	return TARGET_CRT;
-}
-/**
- * Get library compilation os
- * Returns: TARGET_OS string
- */
-const(char) *adbg_info_os() {
-	return TARGET_OS;
+immutable(adbg_info_t)* adbg_info() {
+	immutable static adbg_info_t info;
+	return &info;
 }

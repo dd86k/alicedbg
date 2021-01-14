@@ -1,8 +1,12 @@
-/// Windows Defenitions
-///
-/// This is in a separate module to aid exporting "headers".
-/// Publicly imports core.sys.windows.windef.
-module adbg.os.windows.def;
+/**
+ * Windows Defenitions
+ *
+ * This is in a separate module to aid exporting "headers".
+ * Publicly imports core.sys.windows.windef.
+ *
+ * License: BSD 3-clause
+ */
+module adbg.sys.windows.def;
 
 public import core.sys.windows.windef;
 

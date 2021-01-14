@@ -3,15 +3,15 @@
  *
  * License: BSD 3-clause
  */
-module adbg.ui.loop;
+module debugger.ui.loop;
 
 import adbg.etc.c;
-import adbg.debugger, adbg.os.err : ERR_FMT;
+import adbg.debugger, adbg.sys.err : ERR_FMT;
 import adbg.disasm;
-import adbg.os.term;
+import adbg.sys.term;
 import core.stdc.stdio : printf, puts;
 import core.stdc.string : memcpy;
-import adbg.ui.common;
+import debugger.common;
 
 extern (C):
 
@@ -39,7 +39,7 @@ int adbg_ui_loop_handler(exception_t *e) {
 	// * Print disassembly, if available
 	if (e.faultaddr) {
 		g_disparams.a = e.faultaddr;
-		if (adbg_dasm_line(&g_disparams, DisasmMode.File) == 0) {
+		if (adbg_disasm(&g_disparams, DisasmMode.File) == 0) {
 			printf("> %p: %s| %s\n",
 				e.faultaddr, g_disparams.mcbuf.ptr, g_disparams.mnbuf.ptr);
 		}

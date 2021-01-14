@@ -19,7 +19,7 @@
  *
  * License: BSD 3-clause
  */
-module adbg.os.setjmp;
+module adbg.sys.setjmp;
 
 private import core.stdc.config : c_long;
 

@@ -3,7 +3,7 @@
  *
  * License: BSD 3-clause
  */
-module adbg.os.term;
+module adbg.sys.term;
 
 private import core.stdc.stdio;
 private import core.stdc.stdlib;
@@ -72,6 +72,12 @@ version (Posix) {
 private
 void function(ushort,ushort) adbg_term_resize_handler;
 
+enum TermConfig {
+	ReadlineNoReturn = 1 << 0,
+}
+
+private int term_config; // default to 0
+
 //
 // ANCHOR Initiation
 //
@@ -114,6 +120,10 @@ int adbg_term_tui_init() {
 			return 4;
 	}
 	return 0;
+}
+
+void adbg_term_config(int flags) {
+	term_config = flags;
 }
 
 /// Restore console buffer
@@ -456,7 +466,7 @@ void adbg_term_read(InputInfo *ii) {
 		}
 
 L_DEFAULT:
-		ii.key.keyCode = cast(ushort)c;
+		ii.key.keyCode = cast(Key)c;
 
 L_END:
 		tcsetattr(STDIN_FILENO,TCSANOW, &old_tio);
@@ -486,8 +496,13 @@ L_READKEY:
 		}
 		break;
 	case Enter:
-		putchar('\n');
-		buffer[len] = 0;
+		if (term_config & TermConfig.ReadlineNoReturn) {
+			buffer[len] = 0;
+		} else {
+			putchar('\n');
+			buffer[++len] = '\n';
+			buffer[len+1] = 0;
+		}
 		return len;
 	default:
 		char c = input.key.keyChar;

@@ -3,11 +3,11 @@
  *
  * License: BSD 3-clause
  */
-module adbg.os.seh;
+module adbg.sys.seh;
 
 version (Windows) {
-	public import adbg.os.windows.seh;
+	public import adbg.sys.windows.seh;
 } else
 version (Posix) {
-	public import adbg.os.posix.seh;
+	public import adbg.sys.posix.seh;
 }

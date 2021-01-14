@@ -1,3 +1,6 @@
+/**
+ * License: BSD 3-clause
+ */
 module adbg.debugger.context;
 
 version (Windows) {

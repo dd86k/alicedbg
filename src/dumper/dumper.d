@@ -3,16 +3,18 @@
  *
  * License: BSD 3-clause
  */
-module adbg.dumper.dumper;
+module dumper.dumper;
 
 import core.stdc.stdio;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
-import adbg.disasm, adbg.dumper.objs;
+import adbg.disasm, adbg.obj;
+import dumper;
 public import adbg.obj.loader;
 
 extern (C):
 
+//TODO: Convert to regular enum DumperShow
 enum {
 	//
 	// Dumper flags
@@ -65,7 +67,7 @@ enum {
 /// 	dp = Disassembler settings
 /// 	flags = Dumper options
 /// Returns: Error code if non-zero
-int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
+int adbg_dump(const(char) *file, disasm_params_t *dp, int flags) {
 	FILE *f = fopen(file, "rb"); // Handles null file pointers
 	if (f == null) {
 		perror("dump");
@@ -88,7 +90,7 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 			return EXIT_FAILURE;
 		}
 
-		return adbg_dmpr_disasm(dp, m, fl, flags);
+		return adbg_dump_disasm(dp, m, fl, flags);
 	}
 
 	// When nothing is set, the default is to show headers
@@ -107,7 +109,7 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 
 	with (ObjType)
 	switch (info.type) {
-	case PE: return adbg_dmpr_print_pe(&info, dp, flags);
+	case PE: return adbg_dump_pe(&info, dp, flags);
 	default:
 		puts("dumper: format not supported");
 		return EXIT_FAILURE;
@@ -124,7 +126,7 @@ int adbg_dmpr_dump(const(char) *file, disasm_params_t *dp, int flags) {
 /// 	size = Data size
 /// 	flags = Configuration flags
 /// Returns: Status code
-int adbg_dmpr_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
+int adbg_dump_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
 	dp.a = data;
 	if (flags & DUMPER_DISASM_STATS) {
 		uint iavg;	/// instruction average size
@@ -132,7 +134,7 @@ int adbg_dmpr_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
 		uint icnt;	/// instruction count
 		uint ills;	/// Number of illegal instructions
 		for (uint i, isize = void; i < size; i += isize) {
-			DisasmError e = cast(DisasmError)adbg_dasm_line(dp, DisasmMode.Size);
+			DisasmError e = cast(DisasmError)adbg_disasm(dp, DisasmMode.Size);
 			isize = cast(uint)(dp.av - dp.la);
 			with (DisasmError)
 			final switch (e) {
@@ -162,7 +164,7 @@ int adbg_dmpr_disasm(disasm_params_t *dp, void* data, uint size, int flags) {
 		);
 	} else {
 		for (uint i; i < size; i += dp.av - dp.la) {
-			DisasmError e = cast(DisasmError)adbg_dasm_line(dp, DisasmMode.File);
+			DisasmError e = cast(DisasmError)adbg_disasm(dp, DisasmMode.File);
 			with (DisasmError)
 			switch (e) {
 			case None, Illegal:
