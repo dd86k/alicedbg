@@ -16,6 +16,7 @@ module adbg.obj.pe;
 
 import core.stdc.stdio, core.stdc.inttypes;
 import core.stdc.string : memset;
+import adbg.error;
 import adbg.obj.loader : obj_info_t, ObjType;
 import adbg.disasm.disasm : AdbgDisasmPlatform; // ISA translation
 import adbg.obj.loader;
@@ -634,7 +635,7 @@ int adbg_obj_pe_load(obj_info_t *info, int flags) {
 		info.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDRROM);
 		info.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDRROM);
 		break;
-	default: return ObjError.FormatUnsupported;
+	default: return adbg_error_set(AdbgError.unsupportedObjFormat);
 	}
 	uint secs = info.pe.hdr.NumberOfSections;
 	info.pe.fo_imports = 0;

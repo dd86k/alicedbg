@@ -161,7 +161,8 @@ struct adbg_disasm_t { align(1):
 	fswap64 si64;	/// Used internally
 }
 
-//TODO: int adbg_disasm_setup(adbg_disasm_t *p, int options, AdbgDisasmPlatform isa, AdbgDisasmSyntax syntax)
+//TODO: Consider making a 'diasm setup' function
+//      int adbg_disasm_setup(adbg_disasm_t *p, int f, AdbgDisasmPlatform p, AdbgDisasmSyntax s)
 //      Initiate function pointers (isa and fswap)
 //      Set value for .syntax field
 //      + Setup options and functions once
@@ -181,7 +182,11 @@ struct adbg_disasm_t { align(1):
  * Returns: Error code; Non-zero indicating an error
  */
 int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
-	if (p == null || p.a == null) {
+	if (p == null) {
+		p.mcbuf[0] = 0;
+		return p.error = adbg_error_set(AdbgError.nullArgument);
+	}
+	if (p.a == null) {
 		p.mcbuf[0] = 0;
 		return p.error = adbg_error_set(AdbgError.nullAddress);
 	}
@@ -202,6 +207,7 @@ int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	if (p.platform == AdbgDisasmPlatform.native)
 		p.platform = DISASM_DEFAULT_ISA;
 
+	//TODO: function table
 	with (AdbgDisasmPlatform)
 	switch (p.platform) {
 	case x86_16, x86, x86_64:

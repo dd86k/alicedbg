@@ -99,10 +99,9 @@ int adbg_dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 		flags |= DUMPER_SHOW_HEADER;
 
 	obj_info_t info = void;
-	ObjError e = cast(ObjError)adbg_obj_load(&info, f, 0);
-	if (e) {
-		printf("loader: %s\n", adbg_obj_errmsg(e));
-		return e;
+	if (adbg_obj_load(&info, f, 0)) {
+		printf("loader: %s\n", adbg_error_message);
+		return adbg_error;
 	}
 
 	if (dp.platform == AdbgDisasmPlatform.native)
@@ -117,9 +116,9 @@ int adbg_dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 	}
 }
 
-// NOTE: A FILE* could be passed, but Windows bindings often do not correspond
-//       to their CRT equivalent, so this is hard-wired to stdout, since this
-//       is only for the dumping functionality.
+// NOTE: Normally, a FILE* parameter could be passed, but the Windows bindings
+//       often do not correspond to their CRT equivalent, so this is hard-wired
+//       to stdout, since this is only for the dumping functionality.
 /// Disassemble data to stdout
 /// Params:
 /// 	dp = Disassembler parameters

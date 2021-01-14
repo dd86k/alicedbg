@@ -17,8 +17,9 @@
 module adbg.obj.loader;
 
 import core.stdc.stdio;
+import adbg.error;
 import adbg.disasm.disasm : AdbgDisasmPlatform, adbg_disasm_msb;
-import adbg.obj.pe, adbg.sys.err;
+import adbg.obj.pe;
 
 extern (C):
 
@@ -38,6 +39,7 @@ extern (C):
 }*/
 
 /// File operation error code
+deprecated
 enum ObjError {
 	/// Operating was a success, so no error occurred
 	None,
@@ -176,7 +178,7 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 	import core.stdc.stdlib : malloc;
 
 	if (file == null)
-		return ObjError.FileOperation;
+		return adbg_error_set(AdbgError.nullArgument);
 
 	info.handle = file;
 	info.oflags = flags;
@@ -184,20 +186,20 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 	// File size
 
 	if (fseek(info.handle, 0, SEEK_END))
-		return ObjError.FileOperation;
+		return adbg_error_crt;
 	info.size = cast(uint)ftell(info.handle);
 	if (info.size == 0xFFFF_FFFF) // -1
-		return ObjError.FileOperation;
+		return adbg_error_crt;
 	if (fseek(info.handle, 0, SEEK_SET))
-		return ObjError.FileOperation;
+		return adbg_error_crt;
 
 	// Allocate and read
 
 	info.b = malloc(info.size);
 	if (info.b == null)
-		return ObjError.FileOperation;
+		return adbg_error_crt;
 	if (fread(info.b, info.size, 1, info.handle) == 0)
-		return ObjError.FileOperation;
+		return adbg_error_crt;
 
 	// Auto-detection
 
@@ -208,31 +210,31 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 	case SIG_MZ:
 		uint hdrloc = *(info.bi32 + 15); // 0x3c / 4
 		if (hdrloc == 0)
-			return ObjError.FileOperation;
+			return adbg_error_crt;
 		if (hdrloc >= info.size - 4)
-			return ObjError.FileOperation;
+			return adbg_error_crt;
 		sig.u32 = *cast(uint*)(info.b + hdrloc);
 		switch (sig.u16[0]) {
 		case SIG_PE:
 			if (sig.u16[1]) // "PE\0\0"
-				return ObjError.FormatUnsupported;
+				return adbg_error_set(AdbgError.unsupportedObjFormat);
 			info.type = ObjType.PE;
 			info.offset = hdrloc;
 			e = adbg_obj_pe_load(info, flags);
 			break;
 		default: // MZ
-			return ObjError.FormatUnsupported;
+			return adbg_error_set(AdbgError.unsupportedObjFormat);
 		}
 		break;
 	default:
-		return ObjError.FormatUnsupported;
+		return adbg_error_set(AdbgError.unsupportedObjFormat);
 	}
 
 	if (e) return e;
 
 	info.internal = adbg_disasm_msb(info.platform); // ISA translation
 
-	return ObjError.None;
+	return AdbgError.none;
 }
 
 //TODO: adbg_obj_unload
@@ -249,19 +251,6 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 
 //TODO: int adbg_obj_src_line(source_t *?)
 //      Return line of source code
-
-/// Return a short error message for an ObjError.
-/// Params: err = ObjError number
-/// Returns: String
-const(char) *adbg_obj_errmsg(ObjError err) {
-	with (ObjError)
-	final switch (err) {
-	case None:	return "None";
-	case FileOperation:	return "Could not read, seek, or write to file";
-	case FormatUnsupported:	return "Unsupported format";
-	case Unavailable:	return "Unavailable";
-	}
-}
 
 private:
 

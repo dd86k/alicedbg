@@ -8,80 +8,72 @@ __gshared:
 
 // NOTE: Work in progress
 
-private template ERR(
-	ushort E,
-	AdbgEModule M = AdbgEModule,
-	AdbgESeverity S = AdbgESeverity.info) {
-	enum ERR = (M << 24) | (S << 16) | E;
-}
-
 private enum modshift = 16;
 
-private enum AdbgEModule : ubyte {
-	Debugger,
-	Disassembler,
-	Object,
-	Utilities,
+private enum AdbgESource : ubyte {
+	self,
+	crt,
+	system,
 }
-private enum AdbgESeverity : ubyte {
-	trace,
-	debug_,
-	info,
-	warning,
-	error,
-	fatal,
-}
+
 /// Error
 enum AdbgError {
 	none,
-	nullAddress = ERR!(1, AdbgEModule.Debugger, AdbgESeverity.error),
-	unsupportedPlatform = ERR!(2, AdbgEModule.Debugger, AdbgESeverity.error),
-	illegalInstruction = ERR!(3, AdbgEModule.Debugger, AdbgESeverity.error),
+	nullArgument,
+	nullAddress,
+	unsupportedPlatform,
+	illegalInstruction,
+	unsupportedObjFormat
 }
 
 private struct adbg_error_t {
-	alias syscode this;
 	union {
 		int syscode;
-		public struct {
-			AdbgEModule mod;
-			ubyte meta; // severity
-			ushort err;
-		}
+		AdbgError code;
 	}
-	align(4) bool system;
-	debug int line;
-	debug const(char) *file;
+	AdbgESource source;
+//	debug int line;
+//	debug const(char) *file;
 }
 private __gshared adbg_error_t lasterror;
 
+int adbg_error() {
+	return lasterror.syscode;
+}
+
 //TODO: debug template with const(char) *f = __FILE__, int l = __LINE__
 int adbg_error_set(AdbgError e) {
-	lasterror.system = false;
-	lasterror.syscode = e;
-	return lasterror.syscode;
+	lasterror.source = AdbgESource.self;
+	return lasterror.syscode = e;
 }
 
 int adbg_error_sys() {
 	import adbg.sys.err : adbg_sys_errno;
-	lasterror.system = true;
+	lasterror.source = AdbgESource.system;
+	return lasterror.syscode = adbg_sys_errno;
+}
+int adbg_error_crt() {
+	import adbg.sys.err : adbg_sys_errno;
+	lasterror.source = AdbgESource.crt;
 	return lasterror.syscode = adbg_sys_errno;
 }
 
 const(char)* adbg_error_message() {
 	import adbg.sys.err : adbg_sys_error;
 	
-	if (lasterror.system)
+	with (AdbgESource)
+	final switch (lasterror.source) {
+	case self:
+		with (AdbgError)
+		final switch (lasterror.code) {
+		case nullArgument: return "Parameter is null";
+		case nullAddress: return "Address is null";
+		case unsupportedObjFormat: return "Unsupported object format";
+		case unsupportedPlatform: return "Platforn not supported";
+		case illegalInstruction: return "Illegal instruction encoding";
+		case none: return "no error";
+		}
+	case crt, system:
 		return adbg_sys_error(lasterror.syscode);
-	
-	with (AdbgError)
-	switch (lasterror.syscode) {
-	// disassembler
-	case nullAddress: return "Parameter is null";
-	case unsupportedPlatform: return "Platforn not supported";
-	case illegalInstruction: return "Illegal instruction encoding";
-	// etc
-	case none: return "no error";
-	default: return "unknown error";
 	}
 }
