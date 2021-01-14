@@ -127,7 +127,7 @@ uint adbg_util_bswap32(uint v) pure nothrow @nogc {
 /// Only LDC is able to pick this up as BSWAP.
 /// If x86 inline assembly is available, DMD uses the BSWAP instruction.
 ulong adbg_util_bswap64(ulong v) pure nothrow @nogc {
-	version (DMD_ASM_X86) {
+	static if (IN_ASM == InlineAsm.DMD_x86) {
 		asm pure nothrow @nogc {
 			lea EDI, v;
 			mov EAX, [EDI];
@@ -138,7 +138,7 @@ ulong adbg_util_bswap64(ulong v) pure nothrow @nogc {
 			mov [EDI], EDX;
 		}
 		return v;
-	} else version (DMD_ASM_X86_64) {
+	} else static if (IN_ASM == InlineAsm.DMD_x86_64) {
 		asm pure nothrow @nogc {
 			mov RAX, v;
 			bswap RAX;

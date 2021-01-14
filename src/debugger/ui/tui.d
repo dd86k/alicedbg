@@ -6,6 +6,7 @@
 module debugger.ui.tui;
 
 import core.stdc.stdio, core.stdc.string : memcpy;
+import adbg.error;
 import adbg.sys.term;
 import adbg.debugger;
 import adbg.disasm;
@@ -94,7 +95,7 @@ int adbg_ui_tui_handler(exception_t *e) {
 	const uint ihmax = tui_size.height - 2;
 	// On-point
 	adbg_term_curpos(0, h);
-	if (adbg_disasm(&g_disparams, AdbgDisasmMode.File) == AdbgDisasmError.None)
+	if (adbg_disasm(&g_disparams, AdbgDisasmMode.File) == AdbgError.none)
 		adbg_term_tui_writef("> %zX %-20s %s",
 			g_disparams.la, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	// forward

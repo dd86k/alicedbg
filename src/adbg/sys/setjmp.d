@@ -1,18 +1,14 @@
 /**
  * setjmp.h wrapper binding to the C runtime.
  *
- * This brings back the setjmp wrapper that D once had at std.c.setjmp (~v0.91,
- * found at https://forum.dlang.org/post/c7fb8q$25oi$1@digitaldaemon.com),
- * which should of been at core.stdc.setjmp by now, but is nowhere to be found.
- * In fact, there are bindings in core.stdc.posix.setjmp, so recent that it
- * includes RISC-V, but alas, no Windows version to be found.
+ * While there are bindings for posix (core.sys.posix.setjmp), there are none
+ * for Windows.
  *
- * What's more scary is that, upon downloading the old 0.9x archives held
- * nothing for a std.c.setjmp module.
+ * NOTE: Works on win32-x86_mscoff. Crashes on win32-x86_omf and win64-x86_64
  * 
  * Windows reference:
- * - "[VisualStudio]\VC\Tools\MSVC\14.15.26726\include\setjmp.h"
- * - "[VisualStudio]\VC\Tools\MSVC\14.16.27023\include\setjmp.h"
+ * - "{VisualStudio}\VC\Tools\MSVC\14.15.26726\include\setjmp.h"
+ * - "{VisualStudio}\VC\Tools\MSVC\14.16.27023\include\setjmp.h"
  * Glibc reference:
  * - jmp_buf structures: sysdeps/{arch}/jmpbuf-offsets.h
  * - jmp_buf definitions: sysdeps/{arch}/bits/setjmp.h
@@ -25,29 +21,34 @@ private import core.stdc.config : c_long;
 
 extern (C):
 
-version (Windows) { // 14.15
+version (Windows) {
 	version (X86) {
+		//TODO: Get DigitalMars definitions (CRuntime_DigitalMars + x86_omf)
+		//      Access violation in _local_unwind
 		enum _JBLEN = 16;
 		alias int _JBTYPE;
 
-		struct __JUMP_BUFFER {
+		struct _JUMP_BUFFER {
 			c_long Ebp, Ebx, Edi, Esi, Esp, Eip, Registration,
 				TryLevel, Cookie, UnwindFunc;
 			c_long [6]UnwindData;
 		}
 	} else
 	version (X86_64) {
+		//TODO: Fix C0000028 (__chkstk) issue
+		//      "An invalid or unaligned stack was encountered during
+		//      an unwind operation."
 		enum _JBLEN = 16;
 		alias _SETJMP_FLOAT128 _JBTYPE;
 
-		struct _SETJMP_FLOAT128 { align(16):
+		struct _SETJMP_FLOAT128 {
 			ulong [2]Part;
 		}
 
 		struct _JUMP_BUFFER {
 			ulong Frame, Rbx, Rsp, Rbp, Rsi, Rdi,
 				R12, R13, R14, R15, Rip;
-			uint MxCsr;
+			c_long MxCsr;
 			ushort FpCsr;
 			ushort Spare;
 			_SETJMP_FLOAT128 Xmm6, Xmm7, Xmm8, Xmm9, Xmm10,
@@ -83,7 +84,8 @@ version (Windows) { // 14.15
 	static assert(0, "Missing setjmp definitions (Windows)");
 
 	// typedef _JBTYPE jmp_buf[_JBLEN];
-	public alias _JBTYPE[_JBLEN] jmp_buf;
+	//public alias _JBTYPE[_JBLEN] jmp_buf;
+	public alias _JUMP_BUFFER jmp_buf;
 } else
 version (CRuntime_Glibc) { // 2.25
 	version (X86) {
@@ -100,7 +102,7 @@ version (CRuntime_Glibc) { // 2.25
 		}
 
 		// __extension__ typedef long long int __jmp_buf[8];
-		public alias ulong[8] jmp_buf;
+		public alias __jmp_buf jmp_buf;
 	} else
 	version (ARM) {
 		// NOTE: Glibc sysdeps/arm/jmpbuf-unwind.h DOESN'T define a structure
@@ -158,16 +160,17 @@ version (CRuntime_Musl) { // 1.20
 } else
 static assert(0, "Missing setjmp definitions");
 
-int setjmp(ref jmp_buf e);
-void longjmp(ref jmp_buf e, int s);
+int setjmp(ref jmp_buf);
+void longjmp(ref jmp_buf, int);
 
+version (none)
 unittest {
 	jmp_buf j = void;
 	int e = setjmp(j);
 	if (e) {
-		assert(e == 0xdd);
+		assert(e == 0xdd, "e != 0xdd");
 	} else {
 		longjmp(j, 0xdd);
-		assert(0);
+		assert(0, "longjmp");
 	}
 }

@@ -5,6 +5,7 @@
  */
 module adbg.disasm.disasm;
 
+import adbg.error;
 import adbg.disasm.arch;
 import adbg.disasm.formatter;
 import adbg.utils.bit : fswap16, fswap32, fswap64;
@@ -24,15 +25,6 @@ enum AdbgDisasmMode : ubyte {
 	Data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
 	File,	/// Machine code and instruction mnemonics formatting
 	Full	/// (Not implemented) Add comments
-}
-
-/// Disassembler error
-deprecated
-enum AdbgDisasmError : ubyte {
-	None,	/// Nothing to report
-	NullAddress,	/// Address given is null (0)
-	NotSupported,	/// Selected ISA is not currently supported
-	Illegal,	/// Illegal/invalid opcode
 }
 
 /// Disassembler ABI
@@ -135,11 +127,8 @@ struct adbg_disasm_t { align(1):
 	/// Disassembler operating mode. See the AdbgDisasmMode enumeration for
 	/// more details.
 	AdbgDisasmMode mode; // placed first for cache-related performance reasons
-	/// Error code.
-	///
-	/// If this field is non-zero, it indicates a decoding error. See the
-	/// DisasmError enumeration for more details.
-	AdbgDisasmError error;
+	/// Error code
+	int error;
 	/// Disassembling Platform.
 	///
 	/// Instruction set architecture platform to disassemble from. See the
@@ -172,7 +161,7 @@ struct adbg_disasm_t { align(1):
 	fswap64 si64;	/// Used internally
 }
 
-//TODO: int adbg_dasm_setup(adbg_disasm_t *p, int options, AdbgDisasmPlatform isa, AdbgDisasmSyntax syntax)
+//TODO: int adbg_disasm_setup(adbg_disasm_t *p, int options, AdbgDisasmPlatform isa, AdbgDisasmSyntax syntax)
 //      Initiate function pointers (isa and fswap)
 //      Set value for .syntax field
 //      + Setup options and functions once
@@ -192,16 +181,15 @@ struct adbg_disasm_t { align(1):
  * Returns: Error code; Non-zero indicating an error
  */
 int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
-	if (p.a == null) {
-		adbg_dasm_err(p, AdbgDisasmError.NullAddress);
+	if (p == null || p.a == null) {
 		p.mcbuf[0] = 0;
-		return p.error;
+		return p.error = adbg_error_set(AdbgError.nullAddress);
 	}
 
 	bool modefile = mode >= AdbgDisasmMode.File;
 
 	p.mode = mode;
-	p.error = AdbgDisasmError.None;
+	p.error = 0;
 	p.la = p.av;
 
 	if (modefile) {
@@ -217,28 +205,27 @@ int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	with (AdbgDisasmPlatform)
 	switch (p.platform) {
 	case x86_16, x86, x86_64:
-		adbg_dasm_x86(p);
+		adbg_disasm_x86(p);
 		break;
 	case rv32:
-		adbg_dasm_riscv(p);
+		adbg_disasm_riscv(p);
 		break;
 	default:
-		adbg_dasm_err(p, AdbgDisasmError.NotSupported);
 		p.mcbuf[0] = 0;
-		return p.error;
+		return p.error = adbg_error_set(AdbgError.unsupportedPlatform);
 	}
 
 	if (modefile) {
 		if (p.syntax == AdbgDisasmSyntax.Default)
 			p.syntax = DISASM_DEFAULT_SYNTAX;
-		if (p.error == AdbgDisasmError.None)
-			adbg_dasm_render(p);
+		if (p.error == AdbgError.none)
+			adbg_disasm_render(p);
 	}
 
 	return p.error;
 }
 
-//TODO: AdbgDisasmPlatform adbg_dasm_guess(void *p, int size)
+//TODO: AdbgDisasmPlatform adbg_disasm_guess(void *p, int size)
 //      Returns Default if really nothing found or errors
 //      Sets .isa
 //      Score system (On min 50 instructions or before size is reached)
@@ -257,25 +244,11 @@ int adbg_disasm_msb(AdbgDisasmPlatform isa) {
 	}
 }
 
-/// Get a short message for a DisasmError.
-/// Params: e = DisasmError
-/// Returns: String
-deprecated("use adbg.error module instead")
-const(char) *adbg_dasm_errmsg(AdbgDisasmError e) {
-	with (AdbgDisasmError)
-	final switch (e) {
-	case None:	return "None";
-	case NullAddress:	return "Received null address";
-	case NotSupported:	return "Architecture not supported";
-	case Illegal:	return "Illegal instruction";
-	}
-}
-
 // Status: Waiting on _setup function
-//TODO: byte  adbg_dasm_fi8(adbg_disasm_t*)
-//TODO: short adbg_dasm_fi16(adbg_disasm_t*)
-//TODO: int   adbg_dasm_fi32(adbg_disasm_t*)
-//TODO: long  adbg_dasm_fi64(adbg_disasm_t*)
+//TODO: byte  adbg_disasm_fi8(adbg_disasm_t*)
+//TODO: short adbg_disasm_fi16(adbg_disasm_t*)
+//TODO: int   adbg_disasm_fi32(adbg_disasm_t*)
+//TODO: long  adbg_disasm_fi64(adbg_disasm_t*)
 //      Add automatically to machine code buffer
 //      Automatically increment pointer
 //      Use structure fswap functions

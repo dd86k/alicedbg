@@ -5,6 +5,7 @@
  */
 module adbg.disasm.arch.x86;
 
+import adbg.error;
 import adbg.disasm.disasm;
 import adbg.disasm.formatter;
 
@@ -56,7 +57,7 @@ struct x86_internals_t { align(2):
  * Params:
  * 	p = Disassembler parameters
  */
-void adbg_dasm_x86(adbg_disasm_t *p) {
+void adbg_disasm_x86(adbg_disasm_t *p) {
 	x86_internals_t i;
 	p.x86 = &i;
 
@@ -70,120 +71,120 @@ L_CONTINUE:
 	++p.ai8;
 
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_x8(p, p.x86.op);
+		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) { // 1111_1100
 	// 00H-03H, 08H-0BH, 10H-13H, 18-1BH, 20H-23H, 28H-2BH, 30H-33H, 38H-3BH
 	case 0, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38:
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_grp1[p.x86.op >> 3]);
-		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
+			adbg_disasm_push_str(p, x86_T_grp1[p.x86.op >> 3]);
+		adbg_disasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x04: // 04H-07H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
-				adbg_dasm_push_reg(p, "es");
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
+				adbg_disasm_push_reg(p, "es");
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, "add");
-				adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+				adbg_disasm_push_str(p, "add");
+				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
 			if (p.x86.op & X86_FLAG_WIDE)
-				adbg_dasm_x86_u32imm(p);
+				adbg_disasm_x86_u32imm(p);
 			else
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0x0C: // 0CH-0FH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				adbg_dasm_x86_0f(p);
+				adbg_disasm_x86_0f(p);
 			} else {
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_str(p, "push");
-					adbg_dasm_push_reg(p, "cs");
+					adbg_disasm_push_str(p, "push");
+					adbg_disasm_push_reg(p, "cs");
 				}
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, "or");
-				adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+				adbg_disasm_push_str(p, "or");
+				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
 			if (p.x86.op & X86_FLAG_WIDE)
-				adbg_dasm_x86_u32imm(p);
+				adbg_disasm_x86_u32imm(p);
 			else
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0x14: // 14H-17H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
-				adbg_dasm_push_reg(p, "ss");
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
+				adbg_disasm_push_reg(p, "ss");
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, "adc");
-				adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+				adbg_disasm_push_str(p, "adc");
+				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
 			if (p.x86.op & X86_FLAG_WIDE)
-				adbg_dasm_x86_u32imm(p);
+				adbg_disasm_x86_u32imm(p);
 			else
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0x1C: // 1CH-1FH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
-				adbg_dasm_push_reg(p, "ds");
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
+				adbg_disasm_push_reg(p, "ds");
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, "sbb");
-				adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+				adbg_disasm_push_str(p, "sbb");
+				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
 			if (p.x86.op & X86_FLAG_WIDE)
-				adbg_dasm_x86_u32imm(p);
+				adbg_disasm_x86_u32imm(p);
 			else
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0x24: // 24H-27H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.platform == AdbgDisasmPlatform.x86_64) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "daa");
+					adbg_disasm_push_str(p, "daa");
 			} else {
 				p.x86.segreg = x86SegReg.ES;
 				goto L_CONTINUE;
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, "and");
-				adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+				adbg_disasm_push_str(p, "and");
+				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
 			if (p.x86.op & X86_FLAG_WIDE)
-				adbg_dasm_x86_u32imm(p);
+				adbg_disasm_x86_u32imm(p);
 			else
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0x2C: // 2CH-2FH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.platform == AdbgDisasmPlatform.x86_64) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "das");
+					adbg_disasm_push_str(p, "das");
 				
 			} else {
 				p.x86.segreg = x86SegReg.CS;
@@ -191,61 +192,61 @@ L_CONTINUE:
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, "sub");
-				adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+				adbg_disasm_push_str(p, "sub");
+				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
 			if (p.x86.op & X86_FLAG_WIDE)
-				adbg_dasm_x86_u32imm(p);
+				adbg_disasm_x86_u32imm(p);
 			else
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0x34: // 34H-37H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.platform == AdbgDisasmPlatform.x86_64) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "aaa");
+					adbg_disasm_push_str(p, "aaa");
 			} else {
 				p.x86.segreg = x86SegReg.SS;
 				goto L_CONTINUE;
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, "xor");
-				adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+				adbg_disasm_push_str(p, "xor");
+				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
 			if (p.x86.op & X86_FLAG_WIDE)
-				adbg_dasm_x86_u32imm(p);
+				adbg_disasm_x86_u32imm(p);
 			else
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0x3C: // 3CH-3FH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.platform == AdbgDisasmPlatform.x86_64) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "aas");
+					adbg_disasm_push_str(p, "aas");
 			} else {
 				p.x86.segreg = x86SegReg.DS;
 				goto L_CONTINUE;
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, "cmp");
-				adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+				adbg_disasm_push_str(p, "cmp");
+				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
 			if (p.x86.op & X86_FLAG_WIDE)
-				adbg_dasm_x86_u32imm(p);
+				adbg_disasm_x86_u32imm(p);
 			else
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0x40, 0x44, 0x48, 0x4C: // 40H-4FH
@@ -259,17 +260,17 @@ L_CONTINUE:
 			goto L_CONTINUE;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
-			adbg_dasm_push_str(p, p.x86.op >= 0x48 ? "dec" : "inc");
-			adbg_dasm_push_reg(p,
-				adbg_dasm_x86_modrm_reg(p, p.x86.op,
+			adbg_disasm_push_str(p, p.x86.op >= 0x48 ? "dec" : "inc");
+			adbg_disasm_push_reg(p,
+				adbg_disasm_x86_modrm_reg(p, p.x86.op,
 					p.platform == AdbgDisasmPlatform.x86_64 ? MemWidth.i64 : MemWidth.i32));
 		}
 		return;
 	case 0x50, 0x54, 0x58, 0x5C: // 50H-5FH
 		if (p.mode >= AdbgDisasmMode.File) {
-			adbg_dasm_push_str(p, p.x86.op >= 0x58 ? "pop" : "push");
-			adbg_dasm_push_reg(p,
-				adbg_dasm_x86_modrm_reg(p, p.x86.op,
+			adbg_disasm_push_str(p, p.x86.op >= 0x58 ? "pop" : "push");
+			adbg_disasm_push_reg(p,
+				adbg_disasm_x86_modrm_reg(p, p.x86.op,
 					p.platform == AdbgDisasmPlatform.x86_64 ? MemWidth.i64 : MemWidth.i32));
 		}
 		return;
@@ -283,15 +284,15 @@ L_CONTINUE:
 			} else {
 				//TODO: EVEX prefix
 				if (*p.ai8 >= MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				m = "bound";
 				f = X86_FLAG_DIR | X86_FLAG_MODW_32B;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm(p, f);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm(p, f);
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
 				const(char) *m = void;
@@ -299,7 +300,7 @@ L_CONTINUE:
 					m = p.x86.pf_operand ? "popa" : "popad";
 				else
 					m = p.x86.pf_operand ? "pusha" : "pushad";
-				adbg_dasm_push_str(p, m);
+				adbg_disasm_push_str(p, m);
 			}
 		}
 		return;
@@ -317,59 +318,59 @@ L_CONTINUE:
 	case 0x68: // 68H-6BH
 		if (p.x86.op & X86_FLAG_WIDE) {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "imul");
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
+				adbg_disasm_push_str(p, "imul");
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "push");
+				adbg_disasm_push_str(p, "push");
 		}
 		if (p.x86.op & X86_FLAG_DIR)
-			adbg_dasm_x86_u8imm(p);
+			adbg_disasm_x86_u8imm(p);
 		else
-			adbg_dasm_x86_u32imm(p);
+			adbg_disasm_x86_u32imm(p);
 		return;
 	case 0x6C: // 6CH-6FH
 		if (p.mode < AdbgDisasmMode.File)
 			return;
 		MemWidth w = p.x86.op & X86_FLAG_WIDE ? MemWidth.i32 : MemWidth.i8;
 		if (p.x86.op & X86_FLAG_DIR) {
-			adbg_dasm_push_str(p, "outs");
-			adbg_dasm_push_reg(p, "dx");
-			adbg_dasm_push_memsegreg(p, "ds:", p.x86.pf_address ? "si" : "esi", w);
+			adbg_disasm_push_str(p, "outs");
+			adbg_disasm_push_reg(p, "dx");
+			adbg_disasm_push_memsegreg(p, "ds:", p.x86.pf_address ? "si" : "esi", w);
 		} else {
-			adbg_dasm_push_str(p, "ins");
-			adbg_dasm_push_memsegreg(p, "es:", p.x86.pf_address ? "di" : "edi", w);
-			adbg_dasm_push_reg(p, "dx");
+			adbg_disasm_push_str(p, "ins");
+			adbg_disasm_push_memsegreg(p, "es:", p.x86.pf_address ? "di" : "edi", w);
+			adbg_disasm_push_reg(p, "dx");
 		}
 		return;
 	case 0x70, 0x74, 0x78, 0x7C: // 70H-7FH
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_Jcc[p.x86.op & 15]);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, x86_T_Jcc[p.x86.op & 15]);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0x80: // 80H-83H
 		ubyte modrm = *p.ai8;
 		++p.ai8;
 		int w = (p.x86.op & 0b11) != 0b01 ? MemWidth.i8 : MemWidth.i32;
 		if (p.mode >= AdbgDisasmMode.File) {
-			adbg_dasm_push_x8(p, modrm);
-			adbg_dasm_push_str(p, x86_T_grp1[(modrm >> 3) & 7]);
-			adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, modrm, w));
+			adbg_disasm_push_x8(p, modrm);
+			adbg_disasm_push_str(p, x86_T_grp1[(modrm >> 3) & 7]);
+			adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, modrm, w));
 		}
 		if (w == MemWidth.i8)
-			adbg_dasm_x86_u8imm(p);
+			adbg_disasm_x86_u8imm(p);
 		else
-			adbg_dasm_x86_u32imm(p);
+			adbg_disasm_x86_u32imm(p);
 		return;
 	case 0x84: // 84H-87H
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, p.x86.op & X86_FLAG_DIR ? "xchg" : "test");
-		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
+			adbg_disasm_push_str(p, p.x86.op & X86_FLAG_DIR ? "xchg" : "test");
+		adbg_disasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x88: // 88H-8BH
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, "mov");
-		adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
+			adbg_disasm_push_str(p, "mov");
+		adbg_disasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x8C: // 8CH-8FH
 		if (p.x86.op & X86_FLAG_WIDE) {
@@ -378,62 +379,62 @@ L_CONTINUE:
 				++p.ai8;
 				int xop_map = modrm & X86_VEX_MAP;
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_x8(p, modrm);
+					adbg_disasm_push_x8(p, modrm);
 				if (xop_map < 8) {
 					if (modrm & MODRM_REG) {
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
 					if (p.mode >= AdbgDisasmMode.File) {
-						adbg_dasm_push_str(p, "pop");
-						adbg_dasm_push_reg(p,
-							adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i32));
+						adbg_disasm_push_str(p, "pop");
+						adbg_disasm_push_reg(p,
+							adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i32));
 					}
 					return;
 				}
 				// ANCHOR: XOP prefix
 				switch (xop_map) {
-				case X86_VEX_MAP_XOP8:  adbg_dasm_x86_xop_8(p);  return;
-				case X86_VEX_MAP_XOP9:  adbg_dasm_x86_xop_9(p);  return;
-				case X86_VEX_MAP_XOP10: adbg_dasm_x86_xop_10(p); return;
-				default: adbg_dasm_err(p); return;
+				case X86_VEX_MAP_XOP8:  adbg_disasm_x86_xop_8(p);  return;
+				case X86_VEX_MAP_XOP9:  adbg_disasm_x86_xop_9(p);  return;
+				case X86_VEX_MAP_XOP10: adbg_disasm_x86_xop_10(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else { // LEA REG32, MEM32
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "lea");
-				adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
+					adbg_disasm_push_str(p, "lea");
+				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 			}
 		} else {
 			ubyte modrm = *p.ai8;
 			++p.ai8;
 			int sr = (modrm >> 3) & 7;
 			if (sr > 5) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			if (p.mode < AdbgDisasmMode.File)
 				return;
-			adbg_dasm_push_x8(p, modrm);
-			adbg_dasm_push_str(p, "mov");
+			adbg_disasm_push_x8(p, modrm);
+			adbg_disasm_push_str(p, "mov");
 			const(char) *seg = x86_T_segs[sr + 1];
-			const(char) *reg = adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i16);
+			const(char) *reg = adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i16);
 			if (p.x86.op & X86_FLAG_DIR) {
-				adbg_dasm_push_reg(p, seg);
-				adbg_dasm_push_reg(p, reg);
+				adbg_disasm_push_reg(p, seg);
+				adbg_disasm_push_reg(p, reg);
 			} else {
-				adbg_dasm_push_reg(p, reg);
-				adbg_dasm_push_reg(p, seg);
+				adbg_disasm_push_reg(p, reg);
+				adbg_disasm_push_reg(p, seg);
 			}
 		}
 		return;
 	case 0x90, 0x94: // 90H-97H
 		if (p.mode >= AdbgDisasmMode.File) {
 			if (p.x86.op == 0x90) {
-				adbg_dasm_push_str(p, "nop");
+				adbg_disasm_push_str(p, "nop");
 			} else {
-				adbg_dasm_push_str(p, "xchg");
-				adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.op, MemWidth.i32));
-				adbg_dasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
+				adbg_disasm_push_str(p, "xchg");
+				adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, p.x86.op, MemWidth.i32));
+				adbg_disasm_push_reg(p, p.x86.pf_operand ? "ax" : "eax");
 			}
 		}
 		return;
@@ -441,38 +442,38 @@ L_CONTINUE:
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) { // WAIT/FWAIT
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "fwait");
+					adbg_disasm_push_str(p, "fwait");
 			} else { // CALL (FAR)
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "call");
-				adbg_dasm_x86_immfar(p);
+					adbg_disasm_push_str(p, "call");
+				adbg_disasm_x86_immfar(p);
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "cbd" : "cbw");
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "cbd" : "cbw");
 		}
 		return;
 	case 0x9C: // 9CH-9FH
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_9Ch[p.x86.op & 3]);
+			adbg_disasm_push_str(p, x86_T_9Ch[p.x86.op & 3]);
 		return;
 	case 0xA0: // A0H-A3H
 		const(char) *s = void, a = void;
 		if (p.mode >= AdbgDisasmMode.File) {
 			if (p.x86.segreg == x86SegReg.None)
 				p.x86.segreg = x86SegReg.DS;
-			adbg_dasm_push_str(p, "mov");
-			s = adbg_dasm_x86_segstr(p.x86.segreg);
-			a = adbg_dasm_x86_eax(p, p.x86.op);
+			adbg_disasm_push_str(p, "mov");
+			s = adbg_disasm_x86_segstr(p.x86.segreg);
+			a = adbg_disasm_x86_eax(p, p.x86.op);
 		}
 		if (p.x86.op & X86_FLAG_DIR) {
-			adbg_dasm_x86_segimm(p, s);
+			adbg_disasm_x86_segimm(p, s);
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_reg(p, a);
+				adbg_disasm_push_reg(p, a);
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_reg(p, a);
-			adbg_dasm_x86_segimm(p, s);
+				adbg_disasm_push_reg(p, a);
+			adbg_disasm_x86_segimm(p, s);
 		}
 		return;
 	case 0xA4: // A4H-A7H
@@ -498,28 +499,28 @@ L_CONTINUE:
 				reg1 = "edi"; reg2 = "esi";
 			}
 		}
-		MemWidth w = adbg_dasm_x86_modrm_width(p, p.x86.op);
-		adbg_dasm_push_str(p, m);
-		adbg_dasm_push_memsegreg(p, seg1, reg1, w);
-		adbg_dasm_push_memsegreg(p, seg2, reg2, w);
+		MemWidth w = adbg_disasm_x86_modrm_width(p, p.x86.op);
+		adbg_disasm_push_str(p, m);
+		adbg_disasm_push_memsegreg(p, seg1, reg1, w);
+		adbg_disasm_push_memsegreg(p, seg2, reg2, w);
 		return;
 	case 0xA8: // A8H-ABH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode < AdbgDisasmMode.File)
 				return;
 			const(char) *areg = p.x86.pf_address ? "di" : "edi";
-			adbg_dasm_push_str(p, "stos");
-			adbg_dasm_push_memsegreg(p, "es:", areg, adbg_dasm_x86_modrm_width(p, p.x86.op));
-			adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+			adbg_disasm_push_str(p, "stos");
+			adbg_disasm_push_memsegreg(p, "es:", areg, adbg_disasm_x86_modrm_width(p, p.x86.op));
+			adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, "test");
-				adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+				adbg_disasm_push_str(p, "test");
+				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
 			if (p.x86.op & X86_FLAG_WIDE)
-				adbg_dasm_x86_u32imm(p);
+				adbg_disasm_x86_u32imm(p);
 			else
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0xAC: // ACH-AFH
@@ -534,30 +535,30 @@ L_CONTINUE:
 				seg = "ds:";
 				reg = p.x86.pf_operand ? "si" : "esi";
 			}
-			adbg_dasm_push_str(p, m);
-			adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
-			adbg_dasm_push_segreg(p, seg, reg);
+			adbg_disasm_push_str(p, m);
+			adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
+			adbg_disasm_push_segreg(p, seg, reg);
 		}
 		return;
 	case 0xB0, 0xB4, 0xB8, 0xBC: // B0H-BFH
 		int w = p.x86.op & 0b00_001_000;
 		if (p.mode >= AdbgDisasmMode.File) {
-			adbg_dasm_push_str(p, "mov");
-			adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.op,
+			adbg_disasm_push_str(p, "mov");
+			adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, p.x86.op,
 				w ? MemWidth.i32 : MemWidth.i8));
 		}
-		if (w)	adbg_dasm_x86_u32imm(p);
-		else	adbg_dasm_x86_u8imm(p);
+		if (w)	adbg_disasm_x86_u32imm(p);
+		else	adbg_disasm_x86_u8imm(p);
 		return;
 	case 0xC0: // C0H-C3H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "ret");
+				adbg_disasm_push_str(p, "ret");
 			if (p.x86.op & X86_FLAG_WIDE) // RET IMM16
 				return;
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_x16(p, *p.ai16);
-				adbg_dasm_push_imm(p, *p.ai16);
+				adbg_disasm_push_x16(p, *p.ai16);
+				adbg_disasm_push_imm(p, *p.ai16);
 			}
 			++p.ai16;
 		} else { // GRP2 R/M, IMM8
@@ -565,14 +566,14 @@ L_CONTINUE:
 			++p.ai8;
 			const(char) *r = x86_T_grp2[(modrm >> 3) & 7];
 			if (r == null) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, r);
+				adbg_disasm_push_str(p, r);
 			int w = p.x86.op & X86_FLAG_WIDE;
-			adbg_dasm_x86_modrm_rm(p, modrm, w, w);
-			adbg_dasm_x86_u8imm(p);
+			adbg_disasm_x86_modrm_rm(p, modrm, w, w);
+			adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0xC4: // C4H-C7H
@@ -583,30 +584,30 @@ L_CONTINUE:
 			int reg = modrm & MODRM_REG;
 			if (reg == MODRM_REG_111) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, w ? "xbegin" : "xabort");
-				if (w)	adbg_dasm_x86_u32imm(p);
-				else	adbg_dasm_x86_u8imm(p);
+					adbg_disasm_push_str(p, w ? "xbegin" : "xabort");
+				if (w)	adbg_disasm_x86_u32imm(p);
+				else	adbg_disasm_x86_u8imm(p);
 			} else if (reg > 0) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "mov");
-			adbg_dasm_x86_modrm_rm(p, modrm, w, w);
-			if (w)	adbg_dasm_x86_u32imm(p);
-			else	adbg_dasm_x86_u8imm(p);
+				adbg_disasm_push_str(p, "mov");
+			adbg_disasm_x86_modrm_rm(p, modrm, w, w);
+			if (w)	adbg_disasm_x86_u32imm(p);
+			else	adbg_disasm_x86_u8imm(p);
 		} else { // MOD=11 checking is only in x86-32
 			bool x64 = p.platform == AdbgDisasmPlatform.x86_64;
 			if (x64 == false) {
 				if (modrm < MODRM_MOD_11) {
 					if (p.mode >= AdbgDisasmMode.File)
-						adbg_dasm_push_str(p, w ? "lds" : "les");
-					adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
+						adbg_disasm_push_str(p, w ? "lds" : "les");
+					adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 					return;
 				}
 			}
 			if (p.x86.vex32) { // e.g. REX
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			// ANCHOR: VEX prefixes
@@ -615,19 +616,19 @@ L_CONTINUE:
 			int mask = x64 ? 120 : 56;
 			if (w) { // C5H, VEX 2-byte prefix
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_x8(p, modrm);
+					adbg_disasm_push_x8(p, modrm);
 				p.x86.vex_vvvv = cast(ubyte)((~cast(int)modrm & mask) >> 3);
 				p.x86.vex_L    = modrm & 4;
 				p.x86.vex_pp   = modrm & 3;
 				if (x64)
 					p.x86.vex_R = !(modrm & 128);
 				++p.ai8;
-				adbg_dasm_x86_vex_0f(p);
+				adbg_disasm_x86_vex_0f(p);
 			} else { // C4H, VEX 3-byte prefix
 				ubyte u8 = p.x86.vex[2] = *(p.ai8 + 1);
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_x8(p, u8);
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_x8(p, u8);
 				}
 				p.x86.vex_vvvv = cast(ubyte)((~cast(int)u8 & mask) >> 3);
 				p.x86.vex_L    = u8 & 4;
@@ -640,10 +641,10 @@ L_CONTINUE:
 				}
 				++p.ai16;
 				switch (p.x86.vex[1] & X86_VEX_MAP) {
-				case X86_VEX_MAP_0F: adbg_dasm_x86_vex_0f(p); return;
-				case X86_VEX_MAP_0F38: adbg_dasm_x86_vex_0f38(p); return;
-				case X86_VEX_MAP_0F3A: adbg_dasm_x86_vex_0f3a(p); return;
-				default: adbg_dasm_err(p); return;
+				case X86_VEX_MAP_0F: adbg_disasm_x86_vex_0f(p); return;
+				case X86_VEX_MAP_0F38: adbg_disasm_x86_vex_0f38(p); return;
+				case X86_VEX_MAP_0F3A: adbg_disasm_x86_vex_0f3a(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 			return;
@@ -652,25 +653,25 @@ L_CONTINUE:
 	case 0xC8: // C8H-CBH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "ret");
+				adbg_disasm_push_str(p, "ret");
 			if (p.x86.op & X86_FLAG_WIDE)
 				return;
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_x16(p, *p.ai16);
-				adbg_dasm_push_imm(p, *p.ai16);
+				adbg_disasm_push_x16(p, *p.ai16);
+				adbg_disasm_push_imm(p, *p.ai16);
 			}
 			++p.ai16;
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "leave" : "enter");
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "leave" : "enter");
 			if ((p.x86.op & X86_FLAG_WIDE) == 0) {
 				if (p.mode >= AdbgDisasmMode.File) {
 					ushort v1 = *p.ai16;
 					ubyte v2 = *(p.ai8 + 2);
-					adbg_dasm_push_x16(p, v1);
-					adbg_dasm_push_x8(p, v2);
-					adbg_dasm_push_imm(p, v1);
-					adbg_dasm_push_imm(p, v2);
+					adbg_disasm_push_x16(p, v1);
+					adbg_disasm_push_x8(p, v2);
+					adbg_disasm_push_imm(p, v1);
+					adbg_disasm_push_imm(p, v2);
 				}
 				p.av += 3;
 			}
@@ -679,15 +680,15 @@ L_CONTINUE:
 	case 0xCC: // CCH-CFH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "iret" : "into");
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "iret" : "into");
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) { // INT IMM8
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "int");
-				adbg_dasm_x86_u8imm(p);
+					adbg_disasm_push_str(p, "int");
+				adbg_disasm_x86_u8imm(p);
 			} else { // INT3
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "int3");
+					adbg_disasm_push_str(p, "int3");
 			}
 		}
 		return;
@@ -696,30 +697,30 @@ L_CONTINUE:
 		++p.ai8;
 		const(char) *m = x86_T_grp2[(modrm >> 3) & 7];
 		if (m == null) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		int w = p.x86.op & X86_FLAG_WIDE;
-		adbg_dasm_x86_modrm_rm(p, modrm, w, w);
+		adbg_disasm_x86_modrm_rm(p, modrm, w, w);
 		if (p.mode >= AdbgDisasmMode.File) {
 			if (p.x86.op & X86_FLAG_DIR)
-				adbg_dasm_push_reg(p, "cl");
+				adbg_disasm_push_reg(p, "cl");
 			else
-				adbg_dasm_push_imm(p, 1);
+				adbg_disasm_push_imm(p, 1);
 		}
 		return;
 	case 0xD4: // D4H-D7H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "xlat");
-			} else adbg_dasm_err(p);
+					adbg_disasm_push_str(p, "xlat");
+			} else p.error = adbg_error_set(AdbgError.illegalInstruction);
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "aad" : "amm");
-			adbg_dasm_x86_u8imm(p);
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "aad" : "amm");
+			adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0xD8, 0xDC: // D8H-DBH ESCAPE
@@ -729,15 +730,15 @@ L_CONTINUE:
 		switch (p.x86.op & 7) {
 		case 0:	// D8H
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, x86_T_FLT1[(modrm >> 3) & 7]);
+				adbg_disasm_push_str(p, x86_T_FLT1[(modrm >> 3) & 7]);
 			if (modrm > 0xBF) { // operand is FP
 				if (p.mode < AdbgDisasmMode.File)
 					return;
-				adbg_dasm_push_x8(p, modrm);
-				adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
-				adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, modrm & 7));
+				adbg_disasm_push_x8(p, modrm);
+				adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
+				adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, modrm & 7));
 			} else { // operand is memory pointer
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 			}
 			return;
 		case 1:	// D9H
@@ -753,47 +754,47 @@ L_CONTINUE:
 						sti -= 8;
 						m = "fxch";
 					}
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					return;
 				case 0xD0: // FNOP/Reserved
 					if (sti == 0) {
 						if (p.mode >= AdbgDisasmMode.File) {
-							adbg_dasm_push_x8(p, modrm);
-							adbg_dasm_push_str(p, "fnop");
+							adbg_disasm_push_x8(p, modrm);
+							adbg_disasm_push_str(p, "fnop");
 						}
 					} else
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				case 0xE0:
 					m = x86_T_FLT5[sti];
 					if (m == null) {
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
 					if (p.mode >= AdbgDisasmMode.File) {
-						adbg_dasm_push_x8(p, modrm);
-						adbg_dasm_push_str(p, m);
+						adbg_disasm_push_x8(p, modrm);
+						adbg_disasm_push_str(p, m);
 					}
 					return;
 				default: // F0
 					if (p.mode < AdbgDisasmMode.File)
 						return;
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, x86_T_FLT4[sti]);
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, x86_T_FLT4[sti]);
 					return;
 				}
 			} else { // operand is memory pointer
 				m = x86_T_FLT6[(modrm >> 3) & 7];
 				if (m == null) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, m);
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+					adbg_disasm_push_str(p, m);
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 			}
 			return;
 		case 2:	// DAH
@@ -809,10 +810,10 @@ L_CONTINUE:
 						sti -= 8;
 						m = "fcmove";
 					}
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					return;
 				case 0xD0: // FCMOVBE/FCMOVU
 					if (p.mode < AdbgDisasmMode.File)
@@ -823,27 +824,27 @@ L_CONTINUE:
 						sti -= 8;
 						m = "fcmovu";
 					}
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					return;
 				case 0xE0:
 					if (sti == 9) {
 						if (p.mode >= AdbgDisasmMode.File) {
-							adbg_dasm_push_x8(p, modrm);
-							adbg_dasm_push_str(p, "fucompp");
+							adbg_disasm_push_x8(p, modrm);
+							adbg_disasm_push_str(p, "fucompp");
 						}
 						return;
 					}
 					goto default;
 				default: // 0xF0:
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 				}
 			} else { // operand is memory pointer
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, x86_T_FLT2[(modrm >> 3) & 7]);
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+					adbg_disasm_push_str(p, x86_T_FLT2[(modrm >> 3) & 7]);
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 			}
 			return;
 		case 3:	// DBH
@@ -859,10 +860,10 @@ L_CONTINUE:
 						sti -= 8;
 						m = "fcmovne";
 					}
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					break;
 				case 0xD0: // FCMOVNBE/FCMOVNU
 					if (p.mode < AdbgDisasmMode.File)
@@ -873,69 +874,69 @@ L_CONTINUE:
 						sti -= 8;
 						m = "fcmovnu";
 					}
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					break;
 				case 0xE0: // */FUCOMI
 					if (sti < 0x8) { // FCMOVNBE
 						switch (sti) {
 						case 1: m = "fclex"; break;
 						case 2: m = "finit"; break;
-						default: adbg_dasm_err(p); return;
+						default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 						}
 						if (p.mode >= AdbgDisasmMode.File)
-							adbg_dasm_push_str(p, m);
+							adbg_disasm_push_str(p, m);
 					} else { // FUCOMI
 						if (p.mode >= AdbgDisasmMode.File) {
 							sti -= 8;
-							adbg_dasm_push_x8(p, modrm);
-							adbg_dasm_push_str(p, "fucomi");
-							adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
-							adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+							adbg_disasm_push_x8(p, modrm);
+							adbg_disasm_push_str(p, "fucomi");
+							adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
+							adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 						}
 					}
 					return;
 				default: // (F0) FCOMI/Reserved
 					if (sti < 0x8) { // FCOMI
-						adbg_dasm_push_x8(p, modrm);
-						adbg_dasm_push_str(p, "fcomi");
-						adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
-						adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+						adbg_disasm_push_x8(p, modrm);
+						adbg_disasm_push_str(p, "fcomi");
+						adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
+						adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					} else { // Reserved
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 					}
 					return;
 				}
 			} else { // operand is memory pointer
 				m = x86_T_FLT7[(modrm >> 3) & 7];
 				if (m == null) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, m);
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+					adbg_disasm_push_str(p, m);
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 			}
 			return;
 		case 4:	// DCH
 			if (modrm > 0xBF) { // operand is FP
 				int reg = modrm & MODRM_REG;
 				if (reg == MODRM_REG_010 || reg == MODRM_REG_011) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, x86_T_FLT1[reg >> 3]);
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, modrm & 7));
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, x86_T_FLT1[reg >> 3]);
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, modrm & 7));
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
 				}
 			} else { // operand is memory pointer
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, x86_T_FLT1[(modrm >> 3) & 7]);
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
+					adbg_disasm_push_str(p, x86_T_FLT1[(modrm >> 3) & 7]);
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
 			}
 			return;
 		case 5:	// DDH
@@ -945,12 +946,12 @@ L_CONTINUE:
 				case 0xC0: // FFREE/Reserved
 					if (sti < 0x8) { // FFREE
 						if (p.mode >= AdbgDisasmMode.File) {
-							adbg_dasm_push_x8(p, modrm);
-							adbg_dasm_push_str(p, "ffree");
-							adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+							adbg_disasm_push_x8(p, modrm);
+							adbg_disasm_push_str(p, "ffree");
+							adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 						}
 					} else { // Reserved
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 					}
 					return;
 				case 0xD0: // FST/FSTP
@@ -962,37 +963,37 @@ L_CONTINUE:
 						sti -= 8;
 						m = "fstp";
 					}
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					return;
 				case 0xE0: // FUCOM/FUCOMP
 					if (p.mode < AdbgDisasmMode.File)
 						return;
-					adbg_dasm_push_x8(p, modrm);
+					adbg_disasm_push_x8(p, modrm);
 					if (sti < 0x8) { // FUCOM
-						adbg_dasm_push_str(p, "fucom");
-						adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
-						adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
+						adbg_disasm_push_str(p, "fucom");
+						adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
+						adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
 					} else { // FUCOMP
 						sti -= 8;
-						adbg_dasm_push_str(p, "fucomp");
-						adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+						adbg_disasm_push_str(p, "fucomp");
+						adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					}
 					return;
 				default: // 0xF0
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 			} else { // operand is memory pointer
 				m = x86_T_FLT8[(modrm >> 3) & 7];
 				if (m == null) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, m);
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
+					adbg_disasm_push_str(p, m);
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
 				return;
 			}
 		case 6:	// DEH
@@ -1010,11 +1011,11 @@ L_CONTINUE:
 				case 0xD0: // Reserved/FCOMPP*
 					if (sti == 9) {
 						if (p.mode >= AdbgDisasmMode.File) {
-							adbg_dasm_push_x8(p, modrm);
-							adbg_dasm_push_str(p, "fcompp");
+							adbg_disasm_push_x8(p, modrm);
+							adbg_disasm_push_str(p, "fcompp");
 						}
 					} else
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				case 0xE0: // FSUBRP/FSUBP
 					if (sti < 0x8) { // FSUBP
@@ -1034,15 +1035,15 @@ L_CONTINUE:
 					break;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
-					adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
+					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
 				}
 			} else { // operand is memory pointer
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, x86_T_FLT2[(modrm >> 3) & 7]);
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i16);
+					adbg_disasm_push_str(p, x86_T_FLT2[(modrm >> 3) & 7]);
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i16);
 			}
 			return;
 		default:	// DFH
@@ -1051,108 +1052,108 @@ L_CONTINUE:
 				switch (modrm & 0xF0) {
 				case 0xC0:
 					if (sti < 8) { // (Undocumented)
-						adbg_dasm_push_x8(p, modrm);
-						adbg_dasm_push_str(p, "ffreep");
-						adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+						adbg_disasm_push_x8(p, modrm);
+						adbg_disasm_push_str(p, "ffreep");
+						adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					} else {
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 					}
 					return;
 				case 0xE0: // FSTSW*/FUCOMIP
 					if (sti < 0x8) { // FSUBP
 						if (sti == 0) {
 							if (p.mode >= AdbgDisasmMode.File) {
-								adbg_dasm_push_x8(p, modrm);
-								adbg_dasm_push_str(p, "fstsw");
-								adbg_dasm_push_reg(p, "ax");
+								adbg_disasm_push_x8(p, modrm);
+								adbg_disasm_push_str(p, "fstsw");
+								adbg_disasm_push_reg(p, "ax");
 							}
 						} else
-							adbg_dasm_err(p);
+							p.error = adbg_error_set(AdbgError.illegalInstruction);
 					} else { // FUCOMIP
 						if (p.mode < AdbgDisasmMode.File)
 							return;
 						sti -= 8;
-						adbg_dasm_push_x8(p, modrm);
-						adbg_dasm_push_str(p, "fstsw");
-						adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
-						adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+						adbg_disasm_push_x8(p, modrm);
+						adbg_disasm_push_str(p, "fstsw");
+						adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
+						adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					}
 					return;
 				case 0xF0: // FCOMIP/Reserved
 					if (sti < 0x8) { // FCOMIP
 						if (p.mode < AdbgDisasmMode.File)
 							return;
-						adbg_dasm_push_x8(p, modrm);
-						adbg_dasm_push_str(p, "fcomip");
-						adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, 0));
-						adbg_dasm_push_str(p, adbg_dasm_x87_ststr(p, sti));
+						adbg_disasm_push_x8(p, modrm);
+						adbg_disasm_push_str(p, "fcomip");
+						adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
+						adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					} // else Reserved
 					goto default;
 				default:
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 				}
 			} else { // operand is memory pointer
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, x86_T_FLT3[(modrm >> 3) & 7]);
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
+					adbg_disasm_push_str(p, x86_T_FLT3[(modrm >> 3) & 7]);
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
 			}
 			return;
 		}
 	case 0xE0: // E0H-E3H
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_E0h[p.x86.op & 3]);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, x86_T_E0h[p.x86.op & 3]);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0xE4: // E4H-E7H
 		const(char) *a = void;
 		if (p.mode >= AdbgDisasmMode.File)
-			a = adbg_dasm_x86_eax(p, p.x86.op);
+			a = adbg_disasm_x86_eax(p, p.x86.op);
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "out");
-			adbg_dasm_x86_u8imm(p);
+				adbg_disasm_push_str(p, "out");
+			adbg_disasm_x86_u8imm(p);
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_reg(p, a);
+				adbg_disasm_push_reg(p, a);
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, "in");
-				adbg_dasm_push_reg(p, a);
+				adbg_disasm_push_str(p, "in");
+				adbg_disasm_push_reg(p, a);
 			}
-			adbg_dasm_x86_u8imm(p);
+			adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0xE8: // E8H-EBH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "jmp");
+				adbg_disasm_push_str(p, "jmp");
 			if (p.x86.op & X86_FLAG_WIDE) {
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 			} else {
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x16(p, *p.ai16);
-					adbg_dasm_push_imm(p, *p.ai16);
+					adbg_disasm_push_x16(p, *p.ai16);
+					adbg_disasm_push_imm(p, *p.ai16);
 				}
 				++p.ai16;
-				adbg_dasm_x86_u32imm(p);
+				adbg_disasm_x86_u32imm(p);
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "jmp" : "call");
-			adbg_dasm_x86_u32imm(p);
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "jmp" : "call");
+			adbg_disasm_x86_u32imm(p);
 		}
 		return;
 	case 0xEC: // ECH-EFH
 		if (p.mode < AdbgDisasmMode.File)
 			return;
-		const(char) *m = adbg_dasm_x86_eax(p, p.x86.op);
+		const(char) *m = adbg_disasm_x86_eax(p, p.x86.op);
 		if (p.x86.op & X86_FLAG_DIR) {
-			adbg_dasm_push_str(p, "out");
-			adbg_dasm_push_reg(p, "dx");
-			adbg_dasm_push_reg(p, m);
+			adbg_disasm_push_str(p, "out");
+			adbg_disasm_push_reg(p, "dx");
+			adbg_disasm_push_reg(p, m);
 		} else {
-			adbg_dasm_push_str(p, "in");
-			adbg_dasm_push_reg(p, m);
-			adbg_dasm_push_reg(p, "dx");
+			adbg_disasm_push_str(p, "in");
+			adbg_disasm_push_reg(p, m);
+			adbg_disasm_push_reg(p, "dx");
 		}
 		return;
 	case 0xF0: // F0H-F3H
@@ -1173,7 +1174,7 @@ L_CONTINUE:
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "int1");
+					adbg_disasm_push_str(p, "int1");
 			} else {
 				p.x86.lock = 0xF0;
 //				if (p.mode >= AdbgDisasmMode.File)
@@ -1189,29 +1190,29 @@ L_CONTINUE:
 			++p.ai8;
 			int mreg = modrm & MODRM_REG;
 			if (mreg == MODRM_REG_001) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, x86_T_F4h[mreg >> 3]);
-			adbg_dasm_x86_modrm_rm(p, modrm, w, w);
+				adbg_disasm_push_str(p, x86_T_F4h[mreg >> 3]);
+			adbg_disasm_x86_modrm_rm(p, modrm, w, w);
 			if (mreg >= MODRM_REG_100) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_reg(p, adbg_dasm_x86_eax(p, p.x86.op));
+					adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			} else if (mreg == MODRM_REG_000) { // TEST RM, IMM8
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, w ? "cmc" : "hlt");
+				adbg_disasm_push_str(p, w ? "cmc" : "hlt");
 		}
 		return;
 	case 0xF8: // F8H-FBH
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_F8h[p.x86.op & 3]);
+			adbg_disasm_push_str(p, x86_T_F8h[p.x86.op & 3]);
 		return;
 	default: // FCH-FFH
-		MemWidth w = adbg_dasm_x86_modrm_width(p, p.x86.op);
+		MemWidth w = adbg_disasm_x86_modrm_width(p, p.x86.op);
 		if (p.x86.op & X86_FLAG_DIR) {
 			ubyte modrm = *p.ai8;
 			++p.ai8;
@@ -1225,21 +1226,21 @@ L_CONTINUE:
 				case MODRM_REG_100: m = "jmp"; break;
 				case MODRM_REG_101: w = MemWidth.far; m = "jmp"; break;
 				case MODRM_REG_110: m = "push"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else { // GRP4
 				switch (modrm & MODRM_REG) {
 				case MODRM_REG_000: m = "inc"; break;
 				case MODRM_REG_001: m = "dec"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm_rm(p, modrm, w, 0);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm_rm(p, modrm, w, 0);
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, w ? "std" : "cld");
+				adbg_disasm_push_str(p, w ? "std" : "cld");
 		}
 		return;
 	}
@@ -1247,19 +1248,19 @@ L_CONTINUE:
 
 package:
 
-void adbg_dasm_x86_0f(adbg_disasm_t *p) {
+void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_x8(p, p.x86.op);
+		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) { // 1111_1100
 	case 0:
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "lsl" : "lar");
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "lsl" : "lar");
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 			return;
 		}
 		ubyte modrm = *p.ai8;
@@ -1277,14 +1278,14 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					case MODRM_RM_010: m = "vmlaunch"; break;
 					case MODRM_RM_011: m = "vmresume"; break;
 					case MODRM_RM_100: m = "vmxoff"; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
 				} else { // SGDT
 					if (p.mode >= AdbgDisasmMode.File)
-						adbg_dasm_push_str(p, "sgdt");
-					adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+						adbg_disasm_push_str(p, "sgdt");
+					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 				return;
 			case MODRM_REG_001:
@@ -1297,14 +1298,14 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					case MODRM_RM_010: m = "clac"; break;
 					case MODRM_RM_011: m = "stac"; break;
 					case MODRM_RM_111: m = "encls"; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
 				} else { // SIDT
 					if (p.mode >= AdbgDisasmMode.File)
-						adbg_dasm_push_str(p, "sidt");
-					adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+						adbg_disasm_push_str(p, "sidt");
+					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 				return;
 			case MODRM_REG_010:
@@ -1318,14 +1319,14 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					case MODRM_RM_101: m = "xend"; break;
 					case MODRM_RM_110: m = "xtest"; break;
 					case MODRM_RM_111: m = "enclu"; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
 				} else { // LGDT
 					if (p.mode >= AdbgDisasmMode.File)
-						adbg_dasm_push_str(p, "lgdt");
-					adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+						adbg_disasm_push_str(p, "lgdt");
+					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 				return;
 			case MODRM_REG_011:
@@ -1342,50 +1343,50 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					case MODRM_RM_110: m = "skinit"; break;
 					default:           m = "invlpga"; break;
 					}
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
 				} else { // LIDT
 					if (p.mode >= AdbgDisasmMode.File)
-						adbg_dasm_push_str(p, "lgdt");
-					adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+						adbg_disasm_push_str(p, "lgdt");
+					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 				return;
 			case MODRM_REG_100: // SMSW
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "smsw");
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+					adbg_disasm_push_str(p, "smsw");
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				return;
 			case MODRM_REG_101: // SERIALIZE/?
 				if (mod11 == false) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, "serialize");
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, "serialize");
 				}
 				return;
 			case MODRM_REG_110: // LMSW
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "lmsw");
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+					adbg_disasm_push_str(p, "lmsw");
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				return;
 			case MODRM_REG_111:
 				if (mod11) { // *
 					if ((modrm & MODRM_RM) == MODRM_RM_001) {
 						if (p.mode >= AdbgDisasmMode.File) {
-							adbg_dasm_push_x8(p, modrm);
-							adbg_dasm_push_str(p, "rdtscp");
+							adbg_disasm_push_x8(p, modrm);
+							adbg_disasm_push_str(p, "rdtscp");
 						}
 					} else
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 				} else { // INVLPG
 					if (p.mode >= AdbgDisasmMode.File)
-						adbg_dasm_push_str(p, "invlpg");
-					adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+						adbg_disasm_push_str(p, "invlpg");
+					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 				return;
-			default: adbg_dasm_err(p);
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction);
 			}
 		} else {
 			const(char) *m = void;
@@ -1396,32 +1397,32 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			case MODRM_REG_011: m = "ltr"; break;
 			case MODRM_REG_100: m = "verr"; break;
 			case MODRM_REG_101: m = "verw"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 		}
 		return;
 	case 0x04: // 04H-07H
 		if (p.x86.op & X86_FLAG_DIR && (p.x86.op & X86_FLAG_WIDE) == 0) { // 06H
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "clts");
+				adbg_disasm_push_str(p, "clts");
 		} else {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 		}
 		return;
 	case 0x08: // 08H-0BH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "ud2");
+					adbg_disasm_push_str(p, "ud2");
 			} else {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "wbinvd" : "invd");
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "wbinvd" : "invd");
 		}
 		return;
 	case 0x0C: // 0CH-0FH
@@ -1429,14 +1430,14 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			ubyte modrm = *p.ai8;
 			++p.ai8;
 			if ((modrm & MODRM_REG) != MODRM_REG_001) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "prefetchw");
-			adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+				adbg_disasm_push_str(p, "prefetchw");
+			adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 		} else {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 		}
 		return;
 	case 0x10: // 10H-13H
@@ -1444,40 +1445,40 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 		if (p.x86.op & X86_FLAG_DIR) {
 			const(char) *m = void;
 			if (p.x86.op & X86_FLAG_WIDE) { // MOVLPS/MOVLPD
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: m = "movlps"; break;
 				case X86_0F_66H: m = "movlpd"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else { // (MOVLPS|MOVHLPS)/MOVSLDUP/MOVLPD/MOVDDUP
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE:
 					m = *p.ai8 >= MODRM_MOD_11 ? "movhlps" : "movlps";
 					break;
 				case X86_0F_66H: m = "movlpd"; break;
 				case X86_0F_F2H: m = "movddup"; break;
 				case X86_0F_F3H: m = "movsldup"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				f |= X86_FLAG_DIR;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm(p, f);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm(p, f);
 			
 		} else {
 			const(char) *m = void;
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: m = "movups"; break;
 			case X86_0F_66H: m = "movupd"; break;
 			case X86_0F_F2H: m = "movsd"; break;
 			case X86_0F_F3H: m = "movss"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
+				adbg_disasm_push_str(p, m);
 			if (p.x86.op & X86_FLAG_WIDE) f |= X86_FLAG_DIR;
-			adbg_dasm_x86_modrm(p, f);
+			adbg_disasm_x86_modrm(p, f);
 		}
 		return;
 	case 0x14: // 14H-17H
@@ -1485,34 +1486,34 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 		int f = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: m = "movhps"; break;
 				case X86_0F_66H: m = "movhpd"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				f = X86_FLAG_MODW_128B;
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE:
 					m = *p.ai8 >= MODRM_MOD_11 ? "movlhps" : "movhps";
 					break;
 				case X86_0F_66H: m = "movhpd"; break;
 				case X86_0F_F3H: m = "movshdup"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 			}
 		} else {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: m = p.x86.op & X86_FLAG_WIDE ? "unpckhps" : "unpcklpd"; break;
 			case X86_0F_66H: m = p.x86.op & X86_FLAG_WIDE ? "unpckhpd" : "unpcklpd"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, f);
 		return;
 	case 0x18: // 18H-1BH
 		ubyte modrm = *p.ai8;
@@ -1524,32 +1525,32 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			case MODRM_REG_001: sr = "bnd1"; break;
 			case MODRM_REG_010: sr = "bnd2"; break;
 			case MODRM_REG_011: sr = "bnd3"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			int mi = adbg_dasm_x86_0f_select(p);
+			int mi = adbg_disasm_x86_0f_select(p);
 			if (mi >= X86_0F_F266H) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			int w = p.x86.op & X86_FLAG_WIDE;
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, x86_T_0F_18h[w][mi]);
+				adbg_disasm_push_str(p, x86_T_0F_18h[w][mi]);
 			if (w) {
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_reg(p, sr);
+					adbg_disasm_push_reg(p, sr);
 			} else {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_reg(p, sr);
-				adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+					adbg_disasm_push_reg(p, sr);
+				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 			}
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			} // GRP 16
 			if (modrm >= MODRM_MOD_11) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			switch (modrm & MODRM_REG) {
@@ -1557,11 +1558,11 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			case MODRM_REG_001: m = "prefetcht0"; break;
 			case MODRM_REG_010: m = "prefetcht1"; break;
 			case MODRM_REG_011: m = "prefetcht2"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 		}
 		return;
 	case 0x1C: // 1CH-1FH
@@ -1569,24 +1570,24 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			ubyte modrm = *p.ai8;
 			++p.ai8;
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "nop");
-			adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+				adbg_disasm_push_str(p, "nop");
+			adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 		} else {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 		}
 		return;
 	case 0x20: // 20H-23H
 		ubyte modrm = *p.ai8;
 		++p.ai8;
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_x8(p, modrm);
+			adbg_disasm_push_x8(p, modrm);
 		if (modrm < MODRM_MOD_11) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode < AdbgDisasmMode.File)
 			return;
-		adbg_dasm_push_str(p, "mov");
+		adbg_disasm_push_str(p, "mov");
 		int r = (modrm & MODRM_REG) >> 3;
 		const(char) *sr = void; // special reg
 		if (p.x86.op & X86_FLAG_WIDE) {
@@ -1595,13 +1596,13 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			if (p.x86.lock) r |= 0b1000;
 			sr = x86_T_CR[r];
 		}
-		const(char) *reg = adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i32);
+		const(char) *reg = adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i32);
 		if (p.x86.op & X86_FLAG_DIR) {
-			adbg_dasm_push_reg(p, sr);
-			adbg_dasm_push_reg(p, reg);
+			adbg_disasm_push_reg(p, sr);
+			adbg_disasm_push_reg(p, reg);
 		} else {
-			adbg_dasm_push_reg(p, reg);
-			adbg_dasm_push_reg(p, sr);
+			adbg_disasm_push_reg(p, reg);
+			adbg_disasm_push_reg(p, sr);
 		}
 		return;
 	case 0x28: // 28H-2BH
@@ -1609,53 +1610,53 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 		int f = X86_FLAG_MODW_128B;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: m = "movntps"; break;
 				case X86_0F_66H: m = "movntpd"; break;
 				case X86_0F_F2H: m = "movntsd"; break; // SSE4a
 				case X86_0F_F3H: m = "movntsd"; break; // SSE4a
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: m = "cvtpi2ps"; break;
 				case X86_0F_66H: m = "cvtpi2pd"; break;
 				case X86_0F_F2H: m = "cvtsi2sd"; break;
 				case X86_0F_F3H: m = "cvtsi2ss"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				f |= X86_FLAG_DIR;
 			}
 		} else {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: m = "movaps"; break;
 			case X86_0F_66H: m = "movapd"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if ((p.x86.op & X86_FLAG_WIDE) == 0)
 				f |= X86_FLAG_DIR;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, f);
 		return;
 	case 0x2C: // 2CH-2FH
 		if (p.x86.op & X86_FLAG_DIR) {
 			const(char) *m = void;
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: m = p.x86.op & X86_FLAG_WIDE ? "comiss" : "ucomiss"; break;
 			case X86_0F_66H: m = p.x86.op & X86_FLAG_WIDE ? "comisd" : "ucomisd"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		} else {
 			ubyte modrm = *p.ai8;
 			++p.a;
 			const(char) *m = void;
 			int w = void;
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE:
 				m = p.x86.op & X86_FLAG_WIDE ? "cvtps2pi" : "cvttps2pi";
 				w = MemWidth.i64;
@@ -1672,13 +1673,13 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 				m = p.x86.op & X86_FLAG_WIDE ? "cvtss2si" : "cvttss2si";
 				w = MemWidth.i32;
 				break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, m);
-				adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, modrm, w));
+				adbg_disasm_push_str(p, m);
+				adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, modrm, w));
 			}
-			adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i128);
+			adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i128);
 		}
 		return;
 	case 0x30: // 30H-33H
@@ -1689,7 +1690,7 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "rdpmc" : "rdmsr";
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "rdtsc" : "wrmsr";
-		adbg_dasm_push_str(p, m);
+		adbg_disasm_push_str(p, m);
 		return;
 	case 0x34: // 34H-37H
 		const(char) *m = void;
@@ -1697,71 +1698,71 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				m = "getsec";
 			} else {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "sysexit" : "sysenter";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		return;
 	case 0x38: // 38H-3BH
 		if (p.x86.op & X86_FLAG_WIDE) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.x86.op & X86_FLAG_DIR)
-			adbg_dasm_x86_0f3a(p);
+			adbg_disasm_x86_0f3a(p);
 		else
-			adbg_dasm_x86_0f38(p);
+			adbg_disasm_x86_0f38(p);
 		return;
 	case 0x40, 0x44, 0x48, 0x4C: // 40H-4FH
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_CMOVcc[p.x86.op & 15]);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
+			adbg_disasm_push_str(p, x86_T_CMOVcc[p.x86.op & 15]);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		return;
 	case 0x50: // 50H-53H
 		const(char) *m = void;
 		if (p.x86.op & X86_FLAG_DIR) {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: m = p.x86.op & X86_FLAG_WIDE ? "rcpps" : "rsqrtps"; break;
 			case X86_0F_F3H: m = p.x86.op & X86_FLAG_WIDE ? "rcpss" : "rsqrtss"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: m = "sqrtps"; break;
 				case X86_0F_66H: m = "sqrtpd"; break;
 				case X86_0F_F2H: m = "sqrtsd"; break;
 				case X86_0F_F3H: m = "sqrtss"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, m);
-				adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+					adbg_disasm_push_str(p, m);
+				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: m = "movmskps"; break;
 				case X86_0F_66H: m = "movmskpd"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				ubyte modrm = *p.ai8;
 				++p.ai8;
 				if (modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i32));
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i128));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i32));
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i128));
 				}
 			}
 		}
@@ -1769,72 +1770,72 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 	case 0x54: // 54H-57H
 		const(char) *m = void;
 		if (p.x86.op & X86_FLAG_DIR) {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: m = p.x86.op & X86_FLAG_WIDE ? "xorps" : "orps"; break;
 			case X86_0F_66H: m = p.x86.op & X86_FLAG_WIDE ? "xorpd" : "orpd"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 		} else {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: m = p.x86.op & X86_FLAG_WIDE ? "andnps" : "andps"; break;
 			case X86_0F_66H: m = p.x86.op & X86_FLAG_WIDE ? "andnpd" : "andpd"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x58: // 58H-5BH
 		const(char) *m = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: m = "cvtdq2ps"; break;
 				case X86_0F_66H: m = "cvtps2dq"; break;
 				case X86_0F_F3H: m = "cvttps2dq"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: m = "cvtps2pd"; break;
 				case X86_0F_66H: m = "cvtpd2ps"; break;
 				case X86_0F_F2H: m = "cvtsd2ss"; break;
 				case X86_0F_F3H: m = "cvtss2sd"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 		} else {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: m = p.x86.op & X86_FLAG_WIDE ? "mulps" : "addps"; break;
 			case X86_0F_66H: m = p.x86.op & X86_FLAG_WIDE ? "mulpd" : "addpd"; break;
 			case X86_0F_F2H: m = p.x86.op & X86_FLAG_WIDE ? "mulsd" : "addsd"; break;
 			case X86_0F_F3H: m = p.x86.op & X86_FLAG_WIDE ? "mulss" : "addss"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x5C: // 5CH-5FH
-		int s = adbg_dasm_x86_0f_select(p);
+		int s = adbg_disasm_x86_0f_select(p);
 		if (s == X86_0F_F266H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
 			s |= (p.x86.op & 3) << 2;
-			adbg_dasm_push_str(p, x86_T_0F_5Ch[s]);
+			adbg_disasm_push_str(p, x86_T_0F_5Ch[s]);
 		}
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x60: // 60H-63H
 		int w = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
 			const(char) *m = void;
@@ -1842,16 +1843,16 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 				m = p.x86.op & X86_FLAG_WIDE ? "packsswb" : "punpckldq";
 			else
 				m = p.x86.op & X86_FLAG_WIDE ? "punpcklwd" : "punpcklbw";
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
-		adbg_dasm_x86_modrm(p, w);
+		adbg_disasm_x86_modrm(p, w);
 		return;
 	case 0x64: // 64H-67H
 		int w = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
 			const(char) *m = void;
@@ -1859,16 +1860,16 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 				m = p.x86.op & X86_FLAG_WIDE ? "packuswb" : "pcmpgtd";
 			else
 				m = p.x86.op & X86_FLAG_WIDE ? "pcmpgtw" : "pcmpgtb";
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
-		adbg_dasm_x86_modrm(p, w);
+		adbg_disasm_x86_modrm(p, w);
 		return;
 	case 0x68: // 68H-6BH
 		int w = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
 			const(char) *m = void;
@@ -1876,16 +1877,16 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 				m = p.x86.op & X86_FLAG_WIDE ? "packssdw" : "punpckhdq";
 			else
 				m = p.x86.op & X86_FLAG_WIDE ? "punpckhwd" : "punpckhbw";
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
-		adbg_dasm_x86_modrm(p, w);
+		adbg_disasm_x86_modrm(p, w);
 		return;
 	case 0x6C: // 6CH-6FH
 		const(char) *m = void;
 		int w = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE:
 					m = "movq";
 					w = X86_FLAG_MODW_64B;
@@ -1898,33 +1899,33 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					m = "movdqu";
 					w = X86_FLAG_MODW_128B;
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 				case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				m = "movd";
 			}
 		} else {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_66H: break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			w = X86_FLAG_MODW_128B;
 			m = p.x86.op & X86_FLAG_WIDE ? "punpckhqdq" : "punpcklqdq";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		break;
 	case 0x70: // 70H-73H
 		ubyte modrm = *p.ai8;
 		++p.ai8;
 		if (modrm < MODRM_MOD_11) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			break;
 		}
 		const(char) *m = void;
@@ -1933,103 +1934,103 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			if (p.x86.op & X86_FLAG_WIDE) { // GRP14
 				switch (modrm & MODRM_REG) {
 				case MODRM_REG_010:
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 					case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					m = "psrlq";
 					break;
 				case MODRM_REG_011:
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					m = "psrldq";
 					break;
 				case MODRM_REG_110:
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 					case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					m = "psllq";
 					break;
 				case MODRM_REG_111:
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					m = "pslldq";
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else { // GRP13
 				switch (modrm & MODRM_REG) {
 				case MODRM_REG_010:
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 					case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					m = "psrld";
 					break;
 				case MODRM_REG_100:
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 					case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					m = "psrad";
 					break;
 				case MODRM_REG_110:
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 					case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					m = "pslld";
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) { // GRP12
 				switch (modrm & MODRM_REG) {
 				case MODRM_REG_010:
 					m = "psrlw";
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 					case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					break;
 				case MODRM_REG_100:
 					m = "psraw";
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 					case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					break;
 				case MODRM_REG_110:
 					m = "psllw";
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 					case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, m);
-				adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+					adbg_disasm_push_str(p, m);
+				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE:
 					m = "pshufw";
 					w = MemWidth.i64;
@@ -2046,20 +2047,20 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					m = "pshufhw";
 					w = MemWidth.i128;
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				ubyte imm = *p.ai8;
 				++p.ai8;
 				if (p.mode < AdbgDisasmMode.File) 
 					return;
-				adbg_dasm_push_x8(p, modrm);
-				adbg_dasm_push_x8(p, imm);
-				adbg_dasm_push_str(p, m);
-				adbg_dasm_push_reg(p,
-					adbg_dasm_x86_modrm_reg(p, modrm >> 3, w));
-				adbg_dasm_push_reg(p,
-					adbg_dasm_x86_modrm_reg(p, modrm, w));
-				adbg_dasm_push_imm(p, imm);
+				adbg_disasm_push_x8(p, modrm);
+				adbg_disasm_push_x8(p, imm);
+				adbg_disasm_push_str(p, m);
+				adbg_disasm_push_reg(p,
+					adbg_disasm_x86_modrm_reg(p, modrm >> 3, w));
+				adbg_disasm_push_reg(p,
+					adbg_disasm_x86_modrm_reg(p, modrm, w));
+				adbg_disasm_push_imm(p, imm);
 			}
 		}
 		return;
@@ -2067,73 +2068,73 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "emms");
+					adbg_disasm_push_str(p, "emms");
 			} else {
 				int w = void;
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 				case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "pcmpeqd");
-				adbg_dasm_x86_modrm(p, w);
+					adbg_disasm_push_str(p, "pcmpeqd");
+				adbg_disasm_x86_modrm(p, w);
 			}
 		} else {
 			int w = void;
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 			case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pcmpeqw" : "pcmpeqb");
-			adbg_dasm_x86_modrm(p, w);
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pcmpeqw" : "pcmpeqb");
+			adbg_disasm_x86_modrm(p, w);
 		}
 		return;
 	case 0x78: // 78H-7BH
 		if (p.x86.op & X86_FLAG_DIR) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		int f;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: // (Intel) VMX
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "vmwrite" : "vmread");
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "vmwrite" : "vmread");
 			if (p.x86.op & X86_FLAG_WIDE)
 				f |= X86_FLAG_DIR;
-			adbg_dasm_x86_modrm(p, f | X86_FLAG_MODW_32B);
+			adbg_disasm_x86_modrm(p, f | X86_FLAG_MODW_32B);
 			return;
 		case X86_0F_66H: // (AMD) SSE4a
 			ubyte modrm = *p.ai8; // Reg only
 			++p.ai8;
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, "extrq");
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i128));
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i128));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, "extrq");
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i128));
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i128));
 				}
 			} else { // Group 17
 				if (modrm & MODRM_REG || modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, "extrq");
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i128));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, "extrq");
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i128));
 				}
-				adbg_dasm_x86_u8imm(p);
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 			}
 			return;
 		case X86_0F_F2H: // SSE4a
@@ -2141,42 +2142,42 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			++p.ai8;
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, "insertq");
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i128));
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i128));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, "insertq");
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i128));
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i128));
 				}
 			} else { // Group 17/GRP17
 				if (modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, "insertq");
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i128));
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i128));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, "insertq");
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i128));
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i128));
 				}
-				adbg_dasm_x86_u8imm(p);
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 			}
 			return;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 	case 0x7C: // 7CH-7FH
 		const(char) *m = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			int f = void;
 			if (p.x86.op & X86_FLAG_WIDE) {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE:
 					m = "movq";
 					f = X86_FLAG_MODW_64B;
@@ -2189,10 +2190,10 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					m = "movdqu";
 					f = X86_FLAG_MODW_128B;
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE:
 					m = "movd";
 					f = X86_FLAG_MODW_64B;
@@ -2205,81 +2206,81 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					m = "movq";
 					f = X86_FLAG_MODW_128B | X86_FLAG_DIR;
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm(p, f);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm(p, f);
 		} else {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_66H: m = p.x86.op & X86_FLAG_WIDE ? "hsubpd" : "haddpd"; break;
 			case X86_0F_F2H: m = p.x86.op & X86_FLAG_WIDE ? "hsubps" : "haddps"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		}
 		return;
 	case 0x80, 0x84, 0x88, 0x8C: // 80H-83H
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_Jcc[p.x86.op & 15]);
-		adbg_dasm_x86_u32imm(p);
+			adbg_disasm_push_str(p, x86_T_Jcc[p.x86.op & 15]);
+		adbg_disasm_x86_u32imm(p);
 		return;
 	case 0x90, 0x94, 0x98, 0x9C: // 90H-93H
 		ubyte modrm = *p.ai8;
 		++p.ai8;
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_SETcc[p.x86.op & 15]);
-		adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i8, MemWidth.i8);
+			adbg_disasm_push_str(p, x86_T_SETcc[p.x86.op & 15]);
+		adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i8, MemWidth.i8);
 		return;
 	case 0xA0: // A0H-A3H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "bt");
-				adbg_dasm_x86_modrm(p, X86_FLAG_MODW_32B);
+					adbg_disasm_push_str(p, "bt");
+				adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 			} else {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "cpuid");
+					adbg_disasm_push_str(p, "cpuid");
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
-				adbg_dasm_push_reg(p, "fs");
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
+				adbg_disasm_push_reg(p, "fs");
 			}
 		}
 		return;
 	case 0xA4: // A4H-A7H
 		if (p.x86.op & X86_FLAG_DIR) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, "shld");
-		adbg_dasm_x86_modrm(p, X86_FLAG_MODW_32B);
+			adbg_disasm_push_str(p, "shld");
+		adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 		if (p.x86.op & X86_FLAG_WIDE) {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_reg(p, "cl");
+				adbg_disasm_push_reg(p, "cl");
 		} else {
-			adbg_dasm_x86_u8imm(p);
+			adbg_disasm_x86_u8imm(p);
 		}
 		return;
 	case 0xA8: // A8H-ABH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "bts");
-				adbg_dasm_x86_modrm(p, X86_FLAG_MODW_32B);
+					adbg_disasm_push_str(p, "bts");
+				adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 			} else {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "rsm");
+					adbg_disasm_push_str(p, "rsm");
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
-				adbg_dasm_push_reg(p, "gs");
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
+				adbg_disasm_push_reg(p, "gs");
 			}
 		}
 		return;
@@ -2287,24 +2288,24 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "imul");
-				adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
+					adbg_disasm_push_str(p, "imul");
+				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 			} else { // GRP15
 				ubyte modrm = *p.ai8;
 				++p.ai8;
 				const(char) *m = void;
 				if (modrm >= MODRM_MOD_11) {
-					switch (adbg_dasm_x86_0f_select(p)) {
+					switch (adbg_disasm_x86_0f_select(p)) {
 					case X86_0F_NONE:
 						switch (modrm & MODRM_REG) {
 						case MODRM_REG_101: m = "lfence"; break;
 						case MODRM_REG_110: m = "mfence"; break;
 						case MODRM_REG_111: m = "sfence"; break;
-						default: adbg_dasm_err(p); return;
+						default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 						}
 						if (p.mode >= AdbgDisasmMode.File) {
-							adbg_dasm_push_x8(p, modrm);
-							adbg_dasm_push_str(p, m);
+							adbg_disasm_push_x8(p, modrm);
+							adbg_disasm_push_str(p, m);
 						}
 						return;
 					case X86_0F_66H, X86_0F_F2H: // waitpkg
@@ -2312,16 +2313,16 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 						case MODRM_REG_110: // Same REG field (/6)
 							m = p.x86.pf_operand ? "tpause" : "umwait";
 							break;
-						default: adbg_dasm_err(p); return;
+						default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 						}
 						if (p.mode >= AdbgDisasmMode.File) {
 							p.x86.pf_operand = 0;
-							adbg_dasm_push_x8(p, modrm);
-							adbg_dasm_push_str(p, m);
-							adbg_dasm_push_reg(p,
-								adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i32));
-							adbg_dasm_push_reg(p, "edx");
-							adbg_dasm_push_reg(p, "eax");
+							adbg_disasm_push_x8(p, modrm);
+							adbg_disasm_push_str(p, m);
+							adbg_disasm_push_reg(p,
+								adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i32));
+							adbg_disasm_push_reg(p, "edx");
+							adbg_disasm_push_reg(p, "eax");
 						}
 						return;
 					case X86_0F_F3H:
@@ -2331,16 +2332,16 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 						case MODRM_REG_010: m = "wrfsbase"; break;
 						case MODRM_REG_011: m = "wrgsbase"; break;
 						case MODRM_REG_110: m = "umonitor"; break;
-						default: adbg_dasm_err(p); return;
+						default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 						}
 						if (p.mode >= AdbgDisasmMode.File) {
-							adbg_dasm_push_x8(p, modrm);
-							adbg_dasm_push_str(p, m);
-							adbg_dasm_push_reg(p,
-								adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i32));
+							adbg_disasm_push_x8(p, modrm);
+							adbg_disasm_push_str(p, m);
+							adbg_disasm_push_reg(p,
+								adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i32));
 						}
 						return;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 				} else { // mem
 					if (p.mode >= AdbgDisasmMode.File) {
@@ -2354,20 +2355,20 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 						case MODRM_REG_110: m = "xsaveopt"; break;
 						default:            m = "clflush"; break;
 						}
-						adbg_dasm_push_str(p, m);
+						adbg_disasm_push_str(p, m);
 					}
-					adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "shld");
-			adbg_dasm_x86_modrm(p, X86_FLAG_MODW_32B);
+				adbg_disasm_push_str(p, "shld");
+			adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 			if (p.x86.op & X86_FLAG_WIDE) {
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 			} else {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_reg(p, "cl");
+					adbg_disasm_push_reg(p, "cl");
 			}
 		}
 		return;
@@ -2388,8 +2389,8 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, "cmpxchg");
-		adbg_dasm_x86_modrm(p, f);
+			adbg_disasm_push_str(p, "cmpxchg");
+		adbg_disasm_x86_modrm(p, f);
 		return;
 	case 0xB4: // B4H-B7H
 		const(char) *m = void;
@@ -2404,8 +2405,8 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			f = X86_FLAG_DIR | X86_FLAG_MODW_32B;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, f);
 		return;
 	case 0xB8: // B8H-BBH
 		if (p.x86.op & X86_FLAG_DIR) {
@@ -2413,7 +2414,7 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 				ubyte modrm = *p.ai8;
 				++p.ai8;
 				if (modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				const(char) *m = void;
@@ -2422,32 +2423,32 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 				case MODRM_REG_101: m = "bts"; break;
 				case MODRM_REG_110: m = "btr"; break;
 				case MODRM_REG_111: m = "btc"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i32));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i32));
 				}
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 			} else {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "btc");
-				adbg_dasm_x86_modrm(p, X86_FLAG_MODW_32B);
+					adbg_disasm_push_str(p, "btc");
+				adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 			}
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "ud1");
+					adbg_disasm_push_str(p, "ud1");
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_F3H:
 					if (p.mode >= AdbgDisasmMode.File)
-						adbg_dasm_push_str(p, "popcnt");
-					adbg_dasm_x86_modrm(p, X86_FLAG_MODW_32B);
+						adbg_disasm_push_str(p, "popcnt");
+					adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 					return;
-				default: adbg_dasm_err(p);
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction);
 				}
 			}
 		}
@@ -2461,41 +2462,41 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 				X86_FLAG_DIR | X86_FLAG_MODW_16B :
 				X86_FLAG_DIR | X86_FLAG_MODW_8B;
 		} else {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: m = p.x86.op & X86_FLAG_WIDE ? "bsr" : "bsf"; break;
 			case X86_0F_F3H: m = p.x86.op & X86_FLAG_WIDE ? "lzcnt" : "tzcnt"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			f = X86_FLAG_DIR | X86_FLAG_MODW_32B;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, f);
 		return;
 	case 0xC0: // C0H-C3H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "movnti");
-				adbg_dasm_x86_modrm(p, X86_FLAG_MODW_32B);
+					adbg_disasm_push_str(p, "movnti");
+				adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 			} else {
 				const(char) *m = void;
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: m = "cmpps"; break;
 				case X86_0F_66H:  m = "cmppd"; break;
 				case X86_0F_F2H:  m = "cmpsd"; break;
 				case X86_0F_F3H:  m = "cmpss"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, m);
-				adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
-				adbg_dasm_x86_u8imm(p);
+					adbg_disasm_push_str(p, m);
+				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+				adbg_disasm_x86_u8imm(p);
 			}
 		} else {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "xadd");
-			adbg_dasm_x86_modrm(p, X86_FLAG_USE_OP);
+				adbg_disasm_push_str(p, "xadd");
+			adbg_disasm_x86_modrm(p, X86_FLAG_USE_OP);
 		}
 		return;
 	case 0xC4: // C4H-C7H
@@ -2509,19 +2510,19 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					switch (modrm_reg) {
 					case MODRM_REG_110: m = "rdrand"; break;
 					case MODRM_REG_111:
-						switch (adbg_dasm_x86_0f_select(p)) {
+						switch (adbg_disasm_x86_0f_select(p)) {
 						case X86_0F_NONE: m = "rdseed"; break;
 						case X86_0F_66H: m = "rdpid"; break;
-						default: adbg_dasm_err(p); return;
+						default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 						}
 						break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					if (p.mode >= AdbgDisasmMode.File) {
-						adbg_dasm_push_x8(p, modrm);
-						adbg_dasm_push_str(p, m);
-						adbg_dasm_push_reg(p,
-							adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i32));
+						adbg_disasm_push_x8(p, modrm);
+						adbg_disasm_push_str(p, m);
+						adbg_disasm_push_reg(p,
+							adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i32));
 					}
 				} else {
 					const(char) *m = void;
@@ -2530,116 +2531,116 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 						m = p.x86.vex_W ? "cmpxchg16b" : "cmpxchg8b";
 						break;
 					case MODRM_REG_110:
-						switch (adbg_dasm_x86_0f_select(p)) {
+						switch (adbg_disasm_x86_0f_select(p)) {
 						case X86_0F_NONE: m = "vmptrld"; break;
 						case X86_0F_66H: m = "vmclear"; break;
 						case X86_0F_F3H: m = "vmxon"; break;
-						default: adbg_dasm_err(p); return;
+						default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 						}
 						break;
 					case MODRM_REG_111: m = "vmptrst"; break;
-					default: adbg_dasm_err(p); return;
+					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 					if (p.mode >= AdbgDisasmMode.File)
-						adbg_dasm_push_str(p, m);
-					adbg_dasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
+						adbg_disasm_push_str(p, m);
+					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 			} else {
 				ubyte modrm = *p.ai8;
 				++p.ai8;
 				if (modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				const(char) *m = void;
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: m = "shufps"; break;
 				case X86_0F_66H: m = "shufpd"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, m);
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i128));
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i128));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, m);
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i128));
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i128));
 				}
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 			}
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				ubyte modrm = *p.ai8;
 				++p.ai8;
 				if (modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				int w = void;
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: w = MemWidth.i64; break;
 				case X86_0F_66H: w = MemWidth.i128; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, "pextrw");
-					adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i32));
-					adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, modrm, w));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, "pextrw");
+					adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i32));
+					adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, modrm, w));
 				}
-				adbg_dasm_x86_u8imm(p);
+				adbg_disasm_x86_u8imm(p);
 			} else {
 				int w = void;
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 				case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "pinsrw");
-				adbg_dasm_x86_modrm(p, w);
-				adbg_dasm_x86_u8imm(p);
+					adbg_disasm_push_str(p, "pinsrw");
+				adbg_disasm_x86_modrm(p, w);
+				adbg_disasm_x86_u8imm(p);
 			}
 		}
 		return;
 	case 0xC8, 0xCC: // C8H-CFH
 		if (p.mode < AdbgDisasmMode.File)
 			return;
-		adbg_dasm_push_str(p, "bswap");
-		adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.op, MemWidth.i32));
+		adbg_disasm_push_str(p, "bswap");
+		adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, p.x86.op, MemWidth.i32));
 		return;
 	case 0xD0: // D0H-D3H
 		if (p.x86.op & X86_FLAG_DIR) {
 			int w = void;
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 			case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "psrlq" : "psrld");
-			adbg_dasm_x86_modrm(p, w);
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "psrlq" : "psrld");
+			adbg_disasm_x86_modrm(p, w);
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				int w = void;
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 				case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "psrlw");
-				adbg_dasm_x86_modrm(p, w);
+					adbg_disasm_push_str(p, "psrlw");
+				adbg_disasm_x86_modrm(p, w);
 			} else {
 				const(char) *m = void;
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_66H: m = "addsubpd"; break;
 				case X86_0F_F2H: m = "addsubps"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, m);
-				adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+					adbg_disasm_push_str(p, m);
+				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 			}
 		}
 		return;
@@ -2649,83 +2650,83 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 				ubyte modrm = *p.ai8;
 				++p.ai8;
 				if (modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				int w = void;
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: w = MemWidth.i64; break;
 				case X86_0F_66H: w = MemWidth.i128; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File) {
-					adbg_dasm_push_x8(p, modrm);
-					adbg_dasm_push_str(p, "pmovmskb");
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i32));
-					adbg_dasm_push_reg(p,
-						adbg_dasm_x86_modrm_reg(p, modrm, w));
+					adbg_disasm_push_x8(p, modrm);
+					adbg_disasm_push_str(p, "pmovmskb");
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i32));
+					adbg_disasm_push_reg(p,
+						adbg_disasm_x86_modrm_reg(p, modrm, w));
 				}
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_66H:
 					if (p.mode >= AdbgDisasmMode.File)
-						adbg_dasm_push_str(p, "movq");
-					adbg_dasm_x86_modrm(p, X86_FLAG_MODW_128B);
+						adbg_disasm_push_str(p, "movq");
+					adbg_disasm_x86_modrm(p, X86_FLAG_MODW_128B);
 					return;
 				case X86_0F_F2H:
 					ubyte modrm = *p.ai8;
 					++p.ai8;
 					if (modrm < MODRM_MOD_11) {
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
 					if (p.mode >= AdbgDisasmMode.File) {
-						adbg_dasm_push_x8(p, modrm);
-						adbg_dasm_push_str(p, "movdq2q");
-						adbg_dasm_push_reg(p,
-							adbg_dasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i64));
-						adbg_dasm_push_reg(p,
-							adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i128));
+						adbg_disasm_push_x8(p, modrm);
+						adbg_disasm_push_str(p, "movdq2q");
+						adbg_disasm_push_reg(p,
+							adbg_disasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i64));
+						adbg_disasm_push_reg(p,
+							adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i128));
 					}
 					return;
 				case X86_0F_F3H:
 					ubyte modrm = *p.ai8;
 					++p.ai8;
 					if (modrm < MODRM_MOD_11) {
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
 					if (p.mode >= AdbgDisasmMode.File) {
-						adbg_dasm_push_x8(p, modrm);
-						adbg_dasm_push_str(p, "movq2dq");
-						adbg_dasm_push_reg(p,
-							adbg_dasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i128));
-						adbg_dasm_push_reg(p,
-							adbg_dasm_x86_modrm_reg(p, modrm, MemWidth.i64));
+						adbg_disasm_push_x8(p, modrm);
+						adbg_disasm_push_str(p, "movq2dq");
+						adbg_disasm_push_reg(p,
+							adbg_disasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i128));
+						adbg_disasm_push_reg(p,
+							adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i64));
 					}
 					return;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 		} else {
 			int w = void;
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 			case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmullw" : "paddq");
-			adbg_dasm_x86_modrm(p, w);
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmullw" : "paddq");
+			adbg_disasm_x86_modrm(p, w);
 		}
 		return;
 	case 0xD8: // D8H-DBH
 		int w = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
 			const(char) *m = void;
@@ -2735,16 +2736,16 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			case 2:  m = "pminub"; break;
 			default: m = "pand"; break;
 			}
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
-		adbg_dasm_x86_modrm(p, w);
+		adbg_disasm_x86_modrm(p, w);
 		return;
 	case 0xDC: // DCH-DFH
 		int w = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
 			const(char) *m = void;
@@ -2754,16 +2755,16 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			case 2:  m = "pmaxub"; break;
 			default: m = "pandn"; break;
 			}
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
-		adbg_dasm_x86_modrm(p, w);
+		adbg_disasm_x86_modrm(p, w);
 		return;
 	case 0xE0: // E0H-E3H
 		int w = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
 			const(char) *m = void;
@@ -2773,16 +2774,16 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			case 2:  m = "psrad"; break;
 			default: m = "pavgw"; break;
 			}
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
-		adbg_dasm_x86_modrm(p, w);
+		adbg_disasm_x86_modrm(p, w);
 		return;
 	case 0xE4: // E4H-E7H
 		const(char) *m = void;
 		int w = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE:
 					m = "movntq";
 					w = X86_FLAG_MODW_64B;
@@ -2791,39 +2792,39 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					m = "movntdq";
 					w = X86_FLAG_MODW_128B;
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, m);
-				adbg_dasm_x86_modrm(p, w);
+					adbg_disasm_push_str(p, m);
+				adbg_disasm_x86_modrm(p, w);
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_66H: m = "cvttpd2dq"; break;
 				case X86_0F_F2H: m = "cvtpd2dq"; break;
 				case X86_0F_F3H: m = "cvtdq2pd"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, m);
-				adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+					adbg_disasm_push_str(p, m);
+				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 			}
 		} else {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 			case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmulhw" : "pmulhuw");
-			adbg_dasm_x86_modrm(p, w);
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmulhw" : "pmulhuw");
+			adbg_disasm_x86_modrm(p, w);
 		}
 		return;
 	case 0xE8: // E8H-EBH
 		int w = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
 			const(char) *m = void;
@@ -2833,16 +2834,16 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			case 2:  m = "pminsw"; break;
 			default: m = "por"; break;
 			}
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
-		adbg_dasm_x86_modrm(p, w);
+		adbg_disasm_x86_modrm(p, w);
 		return;
 	case 0xEC: // ECH-EFH
 		int w = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
 			const(char) *m = void;
@@ -2852,40 +2853,40 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			case 2:  m = "pmaxsw"; break;
 			default: m = "pxor"; break;
 			}
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
-		adbg_dasm_x86_modrm(p, w);
+		adbg_disasm_x86_modrm(p, w);
 		return;
 	case 0xF0: // F0H-F3H
 		int w = void;
 		if (p.x86.op & X86_FLAG_DIR) {
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 			case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "psllq" : "psllq");
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "psllq" : "psllq");
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		} else {
 			const(char) *m = void;
 			if (p.x86.op & X86_FLAG_WIDE) {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 				case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				m = "psllw";
 			} else {
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_F2H: w = X86_FLAG_MODW_128B; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				m = "lldqu";
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		}
 		return;
 	case 0xF4: // F4H-F7H
@@ -2894,12 +2895,12 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 				ubyte modrm = *p.ai8;
 				++p.ai8;
 				if (modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				int w = void;
 				const(char) *m = void;
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE:
 					m = "maskmovq";
 					w = X86_FLAG_MODW_64B;
@@ -2908,32 +2909,32 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 					m = "maskmovdqu";
 					w = X86_FLAG_MODW_128B;
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, m);
-				adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+					adbg_disasm_push_str(p, m);
+				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 			} else {
 				int w = void;
-				switch (adbg_dasm_x86_0f_select(p)) {
+				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 				case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, "psadbw");
-				adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+					adbg_disasm_push_str(p, "psadbw");
+				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 			}
 		} else {
 			int w = void;
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 			case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmaddwd" : "pmuludq");
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmaddwd" : "pmuludq");
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		}
 		return;
 	case 0xF8: // F8H-FBH
@@ -2945,15 +2946,15 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			case 2:  m = "psubd"; break;
 			default: m = "psubq"; break;
 			}
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
 		int w = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_FLAG_MODW_64B; break;
 		case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		return;
 	case 0b1111_1100: // FCH-FFH
 		// UD0 NOTE: Some older processors decode without ModR/M.
@@ -2965,29 +2966,29 @@ void adbg_dasm_x86_0f(adbg_disasm_t *p) {
 			case 1:  m = "paddw"; break;
 			case 2:  m = "paddd"; break;
 			default:
-				adbg_dasm_push_str(p, "ud0");
+				adbg_disasm_push_str(p, "ud0");
 				return;
 			}
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
 		int w = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: w = X86_FLAG_MODW_64B | X86_FLAG_DIR; break;
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		adbg_dasm_x86_modrm(p, w);
+		adbg_disasm_x86_modrm(p, w);
 		return;
-	default: adbg_dasm_err(p); return;
+	default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 	}
 }
 
-void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
+void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_x8(p, p.x86.op);
+		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) { // 1111_1100
 	case 0: // 00H-03H
@@ -2998,8 +2999,8 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "phaddw" : "pshufb";
 		int w = p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		return;
 	case 0x04: // 04H-07H
 		const(char) *m = void;
@@ -3009,8 +3010,8 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "phsubw" : "pmaddubsw";
 		int w = p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		return;
 	case 0x08: // 08H-0BH
 		const(char) *m = void;
@@ -3021,21 +3022,21 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 		}
 		int w = p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		return;
 	case 0x10: // 10H-13H
 		if (p.x86.op & X86_FLAG_DIR || p.x86.op & X86_FLAG_WIDE || p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, "pblendvb");
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, "pblendvb");
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x14: // 14H-17H
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3043,21 +3044,21 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				m = "ptest";
 			} else {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "blendvpd" : "blendvps";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x1C: // 1CH-1FH
 		const(char) *m = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			} else {
 				m = "pabsd";
@@ -3067,12 +3068,12 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 		}
 		int w = p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		return;
 	case 0x20: // 20H-23H
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3081,25 +3082,25 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "pmovsxbd" : "pmovsxbw";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x24: // 24H-27H
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.x86.op & X86_FLAG_DIR) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmovsxbd" : "pmovsxbw");
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmovsxbd" : "pmovsxbw");
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x28: // 28H-2BH
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3109,12 +3110,12 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "pcmpeqq" : "pmuldq";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x30: // 30H-33H
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3124,12 +3125,12 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "pmovzxbd" : "pmovzxbw";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x34: // 34H-37H
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3137,19 +3138,19 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				m = "pcmpgtq";
 			} else {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "pmovzxdq" : "pmovzxwq";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x38: // 38H-3BH
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3159,12 +3160,12 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "pminsd" : "pminsb";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x3C: // 3CH-3FH
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3174,21 +3175,21 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "pmaxsd" : "pmaxsb";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x40: // 40H-43H
 		if (p.x86.op & X86_FLAG_DIR || p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "phminposuw" : "pmulld");
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "phminposuw" : "pmulld");
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x80: // 80H-83H
 		if ((p.x86.op & X86_FLAG_WIDE && p.x86.op & X86_FLAG_DIR) || p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3197,8 +3198,8 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "invvpid" : "invept";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "phminposuw" : "pmulld");
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
+			adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "phminposuw" : "pmulld");
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		return;
 	case 0xC8: // C8H-CBH
 		const(char) *m = void;
@@ -3207,31 +3208,31 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "sha1msg1" : "sha1nexte";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0xCC: // CCH-CFH
 		if (p.x86.op & X86_FLAG_DIR) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = p.x86.op & X86_FLAG_WIDE ? "sha256msg2" : "sha256msg1";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0xD8: // D8H-DBH
 		if (p.x86.op & X86_FLAG_DIR && p.x86.op & X86_FLAG_WIDE && p.x86.pf_operand) {
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, "aesimc");
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+				adbg_disasm_push_str(p, "aesimc");
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		} else {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 		}
 		return;
 	case 0xDC: // DBH-DFH
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3240,20 +3241,20 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "aesenclast" : "aesenc";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0xF0: // F0H-F3H
 		if (p.x86.op & X86_FLAG_DIR) { // Yep, GRP17 is all VEX stuff
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
 		int f = void;
-		switch (adbg_dasm_x86_0f_select(p)) {
+		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE, X86_0F_66H:
 			if (*p.ai8 >= MODRM_MOD_11) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "movbe";
@@ -3267,48 +3268,48 @@ void adbg_dasm_x86_0f38(adbg_disasm_t *p) {
 				f = X86_FLAG_REGW_32B | X86_FLAG_MEMW_8B;
 			}
 			break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.x86.op & X86_FLAG_DIR)
 			f |= X86_FLAG_DIR;
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, f);
 		return;
 	case 0xF4: // F4H-F7H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			const(char) *m = void;
-			switch (adbg_dasm_x86_0f_select(p)) {
+			switch (adbg_disasm_x86_0f_select(p)) {
 			case X86_0F_66H: m = "adcx"; break;
 			case X86_0F_F3H: m = "adox"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		} else {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 		}
 		return;
-	default: adbg_dasm_err(p); return;
+	default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 	}
 }
 
-void adbg_dasm_x86_0f3a(adbg_disasm_t *p) {
+void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_x8(p, p.x86.op);
+		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) { // 1111_1100
 	case 0x08: // 08H-0BH
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		p.x86.pf_operand = 0;
@@ -3327,9 +3328,9 @@ void adbg_dasm_x86_0f3a(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "roundpd" : "roundps";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, f);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, f);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0x0C: // 0CH-0FH
 		const(char) *m = void;
@@ -3340,7 +3341,7 @@ void adbg_dasm_x86_0f3a(adbg_disasm_t *p) {
 				w =  p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
 			} else {
 				if (p.x86.pf_operand == 0) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				m = "pblendw";
@@ -3348,20 +3349,20 @@ void adbg_dasm_x86_0f3a(adbg_disasm_t *p) {
 			}
 		} else {
 			if (p.x86.pf_operand == 0) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			w = X86_FLAG_MODW_128B;
 			m = p.x86.op & X86_FLAG_WIDE ? "blendpd" : "blendps";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | w);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0x14: // 14H-17H
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		p.x86.pf_operand = 0;
@@ -3380,13 +3381,13 @@ void adbg_dasm_x86_0f3a(adbg_disasm_t *p) {
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, f);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, f);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0x20: // 20H-23H
 		if ((p.x86.op & X86_FLAG_DIR && p.x86.op & X86_FLAG_WIDE) || p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		p.x86.pf_operand = 0;
@@ -3405,13 +3406,13 @@ void adbg_dasm_x86_0f3a(adbg_disasm_t *p) {
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | wmem | X86_FLAG_MEMW_128B);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | wmem | X86_FLAG_MEMW_128B);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0x40: // 40H-43H
 		if ((p.x86.op & X86_FLAG_DIR && p.x86.op & X86_FLAG_WIDE) || p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3421,23 +3422,23 @@ void adbg_dasm_x86_0f3a(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "dppd" : "dpps";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0x44: // 44H-47H
 		if (p.x86.op & (X86_FLAG_WIDE | X86_FLAG_DIR) || p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, "pclmulqdq");
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, "pclmulqdq");
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0x60: // 60H-63H
 		if (p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -3447,31 +3448,31 @@ void adbg_dasm_x86_0f3a(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "pcmpestri" : "pcmpestrm";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0xCC: // CCH-CFH
 		if (p.x86.op & (X86_FLAG_WIDE | X86_FLAG_DIR) || p.x86.pf_operand) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, "sha1rnds4");
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, "sha1rnds4");
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0xDC: // DCH-DFH
 		if ((p.x86.op & X86_FLAG_WIDE) == 0 || (p.x86.op & X86_FLAG_DIR) == 0 || p.x86.pf_operand == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, "aeskeygenassist");
-		adbg_dasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, "aeskeygenassist");
+		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+		adbg_disasm_x86_u8imm(p);
 		return;
-	default: adbg_dasm_err(p); return;
+	default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 	}
 }
 
@@ -3479,12 +3480,12 @@ void adbg_dasm_x86_0f3a(adbg_disasm_t *p) {
 // ANCHOR: VEX/XOP maps
 //
 
-void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
+void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_x8(p, p.x86.op);
+		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) {
 	case 0x10: // 10H-13H
@@ -3502,7 +3503,7 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 					m = "vmovlpd";
 					f |= X86_FLAG_MEMW_64B;
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else {
 				switch (p.x86.vex_pp) {
@@ -3558,8 +3559,8 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x14: // 14H-17H
 		const(char) *i = void;
@@ -3582,12 +3583,12 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 				break;
 			case X86_VEX_PP_F3H:
 				if (p.x86.op & X86_FLAG_WIDE) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				i = "vmovshdup";
 				break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 		} else {
 			int w = p.x86.op & X86_FLAG_WIDE;
@@ -3595,12 +3596,12 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			switch (p.x86.vex_pp) {
 			case X86_VEX_PP_NONE: i = w ? "vunpckhps" : "vunpcklps"; break;
 			case X86_VEX_PP_66H:  i = w ? "vunpckhpd" : "vunpcklpd"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, i);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, i);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x50: // 50H-53H
 		const(char) *i = void;
@@ -3614,7 +3615,7 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 					i = "vrcpss";
 					f |= X86_FLAG_3OPRND;
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else {
 				switch (p.x86.vex_pp) {
@@ -3623,7 +3624,7 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 					i = "vrsqrtss";
 					f |= X86_FLAG_3OPRND | X86_FLAG_MEMW_32B;
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 		} else {
@@ -3643,20 +3644,20 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 				}
 			} else {
 				if (*p.ai8 < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				switch (p.x86.vex_pp) {
 				case X86_VEX_PP_NONE: i = "vmovmskps"; break;
 				case X86_VEX_PP_66H:  i = "vmovmskpd"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				f |= X86_FLAG_REGW_32B | X86_FLAG_MEMW_32B;
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, i);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, i);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x54: // 54H-57H
 		const(char) *i = void;
@@ -3675,11 +3676,11 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 				i = p.x86.op & X86_FLAG_WIDE ? "vandnpd" : "vandpd";
 			}
 			break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, i);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_3OPRND | X86_FLAG_REGW_128B | X86_FLAG_DIR);
+			adbg_disasm_push_str(p, i);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_3OPRND | X86_FLAG_REGW_128B | X86_FLAG_DIR);
 		return;
 	case 0x58: // 58H-5BH
 		int f = X86_FLAG_REGW_128B | X86_FLAG_DIR;
@@ -3690,14 +3691,14 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 				case X86_VEX_PP_NONE: i = "vaddps"; break;
 				case X86_VEX_PP_66H:  i = "vaddpd"; break;
 				case X86_VEX_PP_F3H:  i = "vaddss"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else {
 				switch (p.x86.vex_pp) {
 				case X86_VEX_PP_NONE: i = "vcvtps2pd"; break;
 				case X86_VEX_PP_66H:
 					if (*p.ai8 < MODRM_MOD_11) {
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
 					i = "vcvtpd2ps";
@@ -3731,8 +3732,8 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, i);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, i);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x5C: // 5CH-5FH
 		const(char) *i = void;
@@ -3819,12 +3820,12 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, i);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, i);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x60: // 60H-63H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *i = void;
@@ -3833,12 +3834,12 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 		else
 			i = p.x86.op & X86_FLAG_WIDE ? "vpunpcklwd" : "vpunpcklbw";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, i);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, i);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0x64: // 64H-67H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *i = void;
@@ -3847,12 +3848,12 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 		else
 			i = p.x86.op & X86_FLAG_WIDE ? "vpcmpgtw" : "vpcmpgtb";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, i);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, i);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0x68: // 68H-6BH
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *i = void;
@@ -3861,8 +3862,8 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 		else
 			i = p.x86.op & X86_FLAG_WIDE ? "vpunpckhwd" : "vpunpckhbw";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, i);
-		adbg_dasm_x86_vex_modrm(p,
+			adbg_disasm_push_str(p, i);
+		adbg_disasm_x86_vex_modrm(p,
 			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0x6C: // 6CH-6FH
@@ -3876,7 +3877,7 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 					f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 				} else {
 					if (*p.ai8 >= MODRM_MOD_11) {
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
 					i = "vmovd";
@@ -3886,27 +3887,27 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 				break;
 			case X86_VEX_PP_F3H:
 				if ((p.x86.op & X86_FLAG_WIDE) == 0) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				i = "vmovdqu";
 				f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 				break;
 			default:
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 		} else {
 			if (p.x86.vex_pp != X86_VEX_PP_66H) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			i = p.x86.op & X86_FLAG_WIDE ? "vpunpcklqdq" : "vpunpckhqdq";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, i);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, i);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x70: // 70H-73H
 		const(char) *m = void;
@@ -3915,7 +3916,7 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 		if (p.x86.op & X86_FLAG_DIR) {
 			modrm = *p.ai8;
 			if (p.x86.vex_pp != X86_VEX_PP_66H || modrm < MODRM_MOD_11) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			if (p.x86.op & X86_FLAG_WIDE) {
@@ -3924,14 +3925,14 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 				case MODRM_REG_011: m = "vpsrldq"; break;
 				case MODRM_REG_110: m = "vpsllq"; break;
 				case MODRM_REG_111: m = "vpslldq"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else {
 				switch (modrm & MODRM_REG) {
 				case MODRM_REG_010: m = "vpsrld"; break;
 				case MODRM_REG_100: m = "vpsrad"; break;
 				case MODRM_REG_110: m = "vpslld"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_VEX_USEvvvv;
@@ -3939,14 +3940,14 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				modrm = *p.ai8;
 				if (p.x86.vex_pp != X86_VEX_PP_66H || modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				switch (modrm & MODRM_REG) {
 				case MODRM_REG_010: m = "vpsrlw"; break;
 				case MODRM_REG_100: m = "vpsraw"; break;
 				case MODRM_REG_110: m = "vpsllw"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_VEX_USEvvvv;
 			} else {
@@ -3954,40 +3955,40 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 				case X86_VEX_PP_66H: m = "vpshufd"; break;
 				case X86_VEX_PP_F3H: m = "vpshufhw"; break;
 				case X86_VEX_PP_F2H: m = "vpshuflw"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0x74: // 74H-77H
 		const(char) *m = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.mode >= AdbgDisasmMode.File)
-					adbg_dasm_push_str(p, p.x86.vex_L ? "vzeroall" : "vzeroupper");
+					adbg_disasm_push_str(p, p.x86.vex_L ? "vzeroall" : "vzeroupper");
 				return;
 			} else {
 				if (p.x86.vex_pp != X86_VEX_PP_66H) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				m = "vpcmpeqd";
 			}
 		} else {
 			if (p.x86.vex_pp != X86_VEX_PP_66H) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = p.x86.op & X86_FLAG_WIDE ? "vpcmpeqw" : "vpcmpeqb";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_3OPRND | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_3OPRND | X86_FLAG_MODW_128B);
 		return;
 	case 0x7C: // 7CH-7FH
 		const(char) *m = void;
@@ -3997,14 +3998,14 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 				switch (p.x86.vex_pp) {
 				case X86_VEX_PP_66H: m = "vmovdqa"; break;
 				case X86_VEX_PP_F3H: m = "vmovdqu"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 				f = X86_FLAG_MODW_128B;
 			} else {
 				switch (p.x86.vex_pp) {
 				case X86_VEX_PP_66H:
 					if (*p.ai8 < MODRM_MOD_11) {
-						adbg_dasm_err(p);
+						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
 					m = "vmovd";
@@ -4014,7 +4015,7 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 					m = "vmovq";
 					f = X86_FLAG_MODW_128B | X86_FLAG_DIR | X86_FLAG_VEX_NO_L;
 					break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 		} else {
@@ -4025,17 +4026,17 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			case X86_VEX_PP_F2H:
 				m = p.x86.op & X86_FLAG_WIDE ? "vhsubps" : "vhaddps";
 				break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			f = X86_FLAG_DIR | X86_FLAG_3OPRND | X86_FLAG_MODW_128B;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0xC0: // C0H-C3H
 		if ((p.x86.op & 0b11) != 0b10) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4059,34 +4060,34 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0xC4: // C4H-C7H
 		const(char) *m = void;
 		int f = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			} else {
 				switch (p.x86.vex_pp) {
 				case X86_VEX_PP_NONE: m = "vshufps"; break;
 				case X86_VEX_PP_66H:  m = "vshufpd"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		} else {
 			if (p.x86.vex_pp != X86_VEX_PP_66H) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			ubyte modrm = *p.ai8;
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (modrm < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				m = "vpextrw";
@@ -4103,22 +4104,22 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0xD0: // D0H-D3H
 		const(char) *m = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.vex_pp != X86_VEX_PP_66H) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = p.x86.op & X86_FLAG_WIDE ? "vpsrlq" : "vpsrld";
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.x86.vex_pp != X86_VEX_PP_66H) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				m = "vpsrlw";
@@ -4126,17 +4127,17 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 				switch (p.x86.vex_pp) {
 				case X86_VEX_PP_66H: m = "vaddsubpd"; break;
 				case X86_VEX_PP_F2H: m = "vaddsubps"; break;
-				default: adbg_dasm_err(p); return;
+				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xD4: // D4H-D7H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4144,7 +4145,7 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (*p.ai8 < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				f = X86_FLAG_REGW_32B | X86_FLAG_MEMW_128B | X86_FLAG_DIR;
@@ -4158,12 +4159,12 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "vpmullw" : "vpaddq";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0xD8: // D8H-DBH
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4173,12 +4174,12 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "vpsubusw" : "vpsubusb";
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xDC: // DCH-DFH
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4187,12 +4188,12 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "vpaddusw" : "vpaddusb";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xE0: // E0H-E3H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4201,8 +4202,8 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "vpsraw" : "vpavgb";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xE4: // E4H-E7H
 		const(char) *m = void;
@@ -4210,14 +4211,14 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 		if (p.x86.op & X86_FLAG_DIR)
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.x86.vex_pp != X86_VEX_PP_66H) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				m = "vmovntdq";
 				f = X86_FLAG_MODW_128B;
 			} else {
 				if (*p.ai8 < MODRM_MOD_11) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				switch (p.x86.vex_pp) {
@@ -4225,38 +4226,38 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 				case X86_VEX_PP_F3H: m = "vcvtdq2pd"; break;
 				case X86_VEX_PP_F2H: m = "vcvtpd2dq"; break;
 				default:
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 			}
 		else {
 			if (p.x86.vex_pp != X86_VEX_PP_66H) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = p.x86.op & X86_FLAG_WIDE ? "vpmulhw" : "vpmulhuw";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0xE8, 0xEC: // E8H-EFH
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_VEX_0F_E8h[p.x86.op & 7]);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, x86_T_VEX_0F_E8h[p.x86.op & 7]);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xF0:
 		const(char) *m = void;
 		int f = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.vex_pp != X86_VEX_PP_66H) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = p.x86.op & X86_FLAG_WIDE ? "vpsllq" : "vpslld";
@@ -4264,14 +4265,14 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) {
 				if (p.x86.vex_pp != X86_VEX_PP_66H) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				m = "vpsllw";
 				f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 			} else {
 				if (p.x86.vex_pp != X86_VEX_PP_F2H) {
-					adbg_dasm_err(p);
+					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
 				m = "vlddqu";
@@ -4279,26 +4280,26 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 			}
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_VEX_0F_E8h[p.x86.op & 7]);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, x86_T_VEX_0F_E8h[p.x86.op & 7]);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0xF4, 0xF8:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		int i = p.x86.op & 7;
 		int f = void;
 		if (i == 0b111) {
 			if (*p.ai8 < MODRM_MOD_11) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 		} else f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_VEX_0F_F4h[i]);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, x86_T_VEX_0F_F4h[i]);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0xFB:
 		int i = p.x86.op & 3;
@@ -4307,64 +4308,64 @@ void adbg_dasm_x86_vex_0f(adbg_disasm_t *p) {
 		case 0: m = "vpaddb"; break;
 		case 1: m = "vpaddw"; break;
 		case 2: m = "vpaddd"; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
-	default: adbg_dasm_err(p); return;
+	default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 	}
 }
 
-void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
+void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_x8(p, p.x86.op);
+		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) {
 	case 0, 0x04, 0x08, 0x0C: // 00H-0FH
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		int f = p.x86.op >= 0x0E ?
 			X86_FLAG_DIR | X86_FLAG_MODW_128B :
 			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_VEX_0F38_00h[p.x86.op & 15]);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, x86_T_VEX_0F38_00h[p.x86.op & 15]);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x10: // 10H-13H
 		if (p.x86.vex_pp != X86_VEX_PP_66H || p.x86.op < 0x13) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, "vcvtph2ps");
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, "vcvtph2ps");
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x14: // 14-17H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.x86.op & X86_FLAG_DIR) {
 			int w = p.x86.op & X86_FLAG_WIDE;
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, w ? "vptest" : "vpermps");
-			adbg_dasm_x86_vex_modrm(p, w ?
+				adbg_disasm_push_str(p, w ? "vptest" : "vpermps");
+			adbg_disasm_x86_vex_modrm(p, w ?
 				X86_FLAG_DIR | X86_FLAG_MODW_128B :
 				X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		} else
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 		return;
 	case 0x18: // 18H-1BH
 		int o = p.x86.op & 3;
 		if (p.x86.vex_pp != X86_VEX_PP_66H || o == 3) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4376,7 +4377,7 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		case 1:
 			if (p.x86.vex_L == 0) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "vbroadcastsd";
@@ -4384,7 +4385,7 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		default: // 2
 			if (p.x86.vex_L == 0) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "vbroadcastf128";
@@ -4392,13 +4393,13 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x1C: // 1CH-1FH
 		int o = p.x86.op & 3;
 		if (p.x86.vex_pp != X86_VEX_PP_66H || o == 3) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File) {
@@ -4408,13 +4409,13 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			case 1:  m = "vpabsw"; break;
 			default: m = "vpabsd"; break;
 			}
-			adbg_dasm_push_str(p, m);
+			adbg_disasm_push_str(p, m);
 		}
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0x20: // 20H-23H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4438,12 +4439,12 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x24: // 24H-27H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4458,38 +4459,38 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_64B;
 			break;
 		default:
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x28: // 28H-2BH
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_VEX_0F38_28h[p.x86.op & 3]);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, x86_T_VEX_0F38_28h[p.x86.op & 3]);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0x2C: // 2CH-2FH
 		ubyte modrm = *p.ai8;
 		if (p.x86.vex_pp != X86_VEX_PP_66H || modrm >= MODRM_MOD_11) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "vmaskmovpd" : "vmaskmovps");
+			adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "vmaskmovpd" : "vmaskmovps");
 		int f = p.x86.op & X86_FLAG_DIR ? // Faster than applying yet another bitwise OR
 			X86_FLAG_MODW_128B | X86_FLAG_3OPRND :
 			X86_FLAG_MODW_128B | X86_FLAG_3OPRND | X86_FLAG_DIR;
-		adbg_dasm_x86_vex_modrm(p, f);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x30: // 30H-33H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4513,12 +4514,12 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x34: // 34H-37H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4534,7 +4535,7 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		case 2:
 			if (p.x86.vex_L == 0) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "vpermd";
@@ -4546,21 +4547,21 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x38, 0x3C: // 38H-3FH
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, x86_T_VEX_0F38_38h[p.x86.op & 7]);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, x86_T_VEX_0F38_38h[p.x86.op & 7]);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0x40: // 40H-43H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4572,23 +4573,23 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		case 1:
 			if (p.x86.vex_L) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "vphminposuw";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 			break;
 		default:
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x44: // 44H-47H
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4596,15 +4597,15 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 		case 1: m = p.x86.vex_W ? "vpsrlvq" : "vpsrlvd"; break;
 		case 2: m = "vpsravd"; break;
 		case 3: m = p.x86.vex_W ? "vpsllvq" : "vpsllvd"; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0x58: // 58H-5BH
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4620,23 +4621,23 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		case 2:
 			if (p.x86.vex_L == 0 || *p.ai8 >= MODRM_MOD_11) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "vbroadcasti128";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 			break;
 		default:
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x78:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4651,31 +4652,31 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_16B;
 			break;
 		default:
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x8C:
 		if (p.x86.vex_pp != X86_VEX_PP_66H || *p.ai8 >= MODRM_MOD_11) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		int f = void;
 		switch (p.x86.op & 3) {
 		case 0: f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND; break;
 		case 2: f = X86_FLAG_MODW_128B | X86_FLAG_3OPRND; break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, p.x86.vex_W ? "vpmaskmovq" : "vpmaskmovd");
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, p.x86.vex_W ? "vpmaskmovq" : "vpmaskmovd");
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x90:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4719,12 +4720,12 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
 	case 0x94: // VFMADDSUB132
 		if (p.x86.vex_pp != X86_VEX_PP_66H || (p.x86.op & X86_FLAG_DIR) == 0) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4733,12 +4734,12 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 		else
 			m = p.x86.vex_W ? "vfmsubadd132ps" : "vfmsubadd132pd";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0x98, 0x9C:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4769,12 +4770,12 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xA0:
 		if (p.x86.vex_pp != X86_VEX_PP_66H || p.x86.op < 0xA2) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4783,12 +4784,12 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 		else
 			m = p.x86.vex_W ? "vfmaddsub213pd" : "vfmaddsub213ps";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xA8, 0xAC:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4819,12 +4820,12 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xB4:
 		if (p.x86.vex_pp != X86_VEX_PP_66H || p.x86.op < 0xB6) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4833,12 +4834,12 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 		else
 			m = p.x86.vex_W ? "vfmaddsub231pd" : "vfmaddsub231ps";
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xB8, 0xBC:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4869,21 +4870,21 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xD8:
 		if (p.x86.vex_pp != X86_VEX_PP_66H || p.x86.op < 0xDB) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, "vaesimc");
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
+			adbg_disasm_push_str(p, "vaesimc");
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0xDC:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4894,18 +4895,18 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 		default: m = "vaesdeclast"; break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
 	case 0xF0:
 		if (p.x86.op < 0xF2) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
 		if (p.x86.op == 0xF2) {
 			if (p.x86.vex_pp != X86_VEX_PP_NONE) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "andn";
@@ -4913,8 +4914,8 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 				X86_FLAG_DIR | X86_FLAG_MODW_64B | X86_FLAG_3OPRND | X86_FLAG_VEX_SWvvvvREG :
 				X86_FLAG_DIR | X86_FLAG_MODW_32B | X86_FLAG_3OPRND | X86_FLAG_VEX_SWvvvvREG;
 			if (p.mode >= AdbgDisasmMode.File)
-				adbg_dasm_push_str(p, m);
-			adbg_dasm_x86_vex_modrm(p, f);
+				adbg_disasm_push_str(p, m);
+			adbg_disasm_x86_vex_modrm(p, f);
 		} else {
 			ubyte modrm = *p.ai8;
 			++p.ai8;
@@ -4922,14 +4923,14 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			case MODRM_REG_001: m = "blsr"; break;
 			case MODRM_REG_010: m = "blsmsk"; break;
 			case MODRM_REG_011: m = "blsi"; break;
-			default: adbg_dasm_err(p); return;
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			int w = p.x86.vex_W ? MemWidth.i64 : MemWidth.i32;
 			if (p.mode >= AdbgDisasmMode.File) {
-				adbg_dasm_push_str(p, m);
-				adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, w));
+				adbg_disasm_push_str(p, m);
+				adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, p.x86.vex_vvvv, w));
 			}
-			adbg_dasm_x86_modrm_rm(p, modrm, w, w);
+			adbg_disasm_x86_modrm_rm(p, modrm, w, w);
 		}
 		return;
 	case 0xF4:
@@ -4950,12 +4951,12 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			case X86_VEX_PP_F2H:
 				m = "pdep";
 				break;
-			default: adbg_dasm_err(p); return; // 66H
+			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return; // 66H
 			}
 			break;
 		case 0xF6:
 			if (p.x86.vex_pp != X86_VEX_PP_F2H) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "mulx";
@@ -4969,27 +4970,27 @@ void adbg_dasm_x86_vex_0f38(adbg_disasm_t *p) {
 			}
 			f |= X86_FLAG_VEX_VSIB;
 			break;
-		default: adbg_dasm_err(p); return; // F4H
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return; // F4H
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
 		return;
-	default: adbg_dasm_err(p); return;
+	default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 	}
 }
 
-void adbg_dasm_x86_vex_0f3a(adbg_disasm_t *p) {
+void adbg_disasm_x86_vex_0f3a(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_x8(p, p.x86.op);
+		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) {
 	case 0:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -4997,7 +4998,7 @@ void adbg_dasm_x86_vex_0f3a(adbg_disasm_t *p) {
 		switch (p.x86.op) {
 		case 0:
 			if (p.x86.vex_L == 0) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "vpermq";
@@ -5005,7 +5006,7 @@ void adbg_dasm_x86_vex_0f3a(adbg_disasm_t *p) {
 			break;
 		case 1:
 			if (p.x86.vex_L == 0) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "vpermpd";
@@ -5015,16 +5016,16 @@ void adbg_dasm_x86_vex_0f3a(adbg_disasm_t *p) {
 			m = "vpblendd";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 			break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0x04:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -5040,22 +5041,22 @@ void adbg_dasm_x86_vex_0f3a(adbg_disasm_t *p) {
 			break;
 		case 2:
 			if (p.x86.vex_L == 0) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			m = "vperm2f128";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 			break;
-		default: adbg_dasm_err(p); return;
+		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0x14:
 		if (p.x86.vex_pp != X86_VEX_PP_66H) {
-			adbg_dasm_err(p);
+			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
 		const(char) *m = void;
@@ -5076,7 +5077,7 @@ void adbg_dasm_x86_vex_0f3a(adbg_disasm_t *p) {
 			break;
 		case 0x16:
 			if (regop == false) {
-				adbg_dasm_err(p);
+				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
 			if (p.x86.vex_W) {
@@ -5095,39 +5096,39 @@ void adbg_dasm_x86_vex_0f3a(adbg_disasm_t *p) {
 			break;
 		}
 		if (p.mode >= AdbgDisasmMode.File)
-			adbg_dasm_push_str(p, m);
-		adbg_dasm_x86_vex_modrm(p, f);
-		adbg_dasm_x86_u8imm(p);
+			adbg_disasm_push_str(p, m);
+		adbg_disasm_x86_vex_modrm(p, f);
+		adbg_disasm_x86_u8imm(p);
 		return;
 	//TODO: -- Continue the x86 decoder!
-	default: adbg_dasm_err(p); return;
+	default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 	}
 }
 
-void adbg_dasm_x86_xop_8(adbg_disasm_t *p) {
+void adbg_disasm_x86_xop_8(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_x8(p, p.x86.op);
+		adbg_disasm_push_x8(p, p.x86.op);
 	
 }
 
-void adbg_dasm_x86_xop_9(adbg_disasm_t *p) {
+void adbg_disasm_x86_xop_9(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_x8(p, p.x86.op);
+		adbg_disasm_push_x8(p, p.x86.op);
 	
 }
 
-void adbg_dasm_x86_xop_10(adbg_disasm_t *p) {
+void adbg_disasm_x86_xop_10(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_x8(p, p.x86.op);
+		adbg_disasm_push_x8(p, p.x86.op);
 	
 }
 
@@ -5449,7 +5450,7 @@ enum {
 /// 	p = adbg_disasm_t 
 /// 	w = If non-zero, imitate W bit
 /// Returns: Register A
-const(char) *adbg_dasm_x86_eax(adbg_disasm_t *p, int w) {
+const(char) *adbg_disasm_x86_eax(adbg_disasm_t *p, int w) {
 	const(char) *a = void;
 	if (w & 1) {
 		if (p.x86.vex_W)
@@ -5463,17 +5464,17 @@ const(char) *adbg_dasm_x86_eax(adbg_disasm_t *p, int w) {
 }
 
 // Also serves as "default widths" for a opcode (byte)
-MemWidth adbg_dasm_x86_modrm_width(adbg_disasm_t *p, int op) {
+MemWidth adbg_disasm_x86_modrm_width(adbg_disasm_t *p, int op) {
 	if (op & 1)
 		return p.x86.pf_operand ? MemWidth.i16 : MemWidth.i32;
 	else
 		return MemWidth.i8;
 }
 
-void adbg_dasm_x86_u8imm(adbg_disasm_t *p) {
+void adbg_disasm_x86_u8imm(adbg_disasm_t *p) {
 	if (p.mode >= AdbgDisasmMode.File) {
-		adbg_dasm_push_x8(p, *p.ai8);
-		adbg_dasm_push_imm(p, *p.ai8);
+		adbg_disasm_push_x8(p, *p.ai8);
+		adbg_disasm_push_imm(p, *p.ai8);
 	}
 	++p.ai8;
 }
@@ -5482,17 +5483,17 @@ void adbg_dasm_x86_u8imm(adbg_disasm_t *p) {
 /// Then if it's the case, fetch and push a 16-bit immediate instead.
 /// Modifies memory pointer.
 /// Params: p = disassembler structure
-void adbg_dasm_x86_u32imm(adbg_disasm_t *p) {
+void adbg_disasm_x86_u32imm(adbg_disasm_t *p) {
 	if (p.x86.pf_operand) { // 16-bit
 		if (p.mode >= AdbgDisasmMode.File) {
-			adbg_dasm_push_x16(p, *p.ai16);
-			adbg_dasm_push_imm(p, *p.ai16);
+			adbg_disasm_push_x16(p, *p.ai16);
+			adbg_disasm_push_imm(p, *p.ai16);
 		}
 		++p.ai16;
 	} else { // Normal mode 32-bit
 		if (p.mode >= AdbgDisasmMode.File) {
-			adbg_dasm_push_x32(p, *p.ai32);
-			adbg_dasm_push_imm(p, *p.ai32);
+			adbg_disasm_push_x32(p, *p.ai32);
+			adbg_disasm_push_imm(p, *p.ai32);
 		}
 		++p.ai32;
 	}
@@ -5504,17 +5505,17 @@ void adbg_dasm_x86_u32imm(adbg_disasm_t *p) {
 /// Params:
 /// 	p = disassembler structure
 /// 	seg = Segment register string
-void adbg_dasm_x86_segimm(adbg_disasm_t *p, const(char) *seg) {
+void adbg_disasm_x86_segimm(adbg_disasm_t *p, const(char) *seg) {
 	if (p.x86.pf_address) { // 16-bit
 		if (p.mode >= AdbgDisasmMode.File) {
-			adbg_dasm_push_x16(p, *p.ai16);
-			adbg_dasm_push_immseg(p, *p.ai16, seg);
+			adbg_disasm_push_x16(p, *p.ai16);
+			adbg_disasm_push_immseg(p, *p.ai16, seg);
 		}
 		++p.ai16;
 	} else { // Normal mode 32-bit
 		if (p.mode >= AdbgDisasmMode.File) {
-			adbg_dasm_push_x32(p, *p.ai32);
-			adbg_dasm_push_immseg(p, *p.ai32, seg);
+			adbg_disasm_push_x32(p, *p.ai32);
+			adbg_disasm_push_immseg(p, *p.ai32, seg);
 		}
 		++p.ai32;
 	}
@@ -5524,7 +5525,7 @@ void adbg_dasm_x86_segimm(adbg_disasm_t *p, const(char) *seg) {
 /// prefix. Handles machine code and mnemonics, including the segment register.
 /// Modifies memory pointer.
 /// Params: p = disassembler structure
-void adbg_dasm_x86_immfar(adbg_disasm_t *p) {
+void adbg_disasm_x86_immfar(adbg_disasm_t *p) {
 	uint v = void;
 	if (p.x86.pf_address) {
 		v = *p.ai16;
@@ -5537,11 +5538,11 @@ void adbg_dasm_x86_immfar(adbg_disasm_t *p) {
 	++p.ai16;
 	if (p.mode >= AdbgDisasmMode.File) {
 		if (p.x86.pf_address)
-			adbg_dasm_push_x16(p, cast(ushort)v);
+			adbg_disasm_push_x16(p, cast(ushort)v);
 		else
-			adbg_dasm_push_x32(p, v);
-		adbg_dasm_push_x16(p, sv);
-		adbg_dasm_push_immfar(p, v, sv);
+			adbg_disasm_push_x32(p, v);
+		adbg_disasm_push_x16(p, sv);
+		adbg_disasm_push_immfar(p, v, sv);
 	}
 }
 
@@ -5559,7 +5560,7 @@ void adbg_dasm_x86_immfar(adbg_disasm_t *p) {
 /// Params: p = Disassembler parameters
 ///
 /// Returns: Selection number (see Enumeration mapping)
-int adbg_dasm_x86_0f_select(adbg_disasm_t *p) {
+int adbg_disasm_x86_0f_select(adbg_disasm_t *p) {
 	switch (p.x86.last_prefix) {
 	case 0xF2: return p.x86.pf_operand ? X86_0F_F266H : X86_0F_F2H;
 	case 0xF3: return X86_0F_F3H;
@@ -5575,13 +5576,13 @@ enum x86SegReg { // By official arrangement
 /// Returns an empty string if unset.
 /// Params: segreg = Byte opcode
 /// Returns: Segment register string
-const(char) *adbg_dasm_x86_segstr(int segreg) {
+const(char) *adbg_disasm_x86_segstr(int segreg) {
 	return segreg ? x86_T_segs[segreg - 1] : "";
 }
 
 /// While it is the formatter's job to format registers, the long legacy of
 /// the syntax wars lead to this
-const(char) *adbg_dasm_x87_ststr(adbg_disasm_t *p, int index) {
+const(char) *adbg_disasm_x87_ststr(adbg_disasm_t *p, int index) {
 	__gshared const(char) *[]att = [
 		"%st", "%st(1)", "%st(2)", "%st(3)", "%st(4)", "%st(5)", "%st(6)", "%st(7)"
 	];
@@ -5601,14 +5602,14 @@ const(char) *adbg_dasm_x87_ststr(adbg_disasm_t *p, int index) {
 
 /// (Internal) Process a ModR/M byte automatically.
 ///
-/// This function calls adbg_dasm_x86_modrm_rm and adbg_dasm_push_reg depending on the
+/// This function calls adbg_disasm_x86_modrm_rm and adbg_disasm_push_reg depending on the
 /// direction flag. If non-zero (X86_FLAG_DIR), the reg field is processed
 /// first; Otherwise vice versa (0).
 ///
 /// Params:
 /// 	p = Disassembler parameters
 /// 	flags = ModRM parameters
-void adbg_dasm_x86_modrm(adbg_disasm_t *p, int flags) {
+void adbg_disasm_x86_modrm(adbg_disasm_t *p, int flags) {
 	ubyte modrm = *p.ai8;
 	++p.ai8;
 
@@ -5628,12 +5629,12 @@ void adbg_dasm_x86_modrm(adbg_disasm_t *p, int flags) {
 	}
 	if (dir) goto L_REG;
 L_RM:
-	adbg_dasm_x86_modrm_rm(p, modrm, wmem, wreg);
+	adbg_disasm_x86_modrm_rm(p, modrm, wmem, wreg);
 	if (dir) return;
 
 L_REG:
 	if (p.mode >= AdbgDisasmMode.File)
-		adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, modrm >> 3, wreg));
+		adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, modrm >> 3, wreg));
 	if (dir) goto L_RM;
 }
 
@@ -5645,7 +5646,7 @@ L_REG:
 /// 	reg = Register selector
 /// 	width = Register width (byte, wide, mm, xmm, etc.)
 /// Returns: Register string or null if out of bound
-const(char) *adbg_dasm_x86_modrm_reg(adbg_disasm_t *p, int reg, int width) {
+const(char) *adbg_disasm_x86_modrm_reg(adbg_disasm_t *p, int reg, int width) {
 	size_t i = reg & 7;
 	if (p.platform == AdbgDisasmPlatform.x86_64) {
 		if (p.x86.modrm == false && p.x86.vex_B)
@@ -5675,7 +5676,7 @@ L_RET:	return x86_regs[width][i];
 /// 	addrpf = If the address prefix is applied
 /// 	vsib = Affected by SIB.Index
 /// Returns: Register string
-const(char) *adbg_dasm_x86_modrm_rm_reg(adbg_disasm_t *p, int rm, bool vsib = false) {
+const(char) *adbg_disasm_x86_modrm_rm_reg(adbg_disasm_t *p, int rm, bool vsib = false) {
 	size_t i = rm & 7;
 	size_t w = void;
 	if (p.platform == AdbgDisasmPlatform.x86_64) {
@@ -5703,13 +5704,13 @@ const(char) *adbg_dasm_x86_modrm_rm_reg(adbg_disasm_t *p, int rm, bool vsib = fa
 /// 	wreg = Register width
 /// 	flags = Modrm configuration flags
 //TODO: Condense wmem/wreg/flags as flags only
-void adbg_dasm_x86_modrm_rm(adbg_disasm_t *p, ubyte modrm, int wmem, int wreg) {
+void adbg_disasm_x86_modrm_rm(adbg_disasm_t *p, ubyte modrm, int wmem, int wreg) {
 	const(char) *seg = void, regstr = void;
 
 	bool filemode = p.mode >= AdbgDisasmMode.File;
 	if (filemode) {
-		adbg_dasm_push_x8(p, modrm);
-		seg = adbg_dasm_x86_segstr(p.x86.segreg);
+		adbg_disasm_push_x8(p, modrm);
+		seg = adbg_disasm_x86_segstr(p.x86.segreg);
 	}
 
 	int rm = modrm & MODRM_RM;
@@ -5731,45 +5732,45 @@ void adbg_dasm_x86_modrm_rm(adbg_disasm_t *p, ubyte modrm, int wmem, int wreg) {
 						ushort m = *p.ai16;
 						++p.ai16;
 						if (filemode)
-							adbg_dasm_push_memregimm(p, seg, m, wmem);
+							adbg_disasm_push_memregimm(p, seg, m, wmem);
 					} else {
 						if (filemode) {
-							regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
-							adbg_dasm_push_memsegreg(p, seg, regstr, wmem);
+							regstr = adbg_disasm_x86_modrm_rm_reg(p, rm);
+							adbg_disasm_push_memsegreg(p, seg, regstr, wmem);
 						}
 					}
 					return;
 				}
 				if (rm == MODRM_RM_100) {
-					adbg_dasm_x86_sib(p, modrm, wmem);
+					adbg_disasm_x86_sib(p, modrm, wmem);
 					return;
 				}
 			}
 			if (filemode)
-				regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
+				regstr = adbg_disasm_x86_modrm_rm_reg(p, rm);
 			if (rm == MODRM_RM_101) {
 				uint m = *p.ai32;
 				++p.ai32;
 				if (filemode) {
-					adbg_dasm_push_x32(p, m);
-					adbg_dasm_push_memregimm(p, regstr, m, wmem);
+					adbg_disasm_push_x32(p, m);
+					adbg_disasm_push_memregimm(p, regstr, m, wmem);
 				}
 			} else {
 				if (filemode)
-					adbg_dasm_push_memsegreg(p, seg, regstr, wmem);
+					adbg_disasm_push_memsegreg(p, seg, regstr, wmem);
 			}
 			return;
 		case 1:	// Memory Mode, 8-bit displacement
 			//TODO: Check if address prefix affects MOD=01 under x86 and x86_64
 			if (p.platform != AdbgDisasmPlatform.x86_16 && rm == MODRM_RM_100) {
-				adbg_dasm_x86_sib(p, modrm, wmem);
+				adbg_disasm_x86_sib(p, modrm, wmem);
 				return;
 			}
 			if (filemode) {
 				ubyte m = *p.ai8;
-				adbg_dasm_push_x8(p, m);
-				regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
-				adbg_dasm_push_memsegregimm(p, seg, regstr, adbg_dasm_adj_i8(m), wmem);
+				adbg_disasm_push_x8(p, m);
+				regstr = adbg_disasm_x86_modrm_rm_reg(p, rm);
+				adbg_disasm_push_memsegregimm(p, seg, regstr, adbg_disasm_adj_i8(m), wmem);
 			}
 			++p.ai8;
 			return;
@@ -5777,21 +5778,21 @@ void adbg_dasm_x86_modrm_rm(adbg_disasm_t *p, ubyte modrm, int wmem, int wreg) {
 			if (p.platform != AdbgDisasmPlatform.x86_64 && p.x86.pf_address) {
 				if (filemode) {
 					ushort m = *p.ai16;
-					adbg_dasm_push_x16(p, m);
-					regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
-					adbg_dasm_push_memsegregimm(p, seg, regstr, adbg_dasm_adj_i16(m), wmem);
+					adbg_disasm_push_x16(p, m);
+					regstr = adbg_disasm_x86_modrm_rm_reg(p, rm);
+					adbg_disasm_push_memsegregimm(p, seg, regstr, adbg_disasm_adj_i16(m), wmem);
 				}
 				++p.ai16;
 			} else {
 				if (rm == MODRM_RM_100) {
-					adbg_dasm_x86_sib(p, modrm, wmem);
+					adbg_disasm_x86_sib(p, modrm, wmem);
 					return;
 				}
 				if (filemode) {
 					uint m = *p.ai32;
-					adbg_dasm_push_x32(p, m);
-					regstr = adbg_dasm_x86_modrm_rm_reg(p, rm);
-					adbg_dasm_push_memsegregimm(p, seg, regstr, m, wmem);
+					adbg_disasm_push_x32(p, m);
+					regstr = adbg_disasm_x86_modrm_rm_reg(p, rm);
+					adbg_disasm_push_memsegregimm(p, seg, regstr, m, wmem);
 				}
 				++p.ai32;
 			}
@@ -5801,12 +5802,12 @@ void adbg_dasm_x86_modrm_rm(adbg_disasm_t *p, ubyte modrm, int wmem, int wreg) {
 	// Register mode
 	if (filemode) {
 		if (p.x86.vex_R) rm |= 0b1000;
-		adbg_dasm_push_reg(p, adbg_dasm_x86_modrm_reg(p, rm, wreg));
+		adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, rm, wreg));
 	}
 }
 
 // Process SIB, trips on address prefix
-void adbg_dasm_x86_sib(adbg_disasm_t *p, ubyte modrm, int wmem) {
+void adbg_disasm_x86_sib(adbg_disasm_t *p, ubyte modrm, int wmem) {
 	ubyte sib = *p.ai8; // SCALE=MOD, INDEX=REG, BASE=RM
 	++p.ai8;
 	int scale = 1 << (sib >> 6); // 2 ^ (0b11_000_000 >> 6)
@@ -5817,48 +5818,48 @@ void adbg_dasm_x86_sib(adbg_disasm_t *p, ubyte modrm, int wmem) {
 
 	bool filemode = p.mode >= AdbgDisasmMode.File;
 	if (filemode) {
-		adbg_dasm_push_x8(p, sib);
-		seg = adbg_dasm_x86_segstr(p.x86.segreg);
+		adbg_disasm_push_x8(p, sib);
+		seg = adbg_disasm_x86_segstr(p.x86.segreg);
 	}
 
 	switch (modrm & MODRM_MOD) { // Mode
 	case MODRM_MOD_00:
 		if (base == SIB_BASE_101) {
 			if (filemode) {
-				adbg_dasm_push_x32(p, *p.ai32);
+				adbg_disasm_push_x32(p, *p.ai32);
 				if (index == SIB_INDEX_100) // D32
-					adbg_dasm_push_x86_sib_m00_i100_b101(p,
+					adbg_disasm_push_x86_sib_m00_i100_b101(p,
 						seg, *p.ai32, wmem);
 				else // INDEX * SCALE + D32
-					adbg_dasm_push_x86_sib_m00_b101(p, seg,
-						adbg_dasm_x86_modrm_rm_reg(p, index, p.x86.vsib),
+					adbg_disasm_push_x86_sib_m00_b101(p, seg,
+						adbg_disasm_x86_modrm_rm_reg(p, index, p.x86.vsib),
 						scale, *p.ai32, wmem);
 			}
 			++p.ai32;
 		} else {
 			if (p.mode < AdbgDisasmMode.File) return;
-			rbase = adbg_dasm_x86_modrm_rm_reg(p, sib);
+			rbase = adbg_disasm_x86_modrm_rm_reg(p, sib);
 			if (index == SIB_INDEX_100) // BASE
-				adbg_dasm_push_x86_sib_m00_i100(p, seg, rbase, wmem);
+				adbg_disasm_push_x86_sib_m00_i100(p, seg, rbase, wmem);
 			else //  BASE + INDEX * SCALE
-				adbg_dasm_push_x86_sib_mod00(p, seg, rbase,
-					adbg_dasm_x86_modrm_rm_reg(p, index, p.x86.vsib),
+				adbg_disasm_push_x86_sib_mod00(p, seg, rbase,
+					adbg_disasm_x86_modrm_rm_reg(p, index, p.x86.vsib),
 					scale, wmem);
 		}
 		return;
 	case MODRM_MOD_01:
 		if (filemode) {
 			if (index == SIB_INDEX_100) { // BASE + DISP8
-				adbg_dasm_push_x8(p, *p.ai8);
-				adbg_dasm_push_x86_sib_m01_i100(p,
+				adbg_disasm_push_x8(p, *p.ai8);
+				adbg_disasm_push_x86_sib_m01_i100(p,
 					seg,
-					adbg_dasm_x86_modrm_rm_reg(p, sib),
+					adbg_disasm_x86_modrm_rm_reg(p, sib),
 					*p.ai8, wmem);
 			} else { // BASE + INDEX * SCALE + DISP8
-				adbg_dasm_push_x8(p, *p.ai8);
-				rbase = adbg_dasm_x86_modrm_rm_reg(p, base);
-				rindex = adbg_dasm_x86_modrm_rm_reg(p, index, p.x86.vsib);
-				adbg_dasm_push_x86_sib_m01(p,
+				adbg_disasm_push_x8(p, *p.ai8);
+				rbase = adbg_disasm_x86_modrm_rm_reg(p, base);
+				rindex = adbg_disasm_x86_modrm_rm_reg(p, index, p.x86.vsib);
+				adbg_disasm_push_x86_sib_m01(p,
 					seg, rbase, rindex, scale, *p.ai8, wmem);
 			}
 		}
@@ -5866,14 +5867,14 @@ void adbg_dasm_x86_sib(adbg_disasm_t *p, ubyte modrm, int wmem) {
 		return;
 	default: // MOD=11, last case
 		if (filemode) {
-			adbg_dasm_push_x32(p, *p.ai32);
-			rbase = adbg_dasm_x86_modrm_rm_reg(p, base);
+			adbg_disasm_push_x32(p, *p.ai32);
+			rbase = adbg_disasm_x86_modrm_rm_reg(p, base);
 			if (index == SIB_INDEX_100) { // BASE + DISP32
-				adbg_dasm_push_x86_sib_m01_i100(p,
+				adbg_disasm_push_x86_sib_m01_i100(p,
 					seg, rbase, *p.ai32, wmem);
 			} else { // BASE + INDEX * SCALE + DISP32
-				rindex = adbg_dasm_x86_modrm_rm_reg(p, index, p.x86.vsib);
-				adbg_dasm_push_x86_sib_m01(p,
+				rindex = adbg_disasm_x86_modrm_rm_reg(p, index, p.x86.vsib);
+				adbg_disasm_push_x86_sib_m01(p,
 					seg, rbase, rindex, scale, *p.ai32, wmem);
 			}
 		}
@@ -5926,13 +5927,13 @@ enum X86_VEX_MAP_XOP10	= 0b0_1010;	/// Map 10
  * 	p = Disassembler parameters
  * 	flags = Direction, Memory/Register widths, Scalar
  */
-void adbg_dasm_x86_vex_modrm(adbg_disasm_t *p, int flags) {
+void adbg_disasm_x86_vex_modrm(adbg_disasm_t *p, int flags) {
 	ubyte modrm = *p.ai8;
 	++p.ai8;
 
 	//TODO: Make it so X86_FLAG_VEX_NO_L is ignored and width is forced to i128
 	if (flags & X86_FLAG_VEX_NO_L && p.x86.vex_L) {
-		adbg_dasm_err(p);
+		p.error = adbg_error_set(AdbgError.illegalInstruction);
 		return;
 	}
 
@@ -5955,47 +5956,47 @@ void adbg_dasm_x86_vex_modrm(adbg_disasm_t *p, int flags) {
 	case 0: // 0, includes 2 operands
 		if (dir) goto L_2REG;
 L_2RM:
-		adbg_dasm_x86_modrm_rm(p, modrm, wmem, sw);
+		adbg_disasm_x86_modrm_rm(p, modrm, wmem, sw);
 		if (dir) return;
 L_2REG:
 		if (filemode) {
 			const(char) *m = void;
 			if (flags & X86_FLAG_VEX_USEvvvv) {
-				m = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
+				m = adbg_disasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
 			} else {
-				m = adbg_dasm_x86_modrm_reg(p, modrm >> 3, wreg);
+				m = adbg_disasm_x86_modrm_reg(p, modrm >> 3, wreg);
 			}
-			adbg_dasm_push_reg(p, m);
+			adbg_disasm_push_reg(p, m);
 		}
 		if (dir) goto L_2RM;
 		return;
 	case X86_FLAG_3OPRND:
 		const(char)* r1 = void, r2 = void;
 		if (filemode) {
-			r1 = adbg_dasm_x86_modrm_reg(p, modrm >> 3, wreg);
-			r2 = adbg_dasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
+			r1 = adbg_disasm_x86_modrm_reg(p, modrm >> 3, wreg);
+			r2 = adbg_disasm_x86_modrm_reg(p, p.x86.vex_vvvv, sw);
 		}
 		// e.g. vgatherdps xmm0,dword [rax+xmm0],xmm0
 		if (flags & X86_FLAG_VEX_VSIB) {
 			p.x86.vsib = true;
 			if (filemode)
-				adbg_dasm_push_reg(p, r1);
-			adbg_dasm_x86_modrm_rm(p, modrm, wmem, sw);
+				adbg_disasm_push_reg(p, r1);
+			adbg_disasm_x86_modrm_rm(p, modrm, wmem, sw);
 			if (filemode)
-				adbg_dasm_push_reg(p, r2);
+				adbg_disasm_push_reg(p, r2);
 		} else {
 			if (dir) goto L_3REG;
 L_3RM:
-			adbg_dasm_x86_modrm_rm(p, modrm, wmem, sw);
+			adbg_disasm_x86_modrm_rm(p, modrm, wmem, sw);
 			if (dir) return;
 L_3REG:
 			if (filemode) {
 				if (dir) {
-					adbg_dasm_push_reg(p, r1);
-					adbg_dasm_push_reg(p, r2);
+					adbg_disasm_push_reg(p, r1);
+					adbg_disasm_push_reg(p, r2);
 				} else {
-					adbg_dasm_push_reg(p, r2);
-					adbg_dasm_push_reg(p, r1);
+					adbg_disasm_push_reg(p, r2);
+					adbg_disasm_push_reg(p, r1);
 				}
 			}
 			if (dir) goto L_3RM;
@@ -6003,7 +6004,7 @@ L_3REG:
 		return;
 	case X86_FLAG_4OPRND: // FMA4 including xmm0:imm8[7:4]
 		if (filemode)
-			adbg_dasm_push_str(p, "todo");
+			adbg_disasm_push_str(p, "todo");
 		return;
 	}
 }

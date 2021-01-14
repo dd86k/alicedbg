@@ -8,6 +8,7 @@ module dumper.dumper;
 import core.stdc.stdio;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
+import adbg.error;
 import adbg.disasm, adbg.obj;
 import dumper;
 public import adbg.obj.loader;
@@ -134,23 +135,23 @@ int adbg_dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 		uint icnt;	/// instruction count
 		uint ills;	/// Number of illegal instructions
 		for (uint i, isize = void; i < size; i += isize) {
-			AdbgDisasmError e = cast(AdbgDisasmError)adbg_disasm(dp, AdbgDisasmMode.Size);
+			AdbgError e = cast(AdbgError)adbg_disasm(dp, AdbgDisasmMode.Size);
 			isize = cast(uint)(dp.av - dp.la);
-			with (AdbgDisasmError)
-			final switch (e) {
-			case None:
+			with (AdbgError)
+			switch (e) {
+			case none:
 				iavg += isize;
 				++icnt;
 				if (isize > imax)
 					imax = isize;
 				break;
-			case Illegal: 
+			case illegalInstruction: 
 				iavg += isize;
 				++icnt;
 				++ills;
 				break;
-			case NullAddress, NotSupported:
-				printf("disasm: %s\n", adbg_dasm_errmsg(e));
+			default:
+				printf("disasm: %s\n", adbg_error_message);
 				return e;
 			}
 		}
@@ -164,15 +165,15 @@ int adbg_dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 		);
 	} else {
 		for (uint i; i < size; i += dp.av - dp.la) {
-			AdbgDisasmError e = cast(AdbgDisasmError)adbg_disasm(dp, AdbgDisasmMode.File);
-			with (AdbgDisasmError)
+			AdbgError e = cast(AdbgError)adbg_disasm(dp, AdbgDisasmMode.File);
+			with (AdbgError)
 			switch (e) {
-			case None, Illegal:
+			case none, illegalInstruction:
 				printf("%08X %-30s %-30s\n",
 					i, dp.mcbuf.ptr, dp.mnbuf.ptr);
 				continue;
 			default:
-				printf("disasm: %s\n", adbg_dasm_errmsg(e));
+				printf("disasm: %s\n", adbg_error_message);
 				return e;
 			}
 		}

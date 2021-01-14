@@ -23,5 +23,5 @@ struct aarch64_internals_t { align(1):
 
 /// Disassemble Aarch64
 /// Params: p = Disassembler parameters
-void adbg_dasm_aarch64(adbg_disasm_t *p) {
+void adbg_disasm_aarch64(adbg_disasm_t *p) {
 }
