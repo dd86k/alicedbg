@@ -3,12 +3,12 @@
  *
  * License: BSD 3-clause
  */
-module adbg.os.posix.seh;
+module adbg.sys.posix.seh;
 
 version (Posix):
 
 import adbg.debugger.exception;
-import adbg.os.setjmp;
+import adbg.sys.setjmp;
 import core.sys.posix.signal;
 import core.sys.posix.ucontext;
 
