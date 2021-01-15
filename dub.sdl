@@ -6,6 +6,9 @@ copyright "Copyright © 2019-2021 dd86k <dd@dax.moe>"
 license "BSD 3-clause"
 version "0.0.0"
 
+# NOTE: To support older DUB and D compiler versions, the "betterC"
+#       buildOptions value is not used.
+
 #
 # Common build types
 #
@@ -16,51 +19,41 @@ configuration "application" {
 	versions "Build_Application"
 }
 
-# Make the compiler very verbose, only for diagnostics when compiling.
-buildType "debugvv" {
-	buildOptions "debugMode" "debugInfo" platform="dmd"
-	buildOptions "debugMode" "debugInfo" platform="ldc"
-	buildOptions "debugMode" "debugInfo" platform="gdc"
-	dflags "-betterC" "-v" "-vgc" "-vtls" platform="dmd"
-	dflags "-betterC" "-v" "--vgc" platform="ldc"
-	dflags "-v" "-ftransition=nogc" "-ftransition=tls" platform="gdc"
-}
-
-# Compile in debug mode and make the compiler emit GC and TLS usage.
-# Mostly interested in the latter, as betterC does not attach the druntime at
-# compile-time, thus rending the GC point moot, but just in case.
+# Make the compiler print GC (despite not using it) usage, TLS (thread local
+# storage) usage, and target info for runtime diagnostic purposes.
 buildType "debugv" {
-	buildOptions "debugMode" "debugInfo" platform="dmd"
-	buildOptions "debugMode" "debugInfo" platform="ldc"
-	buildOptions "debugMode" "debugInfo" platform="gdc"
+	debugVersions "PrintTargetInfo"
+	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
 	dflags "-betterC" "--vgc" platform="ldc"
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
 
+# Make the compiler very verbose for compile-time diagnostic purposess.
+buildType "debugvv" {
+	buildOptions "debugMode" "debugInfo"
+	dflags "-betterC" "-v" platform="dmd"
+	dflags "-betterC" "-v" platform="ldc"
+	dflags "-v" platform="gdc"
+}
+
 # Compile in debug mode.
 buildType "debug" {
-	buildOptions "debugMode" "debugInfo" platform="dmd"
-	buildOptions "debugMode" "debugInfo" platform="ldc"
-	buildOptions "debugMode" "debugInfo" platform="gdc"
+	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
 }
 
 # Compile in release mode.
 buildType "release" {
-	buildOptions "releaseMode" "optimize" platform="dmd"
-	buildOptions "releaseMode" "optimize" platform="ldc"
-	buildOptions "releaseMode" "optimize" platform="gdc"
+	buildOptions "releaseMode" "optimize"
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
 }
 
 # Compile in release mode with no bound checking.
 buildType "release-nobounds" {
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" platform="dmd"
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" platform="ldc"
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" platform="gdc"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck"
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
 }
@@ -69,9 +62,7 @@ buildType "release-nobounds" {
 # This is the maximum performance option, may take much longer to compile.
 # Highly discouraged for building as a library and official release builds.
 buildType "release-inline" {
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" platform="dmd"
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" platform="ldc"
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline" platform="gdc"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline"
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
 }
@@ -83,23 +74,23 @@ buildType "release-inline" {
 # Generate a library.
 configuration "library" {
 	targetType "library"
-	excludedSourceFiles "src/ui/*" "src/main.d"
+	excludedSourceFiles "src/main.d" "src/debugger/*" "src/dumper/*"
 }
 # Ditto as dub docs.
 configuration "sourceLibrary" {
 	targetType "sourceLibrary"
-	excludedSourceFiles "src/ui/*" "src/main.d"
+	excludedSourceFiles "src/main.d" "src/debugger/*" "src/dumper/*"
 }
 # Force output to a static library.
 configuration "staticlibrary" {
 	targetType "library"
-	excludedSourceFiles "src/ui/*" "src/main.d"
+	excludedSourceFiles "src/main.d" "src/debugger/*" "src/dumper/*"
 }
 # Force output to a dynamic/shared library.
 # NOTICE: Broken on windows, regardless of compiler used.
 configuration "dynamicLibrary" {
 	targetType "dynamicLibrary"
-	excludedSourceFiles "src/ui/*" "src/main.d"
+	excludedSourceFiles "src/main.d" "src/debugger/*" "src/dumper/*"
 }
 
 # Generate headers
@@ -134,6 +125,7 @@ buildType "afl" {
 # TODO: add dmain.d as a wrapper and manually call main.
 #       This will permit using the profiler from the druntime (for hooks).
 #       If that doesn't work, exclude main.d and try something else.
+# NOTE: This profiles the GC, which is pointless to do here
 buildType "profile" {
 	buildOptions "debugMode" "debugInfo" "profile" platform="dmd"
 	buildOptions "debugMode" "debugInfo" "profile" platform="ldc"
