@@ -52,7 +52,11 @@ int adbg_sys_errno() {
 /// Params:
 /// 	mod = module adbg.name
 /// 	code = Error code
-void adbg_sys_perror(string mod)(int code) {
+void adbg_sys_perror(string mod = null)(int code) {
 	import core.stdc.stdio : printf;
-	printf(mod~": ("~ERR_FMT~") %s\n", code, adbg_sys_error(code));
+	static if (mod == null)
+		enum fmt = "("~ERR_FMT~") %s\n";
+	else
+		enum fmt = mod~": ("~ERR_FMT~") %s\n";
+	printf(fmt, code, adbg_sys_error(code));
 }
