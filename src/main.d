@@ -338,9 +338,8 @@ immutable(char) *fmt_version =
 " - <https://github.com/dd86k/alicedbg>\n"~
 "Compiler: "~__VENDOR__~" %u.%03u, "~TARGET_OBJFMT~" obj, "~TARGET_FLTABI~" float\n"~
 "CRT: "~TARGET_CRT~" (C++RT: "~TARGET_CPPRT~") on "~TARGET_PLATFORM~"/"~TARGET_OS~"\n"~
-"InlineAsm: "~IN_ASM_STR~"\n"~
-"Features: dbg disasm\n"~
-"Disasm: x86_16 x86 x86_64\n";
+"Environment: "~TARGET_ENV~"\n"~
+"InlineAsm: "~IN_ASM_STR~"\n";
 int cliversion(settings_t*) {
 	printf(fmt_version, d.version_major, d.version_minor);
 	exit(0);

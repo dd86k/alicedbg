@@ -39,13 +39,14 @@ struct adbg_info_t {
 	const(char) *os      = TARGET_OS;
 	const(char) *crt     = TARGET_CRT;
 	const(char) *cpprt   = TARGET_CPPRT;
+	const(char) *env     = TARGET_ENV;
 	const(char) *objfmt  = TARGET_OBJFMT;
 	const(char) *fltabi  = TARGET_FLTABI;
 	const(char) *asmhint = IN_ASM_STR;
 }
 
 //
-// ABI string
+// ANCHOR ABI string
 //
 
 version (X86) {
@@ -68,19 +69,21 @@ else
 	static assert(0, "Platform not supported.");
 
 //
-// CRT string
+// ANCHOR CRT string
 //
 
-version (CRuntime_Microsoft)
-	enum TARGET_CRT = "Microsoft";	/// Platform CRT string
-else version (CRuntime_Bionic)
+version (CRuntime_Bionic)
 	enum TARGET_CRT = "Bionic";	/// Platform CRT string
 else version (CRuntime_DigitalMars)
 	enum TARGET_CRT = "DigitalMars";	/// Platform CRT string
 else version (CRuntime_Glibc)
 	enum TARGET_CRT = "Glibc";	/// Platform CRT string
+else version (CRuntime_Microsoft)
+	enum TARGET_CRT = "Microsoft";	/// Platform CRT string
 else version (CRuntime_Musl)
 	enum TARGET_CRT = "Musl";	/// Platform CRT string
+else version (CRuntime_Newlib) // Cygwin
+	enum TARGET_CRT = "Newlib";	/// Platform CRT string
 else version (CRuntime_UClibc)
 	enum TARGET_CRT = "UClibc";	/// Platform CRT string
 else version (CRuntime_WASI) // WebAssembly
@@ -89,7 +92,7 @@ else
 	enum TARGET_CRT = "Unknown";	/// Platform CRT string
 
 //
-// OS string
+// ANCHOR OS string
 //
 
 version (Win64)
@@ -181,7 +184,22 @@ static if (FEATURE_TARGETINFO) {
 }
 
 //
-// ANCHOR Additional Feature Versions
+// ANCHOR Environement string
+//        This constitutes environment C libraries (e.g., wrappers)
+//
+
+version (MinGW) {
+	enum TARGET_ENV = "MinGW";
+} else version (Cygwin) {
+	enum TARGET_ENV = "Cygwin";
+} else version (FreeStanding) { // now that would surprise me
+	enum TARGET_ENV = "Bare-metal";
+} else {
+	enum TARGET_ENV = "none";
+}
+
+//
+// ANCHOR Inline Assembler string
 //
 
 enum InlineAsm {
@@ -199,6 +217,8 @@ version (DigitalMars) {
 		enum IN_ASM = InlineAsm.DMD_x86;
 	} else version (D_InlineAsm_X86_64) {
 		enum IN_ASM = InlineAsm.DMD_x86_64;
+	} else {
+		enum IN_ASM = InlineAsm.None;
 	}
 } else
 version (GNU_Inline) {
@@ -211,6 +231,8 @@ version (GNU_Inline) {
 		enum IN_ASM = InlineAsm.GDC_x86;
 	} else version (D_InlineAsm_X86_64) {
 		enum IN_ASM = InlineAsm.GDC_x86_64;
+	} else {
+		enum IN_ASM = InlineAsm.None;
 	}
 } else
 version (LDC) {
@@ -218,6 +240,8 @@ version (LDC) {
 		enum IN_ASM = InlineAsm.LDC_x86;
 	} else version (D_InlineAsm_X86_64) {
 		enum IN_ASM = InlineAsm.LDC_x86_64;
+	} else {
+		enum IN_ASM = InlineAsm.None;
 	}
 } else
 	enum IN_ASM = InlineAsm.None;
@@ -236,6 +260,19 @@ else static if (IN_ASM == InlineAsm.LDC_x86_64)
 	enum IN_ASM_STR = "ldc-x86_64";
 else
 	enum IN_ASM_STR = "none";
+
+debug (PrintTargetInfo) {
+	pragma(msg, "ADBG_VERSION\t", ADBG_VERSION);
+	pragma(msg, "__BUILDTYPE__\t", __BUILDTYPE__);
+	pragma(msg, "TARGET_PLATFORM\t", TARGET_PLATFORM);
+	pragma(msg, "TARGET_OS\t", TARGET_OS);
+	pragma(msg, "TARGET_CRT\t", TARGET_CRT);
+	pragma(msg, "TARGET_CPPRT\t", TARGET_CPPRT);
+	pragma(msg, "TARGET_ENV\t", TARGET_ENV);
+	pragma(msg, "TARGET_OBJFMT\t", TARGET_OBJFMT);
+	pragma(msg, "TARGET_FLTABI\t", TARGET_FLTABI);
+	pragma(msg, "IN_ASM_STR\t", IN_ASM_STR);
+}
 
 //
 // ANCHOR External functions
