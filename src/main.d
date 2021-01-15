@@ -81,7 +81,8 @@ immutable option_t[] options = [
 	{ 'S', "show", "Dumper: Select which portions to output (default=h)", true, farg: &clishow },
 	// pages
 	{ 'h', "help",    "Show this help screen and exit", false, &clihelp },
-	{ 0,   "version", "Show the version screen and exit", false, &cliver },
+	{ 0,   "version", "Show the version screen and exit", false, &cliversion },
+	{ 0,   "ver",     "Only show the version string and exit", false, &cliver },
 	{ 0,   "license", "Show the license page and exit", false, &clilicense },
 	{ 0,   "meow",    "Meow and exit", false, &climeow },
 ];
@@ -340,8 +341,13 @@ immutable(char) *fmt_version =
 "InlineAsm: "~IN_ASM_STR~"\n"~
 "Features: dbg disasm\n"~
 "Disasm: x86_16 x86 x86_64\n";
-int cliver(settings_t*) {
+int cliversion(settings_t*) {
 	printf(fmt_version, d.version_major, d.version_minor);
+	exit(0);
+	return 0;
+}
+int cliver(settings_t*) {
+	puts(ADBG_VERSION);
 	exit(0);
 	return 0;
 }
