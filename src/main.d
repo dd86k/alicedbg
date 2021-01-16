@@ -54,10 +54,10 @@ struct settings_t {
 //      Avoids repeating options, may speed-up parsing
 //      * Could be an issue for repeatable options (unless another field added..)
 struct option_t {
-	char alt;
+	align(4) char alt;
 	immutable(char) *val;
 	immutable(char) *desc;
-	bool arg;	/// if it takes an argument
+	align(4) bool arg;	/// if it takes an argument
 	union {
 		extern(C) int function(settings_t*) f;
 		extern(C) int function(settings_t*, const(char)*) farg;

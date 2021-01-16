@@ -30,78 +30,47 @@ size_t adbg_util_argv_flatten(char *b, int bs, const(char) **argv) {
 }
 
 int adbg_util_argv_expand(char *buf, size_t buflen, char **argv) {
-	/*size_t j;
-	int a;
-
-	char* mloc = buf;
-
-	for (size_t i; i <= buflen; ++i) { // was <=
-		const char c = buf[i];
-		if (c == 0 || c == ' ' || c == '\n') {
-			argv[a] = mloc;
-			mloc += i - j + 1;
-			strncpy(argv[a], buf + j, i - j);
-			argv[a][i - j] = 0;
-			while (buf[i + 1] == ' ' || buf[i + 1] == '\t') ++i;
-			j = i + 1;
-			++a;
-		} else if (c == '"') {
-			j = ++i;
-			while (c != '"' && c != 0) ++i;
-			if (c == 0) continue;
-			argv[a] = mloc;
-			mloc += i - j + 1;
-			strncpy(argv[a], buf + j, i - j);
-			argv[a][i - j] = 0;
-			while (buf[i + 1] == ' ' || buf[i + 1] == '\t') ++i;
-			j = ++i;
-			++a;
-		}
-	}
-
-	return --a;*/
-	
-	char c = buf[0];
-	
-	if (c < 20) // any control characters
-		return 0;
-	
-	int argc;
+	import core.stdc.ctype : isalnum, ispunct;
 	size_t index;
+	int argc;
 	
+	if (buflen == 0)
+		return argc;
+	
+	// "   test 1  \t   2 2   "
+	//     ^   0^0      ^0^0
+	
+L_WORD:
+	// move pointer to first non-white character
 	A: while (index < buflen) {
-		c = buf[index];
+		const char c = buf[index];
 		switch (c) {
-		case 0: break A;
+		case 0, '\n', '\r': return argc;
 		case ' ', '\t':
-			size_t l;
-			break;
-		default:
+			++index;
+			continue;
+		default: break A;
 		}
 	}
 	
-	/+A: for (size_t index; index < buflen; ++index) {
-		c = buf[index];
-		switch (c) {
-		case 0: break A;
-		case ' ', '\t':
-			buf[index] = 0;
-			do {
-				c = buf[++index];
-			} while (c == ' ' || c == '\t');
-			argv[argc] = buf + index;
-			++argc;
-			while (c == ' ')
-			do {
-				c = buf[++index];
-			} while (c == ' ' || c == '\t');
-			break;
-//		case '"':
-		default: continue A;
-		}
-	}+/
+	argv[argc] = buf + index;
 	
-	return argc;
+	// get how long the parameter length is
+	while (index < buflen) {
+		const char c = buf[index];
+		
+		if (isalnum(c) || ispunct(c)) {
+			++index;
+			continue;
+		}
+		
+		++argc;
+		buf[index++] = 0;
+		goto L_WORD;
+	}
+	
+	// reached the end before we knew it
+	return --argc;
 }
 
 //
