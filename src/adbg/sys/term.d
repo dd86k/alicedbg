@@ -226,8 +226,9 @@ void adbg_term_clear() {
 	} else version (Posix) {
 		WindowSize ws = void;
 		adbg_term_size(&ws);
-		//TODO: write 'default' attribute character
-		printf("\033[0;0H%*s\033[0;0H", ws.height * ws.width, cast(char*)"");
+		//TODO: write term's 'default' attribute character
+		immutable const(char) *empty = "";
+		printf("\033[0;0H%*s\033[0;0H", ws.height * ws.width, empty);
 	}
 	else static assert(0, "Clear: Not implemented");
 }

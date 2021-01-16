@@ -8,6 +8,8 @@
  */
 module adbg.sys.windows.def;
 
+version (Windows):
+
 public import core.sys.windows.windef;
 
 enum WOW64_SIZE_OF_80387_REGISTERS = 80;

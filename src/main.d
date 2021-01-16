@@ -33,7 +33,6 @@ bool askhelp(const(char) *query) {
 	}
 }
 
-enum size_t ptrsize = size_t.sizeof;
 //immutable(char)* ARG    = "<arg>";
 //immutable(char)* NOARG  = "     ";
 
@@ -55,10 +54,10 @@ struct settings_t {
 //      Avoids repeating options, may speed-up parsing
 //      * Could be an issue for repeatable options (unless another field added..)
 struct option_t {
-	align(ptrsize) char alt;
+	char alt;
 	immutable(char) *val;
 	immutable(char) *desc;
-	align(ptrsize) bool arg;	/// if it takes an argument
+	bool arg;	/// if it takes an argument
 	union {
 		extern(C) int function(settings_t*) f;
 		extern(C) int function(settings_t*, const(char)*) farg;

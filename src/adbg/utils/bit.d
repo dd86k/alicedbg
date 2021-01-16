@@ -32,8 +32,6 @@ version (LittleEndian)
 else
 	private enum TE = 1; /// Target Endian
 
-pragma(inline, true): // Encourage inlining whenever possible
-
 alias fswap16 = ushort function(ushort);
 alias fswap32 = uint function(uint);
 alias fswap64 = ulong function(ulong);

@@ -31,7 +31,7 @@ version (Posix) {
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
 	import core.sys.posix.signal : kill, SIGKILL, siginfo_t, raise;
 	import core.sys.posix.sys.uio;
-	import core.sys.linux.fcntl : open;
+	import core.sys.posix.fcntl : open;
 	import core.stdc.stdlib : exit, malloc, free;
 	import core.stdc.stdio : snprintf;
 	import adbg.sys.posix.mann;
