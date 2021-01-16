@@ -51,6 +51,8 @@ struct settings_t {
 //TODO: Consider adding 'bool processed' field
 //      Avoids repeating options, may speed-up parsing
 //      * Could be an issue for repeatable options (unless another field added..)
+//TODO: Consider adding 'bool bundled' field
+//      Would allow alt options to be bundled: -DR
 struct option_t {
 	align(4) char alt;
 	immutable(char) *val;
@@ -58,24 +60,24 @@ struct option_t {
 	align(4) bool arg;	/// if it takes an argument
 	union {
 		extern(C) int function(settings_t*) f;
-		extern(C) int function(settings_t*, const(char)*) farg;
+		extern(C) int function(settings_t*, const(char)*) fa;
 	}
 }
 immutable option_t[] options = [
 	// general
-	{ 'm', "march",  "Select architecture for disassembler", true, farg: &climarch },
-	{ 's', "syntax", "Select disassembler syntax", true, farg: &clisyntax },
+	{ 'm', "march",  "Select architecture for disassembler", true, fa: &climarch },
+	{ 's', "syntax", "Select disassembler syntax", true, fa: &clisyntax },
 	//TODO: --debug/--no-debug: Disable/enable internal SEH from main
 	// debugger
-	{ 'f', "file", "Debugger: Load file (default parameter)", true, farg: &clifile },
-	{ 0,   "args", "Debugger: Supply arguments to file", true, farg: &cliargs },
-	{ 0,   "env",  "Debugger: Supply environment to file", true, farg: &clienv },
-	{ 'p', "pid",  "Debugger: Attach to process", true, farg: &clipid },
-	{ 'u', "ui",   "Debugger: Select user interface (default=loop)", true, farg: &cliui },
+	{ 'f', "file", "Debugger: Load file (default parameter)", true, fa: &clifile },
+	{ 0,   "args", "Debugger: Supply arguments to file", true, fa: &cliargs },
+	{ 0,   "env",  "Debugger: Supply environment to file", true, fa: &clienv },
+	{ 'p', "pid",  "Debugger: Attach to process", true, fa: &clipid },
+	{ 'u', "ui",   "Debugger: Select user interface (default=loop)", true, fa: &cliui },
 	// dumper
 	{ 'D', "dump", "Dumper: Select the object dump mode", false, &clidump },
 	{ 'R', "raw",  "Dumper: File is not an object, but raw", false, &cliraw },
-	{ 'S', "show", "Dumper: Select which portions to output (default=h)", true, farg: &clishow },
+	{ 'S', "show", "Dumper: Select which portions to output (default=h)", true, fa: &clishow },
 	// pages
 	{ 'h', "help",    "Show this help screen and exit", false, &clihelp },
 	{ 0,   "version", "Show the version screen and exit", false, &cliversion },
@@ -125,9 +127,9 @@ struct setting_syntax_t {
 	immutable(char)* opt, desc;
 }
 immutable setting_syntax_t[] syntaxes = [
-	{ AdbgDisasmSyntax.Att, "att",   "AT&T syntax" },
-	{ AdbgDisasmSyntax.Att, "intel", "Intel syntax" },
-	{ AdbgDisasmSyntax.Att, "nasm",  "Netwide Assembler syntax" },
+	{ AdbgDisasmSyntax.Att,   "att",   "AT&T syntax" },
+	{ AdbgDisasmSyntax.Intel, "intel", "Intel syntax" },
+	{ AdbgDisasmSyntax.Nasm,  "nasm",  "Netwide Assembler syntax" },
 ];
 int clisyntax(settings_t *settings, const(char) *val) {
 	if (askhelp(val)) {
@@ -161,10 +163,10 @@ int clifile(settings_t *settings, const(char) *val) {
 //
 
 int cliargs(settings_t *settings, const(char) *val) {
-	puts("todo");
+	puts("cliargs: todo");
 	return EXIT_FAILURE;
 	//TODO: cliargs
-	//      Seperate per space, "--example=33"
+	//      "--example -u hi"
 	/*settings.argv = cast(const(char)**)malloc(ADBG_CLI_ARGV_ARRAY_LENGTH);
 	if (settings.argv == null) {
 		puts("cli: could not allocate (args)");
@@ -182,8 +184,10 @@ int cliargs(settings_t *settings, const(char) *val) {
 //
 
 int clienv(settings_t *settings, const(char) *val) {
-	puts("todo");
+	puts("clienv: todo");
 	return EXIT_FAILURE;
+	//TODO: clienv
+	//      "key=value,A=B"
 	/*opt.envp = cast(const(char)**)malloc(ADBG_CLI_ARGV_ARRAY_LENGTH);
 	if (opt.envp == null) {
 		puts("cli: could not allocate (envp)");
@@ -450,7 +454,7 @@ int main(int argc, const(char)** argv) {
 						return EXIT_FAILURE;
 					}
 					argval = argv[++argi];
-					lasterr = opt.farg(&settings, argval);
+					lasterr = opt.fa(&settings, argval);
 					if (lasterr) {
 						printf("main: '%s' failed with --%s\n", argval, opt.val);
 						return lasterr;
@@ -474,7 +478,7 @@ int main(int argc, const(char)** argv) {
 						return EXIT_FAILURE;
 					}
 					argval = argv[++argi];
-					lasterr = opt.farg(&settings, argval);
+					lasterr = opt.fa(&settings, argval);
 					if (lasterr) {
 						printf("main: '%s' failed with -%c\n", argval, opt.alt);
 						return lasterr;
