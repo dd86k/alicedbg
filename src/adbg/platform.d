@@ -42,7 +42,6 @@ struct adbg_info_t {
 	const(char) *env     = TARGET_ENV;
 	const(char) *objfmt  = TARGET_OBJFMT;
 	const(char) *fltabi  = TARGET_FLTABI;
-	const(char) *asmhint = IN_ASM_STR;
 }
 
 //
@@ -196,82 +195,6 @@ version (MinGW) {
 	enum TARGET_ENV = "Bare-metal";
 } else {
 	enum TARGET_ENV = "Native";
-}
-
-//
-// ANCHOR Inline Assembler string
-//
-
-enum InlineAsm {
-	None,
-	DMD_x86,
-	DMD_x86_64,
-	LDC_x86,
-	LDC_x86_64,
-	GDC_x86,
-	GDC_x86_64,
-}
-
-version (DigitalMars) {
-	version (D_InlineAsm_X86) {
-		enum IN_ASM = InlineAsm.DMD_x86;
-	} else version (D_InlineAsm_X86_64) {
-		enum IN_ASM = InlineAsm.DMD_x86_64;
-	} else {
-		enum IN_ASM = InlineAsm.None;
-	}
-} else
-version (GNU_Inline) {
-	//TODO: Check which FE version implemented inlined asm
-	version (X86) {
-		enum IN_ASM = InlineAsm.GDC_x86;
-	} else version (X86_64) {
-		enum IN_ASM = InlineAsm.GDC_x86_64;
-	} else version (D_InlineAsm_X86) {
-		enum IN_ASM = InlineAsm.GDC_x86;
-	} else version (D_InlineAsm_X86_64) {
-		enum IN_ASM = InlineAsm.GDC_x86_64;
-	} else {
-		enum IN_ASM = InlineAsm.None;
-	}
-} else
-version (LDC) {
-	version (D_InlineAsm_X86) {
-		enum IN_ASM = InlineAsm.LDC_x86;
-	} else version (D_InlineAsm_X86_64) {
-		enum IN_ASM = InlineAsm.LDC_x86_64;
-	} else {
-		enum IN_ASM = InlineAsm.None;
-	}
-} else
-	enum IN_ASM = InlineAsm.None;
-
-static if (IN_ASM == InlineAsm.DMD_x86)
-	enum IN_ASM_STR = "dmd-x86";
-else static if (IN_ASM == InlineAsm.DMD_x86_64)
-	enum IN_ASM_STR = "dmd-x86_64";
-else static if (IN_ASM == InlineAsm.GDC_x86)
-	enum IN_ASM_STR = "gdc-x86";
-else static if (IN_ASM == InlineAsm.GDC_x86_64)
-	enum IN_ASM_STR = "gdc-x86_64";
-else static if (IN_ASM == InlineAsm.LDC_x86)
-	enum IN_ASM_STR = "ldc-x86";
-else static if (IN_ASM == InlineAsm.LDC_x86_64)
-	enum IN_ASM_STR = "ldc-x86_64";
-else
-	enum IN_ASM_STR = "none";
-
-debug (PrintTargetInfo) {
-	pragma(msg, "ADBG_VERSION\t", ADBG_VERSION);
-	pragma(msg, "__BUILDTYPE__\t", __BUILDTYPE__);
-	pragma(msg, "TARGET_PLATFORM\t", TARGET_PLATFORM);
-	pragma(msg, "TARGET_OS\t", TARGET_OS);
-	pragma(msg, "TARGET_CRT\t", TARGET_CRT);
-	pragma(msg, "TARGET_CPPRT\t", TARGET_CPPRT);
-	pragma(msg, "TARGET_ENV\t", TARGET_ENV);
-	pragma(msg, "TARGET_OBJFMT\t", TARGET_OBJFMT);
-	pragma(msg, "TARGET_FLTABI\t", TARGET_FLTABI);
-	pragma(msg, "IN_ASM_STR\t", IN_ASM_STR);
 }
 
 //

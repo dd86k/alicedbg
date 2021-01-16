@@ -76,24 +76,8 @@ private ulong adbg_util_nop64(ulong v) { return v; }
 /// Byte-swap an 16-bit value.
 /// Params: v = 16-bit value
 /// Returns: Byte-swapped value
-/// Notes:
-/// LDC and GDC transform this into a ROL instruction.
-/// If x86 inline assembly is available, DMD uses the ROL instruction.
 ushort adbg_util_bswap16(ushort v) pure nothrow @nogc {
-	static if (IN_ASM == InlineAsm.DMD_x86) {
-		asm pure nothrow @nogc {
-			lea EDI, v;
-			rol word ptr [EDI], 8;
-		}
-		return v;
-	} else static if (IN_ASM == InlineAsm.DMD_x86_64) {
-		asm pure nothrow @nogc {
-			lea RDI, v;
-			rol word ptr [RDI], 8;
-		}
-		return v;
-	} else
-		return cast(ushort)(v >> 8 | v << 8);
+	return cast(ushort)(v >> 8 | v << 8);
 }
 
 /// Byte-swap an 32-bit value.
@@ -104,17 +88,8 @@ ushort adbg_util_bswap16(ushort v) pure nothrow @nogc {
 /// Only LDC is able to pick this up as BSWAP.
 /// If x86 inline assembly is available, DMD uses the BSWAP instruction.
 uint adbg_util_bswap32(uint v) pure nothrow @nogc {
-	static if (IN_ASM == InlineAsm.DMD_x86 || IN_ASM == InlineAsm.DMD_x86_64) {
-		asm pure nothrow @nogc {
-			mov EAX, v;
-			bswap EAX;
-			mov v, EAX;
-		}
-		return v;
-	} else {
-		v = (v >> 16) | (v << 16);
-		return ((v & 0xFF00FF00) >> 8) | ((v & 0x00FF00FF) << 8);
-	}
+	v = (v >> 16) | (v << 16);
+	return ((v & 0xFF00FF00) >> 8) | ((v & 0x00FF00FF) << 8);
 }
 
 /// Byte-swap an 64-bit value.
@@ -125,64 +100,50 @@ uint adbg_util_bswap32(uint v) pure nothrow @nogc {
 /// Only LDC is able to pick this up as BSWAP.
 /// If x86 inline assembly is available, DMD uses the BSWAP instruction.
 ulong adbg_util_bswap64(ulong v) pure nothrow @nogc {
-	static if (IN_ASM == InlineAsm.DMD_x86) {
-		asm pure nothrow @nogc {
-			lea EDI, v;
-			mov EAX, [EDI];
-			mov EDX, [EDI+4];
-			bswap EAX;
-			bswap EDX;
-			mov [EDI+4], EAX;
-			mov [EDI], EDX;
-		}
-		return v;
-	} else static if (IN_ASM == InlineAsm.DMD_x86_64) {
-		asm pure nothrow @nogc {
-			mov RAX, v;
-			bswap RAX;
-			mov v, RAX;
-		}
-		return v;
-	} else {
-		v = (v >> 32) | (v << 32);
-		v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
-		return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
-	}
+	v = (v >> 32) | (v << 32);
+	v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
+	return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
 }
 
+/// 
 unittest {
-	assert(adbg_util_bswap16(0xAABB) == 0xBBAA);
-	assert(adbg_util_bswap32(0xAABBCCDD) == 0xDDCCBBAA);
-	assert(adbg_util_bswap64(0xAABBCCDD_11223344) == 0x44332211_DDCCBBAA);
+	enum N16 = 0xAABB; enum R16 = 0xBBAA;
+	enum N32 = 0xAABBCCDD; enum R32 = 0xDDCCBBAA;
+	enum N64 = 0xAABBCCDD_11223344; enum R64 = 0x44332211_DDCCBBAA;
+	
+	assert(adbg_util_bswap16(N16) == R16, "bswap16");
+	assert(adbg_util_bswap32(N32) == R32, "bswap32");
+	assert(adbg_util_bswap64(N64) == R64, "bswap64");
+	
 	version (LittleEndian) {
-		fswap16 lsb16 = adbg_util_fswap16(0);
-		fswap32 lsb32 = adbg_util_fswap32(0);
-		fswap64 lsb64 = adbg_util_fswap64(0);
-		fswap16 msb16 = adbg_util_fswap16(1);
-		fswap32 msb32 = adbg_util_fswap32(1);
-		fswap64 msb64 = adbg_util_fswap64(1);
-		// LSB matches
-		assert(lsb16(0xAABB) == 0xAABB);
-		assert(lsb32(0xAABBCCDD) == 0xAABBCCDD);
-		assert(lsb64(0xAABBCCDD_11223344) == 0xAABBCCDD_11223344);
+		fswap16 l16 = adbg_util_fswap16(0);
+		fswap32 l32 = adbg_util_fswap32(0);
+		fswap64 l64 = adbg_util_fswap64(0);
+		fswap16 m16 = adbg_util_fswap16(1);
+		fswap32 m32 = adbg_util_fswap32(1);
+		fswap64 m64 = adbg_util_fswap64(1);
+		// LSB matches, no swapping occurs
+		assert(l16(N16) == N16, "fswap16-lsb");
+		assert(l32(N32) == N32, "fswap32-lsb");
+		assert(l64(N64) == N64, "fswap64-lsb");
 		// MSB does not match
-		assert(msb16(0xAABB) == 0xBBAA);
-		assert(msb32(0xAABBCCDD) == 0xDDCCBBAA);
-		assert(msb64(0xAABBCCDD_11223344) == 0x44332211_DDCCBBAA);
+		assert(m16(N16) == R16, "fswap16-msb");
+		assert(m32(N32) == R32, "fswap32-msb");
+		assert(m64(N64) == R64, "fswap64-msb");
 	} else {
-		fswap16 lsb16 = adbg_util_fswap16(0);
-		fswap32 lsb32 = adbg_util_fswap32(0);
-		fswap64 lsb64 = adbg_util_fswap64(0);
-		fswap16 msb16 = adbg_util_fswap16(1);
-		fswap32 msb32 = adbg_util_fswap32(1);
-		fswap64 msb64 = adbg_util_fswap64(1);
+		fswap16 l16 = adbg_util_fswap16(0);
+		fswap32 l32 = adbg_util_fswap32(0);
+		fswap64 l64 = adbg_util_fswap64(0);
+		fswap16 m16 = adbg_util_fswap16(1);
+		fswap32 m32 = adbg_util_fswap32(1);
+		fswap64 m64 = adbg_util_fswap64(1);
 		// LSB does not match
-		assert(lsb16(0xAABB) == 0xBBAA);
-		assert(lsb32(0xAABBCCDD) == 0xDDCCBBAA);
-		assert(lsb64(0xAABBCCDD_11223344) == 0x44332211_DDCCBBAA);
-		// MSB matches
-		assert(msb16(0xAABB) == 0xAABB);
-		assert(msb32(0xAABBCCDD) == 0xAABBCCDD);
-		assert(msb64(0xAABBCCDD_11223344) == 0xAABBCCDD_11223344);
+		assert(l16(N16) == R16, "fswap16-lsb");
+		assert(l32(N32) == R32, "fswap32-lsb");
+		assert(l64(N64) == R64, "fswap64-lsb");
+		// MSB matches, no swapping occurs
+		assert(m16(N16) == N16, "fswap16-msb");
+		assert(m32(N32) == N32, "fswap32-msb");
+		assert(m64(N64) == N64, "fswap64-msb");
 	}
 }
