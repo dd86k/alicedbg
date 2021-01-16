@@ -73,7 +73,7 @@ private
 void function(ushort,ushort) adbg_term_resize_handler;
 
 enum TermConfig {
-	ReadlineNoReturn = 1 << 0,
+	readlineNoNewline = 1 << 0,
 }
 
 private int term_config; // default to 0
@@ -497,12 +497,12 @@ L_READKEY:
 		}
 		break;
 	case Enter:
-		if (term_config & TermConfig.ReadlineNoReturn) {
+		if (term_config & TermConfig.readlineNoNewline) {
 			buffer[len] = 0;
 		} else {
 			putchar('\n');
-			buffer[++len] = '\n';
-			buffer[len+1] = 0;
+			buffer[len] = '\n';
+			buffer[++len] = 0;
 		}
 		return len;
 	default:

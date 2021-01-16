@@ -17,12 +17,15 @@ import debugger.common;
 extern (C):
 __gshared:
 
+private enum CLI_BUFFER_SIZE = 1024;
+private int debuggerError;
+
 /// Enter the command-line loop
 /// Returns: Error code
 int adbg_ui_cmd() {
 	adbg_event_exception(&adbg_ui_cmd_handler);
 	adbg_term_init;
-	char *buffer = cast(char*)malloc(1024);
+	char *buffer = cast(char*)malloc(CLI_BUFFER_SIZE);
 	if (buffer == null)
 		return 2;
 	return adbg_ui_cmd_loop(buffer);
@@ -40,35 +43,35 @@ int adbg_ui_cmd_execl(char *command, size_t len) {
 private:
 
 int adbg_ui_cmd_loop(char *buffer) {
-	int err;
 L_LINE:
-	adbg_ui_cmd_prompt(err);
-	size_t l = adbg_term_readline(buffer, 1024);
-	err = adbg_ui_cmd_execl(buffer, l);
-	if (err == -1) return 0;
+	adbg_ui_cmd_prompt();
+	size_t l = adbg_term_readline(buffer, CLI_BUFFER_SIZE);
+	int c = adbg_ui_cmd_execl(buffer, l);
+	if (c == CmdReturn.exit) return 0;
 	goto L_LINE;
 }
 
 // NOTE: Negative error codes have special meaning
 
 enum CmdReturn {
-	OK,
-	UnknownCommand = -1,
-	MissingArgument = -2,
-	ActionContinue = AdbgAction.proceed,
-	ActionExit = AdbgAction.exit,
-	ActionStepInstruction = AdbgAction.step,
+	ok,
+	unknownCommand,
+	missingArgument,
+	exit,
+	debuggerContinue = AdbgAction.proceed,
+	debuggerExit = AdbgAction.exit,
+	debuggerStepInstruction = AdbgAction.step,
 }
 
-void adbg_ui_cmd_prompt(int err) {
+void adbg_ui_cmd_prompt() {
 	import adbg.sys.err : ERR_FMT;
 	enum fmt = "["~ERR_FMT~" adbg] ";
-	printf(fmt, err);
+	printf(fmt, debuggerError);
 }
 
 int adbg_ui_cmd_execv(int argc, const(char) **argv) {
 	if (argc <= 0 || argv == null)
-		return -1;
+		return CmdReturn.ok;
 	const(char)  *c = argv[0]; // command
 	char          a = c[0];    // alias
 	foreach (ref command_t comm; commands) {
@@ -81,7 +84,7 @@ int adbg_ui_cmd_execv(int argc, const(char) **argv) {
 			return comm.func(argc, argv);
 		}
 	}
-	return CmdReturn.UnknownCommand;
+	return CmdReturn.unknownCommand;
 }
 
 struct command_t {
@@ -92,7 +95,6 @@ struct command_t {
 }
 
 command_t[] commands = [
-	{ 'T', "test", "test command", &adbg_ui_cmd_c_test },
 	{ 'f', "file", "Load file", &adbg_ui_cmd_c_file },
 //	{ 'p', "pid",  "Attach to pid", &adbg_ui_cmd_c_pid },
 //	{ 'p', "pause",  "Run debugger", &adbg_ui_cmd_c_run },
@@ -103,20 +105,13 @@ command_t[] commands = [
 	{ 'q', "quit", "Quit", &adbg_ui_cmd_c_quit },
 ];
 
-int adbg_ui_cmd_c_test(int argc, const(char) **argv) {
-	for (int i; i < argc; ++i) {
-		printf("argv[%d]: %s\n", i, argv[i]);
-	}
-	return 0;
-}
-
 int adbg_ui_cmd_c_file(int argc, const(char) **argv) {
 	if (argc < 2) {
 		puts("missing file");
-		return CmdReturn.MissingArgument;
+		return CmdReturn.missingArgument;
 	}
 	
-	return CmdReturn.OK;
+	return (debuggerError = adbg_load(argv[1], null, null, null, 0));
 }
 
 int adbg_ui_cmd_c_help(int argc, const(char) **argv) {
@@ -126,17 +121,17 @@ int adbg_ui_cmd_c_help(int argc, const(char) **argv) {
 		else
 			printf("%-15s %s\n", comm.opt, comm.desc);
 	}
-	return CmdReturn.OK;
+	
+	return CmdReturn.ok;
 }
 
 int adbg_ui_cmd_c_run(int argc, const(char) **argv) {
-	return CmdReturn.OK;
+	return CmdReturn.ok;
 }
 
 int adbg_ui_cmd_c_quit(int argc, const(char) **argv) {
 	//TODO: Quit confirmation if debuggee is alive
-	exit(0);
-	return CmdReturn.OK;
+	return CmdReturn.exit;
 }
 
 int adbg_ui_cmd_handler(exception_t *ex) {

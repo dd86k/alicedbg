@@ -59,7 +59,7 @@ L_WORD:
 		switch (c) {
 		case 0, '\n', '\r':
 			buf[index] = 0;
-			return argc;
+			return ++argc;
 		default:
 			if (isalnum(c) || ispunct(c)) {
 				++index;

@@ -139,8 +139,15 @@ buildType "profile" {
 #
 
 # Disassembler scrambler test
-buildType "loopdisasm" {
+buildType "disasm-loop" {
 	buildOptions "unittests"
-	versions "TestLoopDisasm"
-	sourceFiles "tests/loop/disasm.d"
+	sourceFiles "tests/disasm/loop.d"
+}
+buildType "term-readline" {
+	buildOptions "unittests"
+	sourceFiles "tests/term/readline.d"
+}
+buildType "utils-argv" {
+	buildOptions "unittests"
+	sourceFiles "tests/utils/argv.d"
 }

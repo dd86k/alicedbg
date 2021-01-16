@@ -1,4 +1,4 @@
-module test.loop.disasm;
+module tests.disasm.loop;
 
 extern (C) int putchar(int);
 
