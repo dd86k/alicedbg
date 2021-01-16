@@ -31,14 +31,11 @@ size_t adbg_util_argv_flatten(char *b, int bs, const(char) **argv) {
 
 int adbg_util_argv_expand(char *buf, size_t buflen, char **argv) {
 	import core.stdc.ctype : isalnum, ispunct;
+	
 	size_t index;
 	int argc;
 	
-	if (buflen == 0)
-		return argc;
-	
-	// "   test 1  \t   2 2   "
-	//     ^   0^0      ^0^0
+	if (buflen == 0) return 0;
 	
 L_WORD:
 	// move pointer to first non-white character
@@ -59,9 +56,15 @@ L_WORD:
 	while (index < buflen) {
 		const char c = buf[index];
 		
-		if (isalnum(c) || ispunct(c)) {
-			++index;
-			continue;
+		switch (c) {
+		case 0, '\n', '\r':
+			buf[index] = 0;
+			return argc;
+		default:
+			if (isalnum(c) || ispunct(c)) {
+				++index;
+				continue;
+			}
 		}
 		
 		++argc;
@@ -70,7 +73,7 @@ L_WORD:
 	}
 	
 	// reached the end before we knew it
-	return --argc;
+	return argc;
 }
 
 //
