@@ -12,7 +12,7 @@ import core.stdc.stdlib : malloc, strtol, exit, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp, strncpy, strtok;
 import core.stdc.stdio;
 import adbg.platform;
-import adbg.debugger : adbg_attach, adbg_load;
+import adbg.debugger : adbg_attach, adbg_load, adbg_state, AdbgState;
 import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax;
 import adbg.sys.err : adbg_sys_perror;
 import d = std.compiler;
@@ -26,6 +26,7 @@ __gshared:
 // CLI utils
 //
 
+// if asking for help, so '?' and "help" are accepted
 bool askhelp(const(char) *query) {
 	switch (query[0]) {
 	case '?': return true;
@@ -33,11 +34,9 @@ bool askhelp(const(char) *query) {
 	}
 }
 
-//immutable(char)* ARG    = "<arg>";
-//immutable(char)* NOARG  = "     ";
-
 //TODO: Consider adding 'bool avoidopt' field
 //      Acts as "--", to stop processing options
+/// Settings structure for the application (only!)
 struct settings_t {
 	SettingUI ui;	/// Debugger user interface
 	adbg_disasm_t disasm;	/// Disassembler settings
@@ -49,7 +48,6 @@ struct settings_t {
 	uint pid;	/// Debuggee: PID
 	uint flags;	/// 
 }
-
 //TODO: Consider adding 'bool processed' field
 //      Avoids repeating options, may speed-up parsing
 //      * Could be an issue for repeatable options (unless another field added..)
@@ -507,9 +505,10 @@ int main(int argc, const(char)** argv) {
 		return adbg_dump(settings.file, &settings.disasm, settings.flags);
 	
 	// app: debugger
-	lasterr = settings.pid ?
-		adbg_attach(settings.pid, 0) :
-		adbg_load(settings.file, null, settings.argv, null, 0);
+	if (settings.pid)
+		lasterr = adbg_attach(settings.pid, 0);
+	else if (settings.file)
+		lasterr = adbg_load(settings.file, null, settings.argv, null, 0);
 	
 	if (lasterr) {
 		adbg_sys_perror!"dbg"(lasterr);
@@ -519,9 +518,18 @@ int main(int argc, const(char)** argv) {
 	adbg_ui_common_params(&settings.disasm);
 	with (SettingUI)
 	final switch (settings.ui) {
-	case loop: lasterr = adbg_ui_loop(); break;
-	case cmd:  lasterr = adbg_ui_cmd(); break;
-	case tui:  lasterr = adbg_ui_tui(); break;
+	case loop:
+		if (adbg_state == AdbgState.waiting)
+			lasterr = adbg_ui_loop();
+		else
+			puts("main: loop ui requires file");
+		break;
+	case cmd:
+		lasterr = adbg_ui_cmd();
+		break;
+	case tui:
+		lasterr = adbg_ui_tui();
+		break;
 	case server:
 		puts("main: server ui not yet supported");
 		return EXIT_FAILURE;
