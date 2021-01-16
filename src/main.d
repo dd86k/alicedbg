@@ -73,7 +73,7 @@ immutable option_t[] options = [
 	{ 0,   "args", "Debugger: Supply arguments to file", true, farg: &cliargs },
 	{ 0,   "env",  "Debugger: Supply environment to file", true, farg: &clienv },
 	{ 'p', "pid",  "Debugger: Attach to process", true, farg: &clipid },
-	{ 0,   "ui",   "Debugger: Select user interface (default=loop)", true, farg: &cliui },
+	{ 'u', "ui",   "Debugger: Select user interface (default=loop)", true, farg: &cliui },
 	// dumper
 	{ 'D', "dump", "Dumper: Select the object dump mode", false, &clidump },
 	{ 'R', "raw",  "Dumper: File is not an object, but raw", false, &cliraw },
