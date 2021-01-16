@@ -89,20 +89,14 @@ version (Windows) {
 } else
 version (CRuntime_Glibc) { // 2.25
 	version (X86) {
-		struct __jmp_buf {
+		struct __jmp_buf { // typedef int __jmp_buf[6];
 			uint ebx, esi, edi, ebp, esp, eip;
 		}
-
-		// typedef int __jmp_buf[6];
-		public alias int[6] jmp_buf;
 	} else
 	version (X86_64) {
-		struct __jmp_buf {
+		struct __jmp_buf { // typedef unsigned long long __jmp_buf[8]
 			ulong rbx, rbp, r12, r13, r14, r15, rsp, rip;
 		}
-
-		// __extension__ typedef long long int __jmp_buf[8];
-		public alias __jmp_buf jmp_buf;
 	} else
 	version (ARM) {
 		// NOTE: Glibc sysdeps/arm/jmpbuf-unwind.h DOESN'T define a structure
@@ -122,7 +116,7 @@ version (CRuntime_Glibc) { // 2.25
 			double d8, d9, d10, d11, d12, d13, d14, d15;
 		}
 		// typedef int __jmp_buf[64] __attribute__((__aligned__ (8)));
-		alias int[64] jmp_buf;
+//		alias __jmp_buf jmp_buf;
 	} else
 	version (Aarch64) {
 		struct __jmp_buf {
@@ -132,9 +126,17 @@ version (CRuntime_Glibc) { // 2.25
 		}
 
 		// __extension__ typedef unsigned long long __jmp_buf [22];
-		alias ulong[22] jmp_buf;
+//		alias ulong[22] jmp_buf;
 	} else
 	static assert(0, "Missing setjmp definitions (Glibc)");
+	
+	struct __jmp_buf_tag {
+		__jmp_buf __jmpbuf;
+		int __mask_was_saved;
+		c_long __saved_mask; // __sigset_t: unsigned long int
+	}
+
+	public alias __jmp_buf_tag jmp_buf;
 } else
 version (CRuntime_Musl) { // 1.20
 	version (X86) {
@@ -162,15 +164,3 @@ static assert(0, "Missing setjmp definitions");
 
 int setjmp(ref jmp_buf);
 void longjmp(ref jmp_buf, int);
-
-version (none)
-unittest {
-	jmp_buf j = void;
-	int e = setjmp(j);
-	if (e) {
-		assert(e == 0xdd, "e != 0xdd");
-	} else {
-		longjmp(j, 0xdd);
-		assert(0, "longjmp");
-	}
-}

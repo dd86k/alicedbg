@@ -28,6 +28,15 @@ buildType "debugv" {
 	dflags "-betterC" "--vgc" platform="ldc"
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
+# Ditto but aimed for older dmd versions, ldc 0.17.1, and gdc 5.4
+# NOTE: gdc 5.4 is missing a __va_list_arg def in the std import
+buildType "debugv-stage0" {
+	debugVersions "PrintTargetInfo"
+	buildOptions "debugMode" "debugInfo"
+	dflags "-vgc" "-vtls" platform="dmd"
+	dflags "--vgc" platform="ldc"
+	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+}
 
 # Make the compiler very verbose for compile-time diagnostic purposess.
 buildType "debugvv" {
@@ -135,13 +144,17 @@ buildType "profile" {
 }
 
 #
-# Tests
+# Specific tests
 #
 
 # Disassembler scrambler test
 buildType "disasm-loop" {
 	buildOptions "unittests"
 	sourceFiles "tests/disasm/loop.d"
+}
+buildType "sys-setjmp" {
+	buildOptions "unittests"
+	sourceFiles "tests/sys/setjmp.d"
 }
 buildType "term-readline" {
 	buildOptions "unittests"
