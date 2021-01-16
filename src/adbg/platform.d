@@ -192,8 +192,6 @@ version (MinGW) {
 	enum TARGET_ENV = "MinGW";
 } else version (Cygwin) {
 	enum TARGET_ENV = "Cygwin";
-} else version (Posix) {
-	enum TARGET_ENV = "Posix";
 } else version (FreeStanding) { // now that would surprise me
 	enum TARGET_ENV = "Bare-metal";
 } else {
