@@ -7,7 +7,7 @@
  * Most useful being the fswap variants, which depending on the requested
  * endian (compared to the target's), return a function for bulk processing.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.utils.bit;
 

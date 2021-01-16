@@ -1,7 +1,7 @@
 /**
  * String helper functions. Simple string functions to aid redundant typing.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.utils.str;
 

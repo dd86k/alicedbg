@@ -1,7 +1,7 @@
 /**
  * Command interpreter.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module debugger.ui.cmd;
 
@@ -13,6 +13,8 @@ import adbg.debugger.exception : exception_t;
 import adbg.sys.term;
 import adbg.utils.str;
 import debugger.common;
+
+//TODO: adbg_ui_cmd_file -- read commands from file
 
 extern (C):
 __gshared:

@@ -4,7 +4,7 @@
  * Sharing this module adbg.has a few advantages such as: reduce binary size, avoid
  * linking issues, etc.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module debugger.common;
 

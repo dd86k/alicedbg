@@ -1,7 +1,7 @@
 /**
  * Loop on exceptions and continue whenever possible. No user input for this UI.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module debugger.ui.loop;
 

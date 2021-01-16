@@ -1,7 +1,7 @@
 /**
  * MZ executable object format.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.obj.mz;
 

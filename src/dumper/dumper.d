@@ -1,7 +1,7 @@
 /**
  * Image/object dumper, imitates objdump
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module dumper.dumper;
 

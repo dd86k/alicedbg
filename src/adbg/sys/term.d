@@ -1,7 +1,7 @@
 /**
  * In-house console/terminal library
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.sys.term;
 
@@ -480,6 +480,8 @@ size_t adbg_term_readline(char *buffer, const size_t size) {
 	int curx, cury;
 	adbg_term_get_curpos(&curx, &cury);
 L_READKEY:
+	//TODO: \t autocomplete callback
+	//TODO: complete readline
 	adbg_term_read(&input);
 	if (input.type != InputType.Key) goto L_READKEY;
 	with (Key)

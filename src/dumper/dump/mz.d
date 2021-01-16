@@ -1,7 +1,7 @@
 /**
  * MS-DOS MZ file dumper
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module dumper.dump.mz;
 

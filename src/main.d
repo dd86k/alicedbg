@@ -4,7 +4,7 @@
  * This module provides a non-pragmatic approach of configurating the debugger,
  * dumper, or profiler settings via a command-line interface.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module main;
 
@@ -218,9 +218,9 @@ struct setting_ui_t {
 }
 immutable setting_ui_t[] uis = [
 	{ SettingUI.loop,   "loop",   "Simple loop interface with single-character choices (default)" },
-	{ SettingUI.cmd,    "cmd",    "Command-line for more advanced sessions" },
-	{ SettingUI.loop,   "tui",    "Text User Interface" },
-//	{ SettingUI.server, "server", "Work In Progress" },
+	{ SettingUI.cmd,    "cmd",    "(wip) Command-line interface" },
+	{ SettingUI.tui,    "tui",    "(wip) Interractive text user interface" },
+	{ SettingUI.server, "server", "(n/a) TCP/IP server" },
 ];
 int cliui(settings_t* settings, const(char)* val) {
 	if (askhelp(val)) {
@@ -306,12 +306,12 @@ int clishow(settings_t *settings, const(char) *val) {
 
 int clihelp(settings_t*) {
 	puts(
-		"Aiming to be a simple debugger, dumper, and profiler\n"~
-		"Usage:\n"~
-		"  alicedbg {--pid ID|--file FILE|--dump FILE} [OPTIONS...]\n"~
-		"  alicedbg {-h|--help|--version|--license}\n"~
-		"\n"~
-		"OPTIONS"
+	"Aiming to be a simple debugger, dumper, and profiler\n"~
+	"Usage:\n"~
+	"  alicedbg {--pid ID|--file FILE|--dump FILE} [OPTIONS...]\n"~
+	"  alicedbg {-h|--help|--version|--license}\n"~
+	"\n"~
+	"OPTIONS"
 	);
 	foreach (option_t opt; options[0..$-1]) {
 		if (opt.alt)

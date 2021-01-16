@@ -1,7 +1,7 @@
 /**
  * Up to date Posix universal standard defitions (unistd.h) and other utilities.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.sys.posix.unistd;
 

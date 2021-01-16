@@ -1,7 +1,7 @@
 /**
  * Mostly internal module that deals with GUIDs and UUIDs.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.utils.uid;
 

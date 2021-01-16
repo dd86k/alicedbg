@@ -8,7 +8,7 @@
  * (0xC00000005) AND SIGSEGV. That'd be hell!). So a "translater" (see function
  * `codetype`) converts those codes to the enumeration.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.debugger.exception;
 

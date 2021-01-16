@@ -9,7 +9,7 @@
  * ```
  * We need this for PTRACE_GETREGS, for example.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.sys.linux.user;
 

@@ -5,7 +5,7 @@
  * `_D4core4stdc5stdio7putcharFiZi` which is NOT the C mangled name of
  * `_putchar`. Which would lead to a runtime crash.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.etc.c;
 

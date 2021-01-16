@@ -1,7 +1,7 @@
 /**
  * 8086/x86/amd64 decoder.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.disasm.arch.x86;
 

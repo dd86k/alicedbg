@@ -7,7 +7,7 @@
  * This is the only module that contains function names without its module
  * name.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.debugger.debugger;
 

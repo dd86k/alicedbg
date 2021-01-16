@@ -1,7 +1,7 @@
 /**
  * Disassembler core.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.disasm.disasm;
 

@@ -4,7 +4,7 @@
  * This is in a separate module to aid exporting "headers".
  * Publicly imports core.sys.windows.windef.
  *
- * License: BSD 3-clause
+ * License: BSD-3-Clause
  */
 module adbg.sys.windows.def;
 
