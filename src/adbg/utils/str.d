@@ -12,14 +12,14 @@ import core.stdc.string;
 extern (C):
 __gshared:
 
-size_t adbg_util_argv_flatten(char *b, int bs, const(char) **argv) {
+size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 	import core.stdc.stdio : snprintf;
 	if (argv == null)
 		return 0;
 
 	ptrdiff_t ai, bi, t;
 	while (argv[ai]) {
-		t = snprintf(b + bi, bs, "%s ", argv[ai]);
+		t = snprintf(buf + bi, buflen, "%s ", argv[ai]);
 		if (t < 0)
 			return 0;
 		bi += t;

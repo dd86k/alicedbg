@@ -262,7 +262,7 @@ ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
 /// Returns: String
 const(char) *adbg_ex_typestr(ExceptionType code) {
 	with (ExceptionType)
-	final switch (code) {
+	switch (code) {
 	case Unknown:	return "UNKNOWN";
 	case Exit:	return "TERMINATED";
 	case Breakpoint:	return "BREAKPOINT";
@@ -287,6 +287,7 @@ const(char) *adbg_ex_typestr(ExceptionType code) {
 	case FPUStackOverflow:	return "FPU: STACK OVERFLOW";
 	case Disposition:	return "OS: DISPOSITION";
 	case NoContinue:	return "OS: COULD NOT CONTINUE";
+	default: assert(0);
 	}
 }
 

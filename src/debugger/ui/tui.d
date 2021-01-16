@@ -121,7 +121,7 @@ void adbg_ui_tui_event_resize(ushort x, ushort y) {
 /// Draw into display buffer
 void adbg_ui_tui_render(TUIPanel page) {
 	with (TUIPanel)
-	final switch (page) {
+	switch (page) {
 	case disasm:
 		break;
 	case memory: break;
@@ -133,6 +133,7 @@ void adbg_ui_tui_render(TUIPanel page) {
 	case processes: break;
 	case info: break;
 	case about: break;
+	default: assert(0);
 	}
 }
 

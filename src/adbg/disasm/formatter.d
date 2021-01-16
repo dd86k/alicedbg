@@ -609,7 +609,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 	char[FORMATTER_REGBUF_SIZE] b1 = void, b2 = void, b3 = void;
 
 	with (FormatType)
-	final switch (i.type) {
+	switch (i.type) {
 	case String:	adbg_disasm_madd(p, i.sval1); return;
 	case Reg:
 		if (i.sval1[0] == 0) return;
@@ -839,6 +839,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 				MEM_WIDTHS_INTEL[i.ival3], i.sval2, i.sval1, i.ival1);
 			return;
 		}
+	default: assert(0);
 	}
 }
 const(char) *adbg_disasm_fmtreg(adbg_disasm_t *p, const(char) *s, char[FORMATTER_REGBUF_SIZE] *buffer) {

@@ -5952,7 +5952,7 @@ void adbg_disasm_x86_vex_modrm(adbg_disasm_t *p, int flags) {
 
 	bool filemode = p.mode >= AdbgDisasmMode.File;
 	// NOTE: imm8 operand is not included in this operation
-	final switch (flags & X86_FLAG_OPRNDM) {
+	switch (flags & X86_FLAG_OPRNDM) {
 	case 0: // 0, includes 2 operands
 		if (dir) goto L_2REG;
 L_2RM:
@@ -6006,5 +6006,6 @@ L_3REG:
 		if (filemode)
 			adbg_disasm_push_str(p, "todo");
 		return;
+	default: assert(0);
 	}
 }

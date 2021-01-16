@@ -469,8 +469,9 @@ L_DEBUG_LOOP:
 //		if (ptrace(PTRACE_GETREGSET, g_pid, NT_PRSTATUS, &v))
 //			return errno;
 
+		// NOTE: final switch works in betterC but funky in 2.082
 		with (AdbgAction)
-		final switch (g_user_function(&e)) {
+		switch (g_user_function(&e)) {
 		case exit:
 			g_state = AdbgState.idle;
 			kill(g_pid, SIGKILL); // PTRACE_KILL is deprecated
@@ -481,6 +482,7 @@ L_DEBUG_LOOP:
 		case proceed:
 			ptrace(PTRACE_CONT, g_pid, null, null);
 			goto L_DEBUG_LOOP;
+		default: assert(0);
 		}
 	}
 }

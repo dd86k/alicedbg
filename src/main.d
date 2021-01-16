@@ -521,7 +521,7 @@ int main(int argc, const(char)** argv) {
 	
 	adbg_ui_common_params(&settings.disasm);
 	with (SettingUI)
-	final switch (settings.ui) {
+	switch (settings.ui) {
 	case loop:
 		if (adbg_state == AdbgState.waiting)
 			lasterr = adbg_ui_loop();
@@ -537,6 +537,7 @@ int main(int argc, const(char)** argv) {
 	case server:
 		puts("main: server ui not yet supported");
 		return EXIT_FAILURE;
+	default: assert(0);
 	}
 	return lasterr;
 }

@@ -62,18 +62,20 @@ const(char)* adbg_error_message() {
 	import adbg.sys.err : adbg_sys_error;
 	
 	with (AdbgESource)
-	final switch (lasterror.source) {
+	switch (lasterror.source) {
 	case self:
 		with (AdbgError)
-		final switch (lasterror.code) {
+		switch (lasterror.code) {
 		case nullArgument: return "Parameter is null";
 		case nullAddress: return "Address is null";
 		case unsupportedObjFormat: return "Unsupported object format";
 		case unsupportedPlatform: return "Platforn not supported";
 		case illegalInstruction: return "Illegal instruction encoding";
 		case none: return "no error";
+		default: assert(0);
 		}
 	case crt, system:
 		return adbg_sys_error(lasterror.syscode);
+	default: assert(0);
 	}
 }
