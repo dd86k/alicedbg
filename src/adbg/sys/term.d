@@ -62,10 +62,9 @@ version (Posix) {
 		private int tcsetattr(int fd, int a, termios *termios_p);
 		private int ioctl(int fd, ulong request, ...);
 	}
-	private enum TERM_ATTR = ~ICANON & ~ECHO;
+	private enum TERM_ATTR = ~(ICANON | ECHO);
 	private termios old_tio = void, new_tio = void;
 	private enum SIGWINCH = 28;
-//	alias CONCHAR = char;
 }
 
 /// User defined function for resize events
@@ -83,7 +82,7 @@ private int term_config; // default to 0
 //
 
 /// Initiates terminal basics
-/// Returns: Error code, non-zero on error
+/// Returns: Error keyCode, non-zero on error
 int adbg_term_init() {
 	version (Posix) {
 		tcgetattr(STDIN_FILENO, &old_tio);
@@ -224,13 +223,11 @@ void adbg_term_clear() {
 		FillConsoleOutputAttribute(handleOut, csbi.wAttributes, size, c, &num);
 		adbg_term_curpos(0, 0);
 	} else version (Posix) {
-		WindowSize ws = void;
-		adbg_term_size(&ws);
-		//TODO: write term's 'default' attribute character
-		immutable const(char) *empty = "";
-		printf("\033[0;0H%*s\033[0;0H", ws.height * ws.width, empty);
+		// "ESC [ 2 J" acts like clear(1)
+		// "ESC c" is a full reset ala cls (Windows)
+		printf("\033c");
 	}
-	else static assert(0, "Clear: Not implemented");
+	else static assert(0, "clear: Not implemented");
 }
 
 /**
@@ -269,7 +266,7 @@ void adbg_term_curpos(int x, int y) {
 		SetConsoleCursorPosition(handleOut, c);
 	} else
 	version (Posix) { // 1-based
-		printf("\033[u;%uH", y + 1, x + 1);
+		printf("\033[%d;%dH", y + 1, x + 1);
 	}
 }
 
@@ -281,12 +278,13 @@ void adbg_term_get_curpos(int *x, int *y) {
 		*y = csbi.dwCursorPosition.Y;
 	} else
 	version (Posix) { // 1-based
+		tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
 		printf("\033[6n");
-		fscanf(stdin, "\033[%d;%dmR", y, x);
+		fscanf(stdin, "\033[%d;%dR", y, x); // row, col
+		tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
 		--*y; --*x;
 	}
 }
-
 
 //
 // ANCHOR TUI specifics
@@ -388,13 +386,16 @@ void adbg_term_read(InputInfo *ii) {
 		case KEY_EVENT:
 			with (ii)
 			if (ir.KeyEvent.bKeyDown) {
+				// TODO: Consider filtering CTRLs (17, 18)
 				type = InputType.Key;
-				key.keyChar  = ir.KeyEvent.AsciiChar;
-				key.keyCode  = cast(Key)ir.KeyEvent.wVirtualKeyCode;
 				const DWORD state = ir.KeyEvent.dwControlKeyState;
 				key.alt   = (state & ALT_PRESSED)   != 0;
 				key.ctrl  = (state & CTRL_PRESSED)  != 0;
 				key.shift = (state & SHIFT_PRESSED) != 0;
+				key.keyChar = ir.KeyEvent.AsciiChar;
+				key.keyCode = key.ctrl ?
+					cast(Key)ir.KeyEvent.AsciiChar :
+					cast(Key)ir.KeyEvent.wVirtualKeyCode;
 			}
 			break;
 		case MOUSE_EVENT: //TODO: MOUSE_EVENT
@@ -425,7 +426,15 @@ void adbg_term_read(InputInfo *ii) {
 
 		with (ii.key)
 		switch (c) {
-		case '\n', 'M': // \n (RETURN) or M (ENTER)
+		case 0: keyCode = Key.Null; goto L_END;
+		case 1: keyCode = Key.HeadingStart; goto L_END;
+		case 2: keyCode = Key.TextStart; goto L_END;
+		case 3: /* ^C */ keyCode = Key.TextEnd; goto L_END;
+		case 4: /* ^D */ keyCode = Key.TransmissionEnd; goto L_END;
+		case 5: keyCode = Key.Enquiry; goto L_END;
+		case 6: keyCode = Key.Acknowledge; goto L_END;
+		case 7: keyCode = Key.Bell; goto L_END;
+		case '\n', '\r': // \n (RETURN) or \r (ENTER)
 			keyCode = Key.Enter;
 			goto L_END;
 		case 27: // ESC
@@ -451,7 +460,7 @@ void adbg_term_read(InputInfo *ii) {
 			keyCode = Key.Backspace;
 			goto L_END;
 		case 23: // #
-			keyCode = Key.NoName;
+			keyCode = Key.NumSign;
 			keyChar = '#';
 			goto L_END;
 		default:
@@ -470,64 +479,122 @@ L_DEFAULT:
 		ii.key.keyCode = cast(Key)c;
 
 L_END:
-		tcsetattr(STDIN_FILENO,TCSANOW, &old_tio);
+		tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
 	}
 }
 
-size_t adbg_term_readline(char *buffer, const size_t size) {
-	size_t index, len;
+int adbg_term_readline(char *buffer, const size_t size) {
+	int spos;	/// Current cursor position
+	int slen;	/// Current input length
+	int ox = void, oy = void;	/// Original cursor X and Y positions
+	adbg_term_get_curpos(&ox, &oy);
 	InputInfo input = void;
-	int curx, cury;
-	adbg_term_get_curpos(&curx, &cury);
 L_READKEY:
-	//TODO: \t autocomplete callback
-	//TODO: complete readline
+	//TODO: ^C/^D event functions
+	bool modified; /// if output was modified
 	adbg_term_read(&input);
 	if (input.type != InputType.Key) goto L_READKEY;
 	with (Key)
 	switch (input.key.keyCode) {
-	case LeftArrow:
+	//
+	// History navigation
+	//
+	case UpArrow: // TODO: history: previous entry
+		
+		break;
+	case DownArrow: // TODO: history: next entry
 	
 		break;
-	case RightArrow:
-	
+	//
+	// Line navigation
+	//
+	case LeftArrow: // line: move cursor left
+		//TODO: input.key.ctrl: move by word left
+		if (spos > 0) --spos;
 		break;
-	case Backspace:
-		if (index > 0) {
-			buffer[index--] = 0;
-			--len;
+	case RightArrow: // line: move cursor right
+		//TODO: input.key.ctrl: move by word right
+		if (spos < slen) ++spos;
+		break;
+	case Home:
+		spos = 0;
+		break;
+	case End:
+		if (slen > 0) spos = slen;
+		break;
+	//
+	// Line deletion
+	//
+	case Backspace: // remove cursor-previous character
+		if (spos > 0) {
+			modified = true;
+			buffer[spos--] = 0;
+			--slen;
+			
+			//TODO: !!!!!!!
 		}
 		break;
-	case Enter:
+	case Delete: //TODO: remove cursor-selected character
+		
+		break;
+	//
+	// Special
+	//
+	case Enter: // send
 		if (term_config & TermConfig.readlineNoNewline) {
-			buffer[len] = 0;
+			buffer[slen] = 0;
 		} else {
 			putchar('\n');
-			buffer[len] = '\n';
-			buffer[++len] = 0;
+			buffer[slen] = '\n';
+			buffer[++slen] = 0;
 		}
-		return len;
+		return slen;
+	case Tab: //TODO: auto-complete callback
+	
+		break;
+	case TransmissionEnd: //TODO: ^D
+		
+		break;
+	//
+	// Insert at position
+	//
 	default:
 		char c = input.key.keyChar;
-		if (c >= 20 && c <= 126) {
-			if (index + 1 < size) {
-				buffer[index++] = c;
-				++len;
-				putchar(c);
-			}
+		
+		if (c < 20 || c > 126)
+			break;
+		
+		if (spos == slen) { // at end
+			modified = true;
+			buffer[spos++] = c;
+			++slen;
+		} else if (spos + 1 < size) { // insertion
+			modified = true;
+			
+			//TODO: !!!!!!!!
 		}
 	}
+	
+	// Update output string if modified
+	if (modified && slen > 0) {
+		adbg_term_curpos(ox, oy);
+		printf("%.*s", slen, buffer);
+	}
+	
+	// Update output cursor from spos
+	//TODO: get term size then do 2D calculation
+	adbg_term_curpos(ox + spos, oy);
 	
 	goto L_READKEY;
 }
 
 /// Key information structure
 struct KeyInfo {
-	Key   keyCode;	/// Key code.
-	char  keyChar;	/// Character.
-	ubyte ctrl;	/// If either CTRL was held down.
-	ubyte alt;	/// If either ALT was held down.
-	ubyte shift;	/// If SHIFT was held down.
+	Key  keyCode;	/// Key keyCode.
+	char keyChar;	/// Character.
+	bool ctrl;	/// If either CTRL was held down.
+	bool alt;	/// If either ALT was held down.
+	bool shift;	/// If SHIFT was held down.
 }
 /// Mouse input event structure
 struct MouseInfo {
@@ -568,11 +635,22 @@ enum MouseEventType { // Windows compilant
 }
 */
 /// Key codes mapping.
-enum Key : ushort {
-	Backspace = 8,
-	Tab = 9,
-	Clear = 12,
-	Enter = 13,
+//TODO: camelCase enum
+enum Key : short {
+	Null = 0,	/// ^@, NUL
+	HeadingStart = 1,	// ^A, SOH
+	TextStart = 2,	/// ^B, STX
+	TextEnd = 3,	/// ^C, ETX
+	TransmissionEnd = 4,	/// ^D, EOT
+	Enquiry = 5, 	/// ^E, ENQ
+	Acknowledge = 6,	/// ^F, ACK
+	Bell = 7,	/// ^G, BEL
+	Backspace = 8,	/// ^H, BS
+	Tab = 9,	/// ^I, HT
+	LineFeed = 10,	/// ^J, LF
+	VerticalTab = 11,	/// ^K, VT
+	FormFeed = 12,	/// ^L, FF
+	Enter = 13,	/// ^M, CR (return key)
 	Pause = 19,
 	Escape = 27,
 	Spacebar = 32,
@@ -710,7 +788,7 @@ enum Key : ushort {
 	EraseEndOfFile = 249,
 	Play = 250,
 	Zoom = 251,
-	NoName = 252,
+	NumSign = 252,	/// #
 	Pa1 = 253,
 	OemClear = 254
 }
