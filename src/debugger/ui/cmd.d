@@ -47,9 +47,17 @@ private:
 int adbg_ui_cmd_loop(char *buffer) {
 L_LINE:
 	adbg_ui_cmd_prompt();
-	size_t l = adbg_term_readline(buffer, CLI_BUFFER_SIZE);
+	
+	int l = adbg_term_readline(buffer, CLI_BUFFER_SIZE);
+	if (l < 0) {
+		puts("quit");
+		return 0;
+	}
+	
 	int c = adbg_ui_cmd_execl(buffer, l);
-	if (c == CmdReturn.exit) return 0;
+	if (c == CmdReturn.exit)
+		return 0;
+	
 	goto L_LINE;
 }
 

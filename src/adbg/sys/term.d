@@ -20,7 +20,7 @@ version (Windows) {
 	private enum ALT_PRESSED =  RIGHT_ALT_PRESSED  | LEFT_ALT_PRESSED;
 	private enum CTRL_PRESSED = RIGHT_CTRL_PRESSED | LEFT_CTRL_PRESSED;
 	private HANDLE handleIn, handleOut, handleOld;
-	// Internal buffer
+	// Internal buf
 	//TODO: structure
 	private ushort ibuf_x, ibuf_y, ibuf_w, ibuf_h;
 	private CHAR_INFO *ibuf;
@@ -125,7 +125,7 @@ void adbg_term_config(int flags) {
 	term_config = flags;
 }
 
-/// Restore console buffer
+/// Restore console buf
 /*void adbg_term_restore() {
 	version (Windows) {
 		SetConsoleActiveScreenBuffer(hOld);
@@ -155,10 +155,10 @@ void adbg_term_event_resize_posix(int) {
 }
 
 /**
- * Initiate terminal intermediate screen buffer. (Windows) This can be used
+ * Initiate terminal intermediate screen buf. (Windows) This can be used
  * after a resive event, but it's done automatically. (Posix) No-op
  * Params:
- * 	s = Terminal window size
+ * 	s = Terminal window buflen
  */
 private
 int adbg_term_init_buffer(WindowSize *s) {
@@ -214,13 +214,13 @@ void adbg_term_clear() {
 		CONSOLE_SCREEN_BUFFER_INFO csbi = void;
 		COORD c; // 0, 0
 		GetConsoleScreenBufferInfo(handleOut, &csbi);
-		//const int size = csbi.dwSize.X * csbi.dwSize.Y; buffer size
-		const int size = // window size
+		//const int buflen = csbi.dwSize.X * csbi.dwSize.Y; buf buflen
+		const int buflen = // window buflen
 			(csbi.srWindow.Right - csbi.srWindow.Left + 1)* // width
 			(csbi.srWindow.Bottom - csbi.srWindow.Top + 1); // height
 		DWORD num = void; // kind of ala .NET
-		FillConsoleOutputCharacterA(handleOut, ' ', size, c, &num);
-		FillConsoleOutputAttribute(handleOut, csbi.wAttributes, size, c, &num);
+		FillConsoleOutputCharacterA(handleOut, ' ', buflen, c, &num);
+		FillConsoleOutputAttribute(handleOut, csbi.wAttributes, buflen, c, &num);
 		adbg_term_curpos(0, 0);
 	} else version (Posix) {
 		// "ESC [ 2 J" acts like clear(1)
@@ -231,7 +231,7 @@ void adbg_term_clear() {
 }
 
 /**
- * Get current window size
+ * Get current window buflen
  * Params: ws = Pointer to a WindowSize structure
  *
  * Note: A COORD uses SHORT (short) and Linux uses unsigned shorts.
@@ -483,15 +483,18 @@ L_END:
 	}
 }
 
-int adbg_term_readline(char *buffer, const size_t size) {
+int adbg_term_readline(char *buf, const size_t buflen) {
 	int spos;	/// Current cursor position
 	int slen;	/// Current input length
 	int ox = void, oy = void;	/// Original cursor X and Y positions
 	adbg_term_get_curpos(&ox, &oy);
 	InputInfo input = void;
 L_READKEY:
-	//TODO: ^C/^D event functions
-	bool modified; /// if output was modified
+	//TODO: ^D event functions
+	//TODO: readline: damage-based (putchar) instead of pure printf
+	//      e.g. positioning + putchar
+	bool modified;	/// if output was modified
+	bool trimmed;	/// if output was trimmed
 	adbg_term_read(&input);
 	if (input.type != InputType.Key) goto L_READKEY;
 	with (Key)
@@ -506,7 +509,7 @@ L_READKEY:
 	
 		break;
 	//
-	// Line navigation
+	// Line edition: Navigation
 	//
 	case LeftArrow: // line: move cursor left
 		//TODO: input.key.ctrl: move by word left
@@ -523,16 +526,25 @@ L_READKEY:
 		if (slen > 0) spos = slen;
 		break;
 	//
-	// Line deletion
+	// Line edition: Deletion
 	//
 	case Backspace: // remove cursor-previous character
-		if (spos > 0) {
-			modified = true;
-			buffer[spos--] = 0;
-			--slen;
-			
-			//TODO: !!!!!!!
+		// cursor is at beginning? skip
+		if (spos == 0) break;
+		
+		modified = true;
+		trimmed = true;
+		
+		// move buffer leftwards from pos to end
+		if (spos != slen) {
+			int pos = spos;
+			while (pos < slen) {
+				buf[pos] = buf[pos + 1];
+				++pos;
+			}
 		}
+		buf[spos] = 0;
+		--slen; --spos;
 		break;
 	case Delete: //TODO: remove cursor-selected character
 		
@@ -542,47 +554,58 @@ L_READKEY:
 	//
 	case Enter: // send
 		if (term_config & TermConfig.readlineNoNewline) {
-			buffer[slen] = 0;
+			buf[slen] = 0;
 		} else {
 			putchar('\n');
-			buffer[slen] = '\n';
-			buffer[++slen] = 0;
+			buf[slen] = '\n';
+			buf[++slen] = 0;
 		}
 		return slen;
 	case Tab: //TODO: auto-complete callback
 	
 		break;
-	case TransmissionEnd: //TODO: ^D
-		
-		break;
+	case TransmissionEnd: return -1; // ^D
 	//
-	// Insert at position
+	// Line edition: Insert
 	//
 	default:
-		char c = input.key.keyChar;
+		// can't fit a character? skip
+		if (spos + 1 >= buflen) break;
 		
-		if (c < 20 || c > 126)
-			break;
+		const char c = input.key.keyChar;
 		
-		if (spos == slen) { // at end
-			modified = true;
-			buffer[spos++] = c;
-			++slen;
-		} else if (spos + 1 < size) { // insertion
-			modified = true;
-			
-			//TODO: !!!!!!!!
+		// character out of print scope? skip
+		if (c < 20 || c > 126) break;
+		
+		modified = true;
+		
+		// move buffer rightwards if cursor position not at end
+		if (spos != slen) {
+			// move stuff rightwards from len to pos
+			int pos = slen - 1;
+			while (pos >= spos) {
+				buf[pos + 1] = buf[pos];
+				--pos;
+			}
 		}
+		
+		buf[spos] = c;
+		++slen; ++spos;
 	}
 	
 	// Update output string if modified
 	if (modified && slen > 0) {
 		adbg_term_curpos(ox, oy);
-		printf("%.*s", slen, buffer);
+		printf("%.*s", slen, buf);
+		if (trimmed)
+			putchar(' ');
+	} else if (modified && slen == 0) {
+		adbg_term_curpos(ox, oy);
+		putchar(' ');
 	}
 	
 	// Update output cursor from spos
-	//TODO: get term size then do 2D calculation
+	//TODO: get term buflen then do 2D calculation
 	adbg_term_curpos(ox + spos, oy);
 	
 	goto L_READKEY;
@@ -635,7 +658,6 @@ enum MouseEventType { // Windows compilant
 }
 */
 /// Key codes mapping.
-//TODO: camelCase enum
 enum Key : short {
 	Null = 0,	/// ^@, NUL
 	HeadingStart = 1,	// ^A, SOH
