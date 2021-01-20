@@ -535,6 +535,8 @@ L_READKEY:
 		modified = true;
 		trimmed = true;
 		
+		--slen; --spos;
+		
 		// move buffer leftwards from pos to end
 		if (spos != slen) {
 			int pos = spos;
@@ -543,8 +545,6 @@ L_READKEY:
 				++pos;
 			}
 		}
-		buf[spos] = 0;
-		--slen; --spos;
 		break;
 	case Delete: //TODO: remove cursor-selected character
 		
