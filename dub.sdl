@@ -156,6 +156,10 @@ buildType "sys-setjmp" {
 	buildOptions "unittests"
 	sourceFiles "tests/sys/setjmp.d"
 }
+buildType "term-read" {
+	buildOptions "unittests"
+	sourceFiles "tests/term/read.d"
+}
 buildType "term-readline" {
 	buildOptions "unittests"
 	sourceFiles "tests/term/readline.d"

@@ -366,40 +366,40 @@ void adbg_term_tui_clear() {
 //
 
 /**
- * Read a single terminal event (keyboard or mouse). Window resize events
- * are handled externally. (Windows) If the EventType is WINDOW_BUFFER_SIZE_EVENT:
- * this calls the user's handler function. (Posix) Entirely handled externally
- * via the SIGWINCH signal.
+ * Read a single immediate terminal/console event such as a keyboard or mouse.
+ * Window resize events are handled externally.
+ * Windows: User handler function called if EventType is WINDOW_BUFFER_SIZE_EVENT.
+ * Posix: Handled externally via the SIGWINCH signal.
  * Params: ii = InputInfo structure
  */
 void adbg_term_read(InputInfo *ii) {
-	//TODO: consider memset
 	ii.type = InputType.None;
 	version (Windows) {
 		INPUT_RECORD ir = void;
-		DWORD dum = void;
-
-		if (ReadConsoleInput(handleIn, &ir, 1, &dum) == FALSE)
+		DWORD d = void;
+L_READ_AGAIN:
+		if (ReadConsoleInput(handleIn, &ir, 1, &d) == FALSE)
 			return;
 
 		switch (ir.EventType) {
 		case KEY_EVENT:
-			with (ii)
-			if (ir.KeyEvent.bKeyDown) {
-				// TODO: Consider filtering CTRLs (17, 18)
-				type = InputType.Key;
-				const DWORD state = ir.KeyEvent.dwControlKeyState;
-				key.alt   = (state & ALT_PRESSED)   != 0;
-				key.ctrl  = (state & CTRL_PRESSED)  != 0;
-				key.shift = (state & SHIFT_PRESSED) != 0;
-				key.keyChar = ir.KeyEvent.AsciiChar;
-				key.keyCode = key.ctrl ?
-					cast(Key)ir.KeyEvent.AsciiChar :
-					cast(Key)ir.KeyEvent.wVirtualKeyCode;
+			if (ir.KeyEvent.bKeyDown == FALSE)
+				goto L_READ_AGAIN;
+			
+			with (ii) {
+			type = InputType.Key;
+			const DWORD state = ir.KeyEvent.dwControlKeyState;
+			key.alt   = (state & ALT_PRESSED)   != 0;
+			key.ctrl  = (state & CTRL_PRESSED)  != 0;
+			key.shift = (state & SHIFT_PRESSED) != 0;
+			key.keyChar = ir.KeyEvent.AsciiChar;
+			key.keyCode = key.ctrl ?
+				cast(Key)ir.KeyEvent.AsciiChar :
+				cast(Key)ir.KeyEvent.wVirtualKeyCode;
 			}
 			break;
 		case MOUSE_EVENT: //TODO: MOUSE_EVENT
-			
+			ii.type = InputType.Mouse;
 			break;
 		case WINDOW_BUFFER_SIZE_EVENT:
 			with (ir)
@@ -409,7 +409,8 @@ void adbg_term_read(InputInfo *ii) {
 					WindowBufferSizeEvent.dwSize.Y);
 			FlushConsoleInputBuffer(handleIn);
 			break;
-		default:
+		default: // Menu and Focus events
+			goto L_READ_AGAIN;
 		}
 	} else
 	version (Posix) {
@@ -658,6 +659,9 @@ enum MouseEventType { // Windows compilant
 }
 */
 /// Key codes mapping.
+//TODO: Redo keycodes
+//      < 128: ascii map
+//      >=128: special codes (e.g., arrow keys)
 enum Key : short {
 	Null = 0,	/// ^@, NUL
 	HeadingStart = 1,	// ^A, SOH
