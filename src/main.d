@@ -83,8 +83,10 @@ immutable option_t[] options = [
 	{ 0,   "version", "Show the version screen and exit", false, &cliversion },
 	{ 0,   "ver",     "Only show the version string and exit", false, &cliver },
 	{ 0,   "license", "Show the license page and exit", false, &clilicense },
+	// secrets
 	{ 0,   "meow",    "Meow and exit", false, &climeow },
 ];
+enum NUMBER_OF_SECRETS = 1;
 
 //
 // ANCHOR --march
@@ -221,10 +223,10 @@ struct setting_ui_t {
 	immutable(char)* opt, desc;
 }
 immutable setting_ui_t[] uis = [
-	{ SettingUI.loop,   "loop",   "Simple loop interface with single-character choices (default)" },
+	{ SettingUI.loop,   "loop",   "Simple loop interface (default)" },
 	{ SettingUI.cmd,    "cmd",    "(wip) Command-line interface" },
-	{ SettingUI.tui,    "tui",    "(wip) Interractive text user interface" },
-	{ SettingUI.server, "server", "(n/a) TCP/IP server" },
+//	{ SettingUI.tui,    "tui",    "(wip) Interractive text user interface" },
+//	{ SettingUI.server, "server", "(n/a) TCP/IP server" },
 ];
 int cliui(settings_t* settings, const(char)* val) {
 	if (askhelp(val)) {
@@ -277,10 +279,10 @@ immutable setting_show_t[] showflags = [
 	{ 'c', "Show load configuration", DUMPER_SHOW_LOADCFG },
 //	{ 'e', "Show exports", DUMPER_SHOW_EXPORTS },
 	{ 'p', "Show debug information", DUMPER_SHOW_DEBUG },
-	{ 'd', "Disassemble code (e.g., .text)", DUMPER_DISASM_CODE },
+	{ 'd', "Disassemble code (executable sections)", DUMPER_DISASM_CODE },
 	{ 'D', "Disassemble all sections", DUMPER_DISASM_ALL },
-	{ 'S', "Show disassembler statistics", DUMPER_SHOW_HEADER },
-	{ 'A', "Show everything (hsicpd)", DUMPER_SHOW_EVERYTHING },
+	{ 'S', "Show disassembler statistics instead", DUMPER_SHOW_HEADER },
+	{ 'A', "Show everything", DUMPER_SHOW_EVERYTHING },
 ];
 int clishow(settings_t *settings, const(char) *val) {
 	if (askhelp(val)) {
@@ -290,13 +292,13 @@ int clishow(settings_t *settings, const(char) *val) {
 		}
 		exit(0);
 	}
-	l_val: while (*val) {
+	A: while (*val) {
 		char c = *val;
 		++val;
 		foreach (setting_show_t show; showflags) {
 			if (c == show.opt) {
 				settings.flags |= show.val;
-				continue l_val;
+				continue A;
 			}
 		}
 		printf("main: show flag '%c' unknown", c);
@@ -310,14 +312,14 @@ int clishow(settings_t *settings, const(char) *val) {
 
 int clihelp(settings_t*) {
 	puts(
-	"Aiming to be a simple debugger, dumper, and profiler\n"~
+	"alicedbg - Aiming to be a simple debugger\n"~
 	"Usage:\n"~
 	"  alicedbg {--pid ID|--file FILE|--dump FILE} [OPTIONS...]\n"~
 	"  alicedbg {-h|--help|--version|--license}\n"~
 	"\n"~
 	"OPTIONS"
 	);
-	foreach (option_t opt; options[0..$-1]) {
+	foreach (option_t opt; options[0..$-NUMBER_OF_SECRETS]) {
 		if (opt.alt)
 			printf("-%c, --%-11s%s\n", opt.alt, opt.val, opt.desc);
 		else
