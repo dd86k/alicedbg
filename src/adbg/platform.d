@@ -24,7 +24,7 @@ enum ADBG_CHILD_STACK_SIZE	= 1024 * 1024 * 8;
 // Constants
 //
 
-/// Application version
+/// Library and application version
 enum ADBG_VERSION = "0.0.0";
 
 debug enum __BUILDTYPE__ = "debug";	/// Build type
@@ -184,17 +184,23 @@ static if (FEATURE_TARGETINFO) {
 
 //
 // ANCHOR Environement string
-//        This constitutes environment C libraries (e.g., wrappers)
+//        Typically the C library, otherwise system wrappers.
 //
 
 version (MinGW) {
-	enum TARGET_ENV = "MinGW";
+	enum TARGET_ENV = "MinGW";	/// Target environment
 } else version (Cygwin) {
-	enum TARGET_ENV = "Cygwin";
+	enum TARGET_ENV = "Cygwin";	/// Target environment
+} else version (CRuntime_Microsoft) {
+	enum TARGET_ENV = "MSVC";	/// Target environment
+} else version (CRuntime_Glibc) {
+	enum TARGET_ENV = "GNU";	/// Target environment
+} else version (CRuntime_Musl) {
+	enum TARGET_ENV = "Musl";	/// Target environment
 } else version (FreeStanding) { // now that would surprise me
-	enum TARGET_ENV = "Bare-metal";
+	enum TARGET_ENV = "FreeStanding";	/// Target environment
 } else {
-	enum TARGET_ENV = "Native";
+	enum TARGET_ENV = "Unknown";	/// Target environment
 }
 
 //

@@ -19,8 +19,6 @@ import adbg.platform;
 version (Windows) {
 	import core.sys.windows.windows;
 	import adbg.sys.windows.wow64;
-	//SymInitialize, GetFileNameFromHandle, SymGetModuleInfo64,
-	//StackWalk64, SymGetSymFromAddr64, SymFromName
 	package __gshared HANDLE g_tid;	/// Saved thread handle, DEBUG_INFO doesn't contain one
 	package __gshared HANDLE g_pid;	/// Saved process handle
 	version (Win64)
@@ -63,7 +61,7 @@ else version (ARM) {
 	else
 		private enum opcode_t BREAKPOINT = 0xE1200D7D; // BKPT #221 (0xdd)
 } else version (AArch64) {
-	//NOTE: Checked under ODA, endianness seems to be moot
+	// NOTE: Checked under ODA, endianness seems to be moot
 	version (LittleEndian)
 		private enum opcode_t BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
 	else

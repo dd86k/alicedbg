@@ -26,8 +26,8 @@ dinclude
 # C headers, not ready
 include
 
-# Personal notes
-NOTES
+# Personal stuff (e.g., notes)
+perso/
 
 # Commit message (git commit -t)
 MSG

@@ -331,15 +331,16 @@ int clihelp(settings_t*) {
 // ANCHOR --version
 //
 
+debug private enum type = "-debug";
+else  private enum type = "";
+
 immutable(char) *fmt_version =
-"alicedbg "~ADBG_VERSION~" (built: "~__TIMESTAMP__~")\n"~
-"License: BSD-3-Clause <https://spdx.org/licenses/BSD-3-Clause.html>\n"~
-"Homes:\n"~
-" - <https://git.dd86k.space/dd86k/alicedbg>\n"~
-" - <https://github.com/dd86k/alicedbg>\n"~
+"alicedbg "~ADBG_VERSION~type~" (built: "~__TIMESTAMP__~")\n"~
 "Compiler: "~__VENDOR__~" %u.%03u, "~TARGET_OBJFMT~" obj, "~TARGET_FLTABI~" float\n"~
-"CRT: "~TARGET_CRT~" (C++RT: "~TARGET_CPPRT~") on "~TARGET_PLATFORM~"/"~TARGET_OS~"\n"~
-"Environment: "~TARGET_ENV~"\n";
+"Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
+"CRT: "~TARGET_CRT~"\n"~
+"CppRT: "~TARGET_CPPRT~"\n";
+//TODO: Features:
 int cliversion(settings_t*) {
 	printf(fmt_version, d.version_major, d.version_minor);
 	exit(0);
