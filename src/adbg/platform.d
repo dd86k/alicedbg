@@ -203,6 +203,18 @@ version (MinGW) {
 	enum TARGET_ENV = "Unknown";	/// Target environment
 }
 
+version (PrintTargetInfo) {
+	pragma(msg, "ADBG_VERSION     ", ADBG_VERSION);
+	pragma(msg, "__BUILDTYPE__    ", __BUILDTYPE__);
+	pragma(msg, "TARGET_PLATFORM  ", TARGET_PLATFORM);
+	pragma(msg, "TARGET_OS        ", TARGET_OS);
+	pragma(msg, "TARGET_CRT       ", TARGET_CRT);
+	pragma(msg, "TARGET_CPPRT     ", TARGET_CPPRT);
+	pragma(msg, "TARGET_ENV       ", TARGET_ENV);
+	pragma(msg, "TARGET_OBJFMT    ", TARGET_OBJFMT);
+	pragma(msg, "TARGET_FLTABI    ", TARGET_FLTABI);
+}
+
 //
 // ANCHOR External functions
 //

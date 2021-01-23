@@ -22,7 +22,7 @@ configuration "application" {
 # Make the compiler print GC (despite not using it) usage, TLS (thread local
 # storage) usage, and target info for runtime diagnostic purposes.
 buildType "debugv" {
-	debugVersions "PrintTargetInfo"
+	versions "PrintTargetInfo"
 	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
 	dflags "-betterC" "--vgc" platform="ldc"
@@ -31,7 +31,7 @@ buildType "debugv" {
 # Ditto but aimed for older dmd versions, ldc 0.17.1, and gdc 5.4
 # NOTE: gdc 5.4 is missing a __va_list_arg def in the std import
 buildType "debugv-stage0" {
-	debugVersions "PrintTargetInfo"
+	versions "PrintTargetInfo"
 	buildOptions "debugMode" "debugInfo"
 	dflags "-vgc" "-vtls" platform="dmd"
 	dflags "--vgc" platform="ldc"
@@ -83,23 +83,20 @@ buildType "release-inline" {
 # Generate a library.
 configuration "library" {
 	targetType "library"
-	excludedSourceFiles "src/main.d" "src/debugger/*" "src/dumper/*"
+	sourcePaths "src/adbg"
+	importPaths "src/adbg"
 }
 # Ditto as dub docs.
 configuration "sourceLibrary" {
 	targetType "sourceLibrary"
-	excludedSourceFiles "src/main.d" "src/debugger/*" "src/dumper/*"
-}
-# Force output to a static library.
-configuration "staticlibrary" {
-	targetType "library"
-	excludedSourceFiles "src/main.d" "src/debugger/*" "src/dumper/*"
+	sourcePaths "src/adbg"
+	importPaths "src/adbg"
 }
 # Force output to a dynamic/shared library.
-# NOTICE: Broken on windows, regardless of compiler used.
 configuration "dynamicLibrary" {
 	targetType "dynamicLibrary"
-	excludedSourceFiles "src/main.d" "src/debugger/*" "src/dumper/*"
+	sourcePaths "src/adbg"
+	importPaths "src/adbg"
 }
 
 # Generate headers

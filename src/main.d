@@ -38,7 +38,7 @@ bool askhelp(const(char) *query) {
 //      Acts as "--", to stop processing options
 /// Settings structure for the application (only!)
 struct settings_t {
-	SettingUI ui;	/// Debugger user interface
+	SettingUI ui = SettingUI.cmd;	/// Debugger user interface
 	adbg_disasm_t disasm;	/// Disassembler settings
 	bool dump;	/// Dump instead of debugging
 	const(char) *file;	/// Debuggee: file
@@ -420,9 +420,6 @@ int climeow(settings_t*) {
 //
 
 int main(int argc, const(char)** argv) {
-	if (argc <= 1)
-		clihelp(null);
-		
 	// .init automatically take the defaults
 	settings_t settings;	/// cli settings
 	int lasterr;	/// last cli error
