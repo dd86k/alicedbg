@@ -70,24 +70,24 @@ L_CONTINUE:
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) { // 1111_1100
 	// 00H-03H, 08H-0BH, 10H-13H, 18-1BH, 20H-23H, 28H-2BH, 30H-33H, 38H-3BH
 	case 0, 0x08, 0x10, 0x18, 0x20, 0x28, 0x30, 0x38:
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_grp1[p.x86.op >> 3]);
 		adbg_disasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x04: // 04H-07H
 		if (p.x86.op & X86_FLAG_DIR) {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
 				adbg_disasm_push_reg(p, "es");
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, "add");
 				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
@@ -102,13 +102,13 @@ L_CONTINUE:
 			if (p.x86.op & X86_FLAG_WIDE) {
 				adbg_disasm_x86_0f(p);
 			} else {
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_str(p, "push");
 					adbg_disasm_push_reg(p, "cs");
 				}
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, "or");
 				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
@@ -120,12 +120,12 @@ L_CONTINUE:
 		return;
 	case 0x14: // 14H-17H
 		if (p.x86.op & X86_FLAG_DIR) {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
 				adbg_disasm_push_reg(p, "ss");
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, "adc");
 				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
@@ -137,12 +137,12 @@ L_CONTINUE:
 		return;
 	case 0x1C: // 1CH-1FH
 		if (p.x86.op & X86_FLAG_DIR) {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
 				adbg_disasm_push_reg(p, "ds");
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, "sbb");
 				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
@@ -159,14 +159,14 @@ L_CONTINUE:
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "daa");
 			} else {
 				p.x86.segreg = x86SegReg.ES;
 				goto L_CONTINUE;
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, "and");
 				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
@@ -183,7 +183,7 @@ L_CONTINUE:
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "das");
 				
 			} else {
@@ -191,7 +191,7 @@ L_CONTINUE:
 				goto L_CONTINUE;
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, "sub");
 				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
@@ -208,14 +208,14 @@ L_CONTINUE:
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "aaa");
 			} else {
 				p.x86.segreg = x86SegReg.SS;
 				goto L_CONTINUE;
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, "xor");
 				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
@@ -232,14 +232,14 @@ L_CONTINUE:
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "aas");
 			} else {
 				p.x86.segreg = x86SegReg.DS;
 				goto L_CONTINUE;
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, "cmp");
 				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
@@ -259,7 +259,7 @@ L_CONTINUE:
 			p.x86.vex_B = op & 1;
 			goto L_CONTINUE;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_disasm_push_str(p, p.x86.op >= 0x48 ? "dec" : "inc");
 			adbg_disasm_push_reg(p,
 				adbg_disasm_x86_modrm_reg(p, p.x86.op,
@@ -267,7 +267,7 @@ L_CONTINUE:
 		}
 		return;
 	case 0x50, 0x54, 0x58, 0x5C: // 50H-5FH
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_disasm_push_str(p, p.x86.op >= 0x58 ? "pop" : "push");
 			adbg_disasm_push_reg(p,
 				adbg_disasm_x86_modrm_reg(p, p.x86.op,
@@ -290,11 +290,11 @@ L_CONTINUE:
 				m = "bound";
 				f = X86_FLAG_DIR | X86_FLAG_MODW_32B;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm(p, f);
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				const(char) *m = void;
 				if (p.x86.op & X86_FLAG_WIDE)
 					m = p.x86.pf_operand ? "popa" : "popad";
@@ -317,11 +317,11 @@ L_CONTINUE:
 		goto L_CONTINUE;
 	case 0x68: // 68H-6BH
 		if (p.x86.op & X86_FLAG_WIDE) {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "imul");
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "push");
 		}
 		if (p.x86.op & X86_FLAG_DIR)
@@ -330,7 +330,7 @@ L_CONTINUE:
 			adbg_disasm_x86_u32imm(p);
 		return;
 	case 0x6C: // 6CH-6FH
-		if (p.mode < AdbgDisasmMode.File)
+		if (p.mode < AdbgDisasmMode.file)
 			return;
 		MemWidth w = p.x86.op & X86_FLAG_WIDE ? MemWidth.i32 : MemWidth.i8;
 		if (p.x86.op & X86_FLAG_DIR) {
@@ -344,7 +344,7 @@ L_CONTINUE:
 		}
 		return;
 	case 0x70, 0x74, 0x78, 0x7C: // 70H-7FH
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_Jcc[p.x86.op & 15]);
 		adbg_disasm_x86_u8imm(p);
 		return;
@@ -352,7 +352,7 @@ L_CONTINUE:
 		ubyte modrm = *p.ai8;
 		++p.ai8;
 		int w = (p.x86.op & 0b11) != 0b01 ? MemWidth.i8 : MemWidth.i32;
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_disasm_push_x8(p, modrm);
 			adbg_disasm_push_str(p, x86_T_grp1[(modrm >> 3) & 7]);
 			adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, modrm, w));
@@ -363,12 +363,12 @@ L_CONTINUE:
 			adbg_disasm_x86_u32imm(p);
 		return;
 	case 0x84: // 84H-87H
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, p.x86.op & X86_FLAG_DIR ? "xchg" : "test");
 		adbg_disasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
 	case 0x88: // 88H-8BH
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, "mov");
 		adbg_disasm_x86_modrm(p, X86_FLAG_USE_OP);
 		return;
@@ -378,14 +378,14 @@ L_CONTINUE:
 				ubyte modrm = *p.ai8;
 				++p.ai8;
 				int xop_map = modrm & X86_VEX_MAP;
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_x8(p, modrm);
 				if (xop_map < 8) {
 					if (modrm & MODRM_REG) {
 						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
-					if (p.mode >= AdbgDisasmMode.File) {
+					if (p.mode >= AdbgDisasmMode.file) {
 						adbg_disasm_push_str(p, "pop");
 						adbg_disasm_push_reg(p,
 							adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i32));
@@ -400,7 +400,7 @@ L_CONTINUE:
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			} else { // LEA REG32, MEM32
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "lea");
 				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 			}
@@ -412,7 +412,7 @@ L_CONTINUE:
 				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
-			if (p.mode < AdbgDisasmMode.File)
+			if (p.mode < AdbgDisasmMode.file)
 				return;
 			adbg_disasm_push_x8(p, modrm);
 			adbg_disasm_push_str(p, "mov");
@@ -428,7 +428,7 @@ L_CONTINUE:
 		}
 		return;
 	case 0x90, 0x94: // 90H-97H
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			if (p.x86.op == 0x90) {
 				adbg_disasm_push_str(p, "nop");
 			} else {
@@ -441,25 +441,25 @@ L_CONTINUE:
 	case 0x98: // 98H-9BH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) { // WAIT/FWAIT
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "fwait");
 			} else { // CALL (FAR)
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "call");
 				adbg_disasm_x86_immfar(p);
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "cbd" : "cbw");
 		}
 		return;
 	case 0x9C: // 9CH-9FH
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_9Ch[p.x86.op & 3]);
 		return;
 	case 0xA0: // A0H-A3H
 		const(char) *s = void, a = void;
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			if (p.x86.segreg == x86SegReg.None)
 				p.x86.segreg = x86SegReg.DS;
 			adbg_disasm_push_str(p, "mov");
@@ -468,16 +468,16 @@ L_CONTINUE:
 		}
 		if (p.x86.op & X86_FLAG_DIR) {
 			adbg_disasm_x86_segimm(p, s);
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_reg(p, a);
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_reg(p, a);
 			adbg_disasm_x86_segimm(p, s);
 		}
 		return;
 	case 0xA4: // A4H-A7H
-		if (p.mode < AdbgDisasmMode.File)
+		if (p.mode < AdbgDisasmMode.file)
 			return;
 		const(char) *m = void,
 			seg1 = void, seg2 = void,
@@ -506,14 +506,14 @@ L_CONTINUE:
 		return;
 	case 0xA8: // A8H-ABH
 		if (p.x86.op & X86_FLAG_DIR) {
-			if (p.mode < AdbgDisasmMode.File)
+			if (p.mode < AdbgDisasmMode.file)
 				return;
 			const(char) *areg = p.x86.pf_address ? "di" : "edi";
 			adbg_disasm_push_str(p, "stos");
 			adbg_disasm_push_memsegreg(p, "es:", areg, adbg_disasm_x86_modrm_width(p, p.x86.op));
 			adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, "test");
 				adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			}
@@ -524,7 +524,7 @@ L_CONTINUE:
 		}
 		return;
 	case 0xAC: // ACH-AFH
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *seg = void, reg = void, m = void;
 			if (p.x86.op & X86_FLAG_DIR) {
 				m = "scas";
@@ -542,7 +542,7 @@ L_CONTINUE:
 		return;
 	case 0xB0, 0xB4, 0xB8, 0xBC: // B0H-BFH
 		int w = p.x86.op & 0b00_001_000;
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_disasm_push_str(p, "mov");
 			adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, p.x86.op,
 				w ? MemWidth.i32 : MemWidth.i8));
@@ -552,11 +552,11 @@ L_CONTINUE:
 		return;
 	case 0xC0: // C0H-C3H
 		if (p.x86.op & X86_FLAG_DIR) {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "ret");
 			if (p.x86.op & X86_FLAG_WIDE) // RET IMM16
 				return;
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_x16(p, *p.ai16);
 				adbg_disasm_push_imm(p, *p.ai16);
 			}
@@ -569,7 +569,7 @@ L_CONTINUE:
 				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, r);
 			int w = p.x86.op & X86_FLAG_WIDE;
 			adbg_disasm_x86_modrm_rm(p, modrm, w, w);
@@ -583,7 +583,7 @@ L_CONTINUE:
 			++p.ai8;
 			int reg = modrm & MODRM_REG;
 			if (reg == MODRM_REG_111) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, w ? "xbegin" : "xabort");
 				if (w)	adbg_disasm_x86_u32imm(p);
 				else	adbg_disasm_x86_u8imm(p);
@@ -591,7 +591,7 @@ L_CONTINUE:
 				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "mov");
 			adbg_disasm_x86_modrm_rm(p, modrm, w, w);
 			if (w)	adbg_disasm_x86_u32imm(p);
@@ -600,7 +600,7 @@ L_CONTINUE:
 			bool x64 = p.platform == AdbgDisasmPlatform.x86_64;
 			if (x64 == false) {
 				if (modrm < MODRM_MOD_11) {
-					if (p.mode >= AdbgDisasmMode.File)
+					if (p.mode >= AdbgDisasmMode.file)
 						adbg_disasm_push_str(p, w ? "lds" : "les");
 					adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 					return;
@@ -615,7 +615,7 @@ L_CONTINUE:
 			p.x86.vex[1] = modrm;
 			int mask = x64 ? 120 : 56;
 			if (w) { // C5H, VEX 2-byte prefix
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_x8(p, modrm);
 				p.x86.vex_vvvv = cast(ubyte)((~cast(int)modrm & mask) >> 3);
 				p.x86.vex_L    = modrm & 4;
@@ -626,7 +626,7 @@ L_CONTINUE:
 				adbg_disasm_x86_vex_0f(p);
 			} else { // C4H, VEX 3-byte prefix
 				ubyte u8 = p.x86.vex[2] = *(p.ai8 + 1);
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_x8(p, u8);
 				}
@@ -652,20 +652,20 @@ L_CONTINUE:
 		return;
 	case 0xC8: // C8H-CBH
 		if (p.x86.op & X86_FLAG_DIR) {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "ret");
 			if (p.x86.op & X86_FLAG_WIDE)
 				return;
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_x16(p, *p.ai16);
 				adbg_disasm_push_imm(p, *p.ai16);
 			}
 			++p.ai16;
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "leave" : "enter");
 			if ((p.x86.op & X86_FLAG_WIDE) == 0) {
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					ushort v1 = *p.ai16;
 					ubyte v2 = *(p.ai8 + 2);
 					adbg_disasm_push_x16(p, v1);
@@ -679,15 +679,15 @@ L_CONTINUE:
 		return;
 	case 0xCC: // CCH-CFH
 		if (p.x86.op & X86_FLAG_DIR) {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "iret" : "into");
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) { // INT IMM8
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "int");
 				adbg_disasm_x86_u8imm(p);
 			} else { // INT3
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "int3");
 			}
 		}
@@ -700,11 +700,11 @@ L_CONTINUE:
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		int w = p.x86.op & X86_FLAG_WIDE;
 		adbg_disasm_x86_modrm_rm(p, modrm, w, w);
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			if (p.x86.op & X86_FLAG_DIR)
 				adbg_disasm_push_reg(p, "cl");
 			else
@@ -714,11 +714,11 @@ L_CONTINUE:
 	case 0xD4: // D4H-D7H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "xlat");
 			} else p.error = adbg_error_set(AdbgError.illegalInstruction);
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "aad" : "amm");
 			adbg_disasm_x86_u8imm(p);
 		}
@@ -729,10 +729,10 @@ L_CONTINUE:
 		const(char) *m = void;
 		switch (p.x86.op & 7) {
 		case 0:	// D8H
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, x86_T_FLT1[(modrm >> 3) & 7]);
 			if (modrm > 0xBF) { // operand is FP
-				if (p.mode < AdbgDisasmMode.File)
+				if (p.mode < AdbgDisasmMode.file)
 					return;
 				adbg_disasm_push_x8(p, modrm);
 				adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
@@ -746,7 +746,7 @@ L_CONTINUE:
 				ubyte sti = modrm & 0xF;
 				switch (modrm & 0xF0) {
 				case 0xC0: // FLD/FXCH
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						return;
 					if (sti < 0x8) { // FLD
 						m = "fld";
@@ -761,7 +761,7 @@ L_CONTINUE:
 					return;
 				case 0xD0: // FNOP/Reserved
 					if (sti == 0) {
-						if (p.mode >= AdbgDisasmMode.File) {
+						if (p.mode >= AdbgDisasmMode.file) {
 							adbg_disasm_push_x8(p, modrm);
 							adbg_disasm_push_str(p, "fnop");
 						}
@@ -774,13 +774,13 @@ L_CONTINUE:
 						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
-					if (p.mode >= AdbgDisasmMode.File) {
+					if (p.mode >= AdbgDisasmMode.file) {
 						adbg_disasm_push_x8(p, modrm);
 						adbg_disasm_push_str(p, m);
 					}
 					return;
 				default: // F0
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						return;
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, x86_T_FLT4[sti]);
@@ -792,7 +792,7 @@ L_CONTINUE:
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, m);
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 			}
@@ -802,7 +802,7 @@ L_CONTINUE:
 				ubyte sti = modrm & 0xF;
 				switch (modrm & 0xF0) {
 				case 0xC0: // FCMOVB/FCMOVE
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						return;
 					if (sti < 0x8) { // FCMOVB
 						m = "fcmovb";
@@ -816,7 +816,7 @@ L_CONTINUE:
 					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					return;
 				case 0xD0: // FCMOVBE/FCMOVU
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						return;
 					if (sti < 0x8) { // FCMOVBE
 						m = "fcmovbe";
@@ -831,7 +831,7 @@ L_CONTINUE:
 					return;
 				case 0xE0:
 					if (sti == 9) {
-						if (p.mode >= AdbgDisasmMode.File) {
+						if (p.mode >= AdbgDisasmMode.file) {
 							adbg_disasm_push_x8(p, modrm);
 							adbg_disasm_push_str(p, "fucompp");
 						}
@@ -842,7 +842,7 @@ L_CONTINUE:
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 				}
 			} else { // operand is memory pointer
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, x86_T_FLT2[(modrm >> 3) & 7]);
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 			}
@@ -852,7 +852,7 @@ L_CONTINUE:
 				ubyte sti = modrm & 0xF;
 				switch (modrm & 0xF0) {
 				case 0xC0: // FCMOVNB/FCMOVNE
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						return;
 					if (sti < 0x8) { // FCMOVNB
 						m = "fcmovnb";
@@ -866,7 +866,7 @@ L_CONTINUE:
 					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					break;
 				case 0xD0: // FCMOVNBE/FCMOVNU
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						return;
 					if (sti < 0x8) { // FCMOVNBE
 						m = "fcmovnbe";
@@ -886,10 +886,10 @@ L_CONTINUE:
 						case 2: m = "finit"; break;
 						default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 						}
-						if (p.mode >= AdbgDisasmMode.File)
+						if (p.mode >= AdbgDisasmMode.file)
 							adbg_disasm_push_str(p, m);
 					} else { // FUCOMI
-						if (p.mode >= AdbgDisasmMode.File) {
+						if (p.mode >= AdbgDisasmMode.file) {
 							sti -= 8;
 							adbg_disasm_push_x8(p, modrm);
 							adbg_disasm_push_str(p, "fucomi");
@@ -915,7 +915,7 @@ L_CONTINUE:
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, m);
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 			}
@@ -927,14 +927,14 @@ L_CONTINUE:
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, x86_T_FLT1[reg >> 3]);
 					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, modrm & 7));
 					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
 				}
 			} else { // operand is memory pointer
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, x86_T_FLT1[(modrm >> 3) & 7]);
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
 			}
@@ -945,7 +945,7 @@ L_CONTINUE:
 				switch (modrm & 0xF0) {
 				case 0xC0: // FFREE/Reserved
 					if (sti < 0x8) { // FFREE
-						if (p.mode >= AdbgDisasmMode.File) {
+						if (p.mode >= AdbgDisasmMode.file) {
 							adbg_disasm_push_x8(p, modrm);
 							adbg_disasm_push_str(p, "ffree");
 							adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
@@ -955,7 +955,7 @@ L_CONTINUE:
 					}
 					return;
 				case 0xD0: // FST/FSTP
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						return;
 					if (sti < 0x8) { // FST
 						m = "fst";
@@ -968,7 +968,7 @@ L_CONTINUE:
 					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					return;
 				case 0xE0: // FUCOM/FUCOMP
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						return;
 					adbg_disasm_push_x8(p, modrm);
 					if (sti < 0x8) { // FUCOM
@@ -991,7 +991,7 @@ L_CONTINUE:
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, m);
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
 				return;
@@ -1010,7 +1010,7 @@ L_CONTINUE:
 					break;
 				case 0xD0: // Reserved/FCOMPP*
 					if (sti == 9) {
-						if (p.mode >= AdbgDisasmMode.File) {
+						if (p.mode >= AdbgDisasmMode.file) {
 							adbg_disasm_push_x8(p, modrm);
 							adbg_disasm_push_str(p, "fcompp");
 						}
@@ -1034,14 +1034,14 @@ L_CONTINUE:
 					}
 					break;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, m);
 					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, sti));
 					adbg_disasm_push_str(p, adbg_disasm_x87_ststr(p, 0));
 				}
 			} else { // operand is memory pointer
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, x86_T_FLT2[(modrm >> 3) & 7]);
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i16);
 			}
@@ -1062,7 +1062,7 @@ L_CONTINUE:
 				case 0xE0: // FSTSW*/FUCOMIP
 					if (sti < 0x8) { // FSUBP
 						if (sti == 0) {
-							if (p.mode >= AdbgDisasmMode.File) {
+							if (p.mode >= AdbgDisasmMode.file) {
 								adbg_disasm_push_x8(p, modrm);
 								adbg_disasm_push_str(p, "fstsw");
 								adbg_disasm_push_reg(p, "ax");
@@ -1070,7 +1070,7 @@ L_CONTINUE:
 						} else
 							p.error = adbg_error_set(AdbgError.illegalInstruction);
 					} else { // FUCOMIP
-						if (p.mode < AdbgDisasmMode.File)
+						if (p.mode < AdbgDisasmMode.file)
 							return;
 						sti -= 8;
 						adbg_disasm_push_x8(p, modrm);
@@ -1081,7 +1081,7 @@ L_CONTINUE:
 					return;
 				case 0xF0: // FCOMIP/Reserved
 					if (sti < 0x8) { // FCOMIP
-						if (p.mode < AdbgDisasmMode.File)
+						if (p.mode < AdbgDisasmMode.file)
 							return;
 						adbg_disasm_push_x8(p, modrm);
 						adbg_disasm_push_str(p, "fcomip");
@@ -1093,29 +1093,29 @@ L_CONTINUE:
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 				}
 			} else { // operand is memory pointer
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, x86_T_FLT3[(modrm >> 3) & 7]);
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i64);
 			}
 			return;
 		}
 	case 0xE0: // E0H-E3H
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_E0h[p.x86.op & 3]);
 		adbg_disasm_x86_u8imm(p);
 		return;
 	case 0xE4: // E4H-E7H
 		const(char) *a = void;
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			a = adbg_disasm_x86_eax(p, p.x86.op);
 		if (p.x86.op & X86_FLAG_DIR) {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "out");
 			adbg_disasm_x86_u8imm(p);
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_reg(p, a);
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, "in");
 				adbg_disasm_push_reg(p, a);
 			}
@@ -1124,12 +1124,12 @@ L_CONTINUE:
 		return;
 	case 0xE8: // E8H-EBH
 		if (p.x86.op & X86_FLAG_DIR) {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "jmp");
 			if (p.x86.op & X86_FLAG_WIDE) {
 				adbg_disasm_x86_u8imm(p);
 			} else {
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x16(p, *p.ai16);
 					adbg_disasm_push_imm(p, *p.ai16);
 				}
@@ -1137,13 +1137,13 @@ L_CONTINUE:
 				adbg_disasm_x86_u32imm(p);
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "jmp" : "call");
 			adbg_disasm_x86_u32imm(p);
 		}
 		return;
 	case 0xEC: // ECH-EFH
-		if (p.mode < AdbgDisasmMode.File)
+		if (p.mode < AdbgDisasmMode.file)
 			return;
 		const(char) *m = adbg_disasm_x86_eax(p, p.x86.op);
 		if (p.x86.op & X86_FLAG_DIR) {
@@ -1162,22 +1162,22 @@ L_CONTINUE:
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) { // REPZ/REPE/REPE
 				p.x86.last_prefix = 0xF3;
-//				if (p.mode >= AdbgDisasmMode.File)
+//				if (p.mode >= AdbgDisasmMode.file)
 //					disasm_push_prefix(p, "repz");
 				goto L_CONTINUE;
 			} else { // REPNZ/REPNE
 				p.x86.last_prefix = 0xF2;
-//				if (p.mode >= AdbgDisasmMode.File)
+//				if (p.mode >= AdbgDisasmMode.file)
 //					disasm_push_prefix(p, "repnz");
 				goto L_CONTINUE;
 			}
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "int1");
 			} else {
 				p.x86.lock = 0xF0;
-//				if (p.mode >= AdbgDisasmMode.File)
+//				if (p.mode >= AdbgDisasmMode.file)
 //					disasm_push_prefix(p, "lock");
 				goto L_CONTINUE;
 			}
@@ -1193,22 +1193,22 @@ L_CONTINUE:
 				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, x86_T_F4h[mreg >> 3]);
 			adbg_disasm_x86_modrm_rm(p, modrm, w, w);
 			if (mreg >= MODRM_REG_100) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_reg(p, adbg_disasm_x86_eax(p, p.x86.op));
 			} else if (mreg == MODRM_REG_000) { // TEST RM, IMM8
 				adbg_disasm_x86_u8imm(p);
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, w ? "cmc" : "hlt");
 		}
 		return;
 	case 0xF8: // F8H-FBH
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_F8h[p.x86.op & 3]);
 		return;
 	default: // FCH-FFH
@@ -1235,11 +1235,11 @@ L_CONTINUE:
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm_rm(p, modrm, w, 0);
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, w ? "std" : "cld");
 		}
 		return;
@@ -1252,13 +1252,13 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) { // 1111_1100
 	case 0:
 		if (p.x86.op & X86_FLAG_DIR) {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "lsl" : "lar");
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 			return;
@@ -1271,7 +1271,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			switch (modrm & MODRM_REG) {
 			case MODRM_REG_000:
 				if (mod11) { // VM*
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						break;
 					switch (modrm & MODRM_RM) {
 					case MODRM_RM_001: m = "vmcall"; break;
@@ -1283,14 +1283,14 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, m);
 				} else { // SGDT
-					if (p.mode >= AdbgDisasmMode.File)
+					if (p.mode >= AdbgDisasmMode.file)
 						adbg_disasm_push_str(p, "sgdt");
 					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 				return;
 			case MODRM_REG_001:
 				if (mod11) { // MONITOR*
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						break;
 					switch (modrm & MODRM_RM) {
 					case MODRM_RM_000: m = "monitor"; break;
@@ -1303,14 +1303,14 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, m);
 				} else { // SIDT
-					if (p.mode >= AdbgDisasmMode.File)
+					if (p.mode >= AdbgDisasmMode.file)
 						adbg_disasm_push_str(p, "sidt");
 					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 				return;
 			case MODRM_REG_010:
 				if (mod11) { // X*
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						break;
 					switch (modrm & MODRM_RM) {
 					case MODRM_RM_000: m = "xgetbv"; break;
@@ -1324,14 +1324,14 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, m);
 				} else { // LGDT
-					if (p.mode >= AdbgDisasmMode.File)
+					if (p.mode >= AdbgDisasmMode.file)
 						adbg_disasm_push_str(p, "lgdt");
 					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 				return;
 			case MODRM_REG_011:
 				if (mod11) { // (AMD) SVM
-					if (p.mode < AdbgDisasmMode.File)
+					if (p.mode < AdbgDisasmMode.file)
 						break;
 					switch (modrm & MODRM_RM) {
 					case MODRM_RM_000: m = "vmrun"; break;
@@ -1346,13 +1346,13 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, m);
 				} else { // LIDT
-					if (p.mode >= AdbgDisasmMode.File)
+					if (p.mode >= AdbgDisasmMode.file)
 						adbg_disasm_push_str(p, "lgdt");
 					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
 				return;
 			case MODRM_REG_100: // SMSW
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "smsw");
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				return;
@@ -1361,27 +1361,27 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, "serialize");
 				}
 				return;
 			case MODRM_REG_110: // LMSW
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "lmsw");
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				return;
 			case MODRM_REG_111:
 				if (mod11) { // *
 					if ((modrm & MODRM_RM) == MODRM_RM_001) {
-						if (p.mode >= AdbgDisasmMode.File) {
+						if (p.mode >= AdbgDisasmMode.file) {
 							adbg_disasm_push_x8(p, modrm);
 							adbg_disasm_push_str(p, "rdtscp");
 						}
 					} else
 						p.error = adbg_error_set(AdbgError.illegalInstruction);
 				} else { // INVLPG
-					if (p.mode >= AdbgDisasmMode.File)
+					if (p.mode >= AdbgDisasmMode.file)
 						adbg_disasm_push_str(p, "invlpg");
 					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
@@ -1399,14 +1399,14 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case MODRM_REG_101: m = "verw"; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 		}
 		return;
 	case 0x04: // 04H-07H
 		if (p.x86.op & X86_FLAG_DIR && (p.x86.op & X86_FLAG_WIDE) == 0) { // 06H
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "clts");
 		} else {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
@@ -1415,13 +1415,13 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 	case 0x08: // 08H-0BH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "ud2");
 			} else {
 				p.error = adbg_error_set(AdbgError.illegalInstruction);
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "wbinvd" : "invd");
 		}
 		return;
@@ -1433,7 +1433,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "prefetchw");
 			adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 		} else {
@@ -1462,7 +1462,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				}
 				f |= X86_FLAG_DIR;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm(p, f);
 			
@@ -1475,7 +1475,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case X86_0F_F3H: m = "movss"; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			if (p.x86.op & X86_FLAG_WIDE) f |= X86_FLAG_DIR;
 			adbg_disasm_x86_modrm(p, f);
@@ -1511,7 +1511,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			}
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, f);
 		return;
@@ -1533,14 +1533,14 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				return;
 			}
 			int w = p.x86.op & X86_FLAG_WIDE;
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, x86_T_0F_18h[w][mi]);
 			if (w) {
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_reg(p, sr);
 			} else {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_reg(p, sr);
 				adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 			}
@@ -1560,7 +1560,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case MODRM_REG_011: m = "prefetcht2"; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 		}
@@ -1569,7 +1569,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		if (p.x86.op & X86_FLAG_DIR && p.x86.op & X86_FLAG_WIDE) {
 			ubyte modrm = *p.ai8;
 			++p.ai8;
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "nop");
 			adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 		} else {
@@ -1579,13 +1579,13 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 	case 0x20: // 20H-23H
 		ubyte modrm = *p.ai8;
 		++p.ai8;
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_x8(p, modrm);
 		if (modrm < MODRM_MOD_11) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode < AdbgDisasmMode.File)
+		if (p.mode < AdbgDisasmMode.file)
 			return;
 		adbg_disasm_push_str(p, "mov");
 		int r = (modrm & MODRM_REG) >> 3;
@@ -1636,7 +1636,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			if ((p.x86.op & X86_FLAG_WIDE) == 0)
 				f |= X86_FLAG_DIR;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, f);
 		return;
@@ -1648,7 +1648,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case X86_0F_66H: m = p.x86.op & X86_FLAG_WIDE ? "comisd" : "ucomisd"; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		} else {
@@ -1675,7 +1675,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, m);
 				adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, modrm, w));
 			}
@@ -1683,7 +1683,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		}
 		return;
 	case 0x30: // 30H-33H
-		if (p.mode < AdbgDisasmMode.File)
+		if (p.mode < AdbgDisasmMode.file)
 			return;
 		const(char) *m = void;
 		if (p.x86.op & X86_FLAG_DIR)
@@ -1703,7 +1703,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			}
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "sysexit" : "sysenter";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		return;
 	case 0x38: // 38H-3BH
@@ -1717,7 +1717,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			adbg_disasm_x86_0f38(p);
 		return;
 	case 0x40, 0x44, 0x48, 0x4C: // 40H-4FH
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_CMOVcc[p.x86.op & 15]);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		return;
@@ -1729,7 +1729,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case X86_0F_F3H: m = p.x86.op & X86_FLAG_WIDE ? "rcpss" : "rsqrtss"; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		} else {
@@ -1741,7 +1741,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_F3H: m = "sqrtss"; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, m);
 				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 			} else {
@@ -1756,7 +1756,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, m);
 					adbg_disasm_push_reg(p,
@@ -1782,7 +1782,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -1814,7 +1814,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -1824,7 +1824,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			s |= (p.x86.op & 3) << 2;
 			adbg_disasm_push_str(p, x86_T_0F_5Ch[s]);
 		}
@@ -1837,7 +1837,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			if (p.x86.op & X86_FLAG_DIR)
 				m = p.x86.op & X86_FLAG_WIDE ? "packsswb" : "punpckldq";
@@ -1854,7 +1854,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			if (p.x86.op & X86_FLAG_DIR)
 				m = p.x86.op & X86_FLAG_WIDE ? "packuswb" : "pcmpgtd";
@@ -1871,7 +1871,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			if (p.x86.op & X86_FLAG_DIR)
 				m = p.x86.op & X86_FLAG_WIDE ? "packssdw" : "punpckhdq";
@@ -1917,7 +1917,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			w = X86_FLAG_MODW_128B;
 			m = p.x86.op & X86_FLAG_WIDE ? "punpckhqdq" : "punpcklqdq";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		break;
@@ -1994,7 +1994,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		} else {
@@ -2026,7 +2026,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, m);
 				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 			} else {
@@ -2051,7 +2051,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				}
 				ubyte imm = *p.ai8;
 				++p.ai8;
-				if (p.mode < AdbgDisasmMode.File) 
+				if (p.mode < AdbgDisasmMode.file) 
 					return;
 				adbg_disasm_push_x8(p, modrm);
 				adbg_disasm_push_x8(p, imm);
@@ -2067,7 +2067,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 	case 0x74: // 74H-77H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "emms");
 			} else {
 				int w = void;
@@ -2076,7 +2076,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "pcmpeqd");
 				adbg_disasm_x86_modrm(p, w);
 			}
@@ -2087,7 +2087,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pcmpeqw" : "pcmpeqb");
 			adbg_disasm_x86_modrm(p, w);
 		}
@@ -2100,7 +2100,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		int f;
 		switch (adbg_disasm_x86_0f_select(p)) {
 		case X86_0F_NONE: // (Intel) VMX
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "vmwrite" : "vmread");
 			if (p.x86.op & X86_FLAG_WIDE)
 				f |= X86_FLAG_DIR;
@@ -2114,7 +2114,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, "extrq");
 					adbg_disasm_push_reg(p,
@@ -2127,7 +2127,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, "extrq");
 					adbg_disasm_push_reg(p,
@@ -2145,7 +2145,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, "insertq");
 					adbg_disasm_push_reg(p,
@@ -2158,7 +2158,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					p.error = adbg_error_set(AdbgError.illegalInstruction);
 					return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, "insertq");
 					adbg_disasm_push_reg(p,
@@ -2209,7 +2209,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm(p, f);
 		} else {
@@ -2218,35 +2218,35 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case X86_0F_F2H: m = p.x86.op & X86_FLAG_WIDE ? "hsubps" : "haddps"; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		}
 		return;
 	case 0x80, 0x84, 0x88, 0x8C: // 80H-83H
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_Jcc[p.x86.op & 15]);
 		adbg_disasm_x86_u32imm(p);
 		return;
 	case 0x90, 0x94, 0x98, 0x9C: // 90H-93H
 		ubyte modrm = *p.ai8;
 		++p.ai8;
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_SETcc[p.x86.op & 15]);
 		adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i8, MemWidth.i8);
 		return;
 	case 0xA0: // A0H-A3H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "bt");
 				adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 			} else {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "cpuid");
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
 				adbg_disasm_push_reg(p, "fs");
 			}
@@ -2257,11 +2257,11 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, "shld");
 		adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 		if (p.x86.op & X86_FLAG_WIDE) {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_reg(p, "cl");
 		} else {
 			adbg_disasm_x86_u8imm(p);
@@ -2270,15 +2270,15 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 	case 0xA8: // A8H-ABH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "bts");
 				adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 			} else {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "rsm");
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pop" : "push");
 				adbg_disasm_push_reg(p, "gs");
 			}
@@ -2287,7 +2287,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 	case 0xAC: // ACH-AFH
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "imul");
 				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 			} else { // GRP15
@@ -2303,7 +2303,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 						case MODRM_REG_111: m = "sfence"; break;
 						default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 						}
-						if (p.mode >= AdbgDisasmMode.File) {
+						if (p.mode >= AdbgDisasmMode.file) {
 							adbg_disasm_push_x8(p, modrm);
 							adbg_disasm_push_str(p, m);
 						}
@@ -2315,7 +2315,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 							break;
 						default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 						}
-						if (p.mode >= AdbgDisasmMode.File) {
+						if (p.mode >= AdbgDisasmMode.file) {
 							p.x86.pf_operand = 0;
 							adbg_disasm_push_x8(p, modrm);
 							adbg_disasm_push_str(p, m);
@@ -2334,7 +2334,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 						case MODRM_REG_110: m = "umonitor"; break;
 						default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 						}
-						if (p.mode >= AdbgDisasmMode.File) {
+						if (p.mode >= AdbgDisasmMode.file) {
 							adbg_disasm_push_x8(p, modrm);
 							adbg_disasm_push_str(p, m);
 							adbg_disasm_push_reg(p,
@@ -2344,7 +2344,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
 				} else { // mem
-					if (p.mode >= AdbgDisasmMode.File) {
+					if (p.mode >= AdbgDisasmMode.file) {
 						switch (modrm & MODRM_REG) {
 						case MODRM_REG_000: m = "fxsave"; break;
 						case MODRM_REG_001: m = "fxrstor"; break;
@@ -2361,13 +2361,13 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				}
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "shld");
 			adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 			if (p.x86.op & X86_FLAG_WIDE) {
 				adbg_disasm_x86_u8imm(p);
 			} else {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_reg(p, "cl");
 			}
 		}
@@ -2388,7 +2388,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				f = X86_FLAG_DIR | X86_FLAG_MODW_8B;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, "cmpxchg");
 		adbg_disasm_x86_modrm(p, f);
 		return;
@@ -2404,7 +2404,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "lgs" : "lfs";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_32B;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, f);
 		return;
@@ -2425,7 +2425,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case MODRM_REG_111: m = "btc"; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, m);
 					adbg_disasm_push_reg(p,
@@ -2433,18 +2433,18 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				}
 				adbg_disasm_x86_u8imm(p);
 			} else {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "btc");
 				adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 			}
 		} else {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "ud1");
 			} else {
 				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_F3H:
-					if (p.mode >= AdbgDisasmMode.File)
+					if (p.mode >= AdbgDisasmMode.file)
 						adbg_disasm_push_str(p, "popcnt");
 					adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 					return;
@@ -2469,14 +2469,14 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			}
 			f = X86_FLAG_DIR | X86_FLAG_MODW_32B;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, f);
 		return;
 	case 0xC0: // C0H-C3H
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "movnti");
 				adbg_disasm_x86_modrm(p, X86_FLAG_MODW_32B);
 			} else {
@@ -2488,13 +2488,13 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_F3H:  m = "cmpss"; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, m);
 				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 				adbg_disasm_x86_u8imm(p);
 			}
 		} else {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "xadd");
 			adbg_disasm_x86_modrm(p, X86_FLAG_USE_OP);
 		}
@@ -2518,7 +2518,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 						break;
 					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
-					if (p.mode >= AdbgDisasmMode.File) {
+					if (p.mode >= AdbgDisasmMode.file) {
 						adbg_disasm_push_x8(p, modrm);
 						adbg_disasm_push_str(p, m);
 						adbg_disasm_push_reg(p,
@@ -2541,7 +2541,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					case MODRM_REG_111: m = "vmptrst"; break;
 					default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 					}
-					if (p.mode >= AdbgDisasmMode.File)
+					if (p.mode >= AdbgDisasmMode.file)
 						adbg_disasm_push_str(p, m);
 					adbg_disasm_x86_modrm_rm(p, modrm, MemWidth.i32, MemWidth.i32);
 				}
@@ -2558,7 +2558,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_66H: m = "shufpd"; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, m);
 					adbg_disasm_push_reg(p,
@@ -2582,7 +2582,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_66H: w = MemWidth.i128; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, "pextrw");
 					adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, modrm >> 3, MemWidth.i32));
@@ -2596,7 +2596,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "pinsrw");
 				adbg_disasm_x86_modrm(p, w);
 				adbg_disasm_x86_u8imm(p);
@@ -2604,7 +2604,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		}
 		return;
 	case 0xC8, 0xCC: // C8H-CFH
-		if (p.mode < AdbgDisasmMode.File)
+		if (p.mode < AdbgDisasmMode.file)
 			return;
 		adbg_disasm_push_str(p, "bswap");
 		adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, p.x86.op, MemWidth.i32));
@@ -2617,7 +2617,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "psrlq" : "psrld");
 			adbg_disasm_x86_modrm(p, w);
 		} else {
@@ -2628,7 +2628,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "psrlw");
 				adbg_disasm_x86_modrm(p, w);
 			} else {
@@ -2638,7 +2638,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_F2H: m = "addsubps"; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, m);
 				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 			}
@@ -2659,7 +2659,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_66H: w = MemWidth.i128; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File) {
+				if (p.mode >= AdbgDisasmMode.file) {
 					adbg_disasm_push_x8(p, modrm);
 					adbg_disasm_push_str(p, "pmovmskb");
 					adbg_disasm_push_reg(p,
@@ -2670,7 +2670,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			} else {
 				switch (adbg_disasm_x86_0f_select(p)) {
 				case X86_0F_66H:
-					if (p.mode >= AdbgDisasmMode.File)
+					if (p.mode >= AdbgDisasmMode.file)
 						adbg_disasm_push_str(p, "movq");
 					adbg_disasm_x86_modrm(p, X86_FLAG_MODW_128B);
 					return;
@@ -2681,7 +2681,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
-					if (p.mode >= AdbgDisasmMode.File) {
+					if (p.mode >= AdbgDisasmMode.file) {
 						adbg_disasm_push_x8(p, modrm);
 						adbg_disasm_push_str(p, "movdq2q");
 						adbg_disasm_push_reg(p,
@@ -2697,7 +2697,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 						p.error = adbg_error_set(AdbgError.illegalInstruction);
 						return;
 					}
-					if (p.mode >= AdbgDisasmMode.File) {
+					if (p.mode >= AdbgDisasmMode.file) {
 						adbg_disasm_push_x8(p, modrm);
 						adbg_disasm_push_str(p, "movq2dq");
 						adbg_disasm_push_reg(p,
@@ -2716,7 +2716,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmullw" : "paddq");
 			adbg_disasm_x86_modrm(p, w);
 		}
@@ -2728,7 +2728,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			switch (p.x86.op & 3) {
 			case 0:  m = "psubusb"; break;
@@ -2747,7 +2747,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			switch (p.x86.op & 3) {
 			case 0:  m = "paddusb"; break;
@@ -2766,7 +2766,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			switch (p.x86.op & 3) {
 			case 0:  m = "pavgb"; break;
@@ -2794,7 +2794,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, m);
 				adbg_disasm_x86_modrm(p, w);
 			} else {
@@ -2804,7 +2804,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_F3H: m = "cvtdq2pd"; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, m);
 				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 			}
@@ -2814,7 +2814,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmulhw" : "pmulhuw");
 			adbg_disasm_x86_modrm(p, w);
 		}
@@ -2826,7 +2826,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			switch (p.x86.op & 3) {
 			case 0:  m = "psubsb"; break;
@@ -2845,7 +2845,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 		case X86_0F_66H: w = X86_FLAG_MODW_128B | X86_FLAG_DIR; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			switch (p.x86.op & 3) {
 			case 0:  m = "paddsb"; break;
@@ -2865,7 +2865,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "psllq" : "psllq");
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		} else {
@@ -2884,7 +2884,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				}
 				m = "lldqu";
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		}
@@ -2911,7 +2911,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 					break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, m);
 				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 			} else {
@@ -2921,7 +2921,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 				case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, "psadbw");
 				adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 			}
@@ -2932,13 +2932,13 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 			case X86_0F_66H: w = X86_FLAG_MODW_128B; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmaddwd" : "pmuludq");
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		}
 		return;
 	case 0xF8: // F8H-FBH
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			switch (p.x86.op & 3) {
 			case 0:  m = "psubb"; break;
@@ -2959,7 +2959,7 @@ void adbg_disasm_x86_0f(adbg_disasm_t *p) {
 	case 0b1111_1100: // FCH-FFH
 		// UD0 NOTE: Some older processors decode without ModR/M.
 		// Instead, an opcode exception is thrown (instead of a fault).
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			switch (p.x86.op & 3) {
 			case 0:  m = "paddb"; break;
@@ -2987,7 +2987,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) { // 1111_1100
@@ -2998,7 +2998,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "phaddw" : "pshufb";
 		int w = p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		return;
@@ -3009,7 +3009,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "phsubw" : "pmaddubsw";
 		int w = p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		return;
@@ -3021,7 +3021,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "psignw" : "psignb";
 		}
 		int w = p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		return;
@@ -3030,7 +3030,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, "pblendvb");
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3050,7 +3050,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "blendvpd" : "blendvps";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3067,7 +3067,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "pabsb" : "pabsw";
 		}
 		int w = p.x86.pf_operand ? X86_FLAG_MODW_128B : X86_FLAG_MODW_64B;
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		return;
@@ -3081,7 +3081,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "pmovsxwd" : "pmovsxbq";
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "pmovsxbd" : "pmovsxbw";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3094,7 +3094,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "pmovsxbd" : "pmovsxbw");
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3109,7 +3109,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "pcmpeqq" : "pmuldq";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3124,7 +3124,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "pmovzxbd" : "pmovzxbw";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3144,7 +3144,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "pmovzxdq" : "pmovzxwq";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3159,7 +3159,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "pminsd" : "pminsb";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3174,7 +3174,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "pmaxsd" : "pmaxsb";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3183,7 +3183,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "phminposuw" : "pmulld");
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3197,7 +3197,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			m = "invpcid";
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "invvpid" : "invept";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "phminposuw" : "pmulld");
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		return;
@@ -3207,7 +3207,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "sha256rnds2" : "sha1msg2";
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "sha1msg1" : "sha1nexte";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3217,13 +3217,13 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			return;
 		}
 		const(char) *m = p.x86.op & X86_FLAG_WIDE ? "sha256msg2" : "sha256msg1";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
 	case 0xD8: // D8H-DBH
 		if (p.x86.op & X86_FLAG_DIR && p.x86.op & X86_FLAG_WIDE && p.x86.pf_operand) {
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, "aesimc");
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		} else {
@@ -3240,7 +3240,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "aesdeclast" : "aesdec";
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "aesenclast" : "aesenc";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -3272,7 +3272,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 		}
 		if (p.x86.op & X86_FLAG_DIR)
 			f |= X86_FLAG_DIR;
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, f);
 		return;
@@ -3288,7 +3288,7 @@ void adbg_disasm_x86_0f38(adbg_disasm_t *p) {
 			case X86_0F_F3H: m = "adox"; break;
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_32B);
 		} else {
@@ -3303,7 +3303,7 @@ void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) { // 1111_1100
@@ -3327,7 +3327,7 @@ void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 			f = X86_FLAG_MODW_128B | X86_FLAG_DIR;
 			m = p.x86.op & X86_FLAG_WIDE ? "roundpd" : "roundps";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, f);
 		adbg_disasm_x86_u8imm(p);
@@ -3355,7 +3355,7 @@ void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 			w = X86_FLAG_MODW_128B;
 			m = p.x86.op & X86_FLAG_WIDE ? "blendpd" : "blendps";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | w);
 		adbg_disasm_x86_u8imm(p);
@@ -3380,7 +3380,7 @@ void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 				f = X86_FLAG_REGW_128B | X86_FLAG_MEMW_8B;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, f);
 		adbg_disasm_x86_u8imm(p);
@@ -3405,7 +3405,7 @@ void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 				wmem = X86_FLAG_MODW_8B;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | wmem | X86_FLAG_MEMW_128B);
 		adbg_disasm_x86_u8imm(p);
@@ -3421,7 +3421,7 @@ void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "dppd" : "dpps";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		adbg_disasm_x86_u8imm(p);
@@ -3431,7 +3431,7 @@ void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, "pclmulqdq");
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		adbg_disasm_x86_u8imm(p);
@@ -3447,7 +3447,7 @@ void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "pcmpestri" : "pcmpestrm";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		adbg_disasm_x86_u8imm(p);
@@ -3457,7 +3457,7 @@ void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, "sha1rnds4");
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		adbg_disasm_x86_u8imm(p);
@@ -3467,7 +3467,7 @@ void adbg_disasm_x86_0f3a(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, "aeskeygenassist");
 		adbg_disasm_x86_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		adbg_disasm_x86_u8imm(p);
@@ -3484,7 +3484,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) {
@@ -3558,7 +3558,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 				break;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -3599,7 +3599,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, i);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -3655,7 +3655,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 				f |= X86_FLAG_REGW_32B | X86_FLAG_MEMW_32B;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, i);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -3678,7 +3678,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, i);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_3OPRND | X86_FLAG_REGW_128B | X86_FLAG_DIR);
 		return;
@@ -3731,7 +3731,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 				}
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, i);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -3819,7 +3819,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 				}
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, i);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -3833,7 +3833,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			i = p.x86.op & X86_FLAG_WIDE ? "vpacksswb" : "vpunpckldq";
 		else
 			i = p.x86.op & X86_FLAG_WIDE ? "vpunpcklwd" : "vpunpcklbw";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, i);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -3847,7 +3847,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			i = p.x86.op & X86_FLAG_WIDE ? "vpackuswb" : "vpcmpgtd";
 		else
 			i = p.x86.op & X86_FLAG_WIDE ? "vpcmpgtw" : "vpcmpgtb";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, i);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -3861,7 +3861,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			i = p.x86.op & X86_FLAG_WIDE ? "vpackssdw" : "vpunpckhdq";
 		else
 			i = p.x86.op & X86_FLAG_WIDE ? "vpunpckhwd" : "vpunpckhbw";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, i);
 		adbg_disasm_x86_vex_modrm(p,
 			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
@@ -3905,7 +3905,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			i = p.x86.op & X86_FLAG_WIDE ? "vpunpcklqdq" : "vpunpckhqdq";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, i);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -3960,7 +3960,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 				f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		adbg_disasm_x86_u8imm(p);
@@ -3969,7 +3969,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 		const(char) *m = void;
 		if (p.x86.op & X86_FLAG_DIR) {
 			if (p.x86.op & X86_FLAG_WIDE) {
-				if (p.mode >= AdbgDisasmMode.File)
+				if (p.mode >= AdbgDisasmMode.file)
 					adbg_disasm_push_str(p, p.x86.vex_L ? "vzeroall" : "vzeroupper");
 				return;
 			} else {
@@ -3986,7 +3986,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			}
 			m = p.x86.op & X86_FLAG_WIDE ? "vpcmpeqw" : "vpcmpeqb";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_3OPRND | X86_FLAG_MODW_128B);
 		return;
@@ -4030,7 +4030,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			}
 			f = X86_FLAG_DIR | X86_FLAG_3OPRND | X86_FLAG_MODW_128B;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4059,7 +4059,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_3OPRND | X86_FLAG_MEMW_64B;
 			break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		adbg_disasm_x86_u8imm(p);
@@ -4103,7 +4103,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 						| X86_FLAG_DIR | X86_FLAG_VEX_NO_L | X86_FLAG_3OPRND;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		adbg_disasm_x86_u8imm(p);
@@ -4131,7 +4131,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 				}
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4158,7 +4158,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			f = X86_FLAG_3OPRND | X86_FLAG_MODW_128B | X86_FLAG_DIR;
 			m = p.x86.op & X86_FLAG_WIDE ? "vpmullw" : "vpaddq";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4173,7 +4173,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 		} else {
 			m = p.x86.op & X86_FLAG_WIDE ? "vpsubusw" : "vpsubusb";
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4187,7 +4187,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "vpandn" : "vpmaxub";
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "vpaddusw" : "vpaddusb";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4201,7 +4201,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "vpavgw" : "vpsrad";
 		else
 			m = p.x86.op & X86_FLAG_WIDE ? "vpsraw" : "vpavgb";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4239,7 +4239,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			m = p.x86.op & X86_FLAG_WIDE ? "vpmulhw" : "vpmulhuw";
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4248,7 +4248,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_VEX_0F_E8h[p.x86.op & 7]);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4279,7 +4279,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 				f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 			}
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_VEX_0F_E8h[p.x86.op & 7]);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4297,7 +4297,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 			}
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 		} else f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_VEX_0F_F4h[i]);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4310,7 +4310,7 @@ void adbg_disasm_x86_vex_0f(adbg_disasm_t *p) {
 		case 2: m = "vpaddd"; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4322,7 +4322,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) {
@@ -4334,7 +4334,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 		int f = p.x86.op >= 0x0E ?
 			X86_FLAG_DIR | X86_FLAG_MODW_128B :
 			X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_VEX_0F38_00h[p.x86.op & 15]);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4343,7 +4343,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, "vcvtph2ps");
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -4354,7 +4354,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 		}
 		if (p.x86.op & X86_FLAG_DIR) {
 			int w = p.x86.op & X86_FLAG_WIDE;
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, w ? "vptest" : "vpermps");
 			adbg_disasm_x86_vex_modrm(p, w ?
 				X86_FLAG_DIR | X86_FLAG_MODW_128B :
@@ -4392,7 +4392,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B;
 			break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4402,7 +4402,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			const(char) *m = void;
 			switch (o) {
 			case 0:  m = "vpabsb"; break;
@@ -4438,7 +4438,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_64B;
 			break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4462,7 +4462,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4471,7 +4471,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_VEX_0F38_28h[p.x86.op & 3]);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4481,7 +4481,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, p.x86.op & X86_FLAG_WIDE ? "vmaskmovpd" : "vmaskmovps");
 		int f = p.x86.op & X86_FLAG_DIR ? // Faster than applying yet another bitwise OR
 			X86_FLAG_MODW_128B | X86_FLAG_3OPRND :
@@ -4513,7 +4513,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			f = X86_FLAG_DIR | X86_FLAG_REGW_128B | X86_FLAG_MEMW_64B;
 			break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4546,7 +4546,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			f = X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND;
 			break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4555,7 +4555,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, x86_T_VEX_0F38_38h[p.x86.op & 7]);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4583,7 +4583,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4599,7 +4599,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 		case 3: m = p.x86.vex_W ? "vpsllvq" : "vpsllvd"; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4631,7 +4631,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4655,7 +4655,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4670,7 +4670,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 		case 2: f = X86_FLAG_MODW_128B | X86_FLAG_3OPRND; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, p.x86.vex_W ? "vpmaskmovq" : "vpmaskmovd");
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4719,7 +4719,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			}
 			break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4733,7 +4733,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			m = p.x86.vex_W ? "vfmaddsub132pd" : "vfmaddsub132ps";
 		else
 			m = p.x86.vex_W ? "vfmsubadd132ps" : "vfmsubadd132pd";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4769,7 +4769,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			m = p.x86.vex_W ? "vfnmsub132sd" : "vfnmsub132ss";
 			break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4783,7 +4783,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			m = p.x86.vex_W ? "vfmsubadd213pd" : "vfmsubadd213ps";
 		else
 			m = p.x86.vex_W ? "vfmaddsub213pd" : "vfmaddsub213ps";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4819,7 +4819,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			m = p.x86.vex_W ? "vfnmsub213sd" : "vfnmsub213ss";
 			break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4833,7 +4833,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			m = p.x86.vex_W ? "vfmsubadd231pd" : "vfmsubadd231ps";
 		else
 			m = p.x86.vex_W ? "vfmaddsub231pd" : "vfmaddsub231ps";
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4869,7 +4869,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			m = p.x86.vex_W ? "vfnmsub231ss" : "vfnmsub231ss";
 			break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4878,7 +4878,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			p.error = adbg_error_set(AdbgError.illegalInstruction);
 			return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, "vaesimc");
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B);
 		return;
@@ -4894,7 +4894,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 		case 2: m = "vaesdec"; break;
 		default: m = "vaesdeclast"; break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, X86_FLAG_DIR | X86_FLAG_MODW_128B | X86_FLAG_3OPRND);
 		return;
@@ -4913,7 +4913,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			int f = p.x86.vex_W ?
 				X86_FLAG_DIR | X86_FLAG_MODW_64B | X86_FLAG_3OPRND | X86_FLAG_VEX_SWvvvvREG :
 				X86_FLAG_DIR | X86_FLAG_MODW_32B | X86_FLAG_3OPRND | X86_FLAG_VEX_SWvvvvREG;
-			if (p.mode >= AdbgDisasmMode.File)
+			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_push_str(p, m);
 			adbg_disasm_x86_vex_modrm(p, f);
 		} else {
@@ -4926,7 +4926,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 			}
 			int w = p.x86.vex_W ? MemWidth.i64 : MemWidth.i32;
-			if (p.mode >= AdbgDisasmMode.File) {
+			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_disasm_push_str(p, m);
 				adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, p.x86.vex_vvvv, w));
 			}
@@ -4972,7 +4972,7 @@ void adbg_disasm_x86_vex_0f38(adbg_disasm_t *p) {
 			break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return; // F4H
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		return;
@@ -4984,7 +4984,7 @@ void adbg_disasm_x86_vex_0f3a(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x8(p, p.x86.op);
 
 	switch (p.x86.op & 252) {
@@ -5018,7 +5018,7 @@ void adbg_disasm_x86_vex_0f3a(adbg_disasm_t *p) {
 			break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		adbg_disasm_x86_u8imm(p);
@@ -5049,7 +5049,7 @@ void adbg_disasm_x86_vex_0f3a(adbg_disasm_t *p) {
 			break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		adbg_disasm_x86_u8imm(p);
@@ -5095,7 +5095,7 @@ void adbg_disasm_x86_vex_0f3a(adbg_disasm_t *p) {
 				X86_FLAG_MEMW_32B | X86_FLAG_REGW_128B;
 			break;
 		}
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_str(p, m);
 		adbg_disasm_x86_vex_modrm(p, f);
 		adbg_disasm_x86_u8imm(p);
@@ -5109,7 +5109,7 @@ void adbg_disasm_x86_xop_8(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x8(p, p.x86.op);
 	
 }
@@ -5118,7 +5118,7 @@ void adbg_disasm_x86_xop_9(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x8(p, p.x86.op);
 	
 }
@@ -5127,7 +5127,7 @@ void adbg_disasm_x86_xop_10(adbg_disasm_t *p) {
 	p.x86.op = *p.ai8;
 	++p.ai8;
 
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x8(p, p.x86.op);
 	
 }
@@ -5472,7 +5472,7 @@ MemWidth adbg_disasm_x86_modrm_width(adbg_disasm_t *p, int op) {
 }
 
 void adbg_disasm_x86_u8imm(adbg_disasm_t *p) {
-	if (p.mode >= AdbgDisasmMode.File) {
+	if (p.mode >= AdbgDisasmMode.file) {
 		adbg_disasm_push_x8(p, *p.ai8);
 		adbg_disasm_push_imm(p, *p.ai8);
 	}
@@ -5485,13 +5485,13 @@ void adbg_disasm_x86_u8imm(adbg_disasm_t *p) {
 /// Params: p = disassembler structure
 void adbg_disasm_x86_u32imm(adbg_disasm_t *p) {
 	if (p.x86.pf_operand) { // 16-bit
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_disasm_push_x16(p, *p.ai16);
 			adbg_disasm_push_imm(p, *p.ai16);
 		}
 		++p.ai16;
 	} else { // Normal mode 32-bit
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_disasm_push_x32(p, *p.ai32);
 			adbg_disasm_push_imm(p, *p.ai32);
 		}
@@ -5507,13 +5507,13 @@ void adbg_disasm_x86_u32imm(adbg_disasm_t *p) {
 /// 	seg = Segment register string
 void adbg_disasm_x86_segimm(adbg_disasm_t *p, const(char) *seg) {
 	if (p.x86.pf_address) { // 16-bit
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_disasm_push_x16(p, *p.ai16);
 			adbg_disasm_push_immseg(p, *p.ai16, seg);
 		}
 		++p.ai16;
 	} else { // Normal mode 32-bit
-		if (p.mode >= AdbgDisasmMode.File) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_disasm_push_x32(p, *p.ai32);
 			adbg_disasm_push_immseg(p, *p.ai32, seg);
 		}
@@ -5536,7 +5536,7 @@ void adbg_disasm_x86_immfar(adbg_disasm_t *p) {
 	}
 	ushort sv = *p.ai16;
 	++p.ai16;
-	if (p.mode >= AdbgDisasmMode.File) {
+	if (p.mode >= AdbgDisasmMode.file) {
 		if (p.x86.pf_address)
 			adbg_disasm_push_x16(p, cast(ushort)v);
 		else
@@ -5583,20 +5583,20 @@ const(char) *adbg_disasm_x86_segstr(int segreg) {
 /// While it is the formatter's job to format registers, the long legacy of
 /// the syntax wars lead to this
 const(char) *adbg_disasm_x87_ststr(adbg_disasm_t *p, int index) {
-	__gshared const(char) *[]att = [
+	__gshared const(char) *[]__att = [
 		"%st", "%st(1)", "%st(2)", "%st(3)", "%st(4)", "%st(5)", "%st(6)", "%st(7)"
 	];
-	__gshared const(char) *[]intel = [
+	__gshared const(char) *[]__intel = [
 		"st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
 	];
-	__gshared const(char) *[]nasm = [
+	__gshared const(char) *[]__nasm = [
 		"st0", "st1", "st2", "st3", "st4", "st5", "st6", "st7"
 	];
 	with (AdbgDisasmSyntax)
 	switch (p.syntax) {
-	case Att:	return att[index];
-	case Nasm:	return nasm[index];
-	default:	return intel[index];
+	case att:	return __att[index];
+	case nasm:	return __nasm[index];
+	default:	return __intel[index];
 	}
 }
 
@@ -5633,7 +5633,7 @@ L_RM:
 	if (dir) return;
 
 L_REG:
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_reg(p, adbg_disasm_x86_modrm_reg(p, modrm >> 3, wreg));
 	if (dir) goto L_RM;
 }
@@ -5707,7 +5707,7 @@ const(char) *adbg_disasm_x86_modrm_rm_reg(adbg_disasm_t *p, int rm, bool vsib = 
 void adbg_disasm_x86_modrm_rm(adbg_disasm_t *p, ubyte modrm, int wmem, int wreg) {
 	const(char) *seg = void, regstr = void;
 
-	bool filemode = p.mode >= AdbgDisasmMode.File;
+	bool filemode = p.mode >= AdbgDisasmMode.file;
 	if (filemode) {
 		adbg_disasm_push_x8(p, modrm);
 		seg = adbg_disasm_x86_segstr(p.x86.segreg);
@@ -5816,7 +5816,7 @@ void adbg_disasm_x86_sib(adbg_disasm_t *p, ubyte modrm, int wmem) {
 
 	const(char)* rbase = void, rindex = void, seg = void;
 
-	bool filemode = p.mode >= AdbgDisasmMode.File;
+	bool filemode = p.mode >= AdbgDisasmMode.file;
 	if (filemode) {
 		adbg_disasm_push_x8(p, sib);
 		seg = adbg_disasm_x86_segstr(p.x86.segreg);
@@ -5837,7 +5837,7 @@ void adbg_disasm_x86_sib(adbg_disasm_t *p, ubyte modrm, int wmem) {
 			}
 			++p.ai32;
 		} else {
-			if (p.mode < AdbgDisasmMode.File) return;
+			if (p.mode < AdbgDisasmMode.file) return;
 			rbase = adbg_disasm_x86_modrm_rm_reg(p, sib);
 			if (index == SIB_INDEX_100) // BASE
 				adbg_disasm_push_x86_sib_m00_i100(p, seg, rbase, wmem);
@@ -5950,7 +5950,7 @@ void adbg_disasm_x86_vex_modrm(adbg_disasm_t *p, int flags) {
 	if (wreg == MemWidth.i128 && p.x86.vex_L) // VEX.L
 		wreg = MemWidth.i256;
 
-	bool filemode = p.mode >= AdbgDisasmMode.File;
+	bool filemode = p.mode >= AdbgDisasmMode.file;
 	// NOTE: imm8 operand is not included in this operation
 	switch (flags & X86_FLAG_OPRNDM) {
 	case 0: // 0, includes 2 operands

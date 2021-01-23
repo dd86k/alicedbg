@@ -129,9 +129,9 @@ struct setting_syntax_t {
 	immutable(char)* opt, desc;
 }
 immutable setting_syntax_t[] syntaxes = [
-	{ AdbgDisasmSyntax.Att,   "att",   "AT&T syntax" },
-	{ AdbgDisasmSyntax.Intel, "intel", "Intel syntax" },
-	{ AdbgDisasmSyntax.Nasm,  "nasm",  "Netwide Assembler syntax" },
+	{ AdbgDisasmSyntax.att,   "att",   "AT&T syntax" },
+	{ AdbgDisasmSyntax.intel, "intel", "Intel syntax" },
+	{ AdbgDisasmSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
 ];
 int clisyntax(settings_t *settings, const(char) *val) {
 	if (askhelp(val)) {

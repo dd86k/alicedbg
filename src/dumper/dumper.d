@@ -134,7 +134,7 @@ int adbg_dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 		uint icnt;	/// instruction count
 		uint ills;	/// Number of illegal instructions
 		for (uint i, isize = void; i < size; i += isize) {
-			AdbgError e = cast(AdbgError)adbg_disasm(dp, AdbgDisasmMode.Size);
+			AdbgError e = cast(AdbgError)adbg_disasm(dp, AdbgDisasmMode.size);
 			isize = cast(uint)(dp.av - dp.la);
 			with (AdbgError)
 			switch (e) {
@@ -164,7 +164,7 @@ int adbg_dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 		);
 	} else {
 		for (uint i; i < size; i += dp.av - dp.la) {
-			AdbgError e = cast(AdbgError)adbg_disasm(dp, AdbgDisasmMode.File);
+			AdbgError e = cast(AdbgError)adbg_disasm(dp, AdbgDisasmMode.file);
 			with (AdbgError)
 			switch (e) {
 			case none, illegalInstruction:

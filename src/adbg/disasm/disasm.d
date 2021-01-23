@@ -8,23 +8,25 @@ module adbg.disasm.disasm;
 import adbg.error;
 import adbg.disasm.arch;
 import adbg.disasm.formatter;
-import adbg.utils.bit : fswap16, fswap32, fswap64;
+import adbg.utils.bit : fswap16, fswap32, fswap64, BIT;
 
 extern (C):
 
 /// Character buffer size
 ///
 /// Currently, 64 characters is enough to hold SIB memory references, AVX-512
-/// instructions, or 15 bytes of machine code hexadecimal numbers.
+/// instructions, or 15 bytes of machine code hexadecimal numbers. Used in
+/// formatter module.
+///
 /// If that's not enough, update to 80 characters.
-enum DISASM_CBUF_SIZE = 64;
+enum ADBG_DISASM_BUFFER_SIZE = 64;
 
 /// Disassembler operating mode
 enum AdbgDisasmMode : ubyte {
-	Size,	/// Only calculate operation code sizes
-	Data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
-	File,	/// Machine code and instruction mnemonics formatting
-	Full	/// (Not implemented) Add comments
+	size,	/// Only calculate operation code sizes
+	data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
+	file,	/// Machine code and instruction mnemonics formatting
+	full	/// (Not implemented) Add comments (e.g., ; REX PUSH R8)
 }
 
 /// Disassembler ABI
@@ -44,51 +46,58 @@ enum AdbgDisasmPlatform : ubyte {
 //TODO: Native syntax
 //      A custom ISA-dependant format
 enum AdbgDisasmSyntax : ubyte {
-	Default,	/// Platform compiled target default
-	Intel,	/// Intel syntax, closest to the Microsoft/Macro Assembler (MASM)
-	Nasm,	/// (NASM) Netwide Assembler syntax
-	Att,	/// AT&T syntax
-//	Ideal,	/// (Not implemented) Borland Ideal
-//	Hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
+	platform,	/// Platform compiled target default
+	intel,	/// Intel syntax, close to Microsoft/Macro Assembler (MASM)
+	nasm,	/// (NASM) Netwide Assembler syntax
+	att,	/// AT&T syntax
+//	ideal,	/// (Not implemented) Borland Ideal
+//	hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
+}
+
+/// Disassembler option flag
+enum AdbgDisasmOption : ushort {
+	/// Use a space instead of a tab between the mnemonic and operands
+	spaceSep	= BIT!(0),
+	///TODO: Go backwards
+	backward	= BIT!(1),
+	///TODO: Do not group machine code integers
+	noGroup	= BIT!(2),
+	/// Do not insert spaces in-between machine code types (bytes, words, etc.)
+	noSpace	= BIT!(3),
 }
 
 version (X86) {
-	enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.x86;	/// Platform default ABI
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.Intel;	/// Platform default syntax
+	/// Platform default ABI
+	private enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.x86;
+	/// Platform default syntax
+	private enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.intel;
 } else
 version (X86_64) {
-	enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.x86_64;	/// Platform default ABI
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.Intel;	/// Platform default syntax
+	/// Platform default ABI
+	private enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.x86_64;
+	/// Platform default syntax
+	private enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.intel;
+} else
+version (Thumb) {
+	/// Platform default ABI
+	private enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.arm_t32;
+	/// Platform default syntax
+	private enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
 } else
 version (ARM) {
-	enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.arm_a32;	/// Platform default ABI
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.Att;	/// Platform default syntax
+	/// Platform default ABI
+	private enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.arm_a32;
+	/// Platform default syntax
+	private enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
 } else
 version (AArch64) {
-	enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.arm_a64;	/// Platform default ABI
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.Att;	/// Platform default syntax
+	/// Platform default ABI
+	private enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.arm_a64;
+	/// Platform default syntax
+	private enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
 } else {
-	static assert(0, "Missing default platform disassembler settings");
+	static assert(0, "DISASM_DEFAULT_ISA/DISASM_DEFAULT_SYNTAX unset");
 }
-
-//
-// Option bits
-//
-
-/// Disassembler: Use space instead of a tab between the mnemonic and operands
-enum DISASM_O_SPACE	= 0x0001;
-///TODO: Disassembler: Go backwards instead of forward. More expensive to calculate!
-enum DISASM_O_BACKWARD	= 0x0002;
-///TODO: Disassembler: When calculating target addresses, use the internal counter
-//enum DISASM_O_BASEZERO	= 0x0004;
-/// Disassembler: 
-//enum DISASM_O_	= 0x0008;
-/// Disassembler: 
-//enum DISASM_O_	= 0x0010;
-///TODO: Disassembler: Do not group machine code integers
-enum DISASM_O_MC_INT_SEP	= 0x0020;
-/// Disassembler: Do not add an extra space
-enum DISASM_O_MC_NOSPACE	= 0x0040;
 
 /// Disassembler parameters structure
 struct adbg_disasm_t { align(1):
@@ -97,7 +106,7 @@ struct adbg_disasm_t { align(1):
 		/// to the current instruction address for the disassembler.
 		/// Acts as instruction pointer/program counter.
 		void   *a;
-		size_t av;	/// Non-pointer format for calculations
+		size_t av;	/// Non-pointer format for address calculation
 		ubyte  *ai8; 	/// Used internally
 		ushort *ai16;	/// Used internally
 		uint   *ai32;	/// Used internally
@@ -144,9 +153,9 @@ struct adbg_disasm_t { align(1):
 	/// Bitwise flag. See DISASM_O_* flags.
 	uint options;
 	size_t mcbufi;	/// Machine code buffer index
-	char [DISASM_CBUF_SIZE]mcbuf;	/// Machine code buffer
+	char [ADBG_DISASM_BUFFER_SIZE]mcbuf;	/// Machine code buffer
 	size_t mnbufi;	/// Mnemonics buffer index
-	char [DISASM_CBUF_SIZE]mnbuf;	/// Mnemonics buffer
+	char [ADBG_DISASM_BUFFER_SIZE]mnbuf;	/// Mnemonics buffer
 	//
 	// Internal fields
 	//
@@ -155,18 +164,19 @@ struct adbg_disasm_t { align(1):
 		x86_internals_t *x86;	/// Used internally
 		riscv_internals_t *rv;	/// Used internally
 	}
-	disasm_fmt_t *fmt;	/// Formatter structure pointer, used internally
-	fswap16 si16;	/// Used internally
-	fswap32 si32;	/// Used internally
-	fswap64 si64;	/// Used internally
+	adg_disasmfmt_t *fmt;	/// Formatter structure pointer, used internally
+	fswap16 swi16;	/// Used internally
+	fswap32 swi32;	/// Used internally
+	fswap64 swi64;	/// Used internally
 }
 
-//TODO: Consider making a 'diasm setup' function
-//      int adbg_disasm_setup(adbg_disasm_t *p, int f, AdbgDisasmPlatform p, AdbgDisasmSyntax s)
-//      Initiate function pointers (isa and fswap)
-//      Set value for .syntax field
-//      + Setup options and functions once
-//      + Formatter structure pointer can stay (in _line for decoder lifetime)
+//TODO: adbg_disasm_t* adbg_disasm_create();
+//      + turns fmt struct into a normal one
+//      - allocates buffers
+//TODO: void adbg_disasm_destroy(adbg_disasm_t*);
+//TODO: int adbg_disasm_config(adbg_disasm_t*, int, void*);
+//      - formatter: sets function pointers (e.g., style, endian swappers)
+//      - platform: function pointer to disasm function
 
 /**
  * Populate machine mnemonic and machine code buffers.
@@ -181,6 +191,7 @@ struct adbg_disasm_t { align(1):
  *
  * Returns: Error code; Non-zero indicating an error
  */
+//TODO: Address should be given here
 int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	if (p == null) {
 		p.mcbuf[0] = 0;
@@ -191,14 +202,14 @@ int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 		return p.error = adbg_error_set(AdbgError.nullAddress);
 	}
 
-	bool modefile = mode >= AdbgDisasmMode.File;
+	bool modefile = mode >= AdbgDisasmMode.file;
 
 	p.mode = mode;
 	p.error = 0;
 	p.la = p.av;
 
 	if (modefile) {
-		disasm_fmt_t fmt = void;
+		adg_disasmfmt_t fmt = void;
 		p.fmt = &fmt;
 		p.fmt.itemno = 0;
 		with (p) mcbufi = mnbufi = 0;
@@ -207,7 +218,6 @@ int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	if (p.platform == AdbgDisasmPlatform.native)
 		p.platform = DISASM_DEFAULT_ISA;
 
-	//TODO: function table
 	with (AdbgDisasmPlatform)
 	switch (p.platform) {
 	case x86_16, x86, x86_64:
@@ -222,7 +232,7 @@ int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	}
 
 	if (modefile) {
-		if (p.syntax == AdbgDisasmSyntax.Default)
+		if (p.syntax == AdbgDisasmSyntax.platform)
 			p.syntax = DISASM_DEFAULT_SYNTAX;
 		if (p.error == AdbgError.none)
 			adbg_disasm_render(p);

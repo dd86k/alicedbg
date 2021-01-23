@@ -105,7 +105,7 @@ struct disasm_fmt_item_t {
 }
 /// Formatter structure embedded into the disassembler structure
 package
-struct disasm_fmt_t { align(1):
+struct adg_disasmfmt_t { align(1):
 	size_t itemno;	/// Current item number
 	disasm_fmt_item_t [FORMATTER_STACK_SIZE]items;	/// Stack
 }
@@ -116,19 +116,19 @@ const(char) *DISASM_FMT_ERR	= "(bad)";	/// Error function string
 private immutable
 const(char) *DISASM_FMT_SPACE	= " ";	/// Between instruction and operands
 private immutable
-const(char) *DISASM_FMT_TAB	= "\t";	/// Between instruction and operands
+const(char) *adg_disasmfmt_tAB	= "\t";	/// Between instruction and operands
 private immutable
 const(char) *DISASM_FMT_COMMA_SPACE	= ", ";	/// Typically in-between operands
 
 private immutable
 const(char) *[]MEM_WIDTHS_INTEL = [
-	"byte", "word", "dword", "qword", "xmmword", "ymmword", "zmmword", "word?",
-	"fword", "tword", "word?", "word?", "word?", "word?", "word?", "word?"
+	"byte", "word", "dword", "qword", "xmmword", "ymmword", "zmmword", "WORD?",
+	"fword", "tword", "WORD?", "WORD?", "WORD?", "WORD?", "WORD?", "WORD?"
 ];
 private immutable
 const(char) *[]MEM_WIDTHS_NASM = [
-	"byte", "word", "dword", "qword", "oword", "yword", "zword", "word?",
-	"fword", "tword", "word?", "word?", "word?", "word?", "word?", "word?"
+	"byte", "word", "dword", "qword", "oword", "yword", "zword", "WORD?",
+	"fword", "tword", "WORD?", "WORD?", "WORD?", "WORD?", "WORD?", "WORD?"
 ];
 
 //
@@ -141,7 +141,7 @@ const(char) *[]MEM_WIDTHS_NASM = [
 /// 	v = 8-bit value
 void adbg_disasm_push_x8(adbg_disasm_t *p, ubyte v) {
 	adbg_disasm_xadd(p, adbg_util_strx02(v));
-	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
+	if ((p.options & AdbgDisasmOption.noSpace) == 0)
 		adbg_disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 16-bit value into the machine code buffer.
@@ -150,7 +150,7 @@ void adbg_disasm_push_x8(adbg_disasm_t *p, ubyte v) {
 /// 	v = 16-bit value
 void adbg_disasm_push_x16(adbg_disasm_t *p, ushort v) {
 	adbg_disasm_xadd(p, adbg_util_strx04(v));
-	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
+	if ((p.options & AdbgDisasmOption.noSpace) == 0)
 		adbg_disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 32-bit value into the machine code buffer.
@@ -159,7 +159,7 @@ void adbg_disasm_push_x16(adbg_disasm_t *p, ushort v) {
 /// 	v = 32-bit value
 void adbg_disasm_push_x32(adbg_disasm_t *p, uint v) {
 	adbg_disasm_xadd(p, adbg_util_strx08(v));
-	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
+	if ((p.options & AdbgDisasmOption.noSpace) == 0)
 		adbg_disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 64-bit value into the machine code buffer.
@@ -168,7 +168,7 @@ void adbg_disasm_push_x32(adbg_disasm_t *p, uint v) {
 /// 	v = 64-bit value
 void adbg_disasm_push_x64(adbg_disasm_t *p, ulong v) {
 	adbg_disasm_xadd(p, adbg_util_strx016(v));
-	if ((p.options & DISASM_O_MC_NOSPACE) == 0)
+	if ((p.options & AdbgDisasmOption.noSpace) == 0)
 		adbg_disasm_xadd(p, DISASM_FMT_SPACE);
 }
 
@@ -531,11 +531,12 @@ void adbg_disasm_render(adbg_disasm_t *p) {
 
 	if (nitems < 2) return;
 
-	adbg_disasm_madd(p, p.options & DISASM_O_SPACE ? DISASM_FMT_SPACE : DISASM_FMT_TAB);
+	adbg_disasm_madd(p, p.options & AdbgDisasmOption.spaceSep ?
+		DISASM_FMT_SPACE : adg_disasmfmt_tAB);
 
 	with (AdbgDisasmSyntax)
 	switch (p.syntax) {
-	case Att: adbg_disasm_render_att(p, nitems); return;
+	case att: adbg_disasm_render_att(p, nitems); return;
 	default: adbg_disasm_render_intel(p, nitems); return;
 	}
 }
@@ -579,7 +580,7 @@ disasm_fmt_item_t *adbg_disasm_fmt_select(adbg_disasm_t *p) {
 /// 	s = String
 void adbg_disasm_madd(adbg_disasm_t *p, const(char) *s) {
 	with (p)
-	mnbufi = adbg_util_stradd(cast(char*)mnbuf, DISASM_CBUF_SIZE, mnbufi, s);
+	mnbufi = adbg_util_stradd(cast(char*)mnbuf, ADBG_DISASM_BUFFER_SIZE, mnbufi, s);
 }
 /// (Internal) Add string into the formatter's machine code string buffer.
 /// Called by disasm_push_x* functions.
@@ -588,8 +589,10 @@ void adbg_disasm_madd(adbg_disasm_t *p, const(char) *s) {
 /// 	s = String
 void adbg_disasm_xadd(adbg_disasm_t *p, const(char) *s) {
 	with (p)
-	mcbufi = adbg_util_stradd(cast(char*)mcbuf, DISASM_CBUF_SIZE, mcbufi, s);
+	mcbufi = adbg_util_stradd(cast(char*)mcbuf, ADBG_DISASM_BUFFER_SIZE, mcbufi, s);
 }
+
+//TODO: Intel/Nasm/Att function handlers, instead of switch
 
 /// (Internal) Format and add item to mnemonic buffer. No-op if
 /// buffersize - bufferindex <= 0.
@@ -601,7 +604,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 	//      + Ensures all enumeration values are used
 	//      + Barely makes a different by using functions
 
-	ptrdiff_t left = DISASM_CBUF_SIZE - p.mnbufi;
+	ptrdiff_t left = ADBG_DISASM_BUFFER_SIZE - p.mnbufi;
 	if (left <= 0) return;
 
 	char *bp = cast(char*)&p.mnbuf + p.mnbufi;
@@ -629,7 +632,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 	case Imm:
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att: f = "$%d"; break;
+		case att: f = "$%d"; break;
 		default:  f = "%d"; break;
 		}
 		p.mnbufi += snprintf(bp, left, f, i.ival1);
@@ -637,7 +640,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 	case Imm64:
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att: f = "$%lld"; break;
+		case att: f = "$%lld"; break;
 		default:  f = "%lld"; break;
 		}
 		p.mnbufi += snprintf(bp, left, f, i.lval1);
@@ -645,7 +648,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 	case ImmFar:
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att: f = "$0x%x, $0x%x"; break;
+		case att: f = "$0x%x, $0x%x"; break;
 		default:  f = "0x%x:0x%x"; break;
 		}
 		p.mnbufi += snprintf(bp, left, f, i.ival2, i.ival1);
@@ -653,7 +656,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 	case ImmSeg:
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att: f = "%%%s0x%x"; break;
+		case att: f = "%%%s0x%x"; break;
 		default:  f = "%s0x%x"; break;
 		}
 		p.mnbufi += snprintf(bp, left, f, i.sval1, i.ival1);
@@ -661,7 +664,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 	case Mem:
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att: f = "(%d)"; break;
+		case att: f = "(%d)"; break;
 		default:  f = "[%d]"; break;
 		}
 		p.mnbufi += snprintf(bp, left, f, i.ival1);
@@ -669,7 +672,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 	case MemReg:
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att:
+		case att:
 			//TODO: '*' for any call/jmps under at&t
 			//      AT&T syntax emplois '*' for call/jmps with any type (dword/fword)
 			//      Also for far jumps and calls, the instruction prepends 'l'
@@ -686,11 +689,11 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 		i.sval2 = adbg_disasm_fmtreg(p, i.sval2, &b2); // seg
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att:
+		case att:
 			const(char) *fmt = i.ival3 == MemWidth.far ? "*%s(%s)" : "%s(%s)";
 			p.mnbufi += snprintf(bp, left, fmt, i.sval2, i.sval1);
 			return;
-		case Nasm:
+		case nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s]",
 				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1);
 			return;
@@ -703,11 +706,11 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 		i.sval1 = adbg_disasm_fmtreg(p, i.sval1, &b1);
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att:
+		case att:
 			const(char) *fmt = i.ival3 == MemWidth.far ? "*%d(%s)" : "%d(%s)";
 			p.mnbufi += snprintf(bp, left, fmt, i.ival1, i.sval1);
 			return;
-		case Nasm:
+		case nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%+d]",
 				MEM_WIDTHS_NASM[i.ival3], i.sval1, i.ival1);
 			return;
@@ -721,11 +724,11 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 		i.sval1 = adbg_disasm_fmtreg(p, i.sval1, &b1);
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att:
+		case att:
 			const(char) *fmt = i.ival3 == MemWidth.far ? "*%s+%d(%s)" : "%s%+d(%s)";
 			p.mnbufi += snprintf(bp, left, fmt, i.sval2, i.ival1, i.sval1);
 			return;
-		case Nasm:
+		case nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s%+d]",
 				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1, i.ival1);
 			return;
@@ -740,10 +743,10 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 		i.sval3 = adbg_disasm_fmtreg(p, i.sval3, &b3);
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att:
+		case att:
 			p.mnbufi += snprintf(bp, left, "%s(%s,%s,%d)", i.sval3, i.sval1, i.sval2, i.ival1);
 			return;
-		case Nasm:
+		case nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s+%s*%d]",
 				MEM_WIDTHS_NASM[i.ival3], i.sval3, i.sval1, i.sval2, i.ival1);
 			return;
@@ -757,10 +760,10 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 		i.sval1 = adbg_disasm_fmtreg(p, i.sval1, &b1);
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att:
+		case att:
 			p.mnbufi += snprintf(bp, left, "%s(,%s,)", i.sval2, i.sval1);
 			return;
-		case Nasm:
+		case nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s]",
 				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1);
 			return;
@@ -774,11 +777,11 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 		i.sval1 = adbg_disasm_fmtreg(p, i.sval1, &b1);
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att:
+		case att:
 			p.mnbufi += snprintf(bp, left, "%s%+d(,%s,%d)",
 				i.sval2, i.ival2, i.sval1, i.ival1);
 			return;
-		case Nasm:
+		case nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s*%d%+d]",
 				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1, i.ival1, i.ival2);
 			return;
@@ -791,10 +794,10 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 		i.sval1 = adbg_disasm_fmtreg(p, i.sval1, &b1);
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att:
+		case att:
 			p.mnbufi += snprintf(bp, left, "%s%+d(,,)", i.sval1, i.ival1);
 			return;
-		case Nasm:
+		case nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%+d]",
 				MEM_WIDTHS_NASM[i.ival3], i.sval1, i.ival1);
 			return;
@@ -809,11 +812,11 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 		i.sval2 = adbg_disasm_fmtreg(p, i.sval2, &b2);
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att:
+		case att:
 			p.mnbufi += snprintf(bp, left, "%s%+d(%s,%s,%d)",
 				i.sval3, i.ival2, i.sval1, i.sval2, i.ival1);
 			return;
-		case Nasm:
+		case nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s+%s*%d%+d]",
 				MEM_WIDTHS_NASM[i.ival3], i.sval3, i.sval1, i.sval2, i.ival1, i.ival2);
 			return;
@@ -827,10 +830,10 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 		i.sval1 = adbg_disasm_fmtreg(p, i.sval1, &b1);
 		with (AdbgDisasmSyntax)
 		switch (p.syntax) {
-		case Att:
+		case att:
 			p.mnbufi += snprintf(bp, left, "%s%+d(%s,,)", i.sval2, i.ival1, i.sval1);
 			return;
-		case Nasm:
+		case nasm:
 			p.mnbufi += snprintf(bp, left, "%s ptr [%s%s%+d]",
 				MEM_WIDTHS_NASM[i.ival3], i.sval2, i.sval1, i.ival1);
 			return;
@@ -847,7 +850,7 @@ const(char) *adbg_disasm_fmtreg(adbg_disasm_t *p, const(char) *s, char[FORMATTER
 	if (s[0] == 0) return "";
 	with (AdbgDisasmSyntax)
 	switch (p.syntax) {
-	case Att:
+	case att:
 		snprintf(cast(char*)buffer, 16, "%%%s", s);
 		return cast(char*)buffer;
 	default: return s;

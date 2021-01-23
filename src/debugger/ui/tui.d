@@ -29,7 +29,7 @@ int adbg_ui_tui() {
 		printf("Could not initiate terminal buffer (%d)\n", e);
 		return e;
 	}
-	g_disparams.options |= DISASM_O_SPACE;
+	g_disparams.options |= AdbgDisasmOption.spaceSep;
 	adbg_event_exception(&adbg_ui_tui_handler);
 	return adbg_run;
 }
@@ -95,13 +95,13 @@ int adbg_ui_tui_handler(exception_t *e) {
 	const uint ihmax = tui_size.height - 2;
 	// On-point
 	adbg_term_curpos(0, h);
-	if (adbg_disasm(&g_disparams, AdbgDisasmMode.File) == AdbgError.none)
+	if (adbg_disasm(&g_disparams, AdbgDisasmMode.file) == AdbgError.none)
 		adbg_term_tui_writef("> %zX %-20s %s",
 			g_disparams.la, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	// forward
 	for (uint hi = h + 1; hi < ihmax; ++hi) {
 		adbg_term_curpos(0, hi);
-		adbg_disasm(&g_disparams, AdbgDisasmMode.File);
+		adbg_disasm(&g_disparams, AdbgDisasmMode.file);
 		adbg_term_tui_writef("  %zX %-20s %s",
 			g_disparams.la, &g_disparams.mcbuf, &g_disparams.mnbuf);
 	}

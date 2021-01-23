@@ -43,7 +43,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 
 	switch (i.op1 & 3) {
 	case 0:
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_x16(p, i.op1);
 		switch (i.op1 & OP_RVC_FUNC_MASK) {
 		case OP_RVC_FUNC_000: // C.ADDI4SPN
@@ -52,7 +52,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
-			if (p.mode < AdbgDisasmMode.File)
+			if (p.mode < AdbgDisasmMode.file)
 				return;
 			int rd = (i.op1 >> 2) & 7;
 			adbg_disasm_push_str(p, "c.addi4spn");
@@ -60,7 +60,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 			adbg_disasm_push_imm(p, imm);
 			return;
 		case OP_RVC_FUNC_110: // C.SW
-			if (p.mode < AdbgDisasmMode.File)
+			if (p.mode < AdbgDisasmMode.file)
 				return;
 			int rs1 = (i.op1 >> 7) & 7;
 			int rs2 = (i.op1 >> 2) & 7;
@@ -77,11 +77,11 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return; // Yes, 000 is illegal
 		}
 	case 1:
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_x16(p, i.op1);
 		switch (i.op1 & OP_RVC_FUNC_MASK) {
 		case OP_RVC_FUNC_000:
-			if (p.mode < AdbgDisasmMode.File)
+			if (p.mode < AdbgDisasmMode.file)
 				return;
 			int rd = (i.op1 >> 7) & 31; /// rd/rs1 (op[11:7])
 			if (rd) { // C.ADDI
@@ -97,7 +97,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 			}
 			return;
 		case OP_RVC_FUNC_001: // C.JAL
-			if (p.mode < AdbgDisasmMode.File)
+			if (p.mode < AdbgDisasmMode.file)
 				return;
 			adbg_disasm_push_str(p, "c.jal");
 			adbg_disasm_push_imm(p, adbg_disasm_riscv_imm_cj(i.op1));
@@ -126,7 +126,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 				case 0x1020: m = "c.addw"; break;
 				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 				}
-				if (p.mode < AdbgDisasmMode.File)
+				if (p.mode < AdbgDisasmMode.file)
 					return;
 				adbg_disasm_push_str(p, m);
 				adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rd));
@@ -137,7 +137,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
 	case 2:
-		if (p.mode >= AdbgDisasmMode.File)
+		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_push_x16(p, i.op1);
 		switch (i.op1 & OP_RVC_FUNC_MASK) {
 		case OP_RVC_FUNC_010:
@@ -146,7 +146,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 				p.error = adbg_error_set(AdbgError.illegalInstruction);
 				return;
 			}
-			if (p.mode < AdbgDisasmMode.File)
+			if (p.mode < AdbgDisasmMode.file)
 				return;
 			int imm = (i.op1 >> 2) & 31;
 			if (i.op1 & BIT!(12))
@@ -156,7 +156,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 			adbg_disasm_push_imm(p, imm);
 			return;
 		case OP_RVC_FUNC_100:
-			if (p.mode < AdbgDisasmMode.File)
+			if (p.mode < AdbgDisasmMode.file)
 				return;
 			int rd  = (i.op1 >> 7) & 31; // or rd
 			int rs2 = (i.op1 >> 2) & 31;
@@ -185,7 +185,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 			}
 			return;
 		case OP_RVC_FUNC_110:
-			if (p.mode < AdbgDisasmMode.File)
+			if (p.mode < AdbgDisasmMode.file)
 				return;
 			int rs2 = (i.op1 >> 2) & 31;
 			int imm = (i.op1 >> 7) & 63;
@@ -203,7 +203,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 
 	i.op2 = *p.ai16;
 	++p.ai16;
-	if (p.mode >= AdbgDisasmMode.File)
+	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x32(p, i.op);
 	switch (i.op & OP_MASK) {
 	case 19: // (0010011) RV32I: ADDI/SLTI/SLTIU/XORI/ORI/ANDI
@@ -217,7 +217,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_FUNC_111: m = "andi"; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode < AdbgDisasmMode.File)
+		if (p.mode < AdbgDisasmMode.file)
 			return;
 		int imm = i.op >> 20;
 		int rs1 = (i.op >> 15) & 31;
@@ -236,7 +236,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_FUNC_010: m = "sw"; w = MemWidth.i32; break;
 		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
 		}
-		if (p.mode < AdbgDisasmMode.File)
+		if (p.mode < AdbgDisasmMode.file)
 			return;
 		int imm = adbg_disasm_riscv_imm_s(i.op);
 		int rs1 = (i.op >> 15) & 31;

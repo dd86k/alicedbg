@@ -19,7 +19,7 @@ extern (C):
 int adbg_ui_loop() {
 	if (adbg_term_init)
 		return 1;
-	g_disparams.options = DISASM_O_SPACE;
+	g_disparams.options = AdbgDisasmOption.spaceSep;
 	adbg_event_exception(&adbg_ui_loop_handler);
 	return adbg_run;
 }
@@ -39,7 +39,7 @@ int adbg_ui_loop_handler(exception_t *e) {
 	// * Print disassembly, if available
 	if (e.faultaddr) {
 		g_disparams.a = e.faultaddr;
-		if (adbg_disasm(&g_disparams, AdbgDisasmMode.File) == 0) {
+		if (adbg_disasm(&g_disparams, AdbgDisasmMode.file) == 0) {
 			printf("> %p: %s| %s\n",
 				e.faultaddr, g_disparams.mcbuf.ptr, g_disparams.mnbuf.ptr);
 		}
