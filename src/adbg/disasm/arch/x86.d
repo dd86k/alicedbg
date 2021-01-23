@@ -5672,8 +5672,8 @@ L_RET:	return x86_regs[width][i];
 /// (Internal) Retrieve a register name from a ModR/M byte (RM field) and
 /// conditionally returns the 16-bit addressing 
 /// Params:
-/// 	rm = Disassembler parameters
-/// 	addrpf = If the address prefix is applied
+/// 	p = Disassembler parameters
+/// 	rm = R/M source
 /// 	vsib = Affected by SIB.Index
 /// Returns: Register string
 const(char) *adbg_disasm_x86_modrm_rm_reg(adbg_disasm_t *p, int rm, bool vsib = false) {
@@ -5702,7 +5702,6 @@ const(char) *adbg_disasm_x86_modrm_rm_reg(adbg_disasm_t *p, int rm, bool vsib = 
 /// 	modrm = Modrm byte
 /// 	wmem = Memory pointer width
 /// 	wreg = Register width
-/// 	flags = Modrm configuration flags
 //TODO: Condense wmem/wreg/flags as flags only
 void adbg_disasm_x86_modrm_rm(adbg_disasm_t *p, ubyte modrm, int wmem, int wreg) {
 	const(char) *seg = void, regstr = void;

@@ -494,7 +494,7 @@ void adbg_disasm_push_x86_sib_m01_i100(adbg_disasm_t *p,
 }
 
 /// Adjust a signed i8 number from an int, useful with push functions.
-/// Params: Unsigned n = 8-bit number
+/// Params: n = Unsigned 8-bit number
 /// Returns: 32-bit adjusted number
 int adbg_disasm_adj_i8(ubyte n) {
 	if (n > byte.max) // > 127

@@ -527,9 +527,10 @@ enum {	// adbg_mm flags
  * Read or write to a memory region from or to the opened debugee process.
  * This does not include subchildren processes.
  * Params:
+ * 	op   = MM operation
  * 	addr = Memory address location
- * 	flags = See MM_ enumerations
  * 	data = Data pointer
+ *      size = Size to read or write
  * Returns: Zero on success, oscode on error
  */
 int adbg_mm(int op, size_t addr, void *data, uint size) {
