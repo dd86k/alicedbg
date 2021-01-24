@@ -491,7 +491,7 @@ L_END:
 //      instead of reprinting the whole string at every stroke
 //      yes, it's very noticeable on windows
 /// Read a line from input keystrokes
-/// Params: length = int pointer that will contain the number of characters in the buffer
+/// Params: length = Pointer that will contain the number of characters in the buffer
 /// Returns: Internal buffer pointer
 char* term_readline(int *length) {
 	enum BUFFER_SIZE = 1024;
