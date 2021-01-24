@@ -519,21 +519,20 @@ int main(int argc, const(char)** argv) {
 	}
 	
 	adbg_ui_common_params(&settings.disasm);
-	with (SettingUI)
 	switch (settings.ui) {
-	case loop:
+	case SettingUI.loop:
 		if (adbg_state == AdbgState.waiting)
-			lasterr = adbg_ui_loop();
+			lasterr = loop();
 		else
 			puts("main: loop ui requires file");
 		break;
-	case cmd:
-		lasterr = adbg_ui_cmd();
+	case SettingUI.cmd:
+		lasterr = cmd();
 		break;
-	case tui:
-		lasterr = adbg_ui_tui();
+	case SettingUI.tui:
+		lasterr = tui();
 		break;
-	case server:
+	case SettingUI.server:
 		puts("main: server ui not yet supported");
 		return EXIT_FAILURE;
 	default: assert(0);

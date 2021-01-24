@@ -1,17 +1,16 @@
 module tests.term.readline;
 
-import adbg.sys.term;
+import term;
 import core.stdc.stdio;
 import core.stdc.string;
 
 unittest {
-	char[1024] buf = void;
-	char* p = cast(char*)buf;
-	adbg_term_init;
-	adbg_term_config(TermConfig.readlineNoNewline);
+	term_init;
+	term_config(TermConfig.readlineNoNewline);
+	int l = void;
 	while (true) {
 		printf("> ");
-		uint s = cast(uint)adbg_term_readline(p, 1024);
-		printf("\nr=%u l=%u s='%s'\n", s, cast(uint)strlen(p), p);
+		char* s = term_readline(&l);
+		printf("\nl=%u strlen=%u s='%s'\n", l, cast(uint)strlen(s), s);
 	}
 }

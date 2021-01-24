@@ -1,16 +1,16 @@
 module tests.term.read;
 
 import std.stdio;
-import adbg.sys.term;
+import term;
 import core.stdc.stdio;
 import core.stdc.string;
 
 unittest {
-	adbg_term_init;
+	term_init;
 	InputInfo input = void;
 	bool cont = true; /// continue
 	do {
-		adbg_term_read(&input);
+		term_read(&input);
 		switch (input.type) {
 		case InputType.Key:
 			KeyInfo k = input.key;

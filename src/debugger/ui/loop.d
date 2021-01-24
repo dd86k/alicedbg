@@ -8,16 +8,16 @@ module debugger.ui.loop;
 import adbg.etc.c;
 import adbg.debugger, adbg.sys.err : ERR_FMT;
 import adbg.disasm;
-import adbg.sys.term;
+import term;
 import core.stdc.stdio : printf, puts;
 import core.stdc.string : memcpy;
 import debugger.common;
 
 extern (C):
 
-/// Starts plain UI
-int adbg_ui_loop() {
-	if (adbg_term_init)
+/// Starts loop UI
+int loop() {
+	if (term_init)
 		return 1;
 	g_disparams.options = AdbgDisasmOption.spaceSep;
 	adbg_event_exception(&adbg_ui_loop_handler);
@@ -58,7 +58,7 @@ L_PROMPT:
 	printf("\nAction [S=Step,C=Continue,Q=Quit] ");
 	InputInfo input = void;
 L_INPUT:
-	adbg_term_read(&input);
+	term_read(&input);
 	if (input.type != InputType.Key)
 		goto L_INPUT;
 	with (AdbgAction)

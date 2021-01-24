@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module adbg.sys.term;
+module term;
 
 private import core.stdc.stdio;
 private import core.stdc.stdlib;
@@ -69,13 +69,14 @@ version (Posix) {
 
 /// User defined function for resize events
 private
-void function(ushort,ushort) adbg_term_resize_handler;
+void function(ushort,ushort) term_resize_handler;
 
+/// Terminal configuration options
 enum TermConfig {
 	readlineNoNewline = 1 << 0,
 }
 
-private int term_config; // default to 0
+private int term_opts; // default to 0
 
 //
 // ANCHOR Initiation
@@ -83,7 +84,7 @@ private int term_config; // default to 0
 
 /// Initiates terminal basics
 /// Returns: Error keyCode, non-zero on error
-int adbg_term_init() {
+int term_init() {
 	version (Posix) {
 		tcgetattr(STDIN_FILENO, &old_tio);
 		new_tio = old_tio;
@@ -98,7 +99,7 @@ int adbg_term_init() {
 	return 0;
 }
 
-int adbg_term_tui_init() {
+int term_tui_init() {
 	version (Windows) {
 		handleOld = handleOut;
 		handleOut = CreateConsoleScreenBuffer(
@@ -114,19 +115,19 @@ int adbg_term_tui_init() {
 		if (SetConsoleActiveScreenBuffer(handleOut) == FALSE)
 			return 3;
 		WindowSize ws = void;
-		adbg_term_size(&ws);
-		if (adbg_term_init_buffer(&ws))
+		term_size(&ws);
+		if (term_init_buffer(&ws))
 			return 4;
 	}
 	return 0;
 }
 
-void adbg_term_config(int flags) {
-	term_config = flags;
+void term_config(int flags) {
+	term_opts = flags;
 }
 
 /// Restore console buf
-/*void adbg_term_restore() {
+/*void term_restore() {
 	version (Windows) {
 		SetConsoleActiveScreenBuffer(hOld);
 	}
@@ -134,24 +135,24 @@ void adbg_term_config(int flags) {
 
 /// Set terminal window resize event handler
 /// Params: f = Handler function
-void adbg_term_event_resize(void function(ushort,ushort) f) {
+void term_event_resize(void function(ushort,ushort) f) {
 	version (Windows) {
-		adbg_term_resize_handler = f;
+		term_resize_handler = f;
 	} else
 	version (Posix) {
 		//TODO: SIGWINCH : Signal Window change
 		sigaction_t sa;
-		sa.sa_handler = &adbg_term_event_resize_posix;
+		sa.sa_handler = &term_event_resize_posix;
 		sigaction(SIGWINCH, &sa, cast(sigaction_t*)0);
 	}
 }
 
 /// Internal Posix function for handling initial resize signal
 version (Posix) private
-void adbg_term_event_resize_posix(int) {
+void term_event_resize_posix(int) {
 	WindowSize ws = void;
-	adbg_term_size(&ws);
-	adbg_term_resize_handler(ws.width, ws.height);
+	term_size(&ws);
+	term_resize_handler(ws.width, ws.height);
 }
 
 /**
@@ -161,7 +162,7 @@ void adbg_term_event_resize_posix(int) {
  * 	s = Terminal window buflen
  */
 private
-int adbg_term_init_buffer(WindowSize *s) {
+int term_init_buffer(WindowSize *s) {
 	import core.stdc.stdlib : realloc, malloc;
 	version (Windows) {
 		const size_t bsize = s.height * s.width;
@@ -193,7 +194,7 @@ int adbg_term_init_buffer(WindowSize *s) {
 }
 
 /// Invert console color with defaultColor
-/*void adbg_term_color_invert() {
+/*void term_color_invert() {
 	version (Windows)
 		SetConsoleTextAttribute(hOut, COMMON_LVB_REVERSE_VIDEO | defaultColor);
 	version (Posix)
@@ -201,7 +202,7 @@ int adbg_term_init_buffer(WindowSize *s) {
 }
 
 /// Reset console color to defaultColor
-void adbg_term_color_reset() {
+void term_color_reset() {
 	version (Windows)
 		SetConsoleTextAttribute(hOut, defaultColor);
 	version (Posix)
@@ -209,7 +210,7 @@ void adbg_term_color_reset() {
 }*/
 
 /// Clear screen
-void adbg_term_clear() {
+void term_clear() {
 	version (Windows) {
 		CONSOLE_SCREEN_BUFFER_INFO csbi = void;
 		COORD c; // 0, 0
@@ -221,7 +222,7 @@ void adbg_term_clear() {
 		DWORD num = void; // kind of ala .NET
 		FillConsoleOutputCharacterA(handleOut, ' ', buflen, c, &num);
 		FillConsoleOutputAttribute(handleOut, csbi.wAttributes, buflen, c, &num);
-		adbg_term_curpos(0, 0);
+		term_curpos(0, 0);
 	} else version (Posix) {
 		// "ESC [ 2 J" acts like clear(1)
 		// "ESC c" is a full reset ala cls (Windows)
@@ -236,7 +237,7 @@ void adbg_term_clear() {
  *
  * Note: A COORD uses SHORT (short) and Linux uses unsigned shorts.
  */
-void adbg_term_size(WindowSize *ws) {
+void term_size(WindowSize *ws) {
 	version (Windows) {
 		CONSOLE_SCREEN_BUFFER_INFO c = void;
 		GetConsoleScreenBufferInfo(handleOut, &c);
@@ -260,7 +261,7 @@ void adbg_term_size(WindowSize *ws) {
  *   x = X position (horizontal)
  *   y = Y position (vertical)
  */
-void adbg_term_curpos(int x, int y) {
+void term_curpos(int x, int y) {
 	version (Windows) { // 0-based
 		COORD c = { cast(SHORT)x, cast(SHORT)y };
 		SetConsoleCursorPosition(handleOut, c);
@@ -270,7 +271,7 @@ void adbg_term_curpos(int x, int y) {
 	}
 }
 
-void adbg_term_get_curpos(int *x, int *y) {
+void term_get_curpos(int *x, int *y) {
 	version (Windows) { // 0-based
 		CONSOLE_SCREEN_BUFFER_INFO csbi = void;
 		GetConsoleScreenBufferInfo(handleOut, &csbi);
@@ -290,7 +291,7 @@ void adbg_term_get_curpos(int *x, int *y) {
 // ANCHOR TUI specifics
 //
 
-void adbg_term_tui_curpos(int x, int y) {
+void term_tui_curpos(int x, int y) {
 	version (Windows) { // 0-based
 		ibuf_x = cast(ushort)x;
 		ibuf_y = cast(ushort)y;
@@ -300,13 +301,13 @@ void adbg_term_tui_curpos(int x, int y) {
 	}
 }
 
-void adbg_term_tui_get_curpos(int *x, int *y) {
+void term_tui_get_curpos(int *x, int *y) {
 	version (Windows) { // 0-based
 		*x = ibuf_x;
 		*y = ibuf_y;
 	} else
 	version (Posix) { // 1-based
-		adbg_term_get_curpos(x, y);
+		term_get_curpos(x, y);
 	}
 }
 
@@ -314,7 +315,7 @@ void adbg_term_tui_get_curpos(int *x, int *y) {
  *
  *
  */
-void adbg_term_tui_write(const(char) *s) {
+void term_tui_write(const(char) *s) {
 	version (Windows) {
 		size_t si, bi = (ibuf_w * ibuf_y) + ibuf_x;
 		while (s[si]) {
@@ -330,33 +331,33 @@ void adbg_term_tui_write(const(char) *s) {
  *
  *
  */
-void adbg_term_tui_writef(const(char) *f, ...) {
+void term_tui_writef(const(char) *f, ...) {
 	import core.stdc.stdarg : va_list, va_start;
 	char [1024]buf = void;
 	va_list va = void;
 	va_start(va, f);
 	vsnprintf(cast(char*)buf, 1024, f, va);
-	adbg_term_tui_write(cast(char*)buf);
+	term_tui_write(cast(char*)buf);
 }
 
 /**
  *
  */
-void adbg_term_tui_flush() {
+void term_tui_flush() {
 	version (Windows) {
 		WriteConsoleOutputA(handleOut,
 			ibuf, ibuf_size, ibuf_pos, &ibuf_rect);
 	} else fflush(stdout);
 }
 
-void adbg_term_tui_clear() {
+void term_tui_clear() {
 	version (Windows) {
 		size_t m = ibuf_w * ibuf_h;
 		for (size_t i; i < m; ++i) {
 			ibuf[i].AsciiChar = ' ';
 		}
 	} else version (Posix) {
-		adbg_term_clear;
+		term_clear;
 	}
 	else static assert(0, "Clear: Not implemented");
 }
@@ -372,7 +373,7 @@ void adbg_term_tui_clear() {
  * Posix: Handled externally via the SIGWINCH signal.
  * Params: ii = InputInfo structure
  */
-void adbg_term_read(InputInfo *ii) {
+void term_read(InputInfo *ii) {
 	ii.type = InputType.None;
 	version (Windows) {
 		INPUT_RECORD ir = void;
@@ -403,8 +404,8 @@ L_READ_AGAIN:
 			break;
 		case WINDOW_BUFFER_SIZE_EVENT:
 			with (ir)
-			if (adbg_term_resize_handler)
-				adbg_term_resize_handler(
+			if (term_resize_handler)
+				term_resize_handler(
 					WindowBufferSizeEvent.dwSize.X,
 					WindowBufferSizeEvent.dwSize.Y);
 			FlushConsoleInputBuffer(handleIn);
@@ -484,20 +485,31 @@ L_END:
 	}
 }
 
-int adbg_term_readline(char *buf, const size_t buflen) {
+//TODO: term_readline_event(Key, void function(Key))
+//      or just term_event_ctrld (etc.)
+//TODO: damage-based display (putchar)
+//      instead of reprinting the whole string at every stroke
+//      yes, it's very noticeable on windows
+/// Read a line from input keystrokes
+/// Params: length = int pointer that will contain the number of characters in the buffer
+/// Returns: Internal buffer pointer
+char* term_readline(int *length) {
+	enum BUFFER_SIZE = 1024;
+	__gshared char[BUFFER_SIZE] buffer;
+	
 	int spos;	/// Current cursor position
 	int slen;	/// Current input length
 	int ox = void, oy = void;	/// Original cursor X and Y positions
-	adbg_term_get_curpos(&ox, &oy);
+	term_get_curpos(&ox, &oy);
 	InputInfo input = void;
 L_READKEY:
-	//TODO: ^D event functions
-	//TODO: readline: damage-based (putchar) instead of pure printf
-	//      e.g. positioning + putchar
 	bool modified;	/// if output was modified
 	bool trimmed;	/// if output was trimmed
-	adbg_term_read(&input);
+	
+	term_read(&input);
+	
 	if (input.type != InputType.Key) goto L_READKEY;
+	
 	with (Key)
 	switch (input.key.keyCode) {
 	//
@@ -542,7 +554,7 @@ L_READKEY:
 		if (spos != slen) {
 			int pos = spos;
 			while (pos < slen) {
-				buf[pos] = buf[pos + 1];
+				buffer[pos] = buffer[pos + 1];
 				++pos;
 			}
 		}
@@ -554,24 +566,25 @@ L_READKEY:
 	// Special
 	//
 	case Enter: // send
-		if (term_config & TermConfig.readlineNoNewline) {
-			buf[slen] = 0;
+		if (term_opts & TermConfig.readlineNoNewline) {
+			buffer[slen] = 0;
 		} else {
 			putchar('\n');
-			buf[slen] = '\n';
-			buf[++slen] = 0;
+			buffer[slen] = '\n';
+			buffer[++slen] = 0;
 		}
-		return slen;
+		*length = slen;
+		return buffer.ptr;
 	case Tab: //TODO: auto-complete callback
 	
 		break;
-	case TransmissionEnd: return -1; // ^D
+	case TransmissionEnd: return null; // ^D
 	//
 	// Line edition: Insert
 	//
 	default:
 		// can't fit a character? skip
-		if (spos + 1 >= buflen) break;
+		if (spos + 1 >= BUFFER_SIZE) break;
 		
 		const char c = input.key.keyChar;
 		
@@ -585,29 +598,29 @@ L_READKEY:
 			// move stuff rightwards from len to pos
 			int pos = slen - 1;
 			while (pos >= spos) {
-				buf[pos + 1] = buf[pos];
+				buffer[pos + 1] = buffer[pos];
 				--pos;
 			}
 		}
 		
-		buf[spos] = c;
+		buffer[spos] = c;
 		++slen; ++spos;
 	}
 	
 	// Update output string if modified
 	if (modified && slen > 0) {
-		adbg_term_curpos(ox, oy);
-		printf("%.*s", slen, buf);
+		term_curpos(ox, oy);
+		printf("%.*s", slen, buffer.ptr);
 		if (trimmed)
 			putchar(' ');
 	} else if (modified && slen == 0) {
-		adbg_term_curpos(ox, oy);
+		term_curpos(ox, oy);
 		putchar(' ');
 	}
 	
 	// Update output cursor from spos
 	//TODO: get term buflen then do 2D calculation
-	adbg_term_curpos(ox + spos, oy);
+	term_curpos(ox + spos, oy);
 	
 	goto L_READKEY;
 }

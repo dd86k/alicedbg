@@ -5,6 +5,10 @@
  */
 module adbg.platform;
 
+// Other interesting versions:
+// - DRuntime_Use_Libunwind
+// - LDC_LLVM_ (LLVM version, e.g., 1100 for 11.0)
+
 extern (C):
 
 //
@@ -30,18 +34,17 @@ enum ADBG_VERSION = "0.0.0";
 debug enum __BUILDTYPE__ = "debug";	/// Build type
 else  enum __BUILDTYPE__ = "release";	/// Build type
 
-private enum VERSION_TARGET_INFO = 2083;
-
+/// Target information structure
 struct adbg_info_t {
-	const(char) *adbgver = ADBG_VERSION;
-	const(char) *build   = __BUILDTYPE__;
-	const(char) *arch    = TARGET_PLATFORM;
-	const(char) *os      = TARGET_OS;
-	const(char) *crt     = TARGET_CRT;
-	const(char) *cpprt   = TARGET_CPPRT;
-	const(char) *env     = TARGET_ENV;
-	const(char) *objfmt  = TARGET_OBJFMT;
-	const(char) *fltabi  = TARGET_FLTABI;
+	const(char) *adbgver = ADBG_VERSION;	/// Library/app version
+	const(char) *build   = __BUILDTYPE__;	/// "debug" or "release"
+	const(char) *arch    = TARGET_PLATFORM;	/// ISA
+	const(char) *os      = TARGET_OS;	/// Operating system
+	const(char) *crt     = TARGET_CRT;	/// C runtime
+	const(char) *cpprt   = TARGET_CPPRT;	/// C++ runtime
+	const(char) *env     = TARGET_ENV;	/// Target environment
+	const(char) *objfmt  = TARGET_OBJFMT;	/// Object format (e.g., coff)
+	const(char) *fltabi  = TARGET_FLTABI;	/// Float ABI (hard or soft)
 }
 
 //
@@ -138,6 +141,8 @@ else
 //
 // ANCHOR Additional Target Information
 //
+
+private enum VERSION_TARGET_INFO = 2083;
 
 version (DigitalMars) {
 	static if (__VERSION__ >= VERSION_TARGET_INFO)
