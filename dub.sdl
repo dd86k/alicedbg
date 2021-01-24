@@ -9,6 +9,9 @@ version "0.0.0"
 # NOTE: To support older DUB and D compiler versions, the "betterC"
 #       buildOptions value is not used.
 
+# NOTE: This fixes unittesting
+mainSourceFile "src/main.d"
+
 #
 # Common build types
 #
@@ -87,13 +90,13 @@ configuration "library" {
 	importPaths "src/adbg"
 }
 # Ditto as dub docs.
-configuration "sourceLibrary" {
+configuration "source-library" {
 	targetType "sourceLibrary"
 	sourcePaths "src/adbg"
 	importPaths "src/adbg"
 }
 # Force output to a dynamic/shared library.
-configuration "dynamicLibrary" {
+configuration "dynamic-library" {
 	targetType "dynamicLibrary"
 	sourcePaths "src/adbg"
 	importPaths "src/adbg"
