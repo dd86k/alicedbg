@@ -79,17 +79,17 @@ struct exception_t {
 	/// Original OS code (exception or signal value).
 	uint oscode;
 	/// Process ID.
-	uint pid;
+	int pid;
 	/// Thread ID, if available; Otherwise zero.
-	uint tid;
-	/*union {
+	int tid;
+	union {
 		/// Memory address pointer for next instruction.
 		/// Typically the Instruction Pointer or Program Counter.
 		void *nextaddr;
 		/// Memory address value for next instruction.
 		/// Typically the Instruction Pointer or Program Counter.
 		size_t nextaddrv;
-	}*/
+	}
 	union {
 		/// Memory address pointer for fault. Otherwise null.
 		void *faultaddr;
@@ -110,10 +110,10 @@ struct exception_t {
 
 /**
  * (Internal) Translate an oscode to an ExceptionType enum value.
- * - Windows: `DEBUG_INFO.Exception.ExceptionRecord.ExceptionCode` and
+ * Windows: `DEBUG_INFO.Exception.ExceptionRecord.ExceptionCode` and
  * `cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]` in certain
  * cases.
- * - Posix: Signal number (`si_signo`) and its code `si_code` in certain cases.
+ * Posix: Signal number (`si_signo`) and its code `si_code` in certain cases.
  * Params:
  * 	code = OS code
  * 	subcode = OS sub-code
@@ -309,7 +309,7 @@ version (Windows) {
 	}
 } else {
 	package void adbg_ex_dbg(exception_t *e, int pid, int signo) {
-		e.pid = pid;
+		e.pid = e.tid = pid;
 		e.tid = 0;
 		e.oscode = signo;
 		e.type = adbg_ex_oscode(signo);

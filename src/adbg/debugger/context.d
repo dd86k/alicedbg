@@ -47,6 +47,7 @@ struct register_t {
 		ulong  u64;	/// Register data: ulong (u64)
 		float  f32;	/// Register data: float (f32)
 		double f64;	/// Register data: double (f64)
+		size_t st;	/// Register data: size_t
 	}
 	const(char) *name;	/// Register name from adbg_ex_reg_init
 }
@@ -54,14 +55,6 @@ struct register_t {
 /// Represents a thread context structure with the register values once a
 /// process is paused.
 struct thread_context_t {
-	union {
-		/// Memory address value for next instruction.
-		/// Typically the Instruction Pointer or Program Counter.
-		size_t nextaddrv;
-		/// Memory address pointer for next instruction.
-		/// Typically the Instruction Pointer or Program Counter.
-		void *nextaddr;
-	}
 	/// Register count in registers field, populated by
 	/// adbg_ex_reg_init.
 	uint count;
@@ -121,7 +114,7 @@ void adbg_context_get(thread_context_t *ctx) {
 
 version (X86_ANY)
 private void adbg_context_os_init_x86(thread_context_t *ctx) {
-	ctx.count = 10;
+	ctx.count = EX_REG_COUNT;
 	ctx.items[0].name = "EIP";
 	ctx.items[0].type = RegisterType.u32;
 	ctx.items[1].name = "EFLAGS";
@@ -146,7 +139,7 @@ private void adbg_context_os_init_x86(thread_context_t *ctx) {
 
 version (X86_64)
 private void adbg_context_os_init_x86_64(thread_context_t *ctx) {
-	ctx.count = 18;
+	ctx.count = EX_REG_COUNT;
 	ctx.items[0].name  = "RIP";
 	ctx.items[0].type  = RegisterType.u64;
 	ctx.items[1].name  = "RFLAGS";
@@ -193,7 +186,7 @@ version (Windows) {
 	// Populate exception_t.registers array from Windows' CONTEXT
 	void adbg_context_os(thread_context_t *ctx, CONTEXT *winctx) {
 		version (X86) {
-			ctx.items[0].u32 = ctx.nextaddrv = winctx.Eip;
+			ctx.items[0].u32 = winctx.Eip;
 			ctx.items[1].u32 = winctx.EFlags;
 			ctx.items[2].u32 = winctx.Eax;
 			ctx.items[3].u32 = winctx.Ebx;
@@ -205,7 +198,7 @@ version (Windows) {
 			ctx.items[9].u32 = winctx.Edi;
 		} else
 		version (X86_64) {
-			ctx.items[0].u64  = ctx.nextaddrv = winctx.Rip;
+			ctx.items[0].u64  = winctx.Rip;
 			ctx.items[1].u64  = winctx.EFlags;
 			ctx.items[2].u64  = winctx.Rax;
 			ctx.items[3].u64  = winctx.Rbx;
@@ -228,7 +221,7 @@ version (Windows) {
 
 	version (Win64)
 	package void adbg_context_os_win_wow64(thread_context_t *ctx, WOW64_CONTEXT *winctx) {
-		ctx.items[0].u32 = ctx.nextaddrv = winctx.Eip;
+		ctx.items[0].u32 = winctx.Eip;
 		ctx.items[1].u32 = winctx.EFlags;
 		ctx.items[2].u32 = winctx.Eax;
 		ctx.items[3].u32 = winctx.Ebx;
@@ -245,9 +238,9 @@ version (Windows) {
 	//
 
 	/// Populate exception_t.registers array from user_regs_struct
-	void adbg_context_os(thread_context_t *ctx, user_regs_struct *u) {
+	package void adbg_context_os(thread_context_t *ctx, user_regs_struct *u) {
 		version (X86) {
-			ctx.items[0].u32 = ctx.nextaddrv = u.eip;
+			ctx.items[0].u32 = u.eip;
 			ctx.items[1].u32 = u.eflags;
 			ctx.items[2].u32 = u.eax;
 			ctx.items[3].u32 = u.ebx;
@@ -259,7 +252,7 @@ version (Windows) {
 			ctx.items[9].u32 = u.edi;
 		} else
 		version (X86_64) {
-			ctx.items[0].u64 = ctx.nextaddrv = u.rip;
+			ctx.items[0].u64 = u.rip;
 			ctx.items[1].u64 = u.eflags;
 			ctx.items[2].u64 = u.rax;
 			ctx.items[3].u64 = u.rbx;

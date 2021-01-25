@@ -365,6 +365,7 @@ L_DEBUG_LOOP:
 			GetThreadContext(g_tid, &winctx);
 			adbg_context_os(&e.registers, &winctx);
 		}
+		e.nextaddrv = e.registers.items[0].st;
 
 		g_state = AdbgState.paused;
 		with (AdbgAction)

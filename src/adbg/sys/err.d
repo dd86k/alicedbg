@@ -8,12 +8,12 @@ module adbg.sys.err;
 version (Windows) {
 	import core.sys.windows.windows;
 	import core.stdc.string : strerror;
-	enum ERR_FMT = "0x%08X"; /// Error code format
+	enum SYS_ERR_FMT = "0x%08X"; /// Error code format
 	private enum ERR_BUF_SZ = 512;
 } else {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
-	enum ERR_FMT = "%d"; /// Error code format
+	enum SYS_ERR_FMT = "%d"; /// Error code format
 }
 
 extern (C):
@@ -55,8 +55,8 @@ int adbg_sys_errno() {
 void adbg_sys_perror(string mod = null)(int code) {
 	import core.stdc.stdio : printf;
 	static if (mod == null)
-		enum fmt = "("~ERR_FMT~") %s\n";
+		enum fmt = "("~SYS_ERR_FMT~") %s\n";
 	else
-		enum fmt = mod~": ("~ERR_FMT~") %s\n";
+		enum fmt = mod~": ("~SYS_ERR_FMT~") %s\n";
 	printf(fmt, code, adbg_sys_error(code));
 }

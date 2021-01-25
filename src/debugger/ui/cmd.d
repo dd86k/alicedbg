@@ -5,6 +5,7 @@
  */
 module debugger.ui.cmd;
 
+import adbg.etc.c : putchar;
 import core.stdc.stdio;
 import core.stdc.stdlib;
 import core.stdc.string;
@@ -19,6 +20,7 @@ extern (C):
 __gshared:
 
 private bool continue_; /// if user wants to continue
+private bool paused;	/// if debuggee is paused
 
 /// Enter the command-line loop
 /// Returns: Error code
@@ -38,8 +40,8 @@ int cmd_exec(char *command) {
 /// Execute a line of command
 /// Returns: Error code
 int cmd_execl(char *command, size_t len) {
-	char*[8] argv = void;
-	int argc = adbg_util_argv_expand(command, len, cast(char**)argv);
+	int argc = void;
+	char** argv = adbg_util_expand(command, &argc);
 	return cmd_execv(argc, cast(const(char)**)argv);
 }
 
@@ -67,9 +69,8 @@ int cmd_loop() {
 }
 
 void cmd_prompt(int err) {
-	import adbg.sys.err : ERR_FMT;
-	enum fmt = "["~ERR_FMT~" adbg] ";
-	printf(fmt, err);
+	enum fmt = "["~SYS_ERR_FMT~" %cadbg] ";
+	printf(fmt, err, paused ? '*' : ' ');
 }
 
 int cmd_execv(int argc, const(char) **argv) {
@@ -99,6 +100,27 @@ int cmd_execv(int argc, const(char) **argv) {
 	return 1;
 }
 
+int cmd_action(const(char) *a) {
+	size_t l = strlen(a);
+	
+	if (l < 2) {
+		char c = a[0];
+		foreach (action; actions) {
+			if (action.alt == 0) continue;
+			if (c == action.alt)
+				return action.val;
+		}
+	} else {
+		foreach (action; actions) {
+			if (strcmp(a, action.opt) == 0)
+				return action.val;
+		}
+	}
+
+L_END:
+	return -1;
+}
+
 struct command_t {
 	align(4) char alt;	/// short option
 	immutable(char) *opt;	/// long option
@@ -109,12 +131,20 @@ struct command_t {
 immutable command_t[] commands = [
 	{ 'f', "file", "Load file", &cmd_c_file },
 //	{ 'p', "pid",  "Attach to pid", &cmd_c_pid },
-//	{ 'p', "pause",  "Run debugger", & },
-//	{ 'c', "continue",  "Debugger: Continue", & },
-//	{ 'S', "step",  "Debugger: Instruction step", & },
 	{ 'r', "run",  "Run debugger", &cmd_c_run },
 	{ 'h', "help", "Shows this help screen", &cmd_c_help },
 	{ 'q', "quit", "Quit", &cmd_c_quit },
+];
+struct action_t {
+	align(4) char alt;	/// short option
+	immutable(char) *opt;	/// long option
+	immutable(char) *desc;	/// help description
+	AdbgAction val;	/// action value
+}
+immutable action_t[] actions = [
+	{ 'c', "continue", "Continue debuggee", AdbgAction.proceed },
+	{ 0,   "close",    "Close debuggee process", AdbgAction.exit },
+	{ 's', "step",     "Instruction step", AdbgAction.step },
 ];
 
 int cmd_c_file(int argc, const(char) **argv) {
@@ -127,33 +157,64 @@ int cmd_c_file(int argc, const(char) **argv) {
 }
 
 int cmd_c_help(int argc, const(char) **argv) {
+	puts("Debugger commands:");
 	foreach (comm; commands) {
 		if (comm.alt)
-			printf("%c, %-12s %s\n", comm.alt, comm.opt, comm.desc);
+			printf(" %c, %-12s %s\n", comm.alt, comm.opt, comm.desc);
 		else
-			printf("%-15s %s\n", comm.opt, comm.desc);
+			printf(" %-15s %s\n", comm.opt, comm.desc);
+	}
+	puts("Debuggee commands:");
+	foreach (action; actions) {
+		if (action.alt)
+			printf(" %c, %-12s %s\n", action.alt, action.opt, action.desc);
+		else
+			printf(" %-15s %s\n", action.opt, action.desc);
 	}
 	
 	return 0;
 }
 
 int cmd_c_run(int argc, const(char) **argv) {
-	puts("running...");
+	//TODO: Print process id
+	puts("Running...");
 	return adbg_run;
 }
 
 int cmd_c_quit(int argc, const(char) **argv) {
 	continue_ = false;
 	//TODO: Quit confirmation if debuggee is alive
+	exit(0);
 	return 0;
 }
 
 int cmd_handler(exception_t *ex) {
 	memcpy(&g_lastexception, ex, exception_t.sizeof);
-	printf("exception: %s\n", adbg_ex_typestr(ex.type));
+	printf("\n*	Thread %d stopped for: %s\n",
+		ex.tid, adbg_ex_typestr(ex.type));
+	if (ex.faultaddr)
+		printf("\t"~SYS_ERR_FMT~" at %p\n",
+			ex.oscode, ex.faultaddr);
 	
-	//TODO: 
-	cmd_loop();
+	int err = ex.oscode;
+	int length = void;
+	int argc = void;
+	paused = true;
+L_INPUT:
+	cmd_prompt(err);
+	char* line = term_readline(&length);
+	if (line == null) {
+		continue_ = false;
+		return AdbgAction.exit;
+	}
+	char** argv = adbg_util_expand(line, &argc);
 	
-	return AdbgAction.exit;
+	int a = cmd_action(argv[0]);
+	if (a != -1) {
+		paused = false;
+		return a;
+	}
+	
+	err = cmd_execl(line, length);
+	goto L_INPUT;
 }

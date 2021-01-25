@@ -6,7 +6,7 @@
 module debugger.ui.loop;
 
 import adbg.etc.c;
-import adbg.debugger, adbg.sys.err : ERR_FMT;
+import adbg.debugger, adbg.sys.err : SYS_ERR_FMT;
 import adbg.disasm;
 import term;
 import core.stdc.stdio : printf, puts;
@@ -30,7 +30,7 @@ int adbg_ui_loop_handler(exception_t *e) {
 	__gshared uint en;
 	printf(
 	"\n-------------------------------------\n"~
-	"* EXCEPTION #%u: %s ("~ERR_FMT~")\n"~
+	"* EXCEPTION #%u: %s ("~SYS_ERR_FMT~")\n"~
 	"* PID=%u TID=%u\n",
 	en++, adbg_ex_typestr(e.type), e.oscode,
 	e.pid, e.tid,

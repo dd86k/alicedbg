@@ -29,20 +29,36 @@ size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 	return bi;
 }
 
-int adbg_util_argv_expand(char *buf, size_t buflen, char **argv) {
+char** adbg_util_expand(const(char) *str, int *argc) {
 	import core.stdc.ctype : isalnum, ispunct;
+	//TODO: Internal buffer
+	enum BUFFER_LEN   = 1024;
+	enum BUFFER_ITEMS = 16;
+	__gshared char[BUFFER_LEN] _buffer;	/// internal string buffer
+	__gshared char*[BUFFER_ITEMS] _argv;	/// internal argv buffer
 	
-	size_t index;
-	int argc;
+	if (str == null)
+		return null;
+
+	strncpy(_buffer.ptr, str, BUFFER_LEN);
 	
-	if (buflen == 0) return 0;
+	size_t index;	/// string character index
+	int _argc;	/// argument counter
 	
 L_WORD:
+	// maximum number of items reached
+	if (_argc >= BUFFER_ITEMS)
+		goto L_RETURN;
+	
 	// move pointer to first non-white character
-	A: while (index < buflen) {
-		const char c = buf[index];
+	A: while (index < BUFFER_LEN) {
+		const char c = _buffer[index];
+		
 		switch (c) {
-		case 0, '\n', '\r': return argc;
+		case 0: goto L_RETURN;
+		case '\n', '\r':
+			_buffer[index] = 0;
+			goto L_RETURN;
 		case ' ', '\t':
 			++index;
 			continue;
@@ -50,30 +66,31 @@ L_WORD:
 		}
 	}
 	
-	argv[argc] = buf + index;
+	// set argument at position
+	_argv[_argc++] = cast(char*)_buffer + index;
 	
 	// get how long the parameter length is
-	while (index < buflen) {
-		const char c = buf[index];
+	while (index < BUFFER_LEN) {
+		const char c = _buffer[index];
 		
 		switch (c) {
-		case 0, '\n', '\r':
-			buf[index] = 0;
-			return ++argc;
+		case 0: goto L_RETURN;
+		case'\n', '\r':
+			_buffer[index] = 0;
+			goto L_RETURN;
+		case ' ', '\t':
+			_buffer[index++] = 0;
+			goto L_WORD;
 		default:
-			if (isalnum(c) || ispunct(c)) {
-				++index;
-				continue;
-			}
 		}
 		
-		++argc;
-		buf[index++] = 0;
-		goto L_WORD;
+		++index;
 	}
 	
 	// reached the end before we knew it
-	return argc;
+L_RETURN:
+	*argc = _argc;
+	return cast(char**)_argv;
 }
 
 //

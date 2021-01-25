@@ -164,7 +164,7 @@ buildType "term-readline" {
 	buildOptions "unittests"
 	sourceFiles "tests/term/readline.d"
 }
-buildType "utils-argv" {
+buildType "util-expand" {
 	buildOptions "unittests"
-	sourceFiles "tests/utils/argv.d"
+	sourceFiles "tests/util/expand.d"
 }

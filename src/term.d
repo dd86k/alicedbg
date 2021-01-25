@@ -33,6 +33,7 @@ version (Posix) {
 	private import core.sys.posix.termios;
 	private import core.sys.posix.signal;
 	private import core.sys.posix.ucontext;
+	
 	version (CRuntime_Musl) {
 		alias uint tcflag_t;
 		alias uint speed_t;
@@ -62,6 +63,7 @@ version (Posix) {
 		private int tcsetattr(int fd, int a, termios *termios_p);
 		private int ioctl(int fd, ulong request, ...);
 	}
+	
 	private enum TERM_ATTR = ~(ICANON | ECHO);
 	private termios old_tio = void, new_tio = void;
 	private enum SIGWINCH = 28;
@@ -73,7 +75,8 @@ void function(ushort,ushort) term_resize_handler;
 
 /// Terminal configuration options
 enum TermConfig {
-	readlineNoNewline = 1 << 0,
+	/// readline: no dot insert and output newline (Enter)
+	noNewline = 1 << 0,
 }
 
 private int term_opts; // default to 0
@@ -502,6 +505,7 @@ char* term_readline(int *length) {
 	int ox = void, oy = void;	/// Original cursor X and Y positions
 	term_get_curpos(&ox, &oy);
 	InputInfo input = void;
+
 L_READKEY:
 	bool modified;	/// if output was modified
 	bool trimmed;	/// if output was trimmed
@@ -566,7 +570,7 @@ L_READKEY:
 	// Special
 	//
 	case Enter: // send
-		if (term_opts & TermConfig.readlineNoNewline) {
+		if (term_opts & TermConfig.noNewline) {
 			buffer[slen] = 0;
 		} else {
 			putchar('\n');
