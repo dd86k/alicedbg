@@ -16,7 +16,7 @@ public import adbg.debugger.context;
 
 version (Windows) {
 	import core.sys.windows.windows;
-	enum {	// missing D bindings (NTSTATUS, winbase.h)
+	private enum {	// missing D bindings (NTSTATUS, winbase.h)
 		STATUS_WX86_UNSIMULATE	= 0x4000001C,	/// WOW64 exception code
 		STATUS_WX86_CONTINUE	= 0x4000001D,	/// WOW64 exception code
 		STATUS_WX86_SINGLE_STEP	= 0x4000001E,	/// WOW64 exception code
@@ -119,7 +119,7 @@ struct exception_t {
  * 	subcode = OS sub-code
  * Returns: ExceptionType enum value
  */
-ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
+ExceptionType adbg_exception_os(uint code, uint subcode = 0) {
 	version (Windows) {
 		//NOTE: Prefer STATUS_ over EXCEPION_ names when possible
 		with (ExceptionType)
@@ -260,7 +260,7 @@ ExceptionType adbg_ex_oscode(uint code, uint subcode = 0) {
 /// the uppercase.
 /// Params: code = ExceptionType
 /// Returns: String
-const(char) *adbg_ex_typestr(ExceptionType code) {
+const(char) *adbg_exception_string(ExceptionType code) {
 	with (ExceptionType)
 	switch (code) {
 	case Unknown:	return "UNKNOWN";
@@ -300,11 +300,11 @@ version (Windows) {
 		switch (e.oscode) {
 		case EXCEPTION_IN_PAGE_ERROR:
 		case EXCEPTION_ACCESS_VIOLATION:
-			e.type = adbg_ex_oscode(e.oscode,
+			e.type = adbg_exception_os(e.oscode,
 				cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]);
 			break;
 		default:
-			e.type = adbg_ex_oscode(e.oscode);
+			e.type = adbg_exception_os(e.oscode);
 		}
 	}
 } else {
@@ -312,6 +312,6 @@ version (Windows) {
 		e.pid = e.tid = pid;
 		e.tid = 0;
 		e.oscode = signo;
-		e.type = adbg_ex_oscode(signo);
+		e.type = adbg_exception_os(signo);
 	}
 }

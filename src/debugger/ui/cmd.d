@@ -68,8 +68,8 @@ int cmd_loop() {
 	return err;
 }
 
-void cmd_prompt(int err) {
-	enum fmt = "["~SYS_ERR_FMT~" %cadbg] ";
+void cmd_prompt(int err) { // [code*adbg]
+	enum fmt = "["~SYS_ERR_FMT~"%cadbg] ";
 	printf(fmt, err, paused ? '*' : ' ');
 }
 
@@ -129,11 +129,12 @@ struct command_t {
 }
 
 immutable command_t[] commands = [
-	{ 'f', "file", "Load file", &cmd_c_file },
-//	{ 'p', "pid",  "Attach to pid", &cmd_c_pid },
-	{ 'r', "run",  "Run debugger", &cmd_c_run },
-	{ 'h', "help", "Shows this help screen", &cmd_c_help },
-	{ 'q', "quit", "Quit", &cmd_c_quit },
+	{ 'f', "file",   "Load file", &cmd_c_file },
+//	{ 'p', "pid",    "Attach to pid", &cmd_c_pid },
+	{ 'r', "run",    "Run debugger", &cmd_c_run },
+	{ 's', "status", "Print current state", &cmd_c_status },
+	{ 'h', "help",   "Shows this help screen", &cmd_c_help },
+	{ 'q', "quit",   "Quit", &cmd_c_quit },
 ];
 struct action_t {
 	align(4) char alt;	/// short option
@@ -154,6 +155,24 @@ int cmd_c_file(int argc, const(char) **argv) {
 	}
 	
 	return adbg_load(argv[1], null, null, null, 0);
+}
+
+int cmd_c_status(int argc, const(char) **argv) {
+	AdbgState s = adbg_state;
+	const(char) *st = void;
+	switch (s) {
+	case AdbgState.idle:	st = "idle"; break;
+	case AdbgState.waiting:	st = "waiting"; break;
+	case AdbgState.running:	st = "running"; break;
+	case AdbgState.paused:	st = "paused"; break;
+	default: 
+	}
+	printf(
+	"state: (%d) %s\n"~
+	"exception: ("~SYS_ERR_FMT~") %s\n", common_exception.oscode, adbg_exception_string(common_exception.type),
+	s, st
+	);
+	return 0;
 }
 
 int cmd_c_help(int argc, const(char) **argv) {
@@ -189,12 +208,13 @@ int cmd_c_quit(int argc, const(char) **argv) {
 }
 
 int cmd_handler(exception_t *ex) {
-	memcpy(&g_lastexception, ex, exception_t.sizeof);
+	memcpy(&common_exception, ex, exception_t.sizeof);
+	
 	printf("\n*	Thread %d stopped for: %s\n",
-		ex.tid, adbg_ex_typestr(ex.type));
+		ex.tid, adbg_exception_string(ex.type));
+	
 	if (ex.faultaddr)
-		printf("\t"~SYS_ERR_FMT~" at %p\n",
-			ex.oscode, ex.faultaddr);
+		printf("\t"~SYS_ERR_FMT~" at %p\n", ex.oscode, ex.faultaddr);
 	
 	int err = ex.oscode;
 	int length = void;

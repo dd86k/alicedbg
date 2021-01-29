@@ -63,12 +63,12 @@ uint adbg_seh_handle(_EXCEPTION_POINTERS *e) {
 	switch (mcheckpoint.exception.oscode) {
 	case EXCEPTION_IN_PAGE_ERROR:
 	case EXCEPTION_ACCESS_VIOLATION:
-		mcheckpoint.exception.type = adbg_ex_oscode(
+		mcheckpoint.exception.type = adbg_exception_os(
 			e.ExceptionRecord.ExceptionCode,
 			cast(uint)e.ExceptionRecord.ExceptionInformation[0]);
 		break;
 	default:
-		mcheckpoint.exception.type = adbg_ex_oscode(
+		mcheckpoint.exception.type = adbg_exception_os(
 			e.ExceptionRecord.ExceptionCode);
 	}
 	

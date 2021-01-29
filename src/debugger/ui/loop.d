@@ -19,7 +19,7 @@ extern (C):
 int loop() {
 	if (term_init)
 		return 1;
-	g_disparams.options = AdbgDisasmOption.spaceSep;
+	common_disasm_params.options = AdbgDisasmOption.spaceSep;
 	adbg_event_exception(&adbg_ui_loop_handler);
 	return adbg_run;
 }
@@ -32,16 +32,16 @@ int adbg_ui_loop_handler(exception_t *e) {
 	"\n-------------------------------------\n"~
 	"* EXCEPTION #%u: %s ("~SYS_ERR_FMT~")\n"~
 	"* PID=%u TID=%u\n",
-	en++, adbg_ex_typestr(e.type), e.oscode,
+	en++, adbg_exception_string(e.type), e.oscode,
 	e.pid, e.tid,
 	);
 
 	// * Print disassembly, if available
 	if (e.faultaddr) {
-		g_disparams.a = e.faultaddr;
-		if (adbg_disasm(&g_disparams, AdbgDisasmMode.file) == 0) {
+		common_disasm_params.a = e.faultaddr;
+		if (adbg_disasm(&common_disasm_params, AdbgDisasmMode.file) == 0) {
 			printf("> %p: %s| %s\n",
-				e.faultaddr, g_disparams.mcbuf.ptr, g_disparams.mnbuf.ptr);
+				e.faultaddr, common_disasm_params.mcbuf.ptr, common_disasm_params.mnbuf.ptr);
 		}
 	}
 

@@ -518,7 +518,8 @@ int main(int argc, const(char)** argv) {
 		return lasterr;
 	}
 	
-	adbg_ui_common_params(&settings.disasm);
+	common_disasm_params = settings.disasm; // copy fields into global
+	
 	switch (settings.ui) {
 	case SettingUI.loop:
 		if (adbg_state == AdbgState.waiting)

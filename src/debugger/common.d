@@ -17,11 +17,7 @@ extern (C):
 __gshared:
 
 /// Last exception
-exception_t g_lastexception;
+exception_t common_exception;
 
 /// Disassembler parameters
-adbg_disasm_t g_disparams;
-
-void adbg_ui_common_params(adbg_disasm_t *params) {
-	memcpy(&g_disparams, params, adbg_disasm_t.sizeof);
-}
+adbg_disasm_t common_disasm_params;
