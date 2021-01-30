@@ -31,7 +31,7 @@ enum AdbgDisasmMode : ubyte {
 
 /// Disassembler ABI
 enum AdbgDisasmPlatform : ubyte {
-	native,	/// (Default) Platform compiled target, see DISASM_DEFAULT_ISA
+	native,	/// (Default) Platform compiled target, see DISASM_DEFAULT_PLATFORM
 	x86_16,	/// (WIP) 8086, 80186, 80286
 	x86,	/// (WIP) x86-32, 80386/i386
 	x86_64,	/// (WIP) AMD64, Intel64, x64 (Windows)
@@ -67,36 +67,36 @@ enum AdbgDisasmOption : ushort {
 }
 
 version (X86) {
-	/// Platform default ABI
-	private enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.x86;
+	/// Platform default platform
+	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.x86;
 	/// Platform default syntax
-	private enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.intel;
+	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.intel;
 } else
 version (X86_64) {
-	/// Platform default ABI
-	private enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.x86_64;
+	/// Platform default platform
+	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.x86_64;
 	/// Platform default syntax
-	private enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.intel;
+	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.intel;
 } else
 version (Thumb) {
-	/// Platform default ABI
-	private enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.arm_t32;
+	/// Platform default platform
+	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_t32;
 	/// Platform default syntax
-	private enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
+	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
 } else
 version (ARM) {
-	/// Platform default ABI
-	private enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.arm_a32;
+	/// Platform default platform
+	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_a32;
 	/// Platform default syntax
-	private enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
+	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
 } else
 version (AArch64) {
-	/// Platform default ABI
-	private enum DISASM_DEFAULT_ISA = AdbgDisasmPlatform.arm_a64;
+	/// Platform default platform
+	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_a64;
 	/// Platform default syntax
-	private enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
+	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
 } else {
-	static assert(0, "DISASM_DEFAULT_ISA/DISASM_DEFAULT_SYNTAX unset");
+	static assert(0, "DISASM_DEFAULT_PLATFORM/DISASM_DEFAULT_SYNTAX unset");
 }
 
 /// Disassembler parameters structure
@@ -216,7 +216,7 @@ int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	}
 
 	if (p.platform == AdbgDisasmPlatform.native)
-		p.platform = DISASM_DEFAULT_ISA;
+		p.platform = DISASM_DEFAULT_PLATFORM;
 
 	with (AdbgDisasmPlatform)
 	switch (p.platform) {
