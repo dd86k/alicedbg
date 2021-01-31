@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module dumper.dump.mz;
+module app.dumper.dump.mz;
 
 import core.stdc.stdio;
 import core.stdc.config : c_long;
@@ -22,7 +22,7 @@ extern (C):
 /// 	dp = Disassembler parameters
 /// 	flags = Show X flags
 /// Returns: Non-zero on error
-int adbg_dump_mz(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
+int dump_mz(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
 	//TODO: MZ
-	assert(0, "adbg_dmpr_print_mz: todo");
+	assert(0, "dump_mz: todo");
 }

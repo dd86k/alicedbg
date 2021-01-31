@@ -1,8 +1,4 @@
-module tests.disasm.loop;
-
-extern (C) int putchar(int);
-
-import adbg.disasm;
+import adbg.disasm, adbg.etc.c;
 import core.stdc.stdlib, core.stdc.time;
 import std.stdio;
 

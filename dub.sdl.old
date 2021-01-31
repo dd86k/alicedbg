@@ -1,0 +1,168 @@
+name "alicedbg"
+description "Aiming to be a simple debugger"
+homepage "http://github.com/dd86k/alicedbg"
+authors "dd86k <dd@dax.moe>"
+copyright "Copyright © 2019-2021 dd86k <dd@dax.moe>"
+license "BSD 3-clause"
+version "0.0.0"
+
+# NOTE: To support older DUB and D compiler versions, the "betterC"
+#       buildOptions value is not used.
+
+#
+# Common build types
+#
+
+# Default configuration.
+configuration "application" {
+	targetType "executable"
+	versions "Build_Application"
+	mainSourceFile "src/main.d"
+}
+
+# Make the compiler print GC (despite not using it) usage, TLS (thread local
+# storage) usage, and target info for runtime diagnostic purposes.
+buildType "debugv" {
+	versions "PrintTargetInfo"
+	buildOptions "debugMode" "debugInfo"
+	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
+	dflags "-betterC" "--vgc" platform="ldc"
+	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+}
+# Ditto but aimed for older dmd versions, ldc 0.17.1, and gdc 5.4
+# NOTE: gdc 5.4 is missing a __va_list_arg def in the std import
+buildType "debugv-stage0" {
+	versions "PrintTargetInfo"
+	buildOptions "debugMode" "debugInfo"
+	dflags "-vgc" "-vtls" platform="dmd"
+	dflags "--vgc" platform="ldc"
+	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+}
+
+# Make the compiler very verbose for compile-time diagnostic purposess.
+buildType "debugvv" {
+	buildOptions "debugMode" "debugInfo"
+	dflags "-betterC" "-v" platform="dmd"
+	dflags "-betterC" "-v" platform="ldc"
+	dflags "-v" platform="gdc"
+}
+
+# Compile in debug mode.
+buildType "debug" {
+	buildOptions "debugMode" "debugInfo"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
+}
+
+# Compile in release mode.
+buildType "release" {
+	buildOptions "releaseMode" "optimize"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
+}
+
+# Compile in release mode with no bound checking.
+buildType "release-nobounds" {
+	buildOptions "releaseMode" "optimize" "noBoundsCheck"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
+}
+
+# Compile in release mode with no bound checking and inlined functions.
+# This is the maximum performance option, may take much longer to compile.
+# Highly discouraged for building as a library and official release builds.
+buildType "release-inline" {
+	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
+}
+
+#
+# Library-related
+#
+
+# Generate a library.
+configuration "library" {
+	targetType "library"
+	sourcePaths "src/adbg"
+	importPaths "src/adbg"
+}
+# Ditto as dub docs.
+configuration "source-library" {
+	targetType "sourceLibrary"
+	sourcePaths "src/adbg"
+	importPaths "src/adbg"
+}
+# Force output to a dynamic/shared library.
+configuration "dynamic-library" {
+	targetType "dynamicLibrary"
+	sourcePaths "src/adbg"
+	importPaths "src/adbg"
+}
+
+# Generate headers
+buildType "headers" {
+	buildOptions "syntaxOnly"
+	dflags "-H" "--Hd=dinclude" platform="ldc"
+	dflags "-H" "-Hd=dinclude" platform="dmd"
+}
+
+#
+# Fuzzers
+#
+
+# AFL fuzzing test
+buildType "afl" {
+	toolchainRequirements dmd="no" gdc="no" ldc=">=1.0.0"
+	dflags "-plugin=$AFL_ROOT/afl-llvm-pass.so"
+	sourceFiles "$AFL_ROOT/afl-llvm-rt.o"
+	versions "AFL"
+	buildOptions "debugMode" "debugInfo"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
+}
+
+#
+# Profilers
+#
+
+# Build in profile-debug mode, this permits self-profiling. Not related to
+# future profiling feature within alicedbg.
+# NOTICE: Currently broken, do not use!
+# TODO: add dmain.d as a wrapper and manually call main.
+#       This will permit using the profiler from the druntime (for hooks).
+#       If that doesn't work, exclude main.d and try something else.
+# NOTE: This profiles the GC, which is pointless to do here
+buildType "profile" {
+	buildOptions "debugMode" "debugInfo" "profile" platform="dmd"
+	buildOptions "debugMode" "debugInfo" "profile" platform="ldc"
+	buildOptions "debugMode" "debugInfo" "profile" platform="gdc"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
+}
+
+#
+# Specific tests
+#
+
+# Disassembler scrambler test
+buildType "disasm-loop" {
+	buildOptions "unittests"
+	sourceFiles "tests/disasm/loop.d"
+}
+buildType "sys-setjmp" {
+	buildOptions "unittests"
+	sourceFiles "tests/sys/setjmp.d"
+}
+buildType "term-read" {
+	buildOptions "unittests"
+	sourceFiles "tests/term/read.d"
+}
+buildType "term-readline" {
+	buildOptions "unittests"
+	sourceFiles "tests/term/readline.d"
+}
+buildType "util-expand" {
+	buildOptions "unittests"
+	sourceFiles "tests/util/expand.d"
+}

@@ -6,21 +6,20 @@ copyright "Copyright © 2019-2021 dd86k <dd@dax.moe>"
 license "BSD 3-clause"
 version "0.0.0"
 
-# NOTE: To support older DUB and D compiler versions, the "betterC"
-#       buildOptions value is not used.
+# Target DUB >=1.0.0 at best
 
-# NOTE: This fixes unittesting
-mainSourceFile "src/main.d"
-
-#
-# Common build types
-#
-
-# Default configuration.
+# Not a subPackage because I want to avoid generating a seperate library
 configuration "application" {
 	targetType "executable"
-	versions "Build_Application"
+	sourcePaths "app"
+	importPaths "app"
+	mainSourceFile "app/main.d"
 }
+configuration "library" {
+	sourcePaths "src"
+}
+
+# NOTE: We explicitly specify the betterC flag to support older dub releases
 
 # Make the compiler print GC (despite not using it) usage, TLS (thread local
 # storage) usage, and target info for runtime diagnostic purposes.
@@ -70,101 +69,24 @@ buildType "release-nobounds" {
 	dflags "-betterC" platform="ldc"
 }
 
-# Compile in release mode with no bound checking and inlined functions.
-# This is the maximum performance option, may take much longer to compile.
-# Highly discouraged for building as a library and official release builds.
-buildType "release-inline" {
-	buildOptions "releaseMode" "optimize" "noBoundsCheck" "inline"
-	dflags "-betterC" platform="dmd"
-	dflags "-betterC" platform="ldc"
-}
-
-#
-# Library-related
-#
-
-# Generate a library.
-configuration "library" {
-	targetType "library"
-	sourcePaths "src/adbg"
-	importPaths "src/adbg"
-}
-# Ditto as dub docs.
-configuration "source-library" {
-	targetType "sourceLibrary"
-	sourcePaths "src/adbg"
-	importPaths "src/adbg"
-}
-# Force output to a dynamic/shared library.
-configuration "dynamic-library" {
-	targetType "dynamicLibrary"
-	sourcePaths "src/adbg"
-	importPaths "src/adbg"
-}
-
-# Generate headers
-buildType "headers" {
-	buildOptions "syntaxOnly"
-	dflags "-H" "--Hd=dinclude" platform="ldc"
-	dflags "-H" "-Hd=dinclude" platform="dmd"
-}
-
-#
-# Fuzzers
-#
-
-# AFL fuzzing test
-buildType "afl" {
-	toolchainRequirements dmd="no" gdc="no" ldc=">=1.0.0"
-	dflags "-plugin=$AFL_ROOT/afl-llvm-pass.so"
-	sourceFiles "$AFL_ROOT/afl-llvm-rt.o"
-	versions "AFL"
-	buildOptions "debugMode" "debugInfo"
-	dflags "-betterC" platform="dmd"
-	dflags "-betterC" platform="ldc"
-}
-
-#
-# Profilers
-#
-
-# Build in profile-debug mode, this permits self-profiling. Not related to
-# future profiling feature within alicedbg.
-# NOTICE: Currently broken, do not use!
-# TODO: add dmain.d as a wrapper and manually call main.
-#       This will permit using the profiler from the druntime (for hooks).
-#       If that doesn't work, exclude main.d and try something else.
-# NOTE: This profiles the GC, which is pointless to do here
-buildType "profile" {
-	buildOptions "debugMode" "debugInfo" "profile" platform="dmd"
-	buildOptions "debugMode" "debugInfo" "profile" platform="ldc"
-	buildOptions "debugMode" "debugInfo" "profile" platform="gdc"
-	dflags "-betterC" platform="dmd"
-	dflags "-betterC" platform="ldc"
-}
-
-#
-# Specific tests
-#
-
 # Disassembler scrambler test
 buildType "disasm-loop" {
 	buildOptions "unittests"
-	sourceFiles "tests/disasm/loop.d"
+	sourceFiles "tests/disasm-loop.d"
 }
-buildType "sys-setjmp" {
+buildType "setjmp" {
 	buildOptions "unittests"
-	sourceFiles "tests/sys/setjmp.d"
+	sourceFiles "tests/setjmp.d"
 }
-buildType "term-read" {
+buildType "read" {
 	buildOptions "unittests"
-	sourceFiles "tests/term/read.d"
+	sourceFiles "tests/read.d"
 }
-buildType "term-readline" {
+buildType "readline" {
 	buildOptions "unittests"
-	sourceFiles "tests/term/readline.d"
+	sourceFiles "tests/readline.d"
 }
-buildType "util-expand" {
+buildType "expand" {
 	buildOptions "unittests"
-	sourceFiles "tests/util/expand.d"
+	sourceFiles "tests/expand.d"
 }

@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module debugger.ui.cmd;
+module app.debugger.ui.cmd;
 
 import adbg.etc.c : putchar;
 import core.stdc.stdio;
@@ -11,10 +11,10 @@ import core.stdc.stdlib;
 import core.stdc.string;
 import adbg.debugger.debugger;
 import adbg.debugger.exception;
-import term;
 import adbg.sys.err;
 import adbg.utils.str;
-import debugger.common;
+import app.term;
+import app.debugger.common;
 
 extern (C):
 __gshared:

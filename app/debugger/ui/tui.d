@@ -3,14 +3,14 @@
  *
  * License: BSD-3-Clause
  */
-module debugger.ui.tui;
+module app.debugger.ui.tui;
 
 import core.stdc.stdio, core.stdc.string : memcpy;
 import adbg.error;
-import term;
 import adbg.debugger;
 import adbg.disasm;
-import debugger.common;
+import app.term;
+import app.debugger.common;
 
 extern (C):
 __gshared:

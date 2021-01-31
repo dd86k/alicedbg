@@ -6,7 +6,7 @@
  *
  * License: BSD-3-Clause
  */
-module debugger.common;
+module app.debugger.common;
 
 import adbg.debugger.exception;
 import adbg.disasm;

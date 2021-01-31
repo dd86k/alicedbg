@@ -16,7 +16,7 @@ import adbg.debugger : adbg_attach, adbg_load, adbg_state, AdbgState;
 import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax;
 import adbg.sys.err : adbg_sys_perror;
 import d = std.compiler;
-import debugger, dumper;
+import app.debugger, app.dumper;
 
 private:
 extern (C):
@@ -505,7 +505,7 @@ int main(int argc, const(char)** argv) {
 	
 	// app: dumper
 	if (settings.dump)
-		return adbg_dump(settings.file, &settings.disasm, settings.flags);
+		return dump(settings.file, &settings.disasm, settings.flags);
 	
 	// app: debugger
 	if (settings.pid)

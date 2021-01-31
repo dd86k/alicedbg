@@ -3,15 +3,15 @@
  *
  * License: BSD-3-Clause
  */
-module debugger.ui.loop;
+module app.debugger.ui.loop;
 
 import adbg.etc.c;
 import adbg.debugger, adbg.sys.err : SYS_ERR_FMT;
 import adbg.disasm;
-import term;
 import core.stdc.stdio : printf, puts;
 import core.stdc.string : memcpy;
-import debugger.common;
+import app.term;
+import app.debugger.common;
 
 extern (C):
 

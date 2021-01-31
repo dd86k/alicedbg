@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module term;
+module app.term;
 
 private import core.stdc.stdio;
 private import core.stdc.stdlib;
