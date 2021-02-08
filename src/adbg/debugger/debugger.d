@@ -86,7 +86,7 @@ enum AdbgAction {
 public
 enum AdbgState {
 	idle,	/// Waiting for input
-	waiting,	/// Program loaded, waiting to run
+	loaded,	/// Program loaded, waiting to run
 	running,	/// Executing debuggee
 	paused,	/// Exception occured
 }
@@ -140,14 +140,14 @@ private AdbgState g_state;
  * Posix: stat(2), fork(2) or clone(2), ptrace(2) (PTRACE_TRACEME), and execve(2).
  * Params:
  * 	 path = Command, path to executable
- * 	 dir = New directory for the debuggee, null for current directory
  * 	 argv = Argument vector, null-terminated, can be null
+ * 	 dir = New directory for the debuggee, null for current directory
  * 	 envp = Environment vector, null-terminated, can be null
  * 	 flags = Reserved
  * Returns: Zero on success; Otherwise os error code is returned
  */
-int adbg_load(const(char) *path, const(char) *dir = null,
-	const(char) **argv = null, const(char) **envp = null,
+int adbg_load(const(char) *path, const(char) **argv = null,
+	const(char) *dir = null, const(char) **envp = null,
 	int flags = 0) {
 	if (path == null) return 1;
 
@@ -285,7 +285,7 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 			}
 		} // USE_CLONE
 	}
-	g_state = AdbgState.waiting;
+	g_state = AdbgState.loaded;
 	return 0;
 }
 

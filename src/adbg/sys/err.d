@@ -54,9 +54,9 @@ int adbg_sys_errno() {
 /// 	code = Error code
 void adbg_sys_perror(string mod = null)(int code) {
 	import core.stdc.stdio : printf;
-	static if (mod == null)
-		enum fmt = "("~SYS_ERR_FMT~") %s\n";
-	else
+	static if (mod)
 		enum fmt = mod~": ("~SYS_ERR_FMT~") %s\n";
+	else
+		enum fmt = "("~SYS_ERR_FMT~") %s\n";
 	printf(fmt, code, adbg_sys_error(code));
 }

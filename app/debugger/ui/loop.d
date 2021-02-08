@@ -10,15 +10,17 @@ import adbg.etc.c.stdio;
 import adbg.debugger, adbg.sys.err : SYS_ERR_FMT;
 import adbg.disasm;
 import app.term;
-import app.debugger.common;
+import app.common;
 
 extern (C):
 
 /// Starts loop UI
 int loop() {
-	if (term_init)
+	if (adbg_state != AdbgState.loaded) {
+		puts("loop: No program loaded");
 		return 1;
-	common_disasm_params.options = AdbgDisasmOption.spaceSep;
+	}
+	if (term_init) return 1;
 	return adbg_run(&loop_handler);
 }
 
@@ -36,10 +38,12 @@ int loop_handler(exception_t *e) {
 
 	// * Print disassembly, if available
 	if (e.faultaddr) {
-		common_disasm_params.a = e.faultaddr;
-		if (adbg_disasm(&common_disasm_params, AdbgDisasmMode.file) == 0) {
+		common_settings.disasm.a = e.faultaddr;
+		if (adbg_disasm(&common_settings.disasm, AdbgDisasmMode.file) == 0) {
 			printf("> %p: %s| %s\n",
-				e.faultaddr, common_disasm_params.mcbuf.ptr, common_disasm_params.mnbuf.ptr);
+				e.faultaddr,
+				common_settings.disasm.mcbuf.ptr,
+				common_settings.disasm.mnbuf.ptr);
 		}
 	}
 

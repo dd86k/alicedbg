@@ -13,7 +13,7 @@ import adbg.debugger.exception;
 import adbg.sys.err;
 import adbg.utils.str;
 import app.term;
-import app.debugger.common;
+import app.common;
 
 extern (C):
 __gshared:
@@ -153,7 +153,12 @@ int cmd_c_load(int argc, const(char) **argv) {
 		return 1;
 	}
 	
-	return adbg_load(argv[1], null, null, null, 0);
+	//TODO: cmd argv handling
+	
+	int e = adbg_load(argv[1]);
+	if (e)
+		adbg_sys_perror!"cmd"(e);
+	return e;
 }
 
 int cmd_c_status(int argc, const(char) **argv) {
@@ -161,7 +166,7 @@ int cmd_c_status(int argc, const(char) **argv) {
 	const(char) *st = void;
 	switch (s) {
 	case AdbgState.idle:	st = "idle"; break;
-	case AdbgState.waiting:	st = "waiting"; break;
+	case AdbgState.loaded:	st = "loaded"; break;
 	case AdbgState.running:	st = "running"; break;
 	case AdbgState.paused:	st = "paused"; break;
 	default:	st = "unknown";
@@ -208,7 +213,7 @@ int cmd_c_quit(int argc, const(char) **argv) {
 int cmd_handler(exception_t *ex) {
 	memcpy(&common_exception, ex, exception_t.sizeof);
 	
-	printf("\n*	Thread %d stopped for: %s\n",
+	printf("*	Thread %d stopped for: %s\n",
 		ex.tid, adbg_exception_string(ex.type));
 	
 	if (ex.faultaddr)

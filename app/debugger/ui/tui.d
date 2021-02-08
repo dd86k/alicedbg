@@ -10,7 +10,7 @@ import adbg.error;
 import adbg.debugger;
 import adbg.disasm;
 import app.term;
-import app.debugger.common;
+import app.common;
 
 extern (C):
 __gshared:
@@ -29,7 +29,7 @@ int tui() {
 		printf("Could not initiate terminal buffer (%d)\n", e);
 		return e;
 	}
-	common_disasm_params.options |= AdbgDisasmOption.spaceSep;
+	common_settings.disasm.options |= AdbgDisasmOption.spaceSep;
 	return adbg_run(&tui_handler);
 }
 
@@ -88,21 +88,23 @@ L_READKEY:
 /// Params: e = Exception structure
 int tui_handler(exception_t *e) {
 	term_clear;
-	common_disasm_params.a = e.faultaddr;
+	common_settings.disasm.a = e.faultaddr;
 	// locals
 	const uint h = tui_size.height / 2;
 	const uint ihmax = tui_size.height - 2;
 	// On-point
 	term_curpos(0, h);
-	if (adbg_disasm(&common_disasm_params, AdbgDisasmMode.file) == AdbgError.none)
+	if (adbg_disasm(&common_settings.disasm, AdbgDisasmMode.file) == AdbgError.none)
 		term_tui_writef("> %zX %-20s %s",
-			common_disasm_params.la, &common_disasm_params.mcbuf, &common_disasm_params.mnbuf);
+			common_settings.disasm.la,
+			&common_settings.disasm.mcbuf,
+			&common_settings.disasm.mnbuf);
 	// forward
 	for (uint hi = h + 1; hi < ihmax; ++hi) {
 		term_curpos(0, hi);
-		adbg_disasm(&common_disasm_params, AdbgDisasmMode.file);
+		adbg_disasm(&common_settings.disasm, AdbgDisasmMode.file);
 		term_tui_writef("  %zX %-20s %s",
-			common_disasm_params.la, &common_disasm_params.mcbuf, &common_disasm_params.mnbuf);
+			common_settings.disasm.la, &common_settings.disasm.mcbuf, &common_settings.disasm.mnbuf);
 	}
 	// backward
 	//for (uint ih = h - 1; ih >= 0; ih) {

@@ -33,20 +33,6 @@ bool askhelp(const(char) *query) {
 	}
 }
 
-//TODO: Consider adding 'bool avoidopt' field
-//      Acts as "--", to stop processing options
-/// Settings structure for the application (only!)
-struct settings_t {
-	SettingUI ui = SettingUI.cmd;	/// Debugger user interface
-	adbg_disasm_t disasm;	/// Disassembler settings
-	bool dump;	/// Dump instead of debugging
-	const(char) *file;	/// Debuggee: file
-//	const(char) *dir;	/// Debuggee: directory
-	const(char) **argv;	/// Debuggee: argument vector
-	const(char) **env;	/// Debuggee: environement
-	uint pid;	/// Debuggee: PID
-	uint flags;	/// 
-}
 //TODO: Consider adding 'bool processed' field
 //      Avoids repeating options, may speed-up parsing
 //      * Could be an issue for repeatable options (unless another field added..)
@@ -58,8 +44,8 @@ struct option_t {
 	immutable(char) *desc;
 	align(4) bool arg;	/// if it takes an argument
 	union {
-		extern(C) int function(settings_t*) f;
-		extern(C) int function(settings_t*, const(char)*) fa;
+		extern(C) int function() f;
+		extern(C) int function(const(char)*) fa;
 	}
 }
 immutable option_t[] options = [
@@ -101,7 +87,7 @@ immutable setting_platform_t[] platforms = [
 	{ AdbgDisasmPlatform.x86_64, "x86_64", "amd64",   "x86 64-bit (long mode)" },
 	{ AdbgDisasmPlatform.rv32,   "rv32",   "riscv32", "RISC-V 32-bit"},
 ];
-int climarch(settings_t *settings, const(char) *val) {
+int climarch(const(char) *val) {
 	if (askhelp(val)) {
 		puts("Available machine architectures:");
 		foreach (setting_platform_t p; platforms) {
@@ -112,7 +98,7 @@ int climarch(settings_t *settings, const(char) *val) {
 	}
 	foreach (setting_platform_t p; platforms) {
 		if (strcmp(val, p.opt) == 0 || strcmp(val, p.alt) == 0) {
-			settings.disasm.platform = p.val;
+			common_settings.disasm.platform = p.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -132,7 +118,7 @@ immutable setting_syntax_t[] syntaxes = [
 	{ AdbgDisasmSyntax.intel, "intel", "Intel syntax" },
 	{ AdbgDisasmSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
 ];
-int clisyntax(settings_t *settings, const(char) *val) {
+int clisyntax(const(char) *val) {
 	if (askhelp(val)) {
 		puts("Available disassembler syntaxes:");
 		foreach (setting_syntax_t syntax; syntaxes) {
@@ -143,7 +129,7 @@ int clisyntax(settings_t *settings, const(char) *val) {
 	}
 	foreach (setting_syntax_t syntax; syntaxes) {
 		if (strcmp(val, syntax.opt) == 0) {
-			settings.disasm.syntax = syntax.val;
+			common_settings.disasm.syntax = syntax.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -154,8 +140,8 @@ int clisyntax(settings_t *settings, const(char) *val) {
 // ANCHOR --file
 //
 
-int clifile(settings_t *settings, const(char) *val) {
-	settings.file = val;
+int clifile(const(char) *val) {
+	common_settings.file = val;
 	return EXIT_SUCCESS;
 }
 
@@ -163,7 +149,7 @@ int clifile(settings_t *settings, const(char) *val) {
 // ANCHOR --args
 //
 
-int cliargs(settings_t *settings, const(char) *val) {
+int cliargs(const(char) *val) {
 	puts("cliargs: todo");
 	return EXIT_FAILURE;
 	//TODO: cliargs
@@ -184,7 +170,7 @@ int cliargs(settings_t *settings, const(char) *val) {
 // ANCHOR --env
 //
 
-int clienv(settings_t *settings, const(char) *val) {
+int clienv(const(char) *val) {
 	puts("clienv: todo");
 	return EXIT_FAILURE;
 	//TODO: clienv
@@ -207,8 +193,8 @@ int clienv(settings_t *settings, const(char) *val) {
 // ANCHOR --pid
 //
 
-int clipid(settings_t *settings, const(char) *val) {
-	settings.pid = cast(ushort)strtol(val, null, 10);
+int clipid(const(char) *val) {
+	common_settings.pid = cast(ushort)strtol(val, null, 10);
 	return EXIT_SUCCESS;
 }
 
@@ -216,7 +202,6 @@ int clipid(settings_t *settings, const(char) *val) {
 // ANCHOR --ui
 //
 
-enum SettingUI { loop, cmd, tui, server }
 struct setting_ui_t {
 	SettingUI val;
 	immutable(char)* opt, desc;
@@ -227,7 +212,7 @@ immutable setting_ui_t[] uis = [
 //	{ SettingUI.tui,    "tui",    "(wip) Interractive text user interface" },
 //	{ SettingUI.server, "server", "(n/a) TCP/IP server" },
 ];
-int cliui(settings_t* settings, const(char)* val) {
+int cliui(const(char)* val) {
 	if (askhelp(val)) {
 		puts("Available UIs:");
 		foreach (setting_ui_t ui; uis) {
@@ -237,7 +222,7 @@ int cliui(settings_t* settings, const(char)* val) {
 	}
 	foreach (setting_ui_t ui; uis) {
 		if (strcmp(val, ui.opt) == 0) {
-			settings.ui = ui.val;
+			common_settings.ui = ui.val;
 			return 0;
 		}
 	}
@@ -248,8 +233,8 @@ int cliui(settings_t* settings, const(char)* val) {
 // ANCHOR --dump
 //
 
-int clidump(settings_t *settings) {
-	settings.dump = true;
+int clidump() {
+	common_settings.mode = SettingMode.dump;
 	return EXIT_SUCCESS;
 }
 
@@ -257,8 +242,8 @@ int clidump(settings_t *settings) {
 // ANCHOR --raw
 //
 
-int cliraw(settings_t *settings) {
-	settings.flags |= DUMPER_FILE_RAW;
+int cliraw() {
+	common_settings.flags |= DUMPER_FILE_RAW;
 	return EXIT_SUCCESS;
 }
 
@@ -283,7 +268,7 @@ immutable setting_show_t[] showflags = [
 	{ 'S', "Show disassembler statistics instead", DUMPER_SHOW_HEADER },
 	{ 'A', "Show everything", DUMPER_SHOW_EVERYTHING },
 ];
-int clishow(settings_t *settings, const(char) *val) {
+int clishow(const(char) *val) {
 	if (askhelp(val)) {
 		puts("Available dumper-show options:");
 		foreach (setting_show_t show; showflags) {
@@ -296,7 +281,7 @@ int clishow(settings_t *settings, const(char) *val) {
 		++val;
 		foreach (setting_show_t show; showflags) {
 			if (c == show.opt) {
-				settings.flags |= show.val;
+				common_settings.flags |= show.val;
 				continue A;
 			}
 		}
@@ -309,7 +294,7 @@ int clishow(settings_t *settings, const(char) *val) {
 // ANCHOR --help
 //
 
-int clihelp(settings_t*) {
+int clihelp() {
 	puts(
 	"alicedbg - Aiming to be a simple debugger\n"~
 	"Usage:\n"~
@@ -342,13 +327,13 @@ immutable(char) *fmt_version =
 "CRT: "~TARGET_CRT~"\n"~
 "CppRT: "~TARGET_CPPRT~"\n";
 //TODO: Features:
-int cliversion(settings_t*) {
+int cliversion() {
 	import d = std.compiler;
 	printf(fmt_version, d.version_major, d.version_minor);
 	exit(0);
 	return 0;
 }
-int cliver(settings_t*) {
+int cliver() {
 	puts(ADBG_VERSION);
 	exit(0);
 	return 0;
@@ -358,7 +343,7 @@ int cliver(settings_t*) {
 // ANCHOR --license
 //
 
-int clilicense(settings_t*) {
+int clilicense() {
 	puts(
 	`BSD 3-Clause License
 
@@ -398,7 +383,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`
 // --meow
 //
 
-int climeow(settings_t*) {
+int climeow() {
 	puts(
 `
 +------------------+
@@ -420,8 +405,6 @@ int climeow(settings_t*) {
 //
 
 int main(int argc, const(char)** argv) {
-	// .init automatically take the defaults
-	settings_t settings;	/// cli settings
 	int lasterr;	/// last cli error
 	
 	A: for (int argi = 1; argi < argc; ++argi) {
@@ -445,7 +428,7 @@ int main(int argc, const(char)** argv) {
 				foreach (option_t opt; options) {
 					if (strcmp(argLong, opt.val)) continue;
 					if (opt.arg == false) {
-						lasterr = opt.f(&settings);
+						lasterr = opt.f();
 						continue A;
 					}
 					if (argi + 1 >= argc) {
@@ -453,7 +436,7 @@ int main(int argc, const(char)** argv) {
 						return EXIT_FAILURE;
 					}
 					argval = argv[++argi];
-					lasterr = opt.fa(&settings, argval);
+					lasterr = opt.fa(argval);
 					if (lasterr) {
 						printf("main: '%s' failed with --%s\n", argval, opt.val);
 						return lasterr;
@@ -469,7 +452,7 @@ int main(int argc, const(char)** argv) {
 				foreach (option_t opt; options) {
 					if (argShort != opt.alt) continue;
 					if (opt.arg == false) {
-						lasterr = opt.f(&settings);
+						lasterr = opt.f();
 						continue A;
 					}
 					if (argi + 1 >= argc) {
@@ -477,7 +460,7 @@ int main(int argc, const(char)** argv) {
 						return EXIT_FAILURE;
 					}
 					argval = argv[++argi];
-					lasterr = opt.fa(&settings, argval);
+					lasterr = opt.fa(argval);
 					if (lasterr) {
 						printf("main: '%s' failed with -%c\n", argval, opt.alt);
 						return lasterr;
@@ -494,8 +477,8 @@ int main(int argc, const(char)** argv) {
 			}
 		} // not an option
 		
-		if (settings.file == null) {
-			settings.file = argLong;
+		if (common_settings.file == null) {
+			common_settings.file = argLong;
 			continue;
 		}
 		
@@ -503,40 +486,39 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
-	// app: dumper
-	if (settings.dump)
-		return dump(settings.file, &settings.disasm, settings.flags);
-	
-	// app: debugger
-	if (settings.pid)
-		lasterr = adbg_attach(settings.pid, 0);
-	else if (settings.file)
-		lasterr = adbg_load(settings.file, null, settings.argv, null, 0);
-	
-	if (lasterr) {
-		adbg_sys_perror!"dbg"(lasterr);
-		return lasterr;
-	}
-	
-	common_disasm_params = settings.disasm; // copy fields into global
-	
-	switch (settings.ui) {
-	case SettingUI.loop:
-		if (adbg_state == AdbgState.waiting)
-			lasterr = loop();
-		else
-			puts("main: loop ui requires file");
-		break;
-	case SettingUI.cmd:
-		lasterr = cmd();
-		break;
-	case SettingUI.tui:
-		lasterr = tui();
-		break;
-	case SettingUI.server:
-		puts("main: server ui not yet supported");
+	with (common_settings)
+	switch (mode) {
+	case SettingMode.dump:
+		return dump(file, &disasm, flags);
+	case SettingMode.trace:
+		puts("trace not supported");
 		return EXIT_FAILURE;
-	default: assert(0);
+	case SettingMode.debugger:
+		if (file) {
+			lasterr = adbg_load(file);
+			
+			if (lasterr) {
+				adbg_sys_perror!"main"(lasterr);
+				return EXIT_FAILURE;
+			}
+		}
+	
+		switch (ui) {
+		case SettingUI.loop:
+			lasterr = loop();
+			break;
+		case SettingUI.cmd:
+			lasterr = cmd();
+			break;
+		case SettingUI.tui:
+			lasterr = tui();
+			break;
+		case SettingUI.server:
+			puts("main: server ui not yet supported");
+			return EXIT_FAILURE;
+		default: assert(0);
+		}
+		return lasterr;
+	default: assert(0, "mode not supported");
 	}
-	return lasterr;
 }
