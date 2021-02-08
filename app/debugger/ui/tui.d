@@ -30,8 +30,7 @@ int tui() {
 		return e;
 	}
 	common_disasm_params.options |= AdbgDisasmOption.spaceSep;
-	adbg_event_exception(&tui_handler);
-	return adbg_run;
+	return adbg_run(&tui_handler);
 }
 
 private:

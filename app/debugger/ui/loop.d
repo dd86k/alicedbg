@@ -5,11 +5,10 @@
  */
 module app.debugger.ui.loop;
 
-import adbg.etc.c;
+import core.stdc.string : memcpy;
+import adbg.etc.c.stdio;
 import adbg.debugger, adbg.sys.err : SYS_ERR_FMT;
 import adbg.disasm;
-import core.stdc.stdio : printf, puts;
-import core.stdc.string : memcpy;
 import app.term;
 import app.debugger.common;
 
@@ -20,13 +19,12 @@ int loop() {
 	if (term_init)
 		return 1;
 	common_disasm_params.options = AdbgDisasmOption.spaceSep;
-	adbg_event_exception(&adbg_ui_loop_handler);
-	return adbg_run;
+	return adbg_run(&loop_handler);
 }
 
 private:
 
-int adbg_ui_loop_handler(exception_t *e) {
+int loop_handler(exception_t *e) {
 	__gshared uint en;
 	printf(
 	"\n-------------------------------------\n"~

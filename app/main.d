@@ -15,7 +15,6 @@ import adbg.platform;
 import adbg.debugger : adbg_attach, adbg_load, adbg_state, AdbgState;
 import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax;
 import adbg.sys.err : adbg_sys_perror;
-import d = std.compiler;
 import app.debugger, app.dumper;
 
 private:
@@ -344,6 +343,7 @@ immutable(char) *fmt_version =
 "CppRT: "~TARGET_CPPRT~"\n";
 //TODO: Features:
 int cliversion(settings_t*) {
+	import d = std.compiler;
 	printf(fmt_version, d.version_major, d.version_minor);
 	exit(0);
 	return 0;

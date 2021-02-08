@@ -20,6 +20,9 @@ module adbg.sys.setjmp;
 private import core.stdc.config : c_long;
 
 extern (C):
+@system:
+@nogc:
+nothrow:
 
 version (Windows) {
 	version (X86) {
@@ -162,5 +165,7 @@ version (CRuntime_Musl) { // 1.20
 } else
 static assert(0, "Missing setjmp definitions");
 
+/// 
 int setjmp(ref jmp_buf);
+/// 
 void longjmp(ref jmp_buf, int);

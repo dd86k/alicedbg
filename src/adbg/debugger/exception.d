@@ -8,6 +8,10 @@
  * (0xC00000005) AND SIGSEGV. That'd be hell!). So a "translater" (see function
  * `codetype`) converts those codes to the enumeration.
  *
+ * Windows: um/minwinbase.h
+ *
+ * Linux: include/uapi/asm-generic/siginfo.h
+ *
  * License: BSD-3-Clause
  */
 module adbg.debugger.exception;
@@ -33,6 +37,7 @@ version (Windows) {
 version (Posix) {
 	import adbg.sys.linux.user;
 	import core.sys.posix.signal;
+	private enum SEGV_BNDERR = 3;
 }
 
 extern (C):
@@ -124,6 +129,14 @@ ExceptionType adbg_exception_os(uint code, uint subcode = 0) {
 		//NOTE: Prefer STATUS_ over EXCEPION_ names when possible
 		with (ExceptionType)
 		switch (code) {
+		// NOTE: A step may also indicate a trace operation
+		case STATUS_SINGLE_STEP, STATUS_WX86_SINGLE_STEP:
+			return Step;
+		// Instruction
+		case STATUS_BREAKPOINT, STATUS_WX86_BREAKPOINT:
+			return Breakpoint;
+		case STATUS_ILLEGAL_INSTRUCTION:	return Illegal;
+		// Memory
 		case STATUS_ACCESS_VIOLATION:
 			/*switch (subcode) {
 			case 0: // Read access error
@@ -136,13 +149,7 @@ ExceptionType adbg_exception_os(uint code, uint subcode = 0) {
 			}*/
 			return Fault;
 		case STATUS_ARRAY_BOUNDS_EXCEEDED:	return BoundExceeded;
-		case STATUS_BREAKPOINT, STATUS_WX86_BREAKPOINT:
-			return Breakpoint;
-		// NOTE: A step may also indicate a trace operation
-		case STATUS_SINGLE_STEP, STATUS_WX86_SINGLE_STEP:
-			return Step;
 		case STATUS_DATATYPE_MISALIGNMENT:	return Misalignment;
-		case STATUS_ILLEGAL_INSTRUCTION:	return Illegal;
 		case STATUS_IN_PAGE_ERROR:
 			/*switch (subcode) {
 			case 0: // Read access error
@@ -154,10 +161,12 @@ ExceptionType adbg_exception_os(uint code, uint subcode = 0) {
 			default: return PageError;
 			}*/
 			return PageError;
+		// Arithmetic
 		case EXCEPTION_INT_DIVIDE_BY_ZERO:	return DivZero;
 		case EXCEPTION_INT_OVERFLOW:	return IntOverflow;
 		case STATUS_INVALID_DISPOSITION:	return Disposition;
 		case EXCEPTION_PRIV_INSTRUCTION:	return PrivilegedOpcode;
+		// Stack
 		case STATUS_STACK_OVERFLOW, STATUS_STACK_BUFFER_OVERRUN:
 			return StackOverflow;
 		// FPU
@@ -168,6 +177,7 @@ ExceptionType adbg_exception_os(uint code, uint subcode = 0) {
 		case EXCEPTION_FLT_OVERFLOW:	return FPUOverflow;
 		case EXCEPTION_FLT_STACK_CHECK:	return FPUStackOverflow;
 		case EXCEPTION_FLT_UNDERFLOW:	return FPUUnderflow;
+		// Misc
 		case STATUS_NONCONTINUABLE_EXCEPTION:	return NoContinue;
 		default:	return Unknown;
 		}
@@ -203,7 +213,7 @@ ExceptionType adbg_exception_os(uint code, uint subcode = 0) {
 			switch (subcode) {
 			case SEGV_MAPERR: return Fault;
 			case SEGV_ACCERR: return Fault;
-			//case SEGV_BNDERR: return BoundExceeded;
+			case SEGV_BNDERR: return BoundExceeded;
 			//case SEGV_PKUERR: return 
 			default: return Fault;
 			}

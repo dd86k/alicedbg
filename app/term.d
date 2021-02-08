@@ -5,9 +5,9 @@
  */
 module app.term;
 
-private import core.stdc.stdio;
-private import core.stdc.stdlib;
-public import adbg.etc.c : putchar;
+import core.stdc.stdlib;
+import adbg.etc.c.stdio;
+import adbg.etc.c.stdarg;
 private alias sys = core.stdc.stdlib.system;
 
 //TODO: Consider using PDCurses instead
@@ -335,7 +335,6 @@ void term_tui_write(const(char) *s) {
  *
  */
 void term_tui_writef(const(char) *f, ...) {
-	import core.stdc.stdarg : va_list, va_start;
 	char [1024]buf = void;
 	va_list va = void;
 	va_start(va, f);

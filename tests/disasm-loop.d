@@ -58,6 +58,5 @@ L_BUF:
 	p.a = &b;
 	adbg_disasm_line(&p, AdbgDisasmMode.File);
 	printf(" %s\n",  &p.mnbuf);
-//	putchar('\n');
 	goto L_BUF;
 }

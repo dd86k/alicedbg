@@ -5,8 +5,7 @@
  */
 module app.dumper.dump.pe;
 
-import adbg.etc.c : putchar;
-import core.stdc.stdio;
+import adbg.etc.c.stdio;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
 import core.stdc.string : strcpy;

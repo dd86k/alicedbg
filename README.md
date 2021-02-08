@@ -15,4 +15,4 @@ Most of the help topics can be found in the repository wiki.
 | [Github](https://github.com/dd86k/alicedbg) | [URL](https://github.com/dd86k/alicedbg/wiki)
 | [Gitlab](https://gitlab.com/dd86k/alicedbg) | [URL](https://gitlab.com/dd86k/alicedbg/-/wikis/home)
 
-Technical manual: TBD
+Technical manual: TBA

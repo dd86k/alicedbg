@@ -16,6 +16,15 @@ public:
 extern (C):
 __gshared:
 
+/// 
+const(char) *common_file;
+/// 
+const(char) *common_directory;
+/// 
+const(char) **common_env;
+/// 
+const(char) **common_args;
+
 /// Last exception
 exception_t common_exception;
 

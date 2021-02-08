@@ -13,7 +13,7 @@ module adbg.debugger.debugger;
 
 import core.stdc.string : memset;
 import core.stdc.errno : errno;
-import adbg.debugger.exception;
+public import adbg.debugger.exception;
 import adbg.platform;
 
 version (Windows) {
@@ -45,6 +45,7 @@ version (linux)
 	version = USE_CLONE;
 
 extern (C):
+__gshared:
 
 version (X86)
 	private enum opcode_t BREAKPOINT = 0xCC; // INT3
@@ -69,10 +70,14 @@ else version (ARM) {
 } else
 	static assert(0, "Missing BREAKPOINT value for target platform");
 
+/// Debugger event receiver function definition
+//public alias debugger_handler_t = int function(adbg_debugger_event_t*);
+
 /// Actions that a user function handler may return
 public
 enum AdbgAction {
-	exit,	/// Cause the debugger to close the process and stop debugging
+	exit,	/// Close the process and stop debugging
+//	detach,	/// Detach the debugger
 	proceed,	/// Continue debugging
 	step,	/// Proceed with a single step
 }
@@ -85,6 +90,25 @@ enum AdbgState {
 	running,	/// Executing debuggee
 	paused,	/// Exception occured
 }
+
+/// Debugger event
+/+public
+enum AdbgEvent {
+	exception,
+	processCreated,
+	processExit,
+	threadCreated,
+	threadExit,
+}
+
+/// Debugger event structure
+public
+struct adbg_debugger_event_t {
+	AdbgEvent event;
+	public union {
+		exception_t exception;
+	}
+}+/
 
 private
 struct breakpoint_t {
@@ -99,11 +123,11 @@ struct __adbg_child_t {
 }
 
 /// breakpoint opcode for platform
-private __gshared immutable(opcode_t) g_bp_opcode = BREAKPOINT;
-private __gshared breakpoint_t [ADBG_MAX_BREAKPOINTS]g_bp_list;
-private __gshared size_t g_bp_index;
-private __gshared int function(exception_t*) g_user_function;
-private __gshared AdbgState g_state;
+private immutable(opcode_t) g_bp_opcode = BREAKPOINT;
+private breakpoint_t [ADBG_MAX_BREAKPOINTS]g_bp_list;
+private size_t g_bp_index;
+//private debugger_handler_t g_user_handler;
+private AdbgState g_state;
 
 /**
  * Load executable image into the debugger.
@@ -184,7 +208,7 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 		if (stat(path, &st) == -1)
 			return errno;
 		// Proceed normally, execve performs executable checks
-		version (USE_CLONE) {
+		version (USE_CLONE) { // clone(2)
 			void *chld_stack = mmap(null, ADBG_CHILD_STACK_SIZE,
 				PROT_READ | PROT_WRITE,
 				MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
@@ -222,7 +246,7 @@ int adbg_load(const(char) *path, const(char) *dir = null,
 				&chld); // tid
 			if (g_pid < 0)
 				return errno;
-		} else { // fork(2) instead of clone(2)
+		} else { // fork(2)
 			g_pid = fork();
 			if (g_pid < 0)
 				return errno;
@@ -305,14 +329,7 @@ AdbgState adbg_state() {
 	return g_state;
 }
 
-/**
- * Set the user event handle for handling exceptions.
- * Params: f = Function pointer
- * Returns: Zero on success; Otherwise an error occured
- */
-void adbg_event_exception(int function(exception_t*) f) {
-	g_user_function = f;
-}
+//void adbg_set_handler(debugger_handler_t func) 
 
 /**
  * Enter the debugging loop. Continues execution of the process until a new
@@ -320,10 +337,11 @@ void adbg_event_exception(int function(exception_t*) f) {
  * populated with debugging information.
  * (Windows) Uses WaitForDebugEvent, filters any but EXCEPTION_DEBUG_EVENT
  * (Posix) Uses ptrace(2) and waitpid(2), filters SIGCONT out
+ * Params: User function callback
  * Returns: Zero on success; Otherwise an error occured
  */
-int adbg_run() {
-	if (g_user_function == null)
+int adbg_run(int function(exception_t*) userfunc) {
+	if (userfunc == null)
 		return 1;
 
 	exception_t e = void;
@@ -340,6 +358,15 @@ L_DEBUG_LOOP:
 		// Filter events
 		switch (de.dwDebugEventCode) {
 		case EXCEPTION_DEBUG_EVENT: break;
+		/*case CREATE_THREAD_DEBUG_EVENT:
+		case CREATE_PROCESS_DEBUG_EVENT:
+		case EXIT_THREAD_DEBUG_EVENT:
+		//case EXIT_PROCESS_DEBUG_EVENT:
+		case LOAD_DLL_DEBUG_EVENT:
+		case UNLOAD_DLL_DEBUG_EVENT:
+		case OUTPUT_DEBUG_STRING_EVENT:
+		case RIP_EVENT:
+			goto default;*/
 		case EXIT_PROCESS_DEBUG_EVENT: return 0;
 		default:
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
@@ -369,7 +396,7 @@ L_DEBUG_LOOP:
 
 		g_state = AdbgState.paused;
 		with (AdbgAction)
-		final switch (g_user_function(&e)) {
+		final switch (userfunc(&e)) {
 		case exit:
 			//TODO: DebugActiveProcessStop if -pid was used
 			g_state = AdbgState.idle;

@@ -5,8 +5,7 @@
  */
 module app.debugger.ui.cmd;
 
-import adbg.etc.c : putchar;
-import core.stdc.stdio;
+import adbg.etc.c.stdio;
 import core.stdc.stdlib;
 import core.stdc.string;
 import adbg.debugger.debugger;
@@ -25,9 +24,8 @@ private bool paused;	/// if debuggee is paused
 /// Enter the command-line loop
 /// Returns: Error code
 int cmd() {
-	adbg_event_exception(&cmd_handler);
 	term_init;
-	return cmd_loop();
+	return cmd_loop;
 }
 
 //TODO: adbg_ui_cmd_file -- read (commands) from file
@@ -129,8 +127,9 @@ struct command_t {
 }
 
 immutable command_t[] commands = [
-	{ 'f', "file",   "Load file", &cmd_c_file },
-//	{ 'p', "pid",    "Attach to pid", &cmd_c_pid },
+	{ 'l', "load",   "Load executable file into the debugger", &cmd_c_load },
+//	{ 'c', "core",   "Load core debugging object into debugger", &cmd_c_load },
+//	{ 'p', "pid",    "Attach the debugger to pid", &cmd_c_pid },
 	{ 'r', "run",    "Run debugger", &cmd_c_run },
 	{ 's', "status", "Print current state", &cmd_c_status },
 	{ 'h', "help",   "Shows this help screen", &cmd_c_help },
@@ -145,12 +144,12 @@ struct action_t {
 immutable action_t[] actions = [
 	{ 'c', "continue", "Continue debuggee", AdbgAction.proceed },
 	{ 0,   "close",    "Close debuggee process", AdbgAction.exit },
-	{ 's', "step",     "Instruction step", AdbgAction.step },
+	{ 's', "step",     "Step: Instruction", AdbgAction.step },
 ];
 
-int cmd_c_file(int argc, const(char) **argv) {
+int cmd_c_load(int argc, const(char) **argv) {
 	if (argc < 2) {
-		puts("missing file");
+		puts("missing file argument");
 		return 1;
 	}
 	
@@ -165,12 +164,13 @@ int cmd_c_status(int argc, const(char) **argv) {
 	case AdbgState.waiting:	st = "waiting"; break;
 	case AdbgState.running:	st = "running"; break;
 	case AdbgState.paused:	st = "paused"; break;
-	default: 
+	default:	st = "unknown";
 	}
 	printf(
 	"state: (%d) %s\n"~
-	"exception: ("~SYS_ERR_FMT~") %s\n", common_exception.oscode, adbg_exception_string(common_exception.type),
-	s, st
+	"exception: ("~SYS_ERR_FMT~") %s\n",
+	s, st,
+	common_exception.oscode, adbg_exception_string(common_exception.type)
 	);
 	return 0;
 }
@@ -183,7 +183,7 @@ int cmd_c_help(int argc, const(char) **argv) {
 		else
 			printf(" %-15s %s\n", comm.opt, comm.desc);
 	}
-	puts("Debuggee commands:");
+	puts("Commands when debuggee is paused:");
 	foreach (action; actions) {
 		if (action.alt)
 			printf(" %c, %-12s %s\n", action.alt, action.opt, action.desc);
@@ -195,9 +195,7 @@ int cmd_c_help(int argc, const(char) **argv) {
 }
 
 int cmd_c_run(int argc, const(char) **argv) {
-	//TODO: Print process id
-	puts("Running...");
-	return adbg_run;
+	return adbg_run(&cmd_handler);
 }
 
 int cmd_c_quit(int argc, const(char) **argv) {
@@ -220,6 +218,7 @@ int cmd_handler(exception_t *ex) {
 	int length = void;
 	int argc = void;
 	paused = true;
+	
 L_INPUT:
 	cmd_prompt(err);
 	char* line = term_readline(&length);
