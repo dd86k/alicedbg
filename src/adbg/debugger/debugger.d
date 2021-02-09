@@ -497,7 +497,7 @@ L_DEBUG_LOOP:
 
 		// NOTE: final switch works in betterC but funky in 2.082
 		with (AdbgAction)
-		switch (g_user_function(&e)) {
+		switch (userfunc(&e)) {
 		case exit:
 			g_state = AdbgState.idle;
 			kill(g_pid, SIGKILL); // PTRACE_KILL is deprecated
