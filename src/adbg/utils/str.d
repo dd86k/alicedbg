@@ -35,13 +35,15 @@ size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 /// The input string is copied into the internal buffer.
 /// Params:
 /// 	str = Input string
-/// 	argc = Number pointer that will receive the number of arguments parsed
-/// Returns: Internal buffer with seperated items.
-/// Note: The internal buffer is 1024 characters and processes up to 16 items.
+/// 	argc = Pointer that will receive the argument count, can be null
+/// Returns:
+/// 	Internal buffer with seperated items, otherwise null if no items were
+/// 	processed.
+/// Note: The internal buffer is 2048 characters and processes up to 32 items.
 char** adbg_util_expand(const(char) *str, int *argc) {
 	import core.stdc.ctype : isalnum, ispunct;
-	enum BUFFER_LEN   = 1024;
-	enum BUFFER_ITEMS = 16;
+	enum BUFFER_LEN   = 2048;
+	enum BUFFER_ITEMS = 32;
 	__gshared char[BUFFER_LEN] _buffer;	/// internal string buffer
 	__gshared char*[BUFFER_ITEMS] _argv;	/// internal argv buffer
 	
@@ -96,8 +98,49 @@ L_ARG:
 	// reached the end before we knew it
 L_RETURN:
 	_argv[_argc] = null;
-	*argc = _argc;
+	if (argc) *argc = _argc;
 	return _argc ? cast(char**)_argv : null;
+}
+
+/// Process a comma-seperated list of key=value pairs into an internal buffer.
+/// Params:
+/// 	str = String buffer
+/// Returns:
+/// 	Internal buffer with seperated items, otherwise null if no items were
+/// 	processed.
+/// Note: The internal buffer is 2048 characters and processes up to 32 items.
+char** adbg_util_env(const(char) *str) {
+	enum BUFFER_LEN   = 2048;
+	enum BUFFER_ITEMS = 32;
+	__gshared char[BUFFER_LEN] _buffer;	/// internal string buffer
+	__gshared char*[BUFFER_ITEMS] _envp;	/// internal envp buffer
+	
+	char *last = cast(char*)_buffer; /// last item position
+	
+	strncpy(last, str, BUFFER_LEN);
+	
+	_envp[0] = last;
+	
+	size_t bindex, eindex; // buffer and env indexes
+	
+	while (bindex < BUFFER_LEN) {
+		char c = _buffer[bindex];
+		
+		switch (c) {
+		case 0: goto L_RETURN;
+		case ',':
+			_buffer[bindex++] = 0;
+			last = cast(char*)_buffer + bindex;
+			_envp[++eindex] = last;
+			continue;
+		default:
+		}
+		
+		++bindex;
+	}
+	
+L_RETURN:
+	return eindex ? cast(char**)_envp : null;
 }
 
 /// Move (copy) the pointers of two arrays.

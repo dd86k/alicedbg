@@ -13,6 +13,20 @@ public:
 extern (C):
 __gshared:
 
+//
+// Common global variables
+//
+
+/// Common settings shared between sub-modules
+settings_t common_settings;
+
+/// Last exception
+exception_t common_exception;
+
+//
+// Settings
+//
+
 /// 
 enum SettingMode { debugger, dump, trace }
 
@@ -28,14 +42,8 @@ struct settings_t {
 	adbg_disasm_t disasm;	/// Disassembler settings
 	const(char) *file;	/// Debuggee: file
 	const(char) **args;	/// Debuggee: argument vector
-	const(char) **env;	/// Debuggee: environement
+	const(char) **env;	/// Debuggee: environement vector
 	const(char) *dir;	/// Debuggee: directory
 	uint pid;	/// Debuggee: PID
 	uint flags;	/// 
 }
-
-/// Common settings shared between sub-modules
-settings_t common_settings;
-
-/// Last exception
-exception_t common_exception;

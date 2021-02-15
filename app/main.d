@@ -1,9 +1,6 @@
 /**
  * Command line interface.
  *
- * This module provides a non-pragmatic approach of configurating the debugger,
- * dumper, or profiler settings via a command-line interface.
- *
  * License: BSD-3-Clause
  */
 module main;
@@ -56,9 +53,9 @@ immutable option_t[] options = [
 	// debugger
 	{ 'f', "file", "Debugger: Load file (default parameter)", true, fa: &cli_file },
 	{ 0,   "args", "Debugger: Supply arguments to file", true, fa: &cli_args },
-	{ 0,   "env",  "Debugger: Supply environment to file", true, fa: &cli_env },
+	{ 'E', "env",  "Debugger: Supply environment to file", true, fa: &cli_env },
 	{ 'p', "pid",  "Debugger: Attach to process", true, fa: &cli_pid },
-	{ 'u', "ui",   "Debugger: Select user interface (default=loop)", true, fa: &cli_ui },
+	{ 'U', "ui",   "Debugger: Select user interface (default=loop)", true, fa: &cli_ui },
 	// dumper
 	{ 'D', "dump", "Dumper: Select the object dump mode", false, &cli_dump },
 	{ 'R', "raw",  "Dumper: File is not an object, but raw", false, &cli_raw },
@@ -184,28 +181,20 @@ int cli_args(const(char) *val) { // --args
 }
 
 //
-// ANCHOR --env
+// ANCHOR -E, --env
 //
 
 int cli_env(const(char) *val) {
-	enum MAX = 16;
-	__gshared char [MAX]* envp;
-	puts("clienv: todo");
-	return EXIT_FAILURE;
-	//TODO: clienv
-	//      "key=value,A=B"
-	/*opt.envp = cast(const(char)**)malloc(ADBG_CLI_ARGV_ARRAY_LENGTH);
-	if (opt.envp == null) {
-		puts("cli: could not allocate (envp)");
+	import adbg.utils.str : adbg_util_env;
+	
+	common_settings.env = cast(const(char)**)adbg_util_env(val);
+	
+	if (common_settings.env == null) {
+		printf("main: Parsing environment failed");
 		return EXIT_FAILURE;
 	}
-	opt.envp[0] = strtok(cast(char*)argv[argi], ",");
-	size_t ti;
-	while (++ti < ADBG_CLI_ARGV_ARRAY_LENGTH - 1) {
-		char* t = strtok(null, ",");
-		opt.envp[ti] = t;
-		if (t == null) break;
-	}*/
+	
+	return EXIT_SUCCESS;
 }
 
 //
