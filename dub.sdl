@@ -31,16 +31,26 @@ buildType "debugv" {
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
 # Ditto but aimed for older dmd versions, ldc 0.17.1, and gdc 5.4
-# NOTE: gdc 5.4 is missing a __va_list_arg def in the std import
-buildType "debugv-stage0" {
+# NOTE: Doesn't work with GDC 5.4
+#       Linker (ld) whines about missing _tlsstart/_tlsend (TLS) references
+buildType "debugv0" {
 	versions "PrintTargetInfo"
 	buildOptions "debugMode" "debugInfo"
 	dflags "-vgc" "-vtls" platform="dmd"
 	dflags "--vgc" platform="ldc"
-	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+	# GDC 5.4 notes
+	# value for C++/ObjC but not D:
+	# 	-fno-rtti
+	# 	-fno-weak
+	# 	-fno-threadsafe-statics
+	# 	-fextern-tls-init
+	# -fno-switch-errors: not a command-line option
+	# -nophoboslib: makes the linker complain more
+	# "-fno-moduleinfo" "-fno-emit-moduleinfo"
+	dflags "-ftransition=nogc" "-ftransition=tls" "-fno-exceptions" "-fno-bounds-check" "-fno-assert" "-fno-builtin" platform="gdc"
 }
 
-# Make the compiler very verbose for compile-time diagnostic purposess.
+# Instead of DUB, make the compiler verbose instead.
 buildType "debugvv" {
 	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" "-v" platform="dmd"
