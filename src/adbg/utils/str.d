@@ -12,6 +12,8 @@ import core.stdc.string;
 extern (C):
 __gshared:
 
+//TODO: Rewrite as adbg_util_flatten without snprintf
+//      Internal loop
 size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 	import core.stdc.stdio : snprintf;
 	if (argv == null)
@@ -29,9 +31,15 @@ size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 	return bi;
 }
 
+/// Expand a command-line string into an array of items.
+/// The input string is copied into the internal buffer.
+/// Params:
+/// 	str = Input string
+/// 	argc = Number pointer that will receive the number of arguments parsed
+/// Returns: Internal buffer with seperated items.
+/// Note: The internal buffer is 1024 characters and processes up to 16 items.
 char** adbg_util_expand(const(char) *str, int *argc) {
 	import core.stdc.ctype : isalnum, ispunct;
-	//TODO: Internal buffer
 	enum BUFFER_LEN   = 1024;
 	enum BUFFER_ITEMS = 16;
 	__gshared char[BUFFER_LEN] _buffer;	/// internal string buffer
@@ -45,7 +53,7 @@ char** adbg_util_expand(const(char) *str, int *argc) {
 	size_t index;	/// string character index
 	int _argc;	/// argument counter
 	
-L_WORD:
+L_ARG:
 	// maximum number of items reached
 	if (_argc >= BUFFER_ITEMS)
 		goto L_RETURN;
@@ -80,17 +88,35 @@ L_WORD:
 			goto L_RETURN;
 		case ' ', '\t':
 			_buffer[index++] = 0;
-			goto L_WORD;
-		default:
+			goto L_ARG;
+		default: ++index; continue;
 		}
-		
-		++index;
 	}
 	
 	// reached the end before we knew it
 L_RETURN:
+	_argv[_argc] = null;
 	*argc = _argc;
-	return cast(char**)_argv;
+	return _argc ? cast(char**)_argv : null;
+}
+
+/// Move (copy) the pointers of two arrays.
+/// Params:
+/// 	dst = Destination pointer
+/// 	dstsz = Destination buffer size, typically how many items it can hold
+/// 	src = Source pointer
+/// 	srcsz = Source buffer size, typically how many items to transfer
+/// Returns:
+/// 	Number of items copied
+int adbg_util_move(void **dst, int dstsz, void **src, int srcsz) {
+	int r;
+	
+	while (r < dstsz && r < srcsz) {
+		dst[r] = src[r];
+		++r;
+	}
+	
+	return r;
 }
 
 //

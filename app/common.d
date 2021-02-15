@@ -27,9 +27,9 @@ struct settings_t {
 	SettingUI ui;	/// Debugger user interface
 	adbg_disasm_t disasm;	/// Disassembler settings
 	const(char) *file;	/// Debuggee: file
-	const(char) *dir;	/// Debuggee: directory
-	const(char) **argv;	/// Debuggee: argument vector
+	const(char) **args;	/// Debuggee: argument vector
 	const(char) **env;	/// Debuggee: environement
+	const(char) *dir;	/// Debuggee: directory
 	uint pid;	/// Debuggee: PID
 	uint flags;	/// 
 }
