@@ -1,5 +1,7 @@
 module tests.sys.setjmp;
 
+import adbg.etc.c.setjmp;
+
 /// 
 unittest {
 	jmp_buf j = void;

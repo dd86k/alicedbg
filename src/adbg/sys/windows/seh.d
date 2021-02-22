@@ -9,7 +9,7 @@ version (Windows):
 
 import adbg.debugger.exception;
 import adbg.sys.windows.def;
-import adbg.sys.setjmp;
+import adbg.etc.c.setjmp;
 
 //TODO: adbg_seh_set (Windows)
 

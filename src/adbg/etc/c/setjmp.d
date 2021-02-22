@@ -2,9 +2,15 @@
  * setjmp.h wrapper binding to the C runtime.
  *
  * While there are bindings for posix (core.sys.posix.setjmp), there are none
- * for Windows.
+ * for Windows. This module is still on-going work.
  *
- * NOTE: Works on win32-x86_mscoff. Crashes on win32-x86_omf and win64-x86_64
+ * Fine on:
+ * - dmd-x86_omf
+ * - dmd-x86_mscoff
+ * - ldc-x86
+ * Crashes on:
+ * - dmd-x86_64
+ * - ldc-x86_64
  * 
  * Windows reference:
  * - "{VisualStudio}\VC\Tools\MSVC\14.15.26726\include\setjmp.h"
@@ -15,7 +21,7 @@
  *
  * License: BSD-3-Clause
  */
-module adbg.sys.setjmp;
+module adbg.etc.c.setjmp;
 
 private import core.stdc.config : c_long;
 
@@ -26,15 +32,13 @@ nothrow:
 
 version (Windows) {
 	version (X86) {
-		//TODO: Get DigitalMars definitions (CRuntime_DigitalMars + x86_omf)
-		//      Access violation in _local_unwind
 		enum _JBLEN = 16;
 		alias int _JBTYPE;
 
 		struct _JUMP_BUFFER {
-			c_long Ebp, Ebx, Edi, Esi, Esp, Eip, Registration,
+			int Ebp, Ebx, Edi, Esi, Esp, Eip, Registration,
 				TryLevel, Cookie, UnwindFunc;
-			c_long [6]UnwindData;
+			int[6] UnwindData;
 		}
 	} else
 	version (X86_64) {
@@ -45,15 +49,18 @@ version (Windows) {
 		alias _SETJMP_FLOAT128 _JBTYPE;
 
 		struct _SETJMP_FLOAT128 {
-			ulong [2]Part;
+			long[2] Part;
 		}
 
 		struct _JUMP_BUFFER {
-			ulong Frame, Rbx, Rsp, Rbp, Rsi, Rdi,
+			align (1):
+			long Frame, Rbx, Rsp, Rbp, Rsi, Rdi,
 				R12, R13, R14, R15, Rip;
-			c_long MxCsr;
-			ushort FpCsr;
-			ushort Spare;
+			int MxCsr;
+			short FpCsr;
+			short Spare;
+			
+			align (16):
 			_SETJMP_FLOAT128 Xmm6, Xmm7, Xmm8, Xmm9, Xmm10,
 				Xmm11, Xmm12, Xmm13, Xmm14, Xmm15;
 		}
@@ -63,9 +70,9 @@ version (Windows) {
 		alias int _JTYPE;
 
 		struct _JUMP_BUFFER {
-			uint Frame, R4, R5, R6, R7, R8, R9, R10, R11,
+			int Frame, R4, R5, R6, R7, R8, R9, R10, R11,
 				Sp, Pc, Fpscr;
-			ulong [8]D; // D8-D15 VFP/NEON regs
+			long[8] D; // D8-D15 VFP/NEON regs
 		}
 	} else
 	version (Aarch64) {
@@ -73,15 +80,15 @@ version (Windows) {
 		alias int _JTYPE;
 
 		struct _JUMP_BUFFER {
-			ulong Frame, Reserved,
+			long Frame, Reserved,
 				X19, X20, X21, X22, X23, // x19 -- x28
 				X24, X25, X26, X27, X28, // callee saved registers
 				Fp,	// x29 frame pointer
 				Lr,	// x30 link register
 				Sp;	// x31 stack pointer
-			uint Fpcr;	// fp control register
-			uint Fpsr;	// fp status register
-			double [8]D;	// D8-D15 FP regs
+			int Fpcr;	// fp control register
+			int Fpsr;	// fp status register
+			double[8] D;	// D8-D15 FP regs
 		}
 	} else
 	static assert(0, "Missing setjmp definitions (Windows)");
@@ -92,34 +99,35 @@ version (Windows) {
 } else
 version (CRuntime_Glibc) { // 2.25
 	version (X86) {
-		struct __jmp_buf { // typedef int __jmp_buf[6];
-			uint ebx, esi, edi, ebp, esp, eip;
+		struct __jmp_buf {
+			int ebx, esi, edi, ebp, esp, eip;
 		}
+		// typedef int __jmp_buf[6];
 	} else
 	version (X86_64) {
-		struct __jmp_buf { // typedef unsigned long long __jmp_buf[8]
-			ulong rbx, rbp, r12, r13, r14, r15, rsp, rip;
+		struct __jmp_buf {
+			long rbx, rbp, r12, r13, r14, r15, rsp, rip;
 		}
+		// typedef unsigned long long __jmp_buf[8]
 	} else
 	version (ARM) {
 		// NOTE: Glibc sysdeps/arm/jmpbuf-unwind.h DOESN'T define a structure
 		//       So this is made purely out of the description given
 		struct __i128 {
 			union {
-				ubyte [16]b; ushort [8]h;
-				uint [4]d; ulong [2]q;
+				ubyte[16] b; short[8] h;
+				int[4] d; long[2] q;
 			}
 		}
 		// "The first 26 words are occupied by sp, lr, v1-v6, sl, fp,
 		// and d8-d15."
 		struct __jmp_buf {
-			uint sp, lr;
+			int sp, lr;
 			__i128 v1, v2, v3, v4, v5, v6;
-			uint sl, fp;
+			int sl, fp;
 			double d8, d9, d10, d11, d12, d13, d14, d15;
 		}
 		// typedef int __jmp_buf[64] __attribute__((__aligned__ (8)));
-//		alias __jmp_buf jmp_buf;
 	} else
 	version (Aarch64) {
 		struct __jmp_buf {
@@ -129,7 +137,6 @@ version (CRuntime_Glibc) { // 2.25
 		}
 
 		// __extension__ typedef unsigned long long __jmp_buf [22];
-//		alias ulong[22] jmp_buf;
 	} else
 	static assert(0, "Missing setjmp definitions (Glibc)");
 	
@@ -143,16 +150,20 @@ version (CRuntime_Glibc) { // 2.25
 } else
 version (CRuntime_Musl) { // 1.20
 	version (X86) {
+		// typedef unsigned long __jmp_buf[6];
 		alias c_long[6] __jmp_buf;
 	} else
 	version (X86_64) {
+		// typedef unsigned long __jmp_buf[8];
 		alias c_long[8] __jmp_buf;
 	} else
 	version (ARM) {
+		// typedef unsigned long long __jmp_buf[32];
 		alias ulong[32] __jmp_buf;
 	} else
 	version (AArch64) {
-		alias c_long[22] __jmp_buf;
+		// typedef unsigned long __jmp_buf[22];
+		alias c_ulong[22] __jmp_buf;
 	} else
 	static assert(0, "Missing setjmp definitions (Musl)");
 
