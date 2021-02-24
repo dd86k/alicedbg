@@ -8,7 +8,7 @@ module adbg.sys.posix.seh;
 version (Posix):
 
 import adbg.debugger.exception;
-import adbg.sys.setjmp;
+import adbg.etc.c.setjmp;
 import core.sys.posix.signal;
 import core.sys.posix.ucontext;
 
@@ -16,6 +16,9 @@ import core.sys.posix.ucontext;
 
 extern (C):
 __gshared:
+
+private
+enum NULL_SIGACTION = cast(sigaction_t*)0;
 
 struct checkpoint_t {
 	jmp_buf buffer;
@@ -30,11 +33,12 @@ public int adbg_seh_set(checkpoint_t *c) {
 		sigemptyset(&sa.sa_mask);
 		sa.sa_flags = SA_SIGINFO;
 		sa.sa_sigaction = &adbg_seh_action;
-		if (sigaction(SIGSEGV, &sa, cast(sigaction_t*)0) == -1 ||
-			sigaction(SIGTRAP, &sa, cast(sigaction_t*)0) == -1 ||
-			sigaction(SIGFPE, &sa, cast(sigaction_t*)0) == -1 ||
-			sigaction(SIGILL, &sa, cast(sigaction_t*)0) == -1 ||
-			sigaction(SIGBUS, &sa, cast(sigaction_t*)0) == -1) {
+		//TODO: Table + loop
+		if (sigaction(SIGSEGV, &sa, NULL_SIGACTION) == -1 ||
+			sigaction(SIGTRAP, &sa, NULL_SIGACTION) == -1 ||
+			sigaction(SIGFPE, &sa, NULL_SIGACTION) == -1 ||
+			sigaction(SIGILL, &sa, NULL_SIGACTION) == -1 ||
+			sigaction(SIGBUS, &sa, NULL_SIGACTION) == -1) {
 			return 1;
 		}
 		sehinit = true;
