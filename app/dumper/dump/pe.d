@@ -6,6 +6,7 @@
 module app.dumper.dump.pe;
 
 import adbg.etc.c.stdio;
+import adbg.utils.date : ctime32;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
 import core.stdc.string : strcpy;
@@ -39,7 +40,7 @@ int dump_pe(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
 	// Should we try FILETIME (8 bytes..) or SYSTEMTIME (16 bytes..)
 	// windbg.exe x86: 1995-01-25
 	// windbg.exe x64: 2068-03-02
-/*	char[32] tbuffer = void;
+	/*char[32] tbuffer = void;
 	if (strftime(cast(char*)&tbuffer, 32, "%c",
 		localtime(cast(time_t*)&fi.pe.hdr.TimeDateStamp)) == 0) {
 		strcpy(cast(char*)tbuffer, "strftime:err");
@@ -58,14 +59,14 @@ int dump_pe(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
 	"# Header\n\n"~
 	"Machine               %04X\t(%s)\n"~
 	"NumberOfSections      %04X\t(%u)\n"~
-	"TimeDateStamp         %04X\n"~
+	"TimeDateStamp         %04X\t(%s)\n"~
 	"PointerToSymbolTable  %08X\n"~
 	"NumberOfSymbols       %08X\t(%u)\n"~
 	"SizeOfOptionalHeader  %04X\t(%u)\n"~
 	"Characteristics       %04X\t(",
 	Machine, str_mach,
 	NumberOfSections, NumberOfSections,
-	TimeDateStamp,// &tbuffer,
+	TimeDateStamp, ctime32(TimeDateStamp),
 	PointerToSymbolTable,
 	NumberOfSymbols, NumberOfSymbols,
 	SizeOfOptionalHeader, SizeOfOptionalHeader,
@@ -115,7 +116,7 @@ int dump_pe(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
 	//
 
 	if (fi.pe.hdr.SizeOfOptionalHeader) { // No gotos here, it could skip declarations
-		const(char)* str_mag = adbg_obj_pe_magic(fi.pe.ohdr.Magic);
+		const(char) *str_mag = adbg_obj_pe_magic(fi.pe.ohdr.Magic);
 		if (str_mag == null) {
 			printf("dumper: (PE32) Unknown Magic: %04X\n", fi.pe.ohdr.Magic);
 			return EXIT_FAILURE;

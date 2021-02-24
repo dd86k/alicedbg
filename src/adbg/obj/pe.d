@@ -255,7 +255,7 @@ struct PE_HEADER { align(1):
 	uint8_t  [4]Signature;
 	uint16_t Machine;
 	uint16_t NumberOfSections;
-	uint32_t TimeDateStamp;
+	uint32_t TimeDateStamp; // C time_t
 	uint32_t PointerToSymbolTable;
 	uint32_t NumberOfSymbols;
 	uint16_t SizeOfOptionalHeader;
