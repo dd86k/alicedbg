@@ -40,7 +40,7 @@ enum {
 	DUMPER_DISASM_CODE	= 0x01_0000,
 	/// ('D') Include section disassembly in output.
 	DUMPER_DISASM_ALL	= 0x02_0000,
-	///TODO: Do not format instructions. Instead, show disassembler statistics.
+	//TODO: Do not format instructions. Instead, show disassembler statistics.
 	/// Statistics include number of instructions, average instruction length,
 	/// minimum instruction length, maximum instruction length, and its total
 	/// size.
@@ -107,7 +107,7 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 	if (dp.platform == AdbgDisasmPlatform.native)
 		dp.platform = info.platform;
 
-	with (ObjType)
+	with (AdbgObjType)
 	switch (info.type) {
 	case PE: return dump_pe(&info, dp, flags);
 	default:
@@ -144,7 +144,7 @@ int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 				if (isize > imax)
 					imax = isize;
 				break;
-			case illegalInstruction: 
+			case illegalInstruction:
 				iavg += isize;
 				++icnt;
 				++ills;
@@ -156,7 +156,7 @@ int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 		}
 		printf(
 		"Instruction statistics\n"~
-		"avg. size: %f\n"~
+		"avg. size: %.3f\n"~
 		"max. size: %u\n"~
 		"illegal  : %u\n"~
 		"total    : %u\n",

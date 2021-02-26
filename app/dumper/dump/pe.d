@@ -35,17 +35,6 @@ int dump_pe(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
 	} else
 		unkmach = false;
 
-	//TODO: (Windows) Fix strftime crash
-	// Getting 0xC0000409 (STATUS_STACK_BUFFER_OVERRUN) for high numbers
-	// Should we try FILETIME (8 bytes..) or SYSTEMTIME (16 bytes..)
-	// windbg.exe x86: 1995-01-25
-	// windbg.exe x64: 2068-03-02
-	/*char[32] tbuffer = void;
-	if (strftime(cast(char*)&tbuffer, 32, "%c",
-		localtime(cast(time_t*)&fi.pe.hdr.TimeDateStamp)) == 0) {
-		strcpy(cast(char*)tbuffer, "strftime:err");
-	}*/
-
 	//
 	// ANCHOR PE Header
 	//
@@ -55,7 +44,7 @@ int dump_pe(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
 
 	with (fi.pe.hdr)
 	printf(
-	"Microsoft Portable Executable format\n\n"~
+	"Format: Microsoft Portable Executable\n\n"~
 	"# Header\n\n"~
 	"Machine               %04X\t(%s)\n"~
 	"NumberOfSections      %04X\t(%u)\n"~
@@ -355,7 +344,7 @@ L_SECTIONS:
 	if ((flags & DUMPER_SHOW_SECTIONS) == 0)
 		goto L_SYMBOLS;
 
-	puts("\n*\n* Sections\n*");
+	puts("\n# Sections\n");
 	for (ushort si; si < fi.pe.hdr.NumberOfSections; ++si) {
 		PE_SECTION_ENTRY section = fi.pe.sections[si];
 
@@ -471,7 +460,7 @@ L_IMPORTS:
 		fi.pe.hdr.SizeOfOptionalHeader == 0)
 		goto L_DEBUG;
 
-	puts("\n*\n* Imports\n*\n");
+	puts("\n# Imports\n");
 
 	if (fi.pe.fo_imports && fi.pe.hdr.SizeOfOptionalHeader) {
 		char* basename = cast(char*)fi.pe.imports - fi.pe.dir.ImportTable.rva;
@@ -774,7 +763,7 @@ L_IMPORTS:
 	if ((flags & DUMPER_SHOW_DEBUG) == 0)
 		goto L_DISASM;
 
-	puts("\n*\n* Debug\n*\n");
+	puts("\n# Debug\n");
 
 	if (fi.pe.fo_debug) {
 		size_t count = fi.pe.dir.DebugDirectory.size / PE_DEBUG_DIRECTORY.sizeof;
@@ -805,7 +794,7 @@ L_IMPORTS:
 			void *rawdata = fi.b + id.PointerToRawData;
 
 			switch (id.Type) {
-			case IMAGE_DEBUG_TYPE_CODEVIEW:
+			case PE_IMAGE_DEBUG_TYPE_CODEVIEW:
 				//TODO: Check MajorVersion/MinorVersion
 				//      For example, a modern D program use 0.0
 				//      Probably meaningless
@@ -848,13 +837,13 @@ L_DEBUG_PDB20:
 				}
 				putchar('\n');
 				break;
-			case IMAGE_DEBUG_TYPE_MISC:
+			case PE_IMAGE_DEBUG_TYPE_MISC:
 				// TODO: See MSDN doc. Used for separate .DBG files
 				break;
-			case IMAGE_DEBUG_TYPE_FPO:
+			case PE_IMAGE_DEBUG_TYPE_FPO:
 				// TODO: See MSDN doc.
 				break;
-			case IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:
+			case PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:
 				// TODO: See MSDN doc.
 				break;
 			default: break;
@@ -871,14 +860,16 @@ L_DISASM:
 		return EXIT_SUCCESS;
 
 	bool all = (flags & DUMPER_DISASM_ALL) != 0;
-	puts("\n*\n* Disassembly\n*");
+	puts("\n# Disassembly\n");
 	for (size_t si; si < fi.pe.hdr.NumberOfSections; ++si) {
 		PE_SECTION_ENTRY s = fi.pe.sections[si];
 
 		if (s.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
 			printf("\n<%.8s>\n", s.Name.ptr);
 			int e = dump_disasm(dp,
-				fi.b + s.PointerToRawData, s.SizeOfRawData, flags);
+				fi.b + s.PointerToRawData,
+				s.SizeOfRawData,
+				flags);
 			if (e) return e;
 		}
 	}

@@ -14,12 +14,10 @@
  */
 module adbg.obj.pe;
 
-import core.stdc.stdio, core.stdc.inttypes;
-import core.stdc.string : memset;
+import core.stdc.inttypes;
 import adbg.error;
-import adbg.obj.loader : obj_info_t, ObjType;
+import adbg.obj.loader : obj_info_t, AdbgObjType;
 import adbg.disasm.disasm : AdbgDisasmPlatform; // ISA translation
-import adbg.obj.loader;
 import adbg.utils.uid : UID;
 
 extern (C):
@@ -252,7 +250,10 @@ struct PE_META { align(1):
 
 /// COFF file header (object and image)
 struct PE_HEADER { align(1):
-	uint8_t  [4]Signature;
+	union {
+		uint8_t[4] Signature;
+		uint32_t   Signature32;
+	}
 	uint16_t Machine;
 	uint16_t NumberOfSections;
 	uint32_t TimeDateStamp; // C time_t
@@ -435,32 +436,32 @@ struct PE_DEBUG_DIRECTORY { align(1):
 // Debug Types
 enum : uint {
 	/// An unknown value that is ignored by all tools
-	IMAGE_DEBUG_TYPE_UNKNOWN	= 0,
+	PE_IMAGE_DEBUG_TYPE_UNKNOWN	= 0,
 	/// The COFF debug information (line numbers, symbol table, and string table).
 	/// This type of debug information is also pointed to by fields in the file headers.
-	IMAGE_DEBUG_TYPE_COFF	= 1,
+	PE_IMAGE_DEBUG_TYPE_COFF	= 1,
 	/// The Visual C++ debug information
-	IMAGE_DEBUG_TYPE_CODEVIEW	= 2,
+	PE_IMAGE_DEBUG_TYPE_CODEVIEW	= 2,
 	/// The frame pointer omission (FPO) information. This information tells the
 	/// debugger how to interpret nonstandard stack frames, which use the EBP
 	/// register for a purpose other than as a frame pointer.
-	IMAGE_DEBUG_TYPE_FPO	= 3,
-	IMAGE_DEBUG_TYPE_MISC	= 4, /// The location of DBG file.
-	IMAGE_DEBUG_TYPE_EXCEPTION	= 5, /// A copy of .pdata section.
-	IMAGE_DEBUG_TYPE_FIXUP	= 6, /// Reserved.
-	IMAGE_DEBUG_TYPE_OMAP_TO_SRC	= 7, /// The mapping from an RVA in image to an RVA in source image.
-	IMAGE_DEBUG_TYPE_OMAP_FROM_SRC	= 8, /// The mapping from an RVA in source image to an RVA in image.
-	IMAGE_DEBUG_TYPE_BORLAND	= 9, /// Reserved for Borland.
-	IMAGE_DEBUG_TYPE_RESERVED10	= 10, /// Reserved.
-	IMAGE_DEBUG_TYPE_CLSID	= 11, /// Reserved.
-	IMAGE_DEBUG_TYPE_VC_FEATURE	= 12, /// Undocumented, from winnt.h
+	PE_IMAGE_DEBUG_TYPE_FPO	= 3,
+	PE_IMAGE_DEBUG_TYPE_MISC	= 4, /// The location of DBG file.
+	PE_IMAGE_DEBUG_TYPE_EXCEPTION	= 5, /// A copy of .pdata section.
+	PE_IMAGE_DEBUG_TYPE_FIXUP	= 6, /// Reserved.
+	PE_IMAGE_DEBUG_TYPE_OMAP_TO_SRC	= 7, /// The mapping from an RVA in image to an RVA in source image.
+	PE_IMAGE_DEBUG_TYPE_OMAP_FROM_SRC	= 8, /// The mapping from an RVA in source image to an RVA in image.
+	PE_IMAGE_DEBUG_TYPE_BORLAND	= 9, /// Reserved for Borland.
+	PE_IMAGE_DEBUG_TYPE_RESERVED10	= 10, /// Reserved.
+	PE_IMAGE_DEBUG_TYPE_CLSID	= 11, /// Reserved.
+	PE_IMAGE_DEBUG_TYPE_VC_FEATURE	= 12, /// Undocumented, from winnt.h
 	// See https://devblogs.microsoft.com/cppblog/pogo/
-	IMAGE_DEBUG_TYPE_POGO	= 13, /// Profile Guided Optimization
+	PE_IMAGE_DEBUG_TYPE_POGO	= 13, /// Profile Guided Optimization
 	// See https://devblogs.microsoft.com/cppblog/speeding-up-the-incremental-developer-build-scenario/
-	IMAGE_DEBUG_TYPE_ILTCG	= 14, /// Incremental Link Time Code Generation
-	IMAGE_DEBUG_TYPE_MPX	= 15, /// Uses Intel MPX
-	IMAGE_DEBUG_TYPE_REPRO	= 16, /// PE determinism or reproducibility.
-	IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS	= 20, /// Extended DLL characteristics bits.
+	PE_IMAGE_DEBUG_TYPE_ILTCG	= 14, /// Incremental Link Time Code Generation
+	PE_IMAGE_DEBUG_TYPE_MPX	= 15, /// Uses Intel MPX
+	PE_IMAGE_DEBUG_TYPE_REPRO	= 16, /// PE determinism or reproducibility.
+	PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS	= 20, /// Extended DLL characteristics bits.
 }
 
 /// CodeView format for PDB 2.0 and above
@@ -618,8 +619,9 @@ struct PE_SECTION_ENTRY { align(1):
 	uint32_t Characteristics;
 }
 
-int adbg_obj_pe_load(obj_info_t *info, int flags) {
-	void* offset = info.b + info.offset;
+int adbg_obj_pe_load(obj_info_t *info, uint peoffset, int flags) {
+	info.type = AdbgObjType.PE;
+	void* offset = info.b + peoffset;
 	info.pe.hdr = cast(PE_HEADER*)offset;
 	info.pe.ohdr = cast(PE_OPTIONAL_HEADER*)(offset + PE_OFFSET_OPTHDR);
 	switch (info.pe.ohdr.Magic) {
@@ -669,18 +671,6 @@ int adbg_obj_pe_load(obj_info_t *info, int flags) {
 
 	return 0;
 }
-
-//TODO: adbg_obj_pe_get_section_by_name
-/*int adbg_obj_pe_get_section_by_name(obj_info_t *info, ubyte *sptr, const(char) *text) {
-}*/
-
-//TODO: adbg_obj_pe_get_section_by_rva
-/*int adbg_obj_pe_get_section_by_rva(obj_info_t *info, ubyte *sptr, uint rva) {
-}*/
-
-//TODO: adbg_obj_pe_get_section_by_index
-/*int adbg_obj_pe_get_section_by_index(obj_info_t *info, ubyte *sptr, uint index) {
-}*/
 
 const(char) *adbg_obj_pe_mach(ushort mach) {
 	switch (mach) {
@@ -747,24 +737,24 @@ const(char) *adbg_obj_pe_subsys(ushort subs) {
 
 const(char) *adbg_obj_debug_type(uint type) {
 	switch (type) {
-	case IMAGE_DEBUG_TYPE_UNKNOWN:	return "Unknown";
-	case IMAGE_DEBUG_TYPE_COFF:	return "COFF";
-	case IMAGE_DEBUG_TYPE_CODEVIEW:	return "CodeView / VC++";
-	case IMAGE_DEBUG_TYPE_FPO:	return "FPO (Frame Pointer Omission) Information";
-	case IMAGE_DEBUG_TYPE_MISC:	return "DBG File Location";
-	case IMAGE_DEBUG_TYPE_EXCEPTION:	return "Exception";
-	case IMAGE_DEBUG_TYPE_FIXUP:	return "FIXUP";
-	case IMAGE_DEBUG_TYPE_OMAP_TO_SRC:	return "Map RVA to source image RVA";
-	case IMAGE_DEBUG_TYPE_OMAP_FROM_SRC:	return "Map source image RVA to RVA";
-	case IMAGE_DEBUG_TYPE_BORLAND:	return "Borland";
-	case IMAGE_DEBUG_TYPE_RESERVED10:	return "RESERVED10";
-	case IMAGE_DEBUG_TYPE_CLSID:	return "CLSID";
-	case IMAGE_DEBUG_TYPE_VC_FEATURE:	return "VC FEATURE";
-	case IMAGE_DEBUG_TYPE_POGO:	return "Profile Guided Optimization (POGO)";
-	case IMAGE_DEBUG_TYPE_ILTCG:	return "Incremental Link Time Code Generation (ILTCG)";
-	case IMAGE_DEBUG_TYPE_MPX:	return "Memory protection (Intel MPX)";
-	case IMAGE_DEBUG_TYPE_REPRO:	return "PE Reproducibility";
-	case IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:	return "DLL characteristics";
+	case PE_IMAGE_DEBUG_TYPE_UNKNOWN:	return "Unknown";
+	case PE_IMAGE_DEBUG_TYPE_COFF:	return "COFF";
+	case PE_IMAGE_DEBUG_TYPE_CODEVIEW:	return "CodeView / VC++";
+	case PE_IMAGE_DEBUG_TYPE_FPO:	return "FPO (Frame Pointer Omission) Information";
+	case PE_IMAGE_DEBUG_TYPE_MISC:	return "DBG File Location";
+	case PE_IMAGE_DEBUG_TYPE_EXCEPTION:	return "Exception";
+	case PE_IMAGE_DEBUG_TYPE_FIXUP:	return "FIXUP";
+	case PE_IMAGE_DEBUG_TYPE_OMAP_TO_SRC:	return "Map RVA to source image RVA";
+	case PE_IMAGE_DEBUG_TYPE_OMAP_FROM_SRC:	return "Map source image RVA to RVA";
+	case PE_IMAGE_DEBUG_TYPE_BORLAND:	return "Borland";
+	case PE_IMAGE_DEBUG_TYPE_RESERVED10:	return "RESERVED10";
+	case PE_IMAGE_DEBUG_TYPE_CLSID:	return "CLSID";
+	case PE_IMAGE_DEBUG_TYPE_VC_FEATURE:	return "VC FEATURE";
+	case PE_IMAGE_DEBUG_TYPE_POGO:	return "Profile Guided Optimization (POGO)";
+	case PE_IMAGE_DEBUG_TYPE_ILTCG:	return "Incremental Link Time Code Generation (ILTCG)";
+	case PE_IMAGE_DEBUG_TYPE_MPX:	return "Memory protection (Intel MPX)";
+	case PE_IMAGE_DEBUG_TYPE_REPRO:	return "PE Reproducibility";
+	case PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:	return "DLL characteristics";
 	default:	return null;
 	}
 }

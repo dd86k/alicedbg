@@ -38,21 +38,8 @@ extern (C):
 	LOADER_INTERNAL_OBJ_LOADED	= 0x8000_0000
 }*/
 
-/// File operation error code
-deprecated
-enum ObjError {
-	/// Operating was a success, so no error occurred
-	None,
-	/// File operation error (e.g. can't seek, can't read)
-	FileOperation,
-	/// Format not supported
-	FormatUnsupported,
-	/// Requested action/feature is not available
-	Unavailable,
-}
-
-/// Loaded, or specified, executable/object format
-enum ObjType {
+/// Executable or object format
+enum AdbgObjType {
 	/// Mysterious file format
 	Unknown,
 	/// Mark Zbikowski format
@@ -77,12 +64,14 @@ enum ObjType {
 struct obj_symbol_t {
 	size_t address;
 	char *name;
+	uint length;
 }
 
 /// Executable file information and headers
+// NOTE: Could be renamed to obj_meta_t, but oh well
 struct obj_info_t { align(1):
 	//
-	// File fields
+	// File
 	//
 
 	union {
@@ -93,36 +82,28 @@ struct obj_info_t { align(1):
 		uint   *bi32;	/// (Internal)
 		ulong  *bi64;	/// (Internal)
 	}
-	/// File handle, used internally. Copied from supplied FILE structure.
+	/// File handle, used internally.
 	FILE *handle;
 	/// File size.
 	uint size;
 
 	//
-	// Object fields
+	// Object data
 	//
 
 	/// File type, populated by the respective loading function.
-	ObjType type;
+	AdbgObjType type;
 	/// Image's platform translated value for disasm
 	AdbgDisasmPlatform platform;
 	/// A copy of the original loading flags
 	int oflags;
-	/// Number of symbols loaded
-//	uint nsymbols;
-	/// Symbols table
-//	obj_symbol_t *symbols;
-
-	//
-	// Object-specific pointers
-	//
 
 	union {
 		PE_META pe;	/// PE32 data
 	}
 
 	//
-	// Symbols
+	// Symbols handling
 	//
 
 	obj_symbol_t *symbols;	/// Symbols pointer (for internal use)
@@ -132,11 +113,6 @@ struct obj_info_t { align(1):
 	// Internals
 	//
 
-	/// Internal status (bits)
-	/// 0: endian (0=little, 1=big)
-	int internal;
-	/// Offset to header data. PE uses this.
-	int offset;
 }
 
 /// Open object from file path.
@@ -218,9 +194,7 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 		case SIG_PE:
 			if (sig.u16[1]) // "PE\0\0"
 				return adbg_error_set(AdbgError.unsupportedObjFormat);
-			info.type = ObjType.PE;
-			info.offset = hdrloc;
-			e = adbg_obj_pe_load(info, flags);
+			e = adbg_obj_pe_load(info, hdrloc, flags);
 			break;
 		default: // MZ
 			return adbg_error_set(AdbgError.unsupportedObjFormat);
@@ -230,11 +204,7 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 		return adbg_error_set(AdbgError.unsupportedObjFormat);
 	}
 
-	if (e) return e;
-
-	info.internal = adbg_disasm_msb(info.platform); // ISA translation
-
-	return AdbgError.none;
+	return e;
 }
 
 //TODO: adbg_obj_unload

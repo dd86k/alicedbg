@@ -8,12 +8,16 @@ module adbg.utils.date;
 extern (C):
 
 /// Convert a 32-bit time_t into a datetime string.
-/// This was created due time_t sometimes being a 64-bit number, creating some
-/// conflict when parsing object files, such as PE32, and thus making the
-/// Microsoft Visual C Runtime (msvcrt) crash.
+/// This was created because the Microsoft's Visual C Runtime (msvcrt) crashed
+/// on strftime with a value higher than 0x8000000 with 0xC0000409
+/// (STATUS_STACK_BUFFER_OVERRUN).
 /// Params: timestamp = time_t
 /// Returns: "Www Mmm dd hh:mm:ss yyyy" datetime string
 /// Note: Doesn't check for leak year.
+// NOTE: Notable values
+// (crash) windbg.exe x64 (0xB8A65683): 2068-03-02
+// windbg.exe x86 (0x2F269970): 1995-01-25
+// putty x64 (0x5D873EBE): Sun Sep 22 15:28:30 2019
 const(char)* ctime32(uint timestamp) {
 	import core.stdc.stdio : snprintf;
 	
