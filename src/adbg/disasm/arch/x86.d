@@ -416,7 +416,7 @@ L_CONTINUE:
 				return;
 			adbg_disasm_push_x8(p, modrm);
 			adbg_disasm_push_str(p, "mov");
-			const(char) *seg = x86_T_segs[sr + 1];
+			const(char) *seg = x86_T_segs[sr];
 			const(char) *reg = adbg_disasm_x86_modrm_reg(p, modrm, MemWidth.i16);
 			if (p.x86.op & X86_FLAG_DIR) {
 				adbg_disasm_push_reg(p, seg);
