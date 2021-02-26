@@ -273,7 +273,7 @@ immutable setting_show_t[] showflags = [
 	{ 'p', "Show debug information", DUMPER_SHOW_DEBUG },
 	{ 'd', "Disassemble code (executable sections)", DUMPER_DISASM_CODE },
 	{ 'D', "Disassemble all sections", DUMPER_DISASM_ALL },
-	{ 'S', "Show disassembler statistics instead", DUMPER_SHOW_HEADER },
+	{ 'S', "Show disassembler statistics instead", DUMPER_DISASM_STATS },
 	{ 'A', "Show everything", DUMPER_SHOW_EVERYTHING },
 ];
 int cli_show(const(char) *val) {
