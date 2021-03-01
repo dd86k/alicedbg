@@ -201,6 +201,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		// Nevertheless, required to support 32-bit processes under
 		// 64-bit builds.
 		//TODO: GetProcAddress("kernel32", "IsWow64Process2")
+		//      Appeared in Windows 10, version 1511
 		//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 		version (Win64)
 		if (IsWow64Process(g_pid, &processWOW64) == FALSE)
@@ -352,7 +353,7 @@ int adbg_run(int function(exception_t*) userfunc) {
 		return 1;
 
 	exception_t e = void;
-	adbg_context_init(&e.registers);
+	adbg_ctx_init(&e.registers);
 
 	version (Windows) {
 		DEBUG_EVENT de = void;
@@ -388,11 +389,11 @@ L_DEBUG_LOOP:
 			if (processWOW64) {
 				winctxwow64.ContextFlags = CONTEXT_ALL;
 				Wow64GetThreadContext(g_tid, &winctxwow64);
-				adbg_context_os_win_wow64(&e.registers, &winctxwow64);
+				adbg_ctx_os_wow64(&e.registers, &winctxwow64);
 			} else {
 				winctx.ContextFlags = CONTEXT_ALL;
 				GetThreadContext(g_tid, &winctx);
-				adbg_context_os(&e.registers, &winctx);
+				adbg_ctx_os(&e.registers, &winctx);
 			}
 		} else {
 			winctx.ContextFlags = CONTEXT_ALL;

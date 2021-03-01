@@ -64,22 +64,21 @@ struct thread_context_t {
 
 /// (Internal) Initiate register fields with their names and sizes.
 /// Params: e = Exception structure
-void adbg_context_init(thread_context_t *e) {
+void adbg_ctx_init(thread_context_t *e) {
 	version (X86) {
-		adbg_context_os_init_x86(e);
+		adbg_ctx_init_x86(e);
 	} else version (X86_64) {
 		version (Win64) {
-			import adbg.dbg.debugger : processWOW64;
 			if (processWOW64)
-				adbg_context_os_init_x86(e);
+				adbg_ctx_init_x86(e);
 			else
-				adbg_context_os_init_x86_64(e);
+				adbg_ctx_init_x86_64(e);
 		} else
-			adbg_context_os_init_x86_64(e);
+			adbg_ctx_init_x86_64(e);
 	}
 }
 
-void adbg_context_get(thread_context_t *ctx) {
+void adbg_ctx_get(thread_context_t *ctx) {
 	version (Windows) {
 		CONTEXT winctx = void;
 		version (Win64) {
@@ -87,16 +86,16 @@ void adbg_context_get(thread_context_t *ctx) {
 			if (processWOW64) {
 				winctxwow64.ContextFlags = CONTEXT_ALL;
 				Wow64GetThreadContext(g_tid, &winctxwow64);
-				adbg_context_os_win_wow64(ctx, &winctxwow64);
+				adbg_ctx_os_wow64(ctx, &winctxwow64);
 			} else {
 				winctx.ContextFlags = CONTEXT_ALL;
 				GetThreadContext(g_tid, &winctx);
-				adbg_context_os(ctx, &winctx);
+				adbg_ctx_os(ctx, &winctx);
 			}
 		} else {
 			winctx.ContextFlags = CONTEXT_ALL;
 			GetThreadContext(g_tid, &winctx);
-			adbg_context_os(ctx, &winctx);
+			adbg_ctx_os(ctx, &winctx);
 		}
 	} else
 	version (Posix) {
@@ -104,16 +103,35 @@ void adbg_context_get(thread_context_t *ctx) {
 		if (ptrace(PTRACE_GETREGS, g_pid, null, &u) < 0)
 			ctx.count = 0;
 		else
-			adbg_context_os(ctx, &u);
+			adbg_ctx_os(ctx, &u);
 	}
 }
 
-//TODO: adbg_context_set
+//TODO: adbg_ctx_set
 
-//TODO: compile-init these init functions?
+/// Format a register depending on their type as a zero-padded number.
+/// Params: reg = register_t structure
+/// Returns: Formatted hexadecimal value
+const(char) *adbg_ex_reg_fhex(register_t *reg) {
+	import adbg.utils.str : adbg_util_strf;
+	with (RegisterType)
+	switch (reg.type) {
+	case u8:	return adbg_util_strf("%02x", reg.u8);
+	case u16:	return adbg_util_strf("%04x", reg.u16);
+	case u32, f32:	return adbg_util_strf("%08x", reg.u32);
+	case u64, f64:	return adbg_util_strf("%016llx", reg.u64);
+	default: assert(0);
+	}
+}
+
+/*
+const(char) *exception_reg_fval(register_t *reg) {
+	import utils.str : adbg_util_strf;
+	
+}*/
 
 version (X86_ANY)
-private void adbg_context_os_init_x86(thread_context_t *ctx) {
+private void adbg_ctx_init_x86(thread_context_t *ctx) {
 	ctx.count = EX_REG_COUNT;
 	ctx.items[0].name = "EIP";
 	ctx.items[0].type = RegisterType.u32;
@@ -138,7 +156,7 @@ private void adbg_context_os_init_x86(thread_context_t *ctx) {
 }
 
 version (X86_64)
-private void adbg_context_os_init_x86_64(thread_context_t *ctx) {
+private void adbg_ctx_init_x86_64(thread_context_t *ctx) {
 	ctx.count = EX_REG_COUNT;
 	ctx.items[0].name  = "RIP";
 	ctx.items[0].type  = RegisterType.u64;
@@ -184,7 +202,7 @@ version (Windows) {
 	//
 
 	// Populate exception_t.registers array from Windows' CONTEXT
-	void adbg_context_os(thread_context_t *ctx, CONTEXT *winctx) {
+	void adbg_ctx_os(thread_context_t *ctx, CONTEXT *winctx) {
 		version (X86) {
 			ctx.items[0].u32 = winctx.Eip;
 			ctx.items[1].u32 = winctx.EFlags;
@@ -220,7 +238,7 @@ version (Windows) {
 	}
 
 	version (Win64)
-	package void adbg_context_os_win_wow64(thread_context_t *ctx, WOW64_CONTEXT *winctx) {
+	package void adbg_ctx_os_wow64(thread_context_t *ctx, WOW64_CONTEXT *winctx) {
 		ctx.items[0].u32 = winctx.Eip;
 		ctx.items[1].u32 = winctx.EFlags;
 		ctx.items[2].u32 = winctx.Eax;
@@ -238,7 +256,7 @@ version (Windows) {
 	//
 
 	/// Populate exception_t.registers array from user_regs_struct
-	package void adbg_context_os(thread_context_t *ctx, user_regs_struct *u) {
+	package void adbg_ctx_os(thread_context_t *ctx, user_regs_struct *u) {
 		version (X86) {
 			ctx.items[0].u32 = u.eip;
 			ctx.items[1].u32 = u.eflags;
@@ -273,24 +291,3 @@ version (Windows) {
 		}
 	}
 } // version Posix
-
-/// Format a register depending on their type as a zero-padded number.
-/// Params: reg = register_t structure
-/// Returns: Formatted hexadecimal value
-const(char) *adbg_ex_reg_fhex(register_t *reg) {
-	import adbg.utils.str : adbg_util_strf;
-	with (RegisterType)
-	switch (reg.type) {
-	case u8:	return adbg_util_strf("%02x", reg.u8);
-	case u16:	return adbg_util_strf("%04x", reg.u16);
-	case u32, f32:	return adbg_util_strf("%08x", reg.u32);
-	case u64, f64:	return adbg_util_strf("%016llx", reg.u64);
-	default: assert(0);
-	}
-}
-
-/*
-const(char) *exception_reg_fval(register_t *reg) {
-	import utils.str : adbg_util_strf;
-	
-}*/
