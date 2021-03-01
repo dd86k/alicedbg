@@ -9,7 +9,7 @@ import core.stdc.stdlib : malloc, strtol, exit, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp, strncpy, strtok;
 import core.stdc.stdio;
 import adbg.platform;
-import adbg.debugger : adbg_attach, adbg_load, adbg_state, AdbgState;
+import adbg.dbg : adbg_attach, adbg_load, adbg_state, AdbgState;
 import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax;
 import adbg.sys.err : adbg_sys_perror;
 import app.debugger, app.dumper;

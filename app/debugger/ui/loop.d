@@ -7,7 +7,7 @@ module app.debugger.ui.loop;
 
 import core.stdc.string : memcpy;
 import adbg.etc.c.stdio;
-import adbg.debugger, adbg.sys.err : SYS_ERR_FMT;
+import adbg.dbg, adbg.sys.err : SYS_ERR_FMT;
 import adbg.disasm;
 import app.term;
 import app.common;

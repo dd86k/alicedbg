@@ -7,7 +7,7 @@ module app.debugger.ui.tui;
 
 import core.stdc.stdio, core.stdc.string : memcpy;
 import adbg.error;
-import adbg.debugger;
+import adbg.dbg;
 import adbg.disasm;
 import app.term;
 import app.common;

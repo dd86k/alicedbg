@@ -1,21 +1,21 @@
 /**
  * License: BSD-3-Clause
  */
-module adbg.debugger.context;
+module adbg.dbg.context;
 
 version (Windows) {
 	import core.sys.windows.windows;
 	import adbg.sys.windows.wow64;
 	version (Win32)
-		import adbg.debugger.debugger : g_pid, g_tid;
+		import adbg.dbg.debugger : g_pid, g_tid;
 	else
-		import adbg.debugger.debugger : g_pid, g_tid, processWOW64;
+		import adbg.dbg.debugger : g_pid, g_tid, processWOW64;
 } else
 version (Posix) {
 	import adbg.sys.linux.user;
 	import adbg.sys.posix.ptrace;
 	import core.sys.posix.signal;
-	import adbg.debugger.debugger : g_pid;
+	import adbg.dbg.debugger : g_pid;
 }
 
 version (X86)
@@ -69,7 +69,7 @@ void adbg_context_init(thread_context_t *e) {
 		adbg_context_os_init_x86(e);
 	} else version (X86_64) {
 		version (Win64) {
-			import adbg.debugger.debugger : processWOW64;
+			import adbg.dbg.debugger : processWOW64;
 			if (processWOW64)
 				adbg_context_os_init_x86(e);
 			else

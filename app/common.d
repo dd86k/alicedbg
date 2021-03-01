@@ -5,7 +5,7 @@
  */
 module app.common;
 
-import adbg.debugger.exception;
+import adbg.dbg.exception;
 import adbg.disasm;
 import adbg.error;
 import core.stdc.string : memcpy;

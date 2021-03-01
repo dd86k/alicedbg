@@ -3,4 +3,4 @@
  *
  * License: BSD-3-Clause
  */
-module adbg.debugger.disasm.arch.arm;
+module adbg.dbg.disasm.arch.arm;

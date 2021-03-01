@@ -9,10 +9,10 @@
  *
  * License: BSD-3-Clause
  */
-module adbg.debugger.debugger;
+module adbg.dbg.debugger;
 
 import core.stdc.string : memset;
-public import adbg.debugger.exception;
+public import adbg.dbg.exception;
 import adbg.platform, adbg.error;
 
 //TODO: ProcessInfo structure for internal debugging purposes

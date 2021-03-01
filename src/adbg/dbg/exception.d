@@ -14,9 +14,9 @@
  *
  * License: BSD-3-Clause
  */
-module adbg.debugger.exception;
+module adbg.dbg.exception;
 
-public import adbg.debugger.context;
+public import adbg.dbg.context;
 
 version (Windows) {
 	import core.sys.windows.windows;

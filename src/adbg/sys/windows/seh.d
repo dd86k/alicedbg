@@ -7,7 +7,7 @@ module adbg.sys.windows.seh;
 
 version (Windows):
 
-import adbg.debugger.exception;
+import adbg.dbg.exception;
 import adbg.sys.windows.def;
 import adbg.etc.c.setjmp;
 
