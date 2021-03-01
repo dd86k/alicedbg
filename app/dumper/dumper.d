@@ -100,8 +100,8 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 
 	obj_info_t info = void;
 	if (adbg_obj_load(&info, f, 0)) {
-		printf("loader: %s\n", adbg_error_message);
-		return adbg_error;
+		printf("loader: %s\n", adbg_error_msg);
+		return adbg_errno;
 	}
 
 	if (dp.platform == AdbgDisasmPlatform.native)
@@ -114,6 +114,10 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 		puts("dumper: format not supported");
 		return EXIT_FAILURE;
 	}
+}
+
+void dump_section_title(const(char) *title) {
+	printf("\n# %s\n\n", title);
 }
 
 // NOTE: Normally, a FILE* parameter could be passed, but the Windows bindings
@@ -150,7 +154,7 @@ int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 				++ills;
 				break;
 			default:
-				printf("disasm: %s\n", adbg_error_message);
+				printf("disasm: %s\n", adbg_error_msg);
 				return e;
 			}
 		}
@@ -167,12 +171,16 @@ int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 			AdbgError e = cast(AdbgError)adbg_disasm(dp, AdbgDisasmMode.file);
 			with (AdbgError)
 			switch (e) {
-			case none, illegalInstruction:
-				printf("%08X %-30s %-30s\n",
+			case none:
+				printf("%08X %-30s %s\n",
 					i, dp.mcbuf.ptr, dp.mnbuf.ptr);
 				continue;
+			case illegalInstruction:
+				printf("%08X %-30s (error)\n",
+					i, dp.mcbuf.ptr);
+				continue;
 			default:
-				printf("disasm: %s\n", adbg_error_message);
+				printf("disasm: %s\n", adbg_error_msg);
 				return e;
 			}
 		}

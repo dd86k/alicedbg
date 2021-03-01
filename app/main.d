@@ -508,13 +508,13 @@ int main(int argc, const(char)** argv) {
 			lasterr = adbg_load(file, args);
 			
 			if (lasterr) {
-				adbg_sys_perror!"main"(lasterr);
+				printerror;
 				return EXIT_FAILURE;
 			}
 			
 			printf("File '%s' loaded\n", file);
 		}
-	
+		
 		switch (ui) {
 		case SettingUI.loop:
 			lasterr = loop();

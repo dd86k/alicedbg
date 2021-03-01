@@ -279,7 +279,6 @@ version (Windows) {
 /// Returns: Formatted hexadecimal value
 const(char) *adbg_ex_reg_fhex(register_t *reg) {
 	import adbg.utils.str : adbg_util_strf;
-	// NOTE: Yes final switch works with betterC but funky in 2.082
 	with (RegisterType)
 	switch (reg.type) {
 	case u8:	return adbg_util_strf("%02x", reg.u8);

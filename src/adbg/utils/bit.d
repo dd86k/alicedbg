@@ -16,7 +16,12 @@ import adbg.platform;
 extern (C):
 
 /// Create a 1-bit bitmask with a bit position (0-based, 1 << a).
-template BIT(int n) { enum { BIT = 1 << n } }
+/// Params: n = Bit position (0-based)
+template BIT(int n) if (n < 32) { enum { BIT = 1 << n } }
+
+/// Convert bits to bytes.
+/// Params: n = Number of bits
+template BITS(int n) if (n % 8 == 0) { enum { BITS = n << 3 } }
 
 /// Turn a 4-character string into a 4-byte number
 /// Params: s = 4-character string
@@ -25,6 +30,56 @@ template char4i32(char[4] s) {
 		enum { char4i32 = (s[0] << 24) | (s[1] << 16) | (s[2] << 8) | (s[3]) }
 	else
 		enum { char4i32 = (s[3] << 24) | (s[2] << 16) | (s[1] << 8) | (s[0]) }
+}
+
+/// Force a 16-bit number to be in little-endian in memory.
+/// Params: n = 16-bit number 
+template littlei16(int n) {
+	version (BigEndian)
+		enum { littlei16 = adbg_util_bswap16(n) }
+	else
+		enum { littlei16 = n }
+}
+/// Force a 32-bit number to be in little-endian in memory.
+/// Params: n = 32-bit number 
+template littlei32(int n) {
+	version (BigEndian)
+		enum { littlei32 = adbg_util_bswap32(n) }
+	else
+		enum { littlei32 = n }
+}
+/// Force a 64-bit number to be in little-endian in memory.
+/// Params: n = 64-bit number 
+template littlei64(int n) {
+	version (BigEndian)
+		enum { littlei64 = adbg_util_bswap64(n) }
+	else
+		enum { littlei64 = n }
+}
+
+/// Force a 16-bit number to be in big-endian in memory.
+/// Params: n = 16-bit number 
+template bigi16(int n) {
+	version (LittleEndian)
+		enum { bigi16 = adbg_util_bswap16(n) }
+	else
+		enum { bigi16 = n }
+}
+/// Force a 32-bit number to be in big-endian in memory.
+/// Params: n = 32-bit number 
+template bigi32(int n) {
+	version (LittleEndian)
+		enum { bigi32 = adbg_util_bswap32(n) }
+	else
+		enum { bigi32 = n }
+}
+/// Force a 64-bit number to be in big-endian in memory.
+/// Params: n = 64-bit number 
+template bigi64(int n) {
+	version (LittleEndian)
+		enum { bigi64 = adbg_util_bswap64(n) }
+	else
+		enum { bigi64 = n }
 }
 
 version (LittleEndian)
@@ -69,9 +124,9 @@ ulong function(ulong) adbg_util_fswap64(int e) {
 	return e == TE ? &adbg_util_nop64 : &adbg_util_bswap64;
 }
 
-private ushort adbg_util_nop16(ushort v) { return v; }
-private uint adbg_util_nop32(uint v) { return v; }
-private ulong adbg_util_nop64(ulong v) { return v; }
+private ushort adbg_util_nop16(ushort v) pure { return v; }
+private uint adbg_util_nop32(uint v) pure { return v; }
+private ulong adbg_util_nop64(ulong v) pure { return v; }
 
 /// Byte-swap an 16-bit value.
 /// Params: v = 16-bit value

@@ -3,22 +3,30 @@
  */
 module adbg.error;
 
+//TODO: Add template variables for debugging purposes
+// - const(char) *f = __FILE__
+// - int l = __LINE__
+
 extern (C):
 __gshared:
 
-// NOTE: Work in progress
-
-private enum modshift = 16;
-
-private enum AdbgESource : ubyte {
+private enum AdbgErrorSource : ubyte {
+	/// This program is the source of the error
 	self,
-	crt,
+	/// Operating system fault
 	system,
+	/// (Reserved) Runtime fault
+	runtime,
 }
 
-/// Error
+/// Error code
 enum AdbgError {
+	/// Alas, success
 	none,
+	/// OS
+	system,
+	/// (Reserved) CRT
+	runtime,
 	nullArgument,
 	nullAddress,
 	unsupportedPlatform,
@@ -26,56 +34,71 @@ enum AdbgError {
 	unsupportedObjFormat
 }
 
-private struct adbg_error_t {
-	union {
-		int syscode;
-		AdbgError code;
-	}
-	AdbgESource source;
-//	debug int line;
-//	debug const(char) *file;
-}
-private __gshared adbg_error_t lasterror;
+private int errcode;
+private AdbgErrorSource errsource;
+private int errline;
+private const(char)* errfile;
 
-int adbg_error() {
-	return lasterror.syscode;
-}
+//
+// "Getters"
+//
 
-//TODO: debug template with const(char) *f = __FILE__, int l = __LINE__
-int adbg_error_set(AdbgError e) {
-	lasterror.source = AdbgESource.self;
-	return lasterror.syscode = e;
+int adbg_errno() {
+	return errcode;
 }
-
-int adbg_error_sys() {
-	import adbg.sys.err : adbg_sys_errno;
-	lasterror.source = AdbgESource.system;
-	return lasterror.syscode = adbg_sys_errno;
+int adbg_error_line() {
+	return errline;
 }
-int adbg_error_crt() {
-	import adbg.sys.err : adbg_sys_errno;
-	lasterror.source = AdbgESource.crt;
-	return lasterror.syscode = adbg_sys_errno;
+const(char)* adbg_error_file() {
+	return errfile;
 }
-
-const(char)* adbg_error_message() {
+const(char)* adbg_error_msg() {
 	import adbg.sys.err : adbg_sys_error;
 	
-	with (AdbgESource)
-	switch (lasterror.source) {
+	with (AdbgErrorSource)
+	switch (errsource) {
+	case system:
+		return adbg_sys_error(errcode);
 	case self:
 		with (AdbgError)
-		switch (lasterror.code) {
+		switch (errcode) {
 		case nullArgument: return "Parameter is null";
 		case nullAddress: return "Address is null";
 		case unsupportedObjFormat: return "Unsupported object format";
 		case unsupportedPlatform: return "Platforn not supported";
 		case illegalInstruction: return "Illegal instruction encoding";
-		case none: return "no error";
+		case none: return "No error occured";
 		default: assert(0);
 		}
-	case crt, system:
-		return adbg_sys_error(lasterror.syscode);
 	default: assert(0);
 	}
 }
+
+//
+// "Setters"
+//
+
+int adbg_error(string s = __FILE__, int l = __LINE__)(AdbgError e) {
+	errline = l;
+	errfile = s.ptr;
+	errsource = AdbgErrorSource.self;
+	return errcode = e;
+}
+
+//public enum __FUNCTION_NAME__ = __traits(identifier, __traits(parent, {}));
+private template FN(alias s)
+{
+	enum { FN = __traits(identifier, __traits(parent, s)) }
+}
+
+int adbg_error_system(string s = __FILE__, int l = __LINE__)() {
+	import adbg.sys.err : adbg_sys_errno;
+	errline = l;
+	errfile = s.ptr;
+	errsource = AdbgErrorSource.system;
+	return errcode = adbg_sys_errno;
+}
+
+/*int adbg_error_runtime() {
+	
+}*/

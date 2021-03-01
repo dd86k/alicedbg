@@ -637,7 +637,7 @@ int adbg_obj_pe_load(obj_info_t *info, uint peoffset, int flags) {
 		info.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDRROM);
 		info.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDRROM);
 		break;
-	default: return adbg_error_set(AdbgError.unsupportedObjFormat);
+	default: return adbg_error(AdbgError.unsupportedObjFormat);
 	}
 	uint secs = info.pe.hdr.NumberOfSections;
 	info.pe.fo_imports = 0;
@@ -677,7 +677,7 @@ const(char) *adbg_obj_pe_mach(ushort mach) {
 	case PE_MACHINE_UNKNOWN:	return "UNKNOWN";
 	case PE_MACHINE_ALPHA:	return "ALPHA";
 	case PE_MACHINE_ALPHA64:	return "ALPHA64";
-	case PE_MACHINE_AM33:	return "AM33";
+	case PE_MACHINE_AM33:	return "AM33"; // MN10300/AM33
 	case PE_MACHINE_AMD64:	return "AMD64";
 	case PE_MACHINE_ARM:	return "ARM";
 	case PE_MACHINE_ARMNT:	return "ARMNT";

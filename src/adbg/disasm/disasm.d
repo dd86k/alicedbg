@@ -195,11 +195,11 @@ struct adbg_disasm_t { align(1):
 int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	if (p == null) {
 		p.mcbuf[0] = 0;
-		return p.error = adbg_error_set(AdbgError.nullArgument);
+		return p.error = adbg_error(AdbgError.nullArgument);
 	}
 	if (p.a == null) {
 		p.mcbuf[0] = 0;
-		return p.error = adbg_error_set(AdbgError.nullAddress);
+		return p.error = adbg_error(AdbgError.nullAddress);
 	}
 
 	bool modefile = mode >= AdbgDisasmMode.file;
@@ -228,7 +228,7 @@ int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 		break;
 	default:
 		p.mcbuf[0] = 0;
-		return p.error = adbg_error_set(AdbgError.unsupportedPlatform);
+		return p.error = adbg_error(AdbgError.unsupportedPlatform);
 	}
 
 	if (modefile) {

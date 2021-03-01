@@ -49,7 +49,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_RVC_FUNC_000: // C.ADDI4SPN
 			int imm = i.op1 >> 5;
 			if (imm == 0) {
-				p.error = adbg_error_set(AdbgError.illegalInstruction);
+				p.error = adbg_error(AdbgError.illegalInstruction);
 				return;
 			}
 			if (p.mode < AdbgDisasmMode.file)
@@ -74,7 +74,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 			adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rs2));
 			adbg_disasm_push_imm(p, imm);
 			return;
-		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return; // Yes, 000 is illegal
+		default: p.error = adbg_error(AdbgError.illegalInstruction); return; // Yes, 000 is illegal
 		}
 	case 1:
 		if (p.mode >= AdbgDisasmMode.file)
@@ -124,7 +124,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 				case 0x60:   m = "c.and"; break;
 				case 0x1000: m = "c.subw"; break;
 				case 0x1020: m = "c.addw"; break;
-				default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
+				default: p.error = adbg_error(AdbgError.illegalInstruction); return;
 				}
 				if (p.mode < AdbgDisasmMode.file)
 					return;
@@ -134,7 +134,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 				adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rs2));
 				return;
 			}
-		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
+		default: p.error = adbg_error(AdbgError.illegalInstruction); return;
 		}
 	case 2:
 		if (p.mode >= AdbgDisasmMode.file)
@@ -143,7 +143,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_RVC_FUNC_010:
 			int rd = (i.op1 >> 7) & 31;
 			if (rd == 0) {
-				p.error = adbg_error_set(AdbgError.illegalInstruction);
+				p.error = adbg_error(AdbgError.illegalInstruction);
 				return;
 			}
 			if (p.mode < AdbgDisasmMode.file)
@@ -192,7 +192,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 			adbg_disasm_push_str(p, "c.swsp");
 			adbg_disasm_push_memregimm(p, adbg_disasm_riscv_abi_reg(rs2), imm, MemWidth.i32);
 			return;
-		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
+		default: p.error = adbg_error(AdbgError.illegalInstruction); return;
 		}
 	default: // 11 >= 16b
 	}
@@ -203,8 +203,10 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 
 	i.op2 = *p.ai16;
 	++p.ai16;
+	
 	if (p.mode >= AdbgDisasmMode.file)
 		adbg_disasm_push_x32(p, i.op);
+	
 	switch (i.op & OP_MASK) {
 	case 19: // (0010011) RV32I: ADDI/SLTI/SLTIU/XORI/ORI/ANDI
 		const(char) *m = void;
@@ -215,7 +217,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_FUNC_100: m = "xori"; break;
 		case OP_FUNC_110: m = "ori"; break;
 		case OP_FUNC_111: m = "andi"; break;
-		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
+		default: p.error = adbg_error(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode < AdbgDisasmMode.file)
 			return;
@@ -234,7 +236,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_FUNC_000: m = "sb"; w = MemWidth.i8; break;
 		case OP_FUNC_001: m = "sh"; w = MemWidth.i16; break;
 		case OP_FUNC_010: m = "sw"; w = MemWidth.i32; break;
-		default: p.error = adbg_error_set(AdbgError.illegalInstruction); return;
+		default: p.error = adbg_error(AdbgError.illegalInstruction); return;
 		}
 		if (p.mode < AdbgDisasmMode.file)
 			return;
@@ -245,7 +247,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		adbg_disasm_push_memregimm(p, adbg_disasm_riscv_abi_reg(rs1), imm, w);
 		adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rs2));
 		return;
-	default: p.error = adbg_error_set(AdbgError.illegalInstruction);
+	default: p.error = adbg_error(AdbgError.illegalInstruction);
 	}
 }
 

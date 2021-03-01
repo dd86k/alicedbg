@@ -12,9 +12,10 @@
 module adbg.debugger.debugger;
 
 import core.stdc.string : memset;
-import core.stdc.errno : errno;
 public import adbg.debugger.exception;
-import adbg.platform;
+import adbg.platform, adbg.error;
+
+//TODO: ProcessInfo structure for internal debugging purposes
 
 version (Windows) {
 	import core.sys.windows.windows;
@@ -77,7 +78,9 @@ else version (ARM) {
 public
 enum AdbgAction {
 	exit,	/// Close the process and stop debugging
-//	detach,	/// Detach the debugger
+//	close,	/// Close process or detach
+//	stop,	/// Stop debugging
+//	pause,	/// Pause debugging
 	proceed,	/// Continue debugging
 	step,	/// Proceed with a single step
 }
@@ -113,7 +116,7 @@ struct adbg_debugger_event_t {
 private
 struct breakpoint_t {
 	size_t address;
-	align(2) opcode_t opcode;
+	align(4) opcode_t opcode;
 }
 
 version(USE_CLONE) private
@@ -158,23 +161,18 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		int bs = 0x4000; // buffer size, 16 KiB
 		ptrdiff_t bi;
 		char *b = cast(char*)malloc(bs); /// flat buffer
-		//
+		
 		// Copy execultable path into buffer
-		//
 		bi = snprintf(b, bs, "%s ", path);
 		if (bi < 0) return 1;
-		//
+		
 		// Flatten argv
-		//
 		if (argv)
 			bi += adbg_util_argv_flatten(b + bi, bs, argv);
-		//
-		//TODO: Parse envp
-		//
 		
-		//
+		//TODO: Parse envp
+		
 		// Create process
-		//
 		STARTUPINFOA si = void;
 		PROCESS_INFORMATION pi = void;
 		memset(&si, 0, si.sizeof); // memset faster than _init functions
@@ -182,15 +180,21 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		si.cb = STARTUPINFOA.sizeof;
 		// Not using DEBUG_ONLY_THIS_PROCESS because our posix
 		// counterpart is using -1 (all children) for waitpid.
-		if (CreateProcessA(null, b,
-			null, null,
-			FALSE, DEBUG_PROCESS,
-			envp, null,
+		if (CreateProcessA(
+			null,	// lpApplicationName
+			b,	// lpCommandLine
+			null,	// lpProcessAttributes
+			null,	// lpThreadAttributes
+			FALSE,	// bInheritHandles
+			DEBUG_PROCESS,	// dwCreationFlags
+			envp,	// lpEnvironment
+			null,	// lpCurrentDirectory
 			&si, &pi) == FALSE)
-			return GetLastError();
+			return adbg_error_system;
 		free(b);
 		g_tid = pi.hThread;
 		g_pid = pi.hProcess;
+		
 		// Microsoft recommends getting function pointer with
 		// GetProcAddress("kernel32", "IsWow64Process"), but so far
 		// only 64-bit versions of Windows really have WOW64.
@@ -200,13 +204,13 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 		version (Win64)
 		if (IsWow64Process(g_pid, &processWOW64) == FALSE)
-			return GetLastError();
+			return adbg_error_system;
 	} else
 	version (Posix) {
 		// Verify if file exists and we has access to it
 		stat_t st = void;
 		if (stat(path, &st) == -1)
-			return errno;
+			return adbg_error_system;
 		// Proceed normally, execve performs executable checks
 		version (USE_CLONE) { // clone(2)
 			void *chld_stack = mmap(null, ADBG_CHILD_STACK_SIZE,
@@ -214,7 +218,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 				MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
 				-1, 0);
 			if (chld_stack == MAP_FAILED)
-				return errno;
+				return adbg_error_system;
 
 			const(char)*[16] __argv = void;
 			const(char)*[1]  __envp = void;
@@ -245,11 +249,11 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 				CLONE_PTRACE,
 				&chld); // tid
 			if (g_pid < 0)
-				return errno;
+				return adbg_error_system;
 		} else { // fork(2)
 			g_pid = fork();
 			if (g_pid < 0)
-				return errno;
+				return adbg_error_system;
 			if (g_pid == 0) { // Child process
 				const(char)*[16] __argv = void;
 				const(char)*[1]  __envp = void;
@@ -273,15 +277,15 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 					envp[0] = null;
 				}
 				if (ptrace(PTRACE_TRACEME, 0, 0, 0))
-					return errno;
+					return adbg_error_system;
 				version (CRuntime_Musl) {
 					if (raise(SIGTRAP))
-						return errno;
+						return adbg_error_system;
 				}
 				if (execve(path,
 					cast(const(char)**)__argv,
 					cast(const(char)**)__envp) == -1)
-					return errno;
+					return adbg_error_system;
 			}
 		} // USE_CLONE
 	}
@@ -289,14 +293,17 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 	return 0;
 }
 
+//TODO: adbg_dbg_options(flags)
+// - only this process
+
 version (Posix)
 version (USE_CLONE)
 private int __adbg_chld(void* arg) {
 	__adbg_child_t *c = cast(__adbg_child_t*)arg;
 	if (ptrace(PTRACE_TRACEME, 0, 0, 0))
-		return errno;
+		return adbg_error_system;
 	execve(c.argv[0], c.argv, c.envp);
-	return errno;
+	return adbg_error_system;
 }
 
 /**
@@ -311,11 +318,11 @@ private int __adbg_chld(void* arg) {
 int adbg_attach(int pid, int flags = 0) {
 	version (Windows) {
 		if (DebugActiveProcess(pid) == FALSE)
-			return GetLastError();
+			return adbg_error_system;
 	} else
 	version (Posix) {
 		if (ptrace(PTRACE_SEIZE, pid, null, null) == -1)
-			return errno;
+			return adbg_error_system;
 	}
 	g_state = AdbgState.paused;
 	return 0;
@@ -433,7 +440,7 @@ L_DEBUG_LOOP:
 
 		if (g_pid == -1) {
 			g_state = AdbgState.idle;
-			return errno;
+			return adbg_error_system;
 		}
 		
 		g_state = AdbgState.paused;
@@ -521,9 +528,7 @@ int adbg_bp_add(size_t addr) {
 	if (g_bp_index >= ADBG_MAX_BREAKPOINTS - 1)
 		return 2;
 	breakpoint_t *bp = &g_bp_list[g_bp_index];
-	if (adbg_mm(MM_READ, addr, &bp.opcode, cast(uint)opcode_t.sizeof))
-		return 1;
-	return adbg_mm(MM_WRITE, addr, cast(void*)&g_bp_opcode, cast(uint)opcode_t.sizeof);
+	assert(0);
 }
 breakpoint_t* adbg_bp_index(int index) {
 	assert(0, "adbg_bp_index not implemented");
@@ -561,6 +566,7 @@ enum {	// adbg_mm flags
  *      size = Size to read or write
  * Returns: Zero on success, oscode on error
  */
+deprecated
 int adbg_mm(int op, size_t addr, void *data, uint size) {
 	version (Windows) {
 		if (op >= MM_WRITE) {
@@ -577,19 +583,19 @@ int adbg_mm(int op, size_t addr, void *data, uint size) {
 		if (g_mhandle <= 0) {
 			char* cb = cast(char*)malloc(4096);
 			if (cb == null)
-				return errno;
+				return adbg_error_system;
 			int n = snprintf(cb, 4096, "/proc/%d/mem", g_pid);
 			if (n < 0)
-				return errno;
+				return adbg_error_system;
 			g_mhandle = open(cb, 0);
 			free(cb);
 		}
 		if (op >= MM_WRITE) {
 			if (pwrite(g_mhandle, data, size, addr) == -1)
-				return errno;
+				return adbg_error_system;
 		} else {
 			if (pread(g_mhandle, data, size, addr) == -1)
-				return errno;
+				return adbg_error_system;
 		}
 	}
 

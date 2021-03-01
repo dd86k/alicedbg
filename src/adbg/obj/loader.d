@@ -154,7 +154,7 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 	import core.stdc.stdlib : malloc;
 
 	if (file == null)
-		return adbg_error_set(AdbgError.nullArgument);
+		return adbg_error(AdbgError.nullArgument);
 
 	info.handle = file;
 	info.oflags = flags;
@@ -162,20 +162,23 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 	// File size
 
 	if (fseek(info.handle, 0, SEEK_END))
-		return adbg_error_crt;
+		return adbg_error_system;
+	
 	info.size = cast(uint)ftell(info.handle);
+	
 	if (info.size == 0xFFFF_FFFF) // -1
-		return adbg_error_crt;
+		return adbg_error_system;
 	if (fseek(info.handle, 0, SEEK_SET))
-		return adbg_error_crt;
+		return adbg_error_system;
 
 	// Allocate and read
 
 	info.b = malloc(info.size);
+	
 	if (info.b == null)
-		return adbg_error_crt;
+		return adbg_error_system;
 	if (fread(info.b, info.size, 1, info.handle) == 0)
-		return adbg_error_crt;
+		return adbg_error_system;
 
 	// Auto-detection
 
@@ -186,22 +189,22 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 	case SIG_MZ:
 		uint hdrloc = *(info.bi32 + 15); // 0x3c / 4
 		if (hdrloc == 0)
-			return adbg_error_crt;
+			return adbg_error_system;
 		if (hdrloc >= info.size - 4)
-			return adbg_error_crt;
+			return adbg_error_system;
 		sig.u32 = *cast(uint*)(info.b + hdrloc);
 		switch (sig.u16[0]) {
 		case SIG_PE:
 			if (sig.u16[1]) // "PE\0\0"
-				return adbg_error_set(AdbgError.unsupportedObjFormat);
+				return adbg_error(AdbgError.unsupportedObjFormat);
 			e = adbg_obj_pe_load(info, hdrloc, flags);
 			break;
 		default: // MZ
-			return adbg_error_set(AdbgError.unsupportedObjFormat);
+			return adbg_error(AdbgError.unsupportedObjFormat);
 		}
 		break;
 	default:
-		return adbg_error_set(AdbgError.unsupportedObjFormat);
+		return adbg_error(AdbgError.unsupportedObjFormat);
 	}
 
 	return e;

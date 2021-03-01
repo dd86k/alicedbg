@@ -7,6 +7,7 @@ module app.common;
 
 import adbg.debugger.exception;
 import adbg.disasm;
+import adbg.error;
 import core.stdc.string : memcpy;
 
 public:
@@ -33,8 +34,6 @@ enum SettingMode { debugger, dump, trace }
 /// UI setting
 enum SettingUI { cmd, loop, tui, server }
 
-//TODO: Consider adding 'bool avoidopt' field
-//      Acts as "--", to stop processing options
 /// Settings structure for the application (only!)
 struct settings_t {
 	SettingMode mode;	/// Application mode
@@ -45,5 +44,13 @@ struct settings_t {
 	const(char) **env;	/// Debuggee: environement vector
 	const(char) *dir;	/// Debuggee: directory
 	uint pid;	/// Debuggee: PID
-	uint flags;	/// 
+	uint flags;	/// Flags to pass to callee
+}
+
+/// Print to stdout 
+void printerror() {
+	import adbg.sys.err : SYS_ERR_FMT;
+	import adbg.etc.c.stdio : printf;
+	debug printf("[%s:%d] ", adbg_error_file, adbg_error_line);
+	printf("("~SYS_ERR_FMT~") %s\n", adbg_errno, adbg_error_msg);
 }
