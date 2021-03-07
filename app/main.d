@@ -9,7 +9,7 @@ import core.stdc.stdlib : malloc, strtol, exit, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp, strncpy, strtok;
 import core.stdc.stdio;
 import adbg.platform;
-import adbg.dbg : adbg_attach, adbg_load, adbg_state, AdbgState;
+import adbg.dbg : adbg_attach, adbg_load;
 import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax;
 import adbg.sys.err : adbg_sys_perror;
 import debugger, dumper;
@@ -251,7 +251,7 @@ int cli_dump() {
 //
 
 int cli_raw() {
-	common_settings.flags |= DUMPER_FILE_RAW;
+	common_settings.flags |= DumpOpt.raw;
 	return EXIT_SUCCESS;
 }
 
@@ -265,20 +265,20 @@ struct setting_show_t {
 	int val;	/// dumper flag
 }
 immutable setting_show_t[] showflags = [
-	{ 'h', "Show header metadata (default)", DUMPER_SHOW_HEADER },
-	{ 's', "Show sections metadata", DUMPER_SHOW_SECTIONS },
-	{ 'i', "Show imports", DUMPER_SHOW_IMPORTS },
-	{ 'c', "Show load configuration", DUMPER_SHOW_LOADCFG },
+	{ 'h', "Show header metadata (default)", DumpOpt.header },
+	{ 's', "Show sections metadata", DumpOpt.sections },
+	{ 'i', "Show imports", DumpOpt.imports },
+	{ 'c', "Show load configuration", DumpOpt.loadcfg },
 //	{ 'e', "Show exports", DUMPER_SHOW_EXPORTS },
-	{ 'p', "Show debug information", DUMPER_SHOW_DEBUG },
-	{ 'd', "Disassemble code (executable sections)", DUMPER_DISASM_CODE },
-	{ 'D', "Disassemble all sections", DUMPER_DISASM_ALL },
-	{ 'S', "Show disassembler statistics instead", DUMPER_DISASM_STATS },
-	{ 'A', "Show everything", DUMPER_SHOW_EVERYTHING },
+	{ 'p', "Show debug information", DumpOpt.debug_ },
+	{ 'd', "Disassemble code (executable sections)", DumpOpt.disasm },
+	{ 'D', "Disassemble all sections", DumpOpt.disasm_all },
+	{ 'S', "Show disassembler statistics instead", DumpOpt.stats },
+	{ 'A', "Show everything", DumpOpt.everything },
 ];
 int cli_show(const(char) *val) {
 	if (cli_wanthelp(val)) {
-		puts("Available dumper-show options:");
+		puts("Available dumper display options:");
 		foreach (setting_show_t show; showflags) {
 			printf("%c\t%s\n", show.opt, show.desc);
 		}

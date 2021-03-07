@@ -15,51 +15,45 @@ import dumper;
 
 extern (C):
 
-//TODO: Convert to regular enum DumperShow
-enum {
-	//
-	// Dumper flags
-	//
-	DUMPER_SHOW_HEADER	= 0x0001,	/// Show header
-	DUMPER_SHOW_EXPORTS	= 0x0002,	/// Show symbol exports
-	DUMPER_SHOW_IMPORTS	= 0x0004,	/// Show shared library imports
-	DUMPER_SHOW_RESOURCES	= 0x0008,	/// Show resources (e.g. icons)
-	DUMPER_SHOW_SEH	= 0x0010,	/// Show SEH information
-	DUMPER_SHOW_CERTS	= 0x0020,	/// Show certificates information
-	DUMPER_SHOW_RELOCS	= 0x0040,	/// Show relocations
-	DUMPER_SHOW_DEBUG	= 0x0080,	/// Show debugging information
-	DUMPER_SHOW_ARCH	= 0x0100,	/// Show architecture-specific information
-	DUMPER_SHOW_GLOBALPTR	= 0x0200,	/// Show global pointer information
-	DUMPER_SHOW_TLS	= 0x0400,	/// Thead Local Storage
-	DUMPER_SHOW_LOADCFG	= 0x0800,	/// Show load configuration
-	DUMPER_SHOW_VM	= 0x1000,	/// VM-related stuff, like CLR
-	DUMPER_SHOW_SECTIONS	= 0x2000,	/// Show section information
-	DUMPER_SHOW_EVERYTHING	= 0x0F_FFFF,	/// Show absolutely everything
-
-	/// ('d') Include section disassembly in output.
-	DUMPER_DISASM_CODE	= 0x01_0000,
-	/// ('D') Include section disassembly in output.
-	DUMPER_DISASM_ALL	= 0x02_0000,
-	//TODO: Do not format instructions. Instead, show disassembler statistics.
-	/// Statistics include number of instructions, average instruction length,
-	/// minimum instruction length, maximum instruction length, and its total
-	/// size.
-	DUMPER_DISASM_STATS	= 0x04_0000,
-
-	/// ("-raw") File is raw, do not attempt to detect its format,
-	/// disassembly only
-	DUMPER_FILE_RAW	= 0x10_0000,
-
-	//
-	// Export/Extract flags
-	//
-
-	// These are more options that are unaffected by "show everything"
-	///TODO: ('R') Export resources into current directory. This includes
-	/// icons and images.
-	DUMPER_EXPORT_RESOURCES	= 0x0100_0000,
-	///TODO: ('C') Export certificates into current directory.
-	DUMPER_EXPORT_CERTS	= 0x0200_0000,
+/// Bitfield. Selects which information to display.
+enum DumpOpt {
+	/// Dump header
+	header	= 1,
+	/// Dump directories (PE32)
+	dirs	= 1 << 1,
+	/// Exports
+	exports	= 1 << 2,
+	/// Imports
+	imports	= 1 << 3,
+	/// Images, certificates, etc.
+	resources	= 1 << 4,
+	/// Structured Exception Handler
+	seh	= 1 << 5,
+	/// Symbol table(s)
+	symbols	= 1 << 6,
+	/// Debugging table
+	debug_	= 1 << 7,
+	/// Thread Local Storage
+	tls	= 1 << 8,
+	/// Load configuration
+	loadcfg	= 1 << 9,
+	/// Sections
+	sections	= 1 << 10,
+	
+	/// Disassemble executable sections
+	disasm	= 1 << 22,
+	/// Disassembly statistics
+	stats	= 1 << 23,
+	/// Disassemble all sections
+	disasm_all	= 1 << 24,
+	
+	/// File is raw, do not auto-detect
+	raw	= 1 << 31,
+	
+	/// Display absolutely everything
+	everything	= header | dirs |resources | seh |
+		symbols | debug_ | tls | loadcfg |
+		exports | imports | sections,
 }
 
 /// Dump given file to stdout.
@@ -75,7 +69,7 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 		return EXIT_FAILURE;
 	}
 
-	if (flags & DUMPER_FILE_RAW) {
+	if (flags & DumpOpt.raw) {
 		if (fseek(f, 0, SEEK_END)) {
 			puts("dump: could not seek file");
 			return EXIT_FAILURE;
@@ -95,8 +89,8 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 	}
 
 	// When nothing is set, the default is to show headers
-	if ((flags & DUMPER_SHOW_EVERYTHING) == 0)
-		flags |= DUMPER_SHOW_HEADER;
+	if (cast(ushort)flags == 0)
+		flags |= DumpOpt.header;
 
 	adbg_object_t obj = void;
 	if (adbg_obj_open_file(&obj, f)) {
@@ -139,7 +133,7 @@ void dump_chapter(const(char) *title) {
 /// Returns: Status code
 int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 	dp.a = data;
-	if (flags & DUMPER_DISASM_STATS) {
+	if (flags & DumpOpt.stats) {
 		uint iavg;	/// instruction average size
 		uint imax;	/// longest instruction size
 		uint icnt;	/// instruction count

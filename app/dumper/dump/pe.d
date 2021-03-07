@@ -16,18 +16,16 @@ import dumper.dumper;
 
 extern (C):
 
-/// Print PE32 info to stdout, a obj_info_t structure must be loaded before
-/// calling this function. If an unknown Machine type is detected, this only
-/// prints the first header. FILE handle must be pointing to section table.
+/// Dump PE32 info to stdout.
 /// Params:
 /// 	obj = File object
-/// 	dp = Disassembler parameters
+/// 	disasm_opts = Disassembler options
 /// 	flags = Dumper/Loader flags
 /// Returns: Non-zero on error
 int dump_pe(adbg_object_t *obj, adbg_disasm_t *disasm_opts, int flags) {
 	puts("Format: Microsoft Portable Executable");
 	
-	if (flags & DUMPER_SHOW_HEADER) {
+	if (flags & DumpOpt.header) {
 		if (dump_pe_hdr(obj))
 			return 1;
 		
@@ -41,19 +39,19 @@ int dump_pe(adbg_object_t *obj, adbg_disasm_t *disasm_opts, int flags) {
 		}
 	}
 	
-	if (flags & DUMPER_SHOW_SECTIONS)
+	if (flags & DumpOpt.sections)
 		dump_pe_sections(obj);
 	
 /*	if (flags & DUMPER_SHOW_SYMBOLS)
 		dump_pe_symbols;*/
 	
-	if (flags & DUMPER_SHOW_IMPORTS)
+	if (flags & DumpOpt.imports)
 		dump_pe_imports(obj);
 	
-	if (flags & DUMPER_SHOW_DEBUG)
+	if (flags & DumpOpt.debug_)
 		dump_pe_debug(obj);
 	
-	if (flags & (DUMPER_DISASM_CODE | DUMPER_DISASM_ALL | DUMPER_DISASM_STATS))
+	if (flags & (DumpOpt.disasm | DumpOpt.disasm_all | DumpOpt.stats))
 		dump_pe_disasm(obj, disasm_opts, flags);
 	
 	return EXIT_SUCCESS;
@@ -859,7 +857,7 @@ L_DEBUG_PDB20:
 void dump_pe_disasm(adbg_object_t *obj, adbg_disasm_t *disasm, int flags) {
 	dump_chapter("Disassembly");
 	
-	bool all = (flags & DUMPER_DISASM_ALL) != 0;
+	bool all = (flags & DumpOpt.everything) != 0;
 	for (ushort si; si < obj.pe.hdr.NumberOfSections; ++si) {
 		PE_SECTION_ENTRY s = obj.pe.sections[si];
 		if (s.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
