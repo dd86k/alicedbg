@@ -3,18 +3,16 @@
  *
  * License: BSD-3-Clause
  */
-module app.dumper.dump.pe;
+module dumper.dump.pe;
 
+import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE;
 import adbg.etc.c.stdio;
 import adbg.utils.date : ctime32;
-import core.stdc.config : c_long;
-import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc, free;
-import core.stdc.string : strcpy;
-import core.stdc.time : time_t, tm, localtime, strftime;
 import adbg.disasm.disasm;
-import adbg.obj.loader, adbg.obj.pe;
+import adbg.obj.server, adbg.obj.pe;
 import adbg.utils.uid, adbg.utils.bit;
-import app.dumper.dumper;
+import common;
+import dumper.dumper;
 
 extern (C):
 
@@ -22,30 +20,62 @@ extern (C):
 /// calling this function. If an unknown Machine type is detected, this only
 /// prints the first header. FILE handle must be pointing to section table.
 /// Params:
-/// 	fi = File information
+/// 	obj = File object
 /// 	dp = Disassembler parameters
 /// 	flags = Dumper/Loader flags
 /// Returns: Non-zero on error
-int dump_pe(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
+int dump_pe(adbg_object_t *obj, adbg_disasm_t *disasm_opts, int flags) {
+	puts("Format: Microsoft Portable Executable");
+	
+	if (flags & DUMPER_SHOW_HEADER) {
+		if (dump_pe_hdr(obj))
+			return 1;
+		
+		if (obj.pe.hdr.SizeOfOptionalHeader) {
+			dump_pe_opthdr(obj);
+			dump_pe_dirs(obj);
+		} else {
+			//TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
+			printf("Type                         Object\n");
+			return EXIT_SUCCESS;
+		}
+	}
+	
+	if (flags & DUMPER_SHOW_SECTIONS)
+		dump_pe_sections(obj);
+	
+/*	if (flags & DUMPER_SHOW_SYMBOLS)
+		dump_pe_symbols;*/
+	
+	if (flags & DUMPER_SHOW_IMPORTS)
+		dump_pe_imports(obj);
+	
+	if (flags & DUMPER_SHOW_DEBUG)
+		dump_pe_debug(obj);
+	
+	if (flags & (DUMPER_DISASM_CODE | DUMPER_DISASM_ALL | DUMPER_DISASM_STATS))
+		dump_pe_disasm(obj, disasm_opts, flags);
+	
+	return EXIT_SUCCESS;
+}
+
+private:
+
+// Returns true if the machine value is unknown
+bool dump_pe_hdr(adbg_object_t *obj) {
+	const(char) *str_mach = adbg_obj_pe_machine(obj.pe.hdr.Machine);
+	
 	bool unkmach = void;
-	const(char) *str_mach = adbg_obj_pe_mach(fi.pe.hdr.Machine);
 	if (str_mach == null) {
-		str_mach = "UNKNOWN";
+		str_mach = "Unknown";
 		unkmach = true;
 	} else
 		unkmach = false;
-
-	//
-	// ANCHOR PE Header
-	//
-
-	if ((flags & DUMPER_SHOW_HEADER) == 0)
-		goto L_SECTIONS;
-
-	with (fi.pe.hdr)
+	
+	dump_chapter("Header");
+	
+	with (obj.pe.hdr)
 	printf(
-	"Format: Microsoft Portable Executable\n\n"~
-	"# Header\n\n"~
 	"Machine               %04X\t(%s)\n"~
 	"NumberOfSections      %04X\t(%u)\n"~
 	"TimeDateStamp         %04X\t(%s)\n"~
@@ -60,8 +90,8 @@ int dump_pe(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
 	NumberOfSymbols, NumberOfSymbols,
 	SizeOfOptionalHeader, SizeOfOptionalHeader,
 	Characteristics);
-
-	with (fi.pe.hdr) { // Characteristics flags
+	
+	with (obj.pe.hdr) { // Characteristics flags
 	if (Characteristics & PE_CHARACTERISTIC_RELOCS_STRIPPED)
 		printf("RELOCS_STRIPPED,");
 	if (Characteristics & PE_CHARACTERISTIC_EXECUTABLE_IMAGE)
@@ -95,259 +125,244 @@ int dump_pe(obj_info_t *fi, adbg_disasm_t *dp, int flags) {
 	if (Characteristics & PE_CHARACTERISTIC_BYTES_REVERSED_HI)
 		printf("BYTES_REVERSED_HI,");
 	}
-	puts(")\n");
+	
+	puts(")");
+	
+	return unkmach;
+}
 
-	if (unkmach)
-		return EXIT_SUCCESS;
-
+void dump_pe_opthdr(adbg_object_t *obj) {
+	const(char) *str_mag = adbg_obj_pe_magic(obj.pe.opthdr.Magic);
+	if (str_mag == null) {
+		printf("dumper: Invalid magic: %04X\n", obj.pe.opthdr.Magic);
+		return;
+	}
+	const(char) *str_sys = adbg_obj_pe_subsys(obj.pe.opthdr.Subsystem);
+	if (str_sys == null) {
+		printf("dumper: Unknown subsystem: %04X\n", obj.pe.opthdr.Subsystem);
+		return;
+	}
+	
+	dump_chapter("Optional Header");
+	
+	with (obj.pe.opthdr)
+	printf(
+	"Type                         Image\n"~
+	"Magic                        %04X\t(%s)\n"~
+	"MajorLinkerVersion           %02X\t(%u)\n"~
+	"MinorLinkerVersion           %02X\t(%u)\n"~
+	"SizeOfCode                   %08X\t(%u)\n"~
+	"SizeOfInitializedData        %08X\t(%u)\n"~
+	"SizeOfUninitializedData      %08X\t(%u)\n"~
+	"AddressOfEntryPoint          %08X\n"~
+	"BaseOfCode                   %08X\n",
+	Magic, str_mag,
+	MajorLinkerVersion, MajorLinkerVersion,
+	MinorLinkerVersion, MinorLinkerVersion,
+	SizeOfCode, SizeOfCode,
+	SizeOfInitializedData, SizeOfInitializedData,
+	SizeOfUninitializedData, SizeOfUninitializedData,
+	AddressOfEntryPoint,
+	BaseOfCode);
+	
+	ushort DllCharacteristics = void;
+	uint NumberOfRvaAndSizes = void;
+	uint LoaderFlags = void;
+	
 	//
-	// ANCHOR PE Optional Header, and Directory
+	// NT additional fields
 	//
-
-	if (fi.pe.hdr.SizeOfOptionalHeader) { // No gotos here, it could skip declarations
-		const(char) *str_mag = adbg_obj_pe_magic(fi.pe.ohdr.Magic);
-		if (str_mag == null) {
-			printf("dumper: (PE32) Unknown Magic: %04X\n", fi.pe.ohdr.Magic);
-			return EXIT_FAILURE;
-		}
-		const(char) *str_sys = adbg_obj_pe_subsys(fi.pe.ohdr.Subsystem);
-		if (str_sys == null) {
-			printf("dumper: (PE32) Unknown Subsystem: %04X\n", fi.pe.ohdr.Subsystem);
-			return EXIT_FAILURE;
-		}
-
-		//
-		// Standard fields
-		//
-
-		with (fi.pe.ohdr)
+	
+	switch (obj.pe.opthdr.Magic) {
+	case PE_FMT_32: // 32
+		with (obj.pe.opthdr)
 		printf(
-		"# Optional Header\n\n"~
-		"Type                         Image\n"~
-		"Magic                        %04X\t(%s)\n"~
-		"MajorLinkerVersion           %02X\t(%u)\n"~
-		"MinorLinkerVersion           %02X\t(%u)\n"~
-		"SizeOfCode                   %08X\t(%u)\n"~
-		"SizeOfInitializedData        %08X\t(%u)\n"~
-		"SizeOfUninitializedData      %08X\t(%u)\n"~
-		"AddressOfEntryPoint          %08X\n"~
-		"BaseOfCode                   %08X\n",
-		Magic, str_mag,
-		MajorLinkerVersion, MajorLinkerVersion,
-		MinorLinkerVersion, MinorLinkerVersion,
-		SizeOfCode, SizeOfCode,
-		SizeOfInitializedData, SizeOfInitializedData,
-		SizeOfUninitializedData, SizeOfUninitializedData,
-		AddressOfEntryPoint,
-		BaseOfCode);
+		"BaseOfData                   %08X\n"~
+		"ImageBase                    %08X\n"~
+		"SectionAlignment             %08X\t(%u)\n"~
+		"FileAlignment                %08X\t(%u)\n"~
+		"MajorOperatingSystemVersion  %04X\t(%u)\n"~
+		"MinorOperatingSystemVersion  %04X\t(%u)\n"~
+		"MajorImageVersion            %04X\t(%u)\n"~
+		"MinorImageVersion            %04X\t(%u)\n"~
+		"MajorSubsystemVersion        %04X\t(%u)\n"~
+		"MinorSubsystemVersion        %04X\t(%u)\n"~
+		"Win32VersionValue            %08X\n"~
+		"SizeOfImage                  %08X\t(%u)\n"~
+		"SizeOfHeaders                %08X\t(%u)\n"~
+		"CheckSum                     %08X\n"~
+		"Subsystem                    %04X\t(%s)\n"~
+		"SizeOfStackReserve           %08X\t(%u)\n"~
+		"SizeOfStackCommit            %08X\t(%u)\n"~
+		"SizeOfHeapReserve            %08X\t(%u)\n"~
+		"SizeOfHeapCommit             %08X\t(%u)\n",
+		BaseOfData,
+		ImageBase,
+		SectionAlignment, SectionAlignment,
+		FileAlignment, FileAlignment,
+		MajorOperatingSystemVersion, MajorOperatingSystemVersion,
+		MinorOperatingSystemVersion, MinorOperatingSystemVersion,
+		MajorImageVersion, MajorImageVersion,
+		MinorImageVersion, MinorImageVersion,
+		MajorSubsystemVersion, MajorSubsystemVersion,
+		MinorSubsystemVersion, MinorSubsystemVersion,
+		Win32VersionValue,
+		SizeOfImage, SizeOfImage,
+		SizeOfHeaders, SizeOfHeaders,
+		CheckSum,
+		Subsystem, str_sys,
+		SizeOfStackReserve, SizeOfStackReserve,
+		SizeOfStackCommit, SizeOfStackCommit,
+		SizeOfHeapReserve, SizeOfHeapReserve,
+		SizeOfHeapCommit, SizeOfHeapCommit);
 
-		ushort DllCharacteristics = void;
-		uint NumberOfRvaAndSizes = void;
-		uint LoaderFlags = void;
-
-		//
-		// NT additional fields
-		//
-
-		switch (fi.pe.ohdr.Magic) {
-		case PE_FMT_32: // 32
-			with (fi.pe.ohdr)
-			printf(
-			"BaseOfData                   %08X\n"~
-			"ImageBase                    %08X\n"~
-			"SectionAlignment             %08X\t(%u)\n"~
-			"FileAlignment                %08X\t(%u)\n"~
-			"MajorOperatingSystemVersion  %04X\t(%u)\n"~
-			"MinorOperatingSystemVersion  %04X\t(%u)\n"~
-			"MajorImageVersion            %04X\t(%u)\n"~
-			"MinorImageVersion            %04X\t(%u)\n"~
-			"MajorSubsystemVersion        %04X\t(%u)\n"~
-			"MinorSubsystemVersion        %04X\t(%u)\n"~
-			"Win32VersionValue            %08X\n"~
-			"SizeOfImage                  %08X\t(%u)\n"~
-			"SizeOfHeaders                %08X\t(%u)\n"~
-			"CheckSum                     %08X\n"~
-			"Subsystem                    %04X\t(%s)\n"~
-			"SizeOfStackReserve           %08X\t(%u)\n"~
-			"SizeOfStackCommit            %08X\t(%u)\n"~
-			"SizeOfHeapReserve            %08X\t(%u)\n"~
-			"SizeOfHeapCommit             %08X\t(%u)\n",
-			BaseOfData,
-			ImageBase,
-			SectionAlignment, SectionAlignment,
-			FileAlignment, FileAlignment,
-			MajorOperatingSystemVersion, MajorOperatingSystemVersion,
-			MinorOperatingSystemVersion, MinorOperatingSystemVersion,
-			MajorImageVersion, MajorImageVersion,
-			MinorImageVersion, MinorImageVersion,
-			MajorSubsystemVersion, MajorSubsystemVersion,
-			MinorSubsystemVersion, MinorSubsystemVersion,
-			Win32VersionValue,
-			SizeOfImage, SizeOfImage,
-			SizeOfHeaders, SizeOfHeaders,
-			CheckSum,
-			Subsystem, str_sys,
-			SizeOfStackReserve, SizeOfStackReserve,
-			SizeOfStackCommit, SizeOfStackCommit,
-			SizeOfHeapReserve, SizeOfHeapReserve,
-			SizeOfHeapCommit, SizeOfHeapCommit);
-
-			LoaderFlags = fi.pe.ohdr.LoaderFlags;
-			DllCharacteristics = fi.pe.ohdr.DllCharacteristics;
-			NumberOfRvaAndSizes = fi.pe.ohdr.NumberOfRvaAndSizes;
-			break;
-		case PE_FMT_64: // 64
-			with (fi.pe.ohdr64)
-			printf(
-			"ImageBase                    %016llX\n"~
-			"SectionAlignment             %08X\t(%u)\n"~
-			"FileAlignment                %08X\t(%u)\n"~
-			"MajorOperatingSystemVersion  %04X\t(%u)\n"~
-			"MinorOperatingSystemVersion  %04X\t(%u)\n"~
-			"MajorImageVersion            %04X\t(%u)\n"~
-			"MinorImageVersion            %04X\t(%u)\n"~
-			"MajorSubsystemVersion        %04X\t(%u)\n"~
-			"MinorSubsystemVersion        %04X\t(%u)\n"~
-			"Win32VersionValue            %08X\n"~
-			"SizeOfImage                  %08X\t(%u)\n"~
-			"SizeOfHeaders                %08X\t(%u)\n"~
-			"CheckSum                     %08X\n"~
-			"Subsystem                    %04X\t(%s)\n"~
-			"SizeOfStackReserve           %016llX\t(%llu)\n"~
-			"SizeOfStackCommit            %016llX\t(%llu)\n"~
-			"SizeOfHeapReserve            %016llX\t(%llu)\n"~
-			"SizeOfHeapCommit             %016llX\t(%llu)\n",
-			ImageBase,
-			SectionAlignment, SectionAlignment,
-			FileAlignment, FileAlignment,
-			MajorOperatingSystemVersion, MajorOperatingSystemVersion,
-			MinorOperatingSystemVersion, MinorOperatingSystemVersion,
-			MajorImageVersion, MajorImageVersion,
-			MinorImageVersion, MinorImageVersion,
-			MajorSubsystemVersion, MajorSubsystemVersion,
-			MinorSubsystemVersion, MinorSubsystemVersion,
-			Win32VersionValue,
-			SizeOfImage, SizeOfImage,
-			SizeOfHeaders, SizeOfHeaders,
-			CheckSum,
-			Subsystem, str_sys,
-			SizeOfStackReserve, SizeOfStackReserve,
-			SizeOfStackCommit, SizeOfStackCommit,
-			SizeOfHeapReserve, SizeOfHeapReserve,
-			SizeOfHeapCommit, SizeOfHeapCommit);
-
-			LoaderFlags = fi.pe.ohdr64.LoaderFlags;
-			DllCharacteristics = fi.pe.ohdr64.DllCharacteristics;
-			NumberOfRvaAndSizes = fi.pe.ohdr64.NumberOfRvaAndSizes;
-			break;
-		case PE_FMT_ROM: // ROM has no flags/directories
-			with (fi.pe.ohdrrom)
-			printf(
-			"BaseOfData                   %08X\n"~
-			"BaseOfBss                    %08X\n"~
-			"GprMask                      %08X\n"~
-			"CprMask                      %08X %08X %08X %08X\n"~
-			"GpValue                      %08X\n",
-			BaseOfData,
-			BaseOfBss,
-			GprMask,
-			CprMask[0], CprMask[1],
-			CprMask[2], CprMask[3],
-			GpValue,
-			);
-			return EXIT_SUCCESS;
-		default:
-			printf("dumper: unknown Magic %04X\n",
-				fi.pe.ohdr.Magic);
-			return EXIT_FAILURE;
-		}
-
+		LoaderFlags = obj.pe.opthdr.LoaderFlags;
+		DllCharacteristics = obj.pe.opthdr.DllCharacteristics;
+		NumberOfRvaAndSizes = obj.pe.opthdr.NumberOfRvaAndSizes;
+		break;
+	case PE_FMT_64: // 64
+		with (obj.pe.opthdr64)
 		printf(
-		"LoaderFlags                  %08X\n"~
-		"NumberOfRvaAndSizes          %08X\n"~
-		"DllCharacteristics           %04X\t(",
-		LoaderFlags,
-		NumberOfRvaAndSizes,
-		DllCharacteristics);
+		"ImageBase                    %016llX\n"~
+		"SectionAlignment             %08X\t(%u)\n"~
+		"FileAlignment                %08X\t(%u)\n"~
+		"MajorOperatingSystemVersion  %04X\t(%u)\n"~
+		"MinorOperatingSystemVersion  %04X\t(%u)\n"~
+		"MajorImageVersion            %04X\t(%u)\n"~
+		"MinorImageVersion            %04X\t(%u)\n"~
+		"MajorSubsystemVersion        %04X\t(%u)\n"~
+		"MinorSubsystemVersion        %04X\t(%u)\n"~
+		"Win32VersionValue            %08X\n"~
+		"SizeOfImage                  %08X\t(%u)\n"~
+		"SizeOfHeaders                %08X\t(%u)\n"~
+		"CheckSum                     %08X\n"~
+		"Subsystem                    %04X\t(%s)\n"~
+		"SizeOfStackReserve           %016llX\t(%llu)\n"~
+		"SizeOfStackCommit            %016llX\t(%llu)\n"~
+		"SizeOfHeapReserve            %016llX\t(%llu)\n"~
+		"SizeOfHeapCommit             %016llX\t(%llu)\n",
+		ImageBase,
+		SectionAlignment, SectionAlignment,
+		FileAlignment, FileAlignment,
+		MajorOperatingSystemVersion, MajorOperatingSystemVersion,
+		MinorOperatingSystemVersion, MinorOperatingSystemVersion,
+		MajorImageVersion, MajorImageVersion,
+		MinorImageVersion, MinorImageVersion,
+		MajorSubsystemVersion, MajorSubsystemVersion,
+		MinorSubsystemVersion, MinorSubsystemVersion,
+		Win32VersionValue,
+		SizeOfImage, SizeOfImage,
+		SizeOfHeaders, SizeOfHeaders,
+		CheckSum,
+		Subsystem, str_sys,
+		SizeOfStackReserve, SizeOfStackReserve,
+		SizeOfStackCommit, SizeOfStackCommit,
+		SizeOfHeapReserve, SizeOfHeapReserve,
+		SizeOfHeapCommit, SizeOfHeapCommit);
 
-		// DllCharacteristics flags
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA)
-			printf("HIGH_ENTROPY_VA,");
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_DYNAMIC_BASE)
-			printf("DYNAMIC_BASE,");
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_FORCE_INTEGRITY)
-			printf("FORCE_INTEGRITY,");
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_NX_COMPAT)
-			printf("NX_COMPAT,");
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_NO_ISOLATION)
-			printf("NO_ISOLATION,");
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_NO_SEH)
-			printf("NO_SEH,");
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_NO_BIND)
-			printf("NO_BIND,");
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_APPCONTAINER)
-			printf("APPCONTAINER,");
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_WDM_DRIVER)
-			printf("WDM_DRIVER,");
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_GUARD_CF)
-			printf("GUARD_CF,");
-		if (DllCharacteristics & PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE)
-			printf("TERMINAL_SERVER_AWARE,");
-
-		with (fi.pe.dir)
-		printf(	// Directory
-		")\n\n# Directories\n\n"~
-		"Directory                RVA       Size\n"~
-		"Export Table             %08X  %08X  (%u)\n"~
-		"Import Table             %08X  %08X  (%u)\n"~
-		"Resource Table           %08X  %08X  (%u)\n"~
-		"Exception Table          %08X  %08X  (%u)\n"~
-		"Certificate Table        %08X  %08X  (%u)\n"~
-		"Base Relocation Table    %08X  %08X  (%u)\n"~
-		"Debug Directory          %08X  %08X  (%u)\n"~
-		"Architecture             %08X  %08X  (%u)\n"~
-		"Global Ptr               %08X  %08X  (%u)\n"~
-		"TLS Table                %08X  %08X  (%u)\n"~
-		"Load Config Table        %08X  %08X  (%u)\n"~
-		"Bound Import             %08X  %08X  (%u)\n"~
-		"Import Address Table     %08X  %08X  (%u)\n"~
-		"Delay Import Descriptor  %08X  %08X  (%u)\n"~
-		"CLR Header               %08X  %08X  (%u)\n"~
-		"Reserved                 %08X  %08X  (%u)\n",
-		ExportTable.rva,	ExportTable.size, ExportTable.size,
-		ImportTable.rva,	ImportTable.size, ImportTable.size,
-		ResourceTable.rva,	ResourceTable.size, ResourceTable.size,
-		ExceptionTable.rva,	ExceptionTable.size, ExceptionTable.size,
-		CertificateTable.rva,	CertificateTable.size, CertificateTable.size,
-		BaseRelocationTable.rva,	BaseRelocationTable.size, BaseRelocationTable.size,
-		DebugDirectory.rva,	DebugDirectory.size, DebugDirectory.size,
-		ArchitectureData.rva,	ArchitectureData.size, ArchitectureData.size,
-		GlobalPtr.rva,	GlobalPtr.size, GlobalPtr.size,
-		TLSTable.rva,	TLSTable.size, TLSTable.size,
-		LoadConfigurationTable.rva,	LoadConfigurationTable.size, LoadConfigurationTable.size,
-		BoundImportTable.rva,	BoundImportTable.size, BoundImportTable.size,
-		ImportAddressTable.rva,	ImportAddressTable.size, ImportAddressTable.size,
-		DelayImport.rva,	DelayImport.size, DelayImport.size,
-		CLRHeader.rva,	CLRHeader.size, CLRHeader.size,
-		Reserved.rva,	Reserved.size, Reserved.size);
-	} else {
-		//TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
-		printf("Type                         Object\n");
-		return EXIT_SUCCESS;
+		LoaderFlags = obj.pe.opthdr64.LoaderFlags;
+		DllCharacteristics = obj.pe.opthdr64.DllCharacteristics;
+		NumberOfRvaAndSizes = obj.pe.opthdr64.NumberOfRvaAndSizes;
+		break;
+	case PE_FMT_ROM: // ROM has no flags/directories
+		with (obj.pe.opthdrrom)
+		printf(
+		"BaseOfData                   %08X\n"~
+		"BaseOfBss                    %08X\n"~
+		"GprMask                      %08X\n"~
+		"CprMask                      %08X %08X %08X %08X\n"~
+		"GpValue                      %08X\n",
+		BaseOfData,
+		BaseOfBss,
+		GprMask,
+		CprMask[0], CprMask[1], CprMask[2], CprMask[3],
+		GpValue,
+		);
+		return;
+	default:
+		printf("dumper: unknown Magic %04X\n",
+			obj.pe.opthdr.Magic);
+		return;
 	}
 
-	//
-	// ANCHOR Sections
-	//
-L_SECTIONS:
+	printf(
+	"LoaderFlags                  %08X\n"~
+	"NumberOfRvaAndSizes          %08X\n"~
+	"DllCharacteristics           %04X\t(",
+	LoaderFlags,
+	NumberOfRvaAndSizes,
+	DllCharacteristics);
 
-	if ((flags & DUMPER_SHOW_SECTIONS) == 0)
-		goto L_SYMBOLS;
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA)
+		printf("HIGH_ENTROPY_VA,");
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_DYNAMIC_BASE)
+		printf("DYNAMIC_BASE,");
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_FORCE_INTEGRITY)
+		printf("FORCE_INTEGRITY,");
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_NX_COMPAT)
+		printf("NX_COMPAT,");
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_NO_ISOLATION)
+		printf("NO_ISOLATION,");
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_NO_SEH)
+		printf("NO_SEH,");
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_NO_BIND)
+		printf("NO_BIND,");
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_APPCONTAINER)
+		printf("APPCONTAINER,");
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_WDM_DRIVER)
+		printf("WDM_DRIVER,");
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_GUARD_CF)
+		printf("GUARD_CF,");
+	if (DllCharacteristics & PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE)
+		printf("TERMINAL_SERVER_AWARE,");
+	
+	puts(")");
+}
 
-	puts("\n# Sections\n");
-	for (ushort si; si < fi.pe.hdr.NumberOfSections; ++si) {
-		PE_SECTION_ENTRY section = fi.pe.sections[si];
+void dump_pe_dirs(adbg_object_t *obj) {
+	dump_chapter("Directories");
+	with (obj.pe.dir)
+	printf(
+	"Directory                RVA       Size\n"~
+	"Export Table             %08X  %08X  (%u)\n"~
+	"Import Table             %08X  %08X  (%u)\n"~
+	"Resource Table           %08X  %08X  (%u)\n"~
+	"Exception Table          %08X  %08X  (%u)\n"~
+	"Certificate Table        %08X  %08X  (%u)\n"~
+	"Base Relocation Table    %08X  %08X  (%u)\n"~
+	"Debug Directory          %08X  %08X  (%u)\n"~
+	"Architecture             %08X  %08X  (%u)\n"~
+	"Global Ptr               %08X  %08X  (%u)\n"~
+	"TLS Table                %08X  %08X  (%u)\n"~
+	"Load Config Table        %08X  %08X  (%u)\n"~
+	"Bound Import             %08X  %08X  (%u)\n"~
+	"Import Address Table     %08X  %08X  (%u)\n"~
+	"Delay Import Descriptor  %08X  %08X  (%u)\n"~
+	"CLR Header               %08X  %08X  (%u)\n"~
+	"Reserved                 %08X  %08X  (%u)\n",
+	ExportTable.rva,	ExportTable.size, ExportTable.size,
+	ImportTable.rva,	ImportTable.size, ImportTable.size,
+	ResourceTable.rva,	ResourceTable.size, ResourceTable.size,
+	ExceptionTable.rva,	ExceptionTable.size, ExceptionTable.size,
+	CertificateTable.rva,	CertificateTable.size, CertificateTable.size,
+	BaseRelocationTable.rva,	BaseRelocationTable.size, BaseRelocationTable.size,
+	DebugDirectory.rva,	DebugDirectory.size, DebugDirectory.size,
+	ArchitectureData.rva,	ArchitectureData.size, ArchitectureData.size,
+	GlobalPtr.rva,	GlobalPtr.size, GlobalPtr.size,
+	TLSTable.rva,	TLSTable.size, TLSTable.size,
+	LoadConfigurationTable.rva,	LoadConfigurationTable.size, LoadConfigurationTable.size,
+	BoundImportTable.rva,	BoundImportTable.size, BoundImportTable.size,
+	ImportAddressTable.rva,	ImportAddressTable.size, ImportAddressTable.size,
+	DelayImport.rva,	DelayImport.size, DelayImport.size,
+	CLRHeader.rva,	CLRHeader.size, CLRHeader.size,
+	Reserved.rva,	Reserved.size, Reserved.size);
+}
 
+void dump_pe_sections(adbg_object_t *obj) {
+	dump_chapter("Sections");
+	for (ushort si; si < obj.pe.hdr.NumberOfSections; ++si) {
+		PE_SECTION_ENTRY section = obj.pe.sections[si];
+		
 		with (section)
 		printf(
 		"\n%u. %.8s\n"~
@@ -370,7 +385,7 @@ L_SECTIONS:
 		PointerToLinenumbers,
 		NumberOfLinenumbers, section.NumberOfLinenumbers,
 		Characteristics);
-
+		
 		with (section) { // Section Characteristics flags
 		if (Characteristics & PE_SECTION_CHARACTERISTIC_NO_PAD)
 			printf("NO_PAD,");
@@ -436,101 +451,27 @@ L_SECTIONS:
 		if (Characteristics & PE_SECTION_CHARACTERISTIC_MEM_WRITE)
 			printf("MEM_WRITE,");
 		}
-
+		
 		puts(")");
 	}
+}
 
-	//
-	//TODO: Symbols
-	//
-L_SYMBOLS:
-
-/*	if ((flags & DUMPER_SHOW_SYMBOLS) == 0)
-		goto L_IMPORTS;*/
-
-
-	//
-	// ANCHOR LoadConfig, Imports, .NET meta
-	//
-	// NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
-	//
-L_IMPORTS:
-
-	if ((flags & (DUMPER_SHOW_IMPORTS | DUMPER_SHOW_LOADCFG)) == 0 ||
-		fi.pe.hdr.SizeOfOptionalHeader == 0)
-		goto L_DEBUG;
-
-	puts("\n# Imports\n");
-
-	if (fi.pe.fo_imports && fi.pe.hdr.SizeOfOptionalHeader) {
-		char* basename = cast(char*)fi.pe.imports - fi.pe.dir.ImportTable.rva;
-
-		for (size_t i; i < 256; ++i) { // 256 is a hardlimit for testing purposes
-			PE_IMPORT_DESCRIPTOR id = fi.pe.imports[i];
-
-			if (id.Characteristics == 0)
-				break;
-
-			with (id)
-			printf(
-			"Characteristics  %08X\n"~
-			"TimeDateStamp    %08X\n"~
-			"ForwarderChain   %08X\n"~
-			"Name             %08X\t%.32s\n"~ // 32 "in case of"
-			"FirstThunk       %08X\n\n",
-			Characteristics,
-			TimeDateStamp,
-			ForwarderChain,
-			Name, basename + Name,
-			FirstThunk
-			);
-
-			void* n = basename + id.Characteristics;
-
-			switch (fi.pe.ohdr.Magic) {
-			case PE_FMT_32:
-				PE_IMPORT_LTE32 *lte32 = cast(PE_IMPORT_LTE32*)n;
-				while (lte32.val) {
-					if (lte32.val & 0x8000_0000) { // Ordinal
-						printf("%04X\t", lte32.num);
-					} else { // RVA
-						ushort *hint = cast(ushort*)(basename + lte32.rva);
-						printf("%08X\t%04X\t%s\n",
-							lte32.rva, *hint, cast(char*)hint + 2);
-					}
-					++lte32;
-				}
-				putchar('\n');
-				break;
-			case PE_FMT_64:
-				PE_IMPORT_LTE64 *lte64 = cast(PE_IMPORT_LTE64*)n;
-				while (lte64.val1) {
-					if (lte64.val2 & 0x8000_0000) { // Ordinal
-						printf("%04X\t", lte64.num);
-					} else { // RVA
-						ushort *hint = cast(ushort*)(basename + lte64.rva);
-						printf("%08X\t%04X\t%s\n",
-							lte64.rva, *hint, cast(char*)hint + 2);
-					}
-					++lte64;
-				}
-				putchar('\n');
-				break;
-			default: return EXIT_FAILURE;
-			}
-		}
-	} else puts("No imports were found");
-
-	/*if (fo_loadcf && flags & LOADER_LOAD_LOADCFG) { // LOAD_CONFIGURATION
-		if (fseek(fi.handle, fo_loadcf, SEEK_SET))
+/*void dump_pe_loadconfig(adbg_object_t *obj) {
+	
+	dump_chapter("Load Configuration");
+	
+	if (obj.pe.loadconfig == null) { // LOAD_CONFIGURATION
+		puts("No 
+	}
+		if (fseek(obj.handle, fo_loadcf, SEEK_SET))
 			return EXIT_FAILURE;
 
 		PE_LOAD_CONFIG_META lconf = void;
 		char[32] lcbuffer = void;
 
-		if (fread(&lconf, 4, 1, fi.handle) == 0)
+		if (fread(&lconf, 4, 1, obj.handle) == 0)
 			return EXIT_FAILURE;
-		if (fread(&lconf.dir32.TimeDateStamp, lconf.dir32.Size, 1, fi.handle) == 0)
+		if (fread(&lconf.dir32.TimeDateStamp, lconf.dir32.Size, 1, obj.handle) == 0)
 			return EXIT_FAILURE;
 
 		if (strftime(cast(char*)lcbuffer, 32, "%c",
@@ -752,127 +693,182 @@ L_IMPORTS:
 			EnclaveConfigurationPointer,
 			VolatileMetadataPointer);
 		}
-	} // LOAD_CONFIGURATION*/
+	}
+}*/
 
-	//
-	// Debug information
-	//
+// NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
+void dump_pe_imports(adbg_object_t *obj) {
+	dump_chapter("Imports");
+	
+	if (obj.pe.imports == null || obj.pe.hdr.SizeOfOptionalHeader == 0) {
+		puts("No imports were found");
+		return;
+	}
+	
+	char* basename = cast(char*)obj.pe.imports - obj.pe.dir.ImportTable.rva;
+	
+	for (size_t i; i < 256; ++i) { // 256 is a hardlimit for testing purposes
+		PE_IMPORT_DESCRIPTOR id = obj.pe.imports[i];
 
-	L_DEBUG:
+		if (id.Characteristics == 0)
+			break;
 
-	if ((flags & DUMPER_SHOW_DEBUG) == 0)
-		goto L_DISASM;
-
-	puts("\n# Debug\n");
-
-	if (fi.pe.fo_debug) {
-		size_t count = fi.pe.dir.DebugDirectory.size / PE_DEBUG_DIRECTORY.sizeof;
-
-		for (size_t i; i < count; ++i) {
-			PE_DEBUG_DIRECTORY id = fi.pe.debugs[i];
-
-			with (id)
-			printf(
-			"Characteristics   %08X\n"~
-			"TimeDateStamp     %08X\n"~
-			"MajorVersion      %02X (%u)\n"~
-			"MinorVersion      %02X (%u)\n"~
-			"Type              %02X (%s)\n"~
-			"SizeOfData        %08X (%u)\n"~
-			"AddressOfRawData  %08X\n"~
-			"PointerToRawData  %08X\n",
-			Characteristics,
-			TimeDateStamp,
-			MajorVersion, MajorVersion,
-			MinorVersion, MinorVersion,
-			Type, adbg_obj_debug_type(Type),
-			SizeOfData, SizeOfData,
-			AddressOfRawData,
-			PointerToRawData
-			);
-
-			void *rawdata = fi.b + id.PointerToRawData;
-
-			switch (id.Type) {
-			case PE_IMAGE_DEBUG_TYPE_CODEVIEW:
-				//TODO: Check MajorVersion/MinorVersion
-				//      For example, a modern D program use 0.0
-				//      Probably meaningless
-
-				uint sig = *cast(uint*)rawdata;
-				switch (sig) {
-				case char4i32!"RSDS":
-					PE_DEBUG_DATA_CODEVIEW_PDB70* pdb =
-						cast(PE_DEBUG_DATA_CODEVIEW_PDB70*)rawdata;
-					UID_TEXT uidt = void;
-					uid_str(pdb.PDB_GUID, uidt, UID_GUID);
-					printf(
-					"Type              PDB 7.0 File (RSDS)\n"~
-					"GUID              %s\n"~
-					"Age               %d\n"~
-					"Path              %s\n",
-					cast(char*)uidt, pdb.Age, pdb.Path.ptr);
-					break;
-				case char4i32!"NB09":
-					printf("Type              PDB 2.0+ File (CodeView 4.10)\n");
-					goto L_DEBUG_PDB20;
-				case char4i32!"NB10":
-					printf("Type              PDB 2.0+ File (NB10)\n");
-					goto L_DEBUG_PDB20;
-				case char4i32!"NB11":
-					printf("Type              PDB 2.0+ File (CodeView 5.0)\n");
-L_DEBUG_PDB20:
-					PE_DEBUG_DATA_CODEVIEW_PDB20* pdb =
-						cast(PE_DEBUG_DATA_CODEVIEW_PDB20*)rawdata;
-					printf(
-					"Offset            %08X (%d)\n"~
-					"Timestamp         %d\n"~
-					"Age               %d\n"~
-					"Path              %s\n",
-					pdb.Offset, pdb.Offset, pdb.Timestamp, pdb.Age, pdb.Path.ptr);
-					break;
-				default:
-					printf("Type              Unknown (%.4s)\n", cast(char*)rawdata);
-					break;
+		with (id)
+		printf(
+		"Characteristics  %08X\n"~
+		"TimeDateStamp    %08X\n"~
+		"ForwarderChain   %08X\n"~
+		"Name             %08X\t%.64s\n"~ // 64 max temporary
+		"FirstThunk       %08X\n\n",
+		Characteristics,
+		TimeDateStamp,
+		ForwarderChain,
+		Name, basename + Name,
+		FirstThunk
+		);
+		
+		union lte_t {
+			void *raw;
+			PE_IMPORT_LTE32 *e32;
+			PE_IMPORT_LTE64 *e64;
+		}
+		lte_t lte = void; lte.raw = basename + id.Characteristics;
+		
+		switch (obj.pe.opthdr.Magic) {
+		case PE_FMT_32:
+			for (; lte.e32.val; ++lte.e32) {
+				if (lte.e32.val >= 0x8000_0000) { // Ordinal
+					printf("%04X\n", lte.e32.num);
+				} else { // RVA
+					ushort *hint = cast(ushort*)(basename + lte.e32.rva);
+					printf("%08X\t%04X\t%s\n",
+						lte.e32.rva, *hint, cast(char*)hint + 2);
 				}
-				putchar('\n');
-				break;
-			case PE_IMAGE_DEBUG_TYPE_MISC:
-				// TODO: See MSDN doc. Used for separate .DBG files
-				break;
-			case PE_IMAGE_DEBUG_TYPE_FPO:
-				// TODO: See MSDN doc.
-				break;
-			case PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:
-				// TODO: See MSDN doc.
-				break;
-			default: break;
 			}
+			putchar('\n');
+			break;
+		case PE_FMT_64:
+			for (; lte.e64.val; ++lte.e64) {
+				if (lte.e64.val >= 0x8000_0000_0000_0000) { // Ordinal
+					printf("%04X\n", lte.e64.num);
+				} else { // RVA
+					ushort *hint = cast(ushort*)(basename + lte.e64.rva);
+					printf("%08X\t%04X\t%s\n",
+						lte.e64.rva, *hint, cast(char*)(hint + 1));
+				}
+			}
+			putchar('\n');
+			break;
+		default:
 		}
 	}
+}
 
-	//
-	// Disassembly
-	//
-L_DISASM:
+void dump_pe_debug(adbg_object_t *obj) {
+	dump_chapter("Debug");
+	
+	if (obj.pe.debugdir == null) {
+		puts("No debug directory found");
+		return;
+	}
+	
+	size_t count = obj.pe.dir.DebugDirectory.size / PE_DEBUG_DIRECTORY.sizeof;
+	
+	for (size_t i; i < count; ++i) {
+		PE_DEBUG_DIRECTORY id = obj.pe.debugdir[i];
+		
+		with (id)
+		printf(
+		"Characteristics   %08X\n"~
+		"TimeDateStamp     %08X\n"~
+		"MajorVersion      %02X\t(%u)\n"~
+		"MinorVersion      %02X\t(%u)\n"~
+		"Type              %02X\t(%s)\n"~
+		"SizeOfData        %08X\t(%u)\n"~
+		"AddressOfRawData  %08X\n"~
+		"PointerToRawData  %08X\n",
+		Characteristics,
+		TimeDateStamp,
+		MajorVersion, MajorVersion,
+		MinorVersion, MinorVersion,
+		Type, adbg_obj_pe_debug_type(Type),
+		SizeOfData, SizeOfData,
+		AddressOfRawData,
+		PointerToRawData
+		);
+		
+		void *rawdata = obj.buf + id.PointerToRawData;
+		switch (id.Type) {
+		case PE_IMAGE_DEBUG_TYPE_CODEVIEW:
+			//TODO: Check MajorVersion/MinorVersion
+			//      For example, a modern D program use 0.0
+			//      Probably meaningless
+			
+			uint sig = *cast(uint*)rawdata;
+			switch (sig) {
+			case CHAR32!"RSDS":
+				PE_DEBUG_DATA_CODEVIEW_PDB70* pdb =
+					cast(PE_DEBUG_DATA_CODEVIEW_PDB70*)rawdata;
+				UID_TEXT uidt = void;
+				uid_str(pdb.PDB_GUID, uidt, UID_GUID);
+				printf(
+				"Type              PDB 7.0 File (RSDS)\n"~
+				"GUID              %s\n"~
+				"Age               %d\n"~
+				"Path              %s\n",
+				cast(char*)uidt, pdb.Age, pdb.Path.ptr);
+				break;
+			case CHAR32!"NB09":
+				printf("Type              PDB 2.0+ File (CodeView 4.10)\n");
+				goto L_DEBUG_PDB20;
+			case CHAR32!"NB10":
+				printf("Type              PDB 2.0+ File (NB10)\n");
+				goto L_DEBUG_PDB20;
+			case CHAR32!"NB11":
+				printf("Type              PDB 2.0+ File (CodeView 5.0)\n");
+L_DEBUG_PDB20:
+				PE_DEBUG_DATA_CODEVIEW_PDB20* pdb =
+					cast(PE_DEBUG_DATA_CODEVIEW_PDB20*)rawdata;
+				printf(
+				"Offset            %08X (%d)\n"~
+				"Timestamp         %d\n"~
+				"Age               %d\n"~
+				"Path              %s\n",
+				pdb.Offset, pdb.Offset, pdb.Timestamp, pdb.Age, pdb.Path.ptr);
+				break;
+			default:
+				printf("Type              Unknown (%.4s)\n", cast(char*)rawdata);
+				break;
+			}
+			putchar('\n');
+			break;
+		case PE_IMAGE_DEBUG_TYPE_MISC:
+			// TODO: See MSDN doc. Used for separate .DBG files
+			break;
+		case PE_IMAGE_DEBUG_TYPE_FPO:
+			// TODO: See MSDN doc.
+			break;
+		case PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:
+			// TODO: See MSDN doc.
+			break;
+		default: break;
+		}
+	}
+}
 
-	if ((flags & (DUMPER_DISASM_CODE | DUMPER_DISASM_ALL | DUMPER_DISASM_STATS)) == 0)
-		return EXIT_SUCCESS;
-
+void dump_pe_disasm(adbg_object_t *obj, adbg_disasm_t *disasm, int flags) {
+	dump_chapter("Disassembly");
+	
 	bool all = (flags & DUMPER_DISASM_ALL) != 0;
-	puts("\n# Disassembly\n");
-	for (size_t si; si < fi.pe.hdr.NumberOfSections; ++si) {
-		PE_SECTION_ENTRY s = fi.pe.sections[si];
-
+	for (ushort si; si < obj.pe.hdr.NumberOfSections; ++si) {
+		PE_SECTION_ENTRY s = obj.pe.sections[si];
 		if (s.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
 			printf("\n<%.8s>\n", s.Name.ptr);
-			int e = dump_disasm(dp,
-				fi.b + s.PointerToRawData,
+			if (dump_disasm(disasm,
+				obj.buf + s.PointerToRawData,
 				s.SizeOfRawData,
-				flags);
-			if (e) return e;
+				flags))
+				return;
 		}
 	}
-
-	return EXIT_SUCCESS;
 }

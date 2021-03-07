@@ -1,9 +1,9 @@
 /**
  * License: BSD-3-Clause
  */
-module app.dumper;
+module dumper;
 
 public import
-	app.dumper.dumper,
-	app.dumper.dump.mz,
-	app.dumper.dump.pe;
+	dumper.dumper,
+	dumper.dump.mz,
+	dumper.dump.pe;

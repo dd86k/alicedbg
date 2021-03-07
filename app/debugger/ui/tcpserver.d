@@ -9,5 +9,5 @@
  *
  * License: BSD-3-Clause
  */
-module app.debugger.ui.server;
+module debugger.ui.tcpserver;
 

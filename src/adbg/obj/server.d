@@ -14,34 +14,21 @@
  *
  * License: BSD-3-Clause
  */
-module adbg.obj.loader;
+module adbg.obj.server;
 
 import core.stdc.stdio;
+import core.stdc.config : c_long;
 import adbg.error;
 import adbg.disasm.disasm : AdbgDisasmPlatform, adbg_disasm_msb;
-import adbg.obj.pe;
+import adbg.obj.pe, adbg.obj.elf;
+import adbg.utils.bit;
 
 extern (C):
 
-/*enum {	// adbg_obj_load flags
-	/// Leave file in memory, used by dumper
-	LOADER_MEM = 0x1000,
-}*/
-
-/*private enum {	// obj_info_t internal flags
-	/// ISA is MSB
-	LOADER_INTERNAL_MSB	= 0x0000_0001,
-	/// Section info is loaded
-	/// Internal buffer is allocated
-	LOADER_INTERNAL_BUF_ALLOC	= 0x4000_0000,
-	/// Structure is loaded included header
-	LOADER_INTERNAL_OBJ_LOADED	= 0x8000_0000
-}*/
-
 /// Executable or object format
-enum AdbgObjType {
+enum AdbgObjFormat {
 	/// Mysterious file format
-	Unknown,
+	unknown,
 	/// Mark Zbikowski format
 	MZ,
 	/// New Executable format
@@ -60,155 +47,170 @@ enum AdbgObjType {
 	DBG,
 }
 
-/// Symbol entry
-struct obj_symbol_t {
-	size_t address;
-	char *name;
-	uint length;
+struct adbg_object_impl_t {
+//	const(char)* function(adbg_object_t*) machine;
+	ubyte* function(adbg_object_t*, char* name) section;
+//	object_symbol_t* function(object_t*, size_t addr) symbol;
+//	object_line_t* function(object_t*, size_t addr) line;
 }
 
-/// Executable file information and headers
-// NOTE: Could be renamed to obj_meta_t, but oh well
-struct obj_info_t { align(1):
+/// PE meta for internal use
+private struct pe_t {
+	// Header
+	PE_HEADER *hdr;
+	union {
+		PE_OPTIONAL_HEADER *opthdr;
+		PE_OPTIONAL_HEADER64 *opthdr64;
+		PE_OPTIONAL_HEADERROM *opthdrrom;
+	}
+	// Directories
+	union {
+		PE_IMAGE_DATA_DIRECTORY *dir;
+		PE_DIRECTORY_ENTRY *dirs;
+	}
+	// Data
+	PE_EXPORT_DESCRIPTOR *exports;
+	PE_IMPORT_DESCRIPTOR *imports;
+	PE_DEBUG_DIRECTORY *debugdir;
+	union {
+		PE_LOAD_CONFIG_DIR32 *loaddir32;
+		PE_LOAD_CONFIG_DIR64 *loaddir64;
+	}
+	PE_SECTION_ENTRY *sections;
+	// Internal
+	uint offset; /// PE header file offset
+}
+/// ELF meta for internal use
+private struct elf_t {
+	union {
+		Elf32_Ehdr *hdr32;
+		Elf64_Ehdr *hdr64;
+	}
+}
+
+struct adbg_object_t {
 	//
 	// File
 	//
-
+	
 	union {
-		void   *b;	/// (Internal)
-		char   *bc8;	/// (Internal)
-		ubyte  *bi8;	/// (Internal)
-		ushort *bi16;	/// (Internal)
-		uint   *bi32;	/// (Internal)
-		ulong  *bi64;	/// (Internal)
+		void   *buf;	/// (Internal)
+		char   *bufc8;	/// (Internal)
+		ubyte  *bufi8;	/// (Internal)
+		ushort *bufi16;	/// (Internal)
+		uint   *bufi32;	/// (Internal)
+		ulong  *bufi64;	/// (Internal)
 	}
 	/// File handle, used internally.
-	FILE *handle;
+	FILE *file;
 	/// File size.
-	uint size;
-
+	c_long fsize;
+	
 	//
 	// Object data
 	//
-
-	/// File type, populated by the respective loading function.
-	AdbgObjType type;
-	/// Image's platform translated value for disasm
+	
+	/// Object translated platform target
 	AdbgDisasmPlatform platform;
-	/// A copy of the original loading flags
-	int oflags;
-
+	/// Object format
+	AdbgObjFormat format;
+	
+	//
+	// Implementation-defined metadata
+	//
+	
+	adbg_object_impl_t impl; /// Internal
 	union {
-		PE_META pe;	/// PE32 data
+		pe_t pe; /// PE32 meta
+		elf_t elf; /// ELF meta
 	}
-
-	//
-	// Symbols handling
-	//
-
-	obj_symbol_t *symbols;	/// Symbols pointer (for internal use)
-	uint symbols_count;	/// Number of symbols available
-
-	//
-	// Internals
-	//
-
+	
+//	bool is64;
 }
 
-/// Open object from file path.
-///
-/// This uses fopen and adbg_obj_load to load a file from a file path.
-///
-/// Params:
-/// 	info = Object info structure
-/// 	path = File path
-/// 	flags = Configuration flags
-/// Returns: OS error code or a FileError on error
-int adbg_obj_open(obj_info_t *info, const(char*) path, int flags) {
-	info.handle = fopen(path, "rb");
+/// Open 
+int adbg_obj_open_path(adbg_object_t *obj, const(char) *path) {
+	obj.file = fopen(path, "rb");
 
-	if (info.handle == null)
-		return 1;
+	if (obj.file == null)
+		return adbg_error_system;
 
-	return adbg_obj_load(info, info.handle, flags);
+	return adbg_obj_open_file(obj, obj.file);
 }
 
-/// Load object from file handle.
-///
-/// This populates the obj_info_t structure provided to this function.
-/// Flags are used to indicate what to load. The function is responsible of
-/// allocating data depending on the requested information. The headers
-/// are always loaded.
-///
-/// NOTICE: For the moment being, the LOADER_FILE_MEM is default. No other
-/// modes have been implemented.
-///
-/// If you see an executable image larger than 2 GiB, do let me know.
-/// Params:
-/// 	file = Opened FILE
-/// 	info = obj_info_t structure
-/// 	flags = Load options
-/// Returns: OS error code or a FileError on error
-int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
-	import core.stdc.config : c_long;
+int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	import core.stdc.stdlib : malloc;
+	import core.stdc.string : memset;
 
-	if (file == null)
-		return adbg_error(AdbgError.nullArgument);
+	if (obj == null || file == null)
+		return adbg_error(AdbgError.invalidArgument);
 
-	info.handle = file;
-	info.oflags = flags;
+	obj.file = file;
 
 	// File size
 
-	if (fseek(info.handle, 0, SEEK_END))
+	if (fseek(obj.file, 0, SEEK_END))
 		return adbg_error_system;
 	
-	info.size = cast(uint)ftell(info.handle);
+	obj.fsize = ftell(obj.file);
 	
-	if (info.size == 0xFFFF_FFFF) // -1
+	if (obj.fsize < 0) // -1
 		return adbg_error_system;
-	if (fseek(info.handle, 0, SEEK_SET))
+	if (fseek(obj.file, 0, SEEK_SET))
 		return adbg_error_system;
 
-	// Allocate and read
+	// Allocate
 
-	info.b = malloc(info.size);
+	obj.buf = malloc(obj.fsize);
 	
-	if (info.b == null)
+	if (obj.buf == null)
 		return adbg_error_system;
-	if (fread(info.b, info.size, 1, info.handle) == 0)
+	
+	// Read
+	
+	if (fread(obj.buf, obj.fsize, 1, obj.file) == 0)
 		return adbg_error_system;
+	
+	// Set meta to zero (failsafe future impl.)
+	
+	memset(&obj.impl, 0, adbg_object_impl_t.sizeof + pe_t.sizeof);
 
 	// Auto-detection
 
 	file_sig_t sig = void; // for conveniance
-
-	int e = void;
-	switch (*info.bi16) {
-	case SIG_MZ:
-		uint hdrloc = *(info.bi32 + 15); // 0x3c / 4
-		if (hdrloc == 0)
-			return adbg_error_system;
-		if (hdrloc >= info.size - 4)
-			return adbg_error_system;
-		sig.u32 = *cast(uint*)(info.b + hdrloc);
+	
+	switch (obj.bufi32[0]) {
+	case CHAR32!"ELF\0":
+		assert(0, "todo");
+	default:
+	}
+	
+	switch (obj.bufi16[0]) {
+	case CHAR16!"MZ":
+		obj.pe.offset = obj.bufi32[15]; // 0x3c / 4
+		
+		if (obj.pe.offset < 0x40)
+			return adbg_error(AdbgError.unknownObjFormat);
+		if (obj.pe.offset >= obj.fsize - 4)
+			return adbg_error(AdbgError.unknownObjFormat);
+		
+		sig.u32 = *cast(uint*)(obj.buf + obj.pe.offset);
+		
 		switch (sig.u16[0]) {
-		case SIG_PE:
+		case CHAR16!"PE":
 			if (sig.u16[1]) // "PE\0\0"
-				return adbg_error(AdbgError.unsupportedObjFormat);
-			e = adbg_obj_pe_load(info, hdrloc, flags);
-			break;
-		default: // MZ
-			return adbg_error(AdbgError.unsupportedObjFormat);
+				return adbg_error(AdbgError.unknownObjFormat);
+			return adbg_obj_pe_preload(obj);
+		default: //TODO: MZ
 		}
 		break;
 	default:
-		return adbg_error(AdbgError.unsupportedObjFormat);
 	}
-
-	return e;
+	
+	return adbg_error(AdbgError.unknownObjFormat);
 }
+
+//TODO: Select module/PID/debuggee
 
 //TODO: adbg_obj_unload
 /*int adbg_obj_unload(obj_info_t *info) {
@@ -216,28 +218,7 @@ int adbg_obj_load(obj_info_t *info, FILE *file, int flags) {
 	return 0;
 }*/
 
-//TODO: adbg_obj_symbol_at_address
-/*char* adbg_obj_symbol_at_address(obj_info_t *info, size_t address) {
-	
-	return null;
-}*/
-
-//TODO: int adbg_obj_src_line(source_t *?)
-//      Return line of source code
-
 private:
-
-version (LittleEndian) {
-	enum ushort SIG_MZ	= 0x5A4D; // "MZ"
-	enum ushort SIG_PE	= 0x4550; // "PE"
-	enum ushort SIG_ELF_L	= 0x4C45; // "EL", low 2-byte
-	enum ushort SIG_ELF_H	= 0x7F46; // "F\x7F", high 2-byte
-} else {
-	enum ushort SIG_MZ	= 0x4D5A; // "MZ"
-	enum ushort SIG_PE	= 0x5045; // "PE"
-	enum ushort SIG_ELF_L	= 0x454C; // "EL", low 2-byte
-	enum ushort SIG_ELF_H	= 0x467F; // "F\x7F", high 2-byte
-}
 
 struct file_sig_t { align(1):
 	union {

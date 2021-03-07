@@ -16,7 +16,7 @@ module adbg.obj.pe;
 
 import core.stdc.inttypes;
 import adbg.error;
-import adbg.obj.loader : obj_info_t, AdbgObjType;
+import adbg.obj.server;
 import adbg.disasm.disasm : AdbgDisasmPlatform; // ISA translation
 import adbg.utils.uid : UID;
 
@@ -38,7 +38,7 @@ enum : ushort { // PE_HEADER.Machine, likely all little-endian
 	PE_MACHINE_ARM64	= 0xaa64,	// arm_a64
 	PE_MACHINE_EBC	= 0xebc,	// EFI Byte-Code
 	PE_MACHINE_I386	= 0x14c,	// x86
-	PE_MACHINE_IA64	= 0x200,	// Itanium (not x86-64!)
+	PE_MACHINE_IA64	= 0x200,	// Itanium
 	PE_MACHINE_M32R	= 0x9041,	// lsb
 	PE_MACHINE_MIPS16	= 0x266,
 	PE_MACHINE_MIPSFPU	= 0x366,
@@ -158,94 +158,6 @@ enum : ushort { // PE_HEADER
 	PE_SUBSYSTEM_EFI_ROM	= 13,
 	PE_SUBSYSTEM_XBOX	= 14,
 	PE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION	= 16,
-}
-
-/// PE32 META structure for use in the object loader
-struct PE_META { align(1):
-	//
-	// Header
-	//
-	union {
-		PE_HEADER *hdr;
-		uint fo_hdr;
-	}
-	union {
-		PE_OPTIONAL_HEADER *ohdr;
-		PE_OPTIONAL_HEADER64 *ohdr64;
-		PE_OPTIONAL_HEADERROM *ohdrrom;
-		uint fo_ohdr;
-	}
-	union {
-		PE_IMAGE_DATA_DIRECTORY *dir;
-		uint fo_dir;
-	}
-	//
-	// Directories
-	//
-	union {
-		PE_EXPORT_DESCRIPTOR *exports;
-		uint fo_exports;
-	}
-	union {
-		PE_IMPORT_DESCRIPTOR *imports;
-		uint fo_imports;
-	}
-	union {
-		uint fo_resources;
-	}
-	union {
-		uint fo_exception;
-	}
-	union {
-		uint fo_certitiface;
-	}
-	union {
-		uint fo_basereloc;
-	}
-	union {
-		PE_DEBUG_DIRECTORY *debugs;
-		uint fo_debug;
-	}
-	union {
-		uint fo_architecture;
-	}
-	union {
-		uint fo_globalptr;
-	}
-	union {
-		uint fo_tls;
-	}
-	union {
-		PE_LOAD_CONFIG_META *loadconf;
-		uint fo_loadcfg;
-	}
-	union {
-		uint fo_boundimport;
-	}
-	union {
-		uint fo_importaddress;	/// "IAT"
-	}
-	union {
-		uint fo_delayimport;
-	}
-	union {
-		uint fo_clr;
-	}
-	union {
-		uint fo_reserved;
-	}
-	//
-	// Data
-	//
-	union {
-		PE_SECTION_ENTRY *sections;
-		uint fo_sections;
-	}
-	
-/*	union {
-		PE_LOAD_CONFIG_CODE_INTEGRITY *loadcfg_integrity;
-		uint fo_loadcfg_integrity;
-	}*/
 }
 
 /// COFF file header (object and image)
@@ -415,7 +327,6 @@ struct PE_IMPORT_LTE32 { align(1):
 struct PE_IMPORT_LTE64 { align(1):
 	union {
 		ulong val;
-		struct { uint val1, val2; }
 		ushort num; /// Ordinal Number (val2[31] is clear)
 		uint rva; /// Hint/Name Table RVA (val2[31] is set)
 	}
@@ -467,7 +378,7 @@ enum : uint {
 /// CodeView format for PDB 2.0 and above
 // See http://www.debuginfo.com/articles/debuginfomatch.html
 struct PE_DEBUG_DATA_CODEVIEW_PDB20 { align(1):
-	uint8_t[4] Signature;	// Magic: "NB09"/"NB10"/"NB11" bytes
+	uint8_t[4] Signature;	/// Magic: "NB09"/"NB10"/"NB11" bytes
 	/// Offset to the start of the actual debug information from the
 	/// beginning of the CodeView data
 	uint32_t Offset;
@@ -488,6 +399,7 @@ struct PE_DEBUG_DATA_CODEVIEW_PDB70 { align(1):
 
 // Rough guesses for OS limits, offsets+4 since missing Size (already read)
 // If the count is still misleading, the size check will be performed by field
+//TODO: Shouldn't this depend more or less on the linker version?
 // Examples:
 // putty-x86 0.73: 92
 // putty-amd64 0.73: 148
@@ -524,20 +436,22 @@ struct PE_LOAD_CONFIG_DIR32 { align(1):
 	uint16_t CSDVersion;
 	uint16_t Reserved1;
 	uint32_t EditList;
-	uint32_t SecurityCookie; // Windows XP's limit
+	// Windows XP's limit
+	uint32_t SecurityCookie;
 	uint32_t SEHandlerTable;
 	uint32_t SEHandlerCount;
 	uint32_t GuardCFCheckFunctionPointer; // Control Flow
 	uint32_t GuardCFDispatchFunctionPointer;
 	uint32_t GuardCFFunctionTable;
 	uint32_t GuardCFFunctionCount;
-	uint32_t GuardFlags; // Windows 7's limit?
+	// Windows 7's limit?
+	uint32_t GuardFlags;
 	PE_LOAD_CONFIG_CODE_INTEGRITY CodeIntegrity;
 	uint32_t GuardAddressTakenIatEntryTable;
 	uint32_t GuardAddressTakenIatEntryCount;
 	uint32_t GuardLongJumpTargetTable;
 	uint32_t GuardLongJumpTargetCount; // Windows 8's limit?
-	// Windows 10?
+	// Windows 10's limit?
 	uint32_t DynamicValueRelocTable;	// VA
 	uint32_t CHPEMetadataPointer;
 	uint32_t GuardRFFailureRoutine;	// VA
@@ -599,13 +513,6 @@ struct PE_LOAD_CONFIG_DIR64 { align(1):
 	uint64_t VolatileMetadataPointer;         // VA
 }
 
-struct PE_LOAD_CONFIG_META { align(1):
-	union {
-		PE_LOAD_CONFIG_DIR32 dir32;
-		PE_LOAD_CONFIG_DIR64 dir64;
-	}
-}
-
 struct PE_SECTION_ENTRY { align(1):
 	char[8] Name;
 	uint32_t VirtualSize;
@@ -619,91 +526,99 @@ struct PE_SECTION_ENTRY { align(1):
 	uint32_t Characteristics;
 }
 
-int adbg_obj_pe_load(obj_info_t *info, uint peoffset, int flags) {
-	info.type = AdbgObjType.PE;
-	void* offset = info.b + peoffset;
-	info.pe.hdr = cast(PE_HEADER*)offset;
-	info.pe.ohdr = cast(PE_OPTIONAL_HEADER*)(offset + PE_OFFSET_OPTHDR);
-	switch (info.pe.ohdr.Magic) {
+/// (Internal) Called by the server to preload a PE object.
+/// Params: obj = Object
+/// Returns: Status code
+int adbg_obj_pe_preload(adbg_object_t *obj) {
+	obj.format = AdbgObjFormat.PE;
+	
+	void *offset = obj.buf + obj.pe.offset;
+	
+	obj.pe.hdr = cast(PE_HEADER*)offset;
+	obj.pe.opthdr = cast(PE_OPTIONAL_HEADER*)(offset + PE_OFFSET_OPTHDR);
+	
+	switch (obj.pe.opthdr.Magic) {
 	case PE_FMT_32:
-		info.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDR32);
-		info.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDR32);
+		obj.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDR32);
+		obj.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDR32);
 		break;
 	case PE_FMT_64:
-		info.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDR64);
-		info.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDR64);
+		obj.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDR64);
+		obj.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDR64);
 		break;
 	case PE_FMT_ROM:
-		info.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDRROM);
-		info.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDRROM);
+		obj.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDRROM);
+		obj.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDRROM);
 		break;
 	default: return adbg_error(AdbgError.unsupportedObjFormat);
 	}
-	uint secs = info.pe.hdr.NumberOfSections;
-	info.pe.fo_imports = 0;
-	info.pe.fo_debug = 0;
-	for (uint si; si < secs; ++si) {
-		PE_SECTION_ENTRY s = info.pe.sections[si];
+	
+	uint sections = obj.pe.hdr.NumberOfSections;
+	for (uint si; si < sections; ++si) {
+		PE_SECTION_ENTRY s = obj.pe.sections[si];
 
-		if (info.pe.fo_imports == 0)
-		if (s.VirtualAddress <= info.pe.dir.ImportTable.rva &&
-			s.VirtualAddress + s.SizeOfRawData > info.pe.dir.ImportTable.rva) {
-			info.pe.imports = cast(PE_IMPORT_DESCRIPTOR*)(info.b +
-				(s.PointerToRawData +
-				(info.pe.dir.ImportTable.rva - s.VirtualAddress)));
+		if (obj.pe.imports == null)
+		if (s.VirtualAddress <= obj.pe.dir.ImportTable.rva &&
+			s.VirtualAddress + s.SizeOfRawData > obj.pe.dir.ImportTable.rva) {
+			obj.pe.imports = cast(PE_IMPORT_DESCRIPTOR*)
+				(obj.buf + (s.PointerToRawData +
+				(obj.pe.dir.ImportTable.rva - s.VirtualAddress)));
 		}
 
-		if (info.pe.fo_debug == 0)
-		if (s.VirtualAddress <= info.pe.dir.DebugDirectory.rva &&
-			s.VirtualAddress + s.SizeOfRawData > info.pe.dir.DebugDirectory.rva) {
-			info.pe.debugs = cast(PE_DEBUG_DIRECTORY*)(info.b +
-				(s.PointerToRawData +
-				(info.pe.dir.DebugDirectory.rva - s.VirtualAddress)));
+		if (obj.pe.debugdir == null)
+		if (s.VirtualAddress <= obj.pe.dir.DebugDirectory.rva &&
+			s.VirtualAddress + s.SizeOfRawData > obj.pe.dir.DebugDirectory.rva) {
+			obj.pe.debugdir = cast(PE_DEBUG_DIRECTORY*)
+				(obj.buf + (s.PointerToRawData +
+				(obj.pe.dir.DebugDirectory.rva - s.VirtualAddress)));
 		}
 	}
-
-	switch (info.pe.hdr.Machine) {
-	case PE_MACHINE_I386:	info.platform = AdbgDisasmPlatform.x86; break;
-	case PE_MACHINE_AMD64:	info.platform = AdbgDisasmPlatform.x86_64; break;
-	case PE_MACHINE_RISCV32:	info.platform = AdbgDisasmPlatform.rv32; break;
-	default:	info.platform = AdbgDisasmPlatform.native;
+	
+	
+	with (AdbgDisasmPlatform)
+	switch (obj.pe.hdr.Machine) {
+	case PE_MACHINE_AMD64: obj.platform = x86_64; break;
+	case PE_MACHINE_I386: obj.platform = x86; break;
+	case PE_MACHINE_RISCV32: obj.platform = rv32; break;
+	default: obj.platform = AdbgDisasmPlatform.native;
 	}
-
+	
 	return 0;
 }
 
-const(char) *adbg_obj_pe_mach(ushort mach) {
+const(char) *adbg_obj_pe_machine(ushort mach) {
+	import adbg.obj.def;
 	switch (mach) {
-	case PE_MACHINE_UNKNOWN:	return "UNKNOWN";
-	case PE_MACHINE_ALPHA:	return "ALPHA";
-	case PE_MACHINE_ALPHA64:	return "ALPHA64";
-	case PE_MACHINE_AM33:	return "AM33"; // MN10300/AM33
-	case PE_MACHINE_AMD64:	return "AMD64";
-	case PE_MACHINE_ARM:	return "ARM";
-	case PE_MACHINE_ARMNT:	return "ARMNT";
-	case PE_MACHINE_ARM64:	return "ARM64";
-	case PE_MACHINE_EBC:	return "EBC";
-	case PE_MACHINE_I386:	return "I386";
-	case PE_MACHINE_IA64:	return "IA64";
-	case PE_MACHINE_M32R:	return "M32R";
-	case PE_MACHINE_MIPS16:	return "MIPS16";
-	case PE_MACHINE_MIPSFPU:	return "MIPSFPU";
-	case PE_MACHINE_MIPSFPU16:	return "MIPSFPU16";
-	case PE_MACHINE_POWERPC:	return "POWERPC";
-	case PE_MACHINE_POWERPCFP:	return "POWERPCFP";
-	case PE_MACHINE_R3000:	return "R3000";
-	case PE_MACHINE_R4000:	return "R4000";
-	case PE_MACHINE_R10000:	return "R10000";
-	case PE_MACHINE_RISCV32:	return "RISCV32";
-	case PE_MACHINE_RISCV64:	return "RISCV64";
-	case PE_MACHINE_RISCV128:	return "RISCV128";
-	case PE_MACHINE_SH3:	return "SH3";
-	case PE_MACHINE_SH3DSP:	return "SH3DSP";
-	case PE_MACHINE_SH4:	return "SH4";
-	case PE_MACHINE_SH5:	return "SH5";
-	case PE_MACHINE_THUMB:	return "THUMB";
-	case PE_MACHINE_WCEMIPSV2:	return "WCEMIPSV2";
-	case PE_MACHINE_CLR:	return "CLR";
+	case PE_MACHINE_UNKNOWN:	return OBJ_MACH_NONE;
+	case PE_MACHINE_ALPHA:	return OBJ_MACH_ALPHA;
+	case PE_MACHINE_ALPHA64:	return OBJ_MACH_ALPHA64;
+	case PE_MACHINE_AM33:	return OBJ_MACH_MN10300; // MN10300/AM33
+	case PE_MACHINE_AMD64:	return OBJ_MACH_X86_64;
+	case PE_MACHINE_ARM:	return OBJ_MACH_ARM;
+	case PE_MACHINE_ARMNT:	return OBJ_MACH_ARMNT;
+	case PE_MACHINE_ARM64:	return OBJ_MACH_AARCH64;
+	case PE_MACHINE_EBC:	return OBJ_MACH_EBC;
+	case PE_MACHINE_I386:	return OBJ_MACH_386;
+	case PE_MACHINE_IA64:	return OBJ_MACH_IA64;
+	case PE_MACHINE_M32R:	return OBJ_MACH_M32R;
+	case PE_MACHINE_MIPS16:	return OBJ_MACH_MIPS16;
+	case PE_MACHINE_MIPSFPU:	return OBJ_MACH_MIPSFPU;
+	case PE_MACHINE_MIPSFPU16:	return OBJ_MACH_MIPSFPU16;
+	case PE_MACHINE_POWERPC:	return OBJ_MACH_PPC;
+	case PE_MACHINE_POWERPCFP:	return OBJ_MACH_PPCFPU;
+	case PE_MACHINE_R3000:	return OBJ_MACH_MIPS_RS3_LE;
+	case PE_MACHINE_R4000:	return OBJ_MACH_MIPSIII;
+	case PE_MACHINE_R10000:	return OBJ_MACH_MIPSIV;
+	case PE_MACHINE_RISCV32:	return OBJ_MACH_RISCV32;
+	case PE_MACHINE_RISCV64:	return OBJ_MACH_RISCV64;
+	case PE_MACHINE_RISCV128:	return OBJ_MACH_RISCV128;
+	case PE_MACHINE_SH3:	return OBJ_MACH_SH3;
+	case PE_MACHINE_SH3DSP:	return OBJ_MACH_SH3DSP;
+	case PE_MACHINE_SH4:	return OBJ_MACH_SH4;
+	case PE_MACHINE_SH5:	return OBJ_MACH_SH5;
+	case PE_MACHINE_THUMB:	return OBJ_MACH_THUMB;
+	case PE_MACHINE_WCEMIPSV2:	return OBJ_MACH_WCEMIPSV2;
+	case PE_MACHINE_CLR:	return OBJ_MACH_CLR;
 	default:	return null;
 	}
 }
@@ -735,7 +650,7 @@ const(char) *adbg_obj_pe_subsys(ushort subs) {
 	}
 }
 
-const(char) *adbg_obj_debug_type(uint type) {
+const(char) *adbg_obj_pe_debug_type(uint type) {
 	switch (type) {
 	case PE_IMAGE_DEBUG_TYPE_UNKNOWN:	return "Unknown";
 	case PE_IMAGE_DEBUG_TYPE_COFF:	return "COFF";

@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module app.common;
+module common;
 
 import adbg.dbg.exception;
 import adbg.disasm;
@@ -15,7 +15,7 @@ extern (C):
 __gshared:
 
 //
-// Common global variables
+// Common globals
 //
 
 /// Common settings shared between sub-modules
@@ -28,11 +28,11 @@ exception_t common_exception;
 // Settings
 //
 
-/// 
+/// Application operating mode
 enum SettingMode { debugger, dump, trace }
 
-/// UI setting
-enum SettingUI { cmd, loop, tui, server }
+/// Debugger UIs
+enum SettingUI { cmd, loop, tui, tcpserver }
 
 /// Settings structure for the application (only!)
 struct settings_t {
@@ -52,5 +52,5 @@ void printerror() {
 	import adbg.sys.err : SYS_ERR_FMT;
 	import adbg.etc.c.stdio : printf;
 	debug printf("[%s:%d] ", adbg_error_file, adbg_error_line);
-	printf("("~SYS_ERR_FMT~") %s\n", adbg_errno, adbg_error_msg);
+	printf("(%s) %s\n", adbg_error_format, adbg_error_msg);
 }

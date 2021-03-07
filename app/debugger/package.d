@@ -1,9 +1,9 @@
 /**
  * License: BSD-3-Clause
  */
-module app.debugger;
+module debugger;
 
-public import app.common;
-public import app.debugger.ui.cmd  : cmd;
-public import app.debugger.ui.tui  : tui;
-public import app.debugger.ui.loop : loop;
+public import common;
+public import debugger.ui.cmd  : cmd;
+public import debugger.ui.tui  : tui;
+public import debugger.ui.loop : loop;

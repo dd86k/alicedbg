@@ -4,5 +4,5 @@
 module adbg.obj;
 
 public import
-	adbg.obj.loader,
+	adbg.obj.server,
 	adbg.obj.pe;

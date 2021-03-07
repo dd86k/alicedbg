@@ -3,15 +3,15 @@
  *
  * License: BSD-3-Clause
  */
-module app.dumper.dumper;
+module dumper.dumper;
 
 import core.stdc.stdio;
 import core.stdc.config : c_long;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
 import adbg.error;
 import adbg.disasm, adbg.obj;
-import adbg.obj.loader;
-import app.dumper;
+import adbg.obj.server;
+import dumper;
 
 extern (C):
 
@@ -98,27 +98,34 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 	if ((flags & DUMPER_SHOW_EVERYTHING) == 0)
 		flags |= DUMPER_SHOW_HEADER;
 
-	obj_info_t info = void;
-	if (adbg_obj_load(&info, f, 0)) {
+	adbg_object_t obj = void;
+	if (adbg_obj_open_file(&obj, f)) {
 		printf("loader: %s\n", adbg_error_msg);
 		return adbg_errno;
 	}
 
 	if (dp.platform == AdbgDisasmPlatform.native)
-		dp.platform = info.platform;
+		dp.platform = obj.platform;
 
-	with (AdbgObjType)
-	switch (info.type) {
-	case PE: return dump_pe(&info, dp, flags);
+	with (AdbgObjFormat)
+	switch (obj.format) {
+	case PE: return dump_pe(&obj, dp, flags);
 	default:
 		puts("dumper: format not supported");
 		return EXIT_FAILURE;
 	}
 }
 
-void dump_section_title(const(char) *title) {
+/// Output a section title.
+/// Params: title = Section title
+void dump_chapter(const(char) *title) {
 	printf("\n# %s\n\n", title);
 }
+
+//TODO: Consider "dump_value" functions
+//      dump_value(field, value)
+//      dump_value_extra_x32(field, value, number)
+//      dump_value_extra_string(field, value, string)
 
 // NOTE: Normally, a FILE* parameter could be passed, but the Windows bindings
 //       often do not correspond to their CRT equivalent, so this is hard-wired

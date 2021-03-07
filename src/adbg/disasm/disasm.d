@@ -195,7 +195,7 @@ struct adbg_disasm_t { align(1):
 int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	if (p == null) {
 		p.mcbuf[0] = 0;
-		return p.error = adbg_error(AdbgError.nullArgument);
+		return p.error = adbg_error(AdbgError.invalidArgument);
 	}
 	if (p.a == null) {
 		p.mcbuf[0] = 0;

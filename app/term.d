@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module app.term;
+module term;
 
 import core.stdc.stdlib;
 import adbg.etc.c.stdio;

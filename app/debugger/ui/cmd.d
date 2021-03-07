@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module app.debugger.ui.cmd;
+module debugger.ui.cmd;
 
 import adbg.etc.c.stdio;
 import core.stdc.stdlib;
@@ -12,8 +12,8 @@ import adbg.dbg.debugger;
 import adbg.dbg.exception;
 import adbg.sys.err;
 import adbg.utils.str;
-import app.term;
-import app.common;
+import term;
+import common;
 
 extern (C):
 __gshared:

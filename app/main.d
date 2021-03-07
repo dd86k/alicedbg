@@ -12,7 +12,7 @@ import adbg.platform;
 import adbg.dbg : adbg_attach, adbg_load, adbg_state, AdbgState;
 import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax;
 import adbg.sys.err : adbg_sys_perror;
-import app.debugger, app.dumper;
+import debugger, dumper;
 
 private:
 extern (C):
@@ -307,8 +307,8 @@ int cli_help() {
 	"alicedbg - Aiming to be a simple debugger\n"~
 	"\n"~
 	"USAGE\n"~
-	"  alicedbg {--pid ID|--file FILE|--dump FILE} [OPTIONS...]\n"~
-	"  alicedbg {-h|--help|--version|--license}\n"~
+	" alicedbg {--pid ID|--file FILE|--dump FILE} [OPTIONS...]\n"~
+	" alicedbg {-h|--help|--version|--license}\n"~
 	"\n"~
 	"OPTIONS"
 	);
@@ -503,11 +503,10 @@ int main(int argc, const(char)** argv) {
 		puts("trace not supported");
 		return EXIT_FAILURE;
 	case SettingMode.debugger:
-		// Pre-load it. Necessary for loop UI, but optional for others
+		// Pre-load target if specified.
+		// Necessary for loop UI, but optional for others
 		if (file) {
-			lasterr = adbg_load(file, args);
-			
-			if (lasterr) {
+			if (adbg_load(file, args)) {
 				printerror;
 				return EXIT_FAILURE;
 			}
@@ -516,21 +515,14 @@ int main(int argc, const(char)** argv) {
 		}
 		
 		switch (ui) {
-		case SettingUI.loop:
-			lasterr = loop();
-			break;
-		case SettingUI.cmd:
-			lasterr = cmd();
-			break;
-		case SettingUI.tui:
-			lasterr = tui();
-			break;
-		case SettingUI.server:
+		case SettingUI.loop:	return loop();
+		case SettingUI.cmd:	return cmd();
+		case SettingUI.tui:	return tui();
+		case SettingUI.tcpserver:
 			puts("main: server ui not yet supported");
 			return EXIT_FAILURE;
 		default: assert(0);
 		}
-		return lasterr;
 	default: assert(0, "mode not supported");
 	}
 }
