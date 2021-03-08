@@ -103,7 +103,7 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 	}
 
 	// When nothing is set, the default is to show headers
-	if (cast(ushort)flags == 0)
+	if ((flags & 0xFF_FFFF) == 0)
 		flags |= DumpOpt.header;
 
 	adbg_object_t obj = void;
