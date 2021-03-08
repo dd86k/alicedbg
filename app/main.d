@@ -12,7 +12,7 @@ import adbg.platform;
 import adbg.dbg : adbg_attach, adbg_load;
 import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax;
 import adbg.sys.err : adbg_sys_perror;
-import debugger, dumper;
+import common, dumper, ui;
 
 private:
 extern (C):
@@ -268,8 +268,9 @@ immutable setting_show_t[] showflags = [
 	{ 'h', "Show header metadata (default)", DumpOpt.header },
 	{ 's', "Show sections metadata", DumpOpt.sections },
 	{ 'i', "Show imports", DumpOpt.imports },
-	{ 'c', "Show load configuration", DumpOpt.loadcfg },
 //	{ 'e', "Show exports", DUMPER_SHOW_EXPORTS },
+	{ 'c', "Show load configuration", DumpOpt.loadcfg },
+	{ 'r', "Show load configuration", DumpOpt.relocs },
 	{ 'p', "Show debug information", DumpOpt.debug_ },
 	{ 'd', "Disassemble code (executable sections)", DumpOpt.disasm },
 	{ 'D', "Disassemble all sections", DumpOpt.disasm_all },

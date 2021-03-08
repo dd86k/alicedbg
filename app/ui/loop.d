@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module debugger.ui.loop;
+module ui.loop;
 
 import core.stdc.string : memcpy;
 import adbg.etc.c.stdio;

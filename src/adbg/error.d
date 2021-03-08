@@ -77,7 +77,7 @@ private immutable error_t[] errors = [
 	{ AdbgError.unsupportedPlatform, "Platform target not supported" },
 	{ AdbgError.illegalInstruction, "Illegal instruction" },
 	// Object server
-	{ AdbgError.unknownObjFormat, "Invalid object format" },
+	{ AdbgError.unknownObjFormat, "Unknown object format" },
 	{ AdbgError.unsupportedObjFormat, "Unsupported object format" },
 	{ AdbgError.invalidObjPEMachine, "Invalid Machine value for PE32 object" },
 	

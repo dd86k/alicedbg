@@ -20,7 +20,7 @@ import core.stdc.stdio;
 import core.stdc.config : c_long;
 import adbg.error;
 import adbg.disasm.disasm : AdbgDisasmPlatform, adbg_disasm_msb;
-import adbg.obj.pe, adbg.obj.elf;
+import adbg.obj.mz, adbg.obj.pe, adbg.obj.elf;
 import adbg.utils.bit;
 
 extern (C):
@@ -47,6 +47,7 @@ enum AdbgObjFormat {
 	DBG,
 }
 
+/// (Internal) Function pointers the implementation needs to fill.
 struct adbg_object_impl_t {
 //	const(char)* function(adbg_object_t*) machine;
 	ubyte* function(adbg_object_t*, char* name) section;
@@ -54,7 +55,12 @@ struct adbg_object_impl_t {
 //	object_line_t* function(object_t*, size_t addr) line;
 }
 
-/// PE meta for internal use
+/// (Internal) MZ meta structure
+private struct mz_t {
+	mz_hdr *hdr;
+	mz_reloc *relocs;
+}
+/// (Internal) PE meta structure
 private struct pe_t {
 	// Header
 	PE_HEADER *hdr;
@@ -80,7 +86,7 @@ private struct pe_t {
 	// Internal
 	uint offset; /// PE header file offset
 }
-/// ELF meta for internal use
+/// (Internal) ELF meta structure
 private struct elf_t {
 	union {
 		Elf32_Ehdr *hdr32;
@@ -88,7 +94,20 @@ private struct elf_t {
 	}
 }
 
+private enum IMPL_SIZE = adbg_object_impl_t.sizeof;
+private enum META_SIZE = pe_t.sizeof;
+
+/// Represents an object file or module.
 struct adbg_object_t {
+	//
+	// Object data
+	//
+	
+	/// Object translated platform target
+	AdbgDisasmPlatform platform;
+	/// Object format
+	AdbgObjFormat format;
+	
 	//
 	// File
 	//
@@ -107,28 +126,22 @@ struct adbg_object_t {
 	c_long fsize;
 	
 	//
-	// Object data
-	//
-	
-	/// Object translated platform target
-	AdbgDisasmPlatform platform;
-	/// Object format
-	AdbgObjFormat format;
-	
-	//
 	// Implementation-defined metadata
 	//
 	
 	adbg_object_impl_t impl; /// Internal
 	union {
-		pe_t pe; /// PE32 meta
-		elf_t elf; /// ELF meta
+		mz_t mz;	/// MZ meta
+		pe_t pe;	/// PE32 meta
+		elf_t elf;	/// ELF meta
 	}
-	
-//	bool is64;
 }
 
-/// Open 
+/// Load an object file using its path.
+/// Params:
+/// 	obj = Object structure
+/// 	path = File path
+/// Returns: Status code
 int adbg_obj_open_path(adbg_object_t *obj, const(char) *path) {
 	obj.file = fopen(path, "rb");
 
@@ -138,6 +151,11 @@ int adbg_obj_open_path(adbg_object_t *obj, const(char) *path) {
 	return adbg_obj_open_file(obj, obj.file);
 }
 
+/// Load an objet file using a FILE structure.
+/// Params:
+/// 	obj = Object structure
+/// 	file = FILE structure
+/// Returns: Status code
 int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	import core.stdc.stdlib : malloc;
 	import core.stdc.string : memset;
@@ -171,9 +189,9 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	if (fread(obj.buf, obj.fsize, 1, obj.file) == 0)
 		return adbg_error_system;
 	
-	// Set meta to zero (failsafe future impl.)
+	// Set meta to zero (failsafe for future implementations)
 	
-	memset(&obj.impl, 0, adbg_object_impl_t.sizeof + pe_t.sizeof);
+	memset(&obj.impl, 0, IMPL_SIZE + META_SIZE);
 
 	// Auto-detection
 
@@ -187,11 +205,13 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	
 	switch (obj.bufi16[0]) {
 	case CHAR16!"MZ":
+		if (obj.fsize < mz_hdr.sizeof)
+			return adbg_error(AdbgError.unknownObjFormat);
+		
 		obj.pe.offset = obj.bufi32[15]; // 0x3c / 4
 		
-		if (obj.pe.offset < 0x40)
-			return adbg_error(AdbgError.unknownObjFormat);
-		if (obj.pe.offset >= obj.fsize - 4)
+		if (obj.pe.offset)
+		if (obj.pe.offset >= obj.fsize - PE_HEADER.sizeof)
 			return adbg_error(AdbgError.unknownObjFormat);
 		
 		sig.u32 = *cast(uint*)(obj.buf + obj.pe.offset);
@@ -201,13 +221,14 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 			if (sig.u16[1]) // "PE\0\0"
 				return adbg_error(AdbgError.unknownObjFormat);
 			return adbg_obj_pe_preload(obj);
-		default: //TODO: MZ
+		case CHAR16!"LE", CHAR16!"LX", CHAR16!"NE":
+			return adbg_error(AdbgError.unsupportedObjFormat);
+		default: // Assume MZ
+			return adbg_obj_mz_preload(obj);
 		}
-		break;
 	default:
+		return adbg_error(AdbgError.unknownObjFormat);
 	}
-	
-	return adbg_error(AdbgError.unknownObjFormat);
 }
 
 //TODO: Select module/PID/debuggee

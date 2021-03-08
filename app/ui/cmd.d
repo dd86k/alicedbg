@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module debugger.ui.cmd;
+module ui.cmd;
 
 import adbg.etc.c.stdio;
 import core.stdc.stdlib;

@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module debugger.ui.tui;
+module ui.tui;
 
 import core.stdc.stdio, core.stdc.string : memcpy;
 import adbg.error;

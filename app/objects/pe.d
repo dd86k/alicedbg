@@ -3,7 +3,7 @@
  *
  * License: BSD-3-Clause
  */
-module dumper.dump.pe;
+module objects.pe;
 
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE;
 import adbg.etc.c.stdio;
@@ -11,8 +11,7 @@ import adbg.utils.date : ctime32;
 import adbg.disasm.disasm;
 import adbg.obj.server, adbg.obj.pe;
 import adbg.utils.uid, adbg.utils.bit;
-import common;
-import dumper.dumper;
+import common, dumper;
 
 extern (C):
 
@@ -23,7 +22,7 @@ extern (C):
 /// 	flags = Dumper/Loader flags
 /// Returns: Non-zero on error
 int dump_pe(adbg_object_t *obj, adbg_disasm_t *disasm_opts, int flags) {
-	puts("Format: Microsoft Portable Executable");
+	dump_title("Microsoft Portable Executable");
 	
 	if (flags & DumpOpt.header) {
 		if (dump_pe_hdr(obj))
@@ -61,6 +60,8 @@ private:
 
 // Returns true if the machine value is unknown
 bool dump_pe_hdr(adbg_object_t *obj) {
+	dump_chapter("Header");
+	
 	const(char) *str_mach = adbg_obj_pe_machine(obj.pe.hdr.Machine);
 	
 	bool unkmach = void;
@@ -69,8 +70,6 @@ bool dump_pe_hdr(adbg_object_t *obj) {
 		unkmach = true;
 	} else
 		unkmach = false;
-	
-	dump_chapter("Header");
 	
 	with (obj.pe.hdr)
 	printf(
@@ -130,6 +129,8 @@ bool dump_pe_hdr(adbg_object_t *obj) {
 }
 
 void dump_pe_opthdr(adbg_object_t *obj) {
+	dump_chapter("Optional Header");
+	
 	const(char) *str_mag = adbg_obj_pe_magic(obj.pe.opthdr.Magic);
 	if (str_mag == null) {
 		printf("dumper: Invalid magic: %04X\n", obj.pe.opthdr.Magic);
@@ -140,8 +141,6 @@ void dump_pe_opthdr(adbg_object_t *obj) {
 		printf("dumper: Unknown subsystem: %04X\n", obj.pe.opthdr.Subsystem);
 		return;
 	}
-	
-	dump_chapter("Optional Header");
 	
 	with (obj.pe.opthdr)
 	printf(

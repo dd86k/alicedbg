@@ -3,15 +3,14 @@
  *
  * License: BSD-3-Clause
  */
-module dumper.dumper;
+module dumper;
 
 import core.stdc.stdio;
-import core.stdc.config : c_long;
-import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, realloc;
+import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc;
 import adbg.error;
-import adbg.disasm, adbg.obj;
+import adbg.disasm, adbg.obj.server;
 import adbg.obj.server;
-import dumper;
+import common, objects;
 
 extern (C):
 
@@ -39,6 +38,8 @@ enum DumpOpt {
 	loadcfg	= 1 << 9,
 	/// Sections
 	sections	= 1 << 10,
+	/// Relocations
+	relocs	= 1 << 11,
 	
 	/// Disassemble executable sections
 	disasm	= 1 << 22,
@@ -56,6 +57,18 @@ enum DumpOpt {
 		exports | imports | sections,
 }
 
+/// Output a dump title.
+/// Params: title = Title
+void dump_title(const(char) *title) {
+	printf("%s format\n", title);
+}
+
+/// Output a dump chapter.
+/// Params: c = Chapter name
+void dump_chapter(const(char) *title) {
+	printf("\n# %s\n\n", title);
+}
+
 /// Dump given file to stdout.
 /// Params:
 /// 	file = File path
@@ -65,12 +78,13 @@ enum DumpOpt {
 int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 	FILE *f = fopen(file, "rb"); // Handles null file pointers
 	if (f == null) {
-		perror("dump");
+		perror(__FUNCTION__);
 		return EXIT_FAILURE;
 	}
 
 	if (flags & DumpOpt.raw) {
 		if (fseek(f, 0, SEEK_END)) {
+			perror(__FUNCTION__);
 			puts("dump: could not seek file");
 			return EXIT_FAILURE;
 		}
@@ -81,7 +95,7 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 		if (m == null)
 			return EXIT_FAILURE;
 		if (fread(m, fl, 1, f) == 0) {
-			puts("cli: could not read file");
+			perror(__FUNCTION__);
 			return EXIT_FAILURE;
 		}
 
@@ -94,8 +108,8 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 
 	adbg_object_t obj = void;
 	if (adbg_obj_open_file(&obj, f)) {
-		printf("loader: %s\n", adbg_error_msg);
-		return adbg_errno;
+		printerror;
+		return 1;
 	}
 
 	if (dp.platform == AdbgDisasmPlatform.native)
@@ -103,17 +117,12 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 
 	with (AdbgObjFormat)
 	switch (obj.format) {
+	case MZ: return dump_mz(&obj, dp, flags);
 	case PE: return dump_pe(&obj, dp, flags);
 	default:
 		puts("dumper: format not supported");
 		return EXIT_FAILURE;
 	}
-}
-
-/// Output a section title.
-/// Params: title = Section title
-void dump_chapter(const(char) *title) {
-	printf("\n# %s\n\n", title);
 }
 
 //TODO: Consider "dump_value" functions
