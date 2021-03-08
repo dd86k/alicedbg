@@ -81,7 +81,7 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 		perror(__FUNCTION__);
 		return EXIT_FAILURE;
 	}
-
+	
 	if (flags & DumpOpt.raw) {
 		if (fseek(f, 0, SEEK_END)) {
 			perror(__FUNCTION__);
@@ -101,24 +101,26 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 
 		return dump_disasm(dp, m, fl, flags);
 	}
-
-	// When nothing is set, the default is to show headers
-	if ((flags & 0xFF_FFFF) == 0)
-		flags |= DumpOpt.header;
-
+	
+	// Load object into memory
 	adbg_object_t obj = void;
 	if (adbg_obj_open_file(&obj, f)) {
 		printerror;
 		return 1;
 	}
-
+	
+	// When nothing is set, the default is to show headers
+	if ((flags & 0xFF_FFFF) == 0)
+		flags |= DumpOpt.header;
+	
 	if (dp.platform == AdbgDisasmPlatform.native)
 		dp.platform = obj.platform;
-
+	
 	with (AdbgObjFormat)
 	switch (obj.format) {
 	case MZ: return dump_mz(&obj, dp, flags);
 	case PE: return dump_pe(&obj, dp, flags);
+	case ELF: return dump_elf(&obj, dp, flags);
 	default:
 		puts("dumper: format not supported");
 		return EXIT_FAILURE;

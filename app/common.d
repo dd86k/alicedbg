@@ -49,8 +49,7 @@ struct settings_t {
 
 /// Print last library error information to stdout 
 void printerror(string f = __FUNCTION__)() {
-	import adbg.sys.err : SYS_ERR_FMT;
 	import adbg.etc.c.stdio : printf;
 	debug printf("[%s:%d] ", adbg_error_file, adbg_error_line);
-	printf(f~": (%s) %s\n", adbg_error_format, adbg_error_msg);
+	printf(f~": (%s) %s\n", adbg_error_code, adbg_error_msg);
 }

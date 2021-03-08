@@ -61,7 +61,12 @@ enum AdbgError {
 	//
 	unknownObjFormat	= E!(3, 1),
 	unsupportedObjFormat	= E!(3, 2),
-	invalidObjPEMachine	= E!(3, 10),
+	invalidObjVersion	= E!(3, 10),
+	invalidObjMachine	= E!(3, 11),
+	invalidObjClass	= E!(3, 12),
+	invalidObjEndian	= E!(3, 13),
+	invalidObjType	= E!(3, 14),
+	invalidObjABI	= E!(3, 15),
 }
 
 private int errcode;
@@ -71,15 +76,23 @@ private const(char)* errfile;
 private immutable error_t[] errors = [
 	// Genrics
 	{ AdbgError.invalidArgument, "Invalid parameter" },
+	
 	// Debugger
+	
 	// Disassembler
 	{ AdbgError.nullAddress, "Input address is null" },
 	{ AdbgError.unsupportedPlatform, "Platform target not supported" },
 	{ AdbgError.illegalInstruction, "Illegal instruction" },
+	
 	// Object server
 	{ AdbgError.unknownObjFormat, "Unknown object format" },
 	{ AdbgError.unsupportedObjFormat, "Unsupported object format" },
-	{ AdbgError.invalidObjPEMachine, "Invalid Machine value for PE32 object" },
+	{ AdbgError.invalidObjVersion, "Invalid version for object" },
+	{ AdbgError.invalidObjMachine, "Invalid machine/platform value for object" },
+	{ AdbgError.invalidObjClass, "Invalid class/bitness value for object" },
+	{ AdbgError.invalidObjEndian, "Invalid endianess value for object" },
+	{ AdbgError.invalidObjType, "Invalid object type" },
+	{ AdbgError.invalidObjABI, "Invalid ABI value for object" },
 	
 	// Etc.
 	{ AdbgError.none, "Success" },
@@ -131,7 +144,7 @@ int adbg_errno() {
 
 /// Format the last set error code.
 /// Returns: Formatted error code
-const(char) *adbg_error_format() {
+const(char) *adbg_error_code() {
 	import core.stdc.stdio : snprintf;
 	import adbg.sys.err : SYS_ERR_FMT;
 	__gshared char[12] m;

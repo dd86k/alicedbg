@@ -1,5 +1,5 @@
 /**
- * Object/image loader.
+ * Object server.
  *
  * The goal of the object/image loader is being able to obtain information
  * from obj/pdb/image files such as:
@@ -9,8 +9,8 @@
  * - Debugging information (types, etc.);
  * - And a few extras for dumping purposes.
  *
- * Currently, the entire file is loaded in memory out of keeping the
- * implementation simple. Future could see MMI/O usage, or a pure "disk" mode.
+ * Files are first loaded entirely in memory. Then internal pointers are set
+ * depending on the format.
  *
  * License: BSD-3-Clause
  */
@@ -49,10 +49,10 @@ enum AdbgObjFormat {
 
 /// (Internal) Function pointers the implementation needs to fill.
 struct adbg_object_impl_t {
-//	const(char)* function(adbg_object_t*) machine;
-	ubyte* function(adbg_object_t*, char* name) section;
-//	object_symbol_t* function(object_t*, size_t addr) symbol;
-//	object_line_t* function(object_t*, size_t addr) line;
+//	extern (C) const(char)* function(adbg_object_t*) machine;
+	extern (C) ubyte* function(adbg_object_t*, char* name) section;
+//	extern (C) object_symbol_t* function(object_t*, size_t addr) symbol;
+//	extern (C) object_line_t* function(object_t*, size_t addr) line;
 }
 
 /// (Internal) MZ meta structure
@@ -91,6 +91,14 @@ private struct elf_t {
 	union {
 		Elf32_Ehdr *hdr32;
 		Elf64_Ehdr *hdr64;
+	}
+	union {
+		Elf32_Phdr *phdr32;
+		Elf64_Phdr *phdr64;
+	}
+	union {
+		Elf32_Shdr *shdr32;
+		Elf64_Shdr *shdr64;
 	}
 }
 
@@ -198,8 +206,8 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	file_sig_t sig = void; // for conveniance
 	
 	switch (obj.bufi32[0]) {
-	case CHAR32!"ELF\0":
-		assert(0, "todo");
+	case CHAR32!"\x7FELF":
+		return adbg_obj_elf_preload(obj);
 	default:
 	}
 	

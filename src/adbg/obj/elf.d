@@ -1,11 +1,37 @@
 /**
  * ELF format.
  *
- * Source: http://www.sco.com/developers/gabi/latest/ch4.eheader.html
+ * Sources:
+ * - http://www.sco.com/developers/gabi/latest/ch4.eheader.html
+ * - linux/include/uapi/linux/elf.h
  *
  * License: BSD-3-Clause
  */
 module adbg.obj.elf;
+
+import adbg.error;
+import adbg.obj.def;
+import adbg.obj.server : adbg_object_t, AdbgObjFormat;
+import adbg.disasm.disasm : AdbgDisasmPlatform;
+
+// ELF32
+private alias uint	Elf32_Addr;
+private alias ushort	Elf32_Half;
+private alias uint	Elf32_Off;
+private alias int	Elf32_Sword;
+private alias uint	Elf32_Word;
+
+// ELF64
+private alias ulong	Elf64_Addr;
+private alias ushort	Elf64_Half;
+private alias short	Elf64_SHalf;
+private alias ulong	Elf64_Off;
+private alias int	Elf64_Sword;
+private alias uint	Elf64_Word;
+private alias ulong	Elf64_Xword;
+private alias long	Elf64_Sxword;
+
+extern (C):
 
 // Constants
 
@@ -13,6 +39,7 @@ enum ELF_EI_NIDENT	= 16;	/// Size of the initial pad (e_ident[])
 
 // ELF Indexes
 
+// 0..3 is "ELF\0" magic
 enum ELF_EI_CLASS	= 4;	/// Class index
 enum ELF_EI_DATA	= 5;	/// Data index
 enum ELF_EI_VERSION	= 6;	/// File version index
@@ -255,36 +282,443 @@ enum ELF_EM_MOXIE	= 223;	/// Moxie
 enum ELF_EM_AMDGPU	= 224;	/// AMD GPU
 enum ELF_EM_RISCV	= 225;	/// RISC-V
 
+//
+// ELF32 meta
+//
+
 /// ELF32 header structure
 struct Elf32_Ehdr {
 	ubyte[ELF_EI_NIDENT] e_ident;	/// Identification bytes
-	ushort e_type;	/// Object file type
-	ushort e_machine;	/// Object file machine
-	uint e_version;	/// Object version
-	uint e_entry;	/// Object entry address
-	uint e_phoff;	/// Program header offset
-	uint e_shoff;	/// Section header offset
-	uint e_flags;	/// Architecture flags
-	ushort e_ehsize;	/// Header size in bytes
-	ushort e_phentsize;	/// Program header size
-	ushort e_phnum;	/// Number of entries in program header table
-	ushort e_shentsize;	/// Number of entries in the section header table
-	ushort e_shstrndx;	/// Index of the section header table entry that has section names
+	Elf32_Half e_type;	/// Object file type
+	Elf32_Half e_machine;	/// Object file machine
+	Elf32_Word e_version;	/// Object version
+	Elf32_Addr e_entry;	/// Object entry address
+	Elf32_Off  e_phoff;	/// Program header offset
+	Elf32_Off  e_shoff;	/// Section header offset
+	Elf32_Word e_flags;	/// Architecture flags
+	Elf32_Half e_ehsize;	/// Header size in bytes
+	Elf32_Half e_phentsize;	/// Program header size
+	Elf32_Half e_phnum;	/// Number of entries in the program header table
+	Elf32_Half e_shentsize;	/// Section header size
+	Elf32_Half e_shnum;	/// Number of entries in the section header table
+	Elf32_Half e_shstrndx;	/// Index of the section header table entry that has section names
 }
+
+/// Program 32-bit header
+struct Elf32_Phdr {
+	Elf32_Word p_type;	/// Segment type
+	Elf32_Off  p_offset;	/// Segment file offset
+	Elf32_Addr p_vaddr;	/// Segment virtual address
+	Elf32_Addr p_paddr;	/// Segment physical address
+	Elf32_Word p_filesz;	/// Segment size in file
+	Elf32_Word p_memsz;	/// Segment size in memory
+	Elf32_Word p_flags;	
+	Elf32_Word p_align;	/// Segment alignment, file & memory
+}
+
+/// Section 32-bit header
+struct Elf32_Shdr {
+	Elf32_Word sh_name;	/// Section name, index in string table
+	Elf32_Word sh_type;	/// Type of section
+	Elf32_Word sh_flags;	/// Miscellaneous section attributes
+	Elf32_Addr sh_addr;	/// Section virtual addr at execution
+	Elf32_Off  sh_offset;	/// Section file offset
+	Elf32_Word sh_size;	/// Size of section in bytes
+	Elf32_Word sh_link;	/// Index of another section
+	Elf32_Word sh_info;	/// Additional section information
+	Elf32_Word sh_addralign;	/// Section alignment
+	Elf32_Word sh_entsize;	/// Entry size if section holds table
+}
+
+/// Note 32-bit header
+struct Elf32_Nhdr {
+	Elf32_Word n_namesz;	/// Name size
+	Elf32_Word n_descsz;	/// Content size
+	Elf32_Word n_type;	/// Content type
+}
+
+struct Elf32_Dyn {
+	Elf32_Sword d_tag;
+	union {
+		Elf32_Sword d_val;
+		Elf32_Addr  d_ptr;
+	}
+}
+
+struct Elf32_Rel {
+	Elf32_Addr r_offset;
+	Elf32_Word r_info;
+}
+
+struct Elf32_Rela {
+	Elf32_Addr  r_offset;
+	Elf32_Word  r_info;
+	Elf32_Sword r_addend;
+}
+
+struct Elf32_Sym {
+	Elf32_Word st_name;
+	Elf32_Addr st_value;
+	Elf32_Word st_size;
+	ubyte      st_info;
+	ubyte      st_other;
+	Elf32_Half st_shndx;
+}
+
+//
+// ELF64 meta
+//
 
 /// ELF64 header structure
 struct Elf64_Ehdr {
 	ubyte[ELF_EI_NIDENT] e_ident;	/// Identification bytes
-	ushort e_type;	/// Object file type
-	ushort e_machine;	/// Object file machine
-	uint e_version;	/// Object version
-	ulong e_entry;	/// Object entry address
-	ulong e_phoff;	/// Program header offset
-	ulong e_shoff;	/// Section header offset
-	uint e_flags;	/// Architecture flags
-	ushort e_ehsize;	/// Header size in bytes
-	ushort e_phentsize;	/// Program header size
-	ushort e_phnum;	/// Number of entries in program header table
-	ushort e_shentsize;	/// Number of entries in the section header table
-	ushort e_shstrndx;	/// Index of the section header table entry that has section names
+	Elf64_Half e_type;	/// Object file type
+	Elf64_Half e_machine;	/// Object file machine
+	Elf64_Word e_version;	/// Object version
+	Elf64_Addr e_entry;	/// Object entry address
+	Elf64_Off  e_phoff;	/// Program header offset
+	Elf64_Off  e_shoff;	/// Section header offset
+	Elf64_Word e_flags;	/// Architecture flags
+	Elf64_Half e_ehsize;	/// Header size in bytes
+	Elf64_Half e_phentsize;	/// Program header size
+	Elf64_Half e_phnum;	/// Number of entries in the program header table
+	Elf64_Half e_shentsize;	/// Section header size
+	Elf64_Half e_shnum;	/// Number of entries in the section header table
+	Elf64_Half e_shstrndx;	/// Index of the section header table entry that has section names
+}
+
+/// Program 64-bit header
+struct Elf64_Phdr {
+	Elf64_Word  p_type;	/// Segment type
+	Elf64_Word  p_flags;	/// Segment flags
+	Elf64_Off   p_offset;	/// Segment file offset
+	Elf64_Addr  p_vaddr;	/// Segment virtual address
+	Elf64_Addr  p_paddr;	/// Segment physical address
+	Elf64_Xword p_filesz;	/// Segment size in file
+	Elf64_Xword p_memsz;	/// Segment size in memory
+	Elf64_Xword p_align;	/// Segment alignment, file & memory
+}
+
+/// Section 64-bit header
+struct Elf64_Shdr {
+	Elf64_Word  sh_name;	/// Section name, index in string table
+	Elf64_Word  sh_type;	/// Type of section
+	Elf64_Xword sh_flags;	/// Miscellaneous section attributes
+	Elf64_Addr  sh_addr;	/// Section virtual addr at execution
+	Elf64_Off   sh_offset;	/// Section file offset
+	Elf64_Xword sh_size;	/// Size of section in bytes
+	Elf64_Word  sh_link;	/// Index of another section
+	Elf64_Word  sh_info;	/// Additional section information
+	Elf64_Xword sh_addralign;	/// Section alignment
+	Elf64_Xword sh_entsize;	/// Entry size if section holds table
+}
+
+/// Note 64-bit header
+struct Elf64_Nhdr {
+	Elf64_Word n_namesz;	/// Name size
+	Elf64_Word n_descsz;	/// Content size
+	Elf64_Word n_type;	/// Content type
+}
+
+struct Elf64_Dyn {
+	Elf64_Sxword d_tag;
+	union {
+		Elf64_Xword d_val;
+		Elf64_Addr  d_ptr;
+	}
+}
+
+struct Elf64_Rel {
+	Elf64_Addr  r_offset;	/// Location at which to apply the action
+	Elf64_Xword r_info;	/// Index and type of relocation
+}
+
+struct Elf64_Rela {
+	Elf32_Addr  offset;
+	Elf32_Word  info;
+	Elf32_Sword addend;
+}
+
+//
+// Functions
+//
+
+int adbg_obj_elf_preload(adbg_object_t *obj) {
+	obj.format = AdbgObjFormat.ELF;
+	obj.elf.hdr32 = cast(Elf32_Ehdr*)obj.buf;
+	
+	ubyte e_class = obj.elf.hdr32.e_ident[ELF_EI_CLASS];
+	
+	switch (e_class) {
+	case ELFCLASS32:
+		obj.elf.phdr32 = cast(Elf32_Phdr*)(obj.buf + obj.elf.hdr32.e_phoff);
+		obj.elf.shdr32 = cast(Elf32_Shdr*)(obj.buf + obj.elf.hdr32.e_shoff);
+		break;
+	case ELFCLASS64:
+		obj.elf.phdr64 = cast(Elf64_Phdr*)(obj.buf + obj.elf.hdr64.e_phoff);
+		obj.elf.shdr64 = cast(Elf64_Shdr*)(obj.buf + obj.elf.hdr64.e_shoff);
+		break;
+	default:
+		return adbg_error(AdbgError.invalidObjClass);
+	}
+	
+	ushort e_machine = obj.elf.hdr32.e_machine;
+	
+	with (obj)
+	with (AdbgDisasmPlatform)
+	switch (e_machine) {
+	case ELF_EM_386: platform = x86; break;
+	case ELF_EM_X86_64: platform = x86_64; break;
+	case ELF_EM_RISCV:
+		switch (e_class) {
+		case ELFCLASS32: platform = rv32; break;
+		default:
+		}
+		break;
+	default:
+	}
+	
+	return 0;
+}
+
+const(char) *adbg_obj_elf_class(ubyte c) {
+	switch (c) {
+	case ELFCLASS32: return "ELF32";
+	case ELFCLASS64: return "ELF64";
+	default: return null;
+	}
+}
+
+const(char) *adbg_obj_elf_data(ubyte d) {
+	switch (d) {
+	case ELFDATA2LSB: return "LSB";
+	case ELFDATA2MSB: return "MSB";
+	default: return null;
+	}
+}
+
+const(char) *adbg_obj_elf_osabi(ubyte o) {
+	switch (o) {
+	case ELF_OSABI_NONE:	return "NONE";
+	case ELF_OSABI_HPUX:	return "HPUX";
+	case ELF_OSABI_NETBSD:	return "NETBSD";
+	case ELF_OSABI_GNU:	return "GNU";
+	case ELF_OSABI_SOLARIS:	return "SOLARIS";
+	case ELF_OSABI_AIX:	return "AIX";
+	case ELF_OSABI_IRIX:	return "IRIX";
+	case ELF_OSABI_FREEBSD:	return "FREEBSD";
+	case ELF_OSABI_TRU64:	return "TRU64";
+	case ELF_OSABI_MODESTO:	return "MODESTO";
+	case ELF_OSABI_OPENBSD:	return "OPENBSD";
+	case ELF_OSABI_OPENVMS:	return "OPENVMS";
+	case ELF_OSABI_NSK:	return "NSK";
+	case ELF_OSABI_AROS:	return "AROS";
+	case ELF_OSABI_FENIXOS:	return "FENIXOS";
+	case ELF_OSABI_CLOUDABI:	return "CLOUDABI";
+	case ELF_OSABI_OPENVOS:	return "OPENVOS";
+	default: return null;
+	}
+}
+
+const(char) *adbg_obj_elf_type(ushort t) {
+	switch (t) {
+	case ELF_ET_NONE:	return "NONE";
+	case ELF_ET_REL:	return "REL";
+	case ELF_ET_EXEC:	return "EXEC";
+	case ELF_ET_DYN:	return "DYN";
+	case ELF_ET_CORE:	return "CORE";
+	case ELF_ET_LOOS:	return "LOOS";
+	case ELF_ET_HIOS:	return "HIOS";
+	case ELF_ET_LOPROC:	return "LOPROC";
+	case ELF_ET_HIPROC:	return "HIPROC";
+	default: return null;
+	}
+}
+
+const(char) *adbg_obj_elf_machine(ushort m) {
+	switch (m) {
+	case ELF_EM_NONE:	return OBJ_MACH_NONE;
+	case ELF_EM_M32:	return OBJ_MACH_M32;
+	case ELF_EM_SPARC:	return OBJ_MACH_SPARC;
+	case ELF_EM_386:	return OBJ_MACH_386;
+	case ELF_EM_68K:	return OBJ_MACH_68K;
+	case ELF_EM_88K:	return OBJ_MACH_88K;
+	case ELF_EM_MCU:	return OBJ_MACH_MCU;
+	case ELF_EM_860:	return OBJ_MACH_860;
+	case ELF_EM_MIPS:	return OBJ_MACH_MIPS;
+	case ELF_EM_S370:	return OBJ_MACH_S370;
+	case ELF_EM_MIPS_RS3_LE:	return OBJ_MACH_MIPS_RS3_LE;
+	case ELF_EM_PARISC:	return OBJ_MACH_PARISC;
+	case ELF_EM_VPP500:	return OBJ_MACH_VPP500;
+	case ELF_EM_SPARC32PLUS:	return OBJ_MACH_SPARC32PLUS;
+	case ELF_EM_960:	return OBJ_MACH_960;
+	case ELF_EM_PPC:	return OBJ_MACH_PPC;
+	case ELF_EM_PPC64:	return OBJ_MACH_PPC64;
+	case ELF_EM_S390:	return OBJ_MACH_S390;
+	case ELF_EM_SPU:	return OBJ_MACH_SPU;
+	case ELF_EM_V800:	return OBJ_MACH_V800;
+	case ELF_EM_FR20:	return OBJ_MACH_FR20;
+	case ELF_EM_RH32:	return OBJ_MACH_RH32;
+	case ELF_EM_RCE:	return OBJ_MACH_RCE;
+	case ELF_EM_ARM:	return OBJ_MACH_ARM;
+	case ELF_EM_ALPHA:	return OBJ_MACH_ALPHA;
+	case ELF_EM_SH:	return OBJ_MACH_SH;
+	case ELF_EM_SPARCV9:	return OBJ_MACH_SPARCV9;
+	case ELF_EM_TRICORE:	return OBJ_MACH_TRICORE;
+	case ELF_EM_ARC:	return OBJ_MACH_ARC;
+	case ELF_EM_H8_300:	return OBJ_MACH_H8_300;
+	case ELF_EM_H8_300H:	return OBJ_MACH_H8_300H;
+	case ELF_EM_H8S:	return OBJ_MACH_H8S;
+	case ELF_EM_H8_500:	return OBJ_MACH_H8_500;
+	case ELF_EM_IA_64:	return OBJ_MACH_IA64;
+	case ELF_EM_MIPS_X:	return OBJ_MACH_MIPS_X;
+	case ELF_EM_COLDFIRE:	return OBJ_MACH_COLDFIRE;
+	case ELF_EM_68HC12:	return OBJ_MACH_68HC12;
+	case ELF_EM_MMA:	return OBJ_MACH_MMA;
+	case ELF_EM_PCP:	return OBJ_MACH_PCP;
+	case ELF_EM_NCPU:	return OBJ_MACH_NCPU;
+	case ELF_EM_NDR1:	return OBJ_MACH_NDR1;
+	case ELF_EM_STARCODE:	return OBJ_MACH_STARCODE;
+	case ELF_EM_ME16:	return OBJ_MACH_ME16;
+	case ELF_EM_ST100:	return OBJ_MACH_ST100;
+	case ELF_EM_TINYJ:	return OBJ_MACH_TINYJ;
+	case ELF_EM_X86_64:	return OBJ_MACH_X86_64;
+	case ELF_EM_PDSP:	return OBJ_MACH_PDSP;
+	case ELF_EM_PDP10:	return OBJ_MACH_PDP10;
+	case ELF_EM_PDP11:	return OBJ_MACH_PDP11;
+	case ELF_EM_FX66:	return OBJ_MACH_FX66;
+	case ELF_EM_ST9PLUS:	return OBJ_MACH_ST9PLUS;
+	case ELF_EM_ST7:	return OBJ_MACH_ST7;
+	case ELF_EM_68HC16:	return OBJ_MACH_68HC16;
+	case ELF_EM_68HC11:	return OBJ_MACH_68HC11;
+	case ELF_EM_68HC08:	return OBJ_MACH_68HC08;
+	case ELF_EM_68HC05:	return OBJ_MACH_68HC05;
+	case ELF_EM_SVX:	return OBJ_MACH_SVX;
+	case ELF_EM_ST19:	return OBJ_MACH_ST19;
+	case ELF_EM_VAX:	return OBJ_MACH_VAX;
+	case ELF_EM_CRIS:	return OBJ_MACH_CRIS;
+	case ELF_EM_JAVELIN:	return OBJ_MACH_JAVELIN;
+	case ELF_EM_FIREPATH:	return OBJ_MACH_FIREPATH;
+	case ELF_EM_ZSP:	return OBJ_MACH_ZSP;
+	case ELF_EM_MMIX:	return OBJ_MACH_MMIX;
+	case ELF_EM_HUANY:	return OBJ_MACH_HUANY;
+	case ELF_EM_PRISM:	return OBJ_MACH_PRISM;
+	case ELF_EM_AVR:	return OBJ_MACH_AVR;
+	case ELF_EM_FR30:	return OBJ_MACH_FR30;
+	case ELF_EM_D10V:	return OBJ_MACH_D10V;
+	case ELF_EM_D30V:	return OBJ_MACH_D30V;
+	case ELF_EM_V850:	return OBJ_MACH_V850;
+	case ELF_EM_M32R:	return OBJ_MACH_M32R;
+	case ELF_EM_MN10300:	return OBJ_MACH_MN10300;
+	case ELF_EM_MN10200:	return OBJ_MACH_MN10200;
+	case ELF_EM_PJ:	return OBJ_MACH_PJ;
+	case ELF_EM_OPENRISC:	return OBJ_MACH_OPENRISC;
+	case ELF_EM_ARC_COMPACT:	return OBJ_MACH_ARC_COMPACT;
+	case ELF_EM_XTENSA:	return OBJ_MACH_XTENSA;
+	case ELF_EM_VIDEOCORE:	return OBJ_MACH_VIDEOCORE;
+	case ELF_EM_TMM_GPP:	return OBJ_MACH_TMM_GPP;
+	case ELF_EM_NS32K:	return OBJ_MACH_NS32K;
+	case ELF_EM_TPC:	return OBJ_MACH_TPC;
+	case ELF_EM_SNP1K:	return OBJ_MACH_SNP1K;
+	case ELF_EM_ST200:	return OBJ_MACH_ST200;
+	case ELF_EM_IP2K:	return OBJ_MACH_IP2K;
+	case ELF_EM_MAX:	return OBJ_MACH_MAX;
+	case ELF_EM_CR:	return OBJ_MACH_CR;
+	case ELF_EM_F2MC16:	return OBJ_MACH_F2MC16;
+	case ELF_EM_MSP430:	return OBJ_MACH_MSP430;
+	case ELF_EM_BLACKFIN:	return OBJ_MACH_BLACKFIN;
+	case ELF_EM_SE_C33:	return OBJ_MACH_SE_C33;
+	case ELF_EM_SEP:	return OBJ_MACH_SEP;
+	case ELF_EM_ARCA:	return OBJ_MACH_ARCA;
+	case ELF_EM_UNICORE:	return OBJ_MACH_UNICORE;
+	case ELF_EM_EXCESS:	return OBJ_MACH_EXCESS;
+	case ELF_EM_DXP:	return OBJ_MACH_DXP;
+	case ELF_EM_ALTERA_NIOS2:	return OBJ_MACH_ALTERA_NIOS2;
+	case ELF_EM_CRX:	return OBJ_MACH_CRX;
+	case ELF_EM_XGATE:	return OBJ_MACH_XGATE;
+	case ELF_EM_C116:	return OBJ_MACH_C116;
+	case ELF_EM_M16C:	return OBJ_MACH_M16C;
+	case ELF_EM_DSPIC30F:	return OBJ_MACH_DSPIC30F;
+	case ELF_EM_CE:	return OBJ_MACH_CE;
+	case ELF_EM_M32C:	return OBJ_MACH_M32C;
+	case ELF_EM_TSK3000:	return OBJ_MACH_TSK3000;
+	case ELF_EM_RS08:	return OBJ_MACH_RS08;
+	case ELF_EM_SHARC:	return OBJ_MACH_SHARC;
+	case ELF_EM_ECOG2:	return OBJ_MACH_ECOG2;
+	case ELF_EM_SCORE7:	return OBJ_MACH_SCORE7;
+	case ELF_EM_DSP24:	return OBJ_MACH_DSP24;
+	case ELF_EM_VIDEOCORE3:	return OBJ_MACH_VIDEOCORE3;
+	case ELF_EM_LATTICEMICO32:	return OBJ_MACH_LATTICEMICO32;
+	case ELF_EM_SE_C17:	return OBJ_MACH_SE_C17;
+	case ELF_EM_TI_C6000:	return OBJ_MACH_TI_C6000;
+	case ELF_EM_TI_C2000:	return OBJ_MACH_TI_C2000;
+	case ELF_EM_TI_C5500:	return OBJ_MACH_TI_C5500;
+	case ELF_EM_TI_ARP32:	return OBJ_MACH_TI_ARP32;
+	case ELF_EM_TI_PRU:	return OBJ_MACH_TI_PRU;
+	case ELF_EM_MMDSP_PLUS:	return OBJ_MACH_MMDSP_PLUS;
+	case ELF_EM_CYPRESS_M8C:	return OBJ_MACH_CYPRESS_M8C;
+	case ELF_EM_R32C:	return OBJ_MACH_R32C;
+	case ELF_EM_TRIMEDIA:	return OBJ_MACH_TRIMEDIA;
+	case ELF_EM_QDSP6:	return OBJ_MACH_QDSP6;
+	case ELF_EM_8051:	return OBJ_MACH_8051;
+	case ELF_EM_STXP7X:	return OBJ_MACH_STXP7X;
+	case ELF_EM_NDS32:	return OBJ_MACH_NDS32;
+	case ELF_EM_ECOG1X:	return OBJ_MACH_ECOG1X;
+	case ELF_EM_MAXQ30:	return OBJ_MACH_MAXQ30;
+	case ELF_EM_XIMO16:	return OBJ_MACH_XIMO16;
+	case ELF_EM_MANIK:	return OBJ_MACH_MANIK;
+	case ELF_EM_CRAYNV2:	return OBJ_MACH_CRAYNV2;
+	case ELF_EM_RX:	return OBJ_MACH_RX;
+	case ELF_EM_METAG:	return OBJ_MACH_METAG;
+	case ELF_EM_MCST_ELBRUS:	return OBJ_MACH_MCST_ELBRUS;
+	case ELF_EM_ECOG16:	return OBJ_MACH_ECOG16;
+	case ELF_EM_CR16:	return OBJ_MACH_CR16;
+	case ELF_EM_ETPU:	return OBJ_MACH_ETPU;
+	case ELF_EM_SLE9X:	return OBJ_MACH_SLE9X;
+	case ELF_EM_L10M:	return OBJ_MACH_L10M;
+	case ELF_EM_K10M:	return OBJ_MACH_K10M;
+	case ELF_EM_AARCH64:	return OBJ_MACH_AARCH64;
+	case ELF_EM_AVR32:	return OBJ_MACH_AVR32;
+	case ELF_EM_STM8:	return OBJ_MACH_STM8;
+	case ELF_EM_TILE64:	return OBJ_MACH_TILE64;
+	case ELF_EM_TILEPRO:	return OBJ_MACH_TILEPRO;
+	case ELF_EM_MICROBLAZE:	return OBJ_MACH_MICROBLAZE;
+	case ELF_EM_CUDA:	return OBJ_MACH_CUDA;
+	case ELF_EM_TILEGX:	return OBJ_MACH_TILEGX;
+	case ELF_EM_CLOUDSHIELD:	return OBJ_MACH_CLOUDSHIELD;
+	case ELF_EM_COREA_1ST:	return OBJ_MACH_COREA_1ST;
+	case ELF_EM_COREA_2ND:	return OBJ_MACH_COREA_2ND;
+	case ELF_EM_ARC_COMPACT2:	return OBJ_MACH_ARC_COMPACT2;
+	case ELF_EM_OPEN8:	return OBJ_MACH_OPEN8;
+	case ELF_EM_RL78:	return OBJ_MACH_RL78;
+	case ELF_EM_VIDEOCORE5:	return OBJ_MACH_VIDEOCORE5;
+	case ELF_EM_78KOR:	return OBJ_MACH_78KOR;
+	case ELF_EM_56800EX:	return OBJ_MACH_56800EX;
+	case ELF_EM_BA1:	return OBJ_MACH_BA1;
+	case ELF_EM_BA2:	return OBJ_MACH_BA2;
+	case ELF_EM_XCORE:	return OBJ_MACH_XCORE;
+	case ELF_EM_MCHP_PIC:	return OBJ_MACH_MCHP_PIC;
+	case ELF_EM_INTEL205:	return OBJ_MACH_INTEL205;
+	case ELF_EM_INTEL206:	return OBJ_MACH_INTEL206;
+	case ELF_EM_INTEL207:	return OBJ_MACH_INTEL207;
+	case ELF_EM_INTEL208:	return OBJ_MACH_INTEL208;
+	case ELF_EM_INTEL209:	return OBJ_MACH_INTEL209;
+	case ELF_EM_KM32:	return OBJ_MACH_KM32;
+	case ELF_EM_KMX32:	return OBJ_MACH_KMX32;
+	case ELF_EM_KMX16:	return OBJ_MACH_KMX16;
+	case ELF_EM_KMX8:	return OBJ_MACH_KMX8;
+	case ELF_EM_KVARC:	return OBJ_MACH_KVARC;
+	case ELF_EM_CDP:	return OBJ_MACH_CDP;
+	case ELF_EM_COGE:	return OBJ_MACH_COGE;
+	case ELF_EM_COOL:	return OBJ_MACH_COOL;
+	case ELF_EM_NORC:	return OBJ_MACH_NORC;
+	case ELF_EM_CSR_KALIMBA:	return OBJ_MACH_CSR_KALIMBA;
+	case ELF_EM_Z80:	return OBJ_MACH_Z80;
+	case ELF_EM_VISIUM:	return OBJ_MACH_VISIUM;
+	case ELF_EM_FT32:	return OBJ_MACH_FT32;
+	case ELF_EM_MOXIE:	return OBJ_MACH_MOXIE;
+	case ELF_EM_AMDGPU:	return OBJ_MACH_AMDGPU;
+	case ELF_EM_RISCV:	return OBJ_MACH_RISCV;
+	default: return null;
+	}
 }
