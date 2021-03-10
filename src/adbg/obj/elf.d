@@ -14,6 +14,8 @@ import adbg.obj.def;
 import adbg.obj.server : adbg_object_t, AdbgObjFormat;
 import adbg.disasm.disasm : AdbgDisasmPlatform;
 
+// NOTE: The string table section is typically named .shstrtab
+
 // ELF32
 private alias uint	Elf32_Addr;
 private alias ushort	Elf32_Half;
@@ -282,6 +284,48 @@ enum ELF_EM_MOXIE	= 223;	/// Moxie
 enum ELF_EM_AMDGPU	= 224;	/// AMD GPU
 enum ELF_EM_RISCV	= 225;	/// RISC-V
 
+// Section type values
+
+enum ELF_SHT_NULL	= 0;	/// Inactive
+enum ELF_SHT_PROGBITS	= 1;	/// Program bits
+enum ELF_SHT_SYMTAB	= 2;	/// Symbol table
+enum ELF_SHT_STRTAB	= 3;	/// String table
+enum ELF_SHT_RELA	= 4;	/// Relocation entries (with addends)
+enum ELF_SHT_HASH	= 5;	/// Symbol hash table
+enum ELF_SHT_DYNAMIC	= 6;	/// Dynamic linking information
+enum ELF_SHT_NOTE	= 7;	/// File information
+enum ELF_SHT_NOBITS	= 8;	/// Empty section
+enum ELF_SHT_REL	= 9;	/// Relocation entries (without addends)
+enum ELF_SHT_SHLIB	= 10;	/// Reserved
+enum ELF_SHT_DYNSYM	= 11;	/// Dynamic symbol table
+enum ELF_SHT_INIT_ARRAY	= 12;	/// Array of pointers to initialization functions
+enum ELF_SHT_FINI_ARRAY	= 13;	/// Array of pointers to termination functions
+enum ELF_SHT_PREINIT_ARRAY	= 14;	/// Array of pointers to pre-initialization functions
+enum ELF_SHT_GROUP	= 15;	/// Section group
+enum ELF_SHT_SYNTAB_SHNDX	= 16;	/// Symbol table pointed by e_shstrndx
+enum ELF_SHT_LOOS	= 0x60000000;	/// Operating system specific
+enum ELF_SHT_HIOS	= 0x6fffffff;	/// Operating system specific
+enum ELF_SHT_LOPROC	= 0x70000000;	/// Processor specific
+enum ELF_SHT_HIPROC	= 0x7fffffff;	/// Processor specific
+enum ELF_SHT_LOUSER	= 0x80000000;	/// Application specific
+enum ELF_SHT_HIUSER	= 0xffffffff;	/// Application specific
+
+// Section flags
+
+enum ELF_SHF_WRITE	= 0x1;	/// Section should be writable
+enum ELF_SHF_ALLOC	= 0x2;	/// Section occupies memory during executing
+enum ELF_SHF_EXECINSTR	= 0x4;	/// Section contains executable machine instructions
+enum ELF_SHF_MERGE	= 0x10;	/// Section may be merged to eleminate duplication
+enum ELF_SHF_STRINGS	= 0x20;	/// Section is string table
+enum ELF_SHF_INFO_LINK	= 0x40;	/// sh_info field in this section holds a section header table value
+enum ELF_SHF_LINK_ORDER	= 0x80;	/// Adds special ordering for link editors
+enum ELF_SHF_OS_NONCONFORMING	= 0x100;	/// OS-specific
+enum ELF_SHF_GROUP	= 0x200;	/// Section is part of a group
+enum ELF_SHF_TLS	= 0x400;	/// Section contains Thread Local Storage data
+enum ELF_SHF_COMPRESSED	= 0x800;	/// Section is compressed
+enum ELF_SHF_MASKOS	= 0x0ff00000;	/// OS-specific
+enum ELF_SHF_MASKPROC	= 0xf0000000;	/// Processor-specific
+
 //
 // ELF32 meta
 //
@@ -365,6 +409,13 @@ struct Elf32_Sym {
 	Elf32_Half st_shndx;
 }
 
+/// ELF32 Compressed header
+struct Elf32_Chdr {
+	Elf32_Word ch_type;	/// Compression algorithm
+	Elf32_Word ch_size;	/// Uncompressed data size
+	Elf32_Word ch_addralign;	/// Uncompressed data alignment
+}
+
 //
 // ELF64 meta
 //
@@ -437,6 +488,14 @@ struct Elf64_Rela {
 	Elf32_Addr  offset;
 	Elf32_Word  info;
 	Elf32_Sword addend;
+}
+
+/// ELF64 Compressed header
+struct Elf64_Chdr {
+	Elf64_Word  ch_type;	/// Compression algorithm
+	Elf64_Word  ch_reserved;	/// Reserved, obviously
+	Elf64_Xword ch_size;	/// Uncompressed size
+	Elf64_Xword ch_addralign;	/// Uncompressed alignment
 }
 
 //
@@ -719,6 +778,35 @@ const(char) *adbg_obj_elf_machine(ushort m) {
 	case ELF_EM_MOXIE:	return OBJ_MACH_MOXIE;
 	case ELF_EM_AMDGPU:	return OBJ_MACH_AMDGPU;
 	case ELF_EM_RISCV:	return OBJ_MACH_RISCV;
+	default: return null;
+	}
+}
+
+const(char) *adbg_obj_elf_s_type(int t) {
+	switch (t) {
+	case ELF_SHT_NULL:	return "NULL";
+	case ELF_SHT_PROGBITS:	return "PROGBITS";
+	case ELF_SHT_SYMTAB:	return "SYMTAB";
+	case ELF_SHT_STRTAB:	return "STRTAB";
+	case ELF_SHT_RELA:	return "RELA";
+	case ELF_SHT_HASH:	return "HASH";
+	case ELF_SHT_DYNAMIC:	return "DYNAMIC";
+	case ELF_SHT_NOTE:	return "NOTE";
+	case ELF_SHT_NOBITS:	return "NOBITS";
+	case ELF_SHT_REL:	return "REL";
+	case ELF_SHT_SHLIB:	return "SHLIB";
+	case ELF_SHT_DYNSYM:	return "DYNSYM";
+	case ELF_SHT_INIT_ARRAY:	return "INIT_ARRAY";
+	case ELF_SHT_FINI_ARRAY:	return "FINI_ARRAY";
+	case ELF_SHT_PREINIT_ARRAY:	return "PREINIT_ARRAY";
+	case ELF_SHT_GROUP:	return "GROUP";
+	case ELF_SHT_SYNTAB_SHNDX:	return "SYNTAB_SHNDX";
+	case ELF_SHT_LOOS:	return "LOOS";
+	case ELF_SHT_HIOS:	return "HIOS";
+	case ELF_SHT_LOPROC:	return "LOPROC";
+	case ELF_SHT_HIPROC:	return "HIPROC";
+	case ELF_SHT_LOUSER:	return "LOUSER";
+	case ELF_SHT_HIUSER:	return "HIUSER";
 	default: return null;
 	}
 }

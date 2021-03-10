@@ -362,7 +362,7 @@ void dump_pe_sections(adbg_object_t *obj) {
 		
 		with (section)
 		printf(
-		"\n%u. %.8s\n"~
+		"%u. %.8s\n"~
 		"VirtualAddress        %08X\n"~
 		"VirtualSize           %08X\t(%u)\n"~
 		"PointerToRawData      %08X\n"~
@@ -449,7 +449,7 @@ void dump_pe_sections(adbg_object_t *obj) {
 			printf("MEM_WRITE,");
 		}
 		
-		puts(")");
+		puts(")\n");
 	}
 }
 

@@ -21,7 +21,7 @@ import core.stdc.config : c_long;
 import adbg.error;
 import adbg.disasm.disasm : AdbgDisasmPlatform, adbg_disasm_msb;
 import adbg.obj.mz, adbg.obj.pe, adbg.obj.elf;
-import adbg.utils.bit;
+import adbg.utils.bit : CHAR16, CHAR32;
 
 extern (C):
 
@@ -50,6 +50,7 @@ enum AdbgObjFormat {
 /// (Internal) Function pointers the implementation needs to fill.
 struct adbg_object_impl_t {
 //	extern (C) const(char)* function(adbg_object_t*) machine;
+	/// Get data pointer from section name
 	extern (C) ubyte* function(adbg_object_t*, char* name) section;
 //	extern (C) object_symbol_t* function(object_t*, size_t addr) symbol;
 //	extern (C) object_line_t* function(object_t*, size_t addr) line;
@@ -152,10 +153,10 @@ struct adbg_object_t {
 /// Returns: Status code
 int adbg_obj_open_path(adbg_object_t *obj, const(char) *path) {
 	obj.file = fopen(path, "rb");
-
+	
 	if (obj.file == null)
 		return adbg_error_system;
-
+	
 	return adbg_obj_open_file(obj, obj.file);
 }
 
@@ -167,14 +168,14 @@ int adbg_obj_open_path(adbg_object_t *obj, const(char) *path) {
 int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	import core.stdc.stdlib : malloc;
 	import core.stdc.string : memset;
-
+	
 	if (obj == null || file == null)
 		return adbg_error(AdbgError.invalidArgument);
-
+	
 	obj.file = file;
-
+	
 	// File size
-
+	
 	if (fseek(obj.file, 0, SEEK_END))
 		return adbg_error_system;
 	
@@ -184,9 +185,9 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 		return adbg_error_system;
 	if (fseek(obj.file, 0, SEEK_SET))
 		return adbg_error_system;
-
+	
 	// Allocate
-
+	
 	obj.buf = malloc(obj.fsize);
 	
 	if (obj.buf == null)
@@ -200,9 +201,9 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	// Set meta to zero (failsafe for future implementations)
 	
 	memset(&obj.impl, 0, IMPL_SIZE + META_SIZE);
-
+	
 	// Auto-detection
-
+	
 	file_sig_t sig = void; // for conveniance
 	
 	switch (obj.bufi32[0]) {

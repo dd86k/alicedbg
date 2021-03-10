@@ -294,7 +294,8 @@ int cli_show(const(char) *val) {
 				continue A;
 			}
 		}
-		printf("main: show flag '%c' unknown", c);
+		printf("main: show flag '%c' is unknown\n", c);
+		return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
 }
