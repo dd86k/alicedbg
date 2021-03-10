@@ -19,8 +19,7 @@ version (Windows) {
 extern (C):
 
 /// Get error message from the OS (or CRT) by providing the error code
-/// Params:
-/// 	code = Error code number from OS
+/// Params: code = Error code number from OS
 /// Returns: String
 const(char) *adbg_sys_error(int code) {
 	version (Windows) {

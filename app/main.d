@@ -18,6 +18,9 @@ private:
 extern (C):
 __gshared:
 
+//TODO: --loop-log for turning the loop UI into an non-interactive session
+//TODO: --debug/--no-debug: Disable/enable internal SEH from main
+
 //
 // CLI utils
 //
@@ -47,23 +50,22 @@ struct option_t {
 }
 immutable option_t[] options = [
 	// general
-	{ 'm', "march",  "Select architecture for disassembler", true, fa: &cli_march },
-	{ 's', "syntax", "Select disassembler syntax", true, fa: &cli_syntax },
-	//TODO: --debug/--no-debug: Disable/enable internal SEH from main
+	{ 'm', "march",  "Select architecture for disassembler (default=platform)", true, fa: &cli_march },
+	{ 's', "syntax", "Select disassembler syntax (default=platform)", true, fa: &cli_syntax },
 	// debugger
-	{ 'f', "file", "Debugger: Load file (default parameter)", true, fa: &cli_file },
-	{ 0,   "args", "Debugger: Supply arguments to file", true, fa: &cli_args },
-	{ 'E', "env",  "Debugger: Supply environment to file", true, fa: &cli_env },
+	{ 'f', "file", "Debugger: Load executable (default parameter)", true, fa: &cli_file },
+	{ 0,   "args", "Debugger: Supply arguments to executable", true, fa: &cli_args },
+	{ 'E', "env",  "Debugger: Supply environment variables to executable", true, fa: &cli_env },
 	{ 'p', "pid",  "Debugger: Attach to process", true, fa: &cli_pid },
-	{ 'U', "ui",   "Debugger: Select user interface (default=loop)", true, fa: &cli_ui },
+	{ 'U', "ui",   "Debugger: Select debugger user interface (default=cmd)", true, fa: &cli_ui },
 	// dumper
-	{ 'D', "dump", "Dumper: Select the object dump mode", false, &cli_dump },
-	{ 'R', "raw",  "Dumper: File is not an object, but raw", false, &cli_raw },
-	{ 'S', "show", "Dumper: Select which portions to output (default=h)", true, fa: &cli_show },
+	{ 'D', "dump", "Dumper: Dump an object file", false, &cli_dump },
+	{ 'R', "raw",  "Dumper: Specify object is raw", false, &cli_raw },
+	{ 'S', "show", "Dumper: Select which part of the object to display (default=h)", true, fa: &cli_show },
 	// pages
 	{ 'h', "help",    "Show this help screen and exit", false, &cli_help },
 	{ 0,   "version", "Show the version screen and exit", false, &cli_version },
-	{ 0,   "ver",     "Only show the version string and exit", false, &cli_ver },
+	{ 0,   "ver",     "Show the version string and exit", false, &cli_ver },
 	{ 0,   "license", "Show the license page and exit", false, &cli_license },
 	// secrets
 	{ 0,   "meow",    "Meow and exit", false, &cli_meow },
@@ -79,10 +81,10 @@ struct setting_platform_t {
 	immutable(char)* opt, alt, desc;
 }
 immutable setting_platform_t[] platforms = [
-	{ AdbgDisasmPlatform.x86_16, "x86_16", "8086",    "x86 16-bit (real-mode)" },
-	{ AdbgDisasmPlatform.x86,    "x86",    "i386",    "x86 32-bit (extended mode)" },
-	{ AdbgDisasmPlatform.x86_64, "x86_64", "amd64",   "x86 64-bit (long mode)" },
-	{ AdbgDisasmPlatform.rv32,   "rv32",   "riscv32", "RISC-V 32-bit"},
+	{ AdbgDisasmPlatform.x86_16, "x86_16",  "8086",  "x86 16-bit (real-mode)" },
+	{ AdbgDisasmPlatform.x86,    "x86",     "i386",  "x86 32-bit (extended mode)" },
+	{ AdbgDisasmPlatform.x86_64, "x86_64",  "amd64", "x86 64-bit (long mode)" },
+	{ AdbgDisasmPlatform.rv32,   "riscv32", "rv32",  "RISC-V 32-bit"},
 ];
 int cli_march(const(char) *val) {
 	if (cli_wanthelp(val)) {
@@ -149,7 +151,6 @@ int cli_file(const(char) *val) {
 int cli_argsdd(int argi, int argc, const(char) **argv) { // --
 	import adbg.utils.str : adbg_util_move;
 	
-	// NOTE: __gshared items are zero'd at runtime
 	enum MAX = 16;
 	__gshared const(char) *[MAX] args;
 	
@@ -162,8 +163,7 @@ int cli_argsdd(int argi, int argc, const(char) **argv) { // --
 		cast(void**)&common_settings.args, MAX,
 		cast(void**)&s, left);
 	
-	//TODO: move it in _move
-	assert(m == left, "Failed to move items due to insignificant buffer");
+	assert(m == left, "cli_argsdd: 'adbg_util_move' Failed due to small buffer");
 	
 	return EXIT_SUCCESS;
 }
@@ -173,11 +173,11 @@ int cli_args(const(char) *val) { // --args
 	int argc = void;
 	char **argv = adbg_util_expand(val, &argc);
 	
-	if (argc) {
-		common_settings.args = cast(const(char)**)argv;
-		return EXIT_SUCCESS;
-	} else
+	if (argc == 0)
 		return EXIT_FAILURE;
+	
+	common_settings.args = cast(const(char)**)argv;
+	return EXIT_SUCCESS;
 }
 
 //
@@ -332,7 +332,8 @@ else  private enum type = "";
 
 immutable(char) *fmt_version =
 "alicedbg "~ADBG_VERSION~type~" (built: "~__TIMESTAMP__~")\n"~
-"Compiler: "~__VENDOR__~" %u.%03u, "~TARGET_OBJFMT~" obj, "~TARGET_FLTABI~" float\n"~
+"Compiler: "~__VENDOR__~" %u.%03u\n"~
+"Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
 "Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
 "CRT: "~TARGET_CRT~"\n"~
 "CppRT: "~TARGET_CPPRT~"\n";
@@ -451,7 +452,7 @@ int main(int argc, const(char)** argv) {
 					continue A;
 				}
 				if (argi + 1 >= argc) {
-					printf("missing argument for --%s\n", opt.val);
+					printf("main: missing argument for --%s\n", opt.val);
 					return EXIT_FAILURE;
 				}
 				argval = argv[++argi];
@@ -475,7 +476,7 @@ int main(int argc, const(char)** argv) {
 					continue A;
 				}
 				if (argi + 1 >= argc) {
-					printf("missing argument for -%c\n", opt.alt);
+					printf("main: missing argument for -%c\n", opt.alt);
 					return EXIT_FAILURE;
 				}
 				argval = argv[++argi];
@@ -501,7 +502,7 @@ int main(int argc, const(char)** argv) {
 	case SettingMode.dump:
 		return dump(file, &disasm, flags);
 	case SettingMode.trace:
-		puts("trace not supported");
+		puts("main: tracer not supported at this moment");
 		return EXIT_FAILURE;
 	case SettingMode.debugger:
 		// Pre-load target if specified.
@@ -520,10 +521,10 @@ int main(int argc, const(char)** argv) {
 		case SettingUI.cmd:	return cmd();
 		case SettingUI.tui:	return tui();
 		case SettingUI.tcpserver:
-			puts("main: server ui not yet supported");
+			puts("main: tcp-server not yet supported");
 			return EXIT_FAILURE;
 		default: assert(0);
 		}
-	default: assert(0, "mode not supported");
+	default: assert(0, "Implement SettingMode");
 	}
 }
