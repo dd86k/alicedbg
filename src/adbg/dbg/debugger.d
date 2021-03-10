@@ -398,7 +398,7 @@ L_DEBUG_LOOP:
 		} else {
 			winctx.ContextFlags = CONTEXT_ALL;
 			GetThreadContext(g_tid, &winctx);
-			adbg_context_os(&e.registers, &winctx);
+			adbg_ctx_os(&e.registers, &winctx);
 		}
 		e.nextaddrv = e.registers.items[0].st;
 

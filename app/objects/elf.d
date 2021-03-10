@@ -200,6 +200,7 @@ void dump_elf_sections(adbg_object_t *obj) {
 	
 	char *strtable = void;	/// string table location
 	ushort nb = void;	/// number of sections
+	ushort id = void;	/// string table section index
 	
 	ushort i = 1;
 	switch (obj.elf.hdr32.e_ident[ELF_EI_CLASS]) {
@@ -211,15 +212,15 @@ void dump_elf_sections(adbg_object_t *obj) {
 			return;
 		}
 		
-		uint shstrndx32 = obj.elf.hdr32.e_shstrndx;
+		id = obj.elf.hdr32.e_shstrndx;
 		
-		if (shstrndx32 >= nb) {
+		if (id >= nb) {
 			puts("String table index out of bounds");
 			return;
 		}
 		
 		Elf32_Shdr *s32 = obj.elf.shdr32;
-		shstrndx32 = s32[shstrndx32].sh_offset;
+		uint shstrndx32 = s32[id].sh_offset;
 		
 		if (shstrndx32 == 0) {
 			puts("String table offset is zero");
@@ -263,15 +264,15 @@ void dump_elf_sections(adbg_object_t *obj) {
 			return;
 		}
 		
-		ulong shstrndx64 = obj.elf.hdr64.e_shstrndx;
+		id = obj.elf.hdr64.e_shstrndx;
 		
-		if (shstrndx64 >= nb) {
+		if (id >= nb) {
 			puts("String table index out of bounds");
 			return;
 		}
 		
 		Elf64_Shdr *s64 = obj.elf.shdr64;
-		shstrndx64 = s64[shstrndx64].sh_offset;
+		ulong shstrndx64 = s64[id].sh_offset;
 		
 		if (shstrndx64 == 0) {
 			puts("String table offset is zero");
