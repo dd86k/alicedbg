@@ -12,49 +12,70 @@ import adbg.disasm, adbg.obj.server;
 import adbg.obj.server;
 import common, objects;
 
+//TODO: dump_t structure
+//      - adbg_obj_t obj;
+//      - adbg_disasm_t dopts;
+//      - int flags;
+//      - other options such as int d_max_length;
+
 extern (C):
 
 /// Bitfield. Selects which information to display.
 enum DumpOpt {
-	/// Dump header
+	/// 'h' - Dump header
 	header	= 1,
-	/// Dump directories (PE32)
+	/// 'd' - Dump directories (PE32)
 	dirs	= 1 << 1,
-	/// Exports
+	/// 'e' - Exports
 	exports	= 1 << 2,
-	/// Imports
+	/// 'i' - Imports
 	imports	= 1 << 3,
-	/// Images, certificates, etc.
+	/// 'c' - Images, certificates, etc.
 	resources	= 1 << 4,
-	/// Structured Exception Handler
+	/// 't' - Structured Exception Handler
 	seh	= 1 << 5,
-	/// Symbol table(s)
+	/// 't' - Symbol table(s)
 	symbols	= 1 << 6,
-	/// Debugging table
-	debug_	= 1 << 7,
-	/// Thread Local Storage
-	tls	= 1 << 8,
-	/// Load configuration
-	loadcfg	= 1 << 9,
-	/// Sections
-	sections	= 1 << 10,
-	/// Relocations
-	relocs	= 1 << 11,
+	/// 'T' - Dynamic symbol table
+	dynsymbols	= 1 << 7,
+	/// 'g' - Debugging material
+	debug_	= 1 << 8,
+	/// 'o' - Thread Local Storage
+	tls	= 1 << 9,
+	/// 'l' - Load configuration
+	loadcfg	= 1 << 10,
+	/// 's' - Sections
+	sections	= 1 << 11,
+	/// 'r' - Relocations
+	relocs	= 1 << 12,
+	/// 'R' - Dynamic relocations
+	dynrelocs	= 1 << 13,
 	
 	/// Disassemble executable sections
-	disasm	= 1 << 22,
+	disasm_code	= 1 << 22,
 	/// Disassembly statistics
-	stats	= 1 << 23,
+	disasm_stats	= 1 << 23,
 	/// Disassemble all sections
 	disasm_all	= 1 << 24,
 	
 	/// File is raw, do not auto-detect
 	raw	= 1 << 31,
 	
-	/// Display absolutely everything
-	everything	= header | dirs |resources | seh |
+	/// Display all metadata except disassembly
+	everything = header | dirs | resources | seh |
 		symbols | debug_ | tls | loadcfg |
 		exports | imports | sections,
+	
+	/// Wants to disassemble at least something
+	disasm = disasm_code | disasm_stats | disasm_all,
+}
+
+/// dump structure
+struct dump_t {
+	adbg_object_t *obj; /// object
+	adbg_disasm_t *dopts; /// disasm options
+	int flags; /// display settings
+	int maxlen; /// disasm: maximum length to disassemble
 }
 
 /// Output a dump title.
@@ -72,10 +93,10 @@ void dump_chapter(const(char) *title) {
 /// Dump given file to stdout.
 /// Params:
 /// 	file = File path
-/// 	dp = Disassembler settings
+/// 	dopts = Disassembler settings
 /// 	flags = Dumper options
 /// Returns: Error code if non-zero
-int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
+int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 	FILE *f = fopen(file, "rb"); // Handles null file pointers
 	if (f == null) {
 		perror(__FUNCTION__);
@@ -90,7 +111,7 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 		}
 		uint fl = cast(uint)ftell(f);
 		fseek(f, 0, SEEK_SET); // rewind binding is broken
-
+		
 		void *m = malloc(fl + 16);
 		if (m == null)
 			return EXIT_FAILURE;
@@ -98,12 +119,13 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 			perror(__FUNCTION__);
 			return EXIT_FAILURE;
 		}
-
-		return dump_disasm(dp, m, fl, flags);
+		
+		return dump_disasm(dopts, m, fl, flags);
 	}
 	
-	// Load object into memory
 	adbg_object_t obj = void;
+	
+	// Load object into memory
 	if (adbg_obj_open_file(&obj, f)) {
 		printerror;
 		return 1;
@@ -113,24 +135,24 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 	if ((flags & 0xFF_FFFF) == 0)
 		flags |= DumpOpt.header;
 	
-	if (dp.platform == AdbgDisasmPlatform.native)
-		dp.platform = obj.platform;
+	if (dopts.platform == AdbgDisasmPlatform.native)
+		dopts.platform = obj.platform;
+	
+	dump_t dump = void;
+	dump.obj = &obj;
+	dump.dopts = dopts;
+	dump.flags = flags;
 	
 	with (AdbgObjFormat)
-	switch (obj.format) {
-	case MZ: return dump_mz(&obj, dp, flags);
-	case PE: return dump_pe(&obj, dp, flags);
-	case ELF: return dump_elf(&obj, dp, flags);
+	switch (dump.obj.format) {
+	case MZ: return dump_mz(&dump);
+	case PE: return dump_pe(&dump);
+	case ELF: return dump_elf(&dump);
 	default:
 		puts("dumper: format not supported");
 		return EXIT_FAILURE;
 	}
 }
-
-//TODO: Consider "dump_value" functions
-//      dump_value(field, value)
-//      dump_value_extra_x32(field, value, number)
-//      dump_value_extra_string(field, value, string)
 
 // NOTE: Normally, a FILE* parameter could be passed, but the Windows bindings
 //       often do not correspond to their CRT equivalent, so this is hard-wired
@@ -144,7 +166,7 @@ int dump(const(char) *file, adbg_disasm_t *dp, int flags) {
 /// Returns: Status code
 int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 	dp.a = data;
-	if (flags & DumpOpt.stats) {
+	if (flags & DumpOpt.disasm_stats) {
 		uint iavg;	/// instruction average size
 		uint imax;	/// longest instruction size
 		uint icnt;	/// instruction count
@@ -172,10 +194,10 @@ int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 		}
 		printf(
 		"Instruction statistics\n"~
-		"avg. size: %.3f\n"~
-		"max. size: %u\n"~
-		"illegal  : %u\n"~
-		"total    : %u\n",
+		"average instruction size: %.3f\n"~
+		"maximum instruction size: %u\n"~
+		"illegal instructions    : %u\n"~
+		"total instructions      : %u\n",
 		cast(float)iavg / icnt, imax, ills, icnt
 		);
 	} else {

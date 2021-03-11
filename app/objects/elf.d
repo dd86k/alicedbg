@@ -5,7 +5,7 @@
  */
 module objects.elf;
 
-import core.stdc.stdio;
+import adbg.etc.c.stdio;
 import adbg.obj.server;
 import adbg.disasm.disasm : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
 import adbg.obj.elf;
@@ -13,14 +13,17 @@ import dumper;
 
 extern (C):
 
-int dump_elf(adbg_object_t *obj, adbg_disasm_t *disasm_opts, int flags) {
+int dump_elf(dump_t *dump) {
 	dump_title("Executable and Linkable Format");
 	
-	if (flags & DumpOpt.header)
-		dump_elf_hdr(obj);
+	if (dump.flags & DumpOpt.header)
+		dump_elf_hdr(dump.obj);
 	
-	if (flags & DumpOpt.sections)
-		dump_elf_sections(obj);
+	if (dump.flags & DumpOpt.sections)
+		dump_elf_sections(dump.obj);
+	
+	if (dump.flags & DumpOpt.disasm)
+		dump_elf_disasm(dump);
 	
 	return 0;
 }
@@ -222,8 +225,8 @@ void dump_elf_sections(adbg_object_t *obj) {
 		Elf32_Shdr *s32 = obj.elf.shdr32;
 		uint shstrndx32 = s32[id].sh_offset;
 		
-		if (shstrndx32 == 0) {
-			puts("String table offset is zero");
+		if (shstrndx32 == 0 || shstrndx32 > obj.fsize) {
+			puts("String table offset out of bounds");
 			return;
 		}
 		
@@ -274,8 +277,8 @@ void dump_elf_sections(adbg_object_t *obj) {
 		Elf64_Shdr *s64 = obj.elf.shdr64;
 		ulong shstrndx64 = s64[id].sh_offset;
 		
-		if (shstrndx64 == 0) {
-			puts("String table offset is zero");
+		if (shstrndx64 == 0 || shstrndx64 >= obj.fsize) {
+			puts("String table offset out of bounds");
 			return;
 		}
 		
@@ -306,6 +309,89 @@ void dump_elf_sections(adbg_object_t *obj) {
 			sh_addralign,
 			sh_entsize
 			);
+		}
+		return;
+	default:
+	}
+}
+
+void dump_elf_disasm(dump_t *dump) {
+	dump_chapter("Disassembly");
+	
+	bool all = (dump.flags & DumpOpt.disasm_all) != 0;
+	
+	char *strtable = void;
+	ushort id = void; /// string id
+	ushort nb = void;
+	ushort i = 1;
+	switch (dump.obj.elf.hdr32.e_ident[ELF_EI_CLASS]) {
+	case ELFCLASS32:
+		nb = dump.obj.elf.hdr32.e_shnum;
+		
+		if (nb == 0) {
+			puts("No sections");
+			return;
+		}
+		
+		id = dump.obj.elf.hdr32.e_shstrndx;
+		
+		if (id >= nb) {
+			puts("String table index out of bounds");
+			return;
+		}
+		
+		Elf32_Shdr *s32 = dump.obj.elf.shdr32;
+		uint shstrndx32 = s32[id].sh_offset;
+		
+		if (shstrndx32 == 0 || shstrndx32 >= dump.obj.fsize) {
+			puts("String table offset out of bounds");
+			return;
+		}
+	
+		strtable = cast(char*)(dump.obj.buf + shstrndx32);
+		with (s32)
+		for (++s32; i < nb; ++i, ++s32) {
+			if (sh_flags & ELF_SHF_EXECINSTR || all) {
+				printf("<%.32s>\n", strtable + sh_name);
+				dump_disasm(dump.dopts,
+					dump.obj.buf + sh_offset,
+					sh_size, dump.flags);
+			}
+		}
+		return;
+	case ELFCLASS64:
+		nb = dump.obj.elf.hdr64.e_shnum;
+		
+		if (nb == 0) {
+			puts("No sections");
+			return;
+		}
+		
+		id = dump.obj.elf.hdr64.e_shstrndx;
+		
+		if (id >= nb) {
+			puts("String table index out of bounds");
+			return;
+		}
+		
+		Elf64_Shdr *s64 = dump.obj.elf.shdr64;
+		ulong shstrndx64 = s64[id].sh_offset;
+		
+		if (shstrndx64 == 0 || shstrndx64 >= dump.obj.fsize) {
+			puts("String table offset out of bounds");
+			return;
+		}
+		
+		strtable = cast(char*)(dump.obj.buf + shstrndx64);
+		for (++s64; i < nb; ++i, ++s64) {
+			with (s64)
+			if (sh_flags & ELF_SHF_EXECINSTR || all) {
+				printf("<%.32s>\n", strtable + sh_name);
+				dump_disasm(dump.dopts,
+					dump.obj.buf + sh_offset,
+					cast(uint)sh_size, dump.flags);
+				putchar('\n');
+			}
 		}
 		return;
 	default:

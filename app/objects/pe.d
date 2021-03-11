@@ -16,21 +16,18 @@ import common, dumper;
 extern (C):
 
 /// Dump PE32 info to stdout.
-/// Params:
-/// 	obj = File object
-/// 	disasm_opts = Disassembler options
-/// 	flags = Dumper/Loader flags
+/// Params: dump = Dump structure
 /// Returns: Non-zero on error
-int dump_pe(adbg_object_t *obj, adbg_disasm_t *disasm_opts, int flags) {
+int dump_pe(dump_t *dump) {
 	dump_title("Microsoft Portable Executable");
 	
-	if (flags & DumpOpt.header) {
-		if (dump_pe_hdr(obj))
+	if (dump.flags & DumpOpt.header) {
+		if (dump_pe_hdr(dump.obj))
 			return 1;
 		
-		if (obj.pe.hdr.SizeOfOptionalHeader) {
-			dump_pe_opthdr(obj);
-			dump_pe_dirs(obj);
+		if (dump.obj.pe.hdr.SizeOfOptionalHeader) {
+			dump_pe_opthdr(dump.obj);
+			dump_pe_dirs(dump.obj);
 		} else {
 			//TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
 			printf("Type                         Object\n");
@@ -38,20 +35,20 @@ int dump_pe(adbg_object_t *obj, adbg_disasm_t *disasm_opts, int flags) {
 		}
 	}
 	
-	if (flags & DumpOpt.sections)
-		dump_pe_sections(obj);
+	if (dump.flags & DumpOpt.sections)
+		dump_pe_sections(dump.obj);
 	
 /*	if (flags & DUMPER_SHOW_SYMBOLS)
 		dump_pe_symbols;*/
 	
-	if (flags & DumpOpt.imports)
-		dump_pe_imports(obj);
+	if (dump.flags & DumpOpt.imports)
+		dump_pe_imports(dump.obj);
 	
-	if (flags & DumpOpt.debug_)
-		dump_pe_debug(obj);
+	if (dump.flags & DumpOpt.debug_)
+		dump_pe_debug(dump.obj);
 	
-	if (flags & (DumpOpt.disasm | DumpOpt.disasm_all | DumpOpt.stats))
-		dump_pe_disasm(obj, disasm_opts, flags);
+	if (dump.flags & DumpOpt.disasm)
+		dump_pe_disasm(dump);
 	
 	return EXIT_SUCCESS;
 }
@@ -840,31 +837,31 @@ L_DEBUG_PDB20:
 			putchar('\n');
 			break;
 		case PE_IMAGE_DEBUG_TYPE_MISC:
-			// TODO: See MSDN doc. Used for separate .DBG files
+			// TODO: PE_IMAGE_DEBUG_TYPE_MISC. Used for separate .DBG files
 			break;
 		case PE_IMAGE_DEBUG_TYPE_FPO:
-			// TODO: See MSDN doc.
+			// TODO: PE_IMAGE_DEBUG_TYPE_FPO
 			break;
 		case PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:
-			// TODO: See MSDN doc.
+			// TODO: PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS
 			break;
 		default: break;
 		}
 	}
 }
 
-void dump_pe_disasm(adbg_object_t *obj, adbg_disasm_t *disasm, int flags) {
+void dump_pe_disasm(dump_t *dump) {
 	dump_chapter("Disassembly");
 	
-	bool all = (flags & DumpOpt.everything) != 0;
-	for (ushort si; si < obj.pe.hdr.NumberOfSections; ++si) {
-		PE_SECTION_ENTRY s = obj.pe.sections[si];
-		if (s.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
-			printf("\n<%.8s>\n", s.Name.ptr);
-			if (dump_disasm(disasm,
-				obj.buf + s.PointerToRawData,
-				s.SizeOfRawData,
-				flags))
+	bool all = (dump.flags & DumpOpt.disasm_all) != 0;
+	ushort nb = dump.obj.pe.hdr.NumberOfSections;
+	PE_SECTION_ENTRY *entry = dump.obj.pe.sections;
+	for (ushort si; si < nb; ++si, ++entry) {
+		if (entry.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
+			printf("<%.8s>\n", entry.Name.ptr);
+			if (dump_disasm(dump.dopts,
+				dump.obj.buf + entry.PointerToRawData,
+				entry.SizeOfRawData, dump.flags))
 				return;
 		}
 	}

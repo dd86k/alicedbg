@@ -15,40 +15,19 @@ extern (C):
 
 /// Print MZ info to stdout, a file_info_t structure must be loaded before
 /// calling this function.
-/// Params:
-/// 	fi = File information
-/// 	disasm_opts = Disassembler options
-/// 	flags = DumpOpt flags
+/// Params: dump = Dump structure
 /// Returns: Non-zero on error
-int dump_mz(adbg_object_t *obj, adbg_disasm_t *disasm_opts, int flags) {
+int dump_mz(dump_t *dump) {
 	dump_title("MS-DOS MZ");
 	
-	if (flags & DumpOpt.header)
-		dump_mz_hdr(obj);
+	if (dump.flags & DumpOpt.header)
+		dump_mz_hdr(dump.obj);
 	
-	if (flags & DumpOpt.relocs)
-		dump_mz_relocs(obj);
+	if (dump.flags & DumpOpt.relocs)
+		dump_mz_relocs(dump.obj);
 	
-	if (flags & (DumpOpt.disasm | DumpOpt.disasm_all | DumpOpt.stats)) {
-		uint start = obj.mz.hdr.e_cparh * 16;
-		if (start < mz_hdr.sizeof || start >= obj.fsize) {
-			printf(__FUNCTION__~": Data start outside of exe (%u)", start);
-		}
-		
-		uint blks = void;
-		uint len  = void;
-		with (obj.mz.hdr) {
-			blks = e_cblp ? e_cp - 1 : e_cp;
-			len  = (blks * 16) + e_cblp;
-		}
-		if (len > obj.fsize) {
-			printf(__FUNCTION__~": Data length cannot be bigger than file (%u)", len);
-			return 1;
-		}
-		
-		dump_chapter("Disassembly");
-		dump_disasm(disasm_opts, obj.buf + start, len, flags);
-	}
+	if (dump.flags & DumpOpt.disasm)
+		dump_mz_disasm(dump);
 	
 	return 0;
 }
@@ -103,4 +82,26 @@ void dump_mz_relocs(adbg_object_t *obj) {
 	for (ushort i; i < relocs; ++i)
 		printf("%u. segment=%04X offset=%04X\n",
 			i, reloc[i].segment, reloc[i].offset);
+}
+
+void dump_mz_disasm(dump_t *dump) {
+	dump_chapter("Disassembly");
+	
+	uint start = dump.obj.mz.hdr.e_cparh * 16;
+	if (start < mz_hdr.sizeof || start >= dump.obj.fsize) {
+		printf(__FUNCTION__~": Data start outside of exe (%u)", start);
+	}
+	
+	uint blks = void;
+	uint len  = void;
+	with (dump.obj.mz.hdr) {
+		blks = e_cblp ? e_cp - 1 : e_cp;
+		len  = (blks * 16) + e_cblp;
+	}
+	if (len > dump.obj.fsize) {
+		printf(__FUNCTION__~": Data length cannot be bigger than file (%u)", len);
+		return;
+	}
+	
+	dump_disasm(dump.dopts, dump.obj.buf + start, len, dump.flags);
 }

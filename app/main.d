@@ -272,9 +272,9 @@ immutable setting_show_t[] showflags = [
 	{ 'c', "Show load configuration", DumpOpt.loadcfg },
 	{ 'r', "Show load configuration", DumpOpt.relocs },
 	{ 'p', "Show debug information", DumpOpt.debug_ },
-	{ 'd', "Disassemble code (executable sections)", DumpOpt.disasm },
+	{ 'd', "Disassemble code (executable sections)", DumpOpt.disasm_code },
 	{ 'D', "Disassemble all sections", DumpOpt.disasm_all },
-	{ 'S', "Show disassembler statistics instead", DumpOpt.stats },
+	{ 'S', "Show disassembler statistics instead", DumpOpt.disasm_stats },
 	{ 'A', "Show everything", DumpOpt.everything },
 ];
 int cli_show(const(char) *val) {
