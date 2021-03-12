@@ -114,8 +114,7 @@ int cmd_action(const(char) *a) {
 				return action.val;
 		}
 	}
-
-L_END:
+	
 	return -1;
 }
 
@@ -213,11 +212,15 @@ int cmd_c_quit(int argc, const(char) **argv) {
 int cmd_handler(exception_t *ex) {
 	memcpy(&common_exception, ex, exception_t.sizeof);
 	
-	printf("*	Thread %d stopped for: %s\n",
-		ex.tid, adbg_exception_string(ex.type));
+	printf(
+	"*	Thread %d stopped for: %s ("~SYS_ERR_FMT~")\n"~
+	"	Instruction address: %p\n",
+	ex.tid, adbg_exception_string(ex.type), ex.oscode,
+	ex.nextaddr
+	);
 	
 	if (ex.faultaddr)
-		printf("\t"~SYS_ERR_FMT~" at %p\n", ex.oscode, ex.faultaddr);
+		printf("	Fault address: %p\n", ex.faultaddr);
 	
 	int err = ex.oscode;
 	int length = void;

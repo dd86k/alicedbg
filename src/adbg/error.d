@@ -147,11 +147,16 @@ int adbg_errno() {
 const(char) *adbg_error_code() {
 	import core.stdc.stdio : snprintf;
 	import adbg.sys.err : SYS_ERR_FMT;
-	__gshared char[12] m;
-	if (errsource == AdbgErrorSource.self)
-		snprintf(m.ptr, 12, "%u.%u".ptr, errcode >> 24, cast(ushort)errcode);
-	else
-		snprintf(m.ptr, 12, SYS_ERR_FMT, errcode);
+	enum _BL = 16; /// internall buffer length
+	__gshared char[_BL] m;
+	const(char) *fmt = void;
+	with (AdbgErrorSource)
+	switch (errsource) {
+	case self:   fmt = "E%08X"; break;
+	case system: fmt = SYS_ERR_FMT; break;
+	default: assert(0, "adbg_error_code");
+	}
+	snprintf(m.ptr, _BL, fmt, errcode);
 	return m.ptr;
 }
 
@@ -175,8 +180,6 @@ const(char)* adbg_error_msg() {
 	
 	with (AdbgErrorSource)
 	switch (errsource) {
-	case system:
-		return adbg_sys_error(errcode);
 	case self:
 		uint e = errcode;
 		foreach (ref err; errors) {
@@ -185,7 +188,9 @@ const(char)* adbg_error_msg() {
 		}
 		debug assert(0, "missing error message");
 		else  return null;
-	default: assert(0);
+	case system:
+		return adbg_sys_error(errcode);
+	default: assert(0, "adbg_error_msg");
 	}
 }
 

@@ -7,13 +7,12 @@ module adbg.sys.err;
 
 version (Windows) {
 	import core.sys.windows.windows;
-	import core.stdc.string : strerror;
-	enum SYS_ERR_FMT = "0x%08X"; /// Error code format
+	enum SYS_ERR_FMT = "W%08X"; /// Error code format
 	private enum ERR_BUF_SZ = 512;
 } else {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
-	enum SYS_ERR_FMT = "%d"; /// Error code format
+	enum SYS_ERR_FMT = "L%d"; /// Error code format
 }
 
 extern (C):
@@ -29,7 +28,7 @@ const(char) *adbg_sys_error(int code) {
 			null,
 			code,
 			0,	// Default
-			cast(char*)buffer,
+			buffer.ptr,
 			ERR_BUF_SZ,
 			null);
 		return len ? cast(char*)buffer : "Unknown error";

@@ -294,7 +294,7 @@ int cli_show(const(char) *val) {
 				continue A;
 			}
 		}
-		printf("main: show flag '%c' is unknown\n", c);
+		printf("main: unknown display flag '%c'\n", c);
 		return EXIT_FAILURE;
 	}
 	return EXIT_SUCCESS;
@@ -417,12 +417,10 @@ int cli_meow() {
 //
 
 int main(int argc, const(char)** argv) {
-	int lasterr;	/// last cli error
-	
-	A: for (int argi = 1; argi < argc; ++argi) {
+	CLI: for (int argi = 1; argi < argc; ++argi) {
 		const(char) *argLong = argv[argi];
 		
-		if (argLong[0] == 0) continue;
+		if (argLong[0] == 0) continue CLI;
 		
 		char argShort = void;
 		bool isopt  = argLong[0] == '-';
@@ -430,7 +428,7 @@ int main(int argc, const(char)** argv) {
 		if (isopt == false) {
 			if (common_settings.file == null) {
 				common_settings.file = argLong;
-				continue;
+				continue CLI;
 			}
 			
 			printf("main: unknown option '%s'\n", argLong);
@@ -439,61 +437,69 @@ int main(int argc, const(char)** argv) {
 		
 		bool islong = argLong[1] == '-';
 		const(char) *argval = void;
+		
 		if (islong) {
-			if (argLong[2] == 0) { // "--"
+			// test for "--" (debuggee args)
+			if (argLong[2] == 0) {
 				if (cli_argsdd(++argi, argc, argv))
 					return EXIT_FAILURE;
 				break;
 			}
+			
 			argLong = argLong + 2;
-			foreach (option_t opt; options) {
-				if (strcmp(argLong, opt.val)) continue;
+			LONGARG: foreach (option_t opt; options) {
+				if (strcmp(argLong, opt.val)) continue LONGARG;
+				
+				// no argument
 				if (opt.arg == false) {
-					lasterr = opt.f();
-					continue A;
+					if (opt.f())
+						return EXIT_FAILURE;
+					continue CLI;
 				}
+				
+				// with argument
 				if (argi + 1 >= argc) {
 					printf("main: missing argument for --%s\n", opt.val);
 					return EXIT_FAILURE;
 				}
 				argval = argv[++argi];
-				lasterr = opt.fa(argval);
-				if (lasterr) {
-					printf("main: '%s' failed with --%s\n", argval, opt.val);
-					return lasterr;
-				}
-				continue A;
+				if (opt.fa(argval))
+					return EXIT_FAILURE;
+				
+				continue CLI;
 			}
+			printf("main: unknown option '--%s'\n", argLong);
 		} else { // short opt
+			// test for "-" (stdin)
 			argShort = argLong[1];
 			if (argShort == 0) { // "-"
 				puts("main: standard input not supported");
 				return EXIT_FAILURE;
 			}
-			foreach (option_t opt; options) {
-				if (argShort != opt.alt) continue;
+			
+			SHORTARG: foreach (option_t opt; options) {
+				if (argShort != opt.alt)
+					continue SHORTARG;
+				
+				// no argument
 				if (opt.arg == false) {
-					lasterr = opt.f();
-					continue A;
+					if (opt.f())
+						return EXIT_FAILURE;
+					continue CLI;
 				}
+				
+				// with argument
 				if (argi + 1 >= argc) {
 					printf("main: missing argument for -%c\n", opt.alt);
 					return EXIT_FAILURE;
 				}
 				argval = argv[++argi];
-				lasterr = opt.fa(argval);
-				if (lasterr) {
-					printf("main: '%s' failed with -%c\n", argval, opt.alt);
-					return lasterr;
-				}
-				continue A;
+				if (opt.fa(argval))
+					return EXIT_FAILURE;
+				continue CLI;
 			}
-		}
-		
-		if (islong)
-			printf("main: unknown option '--%s'\n", argLong);
-		else
 			printf("main: unknown option '-%c'\n", argShort);
+		}
 		
 		return EXIT_FAILURE;
 	}
