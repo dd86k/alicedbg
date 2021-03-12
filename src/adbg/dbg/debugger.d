@@ -20,10 +20,6 @@ import adbg.platform, adbg.error;
 version (Windows) {
 	import core.sys.windows.windows;
 	import adbg.sys.windows.wow64;
-	package __gshared HANDLE g_tid;	/// Saved thread handle, DEBUG_INFO doesn't contain one
-	package __gshared HANDLE g_pid;	/// Saved process handle
-	version (Win64)
-		package __gshared int processWOW64;
 } else
 version (Posix) {
 	import core.sys.posix.sys.stat;
@@ -38,15 +34,10 @@ version (Posix) {
 	import adbg.sys.posix.unistd;
 	import adbg.sys.linux.user;
 	private enum __WALL = 0x40000000;
-	package __gshared pid_t g_pid;	/// Saved process ID
-	private __gshared int g_mhandle;	/// Saved memory file handle
 }
 
 version (linux)
 	version = USE_CLONE;
-
-extern (C):
-__gshared:
 
 version (X86)
 	private enum opcode_t BREAKPOINT = 0xCC; // INT3
@@ -70,6 +61,9 @@ else version (ARM) {
 		private enum opcode_t BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
 } else
 	static assert(0, "Missing BREAKPOINT value for target platform");
+
+extern (C):
+__gshared:
 
 /// Debugger event receiver function definition
 //public alias debugger_handler_t = int function(adbg_debugger_event_t*);
@@ -114,6 +108,22 @@ struct adbg_debugger_event_t {
 }+/
 
 private
+struct debuggee_t {
+	AdbgState state;
+	breakpoint_t[ADBG_MAX_BREAKPOINTS] breakpoints;
+	size_t bpindex;	/// breakpoint index
+	version (Windows) {
+		HANDLE pid;	/// Process handle
+		HANDLE tid;	/// Thread handle
+		version (Win64) int wow64; /// If running under WoW64
+	}
+	version (Posix) {
+		pid_t pid;	/// Process ID
+		int mhandle;	/// Memory file handle
+	}
+}
+
+private
 struct breakpoint_t {
 	size_t address;
 	align(4) opcode_t opcode;
@@ -125,12 +135,8 @@ struct __adbg_child_t {
 	const(char) **argv, envp;
 }
 
-/// breakpoint opcode for platform
-private immutable(opcode_t) g_bp_opcode = BREAKPOINT;
-private breakpoint_t [ADBG_MAX_BREAKPOINTS]g_bp_list;
-private size_t g_bp_index;
-//private debugger_handler_t g_user_handler;
-private AdbgState g_state;
+package debuggee_t g_debuggee;
+private immutable(opcode_t) g_bp_opcode = BREAKPOINT; /// platform breakpoint opcode
 
 /**
  * Load executable image into the debugger.
@@ -192,8 +198,8 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 			&si, &pi) == FALSE)
 			return adbg_error_system;
 		free(b);
-		g_tid = pi.hThread;
-		g_pid = pi.hProcess;
+		g_debuggee.pid = pi.hProcess;
+		g_debuggee.tid = pi.hThread;
 		
 		// Microsoft recommends getting function pointer with
 		// GetProcAddress("kernel32", "IsWow64Process"), but so far
@@ -204,7 +210,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		//      Appeared in Windows 10, version 1511
 		//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 		version (Win64)
-		if (IsWow64Process(g_pid, &processWOW64) == FALSE)
+		if (IsWow64Process(g_debuggee.pid, &g_debuggee.wow64) == FALSE)
 			return adbg_error_system;
 	} else
 	version (Posix) {
@@ -245,11 +251,11 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 			__adbg_child_t chld = void;
 			chld.envp = cast(const(char)**)&__envp;
 			chld.argv = cast(const(char)**)&__argv;
-			g_pid = clone(&__adbg_chld,
+			g_debuggee.pid = clone(&__adbg_chld,
 				chld_stack + ADBG_CHILD_STACK_SIZE,
 				CLONE_PTRACE,
 				&chld); // tid
-			if (g_pid < 0)
+			if (g_debuggee.pid < 0)
 				return adbg_error_system;
 		} else { // fork(2)
 			g_pid = fork();
@@ -290,7 +296,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 			}
 		} // USE_CLONE
 	}
-	g_state = AdbgState.loaded;
+	g_debuggee.state = AdbgState.loaded;
 	return 0;
 }
 
@@ -325,7 +331,7 @@ int adbg_attach(int pid, int flags = 0) {
 		if (ptrace(PTRACE_SEIZE, pid, null, null) == -1)
 			return adbg_error_system;
 	}
-	g_state = AdbgState.paused;
+	g_debuggee.state = AdbgState.paused;
 	return 0;
 }
 
@@ -334,7 +340,7 @@ int adbg_attach(int pid, int flags = 0) {
  * Returns: AdbgState enum
  */
 AdbgState adbg_state() {
-	return g_state;
+	return g_debuggee.state;
 }
 
 //void adbg_set_handler(debugger_handler_t func) 
@@ -351,18 +357,18 @@ AdbgState adbg_state() {
 int adbg_run(int function(exception_t*) userfunc) {
 	if (userfunc == null)
 		return 1;
-
+	
 	exception_t e = void;
 	adbg_ctx_init(&e.registers);
-
+	
 	version (Windows) {
 		DEBUG_EVENT de = void;
 L_DEBUG_LOOP:
-		g_state = AdbgState.running;
+		g_debuggee.state = AdbgState.running;
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
 			return GetLastError();
-		g_state = AdbgState.paused;
-
+		g_debuggee.state = AdbgState.paused;
+		
 		// Filter events
 		switch (de.dwDebugEventCode) {
 		case EXCEPTION_DEBUG_EVENT: break;
@@ -380,72 +386,72 @@ L_DEBUG_LOOP:
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
 			goto L_DEBUG_LOOP;
 		}
-
+		
 		adbg_ex_dbg(&e, &de);
 		
 		CONTEXT winctx = void;
 		version (Win64) {
 			WOW64_CONTEXT winctxwow64 = void;
-			if (processWOW64) {
+			if (g_debuggee.wow64) {
 				winctxwow64.ContextFlags = CONTEXT_ALL;
-				Wow64GetThreadContext(g_tid, &winctxwow64);
+				Wow64GetThreadContext(g_debuggee.tid, &winctxwow64);
 				adbg_ctx_os_wow64(&e.registers, &winctxwow64);
 			} else {
 				winctx.ContextFlags = CONTEXT_ALL;
-				GetThreadContext(g_tid, &winctx);
+				GetThreadContext(g_debuggee.tid, &winctx);
 				adbg_ctx_os(&e.registers, &winctx);
 			}
 		} else {
 			winctx.ContextFlags = CONTEXT_ALL;
-			GetThreadContext(g_tid, &winctx);
+			GetThreadContext(g_debuggee.tid, &winctx);
 			adbg_ctx_os(&e.registers, &winctx);
 		}
 		e.nextaddrv = e.registers.items[0].st;
-
-		g_state = AdbgState.paused;
+		
+		g_debuggee.state = AdbgState.paused;
 		with (AdbgAction)
 		final switch (userfunc(&e)) {
 		case exit:
 			//TODO: DebugActiveProcessStop if -pid was used
-			g_state = AdbgState.idle;
+			g_debuggee.state = AdbgState.idle;
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
 			return 0;
 		case step:
-			FlushInstructionCache(g_pid, null, 0);
+			FlushInstructionCache(g_debuggee.pid, null, 0);
 			// Enable single-stepping via Trap flag
 			version (Win64) {
-				if (processWOW64) {
+				if (g_debuggee.wow64) {
 					winctxwow64.EFlags |= 0x100;
-					Wow64SetThreadContext(g_tid, &winctxwow64);
+					Wow64SetThreadContext(g_debuggee.tid, &winctxwow64);
 				} else {
 					winctx.EFlags |= 0x100;
-					SetThreadContext(g_tid, &winctx);
+					SetThreadContext(g_debuggee.tid, &winctx);
 				}
 			} else {
 				winctx.EFlags |= 0x100;
-				SetThreadContext(g_tid, &winctx);
+				SetThreadContext(g_debuggee.tid, &winctx);
 			}
 			goto case;
 		case proceed:
 			if (ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE))
 				goto L_DEBUG_LOOP;
-			g_state = AdbgState.idle;
+			g_debuggee.state = AdbgState.idle;
 			return GetLastError();
 		}
 	} else
 	version (Posix) {
 		int wstatus = void;
 L_DEBUG_LOOP:
-		g_state = AdbgState.running;
-		g_pid = waitpid(-1, &wstatus, 0);
-
-		if (g_pid == -1) {
-			g_state = AdbgState.idle;
+		g_debuggee.state = AdbgState.running;
+		g_debuggee.pid = waitpid(-1, &wstatus, 0);
+		
+		if (g_debuggee.pid == -1) {
+			g_debuggee.state = AdbgState.idle;
 			return adbg_error_system;
 		}
 		
-		g_state = AdbgState.paused;
-
+		g_debuggee.state = AdbgState.paused;
+		
 		// Bits  Description (Linux)
 		// 6:0   Signo that caused child to exit
 		//       0x7f if child stopped/continued
@@ -454,15 +460,15 @@ L_DEBUG_LOOP:
 		// 15:8  exit value (or returned main value)
 		//       or signal that cause child to stop/continue
 		int chld_signo = wstatus >> 8;
-
+		
 		// Only interested if child is continuing or stopped; Otherwise
 		// it exited and there's nothing more we can do about it.
 		// So return its status code
 		if ((wstatus & 0x7F) != 0x7F) {
-			g_state = AdbgState.idle;
+			g_debuggee.state = AdbgState.idle;
 			return chld_signo;
 		}
-
+		
 		// Signal filtering
 		switch (chld_signo) {
 		case SIGCONT: goto L_DEBUG_LOOP;
@@ -482,7 +488,7 @@ L_DEBUG_LOOP:
 		// - gdbserver and lldb never attempt to do such thing anyway
 		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 			siginfo_t sig = void;
-			if (ptrace(PTRACE_GETSIGINFO, g_pid, null, &sig) >= 0) {
+			if (ptrace(PTRACE_GETSIGINFO, g_debuggee.pid, null, &sig) >= 0) {
 				version (CRuntime_Glibc)
 					e.faultaddr = sig._sifields._sigfault.si_addr;
 				else version (CRuntime_Musl)
@@ -496,25 +502,25 @@ L_DEBUG_LOOP:
 		default:
 			e.faultaddr = null;
 		}
-
-		adbg_ex_dbg(&e, g_pid, chld_signo);
-
+		
+		adbg_ex_dbg(&e, g_debuggee.pid, chld_signo);
+		
 //		iovec v = void;
 //		if (ptrace(PTRACE_GETREGSET, g_pid, NT_PRSTATUS, &v))
 //			return errno;
-
+		
 		// NOTE: final switch works in betterC but funky in 2.082
 		with (AdbgAction)
 		switch (userfunc(&e)) {
 		case exit:
-			g_state = AdbgState.idle;
-			kill(g_pid, SIGKILL); // PTRACE_KILL is deprecated
+			g_debuggee.state = AdbgState.idle;
+			kill(g_debuggee.pid, SIGKILL); // PTRACE_KILL is deprecated
 			return 0;
 		case step:
-			ptrace(PTRACE_SINGLESTEP, g_pid, null, null);
+			ptrace(PTRACE_SINGLESTEP, g_debuggee.pid, null, null);
 			goto L_DEBUG_LOOP;
 		case proceed:
-			ptrace(PTRACE_CONT, g_pid, null, null);
+			ptrace(PTRACE_CONT, g_debuggee.pid, null, null);
 			goto L_DEBUG_LOOP;
 		default: assert(0);
 		}
@@ -526,9 +532,9 @@ L_DEBUG_LOOP:
 //
 
 int adbg_bp_add(size_t addr) {
-	if (g_bp_index >= ADBG_MAX_BREAKPOINTS - 1)
+	if (g_debuggee.bpindex >= ADBG_MAX_BREAKPOINTS - 1)
 		return 2;
-	breakpoint_t *bp = &g_bp_list[g_bp_index];
+	breakpoint_t *bp = &g_debuggee.breakpoints[g_debuggee.bpindex];
 	assert(0);
 }
 breakpoint_t* adbg_bp_index(int index) {
@@ -571,31 +577,31 @@ deprecated
 int adbg_mm(int op, size_t addr, void *data, uint size) {
 	version (Windows) {
 		if (op >= MM_WRITE) {
-			if (WriteProcessMemory(g_pid, cast(void*)addr, data, size, null) == 0)
+			if (WriteProcessMemory(g_debuggee.pid, cast(void*)addr, data, size, null) == 0)
 				return GetLastError();
 		} else {
-			if (ReadProcessMemory(g_pid, cast(void*)addr, data, size, null) == 0)
+			if (ReadProcessMemory(g_debuggee.pid, cast(void*)addr, data, size, null) == 0)
 				return GetLastError();
 		}
 	} else
 	version (linux) {
 		//TODO: adbg_mm (linux)
 		//      use open(2) and pread64/pwrite64(2)
-		if (g_mhandle <= 0) {
+		if (g_debuggee.mhandle <= 0) {
 			char* cb = cast(char*)malloc(4096);
 			if (cb == null)
 				return adbg_error_system;
-			int n = snprintf(cb, 4096, "/proc/%d/mem", g_pid);
+			int n = snprintf(cb, 4096, "/proc/%d/mem", g_debuggee.pid);
 			if (n < 0)
 				return adbg_error_system;
-			g_mhandle = open(cb, 0);
+			g_debuggee.mhandle = open(cb, 0);
 			free(cb);
 		}
 		if (op >= MM_WRITE) {
-			if (pwrite(g_mhandle, data, size, addr) == -1)
+			if (pwrite(g_debuggee.mhandle, data, size, addr) == -1)
 				return adbg_error_system;
 		} else {
-			if (pread(g_mhandle, data, size, addr) == -1)
+			if (pread(g_debuggee.mhandle, data, size, addr) == -1)
 				return adbg_error_system;
 		}
 	}

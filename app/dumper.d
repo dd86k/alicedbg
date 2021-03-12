@@ -99,13 +99,13 @@ void dump_chapter(const(char) *title) {
 int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 	FILE *f = fopen(file, "rb"); // Handles null file pointers
 	if (f == null) {
-		perror(__FUNCTION__);
+		perror(__FUNCTION__.ptr);
 		return EXIT_FAILURE;
 	}
 	
 	if (flags & DumpOpt.raw) {
 		if (fseek(f, 0, SEEK_END)) {
-			perror(__FUNCTION__);
+			perror(__FUNCTION__.ptr);
 			puts("dump: could not seek file");
 			return EXIT_FAILURE;
 		}
@@ -116,7 +116,7 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 		if (m == null)
 			return EXIT_FAILURE;
 		if (fread(m, fl, 1, f) == 0) {
-			perror(__FUNCTION__);
+			perror(__FUNCTION__.ptr);
 			return EXIT_FAILURE;
 		}
 		

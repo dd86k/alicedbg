@@ -48,8 +48,8 @@ struct settings_t {
 }
 
 /// Print last library error information to stdout 
-void printerror(string f = __FUNCTION__)() {
+void printerror(const(char)* f = cast(char*)__FUNCTION__)() {
 	import adbg.etc.c.stdio : printf;
 	debug printf("[%s:%d] ", adbg_error_file, adbg_error_line);
-	printf(f~": (%s) %s\n", adbg_error_code, adbg_error_msg);
+	printf("%s: (%s) %s\n", f, adbg_error_code, adbg_error_msg);
 }

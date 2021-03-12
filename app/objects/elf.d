@@ -349,13 +349,14 @@ void dump_elf_disasm(dump_t *dump) {
 		}
 	
 		strtable = cast(char*)(dump.obj.buf + shstrndx32);
-		with (s32)
 		for (++s32; i < nb; ++i, ++s32) {
+			with (s32)
 			if (sh_flags & ELF_SHF_EXECINSTR || all) {
-				printf("<%.32s>\n", strtable + sh_name);
+				printf("<%.32s>\n\n", strtable + sh_name);
 				dump_disasm(dump.dopts,
 					dump.obj.buf + sh_offset,
 					sh_size, dump.flags);
+				putchar('\n');
 			}
 		}
 		return;
@@ -386,7 +387,7 @@ void dump_elf_disasm(dump_t *dump) {
 		for (++s64; i < nb; ++i, ++s64) {
 			with (s64)
 			if (sh_flags & ELF_SHF_EXECINSTR || all) {
-				printf("<%.32s>\n", strtable + sh_name);
+				printf("<%.32s>\n\n", strtable + sh_name);
 				dump_disasm(dump.dopts,
 					dump.obj.buf + sh_offset,
 					cast(uint)sh_size, dump.flags);

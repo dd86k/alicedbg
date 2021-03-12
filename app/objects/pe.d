@@ -858,7 +858,7 @@ void dump_pe_disasm(dump_t *dump) {
 	PE_SECTION_ENTRY *entry = dump.obj.pe.sections;
 	for (ushort si; si < nb; ++si, ++entry) {
 		if (entry.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE || all) {
-			printf("<%.8s>\n", entry.Name.ptr);
+			printf("<%.8s>\n\n", entry.Name.ptr);
 			if (dump_disasm(dump.dopts,
 				dump.obj.buf + entry.PointerToRawData,
 				entry.SizeOfRawData, dump.flags))

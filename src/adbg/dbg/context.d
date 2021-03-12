@@ -3,19 +3,16 @@
  */
 module adbg.dbg.context;
 
+import adbg.dbg.debugger : g_debuggee;
+
 version (Windows) {
 	import core.sys.windows.windows;
 	import adbg.sys.windows.wow64;
-	version (Win32)
-		import adbg.dbg.debugger : g_pid, g_tid;
-	else
-		import adbg.dbg.debugger : g_pid, g_tid, processWOW64;
 } else
 version (Posix) {
 	import adbg.sys.linux.user;
 	import adbg.sys.posix.ptrace;
 	import core.sys.posix.signal;
-	import adbg.dbg.debugger : g_pid;
 }
 
 version (X86)
@@ -69,7 +66,7 @@ void adbg_ctx_init(thread_context_t *e) {
 		adbg_ctx_init_x86(e);
 	} else version (X86_64) {
 		version (Win64) {
-			if (processWOW64)
+			if (g_debuggee.wow64)
 				adbg_ctx_init_x86(e);
 			else
 				adbg_ctx_init_x86_64(e);
@@ -83,24 +80,24 @@ void adbg_ctx_get(thread_context_t *ctx) {
 		CONTEXT winctx = void;
 		version (Win64) {
 			WOW64_CONTEXT winctxwow64 = void;
-			if (processWOW64) {
+			if (g_debuggee.wow64) {
 				winctxwow64.ContextFlags = CONTEXT_ALL;
-				Wow64GetThreadContext(g_tid, &winctxwow64);
+				Wow64GetThreadContext(g_debuggee.tid, &winctxwow64);
 				adbg_ctx_os_wow64(ctx, &winctxwow64);
 			} else {
 				winctx.ContextFlags = CONTEXT_ALL;
-				GetThreadContext(g_tid, &winctx);
+				GetThreadContext(g_debuggee.tid, &winctx);
 				adbg_ctx_os(ctx, &winctx);
 			}
 		} else {
 			winctx.ContextFlags = CONTEXT_ALL;
-			GetThreadContext(g_tid, &winctx);
+			GetThreadContext(g_debuggee.tid, &winctx);
 			adbg_ctx_os(ctx, &winctx);
 		}
 	} else
 	version (Posix) {
 		user_regs_struct u = void;
-		if (ptrace(PTRACE_GETREGS, g_pid, null, &u) < 0)
+		if (ptrace(PTRACE_GETREGS, g_debuggee.pid, null, &u) < 0)
 			ctx.count = 0;
 		else
 			adbg_ctx_os(ctx, &u);

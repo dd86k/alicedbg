@@ -89,7 +89,7 @@ void dump_mz_disasm(dump_t *dump) {
 	
 	uint start = dump.obj.mz.hdr.e_cparh * 16;
 	if (start < mz_hdr.sizeof || start >= dump.obj.fsize) {
-		printf(__FUNCTION__~": Data start outside of exe (%u)", start);
+		printf("dump_mz_disasm: Data start outside of exe (%u)", start);
 	}
 	
 	uint blks = void;
@@ -99,7 +99,7 @@ void dump_mz_disasm(dump_t *dump) {
 		len  = (blks * 16) + e_cblp;
 	}
 	if (len > dump.obj.fsize) {
-		printf(__FUNCTION__~": Data length cannot be bigger than file (%u)", len);
+		printf("dump_mz_disasm: Data length cannot be bigger than file (%u)", len);
 		return;
 	}
 	
