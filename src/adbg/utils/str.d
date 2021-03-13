@@ -12,6 +12,9 @@ import core.stdc.string;
 extern (C):
 __gshared:
 
+/// An empty string in case compilers cannot pool strings
+const(char) *empty_string = "";
+
 //TODO: Rewrite as adbg_util_flatten without snprintf
 //      Internal loop
 size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
@@ -341,11 +344,11 @@ void adbg_util_strlcase(char *buf, size_t size) {
 }
 
 /// Quick Format stack size (characters)
-enum STR_QUICK_STACK_SIZE = 128;
+private enum STR_QUICK_STACK_SIZE = 128;
 /// Quick Format stacks count
-enum STR_QUICK_STACKS_COUNT = 16;
+private enum STR_QUICK_STACKS_COUNT = 16;
 /// Quick Format stack limit (count - 1) for index comparason
-enum STR_QUICK_STACKS_LIMIT = STR_QUICK_STACKS_COUNT - 1;
+private enum STR_QUICK_STACKS_LIMIT = STR_QUICK_STACKS_COUNT - 1;
 
 /**
  * Quick format.

@@ -356,7 +356,7 @@ AdbgState adbg_state() {
  */
 int adbg_run(int function(exception_t*) userfunc) {
 	if (userfunc == null)
-		return 1;
+		return adbg_error(AdbgError.nullAddress);
 	
 	exception_t e = void;
 	adbg_ctx_init(&e.registers);
@@ -366,7 +366,7 @@ int adbg_run(int function(exception_t*) userfunc) {
 L_DEBUG_LOOP:
 		g_debuggee.state = AdbgState.running;
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
-			return GetLastError();
+			return adbg_error_system;
 		g_debuggee.state = AdbgState.paused;
 		
 		// Filter events
@@ -433,10 +433,12 @@ L_DEBUG_LOOP:
 			}
 			goto case;
 		case proceed:
-			if (ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE))
-				goto L_DEBUG_LOOP;
-			g_debuggee.state = AdbgState.idle;
-			return GetLastError();
+			if (ContinueDebugEvent(
+				de.dwProcessId, de.dwThreadId, DBG_CONTINUE) == FALSE) {
+				g_debuggee.state = AdbgState.idle;
+				return adbg_error_system;
+			}
+			goto L_DEBUG_LOOP;
 		}
 	} else
 	version (Posix) {
@@ -509,18 +511,25 @@ L_DEBUG_LOOP:
 //		if (ptrace(PTRACE_GETREGSET, g_pid, NT_PRSTATUS, &v))
 //			return errno;
 		
-		// NOTE: final switch works in betterC but funky in 2.082
 		with (AdbgAction)
 		switch (userfunc(&e)) {
 		case exit:
-			g_debuggee.state = AdbgState.idle;
-			kill(g_debuggee.pid, SIGKILL); // PTRACE_KILL is deprecated
+			g_debuggee.state = AdbgState.idle; // in either case
+			// Because PTRACE_KILL is deprecated
+			if (kill(g_debuggee.pid, SIGKILL) == -1)
+				return adbg_error_system;
 			return 0;
 		case step:
-			ptrace(PTRACE_SINGLESTEP, g_debuggee.pid, null, null);
+			if (ptrace(PTRACE_SINGLESTEP, g_debuggee.pid, null, null) == -1) {
+				g_debuggee.state = AdbgState.idle;
+				return adbg_error_system;
+			}
 			goto L_DEBUG_LOOP;
 		case proceed:
-			ptrace(PTRACE_CONT, g_debuggee.pid, null, null);
+			if (ptrace(PTRACE_CONT, g_debuggee.pid, null, null) == -1) {
+				g_debuggee.state = AdbgState.idle;
+				return adbg_error_system;
+			}
 			goto L_DEBUG_LOOP;
 		default: assert(0);
 		}

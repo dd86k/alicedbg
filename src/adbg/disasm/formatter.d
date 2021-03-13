@@ -847,7 +847,8 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 }
 const(char) *adbg_disasm_fmtreg(adbg_disasm_t *p, const(char) *s, char[FORMATTER_REGBUF_SIZE] *buffer) {
 	import core.stdc.stdio : snprintf;
-	if (s[0] == 0) return "";
+	import adbg.utils.str : empty_string;
+	if (s[0] == 0) return empty_string;
 	with (AdbgDisasmSyntax)
 	switch (p.syntax) {
 	case att:

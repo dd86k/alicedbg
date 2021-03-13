@@ -6,8 +6,8 @@ module adbg.dbg.context;
 import adbg.dbg.debugger : g_debuggee;
 
 version (Windows) {
-	import core.sys.windows.windows;
 	import adbg.sys.windows.wow64;
+	import core.sys.windows.windows;
 } else
 version (Posix) {
 	import adbg.sys.linux.user;
@@ -31,7 +31,8 @@ version (X86) {
 
 /// Register size
 enum RegisterType {
-	u8, u16, u32, u64, f32, f64
+	u8, u16, u32, u64, f32, f64,
+	flags_x86, flags_x86_64
 }
 
 /// Register structure, designs a single register for UI ends to understand
@@ -75,6 +76,8 @@ void adbg_ctx_init(thread_context_t *e) {
 	}
 }
 
+/// (Internal) Get the thread context from debuggee
+/// Params: ctx = Thread context structure pointer
 void adbg_ctx_get(thread_context_t *ctx) {
 	version (Windows) {
 		CONTEXT winctx = void;
@@ -109,15 +112,86 @@ void adbg_ctx_get(thread_context_t *ctx) {
 /// Format a register depending on their type as a zero-padded number.
 /// Params: reg = register_t structure
 /// Returns: Formatted hexadecimal value
-const(char) *adbg_ex_reg_fhex(register_t *reg) {
+const(char) *adbg_ctx_reg_hex(register_t *reg) {
 	import adbg.utils.str : adbg_util_strf;
 	with (RegisterType)
 	switch (reg.type) {
 	case u8:	return adbg_util_strf("%02x", reg.u8);
 	case u16:	return adbg_util_strf("%04x", reg.u16);
-	case u32, f32:	return adbg_util_strf("%08x", reg.u32);
-	case u64, f64:	return adbg_util_strf("%016llx", reg.u64);
-	default: assert(0);
+	case u32, f32, flags_x86:
+		return adbg_util_strf("%08x", reg.u32);
+	case u64, f64, flags_x86_64:
+		return adbg_util_strf("%016llx", reg.u64);
+	default:	assert(0);
+	}
+}
+
+const(char) *adbg_ctx_reg_val(register_t *reg) {
+	import adbg.utils.str : adbg_util_strf, empty_string;
+	enum F_X86_CF = 1;
+	enum F_X86_PF = 1 << 2;
+	enum F_X86_AF = 1 << 4;
+	enum F_X86_ZF = 1 << 6;
+	enum F_X86_SF = 1 << 7;
+	enum F_X86_TF = 1 << 8;
+	enum F_X86_IF = 1 << 9;
+	enum F_X86_DF = 1 << 10;
+	enum F_X86_OF = 1 << 11;
+	enum F_X86_IOPL = (1 << 12) | (1 << 13);
+	enum F_X86_NT = 1 << 14;
+	enum F_X86_RF = 1 << 16;
+	enum F_X86_VM = 1 << 17;
+	enum F_X86_AC = 1 << 18;
+	enum F_X86_VIF = 1 << 19;
+	enum F_X86_VIP = 1 << 20;
+	enum F_X86_ID = 1 << 21;
+	__gshared const(char) *FS_X86_CF	= " CF";
+	__gshared const(char) *FS_X86_PF	= " PF";
+	__gshared const(char) *FS_X86_AF	= " AF";
+	__gshared const(char) *FS_X86_ZF	= " ZF";
+	__gshared const(char) *FS_X86_SF	= " SF";
+	__gshared const(char) *FS_X86_TF	= " TF";
+	__gshared const(char) *FS_X86_IF	= " IF";
+	__gshared const(char) *FS_X86_DF	= " DF";
+	__gshared const(char) *FS_X86_OF	= " OF";
+	__gshared const(char) *FS_X86_NT	= " NT";
+	__gshared const(char) *FS_X86_RF	= " RF";
+	__gshared const(char) *FS_X86_VM	= " VM";
+	__gshared const(char) *FS_X86_AC	= " AC";
+	__gshared const(char) *FS_X86_VIF	= " VIF";
+	__gshared const(char) *FS_X86_VIP	= " VIP";
+	__gshared const(char) *FS_X86_ID	= " ID";
+	with (RegisterType)
+	switch (reg.type) {
+	case u8:	return adbg_util_strf("%u", reg.u8);
+	case u16:	return adbg_util_strf("%u", reg.u16);
+	case u32:	return adbg_util_strf("%u", reg.u32);
+	case u64:	return adbg_util_strf("%llu", reg.u64);
+	case f32:	return adbg_util_strf("%f", reg.f32);
+	case f64:	return adbg_util_strf("%f", reg.f64);
+	case flags_x86, flags_x86_64:
+		uint f = reg.u32;
+		return adbg_util_strf(
+			"[%s%s%s%s%s%s%s%s%s IOPL=%d%s%s%s%s%s%s ]",
+			f & F_X86_CF ? FS_X86_CF : empty_string,
+			f & F_X86_PF ? FS_X86_PF : empty_string,
+			f & F_X86_AF ? FS_X86_AF : empty_string,
+			f & F_X86_ZF ? FS_X86_ZF : empty_string,
+			f & F_X86_SF ? FS_X86_SF : empty_string,
+			f & F_X86_TF ? FS_X86_TF : empty_string,
+			f & F_X86_IF ? FS_X86_IF : empty_string,
+			f & F_X86_DF ? FS_X86_DF : empty_string,
+			f & F_X86_OF ? FS_X86_OF : empty_string,
+			(f & F_X86_IOPL) >> 12,
+			f & F_X86_NT ? FS_X86_NT : empty_string,
+			f & F_X86_RF ? FS_X86_RF : empty_string,
+			f & F_X86_VM ? FS_X86_VM : empty_string,
+			f & F_X86_AC ? FS_X86_AC : empty_string,
+			f & F_X86_VIF ? FS_X86_VIF : empty_string,
+			f & F_X86_VIP ? FS_X86_VIP : empty_string,
+			f & F_X86_ID ? FS_X86_ID : empty_string,
+			);
+	default:	assert(0);
 	}
 }
 
@@ -130,66 +204,66 @@ const(char) *exception_reg_fval(register_t *reg) {
 version (X86_ANY)
 private void adbg_ctx_init_x86(thread_context_t *ctx) {
 	ctx.count = EX_REG_COUNT;
-	ctx.items[0].name = "EIP";
+	ctx.items[0].name = "eip";
 	ctx.items[0].type = RegisterType.u32;
-	ctx.items[1].name = "EFLAGS";
-	ctx.items[1].type = RegisterType.u32;
-	ctx.items[2].name = "EAX";
+	ctx.items[1].name = "eflags";
+	ctx.items[1].type = RegisterType.flags_x86;
+	ctx.items[2].name = "eax";
 	ctx.items[2].type = RegisterType.u32;
-	ctx.items[3].name = "EBX";
+	ctx.items[3].name = "ebx";
 	ctx.items[3].type = RegisterType.u32;
-	ctx.items[4].name = "ECX";
+	ctx.items[4].name = "ecx";
 	ctx.items[4].type = RegisterType.u32;
-	ctx.items[5].name = "EDX";
+	ctx.items[5].name = "edx";
 	ctx.items[5].type = RegisterType.u32;
-	ctx.items[6].name = "ESP";
+	ctx.items[6].name = "esp";
 	ctx.items[6].type = RegisterType.u32;
-	ctx.items[7].name = "EBP";
+	ctx.items[7].name = "ebp";
 	ctx.items[7].type = RegisterType.u32;
-	ctx.items[8].name = "ESI";
+	ctx.items[8].name = "esi";
 	ctx.items[8].type = RegisterType.u32;
-	ctx.items[9].name = "EDI";
+	ctx.items[9].name = "edi";
 	ctx.items[9].type = RegisterType.u32;
 }
 
 version (X86_64)
 private void adbg_ctx_init_x86_64(thread_context_t *ctx) {
 	ctx.count = EX_REG_COUNT;
-	ctx.items[0].name  = "RIP";
+	ctx.items[0].name  = "rip";
 	ctx.items[0].type  = RegisterType.u64;
-	ctx.items[1].name  = "RFLAGS";
-	ctx.items[1].type  = RegisterType.u64;
-	ctx.items[2].name  = "RAX";
+	ctx.items[1].name  = "rflags";
+	ctx.items[1].type  = RegisterType.flags_x86_64;
+	ctx.items[2].name  = "rax";
 	ctx.items[2].type  = RegisterType.u64;
-	ctx.items[3].name  = "RBX";
+	ctx.items[3].name  = "rbx";
 	ctx.items[3].type  = RegisterType.u64;
-	ctx.items[4].name  = "RCX";
+	ctx.items[4].name  = "rcx";
 	ctx.items[4].type  = RegisterType.u64;
-	ctx.items[5].name  = "RDX";
+	ctx.items[5].name  = "rdx";
 	ctx.items[5].type  = RegisterType.u64;
-	ctx.items[6].name  = "RSP";
+	ctx.items[6].name  = "rsp";
 	ctx.items[6].type  = RegisterType.u64;
-	ctx.items[7].name  = "RBP";
+	ctx.items[7].name  = "rbp";
 	ctx.items[7].type  = RegisterType.u64;
-	ctx.items[8].name  = "RSI";
+	ctx.items[8].name  = "rsi";
 	ctx.items[8].type  = RegisterType.u64;
-	ctx.items[9].name  = "RDI";
+	ctx.items[9].name  = "rdi";
 	ctx.items[9].type  = RegisterType.u64;
-	ctx.items[10].name = "R8";
+	ctx.items[10].name = "r8";
 	ctx.items[10].type = RegisterType.u64;
-	ctx.items[11].name = "R9";
+	ctx.items[11].name = "r9";
 	ctx.items[11].type = RegisterType.u64;
-	ctx.items[12].name = "R10";
+	ctx.items[12].name = "r10";
 	ctx.items[12].type = RegisterType.u64;
-	ctx.items[13].name = "R11";
+	ctx.items[13].name = "r11";
 	ctx.items[13].type = RegisterType.u64;
-	ctx.items[14].name = "R12";
+	ctx.items[14].name = "r12";
 	ctx.items[14].type = RegisterType.u64;
-	ctx.items[15].name = "R13";
+	ctx.items[15].name = "r13";
 	ctx.items[15].type = RegisterType.u64;
-	ctx.items[16].name = "R14";
+	ctx.items[16].name = "r14";
 	ctx.items[16].type = RegisterType.u64;
-	ctx.items[17].name = "R15";
+	ctx.items[17].name = "r15";
 	ctx.items[17].type = RegisterType.u64;
 }
 

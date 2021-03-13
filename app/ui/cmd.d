@@ -6,13 +6,13 @@
 module ui.cmd;
 
 import adbg.etc.c.stdio;
-import core.stdc.stdlib;
-import core.stdc.string;
 import adbg.dbg.debugger;
 import adbg.dbg.exception;
 import adbg.sys.err;
 import adbg.utils.str;
+import core.stdc.string;
 import term;
+import core.stdc.stdlib;
 import common;
 
 extern (C):
@@ -67,7 +67,7 @@ int cmd_loop() {
 }
 
 void cmd_prompt(int err) { // [code*adbg]
-	enum fmt = "["~SYS_ERR_FMT~"%cadbg] ";
+	enum fmt = "[%d%cadbg] ";
 	printf(fmt, err, paused ? '*' : ' ');
 }
 
@@ -75,76 +75,57 @@ int cmd_execv(int argc, const(char) **argv) {
 	if (argc <= 0 || argv == null)
 		return 0;
 	
-	const(char) *c = argv[0]; // command
+	foreach (comm; commands)
+		if (strcmp(argv[0], comm.opt) == 0)
+			return comm.func(argc, argv);
 	
-	if (c[1] == 0) { // short
-		char a = c[0];    // alias
-		foreach (comm; commands) {
-			if (comm.alt)
-			if (a == comm.alt) {
-				return comm.func(argc, argv);
-			}
-		}
-	} else { // long
-		foreach (comm; commands) {
-			if (strcmp(c, comm.opt) == 0) {
-				return comm.func(argc, argv);
-			}
-		}
-	}
-	
-	printf("unknown command: %s\n", c);
+	printf("unknown command: %s\n", argv[0]);
 	
 	return 1;
 }
 
 int cmd_action(const(char) *a) {
-	size_t l = strlen(a);
-	
-	if (l < 2) {
-		char c = a[0];
-		foreach (action; actions) {
-			if (action.alt == 0) continue;
-			if (c == action.alt)
-				return action.val;
-		}
-	} else {
-		foreach (action; actions) {
-			if (strcmp(a, action.opt) == 0)
-				return action.val;
-		}
+	foreach (action; actions) {
+		if (strcmp(a, action.opt) == 0)
+			return action.val;
 	}
 	
 	return -1;
 }
 
 struct command_t {
-	align(4) char alt;	/// short option
-	immutable(char) *opt;	/// long option
-	immutable(char) *desc;	/// help description
-	int function(int, const(char)**) func;
+	const(char) *opt;	/// command string
+	const(char) *argf;	/// Argument formatting when displaying help
+	const(char) *desc;	/// help description
+	int function(int, const(char)**) func; /// function impl.
 }
-
 immutable command_t[] commands = [
-	{ 'l', "load",   "Load executable file into the debugger", &cmd_c_load },
-//	{ 'c', "core",   "Load core debugging object into debugger", &cmd_c_load },
-//	{ 'p', "pid",    "Attach the debugger to pid", &cmd_c_pid },
-	{ 'r', "run",    "Run debugger", &cmd_c_run },
-	{ 's', "status", "Print current state", &cmd_c_status },
-	{ 'h', "help",   "Shows this help screen", &cmd_c_help },
-	{ 'q', "quit",   "Quit", &cmd_c_quit },
+	{ "load",   "FILE [ARG...]", "Load executable file into the debugger", &cmd_c_load },
+//	{ "core",   null, "Load core debugging object into debugger", &cmd_c_load },
+//	{ "attach", null, "Attach the debugger to pid", &cmd_c_pid },
+//	{ "b",      null, "Manage breakpoints", & },
+//	{ "d",      null, "Disassemble address", & },
+	{ "run",    null, "Run debugger", &cmd_c_run },
+	{ "status", null, "Show current state", &cmd_c_status },
+	{ "r",      null, "Show debuggee registers", &cmd_c_r },
+	{ "help",   null, "Show this help screen", &cmd_c_help },
+	{ "quit",   null, "Quit", &cmd_c_quit },
+	{ "q",      null, "Alias to quit", &cmd_c_quit },
 ];
+
 struct action_t {
-	align(4) char alt;	/// short option
 	immutable(char) *opt;	/// long option
 	immutable(char) *desc;	/// help description
 	AdbgAction val;	/// action value
 }
 immutable action_t[] actions = [
-	{ 'c', "continue", "Continue debuggee", AdbgAction.proceed },
-	{ 0,   "close",    "Close debuggee process", AdbgAction.exit },
-	{ 's', "step",     "Step: Instruction", AdbgAction.step },
+	{ "continue", "Resume debuggee", AdbgAction.proceed },
+	{ "c",        "Alias to continue", AdbgAction.proceed },
+	{ "close",    "Close debuggee process", AdbgAction.exit },
+	{ "step",     "Step: Instruction", AdbgAction.step },
 ];
+
+immutable const(char) *cmd_fmt  = " %-30s %s\n";
 
 int cmd_c_load(int argc, const(char) **argv) {
 	if (argc < 2) {
@@ -155,8 +136,7 @@ int cmd_c_load(int argc, const(char) **argv) {
 	//TODO: cmd argv handling
 	
 	int e = adbg_load(argv[1]);
-	if (e)
-		adbg_sys_perror!"cmd"(e);
+	if (e) printerror;
 	return e;
 }
 
@@ -179,21 +159,27 @@ int cmd_c_status(int argc, const(char) **argv) {
 	return 0;
 }
 
+int cmd_c_r(int argc, const(char) **argv) {
+	int m = common_exception.registers.count;
+	register_t *r = common_exception.registers.items.ptr;
+	for (size_t i; i < m; ++i, ++r)
+		printf("%-8s  0x%8s  %s\n",
+			r.name,
+			adbg_ctx_reg_hex(r),
+			adbg_ctx_reg_val(r));
+	return 0;
+}
+
 int cmd_c_help(int argc, const(char) **argv) {
 	puts("Debugger commands:");
 	foreach (comm; commands) {
-		if (comm.alt)
-			printf(" %c, %-12s %s\n", comm.alt, comm.opt, comm.desc);
-		else
-			printf(" %-15s %s\n", comm.opt, comm.desc);
+		printf(cmd_fmt, comm.opt, comm.desc);
+		
 	}
-	puts("Commands when debuggee is paused:");
-	foreach (action; actions) {
-		if (action.alt)
-			printf(" %c, %-12s %s\n", action.alt, action.opt, action.desc);
-		else
-			printf(" %-15s %s\n", action.opt, action.desc);
-	}
+	
+	puts("\nWhen debuggee is paused:");
+	foreach (action; actions)
+		printf(cmd_fmt, action.opt, action.desc);
 	
 	return 0;
 }
@@ -214,13 +200,13 @@ int cmd_handler(exception_t *ex) {
 	
 	printf(
 	"*	Thread %d stopped for: %s ("~SYS_ERR_FMT~")\n"~
-	"	Instruction address: %p\n",
+	"	Instruction address: %zx\n",
 	ex.tid, adbg_exception_string(ex.type), ex.oscode,
-	ex.nextaddr
+	ex.nextaddrv
 	);
 	
 	if (ex.faultaddr)
-		printf("	Fault address: %p\n", ex.faultaddr);
+		printf("	Fault address: %zx\n", ex.faultaddrv);
 	
 	int err = ex.oscode;
 	int length = void;
