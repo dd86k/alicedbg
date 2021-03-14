@@ -95,7 +95,7 @@ void adbg_ctx_get(thread_context_t *ctx) {
 			}
 		} else {
 			winctx.ContextFlags = CONTEXT_ALL;
-			GetThreadContext(g_debuggee.tid, &winctx);
+			GetThreadContext(g_debuggee.htid, &winctx);
 			adbg_ctx_os(ctx, &winctx);
 		}
 	} else

@@ -425,10 +425,10 @@ L_DEBUG_LOOP:
 			} else {
 				CONTEXT winctx = void;
 				winctx.ContextFlags = CONTEXT_ALL;
-				GetThreadContext(g_debuggee.tid, &winctx);
+				GetThreadContext(g_debuggee.htid, &winctx);
 				FlushInstructionCache(g_debuggee.hpid, null, 0);
 				winctx.EFlags |= 0x100;
-				SetThreadContext(g_debuggee.tid, &winctx);
+				SetThreadContext(g_debuggee.htid, &winctx);
 			}
 			goto case;
 		case proceed:
