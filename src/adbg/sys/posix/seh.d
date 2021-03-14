@@ -33,7 +33,6 @@ public int adbg_seh_set(checkpoint_t *c) {
 		sigemptyset(&sa.sa_mask);
 		sa.sa_flags = SA_SIGINFO;
 		sa.sa_sigaction = &adbg_seh_action;
-		//TODO: Table + loop
 		if (sigaction(SIGSEGV, &sa, NULL_SIGACTION) == -1 ||
 			sigaction(SIGTRAP, &sa, NULL_SIGACTION) == -1 ||
 			sigaction(SIGFPE, &sa, NULL_SIGACTION) == -1 ||
@@ -68,7 +67,7 @@ void adbg_seh_action(int sig, siginfo_t *si, void *p) {
 		mexception.faultaddr = si.__si_fields.__sigfault.si_addr;
 	else static assert(0, "hack me");
 
-	mexception.pid = mexception.tid = 0;
+	/+mexception.pid = mexception.tid = 0;
 	adbg_ctx_init(&mexception.registers);
 	version (X86) {
 		mexception.registers.count = 10;
@@ -148,6 +147,6 @@ void adbg_seh_action(int sig, siginfo_t *si, void *p) {
 			mexception.registers.items[16].u64 = m.__space[6];
 			mexception.registers.items[17].u64 = m.__space[7];
 		}
-	}
+	}+/
 //	longjmp(&mjbuf, 1);
 }

@@ -20,7 +20,6 @@ __gshared:
 
 /// Common settings shared between sub-modules
 settings_t common_settings;
-
 /// Last exception
 exception_t common_exception;
 

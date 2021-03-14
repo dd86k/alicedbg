@@ -88,20 +88,11 @@ struct exception_t {
 	/// Thread ID, if available; Otherwise zero.
 	int tid;
 	union {
-		/// Memory address pointer for next instruction.
-		/// Typically the Instruction Pointer or Program Counter.
-		deprecated("use thread context") void *nextaddr;
-		/// Memory address value for next instruction.
-		/// Typically the Instruction Pointer or Program Counter.
-		deprecated("use thread context") size_t nextaddrv;
-	}
-	union {
 		/// Memory address pointer for fault. Otherwise null.
 		void *faultaddr;
 		/// Memory address value for fault. Otherwise null.
 		size_t faultaddrv;
 	}
-	deprecated("use context services directly") thread_context_t registers;
 }
 
 // Windows: Mostly covered in winbase.h or winnt.h

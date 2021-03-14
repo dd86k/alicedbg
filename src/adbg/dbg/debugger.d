@@ -15,8 +15,6 @@ import core.stdc.string : memset;
 public import adbg.dbg.exception;
 import adbg.platform, adbg.error;
 
-//TODO: ProcessInfo structure for internal debugging purposes
-
 version (Windows) {
 	import core.sys.windows.windows;
 	import adbg.sys.windows.wow64;
@@ -65,9 +63,6 @@ else version (ARM) {
 extern (C):
 __gshared:
 
-/// Debugger event receiver function definition
-//public alias debugger_handler_t = int function(adbg_debugger_event_t*);
-
 /// Actions that a user function handler may return
 public
 enum AdbgAction {
@@ -112,13 +107,16 @@ struct debuggee_t {
 	AdbgState state;
 	breakpoint_t[ADBG_MAX_BREAKPOINTS] breakpoints;
 	size_t bpindex;	/// breakpoint index
+	bool attached;	/// if debuggee was attached to
 	version (Windows) {
-		HANDLE pid;	/// Process handle
-		HANDLE tid;	/// Thread handle
+		HANDLE hpid;	/// Process handle
+		HANDLE htid;	/// Thread handle
+		int pid;	/// Process identificiation number
+		int tid;	/// Thread identification number
 		version (Win64) int wow64; /// If running under WoW64
 	}
 	version (Posix) {
-		pid_t pid;	/// Process ID
+		pid_t pid;	/// Process ID // @suppress(dscanner.suspicious.label_var_same_name)
 		int mhandle;	/// Memory file handle
 	}
 }
@@ -129,14 +127,19 @@ struct breakpoint_t {
 	align(4) opcode_t opcode;
 }
 
-version(USE_CLONE) private
+version(USE_CLONE)
+private
 struct __adbg_child_t {
 	const(char) *dev;
 	const(char) **argv, envp;
 }
 
-package debuggee_t g_debuggee;
-private immutable(opcode_t) g_bp_opcode = BREAKPOINT; /// platform breakpoint opcode
+package debuggee_t g_debuggee;	/// Debuggee information
+private int g_options;	/// Debugger options
+
+//TODO: Load/Attach flags
+//      - processOnly (only this process)
+//      - useClone (linux only)
 
 /**
  * Load executable image into the debugger.
@@ -158,8 +161,9 @@ private immutable(opcode_t) g_bp_opcode = BREAKPOINT; /// platform breakpoint op
 int adbg_load(const(char) *path, const(char) **argv = null,
 	const(char) *dir = null, const(char) **envp = null,
 	int flags = 0) {
-	if (path == null) return 1;
-
+	if (path == null)
+		return adbg_error(AdbgError.invalidArgument);
+	
 	version (Windows) {
 		import core.stdc.stdlib : malloc, free;
 		import core.stdc.stdio : snprintf;
@@ -198,19 +202,22 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 			&si, &pi) == FALSE)
 			return adbg_error_system;
 		free(b);
-		g_debuggee.pid = pi.hProcess;
-		g_debuggee.tid = pi.hThread;
+		g_debuggee.hpid = pi.hProcess;
+		g_debuggee.htid = pi.hThread;
+		g_debuggee.pid = pi.dwProcessId;
+		g_debuggee.tid = pi.dwThreadId;
 		
 		// Microsoft recommends getting function pointer with
 		// GetProcAddress("kernel32", "IsWow64Process"), but so far
 		// only 64-bit versions of Windows really have WOW64.
 		// Nevertheless, required to support 32-bit processes under
 		// 64-bit builds.
-		//TODO: GetProcAddress("kernel32", "IsWow64Process2")
-		//      Appeared in Windows 10, version 1511
+		//TODO: IsWow64Process2 support
+		//      with GetProcAddress("kernel32", "IsWow64Process2")
+		//      Introduced in Windows 10, version 1511
 		//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 		version (Win64)
-		if (IsWow64Process(g_debuggee.pid, &g_debuggee.wow64) == FALSE)
+		if (IsWow64Process(g_debuggee.hpid, &g_debuggee.wow64) == FALSE)
 			return adbg_error_system;
 	} else
 	version (Posix) {
@@ -247,7 +254,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 				envp[0] = null;
 			}
 
-			// Child struct and clone
+			// Clone
 			__adbg_child_t chld = void;
 			chld.envp = cast(const(char)**)&__envp;
 			chld.argv = cast(const(char)**)&__argv;
@@ -258,15 +265,14 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 			if (g_debuggee.pid < 0)
 				return adbg_error_system;
 		} else { // fork(2)
-			g_pid = fork();
-			if (g_pid < 0)
+			g_debuggee.pid = fork();
+			if (g_debuggee.pid < 0)
 				return adbg_error_system;
-			if (g_pid == 0) { // Child process
+			if (g_debuggee.pid == 0) { // Child process
 				const(char)*[16] __argv = void;
 				const(char)*[1]  __envp = void;
-				//
+				
 				// Adjust argv
-				//
 				if (argv) {
 					size_t i, __i = 1;
 					while (argv[i] && __i < 15)
@@ -276,19 +282,22 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 					__argv[1] = null;
 				}
 				__argv[0] = path;
-				//
+				
 				// Adjust envp
-				//
 				if (envp == null) {
 					envp = cast(const(char)**)&__envp;
 					envp[0] = null;
 				}
+				
+				// Trace me
 				if (ptrace(PTRACE_TRACEME, 0, 0, 0))
 					return adbg_error_system;
 				version (CRuntime_Musl) {
 					if (raise(SIGTRAP))
 						return adbg_error_system;
 				}
+				
+				// Execute
 				if (execve(path,
 					cast(const(char)**)__argv,
 					cast(const(char)**)__envp) == -1)
@@ -296,12 +305,11 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 			}
 		} // USE_CLONE
 	}
+	
+	g_debuggee.attached = false;
 	g_debuggee.state = AdbgState.loaded;
 	return 0;
 }
-
-//TODO: adbg_dbg_options(flags)
-// - only this process
 
 version (Posix)
 version (USE_CLONE)
@@ -331,6 +339,8 @@ int adbg_attach(int pid, int flags = 0) {
 		if (ptrace(PTRACE_SEIZE, pid, null, null) == -1)
 			return adbg_error_system;
 	}
+	g_debuggee.attached = true;
+	//TODO: Check if the process is really paused
 	g_debuggee.state = AdbgState.paused;
 	return 0;
 }
@@ -342,8 +352,6 @@ int adbg_attach(int pid, int flags = 0) {
 AdbgState adbg_state() {
 	return g_debuggee.state;
 }
-
-//void adbg_set_handler(debugger_handler_t func) 
 
 /**
  * Enter the debugging loop. Continues execution of the process until a new
@@ -359,7 +367,6 @@ int adbg_run(int function(exception_t*) userfunc) {
 		return adbg_error(AdbgError.nullAddress);
 	
 	exception_t e = void;
-	adbg_ctx_init(&e.registers);
 	
 	version (Windows) {
 		DEBUG_EVENT de = void;
@@ -387,27 +394,6 @@ L_DEBUG_LOOP:
 			goto L_DEBUG_LOOP;
 		}
 		
-		adbg_ex_dbg(&e, &de);
-		
-		CONTEXT winctx = void;
-		version (Win64) {
-			WOW64_CONTEXT winctxwow64 = void;
-			if (g_debuggee.wow64) {
-				winctxwow64.ContextFlags = CONTEXT_ALL;
-				Wow64GetThreadContext(g_debuggee.tid, &winctxwow64);
-				adbg_ctx_os_wow64(&e.registers, &winctxwow64);
-			} else {
-				winctx.ContextFlags = CONTEXT_ALL;
-				GetThreadContext(g_debuggee.tid, &winctx);
-				adbg_ctx_os(&e.registers, &winctx);
-			}
-		} else {
-			winctx.ContextFlags = CONTEXT_ALL;
-			GetThreadContext(g_debuggee.tid, &winctx);
-			adbg_ctx_os(&e.registers, &winctx);
-		}
-		e.nextaddrv = e.registers.items[0].st;
-		
 		g_debuggee.state = AdbgState.paused;
 		with (AdbgAction)
 		final switch (userfunc(&e)) {
@@ -417,17 +403,28 @@ L_DEBUG_LOOP:
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
 			return 0;
 		case step:
-			FlushInstructionCache(g_debuggee.pid, null, 0);
 			// Enable single-stepping via Trap flag
 			version (Win64) {
+				CONTEXT winctx = void;
+				WOW64_CONTEXT winctxwow64 = void;
 				if (g_debuggee.wow64) {
+					winctxwow64.ContextFlags = CONTEXT_CONTROL;
+					Wow64GetThreadContext(g_debuggee.htid, &winctxwow64);
+					FlushInstructionCache(g_debuggee.hpid, null, 0);
 					winctxwow64.EFlags |= 0x100;
-					Wow64SetThreadContext(g_debuggee.tid, &winctxwow64);
+					Wow64SetThreadContext(g_debuggee.htid, &winctxwow64);
 				} else {
+					winctx.ContextFlags = CONTEXT_CONTROL;
+					GetThreadContext(g_debuggee.htid, &winctx);
+					FlushInstructionCache(g_debuggee.hpid, null, 0);
 					winctx.EFlags |= 0x100;
-					SetThreadContext(g_debuggee.tid, &winctx);
+					SetThreadContext(g_debuggee.htid, &winctx);
 				}
 			} else {
+				CONTEXT winctx = void;
+				winctx.ContextFlags = CONTEXT_ALL;
+				GetThreadContext(g_debuggee.tid, &winctx);
+				FlushInstructionCache(g_debuggee.hpid, null, 0);
 				winctx.EFlags |= 0x100;
 				SetThreadContext(g_debuggee.tid, &winctx);
 			}
@@ -586,10 +583,10 @@ deprecated
 int adbg_mm(int op, size_t addr, void *data, uint size) {
 	version (Windows) {
 		if (op >= MM_WRITE) {
-			if (WriteProcessMemory(g_debuggee.pid, cast(void*)addr, data, size, null) == 0)
+			if (WriteProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
 				return GetLastError();
 		} else {
-			if (ReadProcessMemory(g_debuggee.pid, cast(void*)addr, data, size, null) == 0)
+			if (ReadProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
 				return GetLastError();
 		}
 	} else

@@ -6,8 +6,7 @@
 module ui.cmd;
 
 import adbg.etc.c.stdio;
-import adbg.dbg.debugger;
-import adbg.dbg.exception;
+import adbg.dbg.debugger, adbg.dbg.exception, adbg.dbg.context;
 import adbg.sys.err;
 import adbg.utils.str;
 import core.stdc.string;
@@ -98,16 +97,18 @@ struct command_t {
 	const(char) *argf;	/// Argument formatting when displaying help
 	const(char) *desc;	/// help description
 	int function(int, const(char)**) func; /// function impl.
+	//TODO: Help function
 }
 immutable command_t[] commands = [
 	{ "load",   "FILE [ARG...]", "Load executable file into the debugger", &cmd_c_load },
 //	{ "core",   null, "Load core debugging object into debugger", &cmd_c_load },
 //	{ "attach", null, "Attach the debugger to pid", &cmd_c_pid },
-//	{ "b",      null, "Manage breakpoints", & },
+//	{ "b",      "rm|add|", "Manage breakpoints", & },
 //	{ "d",      null, "Disassemble address", & },
 	{ "run",    null, "Run debugger", &cmd_c_run },
 	{ "status", null, "Show current state", &cmd_c_status },
 	{ "r",      null, "Show debuggee registers", &cmd_c_r },
+	//TODO: help on topic
 	{ "help",   null, "Show this help screen", &cmd_c_help },
 	{ "quit",   null, "Quit", &cmd_c_quit },
 	{ "q",      null, "Alias to quit", &cmd_c_quit },
@@ -122,10 +123,11 @@ immutable action_t[] actions = [
 	{ "continue", "Resume debuggee", AdbgAction.proceed },
 	{ "c",        "Alias to continue", AdbgAction.proceed },
 	{ "close",    "Close debuggee process", AdbgAction.exit },
-	{ "step",     "Step: Instruction", AdbgAction.step },
+	{ "si",       "Instruction step", AdbgAction.step },
 ];
 
-immutable const(char) *cmd_fmt  = " %-30s %s\n";
+immutable const(char) *cmd_fmt   = " %-10s            %s\n";
+immutable const(char) *cmd_fmta  = " %-10s %-10s %s\n";
 
 int cmd_c_load(int argc, const(char) **argv) {
 	if (argc < 2) {
@@ -160,8 +162,11 @@ int cmd_c_status(int argc, const(char) **argv) {
 }
 
 int cmd_c_r(int argc, const(char) **argv) {
-	int m = common_exception.registers.count;
-	register_t *r = common_exception.registers.items.ptr;
+	thread_context_t ctx = void;
+	adbg_ctx_init(&ctx);
+	adbg_ctx_get(&ctx);
+	int m = ctx.count;
+	register_t *r = ctx.items.ptr;
 	for (size_t i; i < m; ++i, ++r)
 		printf("%-8s  0x%8s  %s\n",
 			r.name,
@@ -173,8 +178,10 @@ int cmd_c_r(int argc, const(char) **argv) {
 int cmd_c_help(int argc, const(char) **argv) {
 	puts("Debugger commands:");
 	foreach (comm; commands) {
-		printf(cmd_fmt, comm.opt, comm.desc);
-		
+		if (comm.argf)
+			printf(cmd_fmta, comm.opt, comm.argf, comm.desc);
+		else
+			printf(cmd_fmt, comm.opt, comm.desc);
 	}
 	
 	puts("\nWhen debuggee is paused:");
@@ -189,7 +196,6 @@ int cmd_c_run(int argc, const(char) **argv) {
 }
 
 int cmd_c_quit(int argc, const(char) **argv) {
-	continue_ = false;
 	//TODO: Quit confirmation if debuggee is alive
 	exit(0);
 	return 0;
@@ -199,14 +205,14 @@ int cmd_handler(exception_t *ex) {
 	memcpy(&common_exception, ex, exception_t.sizeof);
 	
 	printf(
-	"*	Thread %d stopped for: %s ("~SYS_ERR_FMT~")\n"~
-	"	Instruction address: %zx\n",
+	"*	Thread %d stopped for: %s ("~SYS_ERR_FMT~")\n",
 	ex.tid, adbg_exception_string(ex.type), ex.oscode,
-	ex.nextaddrv
 	);
 	
-	if (ex.faultaddr)
+	if (ex.faultaddr) {
 		printf("	Fault address: %zx\n", ex.faultaddrv);
+		//TODO: (cmd) disasm on fault
+	}
 	
 	int err = ex.oscode;
 	int length = void;

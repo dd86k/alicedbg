@@ -50,14 +50,6 @@ int loop_handler(exception_t *e) {
 		}
 	}
 	
-	// * Print registers, print in pairs
-	for (size_t i; i < e.registers.count; ++i) {
-		register_t *reg = &e.registers.items[i];
-		printf("%8s=%s", reg.name, adbg_ctx_reg_hex(reg));
-		if (i & 1)
-			putchar('\n');
-	}
-	
 	// * Process input
 L_PROMPT:
 	printf("\nAction [S=Step,C=Continue,Q=Quit] ");

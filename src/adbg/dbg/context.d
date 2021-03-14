@@ -45,7 +45,6 @@ struct register_t {
 		ulong  u64;	/// Register data: ulong (u64)
 		float  f32;	/// Register data: float (f32)
 		double f64;	/// Register data: double (f64)
-		size_t st;	/// Register data: size_t
 	}
 	const(char) *name;	/// Register name from adbg_ex_reg_init
 }
@@ -58,6 +57,8 @@ struct thread_context_t {
 	uint count;
 	/// Register population, this may depends by platform.
 	register_t [EX_REG_COUNT]items;
+	/// If context was initiated.
+	bool initiated;
 }
 
 /// (Internal) Initiate register fields with their names and sizes.
@@ -85,11 +86,11 @@ void adbg_ctx_get(thread_context_t *ctx) {
 			WOW64_CONTEXT winctxwow64 = void;
 			if (g_debuggee.wow64) {
 				winctxwow64.ContextFlags = CONTEXT_ALL;
-				Wow64GetThreadContext(g_debuggee.tid, &winctxwow64);
+				Wow64GetThreadContext(g_debuggee.htid, &winctxwow64);
 				adbg_ctx_os_wow64(ctx, &winctxwow64);
 			} else {
 				winctx.ContextFlags = CONTEXT_ALL;
-				GetThreadContext(g_debuggee.tid, &winctx);
+				GetThreadContext(g_debuggee.htid, &winctx);
 				adbg_ctx_os(ctx, &winctx);
 			}
 		} else {
@@ -111,21 +112,27 @@ void adbg_ctx_get(thread_context_t *ctx) {
 
 /// Format a register depending on their type as a zero-padded number.
 /// Params: reg = register_t structure
-/// Returns: Formatted hexadecimal value
+/// Returns: Formatted hexadecimal string
 const(char) *adbg_ctx_reg_hex(register_t *reg) {
 	import adbg.utils.str : adbg_util_strf;
 	with (RegisterType)
 	switch (reg.type) {
-	case u8:	return adbg_util_strf("%02x", reg.u8);
-	case u16:	return adbg_util_strf("%04x", reg.u16);
+	case u8:
+		return adbg_util_strf("%02x", reg.u8);
+	case u16:
+		return adbg_util_strf("%04x", reg.u16);
 	case u32, f32, flags_x86:
 		return adbg_util_strf("%08x", reg.u32);
 	case u64, f64, flags_x86_64:
 		return adbg_util_strf("%016llx", reg.u64);
-	default:	assert(0);
+	default:
+		assert(0);
 	}
 }
 
+/// Format a register's context with their formatted value.
+/// Params: reg = register_t structure
+/// Returns: Formatted string
 const(char) *adbg_ctx_reg_val(register_t *reg) {
 	import adbg.utils.str : adbg_util_strf, empty_string;
 	enum F_X86_CF = 1;
@@ -194,12 +201,6 @@ const(char) *adbg_ctx_reg_val(register_t *reg) {
 	default:	assert(0);
 	}
 }
-
-/*
-const(char) *exception_reg_fval(register_t *reg) {
-	import utils.str : adbg_util_strf;
-	
-}*/
 
 version (X86_ANY)
 private void adbg_ctx_init_x86(thread_context_t *ctx) {

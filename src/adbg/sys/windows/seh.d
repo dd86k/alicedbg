@@ -60,7 +60,6 @@ extern (Windows) {
 
 extern (Windows)
 uint adbg_seh_handle(_EXCEPTION_POINTERS *e) {
-	import core.stdc.stdio : puts;
 	import core.sys.windows.winbase :
 		EXCEPTION_IN_PAGE_ERROR, EXCEPTION_ACCESS_VIOLATION;
 	mcheckpoint.exception.oscode = e.ExceptionRecord.ExceptionCode;
@@ -78,8 +77,8 @@ uint adbg_seh_handle(_EXCEPTION_POINTERS *e) {
 			e.ExceptionRecord.ExceptionCode);
 	}
 	
-	adbg_ctx_init(&mcheckpoint.exception.registers);
-	adbg_ctx_os(&mcheckpoint.exception.registers, cast(CONTEXT*)e.ContextRecord);
+//	adbg_ctx_init(&mcheckpoint.exception.registers);
+//	adbg_ctx_os(&mcheckpoint.exception.registers, cast(CONTEXT*)e.ContextRecord);
 //	longjmp(mcheckpoint.buffer, 1);
 	return EXCEPTION_EXECUTE_HANDLER;
 }
