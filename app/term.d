@@ -102,6 +102,8 @@ int term_init() {
 	return 0;
 }
 
+/// Initiate term as TUI
+/// Returns: Non-zero on error
 int term_tui_init() {
 	version (Windows) {
 		handleOld = handleOut;
@@ -125,11 +127,13 @@ int term_tui_init() {
 	return 0;
 }
 
+/// Configure terminal settings with the TermConfig enumeration
+/// Params: flags = New set of flags
 void term_config(int flags) {
 	term_opts = flags;
 }
 
-/// Restore console buf
+//-/ Restore console buf
 /*void term_restore() {
 	version (Windows) {
 		SetConsoleActiveScreenBuffer(hOld);

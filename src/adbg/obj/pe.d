@@ -28,38 +28,38 @@ enum int PE_OHDR64_SIZE = PE_OPTIONAL_HEADER64.sizeof + PE_DIRECTORY_SIZE; // PE
 enum int PE_OHDRROM_SIZE = PE_OPTIONAL_HEADERROM.sizeof + PE_DIRECTORY_SIZE; // PE-ROM
 
 enum : ushort { // PE_HEADER.Machine, likely all little-endian
-	PE_MACHINE_UNKNOWN	= 0,
-	PE_MACHINE_ALPHA	= 0x184,	// Alpha AXP
-	PE_MACHINE_ALPHA64	= 0x284,	// Alpha AXP 64-bit
-	PE_MACHINE_AM33	= 0x1d3,	// Matsushita AM33
-	PE_MACHINE_AMD64	= 0x8664,	// x86-64
-	PE_MACHINE_ARM	= 0x1c0,	// "ARM little endian", so, ARM7/ARM9?
-	PE_MACHINE_ARMNT	= 0x1c4,	// arm_a32 (ARMv7+ with thumb2)
-	PE_MACHINE_ARM64	= 0xaa64,	// arm_a64
-	PE_MACHINE_EBC	= 0xebc,	// EFI Byte-Code
-	PE_MACHINE_I386	= 0x14c,	// x86
-	PE_MACHINE_IA64	= 0x200,	// Itanium
-	PE_MACHINE_M32R	= 0x9041,	// lsb
-	PE_MACHINE_MIPS16	= 0x266,
-	PE_MACHINE_MIPSFPU	= 0x366,
-	PE_MACHINE_MIPSFPU16	= 0x466,
-	PE_MACHINE_POWERPC	= 0x1f0,
-	PE_MACHINE_POWERPCFP	= 0x1f1,
-	PE_MACHINE_R3000	= 0x162,	// mips
-	PE_MACHINE_R4000	= 0x166,	// mips
-	PE_MACHINE_R10000	= 0x168,	// mips
-	PE_MACHINE_RISCV32	= 0x5032,	// risc-v-32
-	PE_MACHINE_RISCV64	= 0x5064,	// risc-v-64
-	PE_MACHINE_RISCV128	= 0x5128,	// risc-v-128
-	PE_MACHINE_SH3	= 0x1a2,	// SuperH
-	PE_MACHINE_SH3DSP	= 0x1a3,	// SuperH DSP
-	PE_MACHINE_SH4	= 0x1a6,	// SuperH
-	PE_MACHINE_SH5	= 0x1a8,	// SuperH
-	PE_MACHINE_THUMB	= 0x1c2,	// arm_t32
-	PE_MACHINE_WCEMIPSV2	= 0x169,
+	PE_MACHINE_UNKNOWN	= 0,	/// Any machine
+	PE_MACHINE_ALPHAOLD	= 0x183,	/// Alpha (old value), unused
+	PE_MACHINE_ALPHA	= 0x184,	/// Alpha AXP
+	PE_MACHINE_ALPHA64	= 0x284,	/// Alpha AXP 64-bit
+	PE_MACHINE_AM33	= 0x1d3,	/// Matsushita AM33
+	PE_MACHINE_AMD64	= 0x8664,	/// x86-64
+	PE_MACHINE_ARM	= 0x1c0,	/// ARM little endian
+	PE_MACHINE_ARMNT	= 0x1c4,	/// arm_a32 (ARMv7+ with thumb2)
+	PE_MACHINE_ARM64	= 0xaa64,	/// arm_a64 (AArch64)
+	PE_MACHINE_EBC	= 0xebc,	/// EFI Byte-Code
+	PE_MACHINE_I386	= 0x14c,	/// x86
+	PE_MACHINE_IA64	= 0x200,	/// Itanium
+	PE_MACHINE_M32R	= 0x9041,	/// Mitsubishi M32R LSB
+	PE_MACHINE_MIPS16	= 0x266,	/// 
+	PE_MACHINE_MIPSFPU	= 0x366,	/// 
+	PE_MACHINE_MIPSFPU16	= 0x466,	/// 
+	PE_MACHINE_POWERPC	= 0x1f0,	/// 
+	PE_MACHINE_POWERPCFP	= 0x1f1,	/// 
+	PE_MACHINE_R3000	= 0x162,	/// MIPS I
+	PE_MACHINE_R4000	= 0x166,	/// MIPS II
+	PE_MACHINE_R10000	= 0x168,	/// MIPS III
+	PE_MACHINE_RISCV32	= 0x5032,	/// RISC-V (32-bit)
+	PE_MACHINE_RISCV64	= 0x5064,	/// RISC-V (64-bit)
+	PE_MACHINE_RISCV128	= 0x5128,	/// RISC-V (128-bit)
+	PE_MACHINE_SH3	= 0x1a2,	/// SuperH
+	PE_MACHINE_SH3DSP	= 0x1a3,	/// SuperH + DSP
+	PE_MACHINE_SH4	= 0x1a6,	/// SuperH 4
+	PE_MACHINE_SH5	= 0x1a8,	/// SuperH 5
+	PE_MACHINE_THUMB	= 0x1c2,	/// arm_t32
+	PE_MACHINE_WCEMIPSV2	= 0x169,	/// MIPS WCE
 	// https://en.wikibooks.org/wiki/X86_Disassembly/Windows_Executable_Files
-	PE_MACHINE_CLR	= 0xC0EE,
-	//TODO: Missing CEE machine type "COM+ EE"
+	PE_MACHINE_CLR	= 0xC0EE,	/// Pure MSIL. aka COM+ EE?
 }
 
 enum : ushort { // PE_HEADER.Characteristics flags

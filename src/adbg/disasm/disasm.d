@@ -19,14 +19,14 @@ extern (C):
 /// formatter module.
 ///
 /// If that's not enough, update to 80 characters.
-enum ADBG_DISASM_BUFFER_SIZE = 64;
+package enum ADBG_DISASM_BUFFER_SIZE = 64;
 
 /// Disassembler operating mode
 enum AdbgDisasmMode : ubyte {
 	size,	/// Only calculate operation code sizes
 	data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
 	file,	/// Machine code and instruction mnemonics formatting
-	full	/// (Not implemented) Add comments (e.g., ; REX PUSH R8)
+	full	/// (TODO) Add comments (e.g., ; <ntdll!...>)
 }
 
 /// Disassembler ABI
@@ -35,23 +35,22 @@ enum AdbgDisasmPlatform : ubyte {
 	x86_16,	/// (WIP) 8086, 80186, 80286
 	x86,	/// (WIP) x86-32, 80386/i386
 	x86_64,	/// (WIP) AMD64, Intel64, x64 (Windows)
-	arm_t32,	/// (Not implemented) ARM: Thumb 32-bit
-	arm_a32,	/// (Not implemented) ARM: A32 (formally arm)
-	arm_a64,	/// (Not implemented) ARM: A64 (formally aarch64)
+	arm_t32,	/// (TODO) ARM: Thumb 32-bit
+	arm_a32,	/// (TODO) ARM: A32 (formally arm)
+	arm_a64,	/// (TODO) ARM: A64 (formally aarch64)
 	rv32,	/// (WIP) RISC-V 32-bit
-	rv64,	/// (Not implemented) RISC-V 64-bit
+	rv64,	/// (TODO) RISC-V 64-bit
 }
 
 /// Disassembler syntaxes
-//TODO: Native syntax
-//      A custom ISA-dependant format
 enum AdbgDisasmSyntax : ubyte {
 	platform,	/// Platform compiled target default
 	intel,	/// Intel syntax, close to Microsoft/Macro Assembler (MASM)
 	nasm,	/// (NASM) Netwide Assembler syntax
 	att,	/// AT&T syntax
-//	ideal,	/// (Not implemented) Borland Ideal
-//	hyde,	/// (Not implemented) Randall Hyde High Level Assembly Language
+//	ideal,	/// (TODO) Borland Ideal
+//	hyde,	/// (TODO) Randall Hyde High Level Assembly Language
+//	riscv,	/// 
 }
 
 /// Disassembler option flag
@@ -165,18 +164,17 @@ struct adbg_disasm_t { align(1):
 		riscv_internals_t *rv;	/// Used internally
 	}
 	adg_disasmfmt_t *fmt;	/// Formatter structure pointer, used internally
-	fswap16 swi16;	/// Used internally
-	fswap32 swi32;	/// Used internally
-	fswap64 swi64;	/// Used internally
 }
 
-//TODO: adbg_disasm_t* adbg_disasm_create();
-//      + turns fmt struct into a normal one
-//      - allocates buffers
+//TODO: adbg_disasm_t* adbg_disasm_create(void* addr, size_t len, int platform);
+//      Malloc-ish thing
+//      Sets up internal stuff such as byte swappers and internal impl.
+//TODO: adbg_disasm_style(adbg_disasm_t* d, int style)
+//TODO: adbg_disasm_obj(adbg_disasm_t* d, adbg_object_t *o)
+//TODO: adbg_disasm(adbg_disasm_t* d, int mode)
+//TODO: adbg_disasm_cjmp
+//      Calculate jump for internal usage
 //TODO: void adbg_disasm_destroy(adbg_disasm_t*);
-//TODO: int adbg_disasm_config(adbg_disasm_t*, int, void*);
-//      - formatter: sets function pointers (e.g., style, endian swappers)
-//      - platform: function pointer to disasm function
 
 /**
  * Populate machine mnemonic and machine code buffers.
@@ -191,7 +189,6 @@ struct adbg_disasm_t { align(1):
  *
  * Returns: Error code; Non-zero indicating an error
  */
-//TODO: Address should be given here
 int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	if (p == null) {
 		p.mcbuf[0] = 0;
@@ -239,25 +236,6 @@ int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 	}
 
 	return p.error;
-}
-
-//TODO: AdbgDisasmPlatform adbg_disasm_guess(void *p, int size)
-//      Returns Default if really nothing found or errors
-//      Sets .isa
-//      Score system (On min 50 instructions or before size is reached)
-
-/// See if platform is big-endian (useful for swap functions) from an ISA enum
-/// value. The default returns the compilation platform endianness value.
-/// Params: isa = AdbgDisasmPlatform value
-/// Returns: Zero if little-endian, non-zero if big-endian
-int adbg_disasm_msb(AdbgDisasmPlatform isa) {
-	with (AdbgDisasmPlatform)
-	switch (isa) {
-	case x86_16, x86, x86_64, rv32, rv64: return 0;
-	default:
-		version (BigEndian) return 1;
-		else return 0;
-	}
 }
 
 // Status: Waiting on _setup function

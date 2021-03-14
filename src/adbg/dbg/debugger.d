@@ -398,9 +398,11 @@ L_DEBUG_LOOP:
 		with (AdbgAction)
 		final switch (userfunc(&e)) {
 		case exit:
-			//TODO: DebugActiveProcessStop if -pid was used
+			if (g_debuggee.attached)
+				DebugActiveProcessStop(g_debuggee.pid);
+			else
+				ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
 			g_debuggee.state = AdbgState.idle;
-			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
 			return 0;
 		case step:
 			// Enable single-stepping via Trap flag

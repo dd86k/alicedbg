@@ -19,9 +19,12 @@ module adbg.obj.server;
 import core.stdc.stdio;
 import core.stdc.config : c_long;
 import adbg.error;
-import adbg.disasm.disasm : AdbgDisasmPlatform, adbg_disasm_msb;
+import adbg.disasm.disasm : AdbgDisasmPlatform;
 import adbg.obj.mz, adbg.obj.pe, adbg.obj.elf;
 import adbg.utils.bit : CHAR16, CHAR32;
+
+//TODO: adbg_obj_is64bit
+//TODO: adbg_obj_ismsb
 
 extern (C):
 

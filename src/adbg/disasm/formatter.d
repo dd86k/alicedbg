@@ -37,6 +37,12 @@ import adbg.utils.str, adbg.platform;
 
 extern (C):
 
+//TODO: Style implementation functions
+///     Intel/Nasm/Att function handlers, instead of switch
+///     Also do 'native'
+///     - x86: defaults to intel
+///     - riscv: defaults to riscv
+
 //
 // Formatter options for decoder
 //
@@ -111,14 +117,13 @@ struct adg_disasmfmt_t { align(1):
 }
 
 /// Default string for illegal instructions
-private immutable
-const(char) *DISASM_FMT_ERR	= "(bad)";	/// Error function string
-private immutable
-const(char) *DISASM_FMT_SPACE	= " ";	/// Between instruction and operands
-private immutable
-const(char) *adg_disasmfmt_tAB	= "\t";	/// Between instruction and operands
-private immutable
-const(char) *DISASM_FMT_COMMA_SPACE	= ", ";	/// Typically in-between operands
+private immutable const(char) *DISASM_FMT_ERR	= "(bad)";
+/// Between instruction and operands
+private immutable const(char) *DISASM_FMT_SPACE	= " ";
+/// Between instruction and operands
+private immutable const(char) *DISASM_FMT_TAB	= "\t";
+/// Typically in-between operands
+private immutable const(char) *DISASM_FMT_COMMA_SPACE	= ", ";
 
 private immutable
 const(char) *[]MEM_WIDTHS_INTEL = [
@@ -175,9 +180,6 @@ void adbg_disasm_push_x64(adbg_disasm_t *p, ulong v) {
 //
 // ANCHOR Pushing functions
 //
-
-//TODO: Consider renaming the push names
-//      e.g. memsegregimm to msri
 
 /// Push a string value into the formatting stack. This is printed as-is.
 /// Params:
@@ -532,7 +534,7 @@ void adbg_disasm_render(adbg_disasm_t *p) {
 	if (nitems < 2) return;
 
 	adbg_disasm_madd(p, p.options & AdbgDisasmOption.spaceSep ?
-		DISASM_FMT_SPACE : adg_disasmfmt_tAB);
+		DISASM_FMT_SPACE : DISASM_FMT_TAB);
 
 	with (AdbgDisasmSyntax)
 	switch (p.syntax) {
@@ -591,8 +593,6 @@ void adbg_disasm_xadd(adbg_disasm_t *p, const(char) *s) {
 	with (p)
 	mcbufi = adbg_util_stradd(cast(char*)mcbuf, ADBG_DISASM_BUFFER_SIZE, mcbufi, s);
 }
-
-//TODO: Intel/Nasm/Att function handlers, instead of switch
 
 /// (Internal) Format and add item to mnemonic buffer. No-op if
 /// buffersize - bufferindex <= 0.
@@ -674,7 +674,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 		switch (p.syntax) {
 		case att:
 			//TODO: '*' for any call/jmps under at&t
-			//      AT&T syntax emplois '*' for call/jmps with any type (dword/fword)
+			//      AT&T syntax uses '*' for call/jmps with any type (dword/fword)
 			//      Also for far jumps and calls, the instruction prepends 'l'
 			const(char) *fmt = i.ival3 == MemWidth.far ? "*(%s)" : "(%s)";
 			p.mnbufi += snprintf(bp, left, fmt, i.sval1);

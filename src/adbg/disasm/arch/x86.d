@@ -25,7 +25,7 @@ struct x86_internals_t { align(2):
 	/// (C4H) VEX.3B: 11000100 RXBmmmmm WvvvvLpp
 	/// (8FH) XOP   : 10001111 RXBmmmmm WvvvvLpp
 	/// (62H) EVEX  : 01100010 RXBR00mm Wvvvv1pp zLLbVaa
-	//          Note:             R'              L' V'
+	//    EVEX Notes:             R'              L' V'
 	union {
 		uint vex32;	/// AVX alias
 		ubyte[4] vex;	/// AVX byte data
@@ -43,14 +43,6 @@ struct x86_internals_t { align(2):
 }
 
 //TODO: Adjust float memory widths
-//TODO: Consider changing mask to 1111_0000
-//	Mix 1111_0000 (<40H) and 11_111_000
-//	Version: ADBG_DASM_X86_NEW_MASK
-//	https://sandpile.org/x86/opc_grp.htm
-//	version (ADBG_DASM_X86_NEW_MASK) {
-//	} else // version (ADBG_DASM_X86_MASK_F0)
-
-//version = ADBG_DASM_X86_NEW_MASK;
 
 /**
  * x86 disassembler.

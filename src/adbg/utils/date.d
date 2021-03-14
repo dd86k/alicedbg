@@ -77,7 +77,6 @@ const(char)* ctime32(uint timestamp) {
 	const(char) *mon_s =
 		month < 1 || month > 12 ? error_s : MON[month];
 	
-	//TODO: Get strftime for day of week and month since.. locale?
 	int r = snprintf(cast(char*)_buffer, BSZ,
 		// Www Mmm dd hh:mm:ss yyyy
 		// WeekDay Month day hour:minutes:seconds year

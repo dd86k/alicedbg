@@ -10,56 +10,51 @@ import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc;
 import adbg.error;
 import adbg.disasm, adbg.obj.server;
 import adbg.obj.server;
+import adbg.utils.bit : BIT;
 import common, objects;
-
-//TODO: dump_t structure
-//      - adbg_obj_t obj;
-//      - adbg_disasm_t dopts;
-//      - int flags;
-//      - other options such as int d_max_length;
 
 extern (C):
 
 /// Bitfield. Selects which information to display.
 enum DumpOpt {
 	/// 'h' - Dump header
-	header	= 1,
+	header	= BIT!(0),
 	/// 'd' - Dump directories (PE32)
-	dirs	= 1 << 1,
+	dirs	= BIT!(1),
 	/// 'e' - Exports
-	exports	= 1 << 2,
+	exports	= BIT!(2),
 	/// 'i' - Imports
-	imports	= 1 << 3,
+	imports	= BIT!(3),
 	/// 'c' - Images, certificates, etc.
-	resources	= 1 << 4,
+	resources	= BIT!(4),
 	/// 't' - Structured Exception Handler
-	seh	= 1 << 5,
+	seh	= BIT!(5),
 	/// 't' - Symbol table(s)
-	symbols	= 1 << 6,
+	symbols	= BIT!(6),
 	/// 'T' - Dynamic symbol table
-	dynsymbols	= 1 << 7,
+	dynsymbols	= BIT!(7),
 	/// 'g' - Debugging material
-	debug_	= 1 << 8,
+	debug_	= BIT!(8),
 	/// 'o' - Thread Local Storage
-	tls	= 1 << 9,
+	tls	= BIT!(9),
 	/// 'l' - Load configuration
-	loadcfg	= 1 << 10,
+	loadcfg	= BIT!(10),
 	/// 's' - Sections
-	sections	= 1 << 11,
+	sections	= BIT!(11),
 	/// 'r' - Relocations
-	relocs	= 1 << 12,
+	relocs	= BIT!(12),
 	/// 'R' - Dynamic relocations
-	dynrelocs	= 1 << 13,
+	dynrelocs	= BIT!(13),
 	
 	/// Disassemble executable sections
-	disasm_code	= 1 << 22,
+	disasm_code	= BIT!(22),
 	/// Disassembly statistics
-	disasm_stats	= 1 << 23,
+	disasm_stats	= BIT!(23),
 	/// Disassemble all sections
-	disasm_all	= 1 << 24,
+	disasm_all	= BIT!(24),
 	
 	/// File is raw, do not auto-detect
-	raw	= 1 << 31,
+	raw	= BIT!(31),
 	
 	/// Display all metadata except disassembly
 	everything = header | dirs | resources | seh |
@@ -75,7 +70,6 @@ struct dump_t {
 	adbg_object_t *obj; /// object
 	adbg_disasm_t *dopts; /// disasm options
 	int flags; /// display settings
-	int maxlen; /// disasm: maximum length to disassemble
 }
 
 /// Output a dump title.
