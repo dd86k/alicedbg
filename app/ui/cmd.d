@@ -48,6 +48,7 @@ immutable const(char) *cmd_fmt   = " %-10s                      %s\n";
 immutable const(char) *cmd_fmta  = " %-10s %-20s %s\n";
 bool continue_; /// if user wants to continue
 bool paused;	/// if debuggee is paused
+int lasterror;	/// last command error
 
 //
 // loop
@@ -56,11 +57,10 @@ bool paused;	/// if debuggee is paused
 int cmd_loop() {
 	char* line = void;
 	int argc = void;
-	int err;
 	continue_ = true;
 	
 	while (continue_) {
-		cmd_prompt(err); // print prompt
+		cmd_prompt(lasterror); // print prompt
 		line = term_readline(&argc); // read line
 		
 		//TODO: remove once term gets key events
@@ -69,10 +69,10 @@ int cmd_loop() {
 			return 0;
 		}
 		
-		err = cmd_execl(line, argc); // execute line
+		lasterror = cmd_execl(line, argc); // execute line
 	}
 	
-	return err;
+	return lasterror;
 }
 
 //
@@ -182,8 +182,7 @@ int cmd_action(const(char) *a) {
 		if (strcmp(a, action.str) == 0)
 			return action.val;
 	
-	printf("not an action: '%s'\n", a);
-	return AppError.invalidCommand;
+	return -1;
 }
 
 //
@@ -196,13 +195,12 @@ int cmd_c_load(int argc, const(char) **argv) {
 		return AppError.invalidParameter;
 	}
 	
-	//TODO: cmd argv handling
-	
-	if (adbg_load(argv[1])) {
+	if (adbg_load(argv[1], argc > 2 ? argv + 2: null)) {
 		printerror;
 		return AppError.couldntLoad;
 	}
 	
+	printf("Program '%s' loaded\n", argv[1]);
 	return 0;
 }
 void cmd_h_load() {
@@ -250,6 +248,24 @@ int cmd_c_r(int argc, const(char) **argv) {
 	adbg_ctx_get(&ctx);
 	int m = ctx.count;
 	register_t *r = ctx.items.ptr;
+	const(char) *reg = argv[1];
+	
+	// searching for reg
+	//TODO: reg=value when setting context is available
+	if (reg) {
+		for (size_t i; i < m; ++i, ++r) {
+			if (strcmp(reg, r.name))
+				continue;
+			printf("%-8s  0x%8s  %s\n",
+				r.name,
+				adbg_ctx_reg_hex(r),
+				adbg_ctx_reg_val(r));
+			return 0;
+		}
+		puts("Register not found");
+		return AppError.invalidParameter;
+	}
+	
 	for (size_t i; i < m; ++i, ++r)
 		printf("%-8s  0x%8s  %s\n",
 			r.name,
@@ -337,26 +353,26 @@ int cmd_handler(exception_t *ex) {
 		//TODO: (cmd) disasm on fault
 	}
 	
-	int err = ex.oscode;
 	int length = void;
 	int argc = void;
 	paused = true;
 	
 L_INPUT:
-	cmd_prompt(err);
+	cmd_prompt(lasterror);
 	char* line = term_readline(&length);
 	if (line == null) {
 		continue_ = false;
 		return AdbgAction.exit;
 	}
-	char** argv = adbg_util_expand(line, &argc);
+	const(char)** argv = cast(const(char)**)adbg_util_expand(line, &argc);
 	
 	int a = cmd_action(argv[0]);
-	if (a != -1) {
+	if (a > 0) {
+		printf("not an action: '%s'\n", argv[0]);
 		paused = false;
 		return a;
 	}
 	
-	err = cmd_execl(line, length);
+	lasterror = cmd_execv(argc, argv);
 	goto L_INPUT;
 }

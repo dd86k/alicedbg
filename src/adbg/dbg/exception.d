@@ -286,7 +286,7 @@ const(char) *adbg_exception_string(ExceptionType code) {
 	case FPUStackOverflow:	return "FPU: STACK OVERFLOW";
 	case Disposition:	return "OS: DISPOSITION";
 	case NoContinue:	return "OS: COULD NOT CONTINUE";
-	default: assert(0);
+	default:	assert(0, "adbg_exception_string: missing value");
 	}
 }
 

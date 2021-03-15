@@ -394,6 +394,8 @@ L_DEBUG_LOOP:
 			goto L_DEBUG_LOOP;
 		}
 		
+		adbg_ex_dbg(&e, &de);
+		
 		g_debuggee.state = AdbgState.paused;
 		with (AdbgAction)
 		final switch (userfunc(&e)) {
