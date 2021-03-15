@@ -119,13 +119,8 @@ immutable command_t[] commands = [
 //	{ "d",      "<addr>", "Disassemble address", & },
 	{
 		"run", null,
-		"Run debugger",
+		"Run debugger after loading an executable",
 		&cmd_c_run
-	},
-	{
-		"status", null,
-		"Show current state",
-		&cmd_c_status
 	},
 	{
 		"r", null,
@@ -212,29 +207,6 @@ void cmd_h_load() {
 }
 
 //
-// status command
-//
-
-int cmd_c_status(int argc, const(char) **argv) {
-	AdbgState s = adbg_state;
-	const(char) *st = void;
-	switch (s) {
-	case AdbgState.idle:	st = "idle"; break;
-	case AdbgState.loaded:	st = "loaded"; break;
-	case AdbgState.running:	st = "running"; break;
-	case AdbgState.paused:	st = "paused"; break;
-	default:	st = "unknown";
-	}
-	printf(
-	"state: (%d) %s\n"~
-	"exception: ("~SYS_ERR_FMT~") %s\n",
-	s, st,
-	common_exception.oscode, adbg_exception_string(common_exception.type)
-	);
-	return 0;
-}
-
-//
 // r command
 //
 
@@ -243,6 +215,7 @@ int cmd_c_r(int argc, const(char) **argv) {
 		puts("No program loaded or not paused");
 		return AppError.notPaused;
 	}
+	
 	thread_context_t ctx = void;
 	adbg_ctx_init(&ctx);
 	adbg_ctx_get(&ctx);
@@ -368,7 +341,6 @@ L_INPUT:
 	
 	int a = cmd_action(argv[0]);
 	if (a > 0) {
-		printf("not an action: '%s'\n", argv[0]);
 		paused = false;
 		return a;
 	}
