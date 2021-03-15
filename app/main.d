@@ -54,7 +54,7 @@ immutable option_t[] options = [
 	{ 's', "syntax", "Select disassembler syntax (default=platform)", true, fa: &cli_syntax },
 	// debugger
 	{ 'f', "file", "Debugger: Load executable (default parameter)", true, fa: &cli_file },
-	{ 0,   "args", "Debugger: Supply arguments to executable", true, fa: &cli_args },
+	{ 0,   "args", "Debugger: Supply arguments to executable, '--' works too", true, fa: &cli_args },
 	{ 'E', "env",  "Debugger: Supply environment variables to executable", true, fa: &cli_env },
 	{ 'p', "pid",  "Debugger: Attach to process", true, fa: &cli_pid },
 	{ 'U', "ui",   "Debugger: Select debugger user interface (default=cmd)", true, fa: &cli_ui },
@@ -76,22 +76,12 @@ enum NUMBER_OF_SECRETS = 1;
 // ANCHOR --march
 //
 
-struct setting_platform_t {
-	AdbgDisasmPlatform val;
-	immutable(char)* opt, alt, desc;
-}
-immutable setting_platform_t[] platforms = [
-	{ AdbgDisasmPlatform.x86_16, "x86_16",  "8086",  "x86 16-bit (real-mode)" },
-	{ AdbgDisasmPlatform.x86,    "x86",     "i386",  "x86 32-bit (extended mode)" },
-	{ AdbgDisasmPlatform.x86_64, "x86_64",  "amd64", "x86 64-bit (long mode)" },
-	{ AdbgDisasmPlatform.rv32,   "riscv32", "rv32",  "RISC-V 32-bit"},
-];
 int cli_march(const(char) *val) {
 	if (cli_wanthelp(val)) {
 		puts("Available machine architectures:");
 		foreach (setting_platform_t p; platforms) {
 			with (p)
-			printf("%8s, %-12s%s\n", opt, alt, desc);
+			printf("%8s, %-10s  %s\n", opt, alt, desc);
 		}
 		exit(0);
 	}
@@ -108,21 +98,12 @@ int cli_march(const(char) *val) {
 // ANCHOR --syntax
 //
 
-struct setting_syntax_t {
-	AdbgDisasmSyntax val;
-	immutable(char)* opt, desc;
-}
-immutable setting_syntax_t[] syntaxes = [
-	{ AdbgDisasmSyntax.att,   "att",   "AT&T syntax" },
-	{ AdbgDisasmSyntax.intel, "intel", "Intel syntax" },
-	{ AdbgDisasmSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
-];
 int cli_syntax(const(char) *val) {
 	if (cli_wanthelp(val)) {
 		puts("Available disassembler syntaxes:");
 		foreach (setting_syntax_t syntax; syntaxes) {
 			with (syntax)
-			printf("%-8s %s\n", opt, desc);
+			printf("%-10s  %s\n", opt, desc);
 		}
 		exit(0);
 	}
@@ -309,17 +290,18 @@ int cli_help() {
 	"alicedbg - Aiming to be a simple debugger\n"~
 	"\n"~
 	"USAGE\n"~
-	" alicedbg {--pid ID|--file FILE|--dump FILE} [OPTIONS...]\n"~
+	" alicedbg {--pid ID|[--file] FILE|--dump FILE} [OPTIONS...]\n"~
 	" alicedbg {-h|--help|--version|--license}\n"~
 	"\n"~
 	"OPTIONS"
 	);
 	foreach (option_t opt; options[0..$-NUMBER_OF_SECRETS]) {
 		if (opt.alt)
-			printf(" -%c, --%-11s%s\n", opt.alt, opt.val, opt.desc);
+			printf(" -%c, --%-11s  %s\n", opt.alt, opt.val, opt.desc);
 		else
-			printf(" --%-15s%s\n", opt.val, opt.desc);
+			printf(" --%-15s  %s\n", opt.val, opt.desc);
 	}
+	puts("\nFor a list of values, for example a list of platforms, type '-m help'");
 	exit(0);
 	return 0;
 }
@@ -415,6 +397,8 @@ int cli_meow() {
 //
 // Main
 //
+
+//TODO: Support --option=value syntax
 
 int main(int argc, const(char)** argv) {
 	CLI: for (int argi = 1; argi < argc; ++argi) {

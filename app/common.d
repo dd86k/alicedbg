@@ -1,5 +1,6 @@
 /**
- * Common global variables.
+ * Common global variables and definitions so they can be used throughout the
+ * entirety of the program.
  *
  * License: BSD-3-Clause
  */
@@ -13,6 +14,45 @@ import core.stdc.string : memcpy;
 public:
 extern (C):
 __gshared:
+
+//
+// Definitions
+//
+
+/// Application error
+enum AppError {
+	none,
+	invalidParameter,
+	invalidCommand, // or action or sub-command
+	couldntLoad,
+	noHelp,
+	notPaused,
+}
+
+// Platforms
+
+struct setting_platform_t {
+	AdbgDisasmPlatform val;
+	immutable(char)* opt, alt, desc;
+}
+immutable setting_platform_t[] platforms = [
+	{ AdbgDisasmPlatform.x86_16, "x86_16",  "8086",  "x86 16-bit (real mode)" },
+	{ AdbgDisasmPlatform.x86,    "x86",     "i386",  "x86 32-bit (extended mode)" },
+	{ AdbgDisasmPlatform.x86_64, "x86_64",  "amd64", "x86 64-bit (long mode)" },
+	{ AdbgDisasmPlatform.rv32,   "riscv32", "rv32",  "RISC-V 32-bit"},
+];
+
+// Syntaxes
+
+struct setting_syntax_t {
+	AdbgDisasmSyntax val;
+	immutable(char)* opt, desc;
+}
+immutable setting_syntax_t[] syntaxes = [
+	{ AdbgDisasmSyntax.att,   "att",   "AT&T syntax" },
+	{ AdbgDisasmSyntax.intel, "intel", "Intel syntax" },
+	{ AdbgDisasmSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
+];
 
 //
 // Common globals

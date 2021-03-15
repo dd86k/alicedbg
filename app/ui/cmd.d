@@ -6,19 +6,15 @@
 module ui.cmd;
 
 import adbg.etc.c.stdio;
+import adbg.error;
 import adbg.dbg.debugger, adbg.dbg.exception, adbg.dbg.context;
 import adbg.sys.err;
 import adbg.utils.str;
-import core.stdc.string;
-import term;
-import core.stdc.stdlib;
-import common;
+import core.stdc.string, core.stdc.stdlib;
+import common, term;
 
 extern (C):
 __gshared:
-
-private bool continue_; /// if user wants to continue
-private bool paused;	/// if debuggee is paused
 
 /// Enter the command-line loop
 /// Returns: Error code
@@ -27,7 +23,7 @@ int cmd() {
 	return cmd_loop;
 }
 
-//TODO: adbg_ui_cmd_file -- read (commands) from file
+//TODO: cmd_file -- read (commands) from file
 
 /// Execute a line of command
 /// Returns: Error code
@@ -44,78 +40,133 @@ int cmd_execl(char *command, size_t len) {
 
 private:
 
+//
+// Private globals
+//
+
+immutable const(char) *cmd_fmt   = " %-10s                      %s\n";
+immutable const(char) *cmd_fmta  = " %-10s %-20s %s\n";
+bool continue_; /// if user wants to continue
+bool paused;	/// if debuggee is paused
+
+//
+// loop
+//
+
 int cmd_loop() {
 	char* line = void;
-	int llen = void;
+	int argc = void;
 	int err;
 	continue_ = true;
 	
 	while (continue_) {
 		cmd_prompt(err); // print prompt
-		line = term_readline(&llen); // read line
+		line = term_readline(&argc); // read line
 		
 		//TODO: remove once term gets key events
-		if (line == null) return 0;
+		if (line == null) {
+			printf("^D");
+			return 0;
+		}
 		
-		err = cmd_execl(line, llen); // execute line
-		if (err > 1)
-			printf("%s\n", adbg_sys_error(err));
+		err = cmd_execl(line, argc); // execute line
 	}
 	
 	return err;
 }
 
+//
+// prompt
+//
+
 void cmd_prompt(int err) { // [code*adbg]
-	enum fmt = "[%d%cadbg] ";
+	enum fmt = "[%d adbg%c] ";
 	printf(fmt, err, paused ? '*' : ' ');
 }
+
+void cmd_help_chapter(const(char) *name) {
+	puts(name);
+}
+void cmd_help_paragraph(const(char) *p) {
+L_PRINT:
+	int o = printf("\t%.72s\n", p);
+	if (o < 72)
+		return;
+	p += 72;
+	goto L_PRINT;
+}
+
+//
+// Command handling
+//
+
+struct command_t {
+	const(char) *str;	/// command string
+	const(char) *synop;	/// command synopsis
+	const(char) *desc;	/// help description
+	int function(int, const(char)**) func;	/// command implementation
+	void function() help;	/// help implementation
+}
+immutable command_t[] commands = [
+	{
+		"load", "<file> [<arg>...]",
+		"Load executable file into the debugger",
+		&cmd_c_load, &cmd_h_load
+	},
+//	{ "core",   null, "Load core debugging object into debugger", &cmd_c_load },
+//	{ "attach", null, "Attach the debugger to pid", &cmd_c_pid },
+//	{ "b",      "<action>", "Breakpoint management", & },
+//	{ "d",      "<addr>", "Disassemble address", & },
+	{
+		"run", null,
+		"Run debugger",
+		&cmd_c_run
+	},
+	{
+		"status", null,
+		"Show current state",
+		&cmd_c_status
+	},
+	{
+		"r", null,
+		"Register management",
+		&cmd_c_r
+	},
+	{
+		"help", "<command>",
+		"Show this help screen",
+		&cmd_c_help
+	},
+	{
+		"quit", null,
+		"Quit",
+		&cmd_c_quit
+	},
+	{
+		"q", null,
+		"Alias to quit",
+		&cmd_c_quit
+	},
+];
 
 int cmd_execv(int argc, const(char) **argv) {
 	if (argc <= 0 || argv == null)
 		return 0;
 	
 	foreach (comm; commands)
-		if (strcmp(argv[0], comm.opt) == 0)
+		if (strcmp(argv[0], comm.str) == 0)
 			return comm.func(argc, argv);
 	
-	printf("unknown command: %s\n", argv[0]);
-	
-	return 1;
+	printf("unknown command: '%s'\n", argv[0]);
+	return AppError.invalidCommand;
 }
 
-int cmd_action(const(char) *a) {
-	foreach (action; actions) {
-		if (strcmp(a, action.opt) == 0)
-			return action.val;
-	}
-	
-	return -1;
-}
-
-struct command_t {
-	const(char) *opt;	/// command string
-	const(char) *argf;	/// Argument formatting when displaying help
-	const(char) *desc;	/// help description
-	int function(int, const(char)**) func; /// function impl.
-	//TODO: Help function
-}
-immutable command_t[] commands = [
-	{ "load",   "FILE [ARG...]", "Load executable file into the debugger", &cmd_c_load },
-//	{ "core",   null, "Load core debugging object into debugger", &cmd_c_load },
-//	{ "attach", null, "Attach the debugger to pid", &cmd_c_pid },
-//	{ "b",      "rm|add|", "Manage breakpoints", & },
-//	{ "d",      null, "Disassemble address", & },
-	{ "run",    null, "Run debugger", &cmd_c_run },
-	{ "status", null, "Show current state", &cmd_c_status },
-	{ "r",      null, "Show debuggee registers", &cmd_c_r },
-	//TODO: help on topic
-	{ "help",   null, "Show this help screen", &cmd_c_help },
-	{ "quit",   null, "Quit", &cmd_c_quit },
-	{ "q",      null, "Alias to quit", &cmd_c_quit },
-];
+//
+// Action handling
+//
 
 struct action_t {
-	immutable(char) *opt;	/// long option
+	immutable(char) *str;	/// long strion
 	immutable(char) *desc;	/// help description
 	AdbgAction val;	/// action value
 }
@@ -126,21 +177,45 @@ immutable action_t[] actions = [
 	{ "si",       "Instruction step", AdbgAction.step },
 ];
 
-immutable const(char) *cmd_fmt   = " %-10s            %s\n";
-immutable const(char) *cmd_fmta  = " %-10s %-10s %s\n";
+int cmd_action(const(char) *a) {
+	foreach (action; actions)
+		if (strcmp(a, action.str) == 0)
+			return action.val;
+	
+	printf("not an action: '%s'\n", a);
+	return AppError.invalidCommand;
+}
+
+//
+// load command
+//
 
 int cmd_c_load(int argc, const(char) **argv) {
 	if (argc < 2) {
 		puts("missing file argument");
-		return 1;
+		return AppError.invalidParameter;
 	}
 	
 	//TODO: cmd argv handling
 	
-	int e = adbg_load(argv[1]);
-	if (e) printerror;
-	return e;
+	if (adbg_load(argv[1])) {
+		printerror;
+		return AppError.couldntLoad;
+	}
+	
+	return 0;
 }
+void cmd_h_load() {
+	cmd_help_chapter("DESCRIPTION");
+	cmd_help_paragraph(
+	`Load an executable file into the debugger. Any arguments after the `~
+	`file are arguments passed into the debugger.`
+	);
+}
+
+//
+// status command
+//
 
 int cmd_c_status(int argc, const(char) **argv) {
 	AdbgState s = adbg_state;
@@ -161,7 +236,15 @@ int cmd_c_status(int argc, const(char) **argv) {
 	return 0;
 }
 
+//
+// r command
+//
+
 int cmd_c_r(int argc, const(char) **argv) {
+	if (paused == false) {
+		puts("No program loaded or not paused");
+		return AppError.notPaused;
+	}
 	thread_context_t ctx = void;
 	adbg_ctx_init(&ctx);
 	adbg_ctx_get(&ctx);
@@ -175,31 +258,71 @@ int cmd_c_r(int argc, const(char) **argv) {
 	return 0;
 }
 
+//
+// help command
+//
+
 int cmd_c_help(int argc, const(char) **argv) {
-	puts("Debugger commands:");
-	foreach (comm; commands) {
-		if (comm.argf)
-			printf(cmd_fmta, comm.opt, comm.argf, comm.desc);
-		else
-			printf(cmd_fmt, comm.opt, comm.desc);
+	const(char) *arg = argv[1];
+	
+	// Help on command
+	if (arg) {
+		foreach (comm; commands) {
+			if (strcmp(arg, comm.str))
+				continue;
+			if (comm.help == null) {
+				puts("Command has no help article available");
+				return AppError.noHelp;
+			}
+			printf("COMMAND\n\t%s - %s\n\nSYNOPSIS\n\t%s %s\n\n",
+				comm.str, comm.desc,
+				comm.str, comm.synop);
+			comm.help();
+			return 0;
+		}
+		printf("No help article found for '%s'\n", arg);
+		return AppError.invalidCommand;
 	}
 	
+	// Command list
+	puts("Debugger commands:");
+	foreach (comm; commands) {
+		if (comm.synop)
+			printf(cmd_fmta, comm.str, comm.synop, comm.desc);
+		else
+			printf(cmd_fmt, comm.str, comm.desc);
+	}
+	
+	// Action list
 	puts("\nWhen debuggee is paused:");
 	foreach (action; actions)
-		printf(cmd_fmt, action.opt, action.desc);
+		printf(cmd_fmt, action.str, action.desc);
+	
 	
 	return 0;
 }
 
+//
+// run command
+//
+
 int cmd_c_run(int argc, const(char) **argv) {
 	return adbg_run(&cmd_handler);
 }
+
+//
+// quit command
+//
 
 int cmd_c_quit(int argc, const(char) **argv) {
 	//TODO: Quit confirmation if debuggee is alive
 	exit(0);
 	return 0;
 }
+
+//
+// exception handler
+//
 
 int cmd_handler(exception_t *ex) {
 	memcpy(&common_exception, ex, exception_t.sizeof);
