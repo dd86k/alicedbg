@@ -5,6 +5,8 @@
  * compacting them as much as possible in a 32-bit number in the
  * eventuallity that the library is using other libraries.
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module adbg.error;

@@ -9,6 +9,8 @@
  * ```
  * We need this for PTRACE_GETREGS, for example.
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module adbg.sys.linux.user;

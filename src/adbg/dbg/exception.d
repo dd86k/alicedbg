@@ -12,6 +12,8 @@
  *
  * Linux: include/uapi/asm-generic/siginfo.h
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module adbg.dbg.exception;

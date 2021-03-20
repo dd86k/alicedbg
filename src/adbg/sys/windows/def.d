@@ -4,6 +4,8 @@
  * This is in a separate module to aid exporting "headers".
  * Publicly imports core.sys.windows.windef.
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module adbg.sys.windows.def;

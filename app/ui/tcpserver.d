@@ -7,6 +7,8 @@
  * (TCP) Defaults to listen on localhost:3549. Input receives commands and
  * output is done via printf.
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module ui.tcpserver;

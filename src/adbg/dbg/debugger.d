@@ -7,6 +7,8 @@
  * This is the only module that contains function names without its module
  * name.
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module adbg.dbg.debugger;

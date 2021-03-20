@@ -1,6 +1,8 @@
 /**
  * String helper functions. Simple string functions to aid redundant typing.
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module adbg.utils.str;

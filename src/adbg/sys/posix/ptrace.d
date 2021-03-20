@@ -4,6 +4,8 @@
  * based on Glibc 2.25. Support for more runtimes will be implemented
  * here with time.
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module adbg.sys.posix.ptrace;

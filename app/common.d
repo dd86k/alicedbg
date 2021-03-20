@@ -2,6 +2,8 @@
  * Common global variables and definitions so they can be used throughout the
  * entirety of the program.
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module common;

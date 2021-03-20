@@ -6,6 +6,8 @@
  * name for `putchar`, because it is defined as extern (C). Which leads to a
  * runtime crash for some reason.
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module adbg.etc.c.stdio;

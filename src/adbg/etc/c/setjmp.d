@@ -19,6 +19,8 @@
  * - jmp_buf structures: sysdeps/{arch}/jmpbuf-offsets.h
  * - jmp_buf definitions: sysdeps/{arch}/bits/setjmp.h
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module adbg.etc.c.setjmp;

@@ -7,6 +7,8 @@
  * Most useful being the fswap variants, which depending on the requested
  * endian (compared to the target's), return a function for bulk processing.
  *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: See LICENSE
  * License: BSD-3-Clause
  */
 module adbg.utils.bit;
