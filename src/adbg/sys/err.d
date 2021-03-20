@@ -9,12 +9,12 @@ module adbg.sys.err;
 
 version (Windows) {
 	import core.sys.windows.windows;
-	enum SYS_ERR_FMT = "W%08X"; /// Error code format
+	enum SYS_ERR_FMT = "%08X"; /// Error code format
 	private enum ERR_BUF_SZ = 512;
 } else {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
-	enum SYS_ERR_FMT = "L%d"; /// Error code format
+	enum SYS_ERR_FMT = "%d"; /// Error code format
 }
 
 extern (C):

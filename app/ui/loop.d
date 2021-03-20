@@ -40,10 +40,14 @@ int loop_handler(exception_t *e) {
 	e.pid, e.tid,
 	);
 	
-	version (Windows) //TODO: remove restriction once mm is done
 	// * Print disassembly, if available
 	if (e.faultaddr) {
-		common_settings.disasm.a = e.faultaddr;
+		char[16] b = void;
+		if (adbg_mm_cread(e.faultaddrv, cast(void*)b.ptr, 16)) {
+			puts("> Unable to read process memory.");
+			goto L_PROMPT;
+		}
+		common_settings.disasm.a = b.ptr;
 		if (adbg_disasm(&common_settings.disasm, AdbgDisasmMode.file) == 0) {
 			printf("> %p: %s| %s\n",
 				e.faultaddr,

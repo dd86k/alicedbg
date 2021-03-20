@@ -13,6 +13,7 @@
  */
 module adbg.dbg.debugger;
 
+import core.stdc.config : c_long;
 import core.stdc.string : memset;
 public import adbg.dbg.exception;
 import adbg.platform, adbg.error;
@@ -565,54 +566,62 @@ int adbg_bp_rm_addr(size_t addr) {
 // Memory handling
 //
 
-enum {	// adbg_mm flags
-	// Flags
-	MM_READ	= 0,	/// Read from memory to data pointer
-	MM_WRITE	= 0x8000,	/// Write to memory from data pointer
-}
-
-/**
- * Read or write to a memory region from or to the opened debugee process.
- * This does not include subchildren processes.
- * Params:
- * 	op   = MM operation
- * 	addr = Memory address location
- * 	data = Data pointer
- *      size = Size to read or write
- * Returns: Zero on success, oscode on error
- */
-deprecated
-int adbg_mm(int op, size_t addr, void *data, uint size) {
+/// Read memory from debuggee child.
+/// Params:
+/// 	addr = Memory address (within the children address space)
+/// 	data = Pointer to data
+/// 	size = Size of data
+/// Returns: Non-zero on error
+int adbg_mm_cread(size_t addr, void *data, uint size) {
 	version (Windows) {
-		if (op >= MM_WRITE) {
-			if (WriteProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
-				return GetLastError();
-		} else {
-			if (ReadProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
-				return GetLastError();
-		}
-	} else
-	version (linux) {
-		//TODO: adbg_mm (linux)
-		//      use open(2) and pread64/pwrite64(2)
-		if (g_debuggee.mhandle <= 0) {
-			char* cb = cast(char*)malloc(4096);
-			if (cb == null)
-				return adbg_error_system;
-			int n = snprintf(cb, 4096, "/proc/%d/mem", g_debuggee.pid);
-			if (n < 0)
-				return adbg_error_system;
-			g_debuggee.mhandle = open(cb, 0);
-			free(cb);
-		}
-		if (op >= MM_WRITE) {
-			if (pwrite(g_debuggee.mhandle, data, size, addr) == -1)
-				return adbg_error_system;
-		} else {
-			if (pread(g_debuggee.mhandle, data, size, addr) == -1)
-				return adbg_error_system;
+		if (ReadProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
+			return adbg_error_system;
+	} else { // Mostly taken from https://www.linuxjournal.com/article/6100
+		import core.stdc.string : memcpy;
+		
+		c_long *user = cast(c_long*)data;	/// user data pointer
+		int i;	/// offset index
+		int j = size / c_long.sizeof;	/// number of "blocks" to process
+		
+		for (; i < j; ++i, ++user)
+			*user = ptrace(PTRACE_PEEKDATA, g_debuggee.pid,
+				addr + (i * c_long.sizeof), null);
+		
+		j = size % c_long.sizeof;
+		if (j) {
+			c_long r = ptrace(PTRACE_PEEKDATA, g_debuggee.pid,
+				addr + (i * c_long.sizeof), null);
+			memcpy(user, &r, j);
 		}
 	}
+	return 0;
+}
 
+/// Write memory to debuggee child.
+/// Params:
+/// 	addr = Memory address (within the children address space)
+/// 	data = Pointer to data
+/// 	size = Size of data
+/// Returns: Non-zero on error
+int adbg_mm_cwrite(size_t addr, void *data, uint size) {
+	version (Windows) {
+		if (WriteProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
+			return adbg_error_system;
+	} else { // Mostly taken from https://www.linuxjournal.com/article/6100
+		import core.stdc.string : memcpy;
+		
+		c_long *user = cast(c_long*)data;	/// user data pointer
+		int i;	/// offset index
+		int j = size / c_long.sizeof;	/// number of "blocks" to process
+		
+		for (; i < j; ++i, ++user)
+			ptrace(PTRACE_POKEDATA, g_debuggee.pid,
+				addr + (i * c_long.sizeof), user);
+		
+		j = size % c_long.sizeof;
+		if (j)
+			ptrace(PTRACE_POKEDATA, g_debuggee.pid,
+				addr + (i * c_long.sizeof), user);
+	}
 	return 0;
 }

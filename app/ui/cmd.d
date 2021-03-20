@@ -12,6 +12,7 @@ import adbg.error;
 import adbg.dbg.debugger, adbg.dbg.exception, adbg.dbg.context;
 import adbg.sys.err;
 import adbg.utils.str;
+import adbg.disasm.disasm;
 import core.stdc.string, core.stdc.stdlib;
 import common, term;
 
@@ -329,14 +330,24 @@ int cmd_handler(exception_t *ex) {
 	ex.tid, adbg_exception_string(ex.type), ex.oscode,
 	);
 	
-	if (ex.faultaddr) {
-		printf("	Fault address: %zx\n", ex.faultaddrv);
-		//TODO: (cmd) disasm on fault
-	}
-	
 	int length = void;
 	int argc = void;
 	paused = true;
+	
+	if (ex.faultaddr) {
+		printf("	Fault address: %zx\n", ex.faultaddrv);
+		char[16] b = void;
+		if (adbg_mm_cread(ex.faultaddrv, cast(void*)b.ptr, 16)) {
+			puts("	Unable to read process memory.");
+			goto L_INPUT;
+		}
+		common_settings.disasm.a = b.ptr;
+		if (adbg_disasm(&common_settings.disasm, AdbgDisasmMode.file) == 0) {
+			printf("	Faulting instruction: [%s] %s\n",
+				common_settings.disasm.mcbuf.ptr,
+				common_settings.disasm.mnbuf.ptr);
+		}
+	}
 	
 L_INPUT:
 	cmd_prompt(lasterror);
