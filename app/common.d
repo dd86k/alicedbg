@@ -24,9 +24,9 @@ enum AppError {
 	none,
 	invalidParameter,
 	invalidCommand, // or action or sub-command
-	couldntLoad,
-	noHelp,
-	notPaused,
+	unavailable,
+	loadFailed,
+	pauseRequired,
 }
 
 // Platforms

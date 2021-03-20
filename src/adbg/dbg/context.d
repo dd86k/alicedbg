@@ -86,25 +86,36 @@ void adbg_ctx_get(thread_context_t *ctx) {
 			WOW64_CONTEXT winctxwow64 = void;
 			if (g_debuggee.wow64) {
 				winctxwow64.ContextFlags = CONTEXT_ALL;
-				Wow64GetThreadContext(g_debuggee.htid, &winctxwow64);
+				if (Wow64GetThreadContext(g_debuggee.htid, &winctxwow64) == FALSE) {
+					ctx.count = 0;
+					return;
+				}
 				adbg_ctx_os_wow64(ctx, &winctxwow64);
 			} else {
 				winctx.ContextFlags = CONTEXT_ALL;
-				GetThreadContext(g_debuggee.htid, &winctx);
+				if (GetThreadContext(g_debuggee.htid, &winctx)) {
+					ctx.count = 0;
+					return;
+				}
 				adbg_ctx_os(ctx, &winctx);
 			}
 		} else {
 			winctx.ContextFlags = CONTEXT_ALL;
-			GetThreadContext(g_debuggee.htid, &winctx);
+			if (GetThreadContext(g_debuggee.htid, &winctx)) {
+				ctx.count = 0;
+				return;
+			}
 			adbg_ctx_os(ctx, &winctx);
 		}
 	} else
 	version (Posix) {
+		//TODO: PTRACE_GETFPREGS
 		user_regs_struct u = void;
-		if (ptrace(PTRACE_GETREGS, g_debuggee.pid, null, &u) < 0)
+		if (ptrace(PTRACE_GETREGS, g_debuggee.pid, null, &u) < 0) {
 			ctx.count = 0;
-		else
-			adbg_ctx_os(ctx, &u);
+			return;
+		}
+		adbg_ctx_os(ctx, &u);
 	}
 }
 

@@ -349,7 +349,7 @@ enum NT_VERSION	= 1;	///
  * and system call tracing.
  * 
  * Params:
- * 	request = See PTRACE_* enumeration values
+ * 	req = PTRACE_* request
  * 	pid = Process ID number
  * 	addr = Memory pointer
  * 	data = Data pointer
@@ -357,4 +357,4 @@ enum NT_VERSION	= 1;	///
  * Returns: 0 on success; -1 on error. For PTRACE_PEEK requests, check errno
  * first
  */
-c_long ptrace(int request, ...);
+c_long ptrace(int req, ...);

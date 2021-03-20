@@ -508,10 +508,6 @@ L_DEBUG_LOOP:
 		
 		adbg_ex_dbg(&e, g_debuggee.pid, chld_signo);
 		
-//		iovec v = void;
-//		if (ptrace(PTRACE_GETREGSET, g_pid, NT_PRSTATUS, &v))
-//			return errno;
-		
 		with (AdbgAction)
 		switch (userfunc(&e)) {
 		case exit:

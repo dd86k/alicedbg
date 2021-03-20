@@ -192,7 +192,7 @@ int cmd_c_load(int argc, const(char) **argv) {
 	
 	if (adbg_load(argv[1], argc > 2 ? argv + 2: null)) {
 		printerror;
-		return AppError.couldntLoad;
+		return AppError.loadFailed;
 	}
 	
 	printf("Program '%s' loaded\n", argv[1]);
@@ -213,12 +213,18 @@ void cmd_h_load() {
 int cmd_c_r(int argc, const(char) **argv) {
 	if (paused == false) {
 		puts("No program loaded or not paused");
-		return AppError.notPaused;
+		return AppError.pauseRequired;
 	}
 	
 	thread_context_t ctx = void;
 	adbg_ctx_init(&ctx);
 	adbg_ctx_get(&ctx);
+	
+	if (ctx.count == 0) {
+		puts("No registers available");
+		return AppError.unavailable;
+	}
+	
 	int m = ctx.count;
 	register_t *r = ctx.items.ptr;
 	const(char) *reg = argv[1];
@@ -261,7 +267,7 @@ int cmd_c_help(int argc, const(char) **argv) {
 				continue;
 			if (comm.help == null) {
 				puts("Command has no help article available");
-				return AppError.noHelp;
+				return AppError.unavailable;
 			}
 			printf("COMMAND\n\t%s - %s\n\nSYNOPSIS\n\t%s %s\n\n",
 				comm.str, comm.desc,
