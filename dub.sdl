@@ -6,7 +6,8 @@ copyright "Copyright © 2019-2021 dd86k <dd@dax.moe>"
 license "BSD 3-clause"
 version "0.0.0"
 
-# Target DUB >=1.0.0 at best
+# NOTE: We explicitly specify the betterC flag
+#       Supports older DUB releases, like 0.9.24
 
 # Not a subPackage because I want to avoid generating a seperate library
 configuration "application" {
@@ -19,7 +20,9 @@ configuration "library" {
 	sourcePaths "src"
 }
 
-# NOTE: We explicitly specify the betterC flag to support older dub releases
+#
+# Debug builds
+#
 
 # Make the compiler print GC (despite not using it) usage, TLS (thread local
 # storage) usage, and target info for runtime diagnostic purposes.
@@ -65,6 +68,10 @@ buildType "debug" {
 	dflags "-betterC" platform="ldc"
 }
 
+#
+# Release builds
+#
+
 # Compile in release mode.
 buildType "release" {
 	buildOptions "releaseMode" "optimize"
@@ -78,6 +85,10 @@ buildType "release-nobounds" {
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
 }
+
+#
+# Specific tests
+#
 
 # Disassembler scrambler test
 buildType "disasm-loop" {
@@ -99,4 +110,13 @@ buildType "readline" {
 buildType "expand" {
 	buildOptions "unittests"
 	sourceFiles "tests/expand.d"
+}
+
+#
+# Documentation
+#
+
+buildType "ddox" {
+	# Bogus, but brings back ddox
+	versions "__DDOX"
 }
