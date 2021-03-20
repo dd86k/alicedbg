@@ -47,12 +47,12 @@ int loop_handler(exception_t *e) {
 			puts("> Unable to read process memory.");
 			goto L_PROMPT;
 		}
-		common_settings.disasm.a = b.ptr;
-		if (adbg_disasm(&common_settings.disasm, AdbgDisasmMode.file) == 0) {
+		common_disasm.a = b.ptr;
+		if (adbg_disasm(&common_disasm, AdbgDisasmMode.file) == 0) {
 			printf("> %p: %s| %s\n",
 				e.faultaddr,
-				common_settings.disasm.mcbuf.ptr,
-				common_settings.disasm.mnbuf.ptr);
+				common_disasm.mcbuf.ptr,
+				common_disasm.mnbuf.ptr);
 		}
 	}
 	

@@ -89,7 +89,7 @@ int cli_march(const(char) *val) {
 	}
 	foreach (setting_platform_t p; platforms) {
 		if (strcmp(val, p.opt) == 0 || strcmp(val, p.alt) == 0) {
-			common_settings.disasm.platform = p.val;
+			common_disasm.platform = p.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -111,7 +111,7 @@ int cli_syntax(const(char) *val) {
 	}
 	foreach (setting_syntax_t syntax; syntaxes) {
 		if (strcmp(val, syntax.opt) == 0) {
-			common_settings.disasm.syntax = syntax.val;
+			common_disasm.syntax = syntax.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -493,7 +493,7 @@ int main(int argc, const(char)** argv) {
 	with (common_settings)
 	switch (mode) {
 	case SettingMode.dump:
-		return dump(file, &disasm, flags);
+		return dump(file, &common_disasm, flags);
 	case SettingMode.trace:
 		puts("main: tracer not supported at this moment");
 		return EXIT_FAILURE;

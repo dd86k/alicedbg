@@ -64,6 +64,8 @@ immutable setting_syntax_t[] syntaxes = [
 settings_t common_settings;
 /// Last exception
 exception_t common_exception;
+/// Disassembler settings
+adbg_disasm_t common_disasm;
 
 //
 // Settings
@@ -79,7 +81,6 @@ enum SettingUI { cmd, loop, tui, tcpserver }
 struct settings_t {
 	SettingMode mode;	/// Application mode
 	SettingUI ui;	/// Debugger user interface
-	adbg_disasm_t disasm;	/// Disassembler settings
 	const(char) *file;	/// Debuggee: file
 	const(char) **args;	/// Debuggee: argument vector
 	const(char) **env;	/// Debuggee: environement vector

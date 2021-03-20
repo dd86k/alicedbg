@@ -341,11 +341,11 @@ int cmd_handler(exception_t *ex) {
 			puts("	Unable to read process memory.");
 			goto L_INPUT;
 		}
-		common_settings.disasm.a = b.ptr;
-		if (adbg_disasm(&common_settings.disasm, AdbgDisasmMode.file) == 0) {
+		common_disasm.a = b.ptr;
+		if (adbg_disasm(&common_disasm, AdbgDisasmMode.file) == 0) {
 			printf("	Faulting instruction: [%s] %s\n",
-				common_settings.disasm.mcbuf.ptr,
-				common_settings.disasm.mnbuf.ptr);
+				common_disasm.mcbuf.ptr,
+				common_disasm.mnbuf.ptr);
 		}
 	}
 	
