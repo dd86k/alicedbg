@@ -21,7 +21,7 @@ __gshared:
 /// 	mod = Module (0 being generic)
 /// 	err = Error code
 private template E(ubyte mod, ushort err) {
-	enum E = (mod << 24) | err;
+	enum E = (mod * 100) | err;
 }
 
 private struct error_t {
@@ -48,6 +48,8 @@ enum AdbgError {
 	// Generic
 	//
 	invalidArgument	= E!(0, 1),
+	nullArgument	= E!(0, 2),
+	allocationFailed	= E!(0, 3),
 	//
 	// Debugger
 	//
@@ -57,7 +59,10 @@ enum AdbgError {
 	//
 	nullAddress	= E!(2, 1),
 	unsupportedPlatform	= E!(2, 2),
-	illegalInstruction	= E!(2, 3),
+	invalidOption	= E!(2, 3),
+	invalidOptionValue	= E!(2, 4),
+	illegalInstruction	= E!(2, 20),
+	outOfData	= E!(2, 21),
 	//
 	// Object server
 	//
@@ -71,32 +76,44 @@ enum AdbgError {
 	invalidObjABI	= E!(3, 15),
 }
 
+private const(char) *defaultMsg = "Unknown error.";
 private int errcode;
 private AdbgErrorSource errsource;
 private int errline;
 private const(char)* errfile;
 private immutable error_t[] errors = [
-	// Genrics
-	{ AdbgError.invalidArgument, "Invalid parameter" },
-	
+	//
+	// Generics
+	//
+	{ AdbgError.invalidArgument, "Invalid parameter value." },
+	{ AdbgError.nullArgument, "Parameter is null." },
+	{ AdbgError.allocationFailed, "Memory allocation failed, maybe the machine is out of memory." },
+	//
 	// Debugger
-	
+	//
+	//
 	// Disassembler
-	{ AdbgError.nullAddress, "Input address is null" },
-	{ AdbgError.unsupportedPlatform, "Platform target not supported" },
-	{ AdbgError.illegalInstruction, "Illegal instruction" },
-	
+	//
+	{ AdbgError.nullAddress, "Input address is null." },
+	{ AdbgError.unsupportedPlatform, "Platform target not supported." },
+	{ AdbgError.invalidOption, "Invalid disassembler option." },
+	{ AdbgError.invalidOptionValue, "Invalid value for disassembler option." },
+	{ AdbgError.illegalInstruction, "Illegal instruction." },
+	{ AdbgError.outOfData, "The buffer has been depleted." },
+	//
 	// Object server
-	{ AdbgError.unknownObjFormat, "Unknown object format" },
-	{ AdbgError.unsupportedObjFormat, "Unsupported object format" },
-	{ AdbgError.invalidObjVersion, "Invalid version for object" },
-	{ AdbgError.invalidObjMachine, "Invalid machine/platform value for object" },
-	{ AdbgError.invalidObjClass, "Invalid class/bitness value for object" },
-	{ AdbgError.invalidObjEndian, "Invalid endianess value for object" },
-	{ AdbgError.invalidObjType, "Invalid object type" },
-	{ AdbgError.invalidObjABI, "Invalid ABI value for object" },
-	
-	// Etc.
+	//
+	{ AdbgError.unknownObjFormat, "Unknown object format." },
+	{ AdbgError.unsupportedObjFormat, "Unsupported object format." },
+	{ AdbgError.invalidObjVersion, "Invalid version for object." },
+	{ AdbgError.invalidObjMachine, "Invalid machine/platform value for object." },
+	{ AdbgError.invalidObjClass, "Invalid class/bitness value for object." },
+	{ AdbgError.invalidObjEndian, "Invalid endianess value for object." },
+	{ AdbgError.invalidObjType, "Invalid object type." },
+	{ AdbgError.invalidObjABI, "Invalid ABI value for object." },
+	//
+	// Misc.
+	//
 	{ AdbgError.none, "Success" },
 ];
 
@@ -154,7 +171,7 @@ const(char) *adbg_error_code() {
 	const(char) *fmt = void;
 	with (AdbgErrorSource)
 	switch (errsource) {
-	case self:   fmt = "E%08X"; break;
+	case self:   fmt = "E%u"; break;
 	case system: fmt = SYS_ERR_FMT; break;
 	default: assert(0, "adbg_error_code");
 	}
@@ -184,16 +201,12 @@ const(char)* adbg_error_msg() {
 	switch (errsource) {
 	case self:
 		uint e = errcode;
-		foreach (ref err; errors) {
+		foreach (ref err; errors)
 			if (e == err.code)
 				return err.msg;
-		}
-		debug assert(0, "missing error message");
-		else  return null;
+		return defaultMsg;
 	case system:
 		return adbg_sys_error(errcode);
 	default: assert(0, "adbg_error_msg");
 	}
 }
-
-//TODO: unittest all error codes have a message

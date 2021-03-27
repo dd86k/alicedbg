@@ -11,8 +11,8 @@ Most of the help topics can be found in the repository wiki.
 
 | Home | Wiki |
 |---|---|
-| [Gitbucket](https://git.dd86k.space/dd86k/alicedbg) | [URL](https://git.dd86k.space/dd86k/alicedbg/wiki)
 | [Github](https://github.com/dd86k/alicedbg) | [URL](https://github.com/dd86k/alicedbg/wiki)
+| [Gitbucket](https://git.dd86k.space/dd86k/alicedbg) | [URL](https://git.dd86k.space/dd86k/alicedbg/wiki)
 | [Gitlab](https://gitlab.com/dd86k/alicedbg) | [URL](https://gitlab.com/dd86k/alicedbg/-/wikis/home)
 
 Technical manual: TBA

@@ -23,12 +23,35 @@ extern (C):
 /// If that's not enough, update to 80 characters.
 package enum ADBG_DISASM_BUFFER_SIZE = 64;
 
+/// Disassembler options
+enum AdbgDisasmOpt {
+	/// Set the operating mode.
+	mode,
+	/// Set new target platform.
+	platform,
+	/// Set the syntax.
+	syntax,
+	/// Set the machine code format.
+	format,
+	///TODO: If set, go backward instead of forward.
+	backward,
+	///TODO: Add commentary
+	commentary,
+	/// Memory source is a live debuggee process.
+	debuggee,
+	
+	///
+	x86AddrMode = 80,
+	///
+	x86DataMode = 81,
+}
+
 /// Disassembler operating mode
 enum AdbgDisasmMode : ubyte {
 	size,	/// Only calculate operation code sizes
 	data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
 	file,	/// Machine code and instruction mnemonics formatting
-	full	/// (TODO) Add comments (e.g., ; <ntdll!...>)
+	full	/// (TODO) Analysis
 }
 
 /// Disassembler ABI
@@ -44,27 +67,56 @@ enum AdbgDisasmPlatform : ubyte {
 	rv64,	/// (TODO) RISC-V 64-bit
 }
 
-/// Disassembler syntaxes
+/// Disassembler mnemonic syntaxes
 enum AdbgDisasmSyntax : ubyte {
 	platform,	/// Platform compiled target default
-	intel,	/// Intel syntax, close to Microsoft/Macro Assembler (MASM)
-	nasm,	/// (NASM) Netwide Assembler syntax
+	intel,	/// Intel syntax, similar to Microsoft/Macro Assembler (MASM)
+	nasm,	/// Netwide Assembler syntax (NASM)
 	att,	/// AT&T syntax
 //	ideal,	/// (TODO) Borland Ideal
 //	hyde,	/// (TODO) Randall Hyde High Level Assembly Language
 //	riscv,	/// 
 }
 
-/// Disassembler option flag
-enum AdbgDisasmOption : ushort {
-	/// Use a space instead of a tab between the mnemonic and operands
+/// Disassembler machine code formats
+enum AdbgDisasmFormat : ubyte {
+	/// Machine code platform-dependant. Operands are packed.
+	// x86: Unpacked
+	// ARM/RISC: Packed
+	normal,
+	/// Machine code is without spaces. Operands are spaced out.
+	machinePackedOperandsUnpacked,
+	/// 
+	machineUnpackedOperandsPacked,
+	/// All machine bytes, including operands, are separated with a space.
+	allUnpacked,
+	/// All machine bytes, including operands, are not separated with a space.
+	allPacked
+}
+
+/// Disassembler options
+deprecated
+enum AdbgDisasmOption {
+	/// Use a space instead of a tab between the mnemonic and operands.
 	spaceSep	= BIT!(0),
-	///TODO: Go backwards
+	///TODO: Go backwards.
 	backward	= BIT!(1),
-	///TODO: Do not group machine code integers
+	///TODO: Do not group machine code integers.
 	noGroup	= BIT!(2),
-	/// Do not insert spaces in-between machine code types (bytes, words, etc.)
+	/// Do not insert spaces in-between machine code types (bytes, words, etc.).
 	noSpace	= BIT!(3),
+}
+
+/// Disassembler warnings
+enum AdbgDisasmWarning {
+	/// Far jump, call, or return
+	farAddr	= BIT!(0),
+	/// Loads a segment register
+	segment	= BIT!(1),
+	/// Privileged instruction
+	privileged	= BIT!(2),
+	/// I/O instruction
+	io	= BIT!(3),
 }
 
 version (X86) {
@@ -97,48 +149,98 @@ version (AArch64) {
 	/// Platform default syntax
 	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
 } else {
-	static assert(0, "DISASM_DEFAULT_PLATFORM/DISASM_DEFAULT_SYNTAX unset");
+	static assert(0, "Set default disassembler variables");
 }
 
-/// Disassembler parameters structure
+/// Represents a disassembled instruction
+struct adbg_disasm_opcode_t {
+	int warnings;	/// Warning flags
+	int size;	/// Instruction size
+	const(char) *machcode;	/// Instruction machine code
+	const(char) *mnemonic;	/// Instruction mnemonic
+	const(char) *comment;	/// Instruction comment
+	union { // Target address
+		void   *targetaddr;	/// Used internally
+		size_t  targetaddrv;	/// ditto
+		ubyte  *targetaddri8;	/// ditto
+		ushort *targetaddri16;	/// ditto
+		uint   *targetaddri32;	/// ditto
+		ulong  *targetaddri64;	/// ditto
+		float  *targetaddrf32;	/// ditto
+		double *targetaddrf64;	/// ditto
+	}
+}
+
+/// Disassembler parameters structure. This structure is not meant to be
+/// accessed directly.
 struct adbg_disasm_t { align(1):
-	union {
+	//
+	// Generic
+	//
+	
+	union { // Current address
 		/// Memory address entry point. This value is modified to point
 		/// to the current instruction address for the disassembler.
 		/// Acts as instruction pointer/program counter.
-		void   *a;
-		size_t av;	/// Non-pointer format for address calculation
-		ubyte  *ai8; 	/// Used internally
-		ushort *ai16;	/// Used internally
-		uint   *ai32;	/// Used internally
-		ulong  *ai64;	/// Used internally
-		float  *af32;	/// Used internally
-		double *af64;	/// Used internally
+		deprecated void   *a;
+		deprecated size_t av;	/// Non-pointer format for address calculation
+		deprecated ubyte  *ai8; 	/// Used internally
+		deprecated ushort *ai16;	/// Used internally
+		deprecated uint   *ai32;	/// Used internally
+		deprecated ulong  *ai64;	/// Used internally
+		deprecated float  *af32;	/// Used internally
+		deprecated double *af64;	/// Used internally
+		void   *addr;	/// Used internally
+		size_t  addrv;	/// ditto
+		ubyte  *addru8;	/// ditto
+		ushort *addru16;	/// ditto
+		uint   *addru32;	/// ditto
+		ulong  *addru64;	/// ditto
+		float  *addrf32;	/// ditto
+		double *addrf64;	/// ditto
 	}
-	/// Last Address.
-	///
-	/// This field is populated with the entry address, making it useful
-	/// for printing purposes or calculating the address size.
-	size_t la;
-	/// Target Address.
-	///
-	/// This field is populated when the disassembler encounters an
-	/// instruction capable of changing the control flow (jump and call
-	/// instructions) and the disassembly mode is higher than File.
-	size_t ta;
-	/// Base Address;
-	///
-	/// Currently, this field is not used.
-	///
-	/// Used in calculating the target address.
-	size_t ba;
-	/// Operation mode.
-	///
-	/// Disassembler operating mode. See the AdbgDisasmMode enumeration for
-	/// more details.
-	AdbgDisasmMode mode; // placed first for cache-related performance reasons
-	/// Error code
-	int error;
+	union { // Base address
+		/// Base Address;
+		///
+		/// Currently, this field is not used.
+		///
+		/// Used in calculating the target address.
+		deprecated size_t ba;
+		void   *baseaddr;	/// Used internally
+		size_t  baseaddrv;	/// ditto
+		ubyte  *baseaddri8;	/// ditto
+		ushort *baseaddri16;	/// ditto
+		uint   *baseaddri32;	/// ditto
+		ulong  *baseaddri64;	/// ditto
+		float  *baseaddrf32;	/// ditto
+		double *baseaddrf64;	/// ditto
+	}
+	union { // Last address
+		/// Last Address.
+		///
+		/// This field is populated with the entry address, making it useful
+		/// for printing purposes or calculating the address size.
+		deprecated size_t la;
+		void   *lastaddr;	/// Used internally
+		size_t  lastaddrv;	/// ditto
+		ubyte  *lastaddri8;	/// ditto
+		ushort *lastaddri16;	/// ditto
+		uint   *lastaddri32;	/// ditto
+		ulong  *lastaddri64;	/// ditto
+		float  *lastaddrf32;	/// ditto
+		double *lastaddrf64;	/// ditto
+	}
+	/// disasm implementation function
+	int function(adbg_disasm_t*) func;
+	union {
+		x86_internals_t *x86;	/// 
+		riscv_internals_t *rv;	/// 
+	}
+	
+	//
+	// Options
+	//
+	
 	/// Disassembling Platform.
 	///
 	/// Instruction set architecture platform to disassemble from. See the
@@ -149,74 +251,160 @@ struct adbg_disasm_t { align(1):
 	/// Assembler style when formatting instructions. See the AdbgDisasmSyntax
 	/// enumeration for more details.
 	AdbgDisasmSyntax syntax;
-	/// Settings flags.
+	/// Machine code format.
+	AdbgDisasmFormat format;
+	/// Operation mode.
 	///
-	/// Bitwise flag. See DISASM_O_* flags.
-	uint options;
-	size_t mcbufi;	/// Machine code buffer index
-	char [ADBG_DISASM_BUFFER_SIZE]mcbuf;	/// Machine code buffer
-	size_t mnbufi;	/// Mnemonics buffer index
-	char [ADBG_DISASM_BUFFER_SIZE]mnbuf;	/// Mnemonics buffer
+	/// Disassembler operating mode. See the AdbgDisasmMode enumeration for
+	/// more details.
+	AdbgDisasmMode mode;
+	/// User data length that can be processed. If disassembling a debuggee,
+	/// this field is not taken into account.
+	size_t left;
+	/// If set, source is a debuggee. Uses Win32/ptrace to fetch memory.
+	bool debuggee;
+	/// Reserved
+	bool reserved1;
+	/// Reserved
+	bool reserved2;
+	/// Reserved
+	bool reserved3;
+	
 	//
-	// Internal fields
+	// Formatting
 	//
-	union {
-		void *internal;	/// Used internally
-		x86_internals_t *x86;	/// Used internally
-		riscv_internals_t *rv;	/// Used internally
-	}
-	adg_disasmfmt_t *fmt;	/// Formatter structure pointer, used internally
+	
+	/// Format
+	adbg_disasmfmt_t fmt;
+	/// Machine code buffer index
+	size_t mcbufi;
+	/// Machine code buffer
+	char[ADBG_DISASM_BUFFER_SIZE] mcbuf;
+	/// Mnemonics buffer index
+	size_t mnbufi;
+	/// Mnemonics buffer
+	char[ADBG_DISASM_BUFFER_SIZE] mnbuf;
 }
 
-//TODO: adbg_disasm_t* adbg_disasm_create(void* addr, size_t len, int platform);
-//      Malloc-ish thing
-//      Sets up internal stuff such as byte swappers and internal impl.
-//TODO: adbg_disasm_style(adbg_disasm_t* d, int style)
-//TODO: adbg_disasm_obj(adbg_disasm_t* d, adbg_object_t *o)
-//TODO: adbg_disasm(adbg_disasm_t* d, int mode)
-//TODO: adbg_disasm_cjmp
-//      Calculate jump for internal usage
-//TODO: void adbg_disasm_destroy(adbg_disasm_t*);
+adbg_disasm_t *adbg_disasm_open(AdbgDisasmPlatform m) {
+	import core.stdc.stdlib : malloc;
+	
+	if (p == null)
+		return adbg_error(AdbgError.nullAddress);
+	
+	adbg_disasm_t *s = cast(adbg_disasm_t *)malloc(adbg_disasm_impl_t.sizeof);
+	if (s == null) {
+		adbg_error(AdbgError.allocationFailed);
+		return null;
+	}
+	
+	return adbg_disasm_reopen(p, m);
+}
 
-/**
- * Populate machine mnemonic and machine code buffers.
- *
- * Disassemble one instruction from a buffer pointer given in adbg_disasm_t.
- * Caller must ensure memory pointer points to readable regions and givens
- * bounds are respected. The error field is always set.
- *
- * Params:
- * 	p = Disassembler parameters
- * 	mode = Disassembling mode
- *
- * Returns: Error code; Non-zero indicating an error
- */
-int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
-	if (p == null) {
-		p.mcbuf[0] = 0;
+int adbg_disasm_reopen(adbg_disasm_t *p, AdbgDisasmPlatform m) {
+	
+	p.platform = m;
+	with (AdbgDisasmPlatform)
+	switch (m) {
+	case native: goto DISASM_DEFAULT_PLATFORM;
+	case x86_16, x86, x86_64:
+		p.func = &adbg_disasm_x86;
+		break;
+	case rv32:
+		p.func = &adbg_disasm_x86;
+		break;
+	default:
+		return adbg_error(AdbgError.unsupportedPlatform);
+	}
+}
+
+void adbg_disasm_start_file(adbg_disasm_t *p, void *buffer, size_t size, size_t base) {
+	if (p == null)
+		return p.error = adbg_error(AdbgError.nullArgument);
+	
+}
+
+void adbg_disasm_start_debuggee(adbg_disasm_t *p, size_t addr) {
+	if (p == null)
+		return p.error = adbg_error(AdbgError.nullArgument);
+	
+	
+}
+
+int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
+	if (p == null)
+		return p.error = adbg_error(AdbgError.nullArgument);
+	
+	with (AdbgDisasmOpt)
+	switch (opt) {
+	case mode:
+		if (val >= AdbgDisasmMode.max)
+			return adbg_error(AdbgError.invalidOptionValue);
+		p.mode = cast(AdbgDisasmMode)val;
+		break;
+	case platform:
+		if (val >= AdbgDisasmPlatform.max)
+			return adbg_error(AdbgError.invalidOptionValue);
+		p.platform = cast(AdbgDisasmPlatform)val;
+		break;
+	case syntax:
+		if (val >= AdbgDisasmSyntax.max)
+			return adbg_error(AdbgError.invalidOptionValue);
+		p.syntax = cast(AdbgDisasmSyntax)val;
+		break;
+	case format:
+		if (val >= AdbgDisasmFormat.max)
+			return adbg_error(AdbgError.invalidOptionValue);
+		p.format = cast(AdbgDisasmFormat)val;
+		break;
+	/*case backward:
+		p.backwards = val != 0;
+		break;*/
+	/*case commentary:
+		p.commentary = val != 0;
+		break;*/
+	case debuggee:
+		p.debuggee = val != 0;
+		break;
+	default:
+		return adbg_error(AdbgError.invalidOption);
+	}
+	return 0;
+}
+
+/// Populate machine mnemonic and machine code buffers.
+///
+/// Disassemble one instruction from a buffer pointer given in adbg_disasm_t.
+/// Caller must ensure memory pointer points to readable regions and givens
+/// bounds are respected. The error field is always set.
+///
+/// Params:
+/// 	p = Disassembler parameters
+/// 	mode = Disassembling mode
+///
+/// Returns: Error code; Non-zero indicating an error
+int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDisasmMode mode) {
+	if (p == null)
 		return p.error = adbg_error(AdbgError.invalidArgument);
-	}
-	if (p.a == null) {
-		p.mcbuf[0] = 0;
-		return p.error = adbg_error(AdbgError.nullAddress);
-	}
-
-	bool modefile = mode >= AdbgDisasmMode.file;
-
+	if (p.impl == null)
+		return p.error = adbg_error(AdbgError.invalidArgument);
+	
 	p.mode = mode;
 	p.error = 0;
-	p.la = p.av;
-
-	if (modefile) {
-		adg_disasmfmt_t fmt = void;
-		p.fmt = &fmt;
-		p.fmt.itemno = 0;
-		with (p) mcbufi = mnbufi = 0;
+	p.lastaddr = p.addr;
+	
+	if (mode >= AdbgDisasmMode.file) {
+		with (p.impl) {
+			mcbufi = mnbufi = 0;
+			fmt.itemno = 0;
+		}
 	}
-
-	if (p.platform == AdbgDisasmPlatform.native)
-		p.platform = DISASM_DEFAULT_PLATFORM;
-
+	
+	if (p.impl.func == null)
+		return p.error = adbg_error(AdbgError.unsupportedPlatform);
+	
+	p.error = p.imp.func(p);
+	
 	with (AdbgDisasmPlatform)
 	switch (p.platform) {
 	case x86_16, x86, x86_64:
@@ -229,23 +417,169 @@ int adbg_disasm(adbg_disasm_t *p, AdbgDisasmMode mode) {
 		p.mcbuf[0] = 0;
 		return p.error = adbg_error(AdbgError.unsupportedPlatform);
 	}
-
-	if (modefile) {
+	
+	if (mode >= AdbgDisasmMode.file && p.error == AdbgError.none) {
 		if (p.syntax == AdbgDisasmSyntax.platform)
 			p.syntax = DISASM_DEFAULT_SYNTAX;
-		if (p.error == AdbgError.none)
-			adbg_disasm_render(p);
+		adbg_disasm_render(p);
 	}
-
+	
 	return p.error;
 }
 
-// Status: Waiting on _setup function
-//TODO: byte  adbg_disasm_fi8(adbg_disasm_t*)
-//TODO: short adbg_disasm_fi16(adbg_disasm_t*)
-//TODO: int   adbg_disasm_fi32(adbg_disasm_t*)
-//TODO: long  adbg_disasm_fi64(adbg_disasm_t*)
-//      Add automatically to machine code buffer
-//      Automatically increment pointer
-//      Use structure fswap functions
-//      + Removes the need to add _x8 in _modrm_rm functions
+private import core.stdc.stdlib : free;
+public  alias adbg_disasm_close = free;
+
+//
+// Fetch functions
+//
+
+//TODO: Use userlen field to check against length
+//      Would need an internal counter
+//      Or simply decrease field
+//TODO: If in debuggee mode, fetch a chunk
+//      Should increase performance but requires even more internal work
+//TODO: ff80 -- Fetch 80-bit/10-byte (x87)
+//TODO: fu128 -- Fetch 128-bit/16-byte (MMX/SSE)
+//TODO: fu258 -- Fetch 256-bit/32-byte (AVX)
+//TODO: fu512 -- Fetch 512-bit/64-byte (AVX-512)
+//TODO: fu1024 -- Fetch a tile/1024-bit/128-byte (AMX)
+
+/// (Internal) Fetch an 8-bit integer.
+/// The error field is set if an error occured.
+/// The fetch function is debuggee-aware.
+/// Params:
+/// 	p = Disassembler structure
+/// 	u = 8-bit pointer
+/// Returns: Non-zero on error
+int adbg_disasm_fu8(adbg_disasm_t *p, ubyte *u) {
+	import adbg.dbg.debugger : adbg_mm_cread;
+	int e = void;
+	if (p.debuggee) {
+		e = adbg_mm_cread(p.addrv, u, ubyte.sizeof);
+	} else {
+		if (p.left < ubyte.sizeof) // 0 < 1
+			return adbg_error(AdbgError.outOfData);
+		*u = *p.addru8;
+		e = 0;
+		--p.left;
+	}
+	++p.addru8;
+	return e;
+}
+
+/// (Internal) Fetch an 16-bit integer.
+/// The error field is set if an error occured.
+/// The fetch function is debuggee-aware.
+/// Params:
+/// 	p = Disassembler structure
+/// 	u = 16-bit pointer
+/// Returns: Non-zero on error
+int adbg_disasm_fu16(adbg_disasm_t *p, ushort *u) {
+	import adbg.dbg.debugger : adbg_mm_cread;
+	int e = void;
+	if (p.debuggee) {
+		e = adbg_mm_cread(p.addrv, u, ushort.sizeof);
+	} else {
+		if (p.left < ushort.sizeof) // 1 < 2
+			return adbg_error(AdbgError.outOfData);
+		*u = *p.addru16;
+		e = 0;
+		p.left -= ushort.sizeof;
+	}
+	++p.addru16;
+	return e;
+}
+
+
+/// (Internal) Fetch an 32-bit integer.
+/// The error field is set if an error occured.
+/// The fetch function is debuggee-aware.
+/// Params:
+/// 	p = Disassembler structure
+/// 	u = 32-bit pointer
+/// Returns: Non-zero on error
+int adbg_disasm_fu32(adbg_disasm_t *p, uint *u) {
+	import adbg.dbg.debugger : adbg_mm_cread;
+	int e = void;
+	if (p.debuggee) {
+		e = adbg_mm_cread(p.addrv, u, uint.sizeof);
+	} else {
+		if (p.left < uint.sizeof) // 3 < 4
+			return adbg_error(AdbgError.outOfData);
+		*u = *p.addru32;
+		e = 0;
+		p.left -= uint.sizeof;
+	}
+	++p.addru32;
+	return e;
+}
+
+/// (Internal) Fetch an 64-bit integer.
+/// The error field is set if an error occured.
+/// The fetch function is debuggee-aware.
+/// Params:
+/// 	p = Disassembler structure
+/// 	u = 64-bit pointer
+/// Returns: Non-zero on error
+int adbg_disasm_fu64(adbg_disasm_t *p, ulong *u) {
+	import adbg.dbg.debugger : adbg_mm_cread;
+	int e = void;
+	if (p.debuggee) {
+		e = adbg_mm_cread(p.addrv, u, ulong.sizeof);
+	} else {
+		if (p.left < ulong.sizeof) // 6 < 8
+			return adbg_error(AdbgError.outOfData);
+		*u = *p.addru64;
+		e = 0;
+		p.left -= ulong.sizeof;
+	}
+	++p.addru64;
+	return e;
+}
+
+/// (Internal) Fetch a single-precision 32-bit floating number.
+/// The error field is set if an error occured.
+/// The fetch function is debuggee-aware.
+/// Params:
+/// 	p = Disassembler structure
+/// 	u = 32-bit float pointer
+/// Returns: Non-zero on error
+int adbg_disasm_ff32(adbg_disasm_t *p, float *u) {
+	import adbg.dbg.debugger : adbg_mm_cread;
+	int e = void;
+	if (p.debuggee) {
+		e = adbg_mm_cread(p.addrv, u, float.sizeof);
+	} else {
+		if (p.left < float.sizeof) // 2 < 4
+			return adbg_error(AdbgError.outOfData);
+		*u = *p.addrf32;
+		e = 0;
+		p.left -= float.sizeof;
+	}
+	++p.addrf32;
+	return e;
+}
+
+/// (Internal) Fetch a double-precision 64-bit floating number.
+/// The error field is set if an error occured.
+/// The fetch function is debuggee-aware.
+/// Params:
+/// 	p = Disassembler structure
+/// 	u = 64-bit double pointer
+/// Returns: Non-zero on error
+int adbg_disasm_ff64(adbg_disasm_t *p, double *u) {
+	import adbg.dbg.debugger : adbg_mm_cread;
+	int e = void;
+	if (p.debuggee) {
+		e = adbg_mm_cread(p.addrv, u, double.sizeof);
+	} else {
+		if (p.left < double.sizeof) // 6 < 8
+			return adbg_error(AdbgError.outOfData);
+		*u = *p.addrf64;
+		e = 0;
+		p.left -= double.sizeof;
+	}
+	++p.addrf64;
+	return e;
+}

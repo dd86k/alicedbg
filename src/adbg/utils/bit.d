@@ -149,10 +149,7 @@ ushort adbg_util_bswap16(ushort v) pure nothrow @nogc {
 /// Byte-swap an 32-bit value.
 /// Params: v = 32-bit value
 /// Returns: Byte-swapped value
-/// Notes:
-/// Shamelessly taken from https://stackoverflow.com/a/19560621
-/// Only LDC is able to pick this up as BSWAP.
-/// If x86 inline assembly is available, DMD uses the BSWAP instruction.
+// Source: https://stackoverflow.com/a/19560621
 uint adbg_util_bswap32(uint v) pure nothrow @nogc {
 	v = (v >> 16) | (v << 16);
 	return ((v & 0xFF00FF00) >> 8) | ((v & 0x00FF00FF) << 8);
@@ -161,10 +158,7 @@ uint adbg_util_bswap32(uint v) pure nothrow @nogc {
 /// Byte-swap an 64-bit value.
 /// Params: v = 64-bit value
 /// Returns: Byte-swapped value
-/// Notes:
-/// Shamelessly taken from https://stackoverflow.com/a/19560621
-/// Only LDC is able to pick this up as BSWAP.
-/// If x86 inline assembly is available, DMD uses the BSWAP instruction.
+// Source: https://stackoverflow.com/a/19560621
 ulong adbg_util_bswap64(ulong v) pure nothrow @nogc {
 	v = (v >> 32) | (v << 32);
 	v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
