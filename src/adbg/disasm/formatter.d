@@ -113,7 +113,7 @@ struct disasm_fmt_item_t {
 }
 /// Formatter structure embedded into the disassembler structure
 package
-struct adg_disasmfmt_t { align(1):
+struct adbg_disasmfmt_t { align(1):
 	size_t itemno;	/// Current item number
 	disasm_fmt_item_t [FORMATTER_STACK_SIZE]items;	/// Stack
 }
@@ -148,7 +148,7 @@ const(char) *[]MEM_WIDTHS_NASM = [
 /// 	v = 8-bit value
 void adbg_disasm_push_x8(adbg_disasm_t *p, ubyte v) {
 	adbg_disasm_xadd(p, adbg_util_strx02(v));
-	if ((p.options & AdbgDisasmOption.noSpace) == 0)
+//	if ((p.options & AdbgDisasmOption.noSpace) == 0)
 		adbg_disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 16-bit value into the machine code buffer.
@@ -157,7 +157,7 @@ void adbg_disasm_push_x8(adbg_disasm_t *p, ubyte v) {
 /// 	v = 16-bit value
 void adbg_disasm_push_x16(adbg_disasm_t *p, ushort v) {
 	adbg_disasm_xadd(p, adbg_util_strx04(v));
-	if ((p.options & AdbgDisasmOption.noSpace) == 0)
+//	if ((p.options & AdbgDisasmOption.noSpace) == 0)
 		adbg_disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 32-bit value into the machine code buffer.
@@ -166,7 +166,7 @@ void adbg_disasm_push_x16(adbg_disasm_t *p, ushort v) {
 /// 	v = 32-bit value
 void adbg_disasm_push_x32(adbg_disasm_t *p, uint v) {
 	adbg_disasm_xadd(p, adbg_util_strx08(v));
-	if ((p.options & AdbgDisasmOption.noSpace) == 0)
+//	if ((p.options & AdbgDisasmOption.noSpace) == 0)
 		adbg_disasm_xadd(p, DISASM_FMT_SPACE);
 }
 /// Push an 64-bit value into the machine code buffer.
@@ -175,7 +175,7 @@ void adbg_disasm_push_x32(adbg_disasm_t *p, uint v) {
 /// 	v = 64-bit value
 void adbg_disasm_push_x64(adbg_disasm_t *p, ulong v) {
 	adbg_disasm_xadd(p, adbg_util_strx016(v));
-	if ((p.options & AdbgDisasmOption.noSpace) == 0)
+//	if ((p.options & AdbgDisasmOption.noSpace) == 0)
 		adbg_disasm_xadd(p, DISASM_FMT_SPACE);
 }
 
@@ -535,8 +535,7 @@ void adbg_disasm_render(adbg_disasm_t *p) {
 
 	if (nitems < 2) return;
 
-	adbg_disasm_madd(p, p.options & AdbgDisasmOption.spaceSep ?
-		DISASM_FMT_SPACE : DISASM_FMT_TAB);
+	adbg_disasm_madd(p, p.mnemonicTab ? DISASM_FMT_TAB : DISASM_FMT_TAB);
 
 	with (AdbgDisasmSyntax)
 	switch (p.syntax) {

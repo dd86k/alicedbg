@@ -29,21 +29,21 @@ enum AdbgDisasmOpt {
 	mode,
 	/// Set new target platform.
 	platform,
-	/// Set the syntax.
+	/// Set the mnemonic syntax.
 	syntax,
 	/// Set the machine code format.
-	format,
-	///TODO: If set, go backward instead of forward.
+	machineFormat,
+	///TODO: If set, go backward instead of forward in memory.
 	backward,
 	///TODO: Add commentary
 	commentary,
 	/// Memory source is a live debuggee process.
 	debuggee,
-	
-	///
-	x86AddrMode = 80,
-	///
-	x86DataMode = 81,
+	/// If true: Insert a hardware tab instead of a space between the
+	/// mnemonic and operands.
+	mnemonicTab,
+//	x86AddrMode = 80,
+//	x86DataMode = 81,
 }
 
 /// Disassembler operating mode
@@ -91,7 +91,7 @@ enum AdbgDisasmFormat : ubyte {
 	/// All machine bytes, including operands, are separated with a space.
 	allUnpacked,
 	/// All machine bytes, including operands, are not separated with a space.
-	allPacked
+	allPacked,
 }
 
 /// Disassembler options
@@ -263,8 +263,9 @@ struct adbg_disasm_t { align(1):
 	size_t left;
 	/// If set, source is a debuggee. Uses Win32/ptrace to fetch memory.
 	bool debuggee;
-	/// Reserved
-	bool reserved1;
+	/// If set, instead of a space, a hardware tab is inserted after the
+	/// instruction mnemonic.
+	bool mnemonicTab;
 	/// Reserved
 	bool reserved2;
 	/// Reserved
@@ -287,53 +288,62 @@ struct adbg_disasm_t { align(1):
 }
 
 adbg_disasm_t *adbg_disasm_open(AdbgDisasmPlatform m) {
-	import core.stdc.stdlib : malloc;
+	import core.stdc.stdlib : calloc;
 	
-	if (p == null)
-		return adbg_error(AdbgError.nullAddress);
-	
-	adbg_disasm_t *s = cast(adbg_disasm_t *)malloc(adbg_disasm_impl_t.sizeof);
+	adbg_disasm_t *s = cast(adbg_disasm_t *)calloc(1, adbg_disasm_t.sizeof);
 	if (s == null) {
 		adbg_error(AdbgError.allocationFailed);
 		return null;
 	}
 	
-	return adbg_disasm_reopen(p, m);
+	if (adbg_disasm_reopen(s, m)) {
+		free(s);
+		return null;
+	}
+	
+	return s;
 }
 
 int adbg_disasm_reopen(adbg_disasm_t *p, AdbgDisasmPlatform m) {
-	
+	p.syntax = DISASM_DEFAULT_SYNTAX;
 	p.platform = m;
 	with (AdbgDisasmPlatform)
 	switch (m) {
-	case native: goto DISASM_DEFAULT_PLATFORM;
+	case native: goto case DISASM_DEFAULT_PLATFORM;
 	case x86_16, x86, x86_64:
 		p.func = &adbg_disasm_x86;
-		break;
+		return 0;
 	case rv32:
-		p.func = &adbg_disasm_x86;
-		break;
+		p.func = &adbg_disasm_riscv;
+		return 0;
 	default:
 		return adbg_error(AdbgError.unsupportedPlatform);
 	}
 }
 
-void adbg_disasm_start_file(adbg_disasm_t *p, void *buffer, size_t size, size_t base) {
+int adbg_disasm_start_file(adbg_disasm_t *p, void *buffer, size_t size, size_t base) {
 	if (p == null)
-		return p.error = adbg_error(AdbgError.nullArgument);
+		return adbg_error(AdbgError.nullArgument);
 	
+	p.debuggee = false;
+	p.addr = buffer;
+	p.left = size;
+	p.baseaddrv = base;
+	return 0;
 }
 
-void adbg_disasm_start_debuggee(adbg_disasm_t *p, size_t addr) {
+int adbg_disasm_start_debuggee(adbg_disasm_t *p, size_t addr) {
 	if (p == null)
-		return p.error = adbg_error(AdbgError.nullArgument);
+		return adbg_error(AdbgError.nullArgument);
 	
-	
+	p.debuggee = true;
+	p.addrv = addr;
+	return 0;
 }
 
 int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 	if (p == null)
-		return p.error = adbg_error(AdbgError.nullArgument);
+		return adbg_error(AdbgError.nullArgument);
 	
 	with (AdbgDisasmOpt)
 	switch (opt) {
@@ -352,7 +362,7 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 			return adbg_error(AdbgError.invalidOptionValue);
 		p.syntax = cast(AdbgDisasmSyntax)val;
 		break;
-	case format:
+	case machineFormat:
 		if (val >= AdbgDisasmFormat.max)
 			return adbg_error(AdbgError.invalidOptionValue);
 		p.format = cast(AdbgDisasmFormat)val;
@@ -385,201 +395,48 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 /// Returns: Error code; Non-zero indicating an error
 int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDisasmMode mode) {
 	if (p == null)
-		return p.error = adbg_error(AdbgError.invalidArgument);
-	if (p.impl == null)
-		return p.error = adbg_error(AdbgError.invalidArgument);
-	
-	p.mode = mode;
-	p.error = 0;
-	p.lastaddr = p.addr;
+		return adbg_error(AdbgError.invalidArgument);
+	if (p.func == null)
+		return adbg_error(AdbgError.unsupportedPlatform);
 	
 	if (mode >= AdbgDisasmMode.file) {
-		with (p.impl) {
-			mcbufi = mnbufi = 0;
-			fmt.itemno = 0;
-		}
+		p.mcbufi = p.mnbufi = 0;
+		p.fmt.itemno = 0;
 	}
 	
-	if (p.impl.func == null)
-		return p.error = adbg_error(AdbgError.unsupportedPlatform);
+	p.mode = mode;
+	p.lastaddr = p.addr;
 	
-	p.error = p.imp.func(p);
+	int e = p.func(p);
 	
-	with (AdbgDisasmPlatform)
-	switch (p.platform) {
-	case x86_16, x86, x86_64:
-		adbg_disasm_x86(p);
-		break;
-	case rv32:
-		adbg_disasm_riscv(p);
-		break;
-	default:
-		p.mcbuf[0] = 0;
-		return p.error = adbg_error(AdbgError.unsupportedPlatform);
-	}
+	op.size = cast(int)(p.addrv - p.lastaddrv);
 	
-	if (mode >= AdbgDisasmMode.file && p.error == AdbgError.none) {
-		if (p.syntax == AdbgDisasmSyntax.platform)
-			p.syntax = DISASM_DEFAULT_SYNTAX;
+	if (mode >= AdbgDisasmMode.file && e == AdbgError.none)
 		adbg_disasm_render(p);
-	}
 	
-	return p.error;
+	return e;
 }
 
 private import core.stdc.stdlib : free;
 public  alias adbg_disasm_close = free;
 
-//
-// Fetch functions
-//
-
-//TODO: Use userlen field to check against length
-//      Would need an internal counter
-//      Or simply decrease field
-//TODO: If in debuggee mode, fetch a chunk
-//      Should increase performance but requires even more internal work
-//TODO: ff80 -- Fetch 80-bit/10-byte (x87)
-//TODO: fu128 -- Fetch 128-bit/16-byte (MMX/SSE)
-//TODO: fu258 -- Fetch 256-bit/32-byte (AVX)
-//TODO: fu512 -- Fetch 512-bit/64-byte (AVX-512)
-//TODO: fu1024 -- Fetch a tile/1024-bit/128-byte (AMX)
-
-/// (Internal) Fetch an 8-bit integer.
-/// The error field is set if an error occured.
-/// The fetch function is debuggee-aware.
+/// (Internal) Fetch data from data source.
 /// Params:
-/// 	p = Disassembler structure
-/// 	u = 8-bit pointer
+/// 	p = Disassembler structure pointer
+/// 	u = Data pointer
 /// Returns: Non-zero on error
-int adbg_disasm_fu8(adbg_disasm_t *p, ubyte *u) {
+int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
 	import adbg.dbg.debugger : adbg_mm_cread;
 	int e = void;
 	if (p.debuggee) {
-		e = adbg_mm_cread(p.addrv, u, ubyte.sizeof);
+		e = adbg_mm_cread(p.addrv, u, T.sizeof);
 	} else {
-		if (p.left < ubyte.sizeof) // 0 < 1
+		if (p.left < T.sizeof)
 			return adbg_error(AdbgError.outOfData);
-		*u = *p.addru8;
+		*u = *cast(T*)p.addr;
 		e = 0;
-		--p.left;
+		p.left -= T.sizeof;
 	}
-	++p.addru8;
-	return e;
-}
-
-/// (Internal) Fetch an 16-bit integer.
-/// The error field is set if an error occured.
-/// The fetch function is debuggee-aware.
-/// Params:
-/// 	p = Disassembler structure
-/// 	u = 16-bit pointer
-/// Returns: Non-zero on error
-int adbg_disasm_fu16(adbg_disasm_t *p, ushort *u) {
-	import adbg.dbg.debugger : adbg_mm_cread;
-	int e = void;
-	if (p.debuggee) {
-		e = adbg_mm_cread(p.addrv, u, ushort.sizeof);
-	} else {
-		if (p.left < ushort.sizeof) // 1 < 2
-			return adbg_error(AdbgError.outOfData);
-		*u = *p.addru16;
-		e = 0;
-		p.left -= ushort.sizeof;
-	}
-	++p.addru16;
-	return e;
-}
-
-
-/// (Internal) Fetch an 32-bit integer.
-/// The error field is set if an error occured.
-/// The fetch function is debuggee-aware.
-/// Params:
-/// 	p = Disassembler structure
-/// 	u = 32-bit pointer
-/// Returns: Non-zero on error
-int adbg_disasm_fu32(adbg_disasm_t *p, uint *u) {
-	import adbg.dbg.debugger : adbg_mm_cread;
-	int e = void;
-	if (p.debuggee) {
-		e = adbg_mm_cread(p.addrv, u, uint.sizeof);
-	} else {
-		if (p.left < uint.sizeof) // 3 < 4
-			return adbg_error(AdbgError.outOfData);
-		*u = *p.addru32;
-		e = 0;
-		p.left -= uint.sizeof;
-	}
-	++p.addru32;
-	return e;
-}
-
-/// (Internal) Fetch an 64-bit integer.
-/// The error field is set if an error occured.
-/// The fetch function is debuggee-aware.
-/// Params:
-/// 	p = Disassembler structure
-/// 	u = 64-bit pointer
-/// Returns: Non-zero on error
-int adbg_disasm_fu64(adbg_disasm_t *p, ulong *u) {
-	import adbg.dbg.debugger : adbg_mm_cread;
-	int e = void;
-	if (p.debuggee) {
-		e = adbg_mm_cread(p.addrv, u, ulong.sizeof);
-	} else {
-		if (p.left < ulong.sizeof) // 6 < 8
-			return adbg_error(AdbgError.outOfData);
-		*u = *p.addru64;
-		e = 0;
-		p.left -= ulong.sizeof;
-	}
-	++p.addru64;
-	return e;
-}
-
-/// (Internal) Fetch a single-precision 32-bit floating number.
-/// The error field is set if an error occured.
-/// The fetch function is debuggee-aware.
-/// Params:
-/// 	p = Disassembler structure
-/// 	u = 32-bit float pointer
-/// Returns: Non-zero on error
-int adbg_disasm_ff32(adbg_disasm_t *p, float *u) {
-	import adbg.dbg.debugger : adbg_mm_cread;
-	int e = void;
-	if (p.debuggee) {
-		e = adbg_mm_cread(p.addrv, u, float.sizeof);
-	} else {
-		if (p.left < float.sizeof) // 2 < 4
-			return adbg_error(AdbgError.outOfData);
-		*u = *p.addrf32;
-		e = 0;
-		p.left -= float.sizeof;
-	}
-	++p.addrf32;
-	return e;
-}
-
-/// (Internal) Fetch a double-precision 64-bit floating number.
-/// The error field is set if an error occured.
-/// The fetch function is debuggee-aware.
-/// Params:
-/// 	p = Disassembler structure
-/// 	u = 64-bit double pointer
-/// Returns: Non-zero on error
-int adbg_disasm_ff64(adbg_disasm_t *p, double *u) {
-	import adbg.dbg.debugger : adbg_mm_cread;
-	int e = void;
-	if (p.debuggee) {
-		e = adbg_mm_cread(p.addrv, u, double.sizeof);
-	} else {
-		if (p.left < double.sizeof) // 6 < 8
-			return adbg_error(AdbgError.outOfData);
-		*u = *p.addrf64;
-		e = 0;
-		p.left -= double.sizeof;
-	}
-	++p.addrf64;
+	p.addrv += T.sizeof;
 	return e;
 }

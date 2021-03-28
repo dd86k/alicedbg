@@ -10,9 +10,8 @@ module ui.loop;
 import core.stdc.string : memcpy;
 import adbg.etc.c.stdio;
 import adbg.dbg, adbg.sys.err : SYS_ERR_FMT;
-import adbg.disasm;
-import term;
-import common;
+import adbg.disasm, adbg.error;
+import common, term;
 
 //TODO: loop option or new ui for just logging in faults
 
@@ -42,17 +41,14 @@ int loop_handler(exception_t *e) {
 	
 	// * Print disassembly, if available
 	if (e.faultaddr) {
-		char[16] b = void;
-		if (adbg_mm_cread(e.faultaddrv, cast(void*)b.ptr, 16)) {
-			puts("> Unable to read process memory.");
-			goto L_PROMPT;
-		}
-		common_disasm.a = b.ptr;
-		if (adbg_disasm(&common_disasm, AdbgDisasmMode.file) == 0) {
+		adbg_disasm_start_debuggee(&common_disasm, e.faultaddrv);
+		adbg_disasm_opcode_t op = void;
+		if (adbg_disasm(&common_disasm, &op, AdbgDisasmMode.file)) {
+			printf("> %p: (error:%s)\n",
+				e.faultaddr, adbg_error_msg);
+		} else {
 			printf("> %p: %s| %s\n",
-				e.faultaddr,
-				common_disasm.mcbuf.ptr,
-				common_disasm.mnbuf.ptr);
+				e.faultaddr, op.machcode, op.mnemonic);
 		}
 	}
 	

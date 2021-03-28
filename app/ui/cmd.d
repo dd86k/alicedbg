@@ -336,16 +336,14 @@ int cmd_handler(exception_t *ex) {
 	
 	if (ex.faultaddr) {
 		printf("	Fault address: %zx\n", ex.faultaddrv);
-		char[16] b = void;
-		if (adbg_mm_cread(ex.faultaddrv, cast(void*)b.ptr, 16)) {
-			puts("	Unable to read process memory.");
-			goto L_INPUT;
-		}
-		common_disasm.a = b.ptr;
-		if (adbg_disasm(&common_disasm, AdbgDisasmMode.file) == 0) {
+		adbg_disasm_start_debuggee(&common_disasm, ex.faultaddrv);
+		adbg_disasm_opcode_t op = void;
+		if (adbg_disasm(&common_disasm, &op, AdbgDisasmMode.file)) {
+			printf("	Faulting instruction: (error:%s)\n",
+				adbg_error_msg);
+		} else {
 			printf("	Faulting instruction: [%s] %s\n",
-				common_disasm.mcbuf.ptr,
-				common_disasm.mnbuf.ptr);
+				op.machcode, op.mnemonic);
 		}
 	}
 	

@@ -31,7 +31,7 @@ struct riscv_internals_t { align(1):
 /// Disassemble RISC-V
 /// Note: So far only does risc-v-32
 /// Params: p = Disassembler parameters
-void adbg_disasm_riscv(adbg_disasm_t *p) {
+int adbg_disasm_riscv(adbg_disasm_t *p) {
 	riscv_internals_t i = void;
 //	p.rv = &i;
 
@@ -51,19 +51,19 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_RVC_FUNC_000: // C.ADDI4SPN
 			int imm = i.op1 >> 5;
 			if (imm == 0) {
-				p.error = adbg_error(AdbgError.illegalInstruction);
-				return;
+				return adbg_error(AdbgError.illegalInstruction);
+				return 0;
 			}
 			if (p.mode < AdbgDisasmMode.file)
-				return;
+				return 0;
 			int rd = (i.op1 >> 2) & 7;
 			adbg_disasm_push_str(p, "c.addi4spn");
 			adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rd));
 			adbg_disasm_push_imm(p, imm);
-			return;
+			return 0;
 		case OP_RVC_FUNC_110: // C.SW
 			if (p.mode < AdbgDisasmMode.file)
-				return;
+				return 0;
 			int rs1 = (i.op1 >> 7) & 7;
 			int rs2 = (i.op1 >> 2) & 7;
 			int imm = (i.op1 >> 9) & 7;
@@ -75,8 +75,9 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 			adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rs1));
 			adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rs2));
 			adbg_disasm_push_imm(p, imm);
-			return;
-		default: p.error = adbg_error(AdbgError.illegalInstruction); return; // Yes, 000 is illegal
+			return 0;
+		default: // Yes, 000 is illegal
+			return adbg_error(AdbgError.illegalInstruction);
 		}
 	case 1:
 		if (p.mode >= AdbgDisasmMode.file)
@@ -84,7 +85,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		switch (i.op1 & OP_RVC_FUNC_MASK) {
 		case OP_RVC_FUNC_000:
 			if (p.mode < AdbgDisasmMode.file)
-				return;
+				return 0;
 			int rd = (i.op1 >> 7) & 31; /// rd/rs1 (op[11:7])
 			if (rd) { // C.ADDI
 				int imm = (i.op1 >> 2) & 31;
@@ -97,25 +98,25 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 			} else { // C.NOP (rd == 0)
 				adbg_disasm_push_str(p, "c.nop");
 			}
-			return;
+			return 0;
 		case OP_RVC_FUNC_001: // C.JAL
 			if (p.mode < AdbgDisasmMode.file)
-				return;
+				return 0;
 			adbg_disasm_push_str(p, "c.jal");
 			adbg_disasm_push_imm(p, adbg_disasm_riscv_imm_cj(i.op1));
-			return;
+			return 0;
 		case OP_RVC_FUNC_100: // C.GRP1_1
 			int rd = (i.op1 >> 7) & 7;
 			switch (i.op1 & 0xC00) { // op[11:10]
 			case 0:	// C.SRLI
 			
-				return;
+				return 0;
 			case 0x400:	// C.SRAI
 			
-				return;
+				return 0;
 			case 0x800:	// C.ANDI
 			
-				return;
+				return 0;
 			default: // C00H C.GRP1_1_1
 				int rs2 = (i.op1 >> 2) & 7;
 				const(char) *m = void;
@@ -126,17 +127,17 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 				case 0x60:   m = "c.and"; break;
 				case 0x1000: m = "c.subw"; break;
 				case 0x1020: m = "c.addw"; break;
-				default: p.error = adbg_error(AdbgError.illegalInstruction); return;
+				default: return adbg_error(AdbgError.illegalInstruction); return 0;
 				}
 				if (p.mode < AdbgDisasmMode.file)
-					return;
+					return 0;
 				adbg_disasm_push_str(p, m);
 				adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rd));
 				adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rd));
 				adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rs2));
-				return;
+				return 0;
 			}
-		default: p.error = adbg_error(AdbgError.illegalInstruction); return;
+		default: return adbg_error(AdbgError.illegalInstruction); return 0;
 		}
 	case 2:
 		if (p.mode >= AdbgDisasmMode.file)
@@ -145,21 +146,21 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_RVC_FUNC_010:
 			int rd = (i.op1 >> 7) & 31;
 			if (rd == 0) {
-				p.error = adbg_error(AdbgError.illegalInstruction);
-				return;
+				return adbg_error(AdbgError.illegalInstruction);
+				return 0;
 			}
 			if (p.mode < AdbgDisasmMode.file)
-				return;
+				return 0;
 			int imm = (i.op1 >> 2) & 31;
 			if (i.op1 & BIT!(12))
 				imm |= BIT!(5);
 			adbg_disasm_push_str(p, "c.lwsp");
 			adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rd));
 			adbg_disasm_push_imm(p, imm);
-			return;
+			return 0;
 		case OP_RVC_FUNC_100:
 			if (p.mode < AdbgDisasmMode.file)
-				return;
+				return 0;
 			int rd  = (i.op1 >> 7) & 31; // or rd
 			int rs2 = (i.op1 >> 2) & 31;
 			if (i.op1 & BIT!(12)) {
@@ -185,16 +186,16 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 					adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rd));
 				}
 			}
-			return;
+			return 0;
 		case OP_RVC_FUNC_110:
 			if (p.mode < AdbgDisasmMode.file)
-				return;
+				return 0;
 			int rs2 = (i.op1 >> 2) & 31;
 			int imm = (i.op1 >> 7) & 63;
 			adbg_disasm_push_str(p, "c.swsp");
 			adbg_disasm_push_memregimm(p, adbg_disasm_riscv_abi_reg(rs2), imm, MemWidth.i32);
-			return;
-		default: p.error = adbg_error(AdbgError.illegalInstruction); return;
+			return 0;
+		default: return adbg_error(AdbgError.illegalInstruction); return 0;
 		}
 	default: // 11 >= 16b
 	}
@@ -219,10 +220,10 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_FUNC_100: m = "xori"; break;
 		case OP_FUNC_110: m = "ori"; break;
 		case OP_FUNC_111: m = "andi"; break;
-		default: p.error = adbg_error(AdbgError.illegalInstruction); return;
+		default: return adbg_error(AdbgError.illegalInstruction); return 0;
 		}
 		if (p.mode < AdbgDisasmMode.file)
-			return;
+			return 0;
 		int imm = i.op >> 20;
 		int rs1 = (i.op >> 15) & 31;
 		int rd = (i.op >> 7) & 31;
@@ -230,7 +231,7 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rd));
 		adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rs1));
 		adbg_disasm_push_imm(p, imm);
-		return;
+		return 0;
 	case 35: // (0100011) RV32I: SB/SH/SW
 		const(char) *m = void;
 		int w = void;
@@ -238,18 +239,18 @@ void adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_FUNC_000: m = "sb"; w = MemWidth.i8; break;
 		case OP_FUNC_001: m = "sh"; w = MemWidth.i16; break;
 		case OP_FUNC_010: m = "sw"; w = MemWidth.i32; break;
-		default: p.error = adbg_error(AdbgError.illegalInstruction); return;
+		default: return adbg_error(AdbgError.illegalInstruction); return 0;
 		}
 		if (p.mode < AdbgDisasmMode.file)
-			return;
+			return 0;
 		int imm = adbg_disasm_riscv_imm_s(i.op);
 		int rs1 = (i.op >> 15) & 31;
 		int rs2 = (i.op >> 20) & 31;
 		adbg_disasm_push_str(p, m);
 		adbg_disasm_push_memregimm(p, adbg_disasm_riscv_abi_reg(rs1), imm, w);
 		adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rs2));
-		return;
-	default: p.error = adbg_error(AdbgError.illegalInstruction);
+		return 0;
+	default: return adbg_error(AdbgError.illegalInstruction);
 	}
 }
 

@@ -161,59 +161,67 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 /// 	flags = Configuration flags
 /// Returns: Status code
 int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
-	dp.a = data;
+	adbg_disasm_start_file(dp, data, size, 0);
+	adbg_disasm_opcode_t op = void;
+	
 	if (flags & DumpOpt.disasm_stats) {
 		uint iavg;	/// instruction average size
+		uint imin;	/// smallest instruction size
 		uint imax;	/// longest instruction size
 		uint icnt;	/// instruction count
 		uint ills;	/// Number of illegal instructions
-		for (uint i, isize = void; i < size; i += isize) {
-			AdbgError e = cast(AdbgError)adbg_disasm(dp, AdbgDisasmMode.size);
-			isize = cast(uint)(dp.av - dp.la);
-			with (AdbgError)
-			switch (e) {
-			case none:
-				iavg += isize;
-				++icnt;
-				if (isize > imax)
-					imax = isize;
-				break;
-			case illegalInstruction:
-				iavg += isize;
-				++icnt;
-				++ills;
-				break;
-			default:
-				printf("disasm: %s\n", adbg_error_msg);
-				return e;
-			}
+L_DISASM_1:
+		int e = adbg_disasm(dp, &op, AdbgDisasmMode.size);
+		with (AdbgError)
+		switch (e) {
+		case none:
+			iavg += op.size;
+			++icnt;
+			if (op.size > imax)
+				imax = op.size;
+			if (op.size < imin)
+				imin = op.size;
+			goto L_DISASM_1;
+		case illegalInstruction:
+			iavg += op.size;
+			++icnt;
+			++ills;
+			goto L_DISASM_1;
+		case outOfData: break;
+		default:
+			printf("disasm: %s\n", adbg_error_msg);
+			return e;
 		}
 		printf(
-		"Instruction statistics\n"~
-		"average instruction size: %.3f\n"~
-		"maximum instruction size: %u\n"~
-		"illegal instructions    : %u\n"~
-		"total instructions      : %u\n",
-		cast(float)iavg / icnt, imax, ills, icnt
+		"Opcode statistics\n"~
+		"average size : %.3f\n"~
+		"smallest size: %u\n"~
+		"biggest size : %u\n"~
+		"illegal      : %u\n"~
+		"total        : %u\n",
+		cast(float)iavg / icnt, imin, imax, ills, icnt
 		);
-	} else {
-		for (uint i; i < size; i += dp.av - dp.la) {
-			AdbgError e = cast(AdbgError)adbg_disasm(dp, AdbgDisasmMode.file);
-			with (AdbgError)
-			switch (e) {
-			case none:
-				printf("%08X %-30s %s\n",
-					i, dp.mcbuf.ptr, dp.mnbuf.ptr);
-				continue;
-			case illegalInstruction:
-				printf("%08X %-30s (error)\n",
-					i, dp.mcbuf.ptr);
-				continue;
-			default:
-				printf("disasm: %s\n", adbg_error_msg);
-				return e;
-			}
-		}
+		return 0;
 	}
+	
+	uint i;
+L_DISASM_2:
+	int e = adbg_disasm(dp, &op, AdbgDisasmMode.size);
+	with (AdbgError)
+	switch (e) {
+	case none:
+		printf("%08X %-30s %s\n", i, op.machcode, op.mnemonic);
+		i += op.size;
+		goto L_DISASM_2;
+	case illegalInstruction:
+		printf("%08X %-30s (error)\n", i, op.machcode);
+		i += op.size;
+		goto L_DISASM_2;
+	case outOfData: break;
+	default:
+		printf("disasm: %s\n", adbg_error_msg);
+		return e;
+	}
+	
 	return 0;
 }
