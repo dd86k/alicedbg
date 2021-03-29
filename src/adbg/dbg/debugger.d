@@ -362,7 +362,7 @@ AdbgState adbg_state() {
  * populated with debugging information.
  * (Windows) Uses WaitForDebugEvent, filters any but EXCEPTION_DEBUG_EVENT
  * (Posix) Uses ptrace(2) and waitpid(2), filters SIGCONT out
- * Params: User function callback
+ * Params: userfunc = User function callback
  * Returns: Zero on success; Otherwise an error occured
  */
 int adbg_run(int function(exception_t*) userfunc) {

@@ -376,6 +376,9 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 	case debuggee:
 		p.debuggee = val != 0;
 		break;
+	case mnemonicTab:
+		p.mnemonicTab = val != 0;
+		break;
 	default:
 		return adbg_error(AdbgError.invalidOption);
 	}
@@ -390,6 +393,7 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 ///
 /// Params:
 /// 	p = Disassembler parameters
+/// 	op = Opcode structure
 /// 	mode = Disassembling mode
 ///
 /// Returns: Error code; Non-zero indicating an error

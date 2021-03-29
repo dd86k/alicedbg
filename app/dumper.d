@@ -81,7 +81,7 @@ void dump_title(const(char) *title) {
 }
 
 /// Output a dump chapter.
-/// Params: c = Chapter name
+/// Params: title = Chapter name
 void dump_chapter(const(char) *title) {
 	printf("\n# %s\n\n", title);
 }
