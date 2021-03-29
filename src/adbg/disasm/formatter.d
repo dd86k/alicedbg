@@ -61,7 +61,7 @@ private enum FORMATTER_REGBUF_SIZE = 16;
 //      Currently not supported because other ISAs (than x86) don't seem to have such thing
 /// Item type, each item more or less has their own formatting function
 enum FormatType {
-	String,	/// String that will remain unformatted, typically the instruction
+	Raw,	/// String that will remain unformatted, typically the instruction
 	Reg,	/// Register spec
 	SegReg,	/// Segment:Register spec
 	Addr,	/// Address spec (e.g. jumps)
@@ -191,7 +191,7 @@ void adbg_disasm_push_str(adbg_disasm_t *p, const(char) *v) {
 	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
 		return;
 	disasm_fmt_item_t *i = adbg_disasm_fmt_select(p);
-	i.type = FormatType.String;
+	i.type = FormatType.Raw;
 	i.sval1 = v;
 }
 /// Format and format a string into the formatting stack. This is printed as-is.
@@ -203,7 +203,7 @@ void adbg_disasm_push_strf(adbg_disasm_t *p, const(char) *f, ...) {
 	if (p.fmt.itemno >= FORMATTER_STACK_LIMIT)
 		return;
 	disasm_fmt_item_t *i = adbg_disasm_fmt_select(p);
-	i.type = FormatType.String;
+	i.type = FormatType.Raw;
 	va_list va;
 	va_start(va, f);
 	i.sval1 = adbg_util_strfva(f, va);
@@ -614,7 +614,7 @@ void adbg_disasm_fadd(adbg_disasm_t *p, disasm_fmt_item_t *i) {
 
 	with (FormatType)
 	switch (i.type) {
-	case String:	adbg_disasm_madd(p, i.sval1); return;
+	case Raw:	adbg_disasm_madd(p, i.sval1); return;
 	case Reg:
 		if (i.sval1[0] == 0) return;
 		adbg_disasm_madd(p, adbg_disasm_fmtreg(p, i.sval1, &b1));

@@ -89,26 +89,15 @@ L_READKEY:
 /// Params: e = Exception structure
 int tui_handler(exception_t *e) {
 	term_clear;
-	common_disasm.a = e.faultaddr;
 	// locals
 	const uint h = tui_size.height / 2;
 	const uint ihmax = tui_size.height - 2;
-	// On-point
+	
+	// Forward disassembly
 	term_curpos(0, h);
-	/*if (adbg_disasm(&common_disasm, AdbgDisasmMode.file) == AdbgError.none)
-		term_tui_writef("> %zX %-20s %s",
-			common_disasm.la,
-			&common_disasm.mcbuf,
-			&common_disasm.mnbuf);
-	// forward
-	for (uint hi = h + 1; hi < ihmax; ++hi) {
-		term_curpos(0, hi);
-		adbg_disasm(&common_disasm, AdbgDisasmMode.file);
-		term_tui_writef("  %zX %-20s %s",
-			common_disasm.la, &common_disasm.mcbuf, &common_disasm.mnbuf);
-	}*/
-	// backward
-	//for (uint ih = h - 1; ih >= 0; ih) {
+	
+	// Backward disassembly
+	
 	// status
 	tui_status(adbg_exception_string(e.type));
 	term_tui_flush;
