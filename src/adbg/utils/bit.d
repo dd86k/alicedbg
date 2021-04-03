@@ -8,7 +8,7 @@
  * endian (compared to the target's), return a function for bulk processing.
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: See LICENSE
+ * Copyright: © 2013 dd86k
  * License: BSD-3-Clause
  */
 module adbg.utils.bit;
@@ -98,9 +98,9 @@ version (LittleEndian)
 else
 	private enum TE = 1; /// Target Endian
 
-alias fswap16 = ushort function(ushort);
-alias fswap32 = uint function(uint);
-alias fswap64 = ulong function(ulong);
+alias swapfunc16 = ushort function(ushort);
+alias swapfunc32 = uint function(uint);
+alias swapfunc64 = ulong function(ulong);
 
 /// Return a function pointer depending if requested endian matches target
 /// endian. If it matches identical, this function returns a function that
@@ -176,12 +176,12 @@ unittest {
 	assert(adbg_util_bswap64(N64) == R64, "bswap64");
 	
 	version (LittleEndian) {
-		fswap16 l16 = adbg_util_fswap16(0);
-		fswap32 l32 = adbg_util_fswap32(0);
-		fswap64 l64 = adbg_util_fswap64(0);
-		fswap16 m16 = adbg_util_fswap16(1);
-		fswap32 m32 = adbg_util_fswap32(1);
-		fswap64 m64 = adbg_util_fswap64(1);
+		swapfunc16 l16 = adbg_util_fswap16(0);
+		swapfunc32 l32 = adbg_util_fswap32(0);
+		swapfunc64 l64 = adbg_util_fswap64(0);
+		swapfunc16 m16 = adbg_util_fswap16(1);
+		swapfunc32 m32 = adbg_util_fswap32(1);
+		swapfunc64 m64 = adbg_util_fswap64(1);
 		// LSB matches, no swapping occurs
 		assert(l16(N16) == N16, "fswap16-lsb");
 		assert(l32(N32) == N32, "fswap32-lsb");
@@ -191,12 +191,12 @@ unittest {
 		assert(m32(N32) == R32, "fswap32-msb");
 		assert(m64(N64) == R64, "fswap64-msb");
 	} else {
-		fswap16 l16 = adbg_util_fswap16(0);
-		fswap32 l32 = adbg_util_fswap32(0);
-		fswap64 l64 = adbg_util_fswap64(0);
-		fswap16 m16 = adbg_util_fswap16(1);
-		fswap32 m32 = adbg_util_fswap32(1);
-		fswap64 m64 = adbg_util_fswap64(1);
+		swapfunc16 l16 = adbg_util_fswap16(0);
+		swapfunc32 l32 = adbg_util_fswap32(0);
+		swapfunc64 l64 = adbg_util_fswap64(0);
+		swapfunc16 m16 = adbg_util_fswap16(1);
+		swapfunc32 m32 = adbg_util_fswap32(1);
+		swapfunc64 m64 = adbg_util_fswap64(1);
 		// LSB does not match
 		assert(l16(N16) == R16, "fswap16-lsb");
 		assert(l32(N32) == R32, "fswap32-lsb");

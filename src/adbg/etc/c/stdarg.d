@@ -4,7 +4,7 @@
  * Fixes missing __va_tag_list on Posix platforms.
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: See LICENSE
+ * Copyright: © 2013 dd86k
  * License: BSD-3-Clause
  */
 module adbg.etc.c.stdarg;

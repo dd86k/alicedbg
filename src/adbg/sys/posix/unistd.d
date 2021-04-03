@@ -2,7 +2,7 @@
  * Up to date Posix universal standard defitions (unistd.h) and other utilities.
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: See LICENSE
+ * Copyright: © 2013 dd86k
  * License: BSD-3-Clause
  */
 module adbg.sys.posix.unistd;

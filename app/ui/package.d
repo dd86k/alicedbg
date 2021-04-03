@@ -2,7 +2,7 @@
  * UI package
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: See LICENSE
+ * Copyright: © 2013 dd86k
  * License: BSD-3-Clause
  */
 module ui;

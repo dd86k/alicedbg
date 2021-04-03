@@ -11,7 +11,7 @@
  * - Microsoft Corporation, PE Format, 2019-08-26
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: See LICENSE
+ * Copyright: © 2013 dd86k
  * License: BSD-3-Clause
  */
 module adbg.obj.pe;

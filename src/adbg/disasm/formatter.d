@@ -26,7 +26,7 @@
  * mnemonic items use the formatter's stack.
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: See LICENSE
+ * Copyright: © 2013 dd86k
  * License: BSD-3-Clause
  */
 module adbg.disasm.formatter;

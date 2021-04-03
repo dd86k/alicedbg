@@ -2,7 +2,7 @@
  * 8086/x86/amd64 decoder.
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: See LICENSE
+ * Copyright: © 2013 dd86k
  * License: BSD-3-Clause
  */
 module adbg.disasm.arch.x86;
@@ -11,10 +11,369 @@ import adbg.error;
 import adbg.disasm.disasm;
 import adbg.disasm.formatter;
 
+debug = NewX86Disasm;
+
 extern (C):
 
-version (NewX86Disasm) {
+debug (NewX86Disasm) {
+
+/// x86 internal structure
+struct x86_internals_t { align(1):
+	//TODO: Consider addr/data pointers to arrays
+	x86AddrMode addrmode;	/// Current address mode
+	x86DataMode datamode;	/// Current data mode
+	x86Segment segment;	/// segment override
+	x86Prefix prefix;	/// last significant prefix for instruction selection
+	union {
+		uint prefix_fields;	/// prefix filler
+		// Prefixes worth having their own field
+		// Notably the ones not significant to change the
+		// instruction selection
+		struct {
+			bool lock;	/// LOCK prefix
+			bool res1;	/// Reserved
+			bool res2;	/// Reserved
+			bool res3;	/// Reserved
+		}
+	}
+	/// VEX byte pos  [0]      [1]      [2]      [3]
+	/// (C5H) VEX.2B: 11000101 RvvvvLpp
+	/// (C4H) VEX.3B: 11000100 RXBmmmmm WvvvvLpp
+	/// (8FH) XOP   : 10001111 RXBmmmmm WvvvvLpp
+	/// (62H) EVEX  : 01100010 RXBR00mm Wvvvv1pp zLLbVaa
+	//    EVEX Notes:             R'              L' V'
+	union {
+		ubyte[4] vex;	/// VEX byte data
+		uint vex32;	/// VEX data filler alias
+		ushort vex16;	/// VEX data filler alias
+	}
+	union {
+		ulong vex_fields;	/// VEX filler
+		struct {
+			bool vex_L;	/// VEX.L vector length (128b/scalar, 256b)
+			ubyte vex_pp;	/// VEX.pp opcode extension (NONE, 66H, F2H, F3H)
+			ubyte vex_vvvv;	/// VEX.vvvv register, limited to 3 bits in x86-32
+			bool vex_W;	/// REX.W alias, 1=64-bit size, 0=CS.D (normal operation)
+			bool vex_R;	/// REX.R alias, affects ModRM.REG
+			bool vex_X;	/// REX.X alias, affects SIB.INDEX
+			bool vex_B;	/// REX.B alias, affects ModRM.RM, SIB.BASE, or opcode
+			//TODO: Upgrade EVEX fields
+			//      R -> RR (ubyte)
+			//      L -> LL (ubyte)
+		}
+	}
+}
+
+/// (Internal)
+int adbg_disasm_x86(adbg_disasm_t *p) {
+	x86_internals_t x86 = void;
+	//TODO: Hook pointers instead?
+	//      with "reg" limit
+	switch (p.platform) {
+	case AdbgDisasmPlatform.x86_64:
+		x86.datamode = x86DataMode.i32;
+		x86.addrmode = x86AddrMode.i64;
+		break;
+	case AdbgDisasmPlatform.x86:
+		x86.datamode = x86DataMode.i32;
+		x86.addrmode = x86AddrMode.i32;
+		break;
+	default: // x86_16
+		x86.datamode = x86DataMode.i16;
+		x86.addrmode = x86AddrMode.i16;
+		break;
+	}
+	x86.segment = x86Segment.none;
+	x86.prefix_fields = 0;
+	x86.vex32 = 0;
+	x86.vex_fields = 0;
+	p.x86 = &x86;
+
+L_START:
+	ubyte opcode = void;
+	int e = adbg_disasm_fetch!ubyte(p, &opcode);
+	if (e) return e;
 	
+	immutable(x86_legacy_opcode_t) *op = &opcodes_legacy[opcode];
+	if (op == null) // invalid
+		return adbg_error(AdbgError.illegalInstruction);
+	
+	//TODO: assign op pointer to internal struct
+//	push_instruction(p, b.instruction);
+//	push_x8(p, opcode);
+	
+	with (x86OpType)
+	switch (op.type) {
+	case operand: return op.operand(p);
+	case none: return 0;
+	case prefix:
+		x86Prefix prefix = op.prefix;
+		with (x86Prefix)
+		switch (prefix) {
+		case _66H:
+			x86.prefix = prefix;
+			
+			goto L_START;
+		case _F2H:
+			x86.prefix = prefix;
+		
+			goto L_START;
+		case _F3H:
+			x86.prefix = prefix;
+		
+			goto L_START;
+		default: // none
+		
+			goto L_START;
+		}
+	case segment:
+		x86.segment = op.segment;
+		goto L_START;
+	default: assert(0, "INVALID x86 OPCODE TYPE");
+	}
+}
+
+private:
+
+int adbg_disasm_x86_vex(adbg_disasm_t *p) {
+	return 0;
+}
+
+/// Effective address mode
+enum x86AddrMode : ubyte {
+	i16, i32, i64
+}
+/// Effective data mode
+enum x86DataMode : ubyte {
+	i16, i32, i64, i128, i256, i512
+}
+/// Segment override
+enum x86Segment : ubyte {
+	es, cs, ss, ds, fs, gs, none
+}
+/// For instruction selection only
+enum x86Prefix : ubyte { // Intel order
+	none, _66H, _F3H, _F2H, // <- significant instruction prefixes
+	_0FH,
+	_67H,
+	lock	= _0FH,
+	data	= _66H,
+	addr	= _67H,
+	repz	= _F2H,
+	repnz	= _F3H,
+}
+enum x86OpType : ubyte {
+	/// Instruction has no operands
+	none,
+	/// Instruction has operand handler
+	operand,
+	/// Instruction prefix
+	prefix,
+	/// Instruction segment override
+	segment,
+}
+
+//TODO: Consider adding warnings into structure
+//TODO: Consider default segment per instruction
+
+struct x86_opcode_t {
+	const(char)* mnemonic;
+	int function(adbg_disasm_t*) operand;
+}
+struct x86_legacy_opcode_t {
+	align(2) x86OpType type;
+	union {
+		public struct {
+			const(char)* mnemonic;
+			int function(adbg_disasm_t*) operand;
+		}
+		x86Prefix prefix;
+		x86Segment segment;
+	}
+}
+struct x86_vex_opcode_t {
+	/// for each prefixes
+	/// VEX: none, 66H, F3H, F2H (Intel order)
+	/// null being invalid for prefix
+	x86_opcode_t[4] op;
+}
+
+// ANCHOR VM definitions
+
+// Instruction names, in case the compiler doesn't support string pooling
+immutable const(char) *M_ADD	= "add";
+immutable const(char) *M_OR	= "or";
+immutable const(char) *M_PUSH	= "push";
+immutable const(char) *M_POP	= "pop";
+immutable const(char) *M_ADC	= "adc";
+
+// Operand aliases, for readability
+// Intel-compliant, unless the operand format is AMD-specific
+alias EbGb	= adbg_disasm_x86_op_EbGb;
+alias EvGv	= adbg_disasm_x86_op_EvGv;
+alias GbEb	= adbg_disasm_x86_op_GbEb;
+alias GvEv	= adbg_disasm_x86_op_GvEv;
+alias ALIb	= adbg_disasm_x86_op_ALIb;
+alias rAXIz	= adbg_disasm_x86_op_rAXIz;
+alias ES	= adbg_disasm_x86_op_ES;
+alias CS	= adbg_disasm_x86_op_CS;
+alias SS	= adbg_disasm_x86_op_SS;
+
+// Maps
+alias MAP_0F	= adbg_disasm_x86_op_map_0f;
+//alias MAP_0F38	= adbg_disasm_x86_op_map_0f38;
+//alias MAP_0F3A	= adbg_disasm_x86_op_map_0f3a;
+
+// ANCHOR Instruction definitions
+
+immutable x86_legacy_opcode_t[256] opcodes_legacy = [
+	// 00H
+	{ x86OpType.operand,	M_ADD,	&EbGb },
+	{ x86OpType.operand,	M_ADD,	&EvGv },
+	{ x86OpType.operand,	M_ADD,	&GbEb },
+	{ x86OpType.operand,	M_ADD,	&GvEv },
+	{ x86OpType.operand,	M_ADD,	&ALIb },
+	{ x86OpType.operand,	M_ADD,	&rAXIz },
+	{ x86OpType.operand,	M_PUSH,	&ES },
+	{ x86OpType.operand,	M_POP,	&ES },
+	// 08H
+	{ x86OpType.operand,	M_OR,	&EbGb },
+	{ x86OpType.operand,	M_OR,	&EvGv },
+	{ x86OpType.operand,	M_OR,	&GbEb },
+	{ x86OpType.operand,	M_OR,	&GvEv },
+	{ x86OpType.operand,	M_OR,	&ALIb },
+	{ x86OpType.operand,	M_OR,	&rAXIz },
+	{ x86OpType.operand,	M_PUSH,	&CS },
+	{ x86OpType.operand,	M_POP,	&MAP_0F },
+	// 10H
+	{ x86OpType.operand,	M_ADC,	&EbGb },
+	{ x86OpType.operand,	M_ADC,	&EvGv },
+	{ x86OpType.operand,	M_ADC,	&GbEb },
+	{ x86OpType.operand,	M_ADC,	&GvEv },
+	{ x86OpType.operand,	M_ADC,	&ALIb },
+	{ x86OpType.operand,	M_ADC,	&rAXIz },
+	{ x86OpType.operand,	M_PUSH,	&SS },
+	{ x86OpType.operand,	M_POP,	&SS },
+	
+	// ...
+	{ x86OpType.prefix,	prefix: x86Prefix._66H },
+];
+immutable x86_vex_opcode_t[256] opcodes_0f = [
+	{ [ // 0x00
+		{ "", null },
+		{ "", null },
+		{ "", null },
+		{ "", null }
+	] },
+	{ [ // 0x01
+		{ "", null },
+		{ "", null },
+		{ "", null },
+		{ "", null }
+	], }
+];
+immutable x86_vex_opcode_t[256] opcodes_0f38 = [
+];
+immutable x86_vex_opcode_t[256] opcodes_0f3a = [
+];
+//TODO: Switch masks for XOP maps 1,2,3
+//      Too little instructions and deprecated by AMD
+
+immutable const(char)*[] addr16_regs = [
+	"bx+si", "bx+di", "bp+si", "bi+di", "si", "di", "bp", "bx",
+];
+immutable const(char)*[] i8_regs = [
+	"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh",
+	"r8b", "r9b", "r10b", "r11b", "r12b", "r13b", "r14b", "r15b"
+];
+immutable const(char)*[] i16_regs = [
+	"ax", "cx", "dx", "cx", "sp", "bp", "si", "di",
+	"r8w", "r9w", "r10w", "r11w", "r12w", "r13w", "r14w", "r15w"
+];
+immutable const(char)*[] i32_regs = [
+	"eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi",
+	"r8d", "r9d", "r10d", "r11d", "r12d", "r13d", "r14d", "r15d"
+];
+immutable const(char)*[] mm_regs = [ // x87
+	"mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7"
+];
+immutable const(char)*[] xmm_regs = [
+	"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7",
+	"xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
+];
+immutable const(char)*[] ymm_regs = [
+	"ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7",
+	"ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15",
+];
+immutable const(char)*[] zmm_regs = [
+	"zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7",
+	"xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
+];
+/*immutable const(char)*[] tmm_regs = [
+	"tmm0", "tmm1", "tmm2", "tmm3", "tmm4", "tmm5", "tmm6", "tmm7"
+];*/
+
+//
+// ANCHOR Operand implementations
+//
+
+int adbg_disasm_x86_op_EbGb(adbg_disasm_t *p) {
+	int e = void;
+	ubyte rm = void;
+	e = adbg_disasm_fetch!ubyte(p, &rm);
+	if (e) return e;
+	return 0;
+}
+int adbg_disasm_x86_op_EvGv(adbg_disasm_t *p) {
+	return 0;
+}
+int adbg_disasm_x86_op_GbEb(adbg_disasm_t *p) {
+	return 0;
+}
+int adbg_disasm_x86_op_GvEv(adbg_disasm_t *p) {
+	return 0;
+}
+int adbg_disasm_x86_op_ALIb(adbg_disasm_t *p) {
+	return 0;
+}
+int adbg_disasm_x86_op_rAXIz(adbg_disasm_t *p) {
+	return 0;
+}
+int adbg_disasm_x86_op_ES(adbg_disasm_t *p) {
+	return 0;
+}
+int adbg_disasm_x86_op_CS(adbg_disasm_t *p) {
+	return 0;
+}
+int adbg_disasm_x86_op_map_0f(adbg_disasm_t *p) {
+	return 0;
+}
+int adbg_disasm_x86_op_SS(adbg_disasm_t *p) {
+	return 0;
+}
+
+//
+// Internal "mechanic" implementations
+//
+
+// ANCHOR ModR/M
+
+void adbg_disasm_x86_modrm(adbg_disasm_t *p, ubyte rm, bool reg) {
+	
+}
+void adbg_disasm_x86_modrm_rm(adbg_disasm_t *p, ubyte rm) {
+	
+}
+void adbg_disasm_x86_modrm_reg(adbg_disasm_t *p, ubyte reg) {
+	
+}
+
+// ANCHOR VEX ModR/M
+
+void adbg_disasm_x86_modrm_vex(adbg_disasm_t *p, ubyte rm, bool reg) {
+	
+}
+
 } else { // version (NewX86Disasm)
 
 /// x86 internals structure

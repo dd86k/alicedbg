@@ -1,8 +1,10 @@
 /**
- * Disassembler core.
+ * Disassembler module.
+ *
+ * 
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: See LICENSE
+ * Copyright: © 2013 dd86k
  * License: BSD-3-Clause
  */
 module adbg.disasm.disasm;
@@ -10,7 +12,7 @@ module adbg.disasm.disasm;
 import adbg.error;
 import adbg.disasm.arch;
 import adbg.disasm.formatter;
-import adbg.utils.bit : fswap16, fswap32, fswap64, BIT;
+import adbg.utils.bit : swapfunc16, swapfunc32, swapfunc64, BIT;
 
 extern (C):
 
@@ -31,17 +33,22 @@ enum AdbgDisasmOpt {
 	platform,
 	/// Set the mnemonic syntax.
 	syntax,
-	/// Set the machine code format.
-	machineFormat,
 	///TODO: If set, go backward instead of forward in memory.
 	backward,
 	///TODO: Add commentary
 	commentary,
 	/// Memory source is a live debuggee process.
 	debuggee,
+	//
+	// Syntax formatting
+	//
 	/// If true: Insert a hardware tab instead of a space between the
 	/// mnemonic and operands.
 	mnemonicTab,
+	/// 
+	packMachineOpcodes,
+	/// 
+	packOperandOpcodes,
 //	x86AddrMode = 80,
 //	x86DataMode = 81,
 }
@@ -78,22 +85,6 @@ enum AdbgDisasmSyntax : ubyte {
 //	riscv,	/// 
 }
 
-/// Disassembler machine code formats
-enum AdbgDisasmFormat : ubyte {
-	/// Machine code platform-dependant. Operands are packed.
-	// x86: Unpacked
-	// ARM/RISC: Packed
-	normal,
-	/// Machine code is without spaces. Operands are spaced out.
-	machinePackedOperandsUnpacked,
-	/// 
-	machineUnpackedOperandsPacked,
-	/// All machine bytes, including operands, are separated with a space.
-	allUnpacked,
-	/// All machine bytes, including operands, are not separated with a space.
-	allPacked,
-}
-
 /// Disassembler options
 deprecated
 enum AdbgDisasmOption {
@@ -108,14 +99,15 @@ enum AdbgDisasmOption {
 }
 
 /// Disassembler warnings
+//TODO: Only define warnings that are useful
 enum AdbgDisasmWarning {
-	/// Far jump, call, or return
+	/// Far jump, call, or return.
 	farAddr	= BIT!(0),
-	/// Loads a segment register
+	/// Loads a segment register.
 	segment	= BIT!(1),
-	/// Privileged instruction
+	/// Privileged instruction.
 	privileged	= BIT!(2),
-	/// I/O instruction
+	/// I/O instruction.
 	io	= BIT!(3),
 }
 
@@ -236,6 +228,12 @@ struct adbg_disasm_t { align(1):
 		x86_internals_t *x86;	/// 
 		riscv_internals_t *rv;	/// 
 	}
+	/// Opcode information
+	adbg_disasm_opcode_t *opcode;
+	/// (Internal) If byte swapping is required for this architecture.
+	/// If debuggee mode is on, this field is ignored.
+	/// Only fetches of 2, 4, and 8 bytes are affected by this.
+	bool swapRequired;
 	
 	//
 	// Options
@@ -251,8 +249,10 @@ struct adbg_disasm_t { align(1):
 	/// Assembler style when formatting instructions. See the AdbgDisasmSyntax
 	/// enumeration for more details.
 	AdbgDisasmSyntax syntax;
-	/// Machine code format.
-	AdbgDisasmFormat format;
+	/// 
+	bool packMachineOpcodes;
+	/// 
+	bool packOperandOpcodes;
 	/// Operation mode.
 	///
 	/// Disassembler operating mode. See the AdbgDisasmMode enumeration for
@@ -362,11 +362,6 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 			return adbg_error(AdbgError.invalidOptionValue);
 		p.syntax = cast(AdbgDisasmSyntax)val;
 		break;
-	case machineFormat:
-		if (val >= AdbgDisasmFormat.max)
-			return adbg_error(AdbgError.invalidOptionValue);
-		p.format = cast(AdbgDisasmFormat)val;
-		break;
 	/*case backward:
 		p.backwards = val != 0;
 		break;*/
@@ -401,6 +396,7 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDisasmMode mode)
 	if (p == null)
 		return adbg_error(AdbgError.invalidArgument);
 	if (p.func == null)
+		//TODO: Un-init error code?
 		return adbg_error(AdbgError.unsupportedPlatform);
 	
 	if (mode >= AdbgDisasmMode.file) {
@@ -410,13 +406,20 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDisasmMode mode)
 	
 	p.mode = mode;
 	p.lastaddr = p.addr;
+	p.opcode = op;
 	
 	int e = p.func(p);
 	
-	op.size = cast(int)(p.addrv - p.lastaddrv);
-	
-	if (mode >= AdbgDisasmMode.file && e == AdbgError.none)
-		adbg_disasm_render(p);
+	if (e == AdbgError.none) {
+		// opcode size
+		op.size = cast(int)(p.addrv - p.lastaddrv);
+		// formatting
+		if (mode >= AdbgDisasmMode.file) {
+			adbg_disasm_render(p);
+			op.mnemonic = p.mnbuf.ptr;
+			op.machcode = p.mcbuf.ptr;
+		}
+	}
 	
 	return e;
 }
