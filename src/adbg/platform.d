@@ -77,21 +77,21 @@ else
 //
 
 version (CRuntime_Bionic)
-	enum TARGET_CRT = "Bionic";	/// Platform CRT string
+	enum TARGET_CRT = "bionic";	/// Platform CRT string
 else version (CRuntime_DigitalMars)
-	enum TARGET_CRT = "DigitalMars";	/// Platform CRT string
+	enum TARGET_CRT = "digitalmars";	/// Platform CRT string
 else version (CRuntime_Glibc)
-	enum TARGET_CRT = "Glibc";	/// Platform CRT string
+	enum TARGET_CRT = "glibc";	/// Platform CRT string
 else version (CRuntime_Microsoft)
-	enum TARGET_CRT = "Microsoft";	/// Platform CRT string
+	enum TARGET_CRT = "microsoft";	/// Platform CRT string
 else version (CRuntime_Musl)
-	enum TARGET_CRT = "Musl";	/// Platform CRT string
+	enum TARGET_CRT = "musl";	/// Platform CRT string
 else version (CRuntime_Newlib) // Cygwin
-	enum TARGET_CRT = "Newlib";	/// Platform CRT string
+	enum TARGET_CRT = "newlib";	/// Platform CRT string
 else version (CRuntime_UClibc)
-	enum TARGET_CRT = "UClibc";	/// Platform CRT string
+	enum TARGET_CRT = "uclibc";	/// Platform CRT string
 else version (CRuntime_WASI) // WebAssembly
-	enum TARGET_CRT = "WASI";	/// Platform CRT string
+	enum TARGET_CRT = "wasi";	/// Platform CRT string
 else
 	enum TARGET_CRT = "Unknown";	/// Platform CRT string
 
@@ -100,45 +100,45 @@ else
 //
 
 version (Win64)
-	enum TARGET_OS = "Win64";	/// Platform OS string
+	enum TARGET_OS = "win64";	/// Platform OS string
 else version (Win32)
-	enum TARGET_OS = "Win32";	/// Platform OS string
+	enum TARGET_OS = "win32";	/// Platform OS string
 else version (linux)
-	enum TARGET_OS = "Linux";	/// Platform OS string
+	enum TARGET_OS = "linux";	/// Platform OS string
 else version (OSX)
-	enum TARGET_OS = "macOS";	/// Platform OS string
+	enum TARGET_OS = "osx";	/// Platform OS string
 else version (FreeBSD)
-	enum TARGET_OS = "FreeBSD";	/// Platform OS string
+	enum TARGET_OS = "freebsd";	/// Platform OS string
 else version (OpenBSD)
-	enum TARGET_OS = "OpenBSD";	/// Platform OS string
+	enum TARGET_OS = "openbsd";	/// Platform OS string
 else version (NetBSD)
-	enum TARGET_OS = "NetBSD";	/// Platform OS string
+	enum TARGET_OS = "netbsd";	/// Platform OS string
 else version (DragonflyBSD)
-	enum TARGET_OS = "DragonflyBSD";	/// Platform OS string
+	enum TARGET_OS = "dragonflybsd";	/// Platform OS string
 else version (BSD)
-	enum TARGET_OS = "BSD";	/// Platform OS string
+	enum TARGET_OS = "bsd";	/// Platform OS string
 else version (Solaris)
-	enum TARGET_OS = "Solaris";	/// Platform OS string
+	enum TARGET_OS = "solaris";	/// Platform OS string
 else version (AIX)
-	enum TARGET_OS = "AIX";	/// Platform OS string
+	enum TARGET_OS = "aix";	/// Platform OS string
 else version (SkyOS)
-	enum TARGET_OS = "SkyOS";	/// Platform OS string
+	enum TARGET_OS = "skyos";	/// Platform OS string
 else version (SysV3)
-	enum TARGET_OS = "SysV3";	/// Platform OS string
+	enum TARGET_OS = "sysv3";	/// Platform OS string
 else version (SysV4)
-	enum TARGET_OS = "SysV4";	/// Platform OS string
+	enum TARGET_OS = "sysv4";	/// Platform OS string
 else version (Hurd)
-	enum TARGET_OS = "GNU Hurd";	/// Platform OS string
+	enum TARGET_OS = "hurd";	/// Platform OS string
 else version (Android)
-	enum TARGET_OS = "Android";	/// Platform OS string
+	enum TARGET_OS = "android";	/// Platform OS string
 else version (Emscripten)
-	enum TARGET_OS = "Emscripten";	/// Platform OS string
+	enum TARGET_OS = "emscripten";	/// Platform OS string
 else version (PlayStation)
-	enum TARGET_OS = "PlayStation";	/// Platform OS string
+	enum TARGET_OS = "playstation";	/// Platform OS string
 else version (PlayStation3)
-	enum TARGET_OS = "PlayStation3";	/// Platform OS string
+	enum TARGET_OS = "playstation3";	/// Platform OS string
 else
-	enum TARGET_OS = "Unknown";	/// Platform OS string
+	enum TARGET_OS = "unknown";	/// Platform OS string
 
 //
 // ANCHOR Additional Target Information
@@ -195,19 +195,19 @@ static if (FEATURE_TARGETINFO) {
 //
 
 version (MinGW) {
-	enum TARGET_ENV = "MinGW";	/// Target environment
+	enum TARGET_ENV = "mingw";	/// Target environment
 } else version (Cygwin) {
-	enum TARGET_ENV = "Cygwin";	/// Target environment
+	enum TARGET_ENV = "cygwin";	/// Target environment
 } else version (CRuntime_Microsoft) {
-	enum TARGET_ENV = "MSVC";	/// Target environment
+	enum TARGET_ENV = "msvc";	/// Target environment
 } else version (CRuntime_Glibc) {
-	enum TARGET_ENV = "GNU";	/// Target environment
+	enum TARGET_ENV = "gnu";	/// Target environment
 } else version (CRuntime_Musl) {
-	enum TARGET_ENV = "Musl";	/// Target environment
+	enum TARGET_ENV = "musl";	/// Target environment
 } else version (FreeStanding) { // now that would surprise me
-	enum TARGET_ENV = "FreeStanding";	/// Target environment
+	enum TARGET_ENV = "freestanding";	/// Target environment
 } else {
-	enum TARGET_ENV = "Unknown";	/// Target environment
+	enum TARGET_ENV = "unknown";	/// Target environment
 }
 
 version (PrintTargetInfo) {
