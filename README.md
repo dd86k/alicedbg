@@ -16,3 +16,10 @@ Most of the help topics can be found in the repository wiki.
 | [Gitlab](https://gitlab.com/dd86k/alicedbg) | [URL](https://gitlab.com/dd86k/alicedbg/-/wikis/home)
 
 Technical manual: TBA
+
+# Branches
+
+| Name | Description |
+|---|---|
+| `master` | Release branch, including release candidates |
+| `dev` | Development branch, unstable |

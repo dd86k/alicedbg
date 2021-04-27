@@ -26,10 +26,10 @@
  * mnemonic items use the formatter's stack.
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: © 2013 dd86k
+ * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
-module adbg.disasm.formatter;
+deprecated module adbg.disasm.formatter;
 
 import core.stdc.stdarg;
 import core.stdc.stdio : snprintf;

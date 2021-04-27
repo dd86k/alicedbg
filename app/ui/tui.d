@@ -2,7 +2,7 @@
  * Text UI
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: © 2013 dd86k
+ * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
 module ui.tui;

@@ -11,7 +11,7 @@
  * - Microsoft Corporation, PE Format, 2019-08-26
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: © 2013 dd86k
+ * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
 module adbg.obj.pe;
@@ -580,7 +580,7 @@ int adbg_obj_pe_preload(adbg_object_t *obj) {
 	with (AdbgDisasmPlatform)
 	switch (obj.pe.hdr.Machine) {
 	case PE_MACHINE_AMD64: obj.platform = x86_64; break;
-	case PE_MACHINE_I386: obj.platform = x86; break;
+	case PE_MACHINE_I386: obj.platform = x86_32; break;
 	case PE_MACHINE_RISCV32: obj.platform = rv32; break;
 	default: obj.platform = AdbgDisasmPlatform.native;
 	}

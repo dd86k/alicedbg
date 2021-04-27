@@ -3,7 +3,7 @@
  * entirety of the program.
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: © 2013 dd86k
+ * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
 module common;
@@ -38,10 +38,10 @@ struct setting_platform_t {
 	immutable(char)* opt, alt, desc;
 }
 immutable setting_platform_t[] platforms = [
-	{ AdbgDisasmPlatform.x86_16, "x86_16",  "8086",  "x86 16-bit (real mode)" },
-	{ AdbgDisasmPlatform.x86,    "x86",     "i386",  "x86 32-bit (extended mode)" },
-	{ AdbgDisasmPlatform.x86_64, "x86_64",  "amd64", "x86 64-bit (long mode)" },
-	{ AdbgDisasmPlatform.rv32,   "riscv32", "rv32",  "RISC-V 32-bit"},
+	{ AdbgDisasmPlatform.x86_16,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
+	{ AdbgDisasmPlatform.x86_32,	"x86",     "i386",  "x86 32-bit (extended mode)" },
+	{ AdbgDisasmPlatform.x86_64,	"x86_64",  "amd64", "x86 64-bit (long mode)" },
+	{ AdbgDisasmPlatform.rv32,	"riscv32", "rv32",  "RISC-V 32-bit"},
 ];
 
 // Syntaxes

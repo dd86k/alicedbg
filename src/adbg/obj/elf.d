@@ -6,7 +6,7 @@
  * - linux/include/uapi/linux/elf.h
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: © 2013 dd86k
+ * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
 module adbg.obj.elf;
@@ -528,7 +528,7 @@ int adbg_obj_elf_preload(adbg_object_t *obj) {
 	with (obj)
 	with (AdbgDisasmPlatform)
 	switch (e_machine) {
-	case ELF_EM_386: platform = x86; break;
+	case ELF_EM_386: platform = x86_32; break;
 	case ELF_EM_X86_64: platform = x86_64; break;
 	case ELF_EM_RISCV:
 		switch (e_class) {

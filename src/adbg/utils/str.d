@@ -2,7 +2,7 @@
  * String helper functions. Simple string functions to aid redundant typing.
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: © 2013 dd86k
+ * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
 module adbg.utils.str;
@@ -13,6 +13,27 @@ import core.stdc.string;
 
 extern (C):
 __gshared:
+
+/// 
+struct sbuffer_t(int bsize) {
+	enum size = bsize;	/// Buffer size
+	size_t index;	/// Current buffer index
+	char[size] data;	/// Buffer data
+	
+	
+	size_t add(const(char) *s) {
+		
+		return 0;
+	}
+	size_t addf(const(char) *s, ...) {
+		
+		return 0;
+	}
+	size_t addfva(const(char) *s) {
+		
+		return 0;
+	}
+}
 
 /// An empty string in case compilers cannot pool strings
 const(char) *empty_string = "";
