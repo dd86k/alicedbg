@@ -1,9 +1,8 @@
 /**
  * Error handling module.
  *
- * This module is inspired by the way Windows deal with error codes by
- * compacting them as much as possible in a 32-bit number in the
- * eventuallity that the library is using other libraries.
+ * This module is inspired by the way Windows deal with error codes, more or
+ * less.
  *
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k
@@ -15,14 +14,6 @@ extern (C):
 __gshared:
 
 //TODO: C runtime errors
-
-/// Create an errorcode.
-/// Params:
-/// 	mod = Module (0 being generic)
-/// 	err = Error code
-private template E(ubyte mod, ushort err) {
-	enum E = (mod * 100) | err;
-}
 
 private struct error_t {
 	uint code;
@@ -47,9 +38,9 @@ enum AdbgError {
 	//
 	// Generic
 	//
-	invalidArgument	= E!(0, 1),
-	nullArgument	= E!(0, 2),
-	allocationFailed	= E!(0, 3),
+	invalidArgument	= 1,
+	nullArgument	= 2,
+	allocationFailed	= 3,
 	//
 	// Debugger
 	//
@@ -57,26 +48,26 @@ enum AdbgError {
 	//
 	// Disasembler
 	//
-	nullAddress	= E!(2, 1),
-	unsupportedPlatform	= E!(2, 2),
-	invalidOption	= E!(2, 3),
-	invalidOptionValue	= E!(2, 4),
-	illegalInstruction	= E!(2, 20),
-	outOfData	= E!(2, 21),
+	nullAddress	= 201,
+	unsupportedPlatform	= 202,
+	invalidOption	= 203,
+	invalidOptionValue	= 204,
+	illegalInstruction	= 220,
+	outOfData	= 221,
 	//
 	// Object server
 	//
-	unknownObjFormat	= E!(3, 1),
-	unsupportedObjFormat	= E!(3, 2),
-	invalidObjVersion	= E!(3, 10),
-	invalidObjMachine	= E!(3, 11),
-	invalidObjClass	= E!(3, 12),
-	invalidObjEndian	= E!(3, 13),
-	invalidObjType	= E!(3, 14),
-	invalidObjABI	= E!(3, 15),
+	unknownObjFormat	= 301,
+	unsupportedObjFormat	= 302,
+	invalidObjVersion	= 310,
+	invalidObjMachine	= 311,
+	invalidObjClass	= 312,
+	invalidObjEndian	= 313,
+	invalidObjType	= 314,
+	invalidObjABI	= 315,
 }
 
-private const(char) *defaultMsg = "Unknown error.";
+private const(char) *defaultMsg = "Internal error.";
 private int errcode;
 private AdbgErrorSource errsource;
 private int errline;
@@ -166,14 +157,16 @@ int adbg_errno() {
 const(char) *adbg_error_code() {
 	import core.stdc.stdio : snprintf;
 	import adbg.sys.err : SYS_ERR_FMT;
+	
 	enum _BL = 16; /// internall buffer length
 	__gshared char[_BL] m;
+	
 	const(char) *fmt = void;
 	with (AdbgErrorSource)
 	switch (errsource) {
-	case self:   fmt = "E%u"; break;
-	case system: fmt = SYS_ERR_FMT; break;
-	default: assert(0, "adbg_error_code");
+	case self:   fmt = "E-%u"; break;
+	case system: fmt = "E-S"~SYS_ERR_FMT; break;
+	default:     assert(0, "adbg_error_code: No source");
 	}
 	snprintf(m.ptr, _BL, fmt, errcode);
 	return m.ptr;
