@@ -14,27 +14,6 @@ import core.stdc.string;
 extern (C):
 __gshared:
 
-/// 
-struct sbuffer_t(int bsize) {
-	enum size = bsize;	/// Buffer size
-	size_t index;	/// Current buffer index
-	char[size] data;	/// Buffer data
-	
-	
-	size_t add(const(char) *s) {
-		
-		return 0;
-	}
-	size_t addf(const(char) *s, ...) {
-		
-		return 0;
-	}
-	size_t addfva(const(char) *s) {
-		
-		return 0;
-	}
-}
-
 /// An empty string in case compilers cannot pool strings
 const(char) *empty_string = "";
 
@@ -301,6 +280,37 @@ const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 //
 // Generic string formatting
 //
+
+/// Static string buffer structure
+struct sbuffer_t(int size) {
+	size_t index;	/// Current buffer index
+	char[size] data;	/// Buffer data
+	
+	size_t add(char c) {
+		if (index < size)
+			data[index++] = c;
+		return index;
+	}
+	size_t add(const(char) *s) {
+		size_t i = index;
+		for (size_t si; i < size && s[si]; ++i, ++si) {
+			data[i] = s[si];
+		}
+		return index = i;
+	}
+	//TODO: sbuffer_t.add(...)
+	/*size_t add(const(char) *s, ...) {
+		
+		return 0;
+	}*/
+	//TODO: sbuffer_t.add(va_list)
+	/*size_t add(const(char) *s, va_list va) {
+		
+		return 0;
+	}*/
+}
+
+//TODO: Strong consideration of deprecating the following
 
 /**
  * Append a constant string to an existing buffer.

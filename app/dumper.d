@@ -161,8 +161,11 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 /// 	flags = Configuration flags
 /// Returns: Status code
 int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
-	adbg_disasm_start_file(dp, data, size, 0);
 	adbg_disasm_opcode_t op = void;
+	int e = void;
+	AdbgDisasmMode mode = flags & DumpOpt.disasm_stats ?
+		AdbgDisasmMode.size : AdbgDisasmMode.file;
+	adbg_disasm_start_file(dp, mode, data, size, 0);
 	
 	if (flags & DumpOpt.disasm_stats) {
 		uint iavg;	/// instruction average size
@@ -171,9 +174,8 @@ int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 		uint icnt;	/// instruction count
 		uint ills;	/// Number of illegal instructions
 L_DISASM_1:
-		int e = adbg_disasm(dp, &op, AdbgDisasmMode.size);
 		with (AdbgError)
-		switch (e) {
+		switch ((e = adbg_disasm(dp, &op)) != 0) {
 		case none:
 			iavg += op.size;
 			++icnt;
@@ -206,15 +208,14 @@ L_DISASM_1:
 	
 	uint i;
 L_DISASM_2:
-	int e = adbg_disasm(dp, &op, AdbgDisasmMode.size);
 	with (AdbgError)
-	switch (e) {
+	switch ((e = adbg_disasm(dp, &op)) != 0) {
 	case none:
-		printf("%08X %-30s %s\n", i, op.machcode, op.mnemonic);
+		printf("%08X %-30s %s\n", i, op.machine, op.mnemonic);
 		i += op.size;
 		goto L_DISASM_2;
 	case illegalInstruction:
-		printf("%08X %-30s (error)\n", i, op.machcode);
+		printf("%08X %-30s (error)\n", i, op.machine);
 		i += op.size;
 		goto L_DISASM_2;
 	case outOfData: break;

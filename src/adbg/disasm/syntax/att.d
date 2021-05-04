@@ -10,7 +10,8 @@ module adbg.disasm.syntax.att;
 import adbg.disasm : adbg_disasm_t;
 import adbg.disasm.syntaxer;
 
-int adbg_syntax_att_start(adbg_syntax_t *p) {
+// render at&t
+int adbg_syntax_att(adbg_syntax_t *p) {
 	
 	
 	return 0;

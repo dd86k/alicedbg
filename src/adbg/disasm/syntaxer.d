@@ -27,7 +27,7 @@ enum AdbgSyntax : ubyte {
 package
 enum AdbgSyntaxWidth : ubyte {
 	i8, i16, i32, i64, i128, i256, i512, i1024,
-	i80, far1616, far1632, far1664
+	f80, far16, far32, far64,
 }
 package
 enum AdbgSyntaxItem : ubyte {
@@ -104,9 +104,15 @@ struct adbg_syntax_item_MSBO_t { // ScaleBaseOffset
 }
 
 package
-struct adbg_syntax_item_t {
+struct adbg_syntax_item_t { align(1):
 	AdbgSyntaxItem type;	/// operand type
 	AdbgSyntaxWidth width;	/// immediate or memory width
+	union {
+		ushort optall;
+		struct {
+			bool signed;
+		}
+	}
 	union {
 		// 1 item
 		ulong iu64;	/// 64-bit unsigned value
@@ -162,45 +168,38 @@ struct adbg_syntaxter_user_options_t { align(1):
 }
 /// Syntax engine structure
 struct adbg_syntax_t { align(1):
-	/// Item index
+	/// Item index.
 	size_t index;
+	/// Item buffer.
+	adbg_syntax_item_t[ADBG_SYNTAX_MAX_ITEMS] buffer;
 	/// Segment for instruction.
 	/// Affects memory operands, if the syntax supports it.
 	const(char) *segment;
-	/// Decoder formatting options
+	/// Decoder formatting options.
 	adbg_syntaxter_decoder_options_t decoderOpts;
-	/// User formatting options
+	/// User formatting options.
 	adbg_syntaxter_user_options_t userOpts;
-	/// Syntax handler
+	/// Syntax handler.
 	int function(adbg_syntax_t*) handler;
-	/// Item buffer
-	adbg_syntax_item_t[ADBG_SYNTAX_MAX_ITEMS] buffer;
 	/// 
 	sbuffer_t!(ADBG_SYNTAX_BUFFER_LENGTH) machine;
 	/// 
 	sbuffer_t!(ADBG_SYNTAX_BUFFER_LENGTH) mnemonic;
-	/// 
+	/// Current syntax option.
 	AdbgSyntax syntax;
 }
 
 // init
 int adbg_syntax_init(adbg_syntax_t *p, AdbgSyntax syntax) {
-	import adbg.disasm.syntax.intel : adbg_syntax_intel_start;
-	import adbg.disasm.syntax.nasm : adbg_syntax_nasm_start;
-	import adbg.disasm.syntax.att : adbg_syntax_att_start;
+	import adbg.disasm.syntax.intel : adbg_syntax_intel;
+	import adbg.disasm.syntax.nasm : adbg_syntax_nasm;
+	import adbg.disasm.syntax.att : adbg_syntax_att;
 	with (AdbgSyntax)
 	switch (syntax) {
-	case intel:
-		p.handler = &adbg_syntax_intel_start;
-		break;
-	case nasm:
-		p.handler = &adbg_syntax_nasm_start;
-		break;
-	case att:
-		p.handler = &adbg_syntax_att_start;
-		break;
-	default:
-		return adbg_error(AdbgError.invalidOptionValue);
+	case intel: p.handler = &adbg_syntax_intel; break;
+	case nasm:  p.handler = &adbg_syntax_nasm; break;
+	case att:   p.handler = &adbg_syntax_att; break;
+	default:    return adbg_error(AdbgError.invalidOptionValue);
 	}
 	p.decoderOpts.all = 0;
 	p.userOpts.all = 0;
@@ -211,6 +210,8 @@ int adbg_syntax_init(adbg_syntax_t *p, AdbgSyntax syntax) {
 // reset
 void adbg_syntax_reset(adbg_syntax_t *p) {
 	p.index = 0;
+	p.machine.index = 0;
+	p.mnemonic.index = 0;
 }
 
 private
@@ -258,14 +259,26 @@ void adbg_syntax_add_machine(T)(adbg_syntax_t *p, T opcode) {
 	{
 		p.mnemonic.add(adbg_util_strx016(opcode, false));
 	}
-	/*else static if (is(T == float))
+	else static if (is(T == float))
 	{
-		p.mnemonic.add(adbg_util_strx04(opcode, false));
+		union u32_t {
+			uint u32;
+			float f32;
+		}
+		u32_t u = void;
+		u.f32 = opcode;
+		p.mnemonic.add(adbg_util_strx04(u.u32, false));
 	}
 	else static if (is(T == double))
 	{
-		p.mnemonic.add(adbg_util_strx04(opcode, false));
-	}*/
+		union u64_t {
+			ulong u32;
+			double f32;
+		}
+		u64_t u = void;
+		u.f64 = opcode;
+		p.mnemonic.add(adbg_util_strx08(u.u64, false));
+	}
 	else static assert(0, "Type not supported");
 }
 
@@ -299,19 +312,32 @@ void adbg_syntax_add_register(adbg_syntax_t *p, const(char) *register) {
 	item.svalue = register;
 }
 
-// adds to machine buffer
-void adbg_syntax_add_immediate(T)(adbg_syntax_t *p, T opcode) {
-	import adbg.utils.str :
-		adbg_util_strx02, adbg_util_strx04,
-		adbg_util_strx08, adbg_util_strx016;
+// adds immediate
+void adbg_syntax_add_immediate(T)(adbg_syntax_t *p, T v) {
+	adbg_syntax_item_t *item = void;
+	if (adbg_syntax_select(p, &item))
+		return;
+	
 	p.mnemonic.add("0x");
-	static if (is(T == ubyte) || is(T == byte))
+	static if (is(T == ubyte))
 	{
-		p.mnemonic.add(adbg_util_strx02(opcode, false));
+		item.width = AdbgSyntaxWidth.i8;
+		item.iu8 = v;
 	}
-	else static if (is(T == ushort) || is(T == short))
+	else static if (is(T == byte))
 	{
-		p.mnemonic.add(adbg_util_strx04(opcode, false));
+		item.width = AdbgSyntaxWidth.i8;
+		item.is8 = v;
+	}
+	else static if (is(T == ushort))
+	{
+		item.width = AdbgSyntaxWidth.i16;
+		item.iu16 = v;
+	}
+	else static if (is(T == short))
+	{
+		item.width = AdbgSyntaxWidth.i16;
+		item.is16 = v;
 	}
 	else static if (is(T == uint) || is(T == int))
 	{
@@ -339,9 +365,34 @@ void adbg_syntax_add_immediate(T)(adbg_syntax_t *p, T opcode) {
 		}
 		u64_t u = void;
 		u.f64 = opcode;
-		p.mnemonic.add(adbg_util_strx04(u.u64, false));
+		p.mnemonic.add(adbg_util_strx08(u.u64, false));
 	}
-	else static assert(0, "Type not supported");
+	else static assert(0, "adbg_syntax_add_immediate");
 }
 
-
+// renders to mnemonic buffer
+void adbg_syntax_render_immediate_hex(adbg_syntax_t *p, adbg_syntax_item_t *item) {
+	import adbg.utils.str :
+		adbg_util_strx02, adbg_util_strx04,
+		adbg_util_strx08, adbg_util_strx016;
+	
+	p.mnemonic.add("0x");
+	const(char) *v = void;
+	with (AdbgSyntaxWidth)
+	switch (item.width) {
+	case i8:
+		v = adbg_util_strx02(item.iu8, false);
+		break;
+	case i16:
+		v = adbg_util_strx04(item.iu16, false);
+		break;
+	case i32:
+		v = adbg_util_strx08(item.iu32, false);
+		break;
+	case i64:
+		v = adbg_util_strx016(item.iu16, false);
+		break;
+	default: assert(0, "adbg_syntax_render_immediate");
+	}
+	p.mnemonic.add(v);
+}

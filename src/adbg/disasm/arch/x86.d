@@ -172,14 +172,19 @@ L_START:
 
 private:
 
+int adbg_disasm_x86_0f(adbg_disasm_t *p) {
+	
+	
+	return 0;
+}
+
 /// Segment override
 enum x86Segment : ubyte {
 	none, es, cs, ss, ds, fs, gs
 }
 /// x86 prefixes
-// Separated for sanity reasons
 enum x86Prefix : ubyte { // Intel order
-	// To select instruction in table
+	// Prefix selector
 	none,
 	choice66H,
 	choiceF3H,
@@ -446,120 +451,43 @@ immutable x86_legacy_opcode_t[256] opcodes_legacy = [
 
 enum x86Reg { // ModRM order
 	// 16b
-	// easier to remember when assigning values
-	ax, cx, dx,  bx,  sp,  bp,  si,  di,
-	r8w,r9w,r10w,r11w,r12w,r13w,r14w,r15w,
+	ax,	cx,	dx,	bx,
+	sp,	bp,	si,	di,
+	r8w,	r9w,	r10w,	r11w,
+	r12w,	r13w,	r14w,	r15w,
 	// 8b
-	al	= ax,
-	cl	= cx,
-	dl	= dx,
-	bl	= bx,
-	ah	= sp,
-	ch	= bp,
-	dh	= si,
-	bh	= di,
-	r8b	= r8w,
-	r9b	= r9w,
-	r10b	= r10w,
-	r11b	= r11w,
-	r12b	= r12w,
-	r13b	= r13w,
-	r14b	= r14w,
-	r15b	= r15w,
+	al = ax,	cl = cx,	dl = dx,	bl = bx,
+	ah = sp,	ch = bp,	dh = si,	bh = di,
+	r8b = r8w,	r9b = r9w,	r10b = r10w,	r11b = r11w,
+	r12b = r12w,	r13b = r13w,	r14b = r14w,	r15b = r15w,
 	// 32b
-	eax	= ax,
-	ecx	= cx,
-	edx	= dx,
-	ebx	= bx,
-	esp	= sp,
-	ebp	= bp,
-	esi	= si,
-	edi	= di,
-	r8d	= r8w,
-	r9d	= r9w,
-	r10d	= r10w,
-	r11d	= r11w,
-	r12d	= r12w,
-	r13d	= r13w,
-	r14d	= r14w,
-	r15d	= r15w,
+	eax = ax,	ecx = cx,	edx = dx,	ebx = bx,
+	esp = sp,	ebp = bp,	esi = si,	edi = di,
+	r8d = r8w,	r9d = r9w,	r10d = r10w,	r11d = r11w,
+	r12d = r12w,	r13d = r13w,	r14d = r14w,	r15d = r15w,
 	// 64b
-	rax	= ax,
-	rcx	= cx,
-	rdx	= dx,
-	rbx	= bx,
-	rsp	= sp,
-	rbp	= bp,
-	rsi	= si,
-	rdi	= di,
-	r8	= r8w,
-	r9	= r9w,
-	r10	= r10w,
-	r11	= r11w,
-	r12	= r12w,
-	r13	= r13w,
-	r14	= r14w,
-	r15	= r15w,
+	rax	= ax,	rcx	= cx,	rdx	= dx,	rbx	= bx,
+	rsp	= sp,	rbp	= bp,	rsi	= si,	rdi	= di,
+	r8	= r8w,	r9	= r9w,	r10	= r10w,	r11	= r11w,
+	r12	= r12w,	r13	= r13w,	r14	= r14w,	r15	= r15w,
 	// 128b
-	xmm0	= ax,
-	xmm1	= cx,
-	xmm2	= dx,
-	xmm3	= bx,
-	xmm4	= sp,
-	xmm5	= bp,
-	xmm6	= si,
-	xmm7	= di,
-	xmm8	= r8w,
-	xmm9	= r9w,
-	xmm10	= r10w,
-	xmm11	= r11w,
-	xmm12	= r12w,
-	xmm13	= r13w,
-	xmm14	= r14w,
-	xmm15	= r15w,
+	xmm0	= ax,	xmm1	= cx,	xmm2	= dx,	xmm3	= bx,
+	xmm4	= sp,	xmm5	= bp,	xmm6	= si,	xmm7	= di,
+	xmm8	= r8w,	xmm9	= r9w,	xmm10	= r10w,	xmm11	= r11w,
+	xmm12	= r12w,	xmm13	= r13w,	xmm14	= r14w,	xmm15	= r15w,
 	// 256b
-	ymm0	= ax,
-	ymm1	= cx,
-	ymm2	= dx,
-	ymm3	= bx,
-	ymm4	= sp,
-	ymm5	= bp,
-	ymm6	= si,
-	ymm7	= di,
-	ymm8	= r8w,
-	ymm9	= r9w,
-	ymm10	= r10w,
-	ymm11	= r11w,
-	ymm12	= r12w,
-	ymm13	= r13w,
-	ymm14	= r14w,
-	ymm15	= r15w,
+	ymm0	= ax,	ymm1	= cx,	ymm2	= dx,	ymm3	= bx,
+	ymm4	= sp,	ymm5	= bp,	ymm6	= si,	ymm7	= di,
+	ymm8	= r8w,	ymm9	= r9w,	ymm10	= r10w,	ymm11	= r11w,
+	ymm12	= r12w,	ymm13	= r13w,	ymm14	= r14w,	ymm15	= r15w,
 	// 512b
-	zmm0	= ax,
-	zmm1	= cx,
-	zmm2	= dx,
-	zmm3	= bx,
-	zmm4	= sp,
-	zmm5	= bp,
-	zmm6	= si,
-	zmm7	= di,
-	zmm8	= r8w,
-	zmm9	= r9w,
-	zmm10	= r10w,
-	zmm11	= r11w,
-	zmm12	= r12w,
-	zmm13	= r13w,
-	zmm14	= r14w,
-	zmm15	= r15w,
+	zmm0	= ax,	zmm1	= cx,	zmm2	= dx,	zmm3	= bx,
+	zmm4	= sp,	zmm5	= bp,	zmm6	= si,	zmm7	= di,
+	zmm8	= r8w,	zmm9	= r9w,	zmm10	= r10w,	zmm11	= r11w,
+	zmm12	= r12w,	zmm13	= r13w,	zmm14	= r14w,	zmm15	= r15w,
 	// x87
-	mm0	= 0,
-	mm1	= 1,
-	mm2	= 2,
-	mm3	= 3,
-	mm4	= 4,
-	mm5	= 5,
-	mm6	= 6,
-	mm7	= 7,
+	mm0	= 0,	mm1	= 1,	mm2	= 2,	mm3	= 3,
+	mm4	= 4,	mm5	= 5,	mm6	= 6,	mm7	= 7,
 }
 immutable const(char)*[][] regs = [
 	[ // 8b
@@ -592,7 +520,7 @@ immutable const(char)*[2][] regs_addr16 = [ // modrm:rm16
 	[ "bx", "si" ], [ "bx", "si" ], [ "bp", "si" ], [ "bp", "di" ],
 	[ "si", null ], [ "di", null ], [ "bp", null ], [ "bp", null ],
 ];
-/*immutable const(char)*[] tmm_regs = [
+/*immutable const(char)*[] regs_tmm = [
 	"tmm0", "tmm1", "tmm2", "tmm3", "tmm4", "tmm5", "tmm6", "tmm7"
 ];*/
 

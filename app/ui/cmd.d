@@ -336,14 +336,14 @@ int cmd_handler(exception_t *ex) {
 	
 	if (ex.faultaddr) {
 		printf("	Fault address: %zx\n", ex.faultaddrv);
-		adbg_disasm_start_debuggee(&common_disasm, ex.faultaddrv);
+		adbg_disasm_start_debuggee(&common_disasm, AdbgDisasmMode.data, ex.faultaddrv);
 		adbg_disasm_opcode_t op = void;
-		if (adbg_disasm(&common_disasm, &op, AdbgDisasmMode.file)) {
+		if (adbg_disasm(&common_disasm, &op)) {
 			printf("	Faulting instruction: (error:%s)\n",
 				adbg_error_msg);
 		} else {
 			printf("	Faulting instruction: [%s] %s\n",
-				op.machcode, op.mnemonic);
+				op.machine, op.mnemonic);
 		}
 	}
 	

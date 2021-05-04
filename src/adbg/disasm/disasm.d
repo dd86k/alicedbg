@@ -143,7 +143,7 @@ version (X86) {
 
 /// Represents a disassembled instruction
 struct adbg_disasm_opcode_t {
-	const(char) *machcode;	/// Instruction machine code
+	const(char) *machine;	/// Instruction machine code
 	const(char) *mnemonic;	/// Instruction mnemonic
 	const(char) *comment;	/// Instruction comment
 	int warnings;	/// Warning flags
@@ -320,10 +320,11 @@ int adbg_disasm_reopen(adbg_disasm_t *p, AdbgDisasmPlatform m) {
 	}
 }
 
-int adbg_disasm_start_file(adbg_disasm_t *p, void *buffer, size_t size, size_t base) {
+int adbg_disasm_start_file(adbg_disasm_t *p, AdbgDisasmMode mode, void *buffer, size_t size, size_t base) {
 	if (p == null)
 		return adbg_error(AdbgError.nullArgument);
 	
+	p.mode = mode;
 	p.debuggee = false;
 	p.addr = buffer;
 	p.left = size;
@@ -331,10 +332,11 @@ int adbg_disasm_start_file(adbg_disasm_t *p, void *buffer, size_t size, size_t b
 	return 0;
 }
 
-int adbg_disasm_start_debuggee(adbg_disasm_t *p, size_t addr) {
+int adbg_disasm_start_debuggee(adbg_disasm_t *p, AdbgDisasmMode mode, size_t addr) {
 	if (p == null)
 		return adbg_error(AdbgError.nullArgument);
 	
+	p.mode = mode;
 	p.debuggee = true;
 	p.addrv = addr;
 	return 0;
@@ -356,11 +358,6 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 			return adbg_error(AdbgError.invalidOptionValue);
 		p.platform = cast(AdbgDisasmPlatform)val;
 		break;
-	case syntax:
-		if (val >= AdbgDisasmSyntax.max)
-			return adbg_error(AdbgError.invalidOptionValue);
-		p.syntax = cast(AdbgDisasmSyntax)val;
-		break;
 	/*case backward:
 		p.backwards = val != 0;
 		break;*/
@@ -369,6 +366,11 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 		break;*/
 	case debuggee:
 		p.debuggee = val != 0;
+		break;
+	case syntax:
+		if (val >= AdbgSyntax.max)
+			return adbg_error(AdbgError.invalidOptionValue);
+		p.syntaxer.syntax = cast(AdbgSyntax)val;
 		break;
 	case mnemonicTab:
 		p.syntaxer.userOpts.mnemonicTab = val != 0;
@@ -391,19 +393,17 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 /// 	mode = Disassembling mode
 ///
 /// Returns: Error code; Non-zero indicating an error
-int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDisasmMode mode) {
+int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 	if (p == null)
 		return adbg_error(AdbgError.invalidArgument);
 	if (p.func == null)
 		//TODO: "Not initiated" error code?
 		return adbg_error(AdbgError.unsupportedPlatform);
 	
-	if (mode >= AdbgDisasmMode.file) {
-		p.mcbufi = p.mnbufi = 0;
-		p.fmt.itemno = 0;
+	if (p.mode >= AdbgDisasmMode.file) {
+		adbg_syntax_reset(&p.syntaxer);
 	}
 	
-	p.mode = mode;
 	p.lastaddr = p.addr;
 	p.opcode = op;
 	
@@ -413,10 +413,10 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDisasmMode mode)
 		// opcode size
 		op.size = cast(int)(p.addrv - p.lastaddrv);
 		// formatting
-		if (mode >= AdbgDisasmMode.file) {
+		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_disasm_render(p);
-			op.mnemonic = p.mnbuf.ptr;
-			op.machcode = p.mcbuf.ptr;
+			op.machine = p.syntaxer.machine.data.ptr;
+			op.mnemonic = p.syntaxer.mnemonic.data.ptr;
 		}
 	}
 	

@@ -10,7 +10,8 @@ module adbg.disasm.syntax.nasm;
 import adbg.disasm : adbg_disasm_t;
 import adbg.disasm.syntaxer;
 
-int adbg_syntax_nasm_start(adbg_syntax_t *p) {
+// render nasm
+int adbg_syntax_nasm(adbg_syntax_t *p) {
 	
 	
 	return 0;
