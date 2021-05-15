@@ -318,37 +318,33 @@ void adbg_syntax_add_immediate(T)(adbg_syntax_t *p, T v) {
 	if (adbg_syntax_select(p, &item))
 		return;
 	
+	//TODO: Template mixin
 	p.mnemonic.add("0x");
-	static if (is(T == ubyte))
-	{
+	static if (is(T == ubyte)) {
 		item.width = AdbgSyntaxWidth.i8;
 		item.iu8 = v;
-	}
-	else static if (is(T == byte))
-	{
+	} else static if (is(T == byte)) {
 		item.width = AdbgSyntaxWidth.i8;
 		item.is8 = v;
-	}
-	else static if (is(T == ushort))
-	{
+	} else static if (is(T == ushort)) {
 		item.width = AdbgSyntaxWidth.i16;
 		item.iu16 = v;
-	}
-	else static if (is(T == short))
-	{
+	} else static if (is(T == short)) {
 		item.width = AdbgSyntaxWidth.i16;
 		item.is16 = v;
-	}
-	else static if (is(T == uint) || is(T == int))
-	{
-		p.mnemonic.add(adbg_util_strx08(opcode, false));
-	}
-	else static if (is(T == ulong) || is(T == long))
-	{
-		p.mnemonic.add(adbg_util_strx016(opcode, false));
-	}
-	else static if (is(T == float))
-	{
+	} else static if (is(T == uint)) {
+		item.width = AdbgSyntaxWidth.i32;
+		item.iu32 = v;
+	} else static if (is(T == int)) {
+		item.width = AdbgSyntaxWidth.i32;
+		item.is32 = v;
+	} else static if (is(T == ulong)) {
+		item.width = AdbgSyntaxWidth.i64;
+		item.iu64 = v;
+	} else static if (is(T == long)) {
+		item.width = AdbgSyntaxWidth.i64;
+		item.is64 = v;
+	} else static if (is(T == float)) {
 		union u32_t {
 			uint u32;
 			float f32;
@@ -356,9 +352,7 @@ void adbg_syntax_add_immediate(T)(adbg_syntax_t *p, T v) {
 		u32_t u = void;
 		u.f32 = opcode;
 		p.mnemonic.add(adbg_util_strx04(u.u32, false));
-	}
-	else static if (is(T == double))
-	{
+	} else static if (is(T == double)) {
 		union u64_t {
 			ulong u64;
 			double f64;
@@ -366,8 +360,7 @@ void adbg_syntax_add_immediate(T)(adbg_syntax_t *p, T v) {
 		u64_t u = void;
 		u.f64 = opcode;
 		p.mnemonic.add(adbg_util_strx08(u.u64, false));
-	}
-	else static assert(0, "adbg_syntax_add_immediate");
+	} else static assert(0, "adbg_syntax_add_immediate");
 }
 
 // renders to mnemonic buffer

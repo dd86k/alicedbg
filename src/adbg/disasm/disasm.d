@@ -52,8 +52,9 @@ enum AdbgDisasmMode : ubyte {
 }
 
 /// Disassembler ABI
+//TODO: move to common.d as AdbgPlatform (for obj stuff too)
 enum AdbgDisasmPlatform : ubyte {
-	native,	/// (Default) Platform compiled target, see DISASM_DEFAULT_PLATFORM
+	native,	/// (Default) Platform compiled target, see DEFAULT_PLATFORM
 	x86_16,	/// (WIP) 8086, 80186, 80286
 	x86_32,	/// (WIP) 80386/i386, not to be confused with x32
 	x86_64,	/// (WIP) AMD64, EM64T/Intel64, x64
@@ -104,39 +105,39 @@ enum AdbgDisasmWarning {
 
 version (X86) {
 	/// Platform default platform
-	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.x86;
+	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.x86;
 	/// Platform default syntax
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.intel;
+	private enum DEFAULT_SYNTAX = AdbgSyntax.intel;
 } else version (X86_64) {
 	/// Platform default platform
-	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.x86_64;
+	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.x86_64;
 	/// Platform default syntax
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.intel;
+	private enum DEFAULT_SYNTAX = AdbgSyntax.intel;
 } else version (Thumb) {
 	/// Platform default platform
-	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_t32;
+	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_t32;
 	/// Platform default syntax
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
+	private enum DEFAULT_SYNTAX = AdbgSyntax.att;
 } else version (ARM) {
 	/// Platform default platform
-	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_a32;
+	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_a32;
 	/// Platform default syntax
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
+	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: ARM syntax
 } else version (AArch64) {
 	/// Platform default platform
-	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_a64;
+	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_a64;
 	/// Platform default syntax
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att;
+	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: ARM syntax
 } else version (RISCV32) {
 	/// Platform default platform
-	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.rv32;
+	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.rv32;
 	/// Platform default syntax
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att; //TODO: change default rv32
+	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: RISC-V syntax
 } else version (RISCV64) {
 	/// Platform default platform
-	enum DISASM_DEFAULT_PLATFORM = AdbgDisasmPlatform.rv64;
+	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.rv64;
 	/// Platform default syntax
-	enum DISASM_DEFAULT_SYNTAX = AdbgDisasmSyntax.att; //TODO: change default rv64
+	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: RISC-V syntax
 } else {
 	static assert(0, "Set default disassembler variables");
 }
@@ -259,13 +260,14 @@ struct adbg_disasm_t { align(1):
 	/// this field is not taken into account.
 	size_t left;
 	/// Responsable for formatting decoded instructions.
-	adbg_syntax_t syntaxer;
+	adbg_syntax_t *syntaxer;
 	
 	//
 	// Options
 	//
 	
 	/// If set, source is a debuggee. Uses Win32/ptrace to fetch memory.
+	// NOTE: If there are more input modes, a function pointer will be used
 	bool debuggee;
 	deprecated bool mnemonicTab;
 	
@@ -304,11 +306,10 @@ adbg_disasm_t *adbg_disasm_open(AdbgDisasmPlatform m) {
 }
 
 int adbg_disasm_reopen(adbg_disasm_t *p, AdbgDisasmPlatform m) {
-	p.syntax = DISASM_DEFAULT_SYNTAX;
 	p.platform = m;
 	with (AdbgDisasmPlatform)
 	switch (m) {
-	case native: goto case DISASM_DEFAULT_PLATFORM;
+	case native: goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
 		p.func = &adbg_disasm_x86;
 		return 0;
@@ -324,8 +325,8 @@ int adbg_disasm_start_file(adbg_disasm_t *p, AdbgDisasmMode mode, void *buffer, 
 	if (p == null)
 		return adbg_error(AdbgError.nullArgument);
 	
-	p.mode = mode;
 	p.debuggee = false;
+	p.mode = mode;
 	p.addr = buffer;
 	p.left = size;
 	p.baseaddrv = base;
@@ -336,8 +337,8 @@ int adbg_disasm_start_debuggee(adbg_disasm_t *p, AdbgDisasmMode mode, size_t add
 	if (p == null)
 		return adbg_error(AdbgError.nullArgument);
 	
-	p.mode = mode;
 	p.debuggee = true;
+	p.mode = mode;
 	p.addrv = addr;
 	return 0;
 }
@@ -394,30 +395,35 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 ///
 /// Returns: Error code; Non-zero indicating an error
 int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
-	if (p == null)
+	if (p == null || op == null)
 		return adbg_error(AdbgError.invalidArgument);
 	if (p.func == null)
 		//TODO: "Not initiated" error code?
 		return adbg_error(AdbgError.unsupportedPlatform);
 	
+	// Syntax prep
+	adbg_syntax_t syntaxer = void;
 	if (p.mode >= AdbgDisasmMode.file) {
-		adbg_syntax_reset(&p.syntaxer);
+		p.syntaxer = &syntaxer;
+		adbg_syntax_reset(&syntaxer);
 	}
 	
+	// Decode prep
 	p.lastaddr = p.addr;
 	p.opcode = op;
 	
+	// Decode
 	int e = p.func(p);
+	if (e) return e;
 	
-	if (e == AdbgError.none) {
-		// opcode size
-		op.size = cast(int)(p.addrv - p.lastaddrv);
-		// formatting
-		if (p.mode >= AdbgDisasmMode.file) {
-			adbg_disasm_render(p);
-			op.machine = p.syntaxer.machine.data.ptr;
-			op.mnemonic = p.syntaxer.mnemonic.data.ptr;
-		}
+	// opcode size
+	op.size = cast(int)(p.addrv - p.lastaddrv);
+	
+	// formatting
+	if (p.mode >= AdbgDisasmMode.file) {
+		adbg_disasm_render(p);
+		op.machine = p.syntaxer.machine.data.ptr;
+		op.mnemonic = p.syntaxer.mnemonic.data.ptr;
 	}
 	
 	return e;
@@ -431,7 +437,7 @@ public  alias adbg_disasm_close = free;
 /// 	p = Disassembler structure pointer
 /// 	u = Data pointer
 /// Returns: Non-zero on error
-//TODO: Consider T... loop
+//TODO: Consider T... (type-safe template) loop
 int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
 	import adbg.dbg.debugger : adbg_mm_cread;
 	int e = void;
