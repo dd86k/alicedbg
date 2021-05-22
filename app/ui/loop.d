@@ -40,15 +40,15 @@ int loop_handler(exception_t *e) {
 	);
 	
 	// * Print disassembly, if available
-	if (e.faultaddr) {
-		adbg_disasm_start_debuggee(&common_disasm, AdbgDisasmMode.file, e.faultaddrv);
+	if (e.fault) {
+		adbg_disasm_start_debuggee(&common_disasm, AdbgDisasmMode.file, e.fault.sz);
 		adbg_disasm_opcode_t op = void;
 		if (adbg_disasm(&common_disasm, &op)) {
 			printf("> %p: (error:%s)\n",
-				e.faultaddr, adbg_error_msg);
+				e.fault.raw, adbg_error_msg);
 		} else {
 			printf("> %p: %s| %s\n",
-				e.faultaddr, op.machine, op.mnemonic);
+				e.fault.raw, op.machine, op.mnemonic);
 		}
 	}
 	

@@ -65,7 +65,7 @@ uint adbg_seh_handle(_EXCEPTION_POINTERS *e) {
 	import core.sys.windows.winbase :
 		EXCEPTION_IN_PAGE_ERROR, EXCEPTION_ACCESS_VIOLATION;
 	mcheckpoint.exception.oscode = e.ExceptionRecord.ExceptionCode;
-	mcheckpoint.exception.faultaddr = e.ExceptionRecord.ExceptionAddress;
+	mcheckpoint.exception.fault.raw = e.ExceptionRecord.ExceptionAddress;
 	mcheckpoint.exception.pid = mcheckpoint.exception.tid = 0;
 	switch (mcheckpoint.exception.oscode) {
 	case EXCEPTION_IN_PAGE_ERROR:

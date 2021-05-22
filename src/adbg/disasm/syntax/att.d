@@ -11,9 +11,8 @@ import adbg.disasm : adbg_disasm_t;
 import adbg.disasm.syntaxer;
 
 // render at&t
-int adbg_syntax_att(adbg_syntax_t *p) {
+void adbg_syntax_att_item(adbg_syntax_t *p, adbg_syntax_item_t *i) {
 	
 	
-	return 0;
 }
 

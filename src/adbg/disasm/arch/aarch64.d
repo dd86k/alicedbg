@@ -8,7 +8,7 @@
 module adbg.disasm.arch.aarch64;
 
 import adbg.disasm.disasm;
-import adbg.disasm.formatter;
+import adbg.disasm.syntaxer;
 import adbg.utils.bit;
 
 extern (C):

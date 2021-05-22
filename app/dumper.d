@@ -165,7 +165,7 @@ int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 	int e = void;
 	AdbgDisasmMode mode = flags & DumpOpt.disasm_stats ?
 		AdbgDisasmMode.size : AdbgDisasmMode.file;
-	adbg_disasm_start_file(dp, mode, data, size, 0);
+	adbg_disasm_start_buffer(dp, mode, data, size, 0);
 	
 	if (flags & DumpOpt.disasm_stats) {
 		uint iavg;	/// instruction average size

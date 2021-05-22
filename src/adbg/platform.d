@@ -223,6 +223,26 @@ version (PrintTargetInfo) {
 }
 
 //
+// Core structures
+//
+
+/// 
+public
+struct adbg_address_t {
+	alias raw this;
+	union {
+		size_t  sz;	/// Used internally
+		void   *raw;	/// ditto
+		ubyte  *i8;	/// ditto
+		ushort *i16;	/// ditto
+		uint   *i32;	/// ditto
+		ulong  *i64;	/// ditto
+		float  *f32;	/// ditto
+		double *f64;	/// ditto
+	}
+}
+
+//
 // ANCHOR External functions
 //
 

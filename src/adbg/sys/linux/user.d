@@ -2,12 +2,13 @@
  * Necessary platform specific module adbg.for ptrace-related stuff from glibc.
  *
  * Despite glibc explaining in sysdeps/unix/sysv/linux/x86/sys/user.h@L21:
- * ```
- * The whole purpose of this file is for GDB and GDB only.  Don't read
- * too much into it.  Don't use it for anything other than GDB unless
- * you know what you are doing.
- * ```
- * We need this for PTRACE_GETREGS, for example.
+ * ---
+ * // The whole purpose of this file is for GDB and GDB only.  Don't read
+ * // too much into it.  Don't use it for anything other than GDB unless
+ * // you know what you are doing.
+ * ---
+ *
+ * Regardless, we need this for PTRACE_GETREGS, for example.
  *
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k

@@ -12,7 +12,7 @@ import core.stdc.string : strcmp, strncpy, strtok;
 import core.stdc.stdio;
 import adbg.platform;
 import adbg.dbg : adbg_attach, adbg_load;
-import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax;
+import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax, AdbgSyntax;
 import adbg.sys.err : adbg_sys_perror;
 import common, dumper, ui;
 
@@ -111,7 +111,7 @@ int cli_syntax(const(char) *val) {
 	}
 	foreach (setting_syntax_t syntax; syntaxes) {
 		if (strcmp(val, syntax.opt) == 0) {
-			common_disasm.syntax = syntax.val;
+			//TODO: change syntax
 			return EXIT_SUCCESS;
 		}
 	}

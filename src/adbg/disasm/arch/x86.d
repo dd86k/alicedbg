@@ -28,7 +28,7 @@ struct prefixes_t { align(1):
 			AdbgSyntaxWidth data;	/// Data mode (register only)
 			AdbgSyntaxWidth addr;	/// Address mode (address register only)
 			x86Segment segment;	/// segment override
-			x86Prefix select;	/// SSE/VEX instruction selector
+			x86Prefix last;	/// SSE/VEX instruction selector
 			bool lock;	/// LOCK prefix
 			bool rep;	/// REP/REPE prefix
 			bool repne;	/// REPNE prefix
@@ -105,6 +105,8 @@ L_PREFIX:
 	int e = adbg_disasm_fetch!ubyte(p, &opcode);
 	if (e) return e;
 	
+	//TODO: Consider moving this to the normal lot
+	//      Should be part of the normal decoding process
 	switch (opcode) {
 	case 0x26:
 		x86.prefix.segment = x86Segment.es;
@@ -134,6 +136,7 @@ L_PREFIX:
 		x86.prefix.addr =
 			x86.prefix.addr == AdbgSyntaxWidth.i16 ?
 			AdbgSyntaxWidth.i32 : AdbgSyntaxWidth.i16;
+		x86.prefix.last = x86Prefix.data;
 		goto L_PREFIX;
 	case 0x67: // Address, 64-bit = REX.XB (42H,41H)
 		x86.prefix.addr =
@@ -150,12 +153,14 @@ L_PREFIX:
 		goto L_PREFIX;
 	case 0xf2:
 		x86.prefix.repne = true;
+		x86.prefix.last = x86Prefix.repne;
 		if (p.mode >= AdbgDisasmMode.file)
 			if (x86.prefix.repne == false) // avoid spam
 				adbg_syntax_add_prefix(p.syntaxer, "repne");
 		goto L_PREFIX;
 	case 0xf3:
 		x86.prefix.rep = true;
+		x86.prefix.last = x86Prefix.rep;
 		if (p.mode >= AdbgDisasmMode.file)
 			if (x86.prefix.rep == false) // avoid spam
 				adbg_syntax_add_prefix(p.syntaxer, "rep");
@@ -168,9 +173,8 @@ L_OPCODE:
 	if ((e = adbg_disasm_fetch!ubyte(p, &opcode)) != 0) return e;
 	
 	if (opcode < 0x40) {
-		// 2-byte escape
-		// Most intructions are multi-byte so this trick services as an
-		// "already handled" case.
+		// Most used instructions these days are outside of this map.
+		// So, the 2-byte escape is checked here.
 		if (opcode == 0x0f) return adbg_disasm_x86_0f(p);
 		
 		//          r   m
@@ -226,7 +230,7 @@ L_OPCODE:
 		}
 		
 		// modrm
-		return adbg_disasm_x86_modrm_legacy_auto(p, opcode);
+		return adbg_disasm_x86_modrm_legacy_opcode(p, opcode);
 	}
 	if (opcode < 0x50) { // >=40H, INC/DEC or REX
 		if (p.platform == AdbgDisasmPlatform.x86_64) {
@@ -267,7 +271,11 @@ L_OPCODE:
 
 private:
 
-// Instruction names, in case the compiler doesn't support string pooling
+//
+// Instruction names
+// In case the compiler doesn't support string pooling
+//
+
 // Legacy
 immutable const(char) *M_ADD	= "add";
 immutable const(char) *M_OR	= "or";
@@ -316,6 +324,10 @@ immutable const(char) *M_JNLE	= "jnle";
 // SSE
 // AVX
 
+//
+// Instruction tables
+//
+
 immutable const(char)*[] mnemonic_00 = [
 	M_ADD, M_OR, M_ADC, M_SBB, M_AND, M_SUB, M_XOR, M_CMP
 ];
@@ -323,9 +335,13 @@ immutable const(char)*[] mnemonic_ascii = [
 	M_DAA, M_DAS, M_AAA, M_AAS
 ];
 immutable const(char)*[] mnemonic_Jcc = [ // Both Intel and AMD
-	"jo", "jno", "jb", "jnb", "jz", "jnz", "jbe", "jnbe",
-	"js", "jns", "jp", "jnp", "jl", "jnl", "jle", "jnle",
+	M_JO, M_JNO, M_JB, M_JNB, M_JZ, M_JNZ, M_JBE, M_JNBE,
+	M_JS, M_JNS, M_JP, M_JNP, M_JL, M_JNL, M_JLE, M_JNLE,
 ];
+
+//
+// Instructio maps
+//
 
 /// 2-byte escape
 int adbg_disasm_x86_0f(adbg_disasm_t *p) {
@@ -334,61 +350,24 @@ int adbg_disasm_x86_0f(adbg_disasm_t *p) {
 	return 0;
 }
 
+//
+// Stuff
+//
+
 /// Segment register (override only, not for segs)
 enum x86Segment : ubyte {
 	none, es, cs, ss, ds, fs, gs
 }
 /// x86 prefixes
-enum x86Prefix : ubyte { // Intel order
-	// Prefix selector
-	none,
-	choice66H,
-	choiceF3H,
-	choiceF2H,
-	// With actual values
+enum x86Prefix : ubyte {
 	data	= 0x66, /// 0x66
-	rep	= 0xF3, /// 0xF3
-	repne	= 0xF2, /// 0xF2
 	addr	= 0x67, /// 0x67
-	lock	= 0xF0, /// 0xF0
-}
-enum x86OpType : ubyte {
-	/// Instruction has no operands
-	none,
-	/// Instruction has operand handler
-	operand,
-	/// Instruction prefix
-	prefix,
-	/// Instruction segment override
-	segment,
-	/// Instruction maps or custom handling
-	custom,
-}
-
-struct x86_opcode_t {
-	const(char)* mnemonic;
-	int function(adbg_disasm_t*) operand;
-}
-struct x86_legacy_opcode_t {
-	align(2) x86OpType type;
-	union {
-		struct {
-			const(char)* mnemonic;
-			int function(adbg_disasm_t*) operand;
-		}
-		int function(adbg_disasm_t*) custom;
-		x86Segment segment;
-	}
-}
-struct x86_vex_opcode_t {
-	align(2) x86OpType type;
-	union { // NOTE: null meaning invalid
-		struct {
-			x86_opcode_t[4] vex; // none/66H/F3H/F2H
-			x86_opcode_t[2] sse; // none/66H
-		}
-		int function(adbg_disasm_t*) custom;
-	}
+	lock	= 0xf0, /// 0xF0
+	repne	= 0xf2, /// 0xF2
+	rep	= 0xf3, /// 0xF3
+	_66h	= data,
+	_f2h	= repne,
+	_f3h	= rep,
 }
 
 enum x86Reg { // ModRM order
@@ -463,13 +442,15 @@ immutable const(char)*[2][] regs_addr16 = [ // modrm:rm16
 	[ "si", null ], [ "di", null ], [ "bp", null ], [ "bp", null ],
 ];
 immutable const(char)*[] segs = [
-	"es", "cs", "ss", "ds", "fs", "gs"
+	null, "es", "cs", "ss", "ds", "fs", "gs"
 ];
 /*immutable const(char)*[] regs_tmm = [
 	"tmm0", "tmm1", "tmm2", "tmm3", "tmm4", "tmm5", "tmm6", "tmm7"
 ];*/
 
-// Operand
+//
+// ANCHOR Operand handling
+//
 
 int adbg_disasm_x86_op_Ib(adbg_disasm_t *p) { // Immediate 8-bit
 	ubyte i = void;
@@ -515,7 +496,7 @@ int adbg_disasm_x86_op_Jb(adbg_disasm_t *p) { // Immediate 8-bit
 	int e = adbg_disasm_fetch!ubyte(p, &i);
 	if (e == 0) {
 		if (p.mode >= AdbgDisasmMode.data)
-			p.opcode.targetaddri64 = p.baseaddri64 + i;
+			adbg_disasm_offset!ubyte(p, i);
 		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_syntax_add_machine!ubyte(p.syntaxer, i);
 			adbg_syntax_add_immediate!ubyte(p.syntaxer, i);
@@ -524,12 +505,21 @@ int adbg_disasm_x86_op_Jb(adbg_disasm_t *p) { // Immediate 8-bit
 	return e;
 }
 
-
 //
 // ANCHOR ModR/M legacy mechanics
 //
+// adbg_disasm_x86_modrm_legacy_opcode
+//	Uses opcode to determine operation width/direction
+//	Mostly used by legacy opcodes <40H
+//
+// adbg_disasm_x86_modrm_legacy_modrm
+//	Uses internals to determine operation width, direction is a parameter
+//
+// adbg_disasm_x86_modrm_legacy
+//	Called from _opcode or _modrm
+//
 
-int adbg_disasm_x86_modrm_legacy_auto(adbg_disasm_t *p, ubyte opcode) {
+int adbg_disasm_x86_modrm_legacy_opcode(adbg_disasm_t *p, ubyte opcode) {
 	// Reminder: Address and Data modes are already handled prior to
 	//           calling this. Unless, of course, instruction dictactes
 	//           otherwise (e.g. per instruction, per map, etc.)
@@ -537,24 +527,40 @@ int adbg_disasm_x86_modrm_legacy_auto(adbg_disasm_t *p, ubyte opcode) {
 	int e = adbg_disasm_fetch!ubyte(p, &modrm);
 	if (e) return e;
 	
+	bool dir = (opcode & 2) != 0; /// mem-reg direction
+	AdbgSyntaxWidth width = void;
 	
+	if (p.x86.vex.W)
+		width = AdbgSyntaxWidth.i64;
+	else
+		width = opcode & 1 ? AdbgSyntaxWidth.i32 : AdbgSyntaxWidth.i16;
 	
-	return adbg_disasm_x86_modrm_legacy_modrm(p, modrm);
+	return adbg_disasm_x86_modrm_legacy(p, modrm, width, dir);
 }
-int adbg_disasm_x86_modrm_legacy_modrm(adbg_disasm_t *p, ubyte modrm) {
+int adbg_disasm_x86_modrm_legacy_modrm(adbg_disasm_t *p, ubyte modrm, bool dir) {
 	
 	
 	
-	return 0;
+	return adbg_disasm_x86_modrm_legacy(p, modrm, p.x86.prefix.data, dir);
 }
-int adbg_disasm_x86_modrm_legacy(adbg_disasm_t *p, int reg, int mem, AdbgSyntaxWidth wreg, AdbgSyntaxWidth wmem, bool direction) {
+int adbg_disasm_x86_modrm_legacy(adbg_disasm_t *p, ubyte modrm, AdbgSyntaxWidth wdata, bool dir) {
 	
 	
 	
 	return 0;
 }
 
-int adbg_disasm_x86_modrm_rm(adbg_disasm_t *p, ubyte rm) {
+int adbg_disasm_x86_modrm_rm_00(adbg_disasm_t *p, ubyte rm) {
+	
+	
+	return 0;
+}
+int adbg_disasm_x86_modrm_rm_01(adbg_disasm_t *p, ubyte rm) {
+	
+	
+	return 0;
+}
+int adbg_disasm_x86_modrm_rm_10(adbg_disasm_t *p, ubyte rm) {
 	
 	
 	return 0;

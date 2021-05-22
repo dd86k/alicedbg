@@ -47,13 +47,13 @@ immutable setting_platform_t[] platforms = [
 // Syntaxes
 
 struct setting_syntax_t {
-	AdbgDisasmSyntax val;
+	AdbgSyntax val;
 	immutable(char)* opt, desc;
 }
 immutable setting_syntax_t[] syntaxes = [
-	{ AdbgDisasmSyntax.att,   "att",   "AT&T syntax" },
-	{ AdbgDisasmSyntax.intel, "intel", "Intel syntax" },
-	{ AdbgDisasmSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
+	{ AdbgSyntax.att,   "att",   "AT&T syntax" },
+	{ AdbgSyntax.intel, "intel", "Intel syntax" },
+	{ AdbgSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
 ];
 
 //

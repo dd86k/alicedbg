@@ -1,17 +1,26 @@
 /**
  * Disassembler module.
  *
+ * This module is responsable for disassembling and formatting machine code.
+ *
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
 module adbg.disasm.disasm;
 
+//NOTE: The _start functions avoid repetiveness in runtime.
+//NOTE: The formatting can be done at the same time to avoid unnessary actions.
+//      Like, specifying the mode to data calculates jump offsets, but does not
+//      add items in the syntaxer buffers.
+
 import adbg.error;
 import adbg.disasm.arch;
 import adbg.disasm.formatter;
 import adbg.disasm.syntaxer;
 import adbg.utils.bit : swapfunc16, swapfunc32, swapfunc64, BIT;
+import adbg.platform : adbg_address_t;
+public import adbg.disasm.syntaxer : AdbgSyntax;
 
 extern (C):
 
@@ -36,11 +45,11 @@ enum AdbgDisasmOpt {
 	backward,
 	///TODO: Add commentary
 	commentary,
-	/// Memory source is a live debuggee process.
-	debuggee,
-	/// 
+	/// Input mode. See $(SEE AdbgDisasmInput).
+	input,
+	/// Instead of a space, insert a tab between between the instruction
+	/// mnemonic and operands.
 	mnemonicTab
-	/// 
 }
 
 /// Disassembler operating mode
@@ -103,6 +112,14 @@ enum AdbgDisasmWarning {
 	io	= BIT!(3),
 }
 
+/// Disassembler input
+enum AdbgDisasmInput {
+	raw,	/// Buffer
+	debugger,	/// Debuggee
+	file,	///TODO: File
+	mmfile,	///TODO: MmFile
+}
+
 version (X86) {
 	/// Platform default platform
 	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.x86;
@@ -149,16 +166,7 @@ struct adbg_disasm_opcode_t {
 	const(char) *comment;	/// Instruction comment
 	int warnings;	/// Warning flags
 	int size;	/// Instruction size
-	union { // Target address
-		void   *targetaddr;	/// Used internally
-		size_t  targetaddrv;	/// ditto
-		ubyte  *targetaddri8;	/// ditto
-		ushort *targetaddri16;	/// ditto
-		uint   *targetaddri32;	/// ditto
-		ulong  *targetaddri64;	/// ditto
-		float  *targetaddrf32;	/// ditto
-		double *targetaddrf64;	/// ditto
-	}
+	adbg_address_t target;	/// Target address
 }
 
 /// Disassembler parameters structure. This structure is not meant to be
@@ -167,6 +175,10 @@ struct adbg_disasm_t { align(1):
 	//
 	// Generic
 	//
+	
+	adbg_address_t current;	/// Current address, used as a program counter.
+	adbg_address_t base;	/// Base address, used for target calculations.
+	adbg_address_t last;	/// Last address, saved from input.
 	
 	union { // Current address
 		/// Memory address entry point. This value is modified to point
@@ -180,14 +192,14 @@ struct adbg_disasm_t { align(1):
 		deprecated ulong  *ai64;	/// Used internally
 		deprecated float  *af32;	/// Used internally
 		deprecated double *af64;	/// Used internally
-		void   *addr;	/// Used internally
-		size_t  addrv;	/// ditto
-		ubyte  *addru8;	/// ditto
-		ushort *addru16;	/// ditto
-		uint   *addru32;	/// ditto
-		ulong  *addru64;	/// ditto
-		float  *addrf32;	/// ditto
-		double *addrf64;	/// ditto
+		deprecated void   *address;	/// Used internally
+		deprecated size_t  addressv;	/// ditto
+		deprecated ubyte  *addressu8;	/// ditto
+		deprecated ushort *addressu16;	/// ditto
+		deprecated uint   *addressu32;	/// ditto
+		deprecated ulong  *addressu64;	/// ditto
+		deprecated float  *addressf32;	/// ditto
+		deprecated double *addressf64;	/// ditto
 	}
 	union { // Base address
 		/// Base Address;
@@ -196,14 +208,14 @@ struct adbg_disasm_t { align(1):
 		///
 		/// Used in calculating the target address.
 		deprecated size_t ba;
-		void   *baseaddr;	/// Used internally
-		size_t  baseaddrv;	/// ditto
-		ubyte  *baseaddri8;	/// ditto
-		ushort *baseaddri16;	/// ditto
-		uint   *baseaddri32;	/// ditto
-		ulong  *baseaddri64;	/// ditto
-		float  *baseaddrf32;	/// ditto
-		double *baseaddrf64;	/// ditto
+		deprecated void   *base_;	/// Used internally
+		deprecated size_t  basev;	/// ditto
+		deprecated ubyte  *basei8;	/// ditto
+		deprecated ushort *basei16;	/// ditto
+		deprecated uint   *basei32;	/// ditto
+		deprecated ulong  *basei64;	/// ditto
+		deprecated float  *basef32;	/// ditto
+		deprecated double *basef64;	/// ditto
 	}
 	union { // Last address
 		/// Last Address.
@@ -211,14 +223,14 @@ struct adbg_disasm_t { align(1):
 		/// This field is populated with the entry address, making it useful
 		/// for printing purposes or calculating the address size.
 		deprecated size_t la;
-		void   *lastaddr;	/// Used internally
-		size_t  lastaddrv;	/// ditto
-		ubyte  *lastaddri8;	/// ditto
-		ushort *lastaddri16;	/// ditto
-		uint   *lastaddri32;	/// ditto
-		ulong  *lastaddri64;	/// ditto
-		float  *lastaddrf32;	/// ditto
-		double *lastaddrf64;	/// ditto
+		deprecated void   *last_;	/// Used internally
+		deprecated size_t  lastv;	/// ditto
+		deprecated ubyte  *lasti8;	/// ditto
+		deprecated ushort *lasti16;	/// ditto
+		deprecated uint   *lasti32;	/// ditto
+		deprecated ulong  *lasti64;	/// ditto
+		deprecated float  *lastf32;	/// ditto
+		deprecated double *lastf64;	/// ditto
 	}
 	/// disasm implementation function
 	int function(adbg_disasm_t*) func;
@@ -268,8 +280,10 @@ struct adbg_disasm_t { align(1):
 	
 	/// If set, source is a debuggee. Uses Win32/ptrace to fetch memory.
 	// NOTE: If there are more input modes, a function pointer will be used
-	bool debuggee;
+	deprecated bool debuggee;
 	deprecated bool mnemonicTab;
+	/// Input mode.
+	AdbgDisasmInput input;
 	
 	//
 	// Formatting
@@ -288,6 +302,7 @@ struct adbg_disasm_t { align(1):
 
 }
 
+// open
 adbg_disasm_t *adbg_disasm_open(AdbgDisasmPlatform m) {
 	import core.stdc.stdlib : calloc;
 	
@@ -305,6 +320,7 @@ adbg_disasm_t *adbg_disasm_open(AdbgDisasmPlatform m) {
 	return s;
 }
 
+// reopen
 int adbg_disasm_reopen(adbg_disasm_t *p, AdbgDisasmPlatform m) {
 	p.platform = m;
 	with (AdbgDisasmPlatform)
@@ -321,28 +337,33 @@ int adbg_disasm_reopen(adbg_disasm_t *p, AdbgDisasmPlatform m) {
 	}
 }
 
-int adbg_disasm_start_file(adbg_disasm_t *p, AdbgDisasmMode mode, void *buffer, size_t size, size_t base) {
+// start mode raw buffer
+int adbg_disasm_start_buffer(adbg_disasm_t *p, AdbgDisasmMode mode, void *buffer, size_t size, size_t base) {
 	if (p == null)
 		return adbg_error(AdbgError.nullArgument);
 	
-	p.debuggee = false;
+	p.input = AdbgDisasmInput.raw;
 	p.mode = mode;
-	p.addr = buffer;
+	p.current.raw = buffer;
 	p.left = size;
-	p.baseaddrv = base;
+	p.base.sz = base;
 	return 0;
 }
 
+// start mode debuggee
+//TODO: Consider adding base parameter
 int adbg_disasm_start_debuggee(adbg_disasm_t *p, AdbgDisasmMode mode, size_t addr) {
 	if (p == null)
 		return adbg_error(AdbgError.nullArgument);
 	
-	p.debuggee = true;
+	p.input = AdbgDisasmInput.debugger;
 	p.mode = mode;
-	p.addrv = addr;
+	p.current.sz = addr;
+//	p.base.sz = base;
 	return 0;
 }
 
+// set option value
 int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 	if (p == null)
 		return adbg_error(AdbgError.nullArgument);
@@ -359,14 +380,10 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 			return adbg_error(AdbgError.invalidOptionValue);
 		p.platform = cast(AdbgDisasmPlatform)val;
 		break;
-	/*case backward:
-		p.backwards = val != 0;
-		break;*/
-	/*case commentary:
-		p.commentary = val != 0;
-		break;*/
-	case debuggee:
-		p.debuggee = val != 0;
+	case input:
+		if (val >= AdbgDisasmInput.max)
+			return adbg_error(AdbgError.invalidOptionValue);
+		p.input = cast(AdbgDisasmInput)val;
 		break;
 	case syntax:
 		if (val >= AdbgSyntax.max)
@@ -379,6 +396,7 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 	default:
 		return adbg_error(AdbgError.invalidOption);
 	}
+	
 	return 0;
 }
 
@@ -391,7 +409,6 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 /// Params:
 /// 	p = Disassembler parameters
 /// 	op = Opcode structure
-/// 	mode = Disassembling mode
 ///
 /// Returns: Error code; Non-zero indicating an error
 int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
@@ -409,27 +426,30 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 	}
 	
 	// Decode prep
-	p.lastaddr = p.addr;
+	p.last = p.current;
 	p.opcode = op;
 	
 	// Decode
 	int e = p.func(p);
-	if (e) return e;
 	
-	// opcode size
-	op.size = cast(int)(p.addrv - p.lastaddrv);
-	
-	// formatting
-	if (p.mode >= AdbgDisasmMode.file) {
-		adbg_disasm_render(p);
-		op.machine = p.syntaxer.machine.data.ptr;
-		op.mnemonic = p.syntaxer.mnemonic.data.ptr;
+	if (e == 0) {
+		// opcode size
+		op.size = cast(int)(p.current.sz - p.last.sz);
+		
+		// formatting
+		if (p.mode >= AdbgDisasmMode.file) {
+			adbg_syntax_render(&syntaxer);
+			op.machine = syntaxer.machine.data.ptr;
+			op.mnemonic = syntaxer.mnemonic.data.ptr;
+		}
 	}
 	
 	return e;
 }
 
 private import core.stdc.stdlib : free;
+/// Frees a previously allocated disassembly structure.
+/// Params: ptr = adbg_disasm_t structure
 public  alias adbg_disasm_close = free;
 
 /// (Internal) Fetch data from data source.
@@ -438,18 +458,30 @@ public  alias adbg_disasm_close = free;
 /// 	u = Data pointer
 /// Returns: Non-zero on error
 //TODO: Consider T... (type-safe template) loop
+package
 int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
-	import adbg.dbg.debugger : adbg_mm_cread;
+	if (p.left < T.sizeof)
+		return adbg_error(AdbgError.outOfData);
 	int e = void;
-	if (p.debuggee) {
-		e = adbg_mm_cread(p.addrv, u, T.sizeof);
-	} else {
-		if (p.left < T.sizeof)
-			return adbg_error(AdbgError.outOfData);
-		*u = *cast(T*)p.addr;
+	with (AdbgDisasmInput)
+	switch (p.input) {
+	case debugger:
+		import adbg.dbg.debugger : adbg_mm_cread;
+		e = adbg_mm_cread(p.current.sz, u, T.sizeof);
+		break;
+	case raw:
+		*u = *cast(T*)p.current;
 		e = 0;
 		p.left -= T.sizeof;
+		break;
+	default: assert(0, __FUNCTION__~": unimplemented");
 	}
-	p.addrv += T.sizeof;
+	p.current.sz += T.sizeof;
 	return e;
+}
+
+// calculate near offset
+package
+void adbg_disasm_offset(T)(adbg_disasm_t *p, T u) {
+	//TODO: adbg_disasm_offset
 }

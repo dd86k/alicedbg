@@ -334,9 +334,9 @@ int cmd_handler(exception_t *ex) {
 	int argc = void;
 	paused = true;
 	
-	if (ex.faultaddr) {
-		printf("	Fault address: %zx\n", ex.faultaddrv);
-		adbg_disasm_start_debuggee(&common_disasm, AdbgDisasmMode.data, ex.faultaddrv);
+	if (ex.fault) {
+		printf("	Fault address: %zx\n", ex.fault.sz);
+		adbg_disasm_start_debuggee(&common_disasm, AdbgDisasmMode.data, ex.fault.sz);
 		adbg_disasm_opcode_t op = void;
 		if (adbg_disasm(&common_disasm, &op)) {
 			printf("	Faulting instruction: (error:%s)\n",

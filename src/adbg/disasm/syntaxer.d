@@ -1,65 +1,121 @@
 /**
  * Disassembler syntax engine.
  *
+ * TODO
+ *
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
 module adbg.disasm.syntaxer;
 
-import adbg.error;
-import adbg.utils.str : sbuffer_t;
+private import adbg.error;
+private import adbg.utils.str : sbuffer_t;
 
+/// Syntax buffer size in items
 package enum ADBG_SYNTAX_MAX_ITEMS = 8;
+/// String buffer sizes in bytes
 private enum ADBG_SYNTAX_BUFFER_LENGTH = 64;
 
 /// Assembler syntax
 enum AdbgSyntax : ubyte {
-	platform,	/// Platform compiled default for target
-	intel,	/// Intel syntax, similar to Microsoft/Macro Assembler (MASM)
-	nasm,	/// Netwide Assembler syntax (NASM)
-	att,	/// AT&T syntax
-//	arm,	/// (TODO) ARM native syntax
-//	riscv,	/// (TODO) RISC-V native syntax
-//	ideal,	/// (TODO) Borland Ideal (enhanced mode of TASM)
-//	hyde,	/// (TODO) Randall Hyde High Level Assembly Language
+	/// Platform compiled default for target.
+	platform,
+	/// Intel syntax, similar to Microsoft/Macro Assembler (MASM).
+	/// Example:
+	/// ---
+	/// mov ecx, dword ptr ss:[ebp-14]
+	/// ---
+	intel,
+	/// AT&T syntax.
+	/// Example:
+	/// ---
+	/// mov ss:-14(%ebp), %ecx
+	/// ---
+	att,
+	/// Netwide Assembler syntax (NASM).
+	/// Example:
+	/// ---
+	/// mov ecx, dword ptr [ss:ebp-14]
+	/// ---
+	nasm,
+	///TODO: Borland Ideal (enhanced mode of TASM) syntax.
+	/// Example:
+	/// ---
+	/// mov ecx, [dword ss:ebp-14]
+	/// ---
+//	ideal,
+	/// TODO: Randall Hyde High Level Assembly Language syntax.
+	/// Example:
+	/// ---
+	/// mov( [type dword ss:ebp-14], ecx )
+	/// ---
+//	hyde,	///
+	///TODO: ARM native syntax.
+	/// Example:
+	/// ---
+	/// ldr r0, [r1]
+	/// ---
+//	arm,
+	///TODO: RISC-V native syntax.
+	/// Example:
+	/// ---
+	/// TODO
+	/// ---
+//	riscv,
 }
+
+/// 
 package
 enum AdbgSyntaxWidth : ubyte {
-	i8, i16, i32, i64, i128, i256, i512, i1024,
-	f80, far16, far32, far64,
+	i8, i16, i32, i64, i128, i256, i512, i1024
 }
+
+/// 
 package
 enum AdbgSyntaxItem : ubyte {
-	/// Instruction mnemonic
+	/// An instruction mnemonic.
 	mnemonic,	// add
-	/// Instruction prefix
+	/// An instruction prefix.
 	prefix,	// lock
-	///
+	/// A constant value.
 	immediate,	// 0xff
-	/// Register
+	/// 
+	immediateNear,	// 0x10:0x1000 / $0x10:0x1000
+	/// A register string.
 	register,	// eax
-	/// 
+	/// A IEEE 754 80-bit register index and string.
+	// base register index
+	realRegister,	// intel=st,st(1) / nasm=st0,st1 / att=%st,%st(1)
+	/// A constant memory location.
 	memory,	// [0x10]
-	/// 
-	memoryFar,	// [0x10:0x1000]
-	/// 
+	/// A far constant memory location.
+	memoryFar,	// [0x10:0x1000] / (0x10:0x1000)
+	/// A memory location pointed by a register string.
 	memoryRegister,	// [eax]
-	/// 
-	memoryFarRegister,	// [0x10:eax]
+	/// A memory location pointed by a register pair. (notably x86-16)
+	memoryRegisterPair,	// [sp+ax] / (%sp,%ax)
+	/// A far memory location pointed by a constant segment and register string.
+	memoryRegisterFar,	// [0x10:eax] / (0x10:eax)
 	/// 
 	memoryRegisterOffset,	// [eax+0xff]
-	/// (SIB) x86: SIB MOD=00
+	/// Memory scale with BASE and INDEX registers + multiplier.
+	/// x86: ModRM MOD=00 + SIB
 	memoryScaleBaseIndexScale,	// [eax+ecx*2] / (eax,ecx,2)
-	/// (SIB) x86: SIB MOD=00 I=100
+	/// Memory scale with INDEX register.
+	/// x86: ModRM MOD=00 + SIB INDEX=100
 	memoryScaleBase,	// [eax] / (,ecx,)
-	/// (SIB) x86: SIB MOD=01
-	memoryScaleIndexScaleOffset,	// [ecx*2+0x50] / 0x50(,ecx,2)
-	/// (SIB) x86: SIB MOD=01 I=100
+	/// Memory scale with INDEX register + multiplier + offset.
+	/// x86: ModRM MOD=01
+	memoryScaleIndexScaleOffset,	// es:[ecx*2+0x50] / %es:0x50(,ecx,2)
+	/// Memory scale with offset only.
+	/// x86: ModRM MOD=01 + SIB INDEX=100
 	memoryScaleOffset,	// [0x50] / 0x50(,,)
-	/// (SIB) x86: SIB MOD=10
+	/// Memory scale with BASE and INDEX registers + multiplier.
+	/// x86: ModRM MOD=10 + SIB
 	memoryScaleBaseIndexScaleOffset,	// [eax+ecx*2+0x50] / 0x50(eax,ecx,2)
-	/// (SIB) x86: SIB MOD=10 I=100
+	/// Memory scale with BASE register + offset.
+	/// x86: ModRM MOD=10 + SIB INDEX=100
 	memoryScaleBaseOffset,	// [eax+0x50] / 0x50(eax,,)
 }
 
@@ -140,15 +196,16 @@ struct adbg_syntaxter_decoder_options_t { align(1):
 		uint all;	/// Unset when initiated
 		struct {
 			/// memory operation width
-			/// Automatically set when a memory operand is pushed.
+			/// Should be automatically set when a memory operand is pushed.
 			AdbgSyntaxWidth memWidth;
 			/// Under x86, some prefixes like LOCK can sometimes be
 			/// printed, or not, depending on the instruction.
 			/// If set, the prefixes are not included in the output.
 			bool noPrefixes;
-			/// (AT&T syntax) if mnemonic is basic for width modifier
-			/// If set, this mnemonic can be 
+			/// (AT&T syntax) if mnemonic is basic for width modifier.
 			bool primitive;
+			/// (AT&T syntax) Instruction is a far (absolute) call/jump.
+			bool absolute;
 		}
 	}
 }
@@ -157,17 +214,21 @@ struct adbg_syntaxter_user_options_t { align(1):
 	union {
 		//TODO: Consider "addresses as decimal" option
 		//TODO: Consider "immediates as decimal" option
-		//TODO: Consider "pack machine opcodes" option
-		//TODO: Consider "unpack immediate opcodes" option
 		uint all;	/// Unset when initiated
 		struct {
-			/// If set, inserts a tab instead of a space between mnemonic and operands.
+			/// If set, inserts a tab instead of a space between
+			/// mnemonic and operands.
 			bool mnemonicTab;
+			/// Opcodes and operands are not seperated by spaces.
+			bool machinePacked;
 		}
 	}
 }
 /// Syntax engine structure
 struct adbg_syntax_t { align(1):
+	//
+	// Internal fields
+	//
 	/// Item index.
 	size_t index;
 	/// Item buffer.
@@ -179,26 +240,28 @@ struct adbg_syntax_t { align(1):
 	adbg_syntaxter_decoder_options_t decoderOpts;
 	/// User formatting options.
 	adbg_syntaxter_user_options_t userOpts;
-	/// Syntax handler.
-	int function(adbg_syntax_t*) handler;
-	/// 
+	/// Syntax item handler.
+	void function(adbg_syntax_t*, adbg_syntax_item_t*) handler;
+	/// Machine buffer.
 	sbuffer_t!(ADBG_SYNTAX_BUFFER_LENGTH) machine;
-	/// 
+	/// Mnemonic buffer.
 	sbuffer_t!(ADBG_SYNTAX_BUFFER_LENGTH) mnemonic;
+	/// Disassembly comment.
+	const(char) *comment;
 	/// Current syntax option.
 	AdbgSyntax syntax;
 }
 
-// init
+// init structure
 int adbg_syntax_init(adbg_syntax_t *p, AdbgSyntax syntax) {
-	import adbg.disasm.syntax.intel : adbg_syntax_intel;
-	import adbg.disasm.syntax.nasm : adbg_syntax_nasm;
-	import adbg.disasm.syntax.att : adbg_syntax_att;
+	import adbg.disasm.syntax.intel : adbg_syntax_intel_item;
+	import adbg.disasm.syntax.nasm : adbg_syntax_nasm_item;
+	import adbg.disasm.syntax.att : adbg_syntax_att_item;
 	with (AdbgSyntax)
 	switch (syntax) {
-	case intel: p.handler = &adbg_syntax_intel; break;
-	case nasm:  p.handler = &adbg_syntax_nasm; break;
-	case att:   p.handler = &adbg_syntax_att; break;
+	case intel: p.handler = &adbg_syntax_intel_item; break;
+	case nasm:  p.handler = &adbg_syntax_nasm_item; break;
+	case att:   p.handler = &adbg_syntax_att_item; break;
 	default:    return adbg_error(AdbgError.invalidOptionValue);
 	}
 	p.decoderOpts.all = 0;
@@ -207,82 +270,73 @@ int adbg_syntax_init(adbg_syntax_t *p, AdbgSyntax syntax) {
 	return 0;
 }
 
-// reset
+// reset structure
 void adbg_syntax_reset(adbg_syntax_t *p) {
 	p.index = 0;
 	p.machine.index = 0;
 	p.mnemonic.index = 0;
 }
 
+//
+// ANCHOR Internal utils
+//
+
 private
 bool adbg_syntax_select(adbg_syntax_t *p, adbg_syntax_item_t **item) {
 	if (p.index >= ADBG_SYNTAX_MAX_ITEMS)
 		return true;
 	
-	size_t index = p.index;
-	*item = &p.buffer[index];
-	p.index = ++index;
+	*item = &p.buffer[p.index++];
 	return false;
 }
 
+//
+// ANCHOR Machine buffer
+//
+
 // adds to machine buffer
-void adbg_syntax_add_machine(T)(adbg_syntax_t *p, T opcode) {
+package
+void adbg_syntax_add_machine(T)(adbg_syntax_t *p, T v) {
 	import adbg.utils.str :
 		adbg_util_strx02, adbg_util_strx04,
 		adbg_util_strx08, adbg_util_strx016;
-	union u_t {
-		ulong u64;
-		long i64;
-		uint u32;
-		int i32;
-		ushort u16;
-		short i16;
-		ubyte u8;
-		byte i8;
-		float f32;
-		double f64;
-	}
-//	u_t u = void;
-	static if (is(T == ubyte) || is(T == byte))
-	{
-		p.mnemonic.add(adbg_util_strx02(opcode, false));
-	}
-	else static if (is(T == ushort) || is(T == short))
-	{
-		p.mnemonic.add(adbg_util_strx04(opcode, false));
-	}
-	else static if (is(T == uint) || is(T == int))
-	{
-		p.mnemonic.add(adbg_util_strx08(opcode, false));
-	}
-	else static if (is(T == ulong) || is(T == long))
-	{
-		p.mnemonic.add(adbg_util_strx016(opcode, false));
-	}
-	else static if (is(T == float))
-	{
+	
+	static if (is(T == ubyte) || is(T == byte)) {
+		p.mnemonic.add(adbg_util_strx02(v, false));
+	} else static if (is(T == ushort) || is(T == short)) {
+		p.mnemonic.add(adbg_util_strx04(v, false));
+	} else static if (is(T == uint) || is(T == int)) {
+		p.mnemonic.add(adbg_util_strx08(v, false));
+	} else static if (is(T == ulong) || is(T == long)) {
+		p.mnemonic.add(adbg_util_strx016(v, false));
+	} else static if (is(T == float)) {
 		union u32_t {
 			uint u32;
 			float f32;
 		}
 		u32_t u = void;
-		u.f32 = opcode;
+		u.f32 = v;
 		p.mnemonic.add(adbg_util_strx04(u.u32, false));
-	}
-	else static if (is(T == double))
-	{
+	} else static if (is(T == double)) {
 		union u64_t {
 			ulong u32;
 			double f32;
 		}
 		u64_t u = void;
-		u.f64 = opcode;
+		u.f64 = v;
 		p.mnemonic.add(adbg_util_strx08(u.u64, false));
-	}
-	else static assert(0, "Type not supported");
+	} else static assert(0, "adbg_syntax_add_machine: Type not supported");
+	
+	if (p.userOpts.machinePacked == false)
+		p.mnemonic.add(' ');
 }
 
+//
+// ANCHOR Mnemonic buffer
+//
+
 // adds prefix
+package
 void adbg_syntax_add_prefix(adbg_syntax_t *p, const(char) *prefix) {
 	adbg_syntax_item_t *item = void;
 	if (adbg_syntax_select(p, &item))
@@ -293,6 +347,7 @@ void adbg_syntax_add_prefix(adbg_syntax_t *p, const(char) *prefix) {
 }
 
 // adds mnemonic instruction
+package
 void adbg_syntax_add_mnemonic(adbg_syntax_t *p, const(char) *mnemonic) {
 	adbg_syntax_item_t *item = void;
 	if (adbg_syntax_select(p, &item))
@@ -303,6 +358,7 @@ void adbg_syntax_add_mnemonic(adbg_syntax_t *p, const(char) *mnemonic) {
 }
 
 // adds register name
+package
 void adbg_syntax_add_register(adbg_syntax_t *p, const(char) *register) {
 	adbg_syntax_item_t *item = void;
 	if (adbg_syntax_select(p, &item))
@@ -313,57 +369,48 @@ void adbg_syntax_add_register(adbg_syntax_t *p, const(char) *register) {
 }
 
 // adds immediate
+package
 void adbg_syntax_add_immediate(T)(adbg_syntax_t *p, T v) {
 	adbg_syntax_item_t *item = void;
 	if (adbg_syntax_select(p, &item))
 		return;
 	
 	//TODO: Template mixin
-	p.mnemonic.add("0x");
-	static if (is(T == ubyte)) {
+	static if (T.sizeof == ubyte.sizeof) {
 		item.width = AdbgSyntaxWidth.i8;
 		item.iu8 = v;
-	} else static if (is(T == byte)) {
-		item.width = AdbgSyntaxWidth.i8;
-		item.is8 = v;
-	} else static if (is(T == ushort)) {
+	} else static if (T.sizeof == ushort.sizeof) {
 		item.width = AdbgSyntaxWidth.i16;
 		item.iu16 = v;
-	} else static if (is(T == short)) {
-		item.width = AdbgSyntaxWidth.i16;
-		item.is16 = v;
-	} else static if (is(T == uint)) {
+	} else static if (T.sizeof == uint.sizeof) {
 		item.width = AdbgSyntaxWidth.i32;
 		item.iu32 = v;
-	} else static if (is(T == int)) {
-		item.width = AdbgSyntaxWidth.i32;
-		item.is32 = v;
-	} else static if (is(T == ulong)) {
+	} else static if (T.sizeof == ulong.sizeof) {
 		item.width = AdbgSyntaxWidth.i64;
 		item.iu64 = v;
-	} else static if (is(T == long)) {
-		item.width = AdbgSyntaxWidth.i64;
-		item.is64 = v;
-	} else static if (is(T == float)) {
-		union u32_t {
-			uint u32;
-			float f32;
-		}
-		u32_t u = void;
-		u.f32 = opcode;
-		p.mnemonic.add(adbg_util_strx04(u.u32, false));
-	} else static if (is(T == double)) {
-		union u64_t {
-			ulong u64;
-			double f64;
-		}
-		u64_t u = void;
-		u.f64 = opcode;
-		p.mnemonic.add(adbg_util_strx08(u.u64, false));
-	} else static assert(0, "adbg_syntax_add_immediate");
+	} else static assert(0, __FUNCTION__~": Type not supported");
 }
 
-// renders to mnemonic buffer
+//
+// ANCHOR Rendering
+//
+
+// render whole line
+package
+void adbg_syntax_render(adbg_syntax_t *p) {
+	with (AdbgSyntax)
+	switch (p.syntax) {
+	case intel, nasm:
+	
+		return;
+	default:
+	
+		return;
+	}
+}
+
+// render immediate hexadecimal to mnemonic buffer
+package
 void adbg_syntax_render_immediate_hex(adbg_syntax_t *p, adbg_syntax_item_t *item) {
 	import adbg.utils.str :
 		adbg_util_strx02, adbg_util_strx04,
@@ -385,7 +432,7 @@ void adbg_syntax_render_immediate_hex(adbg_syntax_t *p, adbg_syntax_item_t *item
 	case i64:
 		v = adbg_util_strx016(item.iu16, false);
 		break;
-	default: assert(0, "adbg_syntax_render_immediate");
+	default: assert(0, __FUNCTION__);
 	}
 	p.mnemonic.add(v);
 }

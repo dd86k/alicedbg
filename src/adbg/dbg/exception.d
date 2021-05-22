@@ -19,6 +19,7 @@
 module adbg.dbg.exception;
 
 public import adbg.dbg.context;
+import adbg.platform : adbg_address_t;
 
 version (Windows) {
 	import core.sys.windows.windows;
@@ -89,11 +90,12 @@ struct exception_t {
 	int pid;
 	/// Thread ID, if available; Otherwise zero.
 	int tid;
+	adbg_address_t fault;	/// Memory address pointer for fault. Otherwise null.
 	union {
 		/// Memory address pointer for fault. Otherwise null.
-		void *faultaddr;
+		deprecated void *faultaddr;
 		/// Memory address value for fault. Otherwise null.
-		size_t faultaddrv;
+		deprecated size_t faultaddrv;
 	}
 }
 
@@ -296,7 +298,7 @@ version (Windows) {
 	package void adbg_ex_dbg(exception_t *e, DEBUG_EVENT *de) {
 		e.pid = de.dwProcessId;
 		e.tid = de.dwThreadId;
-		e.faultaddr = de.Exception.ExceptionRecord.ExceptionAddress;
+		e.fault.raw = de.Exception.ExceptionRecord.ExceptionAddress;
 		e.oscode = de.Exception.ExceptionRecord.ExceptionCode;
 		switch (e.oscode) {
 		case EXCEPTION_IN_PAGE_ERROR:
