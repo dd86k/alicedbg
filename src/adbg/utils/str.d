@@ -12,10 +12,9 @@ import core.stdc.stdarg;
 import core.stdc.string;
 
 extern (C):
-__gshared:
 
 /// An empty string in case compilers cannot pool strings
-const(char) *empty_string = "";
+immutable const(char) *empty_string = "";
 
 //TODO: Rewrite as adbg_util_flatten without snprintf
 //      Internal loop
@@ -172,9 +171,9 @@ int adbg_util_move(void **dst, int dstsz, void **src, int srcsz) {
 //
 
 /// Hexadecimal map for strx0* functions to provide much faster %x parsing
-private char [16]hexmaplow = "0123456789abcdef";
+private immutable char [16]hexmaplow = "0123456789abcdef";
 /// Hexadecimal map for strx0* functions to provide much faster %X parsing
-private char [16]hexmapupp = "0123456789ABCDEF";
+private immutable char [16]hexmapupp = "0123456789ABCDEF";
 
 /**
  * Quick and dirty conversion function to convert an ubyte value to a
@@ -285,12 +284,19 @@ const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 struct sbuffer_t(int size) {
 	size_t index;	/// Current buffer index
 	char[size] data;	/// Buffer data
+	alias data this;
 	
+	/// Add a character into the buffer.
+	/// Params: c = Character
+	/// Returns: Index position
 	size_t add(char c) {
 		if (index < size)
 			data[index++] = c;
 		return index;
 	}
+	/// Add a character into the buffer.
+	/// Params: c = Character
+	/// Returns: Index position
 	size_t add(const(char) *s) {
 		size_t i = index;
 		for (size_t si; i < size && s[si]; ++i, ++si) {
@@ -298,19 +304,30 @@ struct sbuffer_t(int size) {
 		}
 		return index = i;
 	}
-	//TODO: sbuffer_t.add(...)
-	/*size_t add(const(char) *s, ...) {
-		
-		return 0;
-	}*/
-	//TODO: sbuffer_t.add(va_list)
-	/*size_t add(const(char) *s, va_list va) {
-		
-		return 0;
-	}*/
+	/// Add multiple items into buffer.
+	/// Params: s = printf format specificer
+	/// Returns: Index position
+	size_t add(const(char) *s, ...) {
+		import adbg.etc.c.stdarg : va_list, va_start;
+		va_list va = void;
+		va_start(va, s);
+		return add(s, va);
+	}
+	/// Add multiple items into buffer.
+	/// Params: s = printf format specificer
+	/// Returns: Index position
+	size_t add(const(char) *s, ref va_list va) {
+		import adbg.etc.c.stdio : vsnprintf;
+		return vsnprintf(data.ptr + index, index - size, s, va);
+	}
+	
+	/// Prepares and returns null-terminated pointer.
+	/// Return: Character pointer
+	char* pointer() {
+		data[index >= size ? index - 1 : index] = 0;
+		return data.ptr;
+	}
 }
-
-//TODO: Strong consideration of deprecating the following
 
 /**
  * Append a constant string to an existing buffer.
@@ -321,6 +338,7 @@ struct sbuffer_t(int size) {
  * 	str  = String data
  * Returns: Updated buffer index
  */
+//TODO: Consider deprecating
 size_t adbg_util_stradd(char *buf, size_t size, size_t bufi, const(char) *str) {
 	size_t stri;
 	while (str[stri] && bufi < size) {
@@ -341,6 +359,7 @@ size_t adbg_util_stradd(char *buf, size_t size, size_t bufi, const(char) *str) {
  * 	... = Additional objects to be formatted
  * Returns: Updated buffer index
  */
+//TODO: Consider deprecating
 size_t adbg_util_straddf(char *buf, size_t size, size_t bufi, const(char) *f, ...) {
 	va_list va = void;
 	va_start(va, f);
@@ -357,6 +376,7 @@ size_t adbg_util_straddf(char *buf, size_t size, size_t bufi, const(char) *f, ..
  * 	va = Argument list
  * Returns: Updated buffer index
  */
+//TODO: Consider deprecating
 size_t adbg_util_straddva(char *buf, size_t size, size_t bufi, const(char) *f, va_list va) {
 	char [128]b = void;
 	vsnprintf(cast(char*)b, 128, f, va);
@@ -377,10 +397,13 @@ void adbg_util_strlcase(char *buf, size_t size) {
 }
 
 /// Quick Format stack size (characters)
+//TODO: Consider deprecating
 private enum STR_QUICK_STACK_SIZE = 128;
 /// Quick Format stacks count
+//TODO: Consider deprecating
 private enum STR_QUICK_STACKS_COUNT = 16;
 /// Quick Format stack limit (count - 1) for index comparason
+//TODO: Consider deprecating
 private enum STR_QUICK_STACKS_LIMIT = STR_QUICK_STACKS_COUNT - 1;
 
 /**
@@ -396,6 +419,7 @@ private enum STR_QUICK_STACKS_LIMIT = STR_QUICK_STACKS_COUNT - 1;
  *
  * Returns: String
  */
+//TODO: Consider deprecating
 const(char) *adbg_util_strf(const(char) *f, ...) {
 	va_list va = void;
 	va_start(va, f);
@@ -413,6 +437,7 @@ const(char) *adbg_util_strf(const(char) *f, ...) {
  *
  * Returns: String
  */
+//TODO: Consider deprecating
 const(char) *adbg_util_strfva(const(char) *f, va_list va) {
 	__gshared size_t strfc; /// buffer selection index
 	__gshared char [STR_QUICK_STACK_SIZE][STR_QUICK_STACKS_COUNT]b = void;
