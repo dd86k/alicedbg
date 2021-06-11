@@ -10,65 +10,87 @@ module adbg.disasm.syntax.intel;
 import adbg.disasm : adbg_disasm_t;
 import adbg.disasm.syntaxer;
 
-private immutable const(char)*[] WIDTHS = [
+extern (C):
+
+private immutable const(char)*[] INTEL_WIDTH = [
 	"byte",    "word",    "dword",   "qword",
 	"xmmword", "ymmword", "zmmword", "word?"
 ];
 
 // render intel
-void adbg_syntax_intel_item(adbg_syntax_t *p, adbg_syntax_item_t *i) {
-	
-	
+void adbg_syntax_intel_item(ref adbg_syntax_t p, ref adbg_syntax_item_t i) {
 	with (AdbgSyntaxItem)
 	switch (i.type) {
-	case prefix:	// loop
-		if (p.decoderOpts.noPrefixes)
-			return;
-		p.mnemonic.add(i.svalue);
-		return;
-	case mnemonic:	// add
-		p.mnemonic.add(i.svalue);
-		return;
 	case immediate:	// 0x50
-		adbg_syntax_render_immediate_hex(p, i);
+		p.mnemonicBuffer.add("0x%x", i.immediate.value);
 		return;
 	case register:	// eax
+		p.mnemonicBuffer.add(i.register.name);
+		return;
+	case realRegister:	// st,st(1)
+		p.mnemonicBuffer.add(i.realRegister.name);
+		if (i.realRegister.index)
+			p.mnemonicBuffer.add("(%d)", i.realRegister.index);
+		return;
+	case memory:	// dword ptr [0x1000]
+		p.mnemonicBuffer.add(INTEL_WIDTH[i.memory.width]);
+		p.mnemonicBuffer.add(" ptr ");
+		if (p.segmentRegister) {
+			p.mnemonicBuffer.add(p.segmentRegister);
+			p.mnemonicBuffer.add(':');
+		}
+		p.mnemonicBuffer.add('[');
+		adbg_syntax_render_offset(p, i.memory.offset);
+		p.mnemonicBuffer.add(']');
+		return;
+	case memoryFar:	// [0x10:0x1000] -- segment registers are ignored
+		p.mnemonicBuffer.add("%s ptr [0x%x:%x]",
+			INTEL_WIDTH[i.memoryFar.width],
+			i.memoryFar.segment, i.memoryFar.offset.u32);
+		return;
+	case memoryRegister:	// cs:[eax]
+		p.mnemonicBuffer.add(INTEL_WIDTH[i.memoryRegisterOffset.width]);
+		p.mnemonicBuffer.add(" ptr ");
+		if (p.segmentRegister) {
+			p.mnemonicBuffer.add(i.memoryRegister.register);
+			p.mnemonicBuffer.add(':');
+		}
+		p.mnemonicBuffer.add("[%s]", i.memoryRegister.register);
+		return;
+	case memoryRegisterFar:	// dword ptr [0x10:eax]
+		p.mnemonicBuffer.add("%s ptr [%x:%s]",
+			INTEL_WIDTH[i.memoryRegisterFar.width],
+			i.memoryRegisterFar.segment,
+			i.memoryRegisterFar.register);
+		return;
+	case memoryRegisterOffset:	// dword ptr cs:[eax+0x100]
+		p.mnemonicBuffer.add(INTEL_WIDTH[i.memoryRegisterOffset.width]);
+		p.mnemonicBuffer.add(" ptr ");
+		if (p.segmentRegister) {
+			p.mnemonicBuffer.add(p.segmentRegister);
+			p.mnemonicBuffer.add(':');
+		}
+		p.mnemonicBuffer.add('[');
+		p.mnemonicBuffer.add(i.memoryRegisterOffset.register);
+		adbg_syntax_render_offset(p, i.memoryRegisterOffset.offset);
+		p.mnemonicBuffer.add(']');
+		return;
+	case memoryScaleBaseIndexScale:	// dword ptr [eax+ecx*2]
 	
 		return;
-	case realRegister:	// eax
+	case memoryScaleBase:	// dword ptr cs:[eax]
 	
 		return;
-	case memory:	// [0x1000]
+	case memoryScaleIndexScaleOffset:	// dword ptr cs:[ecx*2+0x50]
 	
 		return;
-	case memoryFar:	// [0x10:0x1000] -- can't take segment
+	case memoryScaleOffset:	// dword ptr cs:[0x50]
 	
 		return;
-	case memoryRegister:	// [eax]
+	case memoryScaleBaseIndexScaleOffset:	// dword ptr cs:[eax+ecx*2+0x50]
 	
 		return;
-	case memoryRegisterFar:	// [0x10:eax]
-	
-		return;
-	case memoryRegisterOffset:	// [eax+0x100]
-		
-		return;
-	case memoryScaleBaseIndexScale:	// [eax+ecx*2]
-	
-		return;
-	case memoryScaleBase:	// [eax]
-	
-		return;
-	case memoryScaleIndexScaleOffset:	// [ecx*2+0x50]
-	
-		return;
-	case memoryScaleOffset:	// [0x50]
-	
-		return;
-	case memoryScaleBaseIndexScaleOffset:	// [eax+ecx*2+0x50]
-	
-		return;
-	case memoryScaleBaseOffset:	// [eax+0x50]
+	case memoryScaleBaseOffset:	// dword ptr cs:[eax+0x50]
 	
 		return;
 	default:

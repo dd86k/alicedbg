@@ -33,6 +33,9 @@ extern (C):
 /// If that's not enough, update to 80 characters.
 package enum ADBG_DISASM_BUFFER_SIZE = 64;
 
+/// Don't tell anyone.
+private enum ADBG_COOKIE = 0xccccc0fe;
+
 /// Disassembler options
 enum AdbgDisasmOpt {
 	/// Set the operating mode.
@@ -233,13 +236,15 @@ struct adbg_disasm_t { align(1):
 		deprecated double *lastf64;	/// ditto
 	}
 	/// disasm implementation function
-	int function(adbg_disasm_t*) func;
+	int function(adbg_disasm_t*) decode;
 	union {
 		x86_internals_t *x86;	/// 
 		riscv_internals_t *rv;	/// 
 	}
 	/// Opcode information
 	adbg_disasm_opcode_t *opcode;
+	/// Internal
+	uint cookie;
 	/// (Internal) If byte swapping is required for this architecture.
 	/// If debuggee mode is on, this field is ignored.
 	/// Only fetches of 2, 4, and 8 bytes are affected by this.
@@ -272,7 +277,7 @@ struct adbg_disasm_t { align(1):
 	/// this field is not taken into account.
 	size_t left;
 	/// Responsable for formatting decoded instructions.
-	adbg_syntax_t *syntaxer;
+	adbg_syntax_t syntaxer;
 	
 	//
 	// Options
@@ -302,8 +307,8 @@ struct adbg_disasm_t { align(1):
 
 }
 
-// open
-adbg_disasm_t *adbg_disasm_open(AdbgDisasmPlatform m) {
+// new
+adbg_disasm_t *adbg_disasm_new(AdbgDisasmPlatform m) {
 	import core.stdc.stdlib : calloc;
 	
 	adbg_disasm_t *s = cast(adbg_disasm_t *)calloc(1, adbg_disasm_t.sizeof);
@@ -312,7 +317,7 @@ adbg_disasm_t *adbg_disasm_open(AdbgDisasmPlatform m) {
 		return null;
 	}
 	
-	if (adbg_disasm_reopen(s, m)) {
+	if (adbg_disasm_open(s, m)) {
 		free(s);
 		return null;
 	}
@@ -320,21 +325,22 @@ adbg_disasm_t *adbg_disasm_open(AdbgDisasmPlatform m) {
 	return s;
 }
 
-// reopen
-int adbg_disasm_reopen(adbg_disasm_t *p, AdbgDisasmPlatform m) {
-	p.platform = m;
+// open
+int adbg_disasm_open(adbg_disasm_t *p, AdbgDisasmPlatform m) {
 	with (AdbgDisasmPlatform)
 	switch (m) {
 	case native: goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
-		p.func = &adbg_disasm_x86;
+		p.decode = &adbg_disasm_x86;
 		return 0;
 	case rv32:
-		p.func = &adbg_disasm_riscv;
+		p.decode = &adbg_disasm_riscv;
 		return 0;
 	default:
 		return adbg_error(AdbgError.unsupportedPlatform);
 	}
+	p.platform = m;
+	p.cookie = ADBG_COOKIE;
 }
 
 // start mode raw buffer
@@ -413,16 +419,13 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 /// Returns: Error code; Non-zero indicating an error
 int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 	if (p == null || op == null)
-		return adbg_error(AdbgError.invalidArgument);
-	if (p.func == null)
-		//TODO: "Not initiated" error code?
-		return adbg_error(AdbgError.unsupportedPlatform);
+		return adbg_error(AdbgError.nullArgument);
+	if (p.cookie != ADBG_COOKIE)
+		return adbg_error(AdbgError.uninitiated);
 	
 	// Syntax prep
-	adbg_syntax_t syntaxer = void;
 	if (p.mode >= AdbgDisasmMode.file) {
-		p.syntaxer = &syntaxer;
-		adbg_syntax_reset(&syntaxer);
+		adbg_syntax_reset(p.syntaxer);
 	}
 	
 	// Decode prep
@@ -430,7 +433,7 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 	p.opcode = op;
 	
 	// Decode
-	int e = p.func(p);
+	int e = p.decode(p);
 	
 	if (e == 0) {
 		// opcode size
@@ -438,9 +441,9 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 		
 		// formatting
 		if (p.mode >= AdbgDisasmMode.file) {
-			adbg_syntax_render(&syntaxer);
-			op.machine = syntaxer.machine.data.ptr;
-			op.mnemonic = syntaxer.mnemonic.data.ptr;
+			adbg_syntax_render(p.syntaxer);
+			op.machine = p.syntaxer.machineBuffer.cstring;
+			op.mnemonic = p.syntaxer.mnemonicBuffer.cstring;
 		}
 	}
 	
@@ -450,18 +453,16 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 private import core.stdc.stdlib : free;
 /// Frees a previously allocated disassembly structure.
 /// Params: ptr = adbg_disasm_t structure
-public  alias adbg_disasm_close = free;
+public  alias adbg_disasm_delete = free;
 
 /// (Internal) Fetch data from data source.
 /// Params:
 /// 	p = Disassembler structure pointer
 /// 	u = Data pointer
 /// Returns: Non-zero on error
-//TODO: Consider T... (type-safe template) loop
+//TODO: Consider T... (type-safe template) variadic loop
 package
 int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
-	if (p.left < T.sizeof)
-		return adbg_error(AdbgError.outOfData);
 	int e = void;
 	with (AdbgDisasmInput)
 	switch (p.input) {
@@ -470,6 +471,8 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
 		e = adbg_mm_cread(p.current.sz, u, T.sizeof);
 		break;
 	case raw:
+		if (p.left < T.sizeof)
+			return adbg_error(AdbgError.outOfData);
 		*u = *cast(T*)p.current;
 		e = 0;
 		p.left -= T.sizeof;
@@ -482,6 +485,6 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
 
 // calculate near offset
 package
-void adbg_disasm_offset(T)(adbg_disasm_t *p, T u) {
+void adbg_disasm_calc_offset(T)(adbg_disasm_t *p, T u) {
 	//TODO: adbg_disasm_offset
 }

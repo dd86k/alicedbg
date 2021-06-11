@@ -61,11 +61,13 @@ immutable setting_syntax_t[] syntaxes = [
 //
 
 /// Common settings shared between sub-modules
-settings_t common_settings;
+settings_t settings;
 /// Last exception
-exception_t common_exception;
+exception_t last_exception;
 /// Disassembler settings
-adbg_disasm_t common_disasm;
+deprecated("use disassembler where appropriate") adbg_disasm_t common_disasm;
+/// Disassembler
+adbg_disasm_t disassembler;
 
 //
 // Settings
@@ -87,6 +89,8 @@ struct settings_t {
 	const(char) *dir;	/// Debuggee: directory
 	uint pid;	/// Debuggee: PID
 	uint flags;	/// Flags to pass to callee
+	AdbgDisasmPlatform platform;	/// 
+	AdbgSyntax syntax;	/// 
 }
 
 /// Print last library error information to stdout 

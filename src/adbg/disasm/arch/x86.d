@@ -1,5 +1,5 @@
 /**
- * 8086/x86/amd64 decoder.
+ * Linear 8086/x86/amd64 decoder.
  *
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k
@@ -7,8 +7,10 @@
  */
 module adbg.disasm.arch.x86;
 
-//TODO: Consider default segment per instruction
-//TODO: Use signed numbers as much as possible
+//TODO: Flow-oriented disassembly
+//      With setting, code or data mode
+//      With adbg_syntax_number_t buffer?
+//      1. Save previous jmp targets
 
 //TODO:
 
@@ -48,7 +50,7 @@ struct vex_t { align(1):
 		ulong all;
 		struct {
 			ubyte LL;	/// VEX.L vector length
-					// 0=scalar/i128, 1=i256, 2=i512, 3=reserved (i1024)
+					// 0=scalar/i128, 1=i256, 2=i512, 3=i1024 (reserved)
 			ubyte pp;	/// VEX.pp opcode extension (NONE, 66H, F2H, F3H)
 			ubyte vvvv;	/// VEX.vvvv register, limited to 3 bits in x86-32
 			bool W;	/// REX.W alias, 1=64-bit size, 0=CS.D (normal operation)
@@ -110,27 +112,33 @@ L_PREFIX:
 	switch (opcode) {
 	case 0x26:
 		x86.prefix.segment = x86Segment.es;
-		p.syntaxer.segment = segs[x86Segment.es];
+		if (p.mode >= AdbgDisasmMode.file)
+			adbg_syntax_add_segment(p.syntaxer, segs[x86Segment.es]);
 		goto L_PREFIX;
 	case 0x2e:
 		x86.prefix.segment = x86Segment.cs;
-		p.syntaxer.segment = segs[x86Segment.cs];
+		if (p.mode >= AdbgDisasmMode.file)
+			adbg_syntax_add_segment(p.syntaxer, segs[x86Segment.cs]);
 		goto L_PREFIX;
 	case 0x36:
 		x86.prefix.segment = x86Segment.ss;
-		p.syntaxer.segment = segs[x86Segment.ss];
+		if (p.mode >= AdbgDisasmMode.file)
+			adbg_syntax_add_segment(p.syntaxer, segs[x86Segment.ss]);
 		goto L_PREFIX;
 	case 0x3e:
 		x86.prefix.segment = x86Segment.ds;
-		p.syntaxer.segment = segs[x86Segment.ds];
+		if (p.mode >= AdbgDisasmMode.file)
+			adbg_syntax_add_segment(p.syntaxer, segs[x86Segment.ds]);
 		goto L_PREFIX;
 	case 0x64:
 		x86.prefix.segment = x86Segment.fs;
-		p.syntaxer.segment = segs[x86Segment.fs];
+		if (p.mode >= AdbgDisasmMode.file)
+			adbg_syntax_add_segment(p.syntaxer, segs[x86Segment.fs]);
 		goto L_PREFIX;
 	case 0x65:
 		x86.prefix.segment = x86Segment.gs;
-		p.syntaxer.segment = segs[x86Segment.gs];
+		if (p.mode >= AdbgDisasmMode.file)
+			adbg_syntax_add_segment(p.syntaxer, segs[x86Segment.gs]);
 		goto L_PREFIX;
 	case 0x66: // Data, 64-bit = REX.W (48H)
 		x86.prefix.addr =
@@ -458,7 +466,7 @@ int adbg_disasm_x86_op_Ib(adbg_disasm_t *p) { // Immediate 8-bit
 	if (e == 0) {
 		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_syntax_add_machine!ubyte(p.syntaxer, i);
-			adbg_syntax_add_immediate!ubyte(p.syntaxer, i);
+			adbg_syntax_add_immediate(p.syntaxer, i);
 		}
 	}
 	return e;
@@ -476,7 +484,7 @@ int adbg_disasm_x86_op_Iz(adbg_disasm_t *p) { // Immediate 16/32-bit
 		if (e == 0) {
 			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_syntax_add_machine!uint(p.syntaxer, u.i32);
-				adbg_syntax_add_immediate!uint(p.syntaxer, u.i32);
+				adbg_syntax_add_immediate(p.syntaxer, u.i32);
 			}
 		}
 	} else {
@@ -484,7 +492,7 @@ int adbg_disasm_x86_op_Iz(adbg_disasm_t *p) { // Immediate 16/32-bit
 		if (e == 0) {
 			if (p.mode >= AdbgDisasmMode.file) {
 				adbg_syntax_add_machine!uint(p.syntaxer, u.i16);
-				adbg_syntax_add_immediate!uint(p.syntaxer, u.i16);
+				adbg_syntax_add_immediate(p.syntaxer, u.i16);
 			}
 		}
 	}
@@ -496,10 +504,10 @@ int adbg_disasm_x86_op_Jb(adbg_disasm_t *p) { // Immediate 8-bit
 	int e = adbg_disasm_fetch!ubyte(p, &i);
 	if (e == 0) {
 		if (p.mode >= AdbgDisasmMode.data)
-			adbg_disasm_offset!ubyte(p, i);
+			adbg_disasm_calc_offset!ubyte(p, i);
 		if (p.mode >= AdbgDisasmMode.file) {
 			adbg_syntax_add_machine!ubyte(p.syntaxer, i);
-			adbg_syntax_add_immediate!ubyte(p.syntaxer, i);
+			adbg_syntax_add_immediate(p.syntaxer, i);
 		}
 	}
 	return e;

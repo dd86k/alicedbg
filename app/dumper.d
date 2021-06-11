@@ -99,6 +99,7 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 		return EXIT_FAILURE;
 	}
 	
+	//TODO: Rework this part for new disasm
 	if (flags & DumpOpt.raw) {
 		if (fseek(f, 0, SEEK_END)) {
 			perror(__FUNCTION__.ptr);
@@ -191,7 +192,7 @@ L_DISASM_1:
 			goto L_DISASM_1;
 		case outOfData: break;
 		default:
-			printf("disasm: %s\n", adbg_error_msg);
+			printerror();
 			return e;
 		}
 		printf(
@@ -215,12 +216,12 @@ L_DISASM_2:
 		i += op.size;
 		goto L_DISASM_2;
 	case illegalInstruction:
-		printf("%08X %-30s (error)\n", i, op.machine);
+		printf("%08X %-30s (bad)\n", i, op.machine);
 		i += op.size;
 		goto L_DISASM_2;
 	case outOfData: break;
 	default:
-		printf("disasm: %s\n", adbg_error_msg);
+		printerror();
 		return e;
 	}
 	

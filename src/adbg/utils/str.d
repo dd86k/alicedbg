@@ -13,8 +13,68 @@ import core.stdc.string;
 
 extern (C):
 
-/// An empty string in case compilers cannot pool strings
+/// An empty string in case compilers does not support pool strings.
 immutable const(char) *empty_string = "";
+
+/// Static string buffer structure
+struct sbuffer_t(int bsize) {
+	size_t index;	/// Current buffer index
+	char[bsize] data;	/// Buffer data
+	alias data this;
+	enum size = bsize;
+	
+	/// Add a character into the buffer.
+	/// Params: c = Character
+	/// Returns: Index position
+	size_t add(char c) {
+		if (index < bsize)
+			data[index++] = c;
+		return index;
+	}
+	/// Add a character into the buffer.
+	/// Params: c = Character
+	/// Returns: Index position
+	size_t add(const(char) *s) {
+		for (size_t si; index < bsize && s[si]; ++index, ++si) {
+			data[index] = s[si];
+		}
+		return index;
+	}
+	static if (__VERSION__ >= 2092) {
+		/// Add multiple items into buffer.
+		/// Params: s = printf format specificer
+		/// Returns: Index position
+		pragma(printf)
+		size_t add(const(char) *s, ...) {
+			import adbg.etc.c.stdarg : va_list, va_start;
+			va_list va = void;
+			va_start(va, s);
+			return add(s, va);
+		}
+	} else {
+		/// ditto
+		size_t add(const(char) *s, ...) {
+			import adbg.etc.c.stdarg : va_list, va_start;
+			va_list va = void;
+			va_start(va, s);
+			return add(s, va);
+		}
+	}
+	/// Add multiple items into buffer.
+	/// Params: s = printf format specificer
+	/// Returns: Index position
+	size_t add(const(char) *s, ref va_list va) {
+		import adbg.etc.c.stdio : vsnprintf;
+		return vsnprintf(data.ptr + index, index - bsize, s, va);
+	}
+	
+	/// Prepares and returns null-terminated pointer.
+	/// Return: Character pointer
+	char* cstring() {
+		data[index >= bsize ? index - 1 : index] = 0;
+		return data.ptr;
+	}
+}
 
 //TODO: Rewrite as adbg_util_flatten without snprintf
 //      Internal loop
@@ -175,6 +235,10 @@ private immutable char [16]hexmaplow = "0123456789abcdef";
 /// Hexadecimal map for strx0* functions to provide much faster %X parsing
 private immutable char [16]hexmapupp = "0123456789ABCDEF";
 
+//TODO: adbg_util_strx(T)(char* buffer, size_t bufsz, T v, bool upper = false)
+//      - No leading zeroes
+//      - Mainly for syntax engine (current case, even)
+
 /**
  * Quick and dirty conversion function to convert an ubyte value to a
  * '0'-padded hexadecimal string. Faster than using vsnprintf.
@@ -279,55 +343,6 @@ const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 //
 // Generic string formatting
 //
-
-/// Static string buffer structure
-struct sbuffer_t(int size) {
-	size_t index;	/// Current buffer index
-	char[size] data;	/// Buffer data
-	alias data this;
-	
-	/// Add a character into the buffer.
-	/// Params: c = Character
-	/// Returns: Index position
-	size_t add(char c) {
-		if (index < size)
-			data[index++] = c;
-		return index;
-	}
-	/// Add a character into the buffer.
-	/// Params: c = Character
-	/// Returns: Index position
-	size_t add(const(char) *s) {
-		size_t i = index;
-		for (size_t si; i < size && s[si]; ++i, ++si) {
-			data[i] = s[si];
-		}
-		return index = i;
-	}
-	/// Add multiple items into buffer.
-	/// Params: s = printf format specificer
-	/// Returns: Index position
-	size_t add(const(char) *s, ...) {
-		import adbg.etc.c.stdarg : va_list, va_start;
-		va_list va = void;
-		va_start(va, s);
-		return add(s, va);
-	}
-	/// Add multiple items into buffer.
-	/// Params: s = printf format specificer
-	/// Returns: Index position
-	size_t add(const(char) *s, ref va_list va) {
-		import adbg.etc.c.stdio : vsnprintf;
-		return vsnprintf(data.ptr + index, index - size, s, va);
-	}
-	
-	/// Prepares and returns null-terminated pointer.
-	/// Return: Character pointer
-	char* pointer() {
-		data[index >= size ? index - 1 : index] = 0;
-		return data.ptr;
-	}
-}
 
 /**
  * Append a constant string to an existing buffer.

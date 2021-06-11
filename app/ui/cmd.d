@@ -323,7 +323,7 @@ int cmd_c_quit(int argc, const(char) **argv) {
 //
 
 int cmd_handler(exception_t *ex) {
-	memcpy(&common_exception, ex, exception_t.sizeof);
+	memcpy(&last_exception, ex, exception_t.sizeof);
 	
 	printf(
 	"*	Thread %d stopped for: %s ("~SYS_ERR_FMT~")\n",

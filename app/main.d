@@ -12,7 +12,7 @@ import core.stdc.string : strcmp, strncpy, strtok;
 import core.stdc.stdio;
 import adbg.platform;
 import adbg.dbg : adbg_attach, adbg_load;
-import adbg.disasm : adbg_disasm_t, AdbgDisasmPlatform, AdbgDisasmSyntax, AdbgSyntax;
+import adbg.disasm;
 import adbg.sys.err : adbg_sys_perror;
 import common, dumper, ui;
 
@@ -28,7 +28,7 @@ __gshared:
 //
 
 // if asking for help, so '?' and "help" are accepted
-bool cli_wanthelp(const(char) *query) {
+bool cli_needhelp(const(char) *query) {
 	switch (query[0]) {
 	case '?': return true;
 	default: return strcmp(query, "help") == 0;
@@ -79,7 +79,7 @@ enum NUMBER_OF_SECRETS = 1;
 //
 
 int cli_march(const(char) *val) {
-	if (cli_wanthelp(val)) {
+	if (cli_needhelp(val)) {
 		puts("Available machine architectures:");
 		foreach (setting_platform_t p; platforms) {
 			with (p)
@@ -89,7 +89,7 @@ int cli_march(const(char) *val) {
 	}
 	foreach (setting_platform_t p; platforms) {
 		if (strcmp(val, p.opt) == 0 || strcmp(val, p.alt) == 0) {
-			common_disasm.platform = p.val;
+			settings.platform = p.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -101,7 +101,7 @@ int cli_march(const(char) *val) {
 //
 
 int cli_syntax(const(char) *val) {
-	if (cli_wanthelp(val)) {
+	if (cli_needhelp(val)) {
 		puts("Available disassembler syntaxes:");
 		foreach (setting_syntax_t syntax; syntaxes) {
 			with (syntax)
@@ -111,7 +111,7 @@ int cli_syntax(const(char) *val) {
 	}
 	foreach (setting_syntax_t syntax; syntaxes) {
 		if (strcmp(val, syntax.opt) == 0) {
-			//TODO: change syntax
+			adbg_disasm_opt(&common_disasm, AdbgDisasmOpt.syntax, syntax.val);
 			return EXIT_SUCCESS;
 		}
 	}
@@ -123,7 +123,7 @@ int cli_syntax(const(char) *val) {
 //
 
 int cli_file(const(char) *val) {
-	common_settings.file = val;
+	settings.file = val;
 	return EXIT_SUCCESS;
 }
 
@@ -137,16 +137,16 @@ int cli_argsdd(int argi, int argc, const(char) **argv) { // --
 	enum MAX = 16;
 	__gshared const(char) *[MAX] args;
 	
-	common_settings.args = cast(const(char)**)args;
+	settings.args = cast(const(char)**)args;
 	
 	int left = argc - argi; /// to move
 	void **s = cast(void**)(argv+argi);
 	
 	int m = adbg_util_move(
-		cast(void**)&common_settings.args, MAX,
+		cast(void**)&settings.args, MAX,
 		cast(void**)&s, left);
 	
-	assert(m == left, "cli_argsdd: 'adbg_util_move' Failed due to small buffer");
+	debug assert(m == left, "cli_argsdd: 'adbg_util_move' Failed due to small buffer");
 	
 	return EXIT_SUCCESS;
 }
@@ -159,7 +159,7 @@ int cli_args(const(char) *val) { // --args
 	if (argc == 0)
 		return EXIT_FAILURE;
 	
-	common_settings.args = cast(const(char)**)argv;
+	settings.args = cast(const(char)**)argv;
 	return EXIT_SUCCESS;
 }
 
@@ -170,9 +170,9 @@ int cli_args(const(char) *val) { // --args
 int cli_env(const(char) *val) {
 	import adbg.utils.str : adbg_util_env;
 	
-	common_settings.env = cast(const(char)**)adbg_util_env(val);
+	settings.env = cast(const(char)**)adbg_util_env(val);
 	
-	if (common_settings.env == null) {
+	if (settings.env == null) {
 		printf("main: Parsing environment failed");
 		return EXIT_FAILURE;
 	}
@@ -185,7 +185,7 @@ int cli_env(const(char) *val) {
 //
 
 int cli_pid(const(char) *val) {
-	common_settings.pid = cast(ushort)strtol(val, null, 10);
+	settings.pid = cast(ushort)strtol(val, null, 10);
 	return EXIT_SUCCESS;
 }
 
@@ -204,7 +204,7 @@ immutable setting_ui_t[] uis = [
 //	{ SettingUI.server, "server", "(n/a) TCP/IP server" },
 ];
 int cli_ui(const(char)* val) {
-	if (cli_wanthelp(val)) {
+	if (cli_needhelp(val)) {
 		puts("Available UIs:");
 		foreach (setting_ui_t ui; uis) {
 			printf("%-10s%s\n", ui.opt, ui.desc);
@@ -213,7 +213,7 @@ int cli_ui(const(char)* val) {
 	}
 	foreach (setting_ui_t ui; uis) {
 		if (strcmp(val, ui.opt) == 0) {
-			common_settings.ui = ui.val;
+			settings.ui = ui.val;
 			return 0;
 		}
 	}
@@ -225,7 +225,7 @@ int cli_ui(const(char)* val) {
 //
 
 int cli_dump() {
-	common_settings.mode = SettingMode.dump;
+	settings.mode = SettingMode.dump;
 	return EXIT_SUCCESS;
 }
 
@@ -234,7 +234,7 @@ int cli_dump() {
 //
 
 int cli_raw() {
-	common_settings.flags |= DumpOpt.raw;
+	settings.flags |= DumpOpt.raw;
 	return EXIT_SUCCESS;
 }
 
@@ -261,7 +261,7 @@ immutable setting_show_t[] showflags = [
 	{ 'A', "Show everything", DumpOpt.everything },
 ];
 int cli_show(const(char) *val) {
-	if (cli_wanthelp(val)) {
+	if (cli_needhelp(val)) {
 		puts("Available dumper display options:");
 		foreach (setting_show_t show; showflags) {
 			printf("%c\t%s\n", show.opt, show.desc);
@@ -273,7 +273,7 @@ int cli_show(const(char) *val) {
 		++val;
 		foreach (setting_show_t show; showflags) {
 			if (c == show.opt) {
-				common_settings.flags |= show.val;
+				settings.flags |= show.val;
 				continue A;
 			}
 		}
@@ -341,7 +341,7 @@ int cli_ver() {
 
 int cli_license() {
 	puts(
-	`BSD 3-Clause License
+`BSD 3-Clause License
 
 Copyright (c) 2019-2021, dd86k <dd@dax.moe>
 All rights reserved.
@@ -412,8 +412,8 @@ int main(int argc, const(char)** argv) {
 		bool isopt  = argLong[0] == '-';
 		
 		if (isopt == false) {
-			if (common_settings.file == null) {
-				common_settings.file = argLong;
+			if (settings.file == null) {
+				settings.file = argLong;
 				continue CLI;
 			}
 			
@@ -490,26 +490,26 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
-	with (common_settings)
-	switch (mode) {
+	switch (settings.mode) {
 	case SettingMode.dump:
-		return dump(file, &common_disasm, flags);
+		adbg_disasm_open(&common_disasm, settings.platform);
+		return dump(settings.file, &common_disasm, settings.flags);
 	case SettingMode.trace:
 		puts("main: tracer not supported at this moment");
 		return EXIT_FAILURE;
 	case SettingMode.debugger:
 		// Pre-load target if specified.
 		// Necessary for loop UI, but optional for others
-		if (file) {
-			if (adbg_load(file, args)) {
+		if (settings.file) {
+			if (adbg_load(settings.file, settings.args)) {
 				printerror;
 				return EXIT_FAILURE;
 			}
 			
-			printf("File '%s' loaded\n", file);
+			printf("File '%s' loaded\n", settings.file);
 		}
 		
-		switch (ui) {
+		switch (settings.ui) {
 		case SettingUI.loop:	return loop();
 		case SettingUI.cmd:	return cmd();
 		case SettingUI.tui:	return tui();

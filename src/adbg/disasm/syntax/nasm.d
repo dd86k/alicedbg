@@ -10,13 +10,15 @@ module adbg.disasm.syntax.nasm;
 import adbg.disasm : adbg_disasm_t;
 import adbg.disasm.syntaxer;
 
-private immutable const(char)*[] WIDTHS = [
+extern (C):
+
+private immutable const(char)*[] NASM_WIDTH = [
 	"byte", "word", "dword", "qword",
 	"oword", "yword", "zword", "word?"
 ];
 
 // render nasm
-void adbg_syntax_nasm_item(adbg_syntax_t *p, adbg_syntax_item_t *i) {
+void adbg_syntax_nasm_item(ref adbg_syntax_t p, ref adbg_syntax_item_t i) {
 	
 	
 }

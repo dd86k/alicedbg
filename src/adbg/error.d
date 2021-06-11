@@ -41,6 +41,7 @@ enum AdbgError {
 	invalidArgument	= 1,
 	nullArgument	= 2,
 	allocationFailed	= 3,
+	uninitiated	= 4,
 	//
 	// Debugger
 	//
@@ -79,6 +80,7 @@ private immutable error_t[] errors = [
 	{ AdbgError.invalidArgument, "Invalid parameter value." },
 	{ AdbgError.nullArgument, "Parameter is null." },
 	{ AdbgError.allocationFailed, "Memory allocation failed, maybe the machine is out of memory." },
+	{ AdbgError.uninitiated, "Object or structure is uninitiated." },
 	//
 	// Debugger
 	//
