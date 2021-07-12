@@ -18,8 +18,23 @@ private immutable const(char)*[] INTEL_WIDTH = [
 ];
 
 // render intel
-void adbg_syntax_intel_item(ref adbg_syntax_t p, ref adbg_syntax_item_t i) {
-	with (AdbgSyntaxItem)
+void adbg_syntax_op_intel(ref adbg_syntaxer_t p, ref adbg_syntax_op_t op) {
+	switch (op.type) {
+	case AdbgSyntaxType.immediate:
+		p.mnemonicBuffer.add("0x%x", op.imm.value);
+		break;
+	case AdbgSyntaxType.register:
+		if (op.reg.isReal)
+			p.mnemonicBuffer.add("%s(%d)", op.reg.name, op.reg.index);
+		else
+			p.mnemonicBuffer.add(op.reg.name);
+		break;
+	case AdbgSyntaxType.memory:
+		
+		break;
+	default: assert(0);
+	}
+	/*with (AdbgSyntaxItem)
 	switch (i.type) {
 	case immediate:	// 0x50
 		p.mnemonicBuffer.add("0x%x", i.immediate.value);
@@ -95,5 +110,5 @@ void adbg_syntax_intel_item(ref adbg_syntax_t p, ref adbg_syntax_item_t i) {
 		return;
 	default:
 		assert(0, "intel: implement disasm type");
-	}
+	}*/
 }

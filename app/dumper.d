@@ -109,15 +109,17 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 		uint fl = cast(uint)ftell(f);
 		fseek(f, 0, SEEK_SET); // rewind binding is broken
 		
-		void *m = malloc(fl + 16);
-		if (m == null)
+		void *data = malloc(fl);
+		if (data == null) {
+			perror(__FUNCTION__.ptr);
 			return EXIT_FAILURE;
-		if (fread(m, fl, 1, f) == 0) {
+		}
+		if (fread(data, fl, 1, f) == 0) {
 			perror(__FUNCTION__.ptr);
 			return EXIT_FAILURE;
 		}
 		
-		return dump_disasm(dopts, m, fl, flags);
+		return dump_disasm(dopts, data, fl, flags);
 	}
 	
 	adbg_object_t obj = void;
@@ -132,7 +134,7 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 	if ((flags & 0xFF_FFFF) == 0)
 		flags |= DumpOpt.header;
 	
-	if (dopts.platform == AdbgDisasmPlatform.native)
+	if (dopts.platform == AdbgPlatform.native)
 		dopts.platform = obj.platform;
 	
 	dump_t dump = void;
@@ -176,7 +178,7 @@ int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 		uint ills;	/// Number of illegal instructions
 L_DISASM_1:
 		with (AdbgError)
-		switch ((e = adbg_disasm(dp, &op)) != 0) {
+		switch (e = adbg_disasm(dp, &op)) {
 		case none:
 			iavg += op.size;
 			++icnt;
@@ -210,7 +212,7 @@ L_DISASM_1:
 	uint i;
 L_DISASM_2:
 	with (AdbgError)
-	switch ((e = adbg_disasm(dp, &op)) != 0) {
+	switch (e = adbg_disasm(dp, &op)) {
 	case none:
 		printf("%08X %-30s %s\n", i, op.machine, op.mnemonic);
 		i += op.size;

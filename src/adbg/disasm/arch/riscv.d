@@ -9,7 +9,6 @@ module adbg.disasm.arch.riscv;
 
 import adbg.error;
 import adbg.disasm.disasm;
-import adbg.disasm.formatter;
 import adbg.utils.bit;
 
 extern (C):
@@ -24,6 +23,8 @@ struct riscv_internals_t { align(1):
 	}
 }
 
+version (0):
+
 //TODO: Functions to process opcodes by types (C.I, I, C.J, J, etc.)
 //      1. rv32_ci(string, int) e.g. rv32_ci("c.jal", op);
 //      2. rv32_ci(string, string, int) e.g. rv32_ci("c.jal", "x1", 0x20);
@@ -32,6 +33,8 @@ struct riscv_internals_t { align(1):
 /// Note: So far only does risc-v-32
 /// Params: p = Disassembler parameters
 int adbg_disasm_riscv(adbg_disasm_t *p) {
+	return 0;
+	/+
 	riscv_internals_t i = void;
 //	p.rv = &i;
 
@@ -250,6 +253,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		return 0;
 	default: return adbg_error(AdbgError.illegalInstruction);
 	}
+	+/
 }
 
 private:

@@ -12,14 +12,28 @@ module adbg.disasm.arch.x86;
 //      With adbg_syntax_number_t buffer?
 //      1. Save previous jmp targets
 
-//TODO:
-
 import adbg.error;
 import adbg.disasm.disasm;
 
 extern (C):
-	
+
 private import adbg.disasm.syntaxer;
+
+private
+enum x86Attr : uint {
+	modrm	= 0x0000_0001,	/// Has ModRM byte
+	sib	= 0x0000_0002,	/// Has SIB byte
+	rex	= 0x0000_0004,	/// Has REX prefix
+	xop	= 0x0000_0008,	/// Has XOP prefix
+	vex	= 0x0000_0010,	/// Has VEX prefix
+	evex	= 0x0000_0020,	/// Has EVEX prefix
+	mvex	= 0x0000_0040,	/// Has MVEX prefix
+	relative	= 0x0000_0080,	/// Has at least one operand with position-relative offset
+	privileged	= 0x0000_0100,	/// Instruction is privileged
+}
+
+private
+enum MAX_INSTRUCTION_LEN = 15;
 
 private
 struct prefixes_t { align(1):
@@ -72,9 +86,18 @@ struct vex_data_t { align(1):
 
 /// x86 internal structure
 struct x86_internals_t { align(1):
-	prefixes_t prefix;	/// Prefix data
-	vex_data_t vexraw;	/// VEX raw data
-	vex_t vex;	/// VEX computed fields
+	union {
+		ulong[4] z;	/// 
+		struct {
+			ushort counter;	/// Instruction decoding counter limit
+			prefixes_t prefix;	/// Prefix data
+			vex_data_t vexraw;	/// VEX raw data
+			vex_t vex;	/// VEX/REX computed fields
+			bool modrm;	/// 
+			bool sib;	/// 
+			bool mvex;	/// 
+		}
+	}
 }
 
 /// (Internal)
@@ -90,16 +113,23 @@ int adbg_disasm_x86(adbg_disasm_t *p) {
 	enum MODEPACK16 = AdbgSyntaxWidth.i16 | AdbgSyntaxWidth.i16 << 8;
 	
 	x86_internals_t x86 = void;
+	x86.z[3] = x86.z[2] = x86.z[1] = x86.z[0] = 0;
 	
-	with (AdbgDisasmPlatform)
+	with (AdbgPlatform)
 	switch (p.platform) {
-	case x86_64: x86.prefix.modes = MODEPACK64; break; // AMD64
-	case x86_32: x86.prefix.modes = MODEPACK32; break; // i386
-	default:     x86.prefix.modes = MODEPACK16; break; // 8086
+	case x86_64:
+		x86.prefix.addr = AdbgSyntaxWidth.i64;
+		x86.prefix.data = AdbgSyntaxWidth.i32;
+		break;
+	case x86_32:
+		x86.prefix.addr = AdbgSyntaxWidth.i32;
+		x86.prefix.data = AdbgSyntaxWidth.i32;
+		break;
+	default:
+		x86.prefix.addr = AdbgSyntaxWidth.i16;
+		x86.prefix.data = AdbgSyntaxWidth.i16;
+		break;
 	}
-	x86.prefix.all = 0;
-	x86.vex.all = 0;
-	x86.vexraw.i32 = 0;
 	p.x86 = &x86;
 	
 	ubyte opcode = void;
@@ -140,13 +170,13 @@ L_PREFIX:
 		if (p.mode >= AdbgDisasmMode.file)
 			adbg_syntax_add_segment(p.syntaxer, segs[x86Segment.gs]);
 		goto L_PREFIX;
-	case 0x66: // Data, 64-bit = REX.W (48H)
+	case 0x66: // Data, in 64-bit+AVX, controlled by REX.W (48H)
 		x86.prefix.addr =
 			x86.prefix.addr == AdbgSyntaxWidth.i16 ?
 			AdbgSyntaxWidth.i32 : AdbgSyntaxWidth.i16;
 		x86.prefix.last = x86Prefix.data;
 		goto L_PREFIX;
-	case 0x67: // Address, 64-bit = REX.XB (42H,41H)
+	case 0x67: // Address, in 64-bit+AVX, controlled by REX.XB (42H,41H)
 		x86.prefix.addr =
 			x86.prefix.addr == AdbgSyntaxWidth.i16 ?
 			AdbgSyntaxWidth.i32 : AdbgSyntaxWidth.i16;
@@ -163,29 +193,30 @@ L_PREFIX:
 		x86.prefix.repne = true;
 		x86.prefix.last = x86Prefix.repne;
 		if (p.mode >= AdbgDisasmMode.file)
-			if (x86.prefix.repne == false) // avoid spam
-				adbg_syntax_add_prefix(p.syntaxer, "repne");
+			adbg_syntax_add_prefix(p.syntaxer, "repne");
 		goto L_PREFIX;
 	case 0xf3:
 		x86.prefix.rep = true;
 		x86.prefix.last = x86Prefix.rep;
 		if (p.mode >= AdbgDisasmMode.file)
-			if (x86.prefix.rep == false) // avoid spam
-				adbg_syntax_add_prefix(p.syntaxer, "rep");
+			adbg_syntax_add_prefix(p.syntaxer, "rep");
 		goto L_PREFIX;
 	default:
+		goto L_DECODE;
 	}
 	
 	// Opcode
 L_OPCODE:
 	if ((e = adbg_disasm_fetch!ubyte(p, &opcode)) != 0) return e;
-	
+
+L_DECODE:
+	// Going ascending to make second opcode map closer (branching)
 	if (opcode < 0x40) {
 		// Most used instructions these days are outside of this map.
 		// So, the 2-byte escape is checked here.
 		if (opcode == 0x0f) return adbg_disasm_x86_0f(p);
 		
-		//          r   m
+		//         reg r/m
 		//              DW
 		// 0	00 000 000	modrm
 		// 1	00 000 001	modrm
@@ -210,7 +241,7 @@ L_OPCODE:
 				return 0;
 			}
 			// Prefixes already taken care of
-			if (p.platform == AdbgDisasmPlatform.x86_64)
+			if (p.platform == AdbgPlatform.x86_64)
 				return adbg_error(AdbgError.illegalInstruction);
 			// 27h	00 100 111	daa
 			// 2fh	00 101 111	das
@@ -241,7 +272,7 @@ L_OPCODE:
 		return adbg_disasm_x86_modrm_legacy_opcode(p, opcode);
 	}
 	if (opcode < 0x50) { // >=40H, INC/DEC or REX
-		if (p.platform == AdbgDisasmPlatform.x86_64) {
+		if (p.platform == AdbgPlatform.x86_64) {
 			x86.vex.W  = (opcode & 8) != 0;
 			x86.vex.RR = (opcode & 4) != 0;
 			x86.vex.X  = (opcode & 2) != 0;
@@ -250,7 +281,7 @@ L_OPCODE:
 		}
 		if (p.mode >= AdbgDisasmMode.file) {
 			ubyte m = opcode & 7;
-			adbg_syntax_add_mnemonic(p.syntaxer, opcode < 0x48 ? M_INC : M_DEC);
+			adbg_syntax_add_mnemonic(p.syntaxer, opcode >= 0x48 ? M_DEC : M_INC);
 			adbg_syntax_add_register(p.syntaxer, regs[x86.prefix.data][m]);
 		}
 		return 0;
@@ -368,14 +399,15 @@ enum x86Segment : ubyte {
 }
 /// x86 prefixes
 enum x86Prefix : ubyte {
-	data	= 0x66, /// 0x66
-	addr	= 0x67, /// 0x67
-	lock	= 0xf0, /// 0xF0
-	repne	= 0xf2, /// 0xF2
-	rep	= 0xf3, /// 0xF3
-	_66h	= data,
-	_f2h	= repne,
-	_f3h	= rep,
+	data	= 0x66,	/// 0x66
+	addr	= 0x67,	/// 0x67
+	lock	= 0xf0,	/// 0xF0
+	repne	= 0xf2,	/// 0xF2
+	rep	= 0xf3,	/// 0xF3
+	_66h	= data,	/// Data operand prefix
+	_67h	= addr,	/// Address operand prefix
+	_f2h	= repne,	/// REPNE
+	_f3h	= rep,	/// REP/REPE
 }
 
 enum x86Reg { // ModRM order

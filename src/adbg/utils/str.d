@@ -21,7 +21,7 @@ struct sbuffer_t(int bsize) {
 	size_t index;	/// Current buffer index
 	char[bsize] data;	/// Buffer data
 	alias data this;
-	enum size = bsize;
+	enum size = bsize;	/// Bufer size
 	
 	/// Add a character into the buffer.
 	/// Params: c = Character

@@ -14,7 +14,7 @@ module adbg.obj.elf;
 import adbg.error;
 import adbg.obj.def;
 import adbg.obj.server : adbg_object_t, AdbgObjFormat;
-import adbg.disasm.disasm : AdbgDisasmPlatform;
+import adbg.disasm.disasm : AdbgPlatform;
 
 // NOTE: The string table section is typically named .shstrtab
 
@@ -526,13 +526,13 @@ int adbg_obj_elf_preload(adbg_object_t *obj) {
 	ushort e_machine = obj.elf.hdr32.e_machine;
 	
 	with (obj)
-	with (AdbgDisasmPlatform)
+	with (AdbgPlatform)
 	switch (e_machine) {
 	case ELF_EM_386: platform = x86_32; break;
 	case ELF_EM_X86_64: platform = x86_64; break;
 	case ELF_EM_RISCV:
 		switch (e_class) {
-		case ELFCLASS32: platform = rv32; break;
+		case ELFCLASS32: platform = riscv32; break;
 		default:
 		}
 		break;

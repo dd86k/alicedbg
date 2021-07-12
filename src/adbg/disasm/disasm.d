@@ -15,12 +15,10 @@ module adbg.disasm.disasm;
 //      add items in the syntaxer buffers.
 
 import adbg.error;
-import adbg.disasm.arch;
-import adbg.disasm.formatter;
-import adbg.disasm.syntaxer;
 import adbg.utils.bit : swapfunc16, swapfunc32, swapfunc64, BIT;
 import adbg.platform : adbg_address_t;
-public import adbg.disasm.syntaxer : AdbgSyntax;
+import adbg.disasm.arch;
+import adbg.disasm.syntaxer;
 
 extern (C):
 
@@ -34,7 +32,24 @@ extern (C):
 package enum ADBG_DISASM_BUFFER_SIZE = 64;
 
 /// Don't tell anyone.
-private enum ADBG_COOKIE = 0xccccc0fe;
+// Acts as a "bool" to see if things are setup.
+version (X86)
+	private enum ADBG_COOKIE = 0xccccc0fe;
+else version (X86_64)
+	private enum ADBG_COOKIE = 0xccccc0fe;	/// Ditto
+
+/// Disassembler ABI
+enum AdbgPlatform : ubyte {
+	native,	/// (Default) Platform compiled target, see DEFAULT_PLATFORM
+	x86_16,	/// (WIP) 8086, 80186, 80286
+	x86_32,	/// (WIP) 80386/i386, not to be confused with x32
+	x86_64,	/// (WIP) AMD64, EM64T/Intel64, x64
+	arm_t32,	/// (TODO) ARM T32 (thumb)
+	arm_a32,	/// (TODO) ARM A32 (arm)
+	arm_a64,	/// (TODO) ARM A64 (aarch64)
+	riscv32,	/// (WIP) RISC-V 32-bit
+	riscv64,	/// (TODO) RISC-V 64-bit
+}
 
 /// Disassembler options
 enum AdbgDisasmOpt {
@@ -63,43 +78,54 @@ enum AdbgDisasmMode : ubyte {
 	full	/// (TODO) Analysis
 }
 
-/// Disassembler ABI
-//TODO: move to common.d as AdbgPlatform (for obj stuff too)
-enum AdbgDisasmPlatform : ubyte {
-	native,	/// (Default) Platform compiled target, see DEFAULT_PLATFORM
-	x86_16,	/// (WIP) 8086, 80186, 80286
-	x86_32,	/// (WIP) 80386/i386, not to be confused with x32
-	x86_64,	/// (WIP) AMD64, EM64T/Intel64, x64
-	arm_t32,	/// (TODO) ARM T32 (thumb)
-	arm_a32,	/// (TODO) ARM A32 (arm)
-	arm_a64,	/// (TODO) ARM A64 (aarch64)
-	rv32,	/// (WIP) RISC-V 32-bit
-	rv64,	/// (TODO) RISC-V 64-bit
-}
-
-/// Disassembler mnemonic syntaxes
-deprecated
-enum AdbgDisasmSyntax : ubyte {
-	platform,	/// Platform compiled target default
-	intel,	/// Intel syntax, similar to Microsoft/Macro Assembler (MASM)
-	nasm,	/// Netwide Assembler syntax (NASM)
-	att,	/// AT&T syntax
-//	ideal,	/// (TODO) Borland Ideal
-//	hyde,	/// (TODO) Randall Hyde High Level Assembly Language
-//	riscv,	/// 
-}
-
-/// Disassembler options
-deprecated
-enum AdbgDisasmOption {
-	/// Use a space instead of a tab between the mnemonic and operands.
-	spaceSep	= BIT!(0),
-	///TODO: Go backwards.
-	backward	= BIT!(1),
-	///TODO: Do not group machine code integers.
-	noGroup	= BIT!(2),
-	/// Do not insert spaces in-between machine code types (bytes, words, etc.).
-	noSpace	= BIT!(3),
+/// Assembler syntax
+enum AdbgSyntax : ubyte {
+	/// Platform compiled default for target.
+	platform,
+	/// Intel syntax (1978), similar to Microsoft/Macro Assembler (MASM).
+	/// Example:
+	/// ---
+	/// mov ecx, dword ptr ss:[ebp-14]
+	/// ---
+	intel,
+	/// AT&T syntax (1975).
+	/// See the GNU Assembler documentation or the
+	/// IAS/RSX-11 MACRO-11 Reference Manual for more information.
+	/// Example:
+	/// ---
+	/// mov ss:-14(%ebp), %ecx
+	/// ---
+	att,
+	/// Netwide Assembler syntax (NASM, 1996).
+	/// Example:
+	/// ---
+	/// mov ecx, dword ptr [ss:ebp-14]
+	/// ---
+	nasm,
+	///TODO: Borland Ideal (enhanced mode of TASM) syntax.
+	/// Example:
+	/// ---
+	/// mov ecx, [dword ss:ebp-14]
+	/// ---
+//	ideal,
+	/// TODO: Randall Hyde High Level Assembly Language syntax.
+	/// Example:
+	/// ---
+	/// mov( [type dword ss:ebp-14], ecx )
+	/// ---
+//	hyde,	///
+	///TODO: ARM native syntax.
+	/// Example:
+	/// ---
+	/// ldr r0, [r1]
+	/// ---
+//	arm,
+	///TODO: RISC-V native syntax.
+	/// Example:
+	/// ---
+	/// TODO
+	/// ---
+//	riscv,
 }
 
 /// Disassembler warnings
@@ -125,41 +151,48 @@ enum AdbgDisasmInput {
 
 version (X86) {
 	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.x86;
+	private enum DEFAULT_PLATFORM = AdbgPlatform.x86;
 	/// Platform default syntax
 	private enum DEFAULT_SYNTAX = AdbgSyntax.intel;
 } else version (X86_64) {
 	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.x86_64;
+	private enum DEFAULT_PLATFORM = AdbgPlatform.x86_64;
 	/// Platform default syntax
 	private enum DEFAULT_SYNTAX = AdbgSyntax.intel;
 } else version (Thumb) {
 	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_t32;
+	private enum DEFAULT_PLATFORM = AdbgPlatform.arm_t32;
 	/// Platform default syntax
 	private enum DEFAULT_SYNTAX = AdbgSyntax.att;
 } else version (ARM) {
 	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_a32;
+	private enum DEFAULT_PLATFORM = AdbgPlatform.arm_a32;
 	/// Platform default syntax
 	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: ARM syntax
 } else version (AArch64) {
 	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.arm_a64;
+	private enum DEFAULT_PLATFORM = AdbgPlatform.arm_a64;
 	/// Platform default syntax
 	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: ARM syntax
 } else version (RISCV32) {
 	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.rv32;
+	private enum DEFAULT_PLATFORM = AdbgPlatform.rv32;
 	/// Platform default syntax
 	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: RISC-V syntax
 } else version (RISCV64) {
 	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgDisasmPlatform.rv64;
+	private enum DEFAULT_PLATFORM = AdbgPlatform.rv64;
 	/// Platform default syntax
 	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: RISC-V syntax
 } else {
 	static assert(0, "Set default disassembler variables");
+}
+
+/// 
+package
+struct adbg_options_t {
+	/// Input mode.
+	AdbgDisasmInput input;
 }
 
 /// Represents a disassembled instruction
@@ -183,72 +216,17 @@ struct adbg_disasm_t { align(1):
 	adbg_address_t base;	/// Base address, used for target calculations.
 	adbg_address_t last;	/// Last address, saved from input.
 	
-	union { // Current address
-		/// Memory address entry point. This value is modified to point
-		/// to the current instruction address for the disassembler.
-		/// Acts as instruction pointer/program counter.
-		deprecated void   *a;
-		deprecated size_t av;	/// Non-pointer format for address calculation
-		deprecated ubyte  *ai8; 	/// Used internally
-		deprecated ushort *ai16;	/// Used internally
-		deprecated uint   *ai32;	/// Used internally
-		deprecated ulong  *ai64;	/// Used internally
-		deprecated float  *af32;	/// Used internally
-		deprecated double *af64;	/// Used internally
-		deprecated void   *address;	/// Used internally
-		deprecated size_t  addressv;	/// ditto
-		deprecated ubyte  *addressu8;	/// ditto
-		deprecated ushort *addressu16;	/// ditto
-		deprecated uint   *addressu32;	/// ditto
-		deprecated ulong  *addressu64;	/// ditto
-		deprecated float  *addressf32;	/// ditto
-		deprecated double *addressf64;	/// ditto
-	}
-	union { // Base address
-		/// Base Address;
-		///
-		/// Currently, this field is not used.
-		///
-		/// Used in calculating the target address.
-		deprecated size_t ba;
-		deprecated void   *base_;	/// Used internally
-		deprecated size_t  basev;	/// ditto
-		deprecated ubyte  *basei8;	/// ditto
-		deprecated ushort *basei16;	/// ditto
-		deprecated uint   *basei32;	/// ditto
-		deprecated ulong  *basei64;	/// ditto
-		deprecated float  *basef32;	/// ditto
-		deprecated double *basef64;	/// ditto
-	}
-	union { // Last address
-		/// Last Address.
-		///
-		/// This field is populated with the entry address, making it useful
-		/// for printing purposes or calculating the address size.
-		deprecated size_t la;
-		deprecated void   *last_;	/// Used internally
-		deprecated size_t  lastv;	/// ditto
-		deprecated ubyte  *lasti8;	/// ditto
-		deprecated ushort *lasti16;	/// ditto
-		deprecated uint   *lasti32;	/// ditto
-		deprecated ulong  *lasti64;	/// ditto
-		deprecated float  *lastf32;	/// ditto
-		deprecated double *lastf64;	/// ditto
-	}
-	/// disasm implementation function
+	/// Implementation function
 	int function(adbg_disasm_t*) decode;
 	union {
-		x86_internals_t *x86;	/// 
-		riscv_internals_t *rv;	/// 
+		void *internal;	/// Pointer for internal decoders
+		x86_internals_t *x86;	/// Ditto
+		riscv_internals_t *rv;	/// Ditto
 	}
 	/// Opcode information
 	adbg_disasm_opcode_t *opcode;
-	/// Internal
+	/// Internal cookie. Yummy!
 	uint cookie;
-	/// (Internal) If byte swapping is required for this architecture.
-	/// If debuggee mode is on, this field is ignored.
-	/// Only fetches of 2, 4, and 8 bytes are affected by this.
-	bool swapRequired;
 	
 	//
 	// Options
@@ -258,16 +236,7 @@ struct adbg_disasm_t { align(1):
 	///
 	/// Instruction set architecture platform to disassemble from. See the
 	/// AdbgDisasmPlatform enumeration for more details.
-	AdbgDisasmPlatform platform;
-	/// Assembler syntax.
-	///
-	/// Assembler style when formatting instructions. See the AdbgDisasmSyntax
-	/// enumeration for more details.
-	deprecated AdbgDisasmSyntax syntax;
-	/// 
-	bool packMachineOpcodes;
-	/// 
-	bool packOperandOpcodes;
+	AdbgPlatform platform;
 	/// Operation mode.
 	///
 	/// Disassembler operating mode. See the AdbgDisasmMode enumeration for
@@ -276,39 +245,14 @@ struct adbg_disasm_t { align(1):
 	/// User data length that can be processed. If disassembling a debuggee,
 	/// this field is not taken into account.
 	size_t left;
+	/// 
+	adbg_options_t option;
 	/// Responsable for formatting decoded instructions.
-	adbg_syntax_t syntaxer;
-	
-	//
-	// Options
-	//
-	
-	/// If set, source is a debuggee. Uses Win32/ptrace to fetch memory.
-	// NOTE: If there are more input modes, a function pointer will be used
-	deprecated bool debuggee;
-	deprecated bool mnemonicTab;
-	/// Input mode.
-	AdbgDisasmInput input;
-	
-	//
-	// Formatting
-	//
-	
-	/// Format
-	deprecated adbg_disasmfmt_t fmt;
-	/// Machine code buffer index
-	deprecated size_t mcbufi;
-	/// Machine code buffer
-	deprecated char[ADBG_DISASM_BUFFER_SIZE] mcbuf;
-	/// Mnemonics buffer index
-	deprecated size_t mnbufi;
-	/// Mnemonics buffer
-	deprecated char[ADBG_DISASM_BUFFER_SIZE] mnbuf;
-
+	adbg_syntaxer_t syntaxer;
 }
 
-// new
-adbg_disasm_t *adbg_disasm_new(AdbgDisasmPlatform m) {
+// alloc
+adbg_disasm_t *adbg_disasm_new(AdbgPlatform m) {
 	import core.stdc.stdlib : calloc;
 	
 	adbg_disasm_t *s = cast(adbg_disasm_t *)calloc(1, adbg_disasm_t.sizeof);
@@ -317,7 +261,7 @@ adbg_disasm_t *adbg_disasm_new(AdbgDisasmPlatform m) {
 		return null;
 	}
 	
-	if (adbg_disasm_open(s, m)) {
+	if (adbg_disasm_configure(s, m)) {
 		free(s);
 		return null;
 	}
@@ -325,30 +269,32 @@ adbg_disasm_t *adbg_disasm_new(AdbgDisasmPlatform m) {
 	return s;
 }
 
-// open
-int adbg_disasm_open(adbg_disasm_t *p, AdbgDisasmPlatform m) {
-	with (AdbgDisasmPlatform)
+// configure
+int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
+	with (AdbgPlatform)
 	switch (m) {
 	case native: goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
 		p.decode = &adbg_disasm_x86;
-		return 0;
-	case rv32:
+		break;
+	case riscv32:
 		p.decode = &adbg_disasm_riscv;
-		return 0;
+		break;
 	default:
 		return adbg_error(AdbgError.unsupportedPlatform);
 	}
 	p.platform = m;
 	p.cookie = ADBG_COOKIE;
+	adbg_syntax_init(p.syntaxer, DEFAULT_SYNTAX);
+	return 0;
 }
 
-// start mode raw buffer
+// start: raw buffer
 int adbg_disasm_start_buffer(adbg_disasm_t *p, AdbgDisasmMode mode, void *buffer, size_t size, size_t base) {
 	if (p == null)
 		return adbg_error(AdbgError.nullArgument);
 	
-	p.input = AdbgDisasmInput.raw;
+	p.option.input = AdbgDisasmInput.raw;
 	p.mode = mode;
 	p.current.raw = buffer;
 	p.left = size;
@@ -356,20 +302,20 @@ int adbg_disasm_start_buffer(adbg_disasm_t *p, AdbgDisasmMode mode, void *buffer
 	return 0;
 }
 
-// start mode debuggee
+// start: debuggee
 //TODO: Consider adding base parameter
 int adbg_disasm_start_debuggee(adbg_disasm_t *p, AdbgDisasmMode mode, size_t addr) {
 	if (p == null)
 		return adbg_error(AdbgError.nullArgument);
 	
-	p.input = AdbgDisasmInput.debugger;
+	p.option.input = AdbgDisasmInput.debugger;
 	p.mode = mode;
 	p.current.sz = addr;
 //	p.base.sz = base;
 	return 0;
 }
 
-// set option value
+// set option
 int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 	if (p == null)
 		return adbg_error(AdbgError.nullArgument);
@@ -382,14 +328,14 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 		p.mode = cast(AdbgDisasmMode)val;
 		break;
 	case platform:
-		if (val >= AdbgDisasmPlatform.max)
+		if (val >= AdbgPlatform.max)
 			return adbg_error(AdbgError.invalidOptionValue);
-		p.platform = cast(AdbgDisasmPlatform)val;
+		p.platform = cast(AdbgPlatform)val;
 		break;
 	case input:
 		if (val >= AdbgDisasmInput.max)
 			return adbg_error(AdbgError.invalidOptionValue);
-		p.input = cast(AdbgDisasmInput)val;
+		p.option.input = cast(AdbgDisasmInput)val;
 		break;
 	case syntax:
 		if (val >= AdbgSyntax.max)
@@ -465,7 +411,7 @@ package
 int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
 	int e = void;
 	with (AdbgDisasmInput)
-	switch (p.input) {
+	switch (p.option.input) {
 	case debugger:
 		import adbg.dbg.debugger : adbg_mm_cread;
 		e = adbg_mm_cread(p.current.sz, u, T.sizeof);
@@ -474,8 +420,8 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
 		if (p.left < T.sizeof)
 			return adbg_error(AdbgError.outOfData);
 		*u = *cast(T*)p.current;
-		e = 0;
 		p.left -= T.sizeof;
+		e = 0;
 		break;
 	default: assert(0, __FUNCTION__~": unimplemented");
 	}

@@ -21,7 +21,7 @@ module adbg.obj.server;
 import core.stdc.stdio;
 import core.stdc.config : c_long;
 import adbg.error;
-import adbg.disasm.disasm : AdbgDisasmPlatform;
+import adbg.disasm.disasm : AdbgPlatform;
 import adbg.obj.mz, adbg.obj.pe, adbg.obj.elf;
 import adbg.utils.bit : CHAR16, CHAR32;
 
@@ -118,7 +118,7 @@ struct adbg_object_t {
 	//
 	
 	/// Object translated platform target
-	AdbgDisasmPlatform platform;
+	AdbgPlatform platform;
 	/// Object format
 	AdbgObjFormat format;
 	

@@ -83,7 +83,7 @@ else version (CRuntime_DigitalMars)
 else version (CRuntime_Glibc)
 	enum TARGET_CRT = "glibc";	/// Platform CRT string
 else version (CRuntime_Microsoft)
-	enum TARGET_CRT = "microsoft";	/// Platform CRT string
+	enum TARGET_CRT = "mscvrt";	/// Platform CRT string
 else version (CRuntime_Musl)
 	enum TARGET_CRT = "musl";	/// Platform CRT string
 else version (CRuntime_Newlib) // Cygwin
@@ -144,22 +144,16 @@ else
 // ANCHOR Additional Target Information
 //
 
-private enum VERSION_TARGET_INFO = 2083;
+// Check if compiler supports the getTargetInfo trait
 
 version (DigitalMars) {
-	static if (__VERSION__ >= VERSION_TARGET_INFO)
-		private enum FEATURE_TARGETINFO = true;
-	else
-		private enum FEATURE_TARGETINFO = false;
+	private enum COMPILER_FEAT_TARGETINFO = __VERSION__ >= 2083;
 } else version (LDC) {
-	static if (__VERSION__ >= VERSION_TARGET_INFO)
-		private enum FEATURE_TARGETINFO = true;
-	else
-		private enum FEATURE_TARGETINFO = false;
+	private enum COMPILER_FEAT_TARGETINFO = __VERSION__ >= 2083;
 } else
-	private enum FEATURE_TARGETINFO = false;
+	private enum COMPILER_FEAT_TARGETINFO = false;
 
-static if (FEATURE_TARGETINFO) {
+static if (COMPILER_FEAT_TARGETINFO) {
 	/// Target object format string
 	enum TARGET_OBJFMT = __traits(getTargetInfo, "objectFormat");
 	/// Target float ABI string

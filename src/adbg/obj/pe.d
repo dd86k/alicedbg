@@ -19,7 +19,7 @@ module adbg.obj.pe;
 import core.stdc.inttypes;
 import adbg.error;
 import adbg.obj.server;
-import adbg.disasm.disasm : AdbgDisasmPlatform; // ISA translation
+import adbg.disasm.disasm : AdbgPlatform; // ISA translation
 import adbg.utils.uid : UID;
 
 extern (C):
@@ -577,12 +577,12 @@ int adbg_obj_pe_preload(adbg_object_t *obj) {
 	}
 	
 	
-	with (AdbgDisasmPlatform)
+	with (AdbgPlatform)
 	switch (obj.pe.hdr.Machine) {
 	case PE_MACHINE_AMD64: obj.platform = x86_64; break;
 	case PE_MACHINE_I386: obj.platform = x86_32; break;
-	case PE_MACHINE_RISCV32: obj.platform = rv32; break;
-	default: obj.platform = AdbgDisasmPlatform.native;
+	case PE_MACHINE_RISCV32: obj.platform = riscv32; break;
+	default: obj.platform = AdbgPlatform.native;
 	}
 	
 	return 0;

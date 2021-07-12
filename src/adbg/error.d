@@ -68,11 +68,12 @@ enum AdbgError {
 	invalidObjABI	= 315,
 }
 
-private const(char) *defaultMsg = "Internal error.";
 private int errcode;
 private AdbgErrorSource errsource;
 private int errline;
 private const(char)* errfile;
+
+private const(char) *defaultMsg = "Internal error.";
 private immutable error_t[] errors = [
 	//
 	// Generics
@@ -92,7 +93,7 @@ private immutable error_t[] errors = [
 	{ AdbgError.invalidOption, "Invalid disassembler option." },
 	{ AdbgError.invalidOptionValue, "Invalid value for disassembler option." },
 	{ AdbgError.illegalInstruction, "Illegal instruction." },
-	{ AdbgError.outOfData, "The buffer has been depleted." },
+	{ AdbgError.outOfData, "The input buffer has been depleted in an unexpected fashion." },
 	//
 	// Object server
 	//

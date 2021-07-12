@@ -8,7 +8,7 @@
 module adbg.obj.mz;
 
 import adbg.obj.server : AdbgObjFormat, adbg_object_t;
-import adbg.disasm.disasm : AdbgDisasmPlatform;
+import adbg.disasm.disasm : AdbgPlatform;
 
 private enum ERESWDS = 0x10;
 
@@ -40,7 +40,7 @@ struct mz_reloc {
 
 int adbg_obj_mz_preload(adbg_object_t *obj) {
 	obj.format = AdbgObjFormat.MZ;
-	obj.platform = AdbgDisasmPlatform.x86_16;
+	obj.platform = AdbgPlatform.x86_16;
 	obj.mz.hdr = cast(mz_hdr*)obj.buf;
 	if (obj.mz.hdr.e_lfarlc && obj.mz.hdr.e_crlc)
 		obj.mz.relocs = cast(mz_reloc*)(obj.buf + obj.mz.hdr.e_lfarlc);

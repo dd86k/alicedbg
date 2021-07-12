@@ -42,8 +42,8 @@ int loop_handler(exception_t *e) {
 	// * Print disassembly, if available
 	if (e.fault) {
 		adbg_disasm_opcode_t op = void;
-		adbg_disasm_start_debuggee(&common_disasm, AdbgDisasmMode.file, e.fault.sz);
-		if (adbg_disasm(&common_disasm, &op)) {
+		adbg_disasm_start_debuggee(&global.disasm, AdbgDisasmMode.file, e.fault.sz);
+		if (adbg_disasm(&global.disasm, &op)) {
 			printf("> %p: (error:%s)\n",
 				e.fault.raw, adbg_error_msg);
 		} else {

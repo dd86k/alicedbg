@@ -17,10 +17,6 @@ public:
 extern (C):
 __gshared:
 
-//
-// Definitions
-//
-
 /// Application error
 enum AppError {
 	none,
@@ -34,14 +30,14 @@ enum AppError {
 // Platforms
 
 struct setting_platform_t {
-	AdbgDisasmPlatform val;
+	AdbgPlatform val;
 	immutable(char)* opt, alt, desc;
 }
 immutable setting_platform_t[] platforms = [
-	{ AdbgDisasmPlatform.x86_16,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
-	{ AdbgDisasmPlatform.x86_32,	"x86",     "i386",  "x86 32-bit (extended mode)" },
-	{ AdbgDisasmPlatform.x86_64,	"x86_64",  "amd64", "x86 64-bit (long mode)" },
-	{ AdbgDisasmPlatform.rv32,	"riscv32", "rv32",  "RISC-V 32-bit"},
+	{ AdbgPlatform.x86_16,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
+	{ AdbgPlatform.x86_32,	"x86",     "i386",  "x86 32-bit (extended mode)" },
+	{ AdbgPlatform.x86_64,	"x86_64",  "amd64", "x86 64-bit (long mode)" },
+	{ AdbgPlatform.riscv32,	"riscv32", "rv32",  "RISC-V 32-bit"},
 ];
 
 // Syntaxes
@@ -57,19 +53,6 @@ immutable setting_syntax_t[] syntaxes = [
 ];
 
 //
-// Common globals
-//
-
-/// Common settings shared between sub-modules
-settings_t settings;
-/// Last exception
-exception_t last_exception;
-/// Disassembler settings
-deprecated("use disassembler where appropriate") adbg_disasm_t common_disasm;
-/// Disassembler
-adbg_disasm_t disassembler;
-
-//
 // Settings
 //
 
@@ -81,6 +64,7 @@ enum SettingUI { cmd, loop, tui, tcpserver }
 
 /// Settings structure for the application (only!)
 struct settings_t {
+	// CLI
 	SettingMode mode;	/// Application mode
 	SettingUI ui;	/// Debugger user interface
 	const(char) *file;	/// Debuggee: file
@@ -89,9 +73,18 @@ struct settings_t {
 	const(char) *dir;	/// Debuggee: directory
 	uint pid;	/// Debuggee: PID
 	uint flags;	/// Flags to pass to callee
-	AdbgDisasmPlatform platform;	/// 
+	AdbgPlatform platform;	/// 
 	AdbgSyntax syntax;	/// 
+	// App
+	adbg_disasm_t disasm;	/// Disassembler
+	exception_t last_exception;	/// Last exception
 }
+
+/// Global variables.
+///
+/// This is in one big structure to avoid thinking complexity, and avoids
+/// tracking other stuff. Like, "uhhh what is the variable name again".
+settings_t global;
 
 /// Print last library error information to stdout 
 void printerror(const(char)* f = cast(char*)__FUNCTION__)() {

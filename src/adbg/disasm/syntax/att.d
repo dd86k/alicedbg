@@ -13,7 +13,7 @@ import adbg.disasm.syntaxer;
 extern (C):
 
 // render at&t
-void adbg_syntax_att_item(ref adbg_syntax_t p, ref adbg_syntax_item_t i) {
+void adbg_syntax_op_att(ref adbg_syntaxer_t p, ref adbg_syntax_op_t i) {
 	
 	
 }

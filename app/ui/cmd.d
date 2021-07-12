@@ -323,7 +323,7 @@ int cmd_c_quit(int argc, const(char) **argv) {
 //
 
 int cmd_handler(exception_t *ex) {
-	memcpy(&last_exception, ex, exception_t.sizeof);
+	memcpy(&global.last_exception, ex, exception_t.sizeof);
 	
 	printf(
 	"*	Thread %d stopped for: %s ("~SYS_ERR_FMT~")\n",
@@ -336,9 +336,9 @@ int cmd_handler(exception_t *ex) {
 	
 	if (ex.fault) {
 		printf("	Fault address: %zx\n", ex.fault.sz);
-		adbg_disasm_start_debuggee(&common_disasm, AdbgDisasmMode.data, ex.fault.sz);
+		adbg_disasm_start_debuggee(&global.disasm, AdbgDisasmMode.data, ex.fault.sz);
 		adbg_disasm_opcode_t op = void;
-		if (adbg_disasm(&common_disasm, &op)) {
+		if (adbg_disasm(&global.disasm, &op)) {
 			printf("	Faulting instruction: (error:%s)\n",
 				adbg_error_msg);
 		} else {
