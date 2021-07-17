@@ -520,7 +520,7 @@ int adbg_obj_elf_preload(adbg_object_t *obj) {
 		obj.elf.shdr64 = cast(Elf64_Shdr*)(obj.buf + obj.elf.hdr64.e_shoff);
 		break;
 	default:
-		return adbg_error(AdbgError.invalidObjClass);
+		return adbg_oops(AdbgError.invalidObjClass);
 	}
 	
 	ushort e_machine = obj.elf.hdr32.e_machine;

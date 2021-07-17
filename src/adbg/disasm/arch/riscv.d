@@ -54,7 +54,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_RVC_FUNC_000: // C.ADDI4SPN
 			int imm = i.op1 >> 5;
 			if (imm == 0) {
-				return adbg_error(AdbgError.illegalInstruction);
+				return adbg_oops(AdbgError.illegalInstruction);
 			}
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
@@ -79,7 +79,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			adbg_disasm_push_imm(p, imm);
 			return 0;
 		default: // Yes, 000 is illegal
-			return adbg_error(AdbgError.illegalInstruction);
+			return adbg_oops(AdbgError.illegalInstruction);
 		}
 	case 1:
 		if (p.mode >= AdbgDisasmMode.file)
@@ -129,7 +129,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 				case 0x60:   m = "c.and"; break;
 				case 0x1000: m = "c.subw"; break;
 				case 0x1020: m = "c.addw"; break;
-				default: return adbg_error(AdbgError.illegalInstruction);
+				default: return adbg_oops(AdbgError.illegalInstruction);
 				}
 				if (p.mode < AdbgDisasmMode.file)
 					return 0;
@@ -139,7 +139,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 				adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rs2));
 				return 0;
 			}
-		default: return adbg_error(AdbgError.illegalInstruction);
+		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 	case 2:
 		if (p.mode >= AdbgDisasmMode.file)
@@ -148,7 +148,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_RVC_FUNC_010:
 			int rd = (i.op1 >> 7) & 31;
 			if (rd == 0) {
-				return adbg_error(AdbgError.illegalInstruction);
+				return adbg_oops(AdbgError.illegalInstruction);
 			}
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
@@ -196,7 +196,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			adbg_disasm_push_str(p, "c.swsp");
 			adbg_disasm_push_memregimm(p, adbg_disasm_riscv_abi_reg(rs2), imm, MemWidth.i32);
 			return 0;
-		default: return adbg_error(AdbgError.illegalInstruction);
+		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 	default: // 11 >= 16b
 	}
@@ -221,7 +221,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_FUNC_100: m = "xori"; break;
 		case OP_FUNC_110: m = "ori"; break;
 		case OP_FUNC_111: m = "andi"; break;
-		default: return adbg_error(AdbgError.illegalInstruction);
+		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 		if (p.mode < AdbgDisasmMode.file)
 			return 0;
@@ -240,7 +240,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_FUNC_000: m = "sb"; w = MemWidth.i8; break;
 		case OP_FUNC_001: m = "sh"; w = MemWidth.i16; break;
 		case OP_FUNC_010: m = "sw"; w = MemWidth.i32; break;
-		default: return adbg_error(AdbgError.illegalInstruction);
+		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 		if (p.mode < AdbgDisasmMode.file)
 			return 0;
@@ -251,7 +251,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		adbg_disasm_push_memregimm(p, adbg_disasm_riscv_abi_reg(rs1), imm, w);
 		adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rs2));
 		return 0;
-	default: return adbg_error(AdbgError.illegalInstruction);
+	default: return adbg_oops(AdbgError.illegalInstruction);
 	}
 	+/
 }

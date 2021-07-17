@@ -165,7 +165,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 	const(char) *dir = null, const(char) **envp = null,
 	int flags = 0) {
 	if (path == null)
-		return adbg_error(AdbgError.invalidArgument);
+		return adbg_oops(AdbgError.invalidArgument);
 	
 	version (Windows) {
 		import core.stdc.stdlib : malloc, free;
@@ -367,7 +367,7 @@ AdbgState adbg_state() {
  */
 int adbg_run(int function(exception_t*) userfunc) {
 	if (userfunc == null)
-		return adbg_error(AdbgError.nullAddress);
+		return adbg_oops(AdbgError.nullAddress);
 	
 	exception_t e = void;
 	

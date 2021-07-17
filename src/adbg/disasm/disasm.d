@@ -82,38 +82,57 @@ enum AdbgDisasmMode : ubyte {
 enum AdbgSyntax : ubyte {
 	/// Platform compiled default for target.
 	platform,
-	/// Intel syntax (1978), similar to Microsoft/Macro Assembler (MASM).
+	/// Intel syntax (introduced 1978)
+	///
+	/// Similar to the Microsoft/Macro Assembler (MASM) syntax.
+	/// This is the reference syntax for the x86 instruction set.
+	/// For more information, consult the Intel and AMD reference manuals.
+	///
 	/// Example:
 	/// ---
 	/// mov ecx, dword ptr ss:[ebp-14]
 	/// ---
 	intel,
-	/// AT&T syntax (1975).
-	/// See the GNU Assembler documentation or the
-	/// IAS/RSX-11 MACRO-11 Reference Manual for more information.
+	/// AT&T syntax (introduced 1975)
+	///
+	/// For more information, consult the IAS/RSX-11 MACRO-11 Reference
+	/// Manual and the GNU Assembler documentation.
+	///
 	/// Example:
 	/// ---
 	/// mov ss:-14(%ebp), %ecx
 	/// ---
 	att,
-	/// Netwide Assembler syntax (NASM, 1996).
+	/// Netwide Assembler syntax (NASM, introduced 1996)
+	///
+	/// This is a popular alternative syntax for the x86 instruction set.
+	/// For more information, consult The Netwide Assembler manual.
+	///
 	/// Example:
 	/// ---
 	/// mov ecx, dword ptr [ss:ebp-14]
 	/// ---
 	nasm,
-	///TODO: Borland Ideal (enhanced mode of TASM) syntax.
+	///TODO: Borland Turbo Assembler Ideal syntax (introduced 1989)
+	///
+	/// Also known as the TASM enhanced mode.
+	/// For more information, consult the Borland Turbo Assembler Reference Guide.
+	///
 	/// Example:
 	/// ---
 	/// mov ecx, [dword ss:ebp-14]
 	/// ---
 //	ideal,
-	/// TODO: Randall Hyde High Level Assembly Language syntax.
+	/// TODO: Randall Hyde High Level Assembly Language syntax
+	///
+	/// Created by Randy Hyde, this syntax is based on the PL/360.
+	/// For more information, consult the HLA Reference Manual.
+	///
 	/// Example:
 	/// ---
 	/// mov( [type dword ss:ebp-14], ecx )
 	/// ---
-//	hyde,	///
+//	hyde,
 	///TODO: ARM native syntax.
 	/// Example:
 	/// ---
@@ -123,7 +142,7 @@ enum AdbgSyntax : ubyte {
 	///TODO: RISC-V native syntax.
 	/// Example:
 	/// ---
-	/// TODO
+	/// lw x13, 0(x13)
 	/// ---
 //	riscv,
 }
@@ -142,6 +161,8 @@ enum AdbgDisasmWarning {
 }
 
 /// Disassembler input
+// NOTE: Uh, and why/how I'll do File/MmFile implementations?
+//       There is no point to these two... Unless proven otherwise.
 enum AdbgDisasmInput {
 	raw,	/// Buffer
 	debugger,	/// Debuggee
@@ -163,7 +184,7 @@ version (X86) {
 	/// Platform default platform
 	private enum DEFAULT_PLATFORM = AdbgPlatform.arm_t32;
 	/// Platform default syntax
-	private enum DEFAULT_SYNTAX = AdbgSyntax.att;
+	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: ARM syntax
 } else version (ARM) {
 	/// Platform default platform
 	private enum DEFAULT_PLATFORM = AdbgPlatform.arm_a32;
@@ -257,7 +278,7 @@ adbg_disasm_t *adbg_disasm_new(AdbgPlatform m) {
 	
 	adbg_disasm_t *s = cast(adbg_disasm_t *)calloc(1, adbg_disasm_t.sizeof);
 	if (s == null) {
-		adbg_error(AdbgError.allocationFailed);
+		adbg_oops(AdbgError.allocationFailed);
 		return null;
 	}
 	
@@ -281,7 +302,7 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 		p.decode = &adbg_disasm_riscv;
 		break;
 	default:
-		return adbg_error(AdbgError.unsupportedPlatform);
+		return adbg_oops(AdbgError.unsupportedPlatform);
 	}
 	p.platform = m;
 	p.cookie = ADBG_COOKIE;
@@ -292,7 +313,7 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 // start: raw buffer
 int adbg_disasm_start_buffer(adbg_disasm_t *p, AdbgDisasmMode mode, void *buffer, size_t size, size_t base) {
 	if (p == null)
-		return adbg_error(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.nullArgument);
 	
 	p.option.input = AdbgDisasmInput.raw;
 	p.mode = mode;
@@ -306,7 +327,7 @@ int adbg_disasm_start_buffer(adbg_disasm_t *p, AdbgDisasmMode mode, void *buffer
 //TODO: Consider adding base parameter
 int adbg_disasm_start_debuggee(adbg_disasm_t *p, AdbgDisasmMode mode, size_t addr) {
 	if (p == null)
-		return adbg_error(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.nullArgument);
 	
 	p.option.input = AdbgDisasmInput.debugger;
 	p.mode = mode;
@@ -318,35 +339,35 @@ int adbg_disasm_start_debuggee(adbg_disasm_t *p, AdbgDisasmMode mode, size_t add
 // set option
 int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 	if (p == null)
-		return adbg_error(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.nullArgument);
 	
 	with (AdbgDisasmOpt)
 	switch (opt) {
 	case mode:
 		if (val >= AdbgDisasmMode.max)
-			return adbg_error(AdbgError.invalidOptionValue);
+			return adbg_oops(AdbgError.invalidOptionValue);
 		p.mode = cast(AdbgDisasmMode)val;
 		break;
 	case platform:
 		if (val >= AdbgPlatform.max)
-			return adbg_error(AdbgError.invalidOptionValue);
+			return adbg_oops(AdbgError.invalidOptionValue);
 		p.platform = cast(AdbgPlatform)val;
 		break;
 	case input:
 		if (val >= AdbgDisasmInput.max)
-			return adbg_error(AdbgError.invalidOptionValue);
+			return adbg_oops(AdbgError.invalidOptionValue);
 		p.option.input = cast(AdbgDisasmInput)val;
 		break;
 	case syntax:
 		if (val >= AdbgSyntax.max)
-			return adbg_error(AdbgError.invalidOptionValue);
+			return adbg_oops(AdbgError.invalidOptionValue);
 		p.syntaxer.syntax = cast(AdbgSyntax)val;
 		break;
 	case mnemonicTab:
 		p.syntaxer.userOpts.mnemonicTab = val != 0;
 		break;
 	default:
-		return adbg_error(AdbgError.invalidOption);
+		return adbg_oops(AdbgError.invalidOption);
 	}
 	
 	return 0;
@@ -365,9 +386,9 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 /// Returns: Error code; Non-zero indicating an error
 int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 	if (p == null || op == null)
-		return adbg_error(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.nullArgument);
 	if (p.cookie != ADBG_COOKIE)
-		return adbg_error(AdbgError.uninitiated);
+		return adbg_oops(AdbgError.uninitiated);
 	
 	// Syntax prep
 	if (p.mode >= AdbgDisasmMode.file) {
@@ -418,14 +439,15 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
 		break;
 	case raw:
 		if (p.left < T.sizeof)
-			return adbg_error(AdbgError.outOfData);
+			return adbg_oops(AdbgError.outOfData);
 		*u = *cast(T*)p.current;
 		p.left -= T.sizeof;
 		e = 0;
 		break;
-	default: assert(0, __FUNCTION__~": unimplemented");
+	default: assert(0);
 	}
 	p.current.sz += T.sizeof;
+	adbg_syntax_add_machine(p.syntaxer, *u);
 	return e;
 }
 

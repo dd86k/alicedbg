@@ -24,13 +24,38 @@ void adbg_syntax_op_intel(ref adbg_syntaxer_t p, ref adbg_syntax_op_t op) {
 		p.mnemonicBuffer.add("0x%x", op.imm.value);
 		break;
 	case AdbgSyntaxType.register:
-		if (op.reg.isReal)
-			p.mnemonicBuffer.add("%s(%d)", op.reg.name, op.reg.index);
-		else
-			p.mnemonicBuffer.add(op.reg.name);
+		p.mnemonicBuffer.add(op.reg.name);
 		break;
 	case AdbgSyntaxType.memory:
+		p.mnemonicBuffer.add(INTEL_WIDTH[op.mem.width]);
+		p.mnemonicBuffer.add(" ptr ");
 		
+		//TODO: p.decoderOpts.noSegment
+		if (p.segmentRegister) {
+			p.mnemonicBuffer.add(p.segmentRegister);
+			p.mnemonicBuffer.add(':');
+		}
+		
+		p.mnemonicBuffer.add('[');
+		
+		with (AdbgSyntaxMemType)
+		switch (op.mem.type) {
+		case register:
+			p.mnemonicBuffer.add(op.mem.base);
+			break;
+		case registerOffset:
+			p.mnemonicBuffer.add("%s%+d", op.mem.base, op.mem.disp);
+			break;
+		case registerRegister:
+			p.mnemonicBuffer.add("%s+%s", op.mem.base, op.mem.index);
+			break;
+		case registerRegisterOffset:
+			p.mnemonicBuffer.add("%s+%s%+d", op.mem.base, op.mem.index, op.mem.disp);
+			break;
+		default: assert(0);
+		}
+		
+		p.mnemonicBuffer.add(']');
 		break;
 	default: assert(0);
 	}

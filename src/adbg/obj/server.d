@@ -175,7 +175,7 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	import core.stdc.string : memset;
 	
 	if (obj == null || file == null)
-		return adbg_error(AdbgError.invalidArgument);
+		return adbg_oops(AdbgError.invalidArgument);
 	
 	obj.file = file;
 	
@@ -220,28 +220,28 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	switch (obj.bufi16[0]) {
 	case CHAR16!"MZ":
 		if (obj.fsize < mz_hdr.sizeof)
-			return adbg_error(AdbgError.unknownObjFormat);
+			return adbg_oops(AdbgError.unknownObjFormat);
 		
 		obj.pe.offset = obj.bufi32[15]; // 0x3c / 4
 		
 		if (obj.pe.offset)
 		if (obj.pe.offset >= obj.fsize - PE_HEADER.sizeof)
-			return adbg_error(AdbgError.unknownObjFormat);
+			return adbg_oops(AdbgError.unknownObjFormat);
 		
 		sig.u32 = *cast(uint*)(obj.buf + obj.pe.offset);
 		
 		switch (sig.u16[0]) {
 		case CHAR16!"PE":
 			if (sig.u16[1]) // "PE\0\0"
-				return adbg_error(AdbgError.unknownObjFormat);
+				return adbg_oops(AdbgError.unknownObjFormat);
 			return adbg_obj_pe_preload(obj);
 		case CHAR16!"LE", CHAR16!"LX", CHAR16!"NE":
-			return adbg_error(AdbgError.unsupportedObjFormat);
+			return adbg_oops(AdbgError.unsupportedObjFormat);
 		default: // Assume MZ
 			return adbg_obj_mz_preload(obj);
 		}
 	default:
-		return adbg_error(AdbgError.unknownObjFormat);
+		return adbg_oops(AdbgError.unknownObjFormat);
 	}
 }
 

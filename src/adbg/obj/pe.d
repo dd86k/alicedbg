@@ -552,7 +552,7 @@ int adbg_obj_pe_preload(adbg_object_t *obj) {
 		obj.pe.dir = cast(PE_IMAGE_DATA_DIRECTORY*)(offset + PE_OFFSET_DIR_OPTHDRROM);
 		obj.pe.sections = cast(PE_SECTION_ENTRY*)(offset + PE_OFFSET_SEC_OPTHDRROM);
 		break;
-	default: return adbg_error(AdbgError.unsupportedObjFormat);
+	default: return adbg_oops(AdbgError.unsupportedObjFormat);
 	}
 	
 	uint sections = obj.pe.hdr.NumberOfSections;

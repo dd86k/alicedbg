@@ -17,6 +17,8 @@ import common, objects;
 
 extern (C):
 
+private enum MODULE = __MODULE__.ptr;
+
 /// Bitfield. Selects which information to display.
 enum DumpOpt {
 	/// 'h' - Dump header
@@ -95,14 +97,14 @@ void dump_chapter(const(char) *title) {
 int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 	FILE *f = fopen(file, "rb"); // Handles null file pointers
 	if (f == null) {
-		perror(__FUNCTION__.ptr);
+		perror(MODULE);
 		return EXIT_FAILURE;
 	}
 	
 	//TODO: Rework this part for new disasm
 	if (flags & DumpOpt.raw) {
 		if (fseek(f, 0, SEEK_END)) {
-			perror(__FUNCTION__.ptr);
+			perror(MODULE);
 			puts("dump: could not seek file");
 			return EXIT_FAILURE;
 		}
@@ -111,11 +113,11 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 		
 		void *data = malloc(fl);
 		if (data == null) {
-			perror(__FUNCTION__.ptr);
+			perror(MODULE);
 			return EXIT_FAILURE;
 		}
 		if (fread(data, fl, 1, f) == 0) {
-			perror(__FUNCTION__.ptr);
+			perror(MODULE);
 			return EXIT_FAILURE;
 		}
 		
@@ -153,9 +155,6 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 	}
 }
 
-// NOTE: Normally, a FILE* parameter could be passed, but the Windows bindings
-//       often do not correspond to their CRT equivalent, so this is hard-wired
-//       to stdout, since this is only for the dumping functionality.
 /// Disassemble data to stdout
 /// Params:
 /// 	dp = Disassembler parameters
@@ -165,10 +164,6 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 /// Returns: Status code
 int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 	adbg_disasm_opcode_t op = void;
-	int e = void;
-	AdbgDisasmMode mode = flags & DumpOpt.disasm_stats ?
-		AdbgDisasmMode.size : AdbgDisasmMode.file;
-	adbg_disasm_start_buffer(dp, mode, data, size, 0);
 	
 	if (flags & DumpOpt.disasm_stats) {
 		uint iavg;	/// instruction average size
@@ -176,9 +171,10 @@ int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 		uint imax;	/// longest instruction size
 		uint icnt;	/// instruction count
 		uint ills;	/// Number of illegal instructions
+		adbg_disasm_start_buffer(dp, AdbgDisasmMode.size, data, size, 0);
 L_DISASM_1:
 		with (AdbgError)
-		switch (e = adbg_disasm(dp, &op)) {
+		switch (adbg_disasm(dp, &op)) {
 		case none:
 			iavg += op.size;
 			++icnt;
@@ -193,9 +189,7 @@ L_DISASM_1:
 			++ills;
 			goto L_DISASM_1;
 		case outOfData: break;
-		default:
-			printerror();
-			return e;
+		default: return printerror();
 		}
 		printf(
 		"Opcode statistics\n"~
@@ -210,22 +204,20 @@ L_DISASM_1:
 	}
 	
 	uint i;
+	adbg_disasm_start_buffer(dp, AdbgDisasmMode.file, data, size, 0);
 L_DISASM_2:
 	with (AdbgError)
-	switch (e = adbg_disasm(dp, &op)) {
+	switch (adbg_disasm(dp, &op)) {
 	case none:
 		printf("%08X %-30s %s\n", i, op.machine, op.mnemonic);
 		i += op.size;
 		goto L_DISASM_2;
+	//TODO: Illegal should be moved with none and disasm takes care of buffer
 	case illegalInstruction:
 		printf("%08X %-30s (bad)\n", i, op.machine);
 		i += op.size;
 		goto L_DISASM_2;
-	case outOfData: break;
-	default:
-		printerror();
-		return e;
+	case outOfData: return 0;
+	default: return printerror();
 	}
-	
-	return 0;
 }

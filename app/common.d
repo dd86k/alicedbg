@@ -31,7 +31,7 @@ enum AppError {
 
 struct setting_platform_t {
 	AdbgPlatform val;
-	immutable(char)* opt, alt, desc;
+	const(char)* opt, alt, desc;
 }
 immutable setting_platform_t[] platforms = [
 	{ AdbgPlatform.x86_16,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
@@ -44,7 +44,7 @@ immutable setting_platform_t[] platforms = [
 
 struct setting_syntax_t {
 	AdbgSyntax val;
-	immutable(char)* opt, desc;
+	const(char)* opt, desc;
 }
 immutable setting_syntax_t[] syntaxes = [
 	{ AdbgSyntax.att,   "att",   "AT&T syntax" },
@@ -87,8 +87,21 @@ struct settings_t {
 settings_t global;
 
 /// Print last library error information to stdout 
-void printerror(const(char)* f = cast(char*)__FUNCTION__)() {
+int printerror(const(char)* f = cast(char*)__FUNCTION__)() {
 	import adbg.etc.c.stdio : printf;
-	debug printf("[%s:%d] ", adbg_error_file, adbg_error_line);
-	printf("%s: (%s) %s\n", f, adbg_error_code, adbg_error_msg);
+	import adbg.error : error;
+	import adbg.sys.err : SYS_ERR_FMT;
+	
+	debug printf("[%s:%d] ", error.file, error.line);
+	
+	const(char) *msg = adbg_error_msg;
+	const(char) *ecd = adbg_error_ext_code;
+	switch (error.code) {
+	case AdbgError.system:
+		printf("%s: (%s) %s ("~SYS_ERR_FMT~")\n", f, ecd, msg, error.source);
+		break;
+	default:
+		printf("%s: (%s) %s\n", f, ecd, msg);
+	}
+	return error.code;
 }

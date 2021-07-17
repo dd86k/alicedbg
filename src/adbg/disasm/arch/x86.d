@@ -7,9 +7,24 @@
  */
 module adbg.disasm.arch.x86;
 
+// NOTE: Instruction encoding
+//         reg r/m
+//              DW
+// 0	00 000 000	modrm
+// 1	00 000 001	modrm
+// 2	00 000 010	modrm
+// 3	00 000 011	modrm
+// 4	00 000 100	al, imm8
+// 5	00 000 101	ax, imm16
+// 6	00 000 110	PUSH
+// 7	00 000 111	POP (or 2-byte)
+// 00h	00 000 000	add
+// 08h	00 001 000	or
+// ..
+// 38h	00 111 000	cmp
+
 //TODO: Flow-oriented disassembly
-//      With setting, code or data mode
-//      With adbg_syntax_number_t buffer?
+//      With setting? code or data mode?
 //      1. Save previous jmp targets
 
 import adbg.error;
@@ -137,8 +152,10 @@ L_PREFIX:
 	int e = adbg_disasm_fetch!ubyte(p, &opcode);
 	if (e) return e;
 	
-	//TODO: Consider moving this to the normal lot
-	//      Should be part of the normal decoding process
+	//TODO: Consider moving this to the normal decoding process
+	//      Should be part of the normal decoding process since there are
+	//      a lot of these
+	//      e.g., 0f ... already has to go through 12 cases
 	switch (opcode) {
 	case 0x26:
 		x86.prefix.segment = x86Segment.es;
@@ -182,7 +199,7 @@ L_PREFIX:
 			AdbgSyntaxWidth.i32 : AdbgSyntaxWidth.i16;
 		goto L_PREFIX;
 	case 0xd6: // hehe
-		return adbg_error(AdbgError.illegalInstruction);
+		return adbg_oops(AdbgError.illegalInstruction);
 	case 0xf0:
 		x86.prefix.lock = true;
 		if (p.mode >= AdbgDisasmMode.file)
@@ -216,20 +233,6 @@ L_DECODE:
 		// So, the 2-byte escape is checked here.
 		if (opcode == 0x0f) return adbg_disasm_x86_0f(p);
 		
-		//         reg r/m
-		//              DW
-		// 0	00 000 000	modrm
-		// 1	00 000 001	modrm
-		// 2	00 000 010	modrm
-		// 3	00 000 011	modrm
-		// 4	00 000 100	al, imm8
-		// 5	00 000 101	ax, imm16
-		// 6	00 000 110	PUSH
-		// 7	00 000 111	POP (or 2-byte)
-		// 00h	00 000 000	add
-		// 08h	00 001 000	or
-		// ..
-		// 38h	00 111 000	cmp
 		ubyte m = opcode & 7;
 		ubyte r = opcode >> 3; // no masking since MOD=00
 		
@@ -242,7 +245,7 @@ L_DECODE:
 			}
 			// Prefixes already taken care of
 			if (p.platform == AdbgPlatform.x86_64)
-				return adbg_error(AdbgError.illegalInstruction);
+				return adbg_oops(AdbgError.illegalInstruction);
 			// 27h	00 100 111	daa
 			// 2fh	00 101 111	das
 			// 37h	00 110 111	aaa
@@ -257,7 +260,7 @@ L_DECODE:
 			adbg_syntax_add_mnemonic(p.syntaxer, mnemonic);
 		}
 		
-		// A, immediate
+		// immediate
 		if (m >= 0b100) {
 			if (p.mode >= AdbgDisasmMode.file)
 				adbg_syntax_add_register(p.syntaxer,
@@ -474,7 +477,16 @@ immutable const(char)*[][] regs = [
 		"zmm8", "zmm9", "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15",
 	]
 ];
-immutable const(char)*[] regs80 = [ // x87
+immutable const(char)*[] regs_x87_intel = [
+	"st", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
+];
+immutable const(char)*[] regs_x87_nasm = [
+	"st0", "st1", "st2", "st3", "st4", "st5", "st6", "st7"
+];
+immutable const(char)*[] regs_x87_att = [
+	"st(0)", "st(1)", "st(2)", "st(3)", "st(4)", "st(5)", "st(6)", "st(7)"
+];
+immutable const(char)*[] regs_mmx = [ // mmx
 	"mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7"
 ];
 immutable const(char)*[2][] regs_addr16 = [ // modrm:rm16
