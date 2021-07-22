@@ -223,7 +223,15 @@ struct adbg_disasm_opcode_t {
 	const(char) *comment;	/// Instruction comment
 	int warnings;	/// Warning flags
 	int size;	/// Instruction size
-	adbg_address_t target;	/// Target address
+}
+/// 
+struct adbg_disasm_opcode_info_t {
+	const(char) *mnemonic;
+	const(char) *segment;
+	adbg_syntax_op_t *operands;
+	size_t operandCount;
+	const(char) **prefixes;
+	size_t prefixCount;
 }
 
 /// Disassembler parameters structure. This structure is not meant to be
@@ -415,6 +423,19 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 	}
 	
 	return e;
+}
+
+/// 
+//TODO: make an easy way to switch between the two
+//      e.g. info THEN format/finalize?
+//      ACTUALLY GOOD IDEA (bypass formatting for people who only want pure ops meta)
+void adbg_disasm_opcode_info(adbg_disasm_t *p, adbg_disasm_opcode_info_t *op) {
+	op.mnemonic = p.syntaxer.mnemonicInstruction;
+	op.segment = p.syntaxer.segmentRegister;
+	op.operands = &p.syntaxer.op[0];
+	op.operandCount = p.syntaxer.opIndex;
+	op.prefixes = &p.syntaxer.pf[0];
+	op.prefixCount = p.syntaxer.pfIndex;
 }
 
 private import core.stdc.stdlib : free;

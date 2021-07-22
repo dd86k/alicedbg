@@ -160,7 +160,7 @@ int adbg_obj_open_path(adbg_object_t *obj, const(char) *path) {
 	obj.file = fopen(path, "rb");
 	
 	if (obj.file == null)
-		return adbg_error_system;
+		return adbg_oops(AdbgError.os);
 	
 	return adbg_obj_open_file(obj, obj.file);
 }
@@ -182,26 +182,26 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	// File size
 	
 	if (fseek(obj.file, 0, SEEK_END))
-		return adbg_error_system;
+		return adbg_oops(AdbgError.os);
 	
 	obj.fsize = ftell(obj.file);
 	
 	if (obj.fsize < 0) // -1
-		return adbg_error_system;
+		return adbg_oops(AdbgError.os);
 	if (fseek(obj.file, 0, SEEK_SET))
-		return adbg_error_system;
+		return adbg_oops(AdbgError.os);
 	
 	// Allocate
 	
 	obj.buf = malloc(obj.fsize);
 	
 	if (obj.buf == null)
-		return adbg_error_system;
+		return adbg_oops(AdbgError.os);
 	
 	// Read
 	
 	if (fread(obj.buf, obj.fsize, 1, obj.file) == 0)
-		return adbg_error_system;
+		return adbg_oops(AdbgError.os);
 	
 	// Set meta to zero (failsafe for future implementations)
 	

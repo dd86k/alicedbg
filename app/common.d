@@ -87,21 +87,20 @@ struct settings_t {
 settings_t global;
 
 /// Print last library error information to stdout 
-int printerror(const(char)* f = cast(char*)__FUNCTION__)() {
-	import adbg.etc.c.stdio : printf;
+int printerror(const(char)* func = cast(char*)__FUNCTION__)() {
+	import adbg.etc.c.stdio : printf, puts;
 	import adbg.error : error;
 	import adbg.sys.err : SYS_ERR_FMT;
 	
 	debug printf("[%s:%d] ", error.file, error.line);
-	
-	const(char) *msg = adbg_error_msg;
-	const(char) *ecd = adbg_error_ext_code;
+	printf("%s: E-%u ", func, adbg_errno);
+	with (AdbgError)
 	switch (error.code) {
-	case AdbgError.system:
-		printf("%s: (%s) %s ("~SYS_ERR_FMT~")\n", f, ecd, msg, error.source);
-		break;
+	case clib: printf("(%d) ", adbg_errno_extern); break;
+	case os: printf("("~SYS_ERR_FMT~") ", adbg_errno_extern); break;
 	default:
-		printf("%s: (%s) %s\n", f, ecd, msg);
 	}
+	puts(adbg_error_msg);
+	
 	return error.code;
 }

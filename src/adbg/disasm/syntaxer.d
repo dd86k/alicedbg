@@ -1,7 +1,22 @@
 /**
  * Disassembler syntax engine.
  *
- * TODO
+ * Intel:
+ * ---
+ * add edx,es:[eax+ecx*4+0x50]
+ * ---
+ *
+ * NASM:
+ * ---
+ * add edx,[es:eax+ecx*4+0x50]
+ * ---
+ *
+ * ATT:
+ * ---
+ * add %es:+0x50(%ax+%cx),%dx
+ * // Scaled:
+ * add %es:+0x50(%eax,%ecx,4),%edx
+ * ---
  *
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k
@@ -9,16 +24,25 @@
  */
 module adbg.disasm.syntaxer;
 
+//TODO: Consider isa info structures in memory
+//      Depending on ISA enum
+//      Little/Big endian for fetch operations
 //TODO: Invalid results could be rendered differntly
 //      e.g., .byte 0xd6,0xd6 instead of (bad)
+//      Take from machine buffer? (only if it were a plain buffer...)
+//TODO: Consider making the machine buffer a plain buffer
+//      e.g., do not already format the bytes?
+//        pros: - caller has the.. instruction bytes?
+//              - format later? (even if we are using our "fast" formatting functions?)
+//        cons: - no grouping from decoder
+//                - re-introduce group with instruction offset in buffer?
 //TODO: option for hex offset prefix/suffix ($,h,0x)
-
-//TODO: Figure out how to offset
+//      Maybe per syntax? At least default setting?
+//TODO: Figure out how to do offsets in memory accesses
+//      Displacement size / signed / etc.
 
 private import adbg.error;
 private import adbg.disasm : AdbgSyntax;
-//TODO: Deprecate?
-private import core.stdc.stdarg;
 private import adbg.utils.str : sbuffer_t;
 
 extern (C):
@@ -36,20 +60,19 @@ enum AdbgSyntaxWidth : ubyte {
 	i8, i16, i32, i64, i128, i256, i512, i1024
 }
 
-/// Operand type.
+/// Main operand types.
 package
-enum AdbgSyntaxType : ubyte {
+enum AdbgSyntaxOperand : ubyte {
 	immediate,	/// 
 	register,	/// 
 	memory,	/// 
 }
 
 /// Memory immediate types
+deprecated
 package
 enum AdbgSyntaxImmType : ubyte {
 	absolute,	/// 
-	relative,	/// 
-	signed = relative,	/// 
 	far	/// 
 }
 
@@ -57,6 +80,7 @@ enum AdbgSyntaxImmType : ubyte {
 ///
 /// All examples may feature a base register (eax), an additional register
 /// (ecx), a displacement or offset (0x50 or 80), or a segment register (es).
+deprecated
 package
 enum AdbgSyntaxMemType : ubyte {
 	/// Access with register.
@@ -114,8 +138,6 @@ enum AdbgSyntaxMemType : ubyte {
 	/// 	---
 	/// 	%es:0x50(%sp+%ax)
 	/// 	---
-	/// intel: [sp+ax+0x50]
-	/// att: 0x50(%sp+%ax)
 	registerRegisterOffset,
 	/// A far memory location pointed by a constant segment and register string.
 	/// intel:
@@ -223,17 +245,11 @@ enum AdbgSyntaxMemType : ubyte {
 	scaleBaseOffset,
 }
 
-package
-struct adbg_syntax_op_imm_t {
-	AdbgSyntaxImmType type;
-	uint value;
-	ushort segment;
-}
-
 /// Immediate operand
 package
-struct adbg_syntax_op_imm64_t {
-	ulong value;
+struct adbg_syntax_op_imm_t {
+	int value;
+	ushort segment;
 }
 
 /// Register operand
@@ -245,22 +261,21 @@ struct adbg_syntax_op_reg_t {
 /// Memory operand
 package
 struct adbg_syntax_op_mem_t {
-	AdbgSyntaxMemType type;	/// 
 	const(char) *base;	/// Used for normal usage, otherwise SIB:BASE
 	const(char) *index;	/// SIB:INDEX
 	int disp;	/// Offset or SIB:OFFSET
 	ubyte scale;	/// SIB:SCALE
 	AdbgSyntaxWidth width;	/// Memory operation width
 	AdbgSyntaxWidth size;	/// Offset size
+	bool scaled;	/// SIB or any scaling mode
 }
 
 /// Operand structure
 package
 struct adbg_syntax_op_t { align(1):
-	AdbgSyntaxType type;	/// Operand type
+	AdbgSyntaxOperand type;	/// Operand type
 	union {
 		adbg_syntax_op_imm_t imm;	/// Immediate item
-		adbg_syntax_op_imm64_t imm64;	/// Long immediate item
 		adbg_syntax_op_reg_t reg;	/// Register item
 		adbg_syntax_op_mem_t mem;	/// Memory operand item
 	}
@@ -418,7 +433,7 @@ void adbg_syntax_add_machine(T)(ref adbg_syntaxer_t p, T v) {
 		u64_t u = void;
 		u.f64 = v;
 		p.machineBuffer.add(adbg_util_strx08(u.u64, false));
-	} else static assert(0, "adbg_syntax_add_machine: Type not supported");
+	} else static assert(0, "Type not supported");
 	
 	if (p.userOpts.machinePacked == false)
 		p.machineBuffer.add(' ');
@@ -461,7 +476,7 @@ void adbg_syntax_add_segment(ref adbg_syntaxer_t p, const(char) *segment) {
 // ANCHOR Operand operations
 //
 
-// immediate type
+// immediate operand type
 
 package
 void adbg_syntax_add_immediate(ref adbg_syntaxer_t p, uint v) {
@@ -469,11 +484,11 @@ void adbg_syntax_add_immediate(ref adbg_syntaxer_t p, uint v) {
 		return;
 	
 	adbg_syntax_op_t *item = &p.op[p.opIndex++];
-	item.type = AdbgSyntaxType.immediate;
+	item.type = AdbgSyntaxOperand.immediate;
 	item.imm.value = v;
 }
 
-// register type
+// register operand type
 
 package
 void adbg_syntax_add_register(ref adbg_syntaxer_t p, const(char) *register) {
@@ -481,69 +496,32 @@ void adbg_syntax_add_register(ref adbg_syntaxer_t p, const(char) *register) {
 		return;
 	
 	adbg_syntax_op_t *item = &p.op[p.opIndex++];
-	item.type = AdbgSyntaxType.register;
+	item.type = AdbgSyntaxOperand.register;
 	item.reg.name = register;
 }
 
-// memory type
-//TODO: Think if a smart structure constructor is better than this...
-//      Make it variadic (compile-time?) or just C-like variadic?
-//      Smartly configure the operand within ctor?
+// memory operand type
 
 package
-void adbg_syntax_add_memory_register(ref adbg_syntaxer_t p, AdbgSyntaxWidth width,
-	const(char) *register) {
+void adbg_syntax_add_memory(ref adbg_syntaxer_t p,
+	const(char) *regbase,
+	const(char) *regindex,
+	int disp,
+	//TODO: ushort
+	AdbgSyntaxWidth width,
+	ubyte scale,
+	bool scaled) {
 	if (p.opIndex >= ADBG_MAX_OPERANDS)
 		return;
 	
 	adbg_syntax_op_t *item = &p.op[p.opIndex++];
-	item.type = AdbgSyntaxType.memory;
-	item.mem.type = AdbgSyntaxMemType.register;
-	item.mem.width = width;
-	item.mem.base = register;
-}
-
-package
-void adbg_syntax_add_memory_register_offset(ref adbg_syntaxer_t p, AdbgSyntaxWidth width,
-	const(char) *register, int offset) {
-	if (p.opIndex >= ADBG_MAX_OPERANDS)
-		return;
-	
-	adbg_syntax_op_t *item = &p.op[p.opIndex++];
-	item.type = AdbgSyntaxType.memory;
-	item.mem.type = AdbgSyntaxMemType.registerOffset;
-	item.mem.width = width;
-	item.mem.base = register;
-	item.mem.disp = offset;
-}
-
-package
-void adbg_syntax_add_memory_register_register(ref adbg_syntaxer_t p, AdbgSyntaxWidth width,
-	const(char) *register1, const(char) *register2) {
-	if (p.opIndex >= ADBG_MAX_OPERANDS)
-		return;
-	
-	adbg_syntax_op_t *item = &p.op[p.opIndex++];
-	item.type = AdbgSyntaxType.memory;
-	item.mem.width = width;
-	item.mem.type = AdbgSyntaxMemType.registerRegister;
-	item.mem.base = register1;
-	item.mem.index = register2;
-}
-
-package
-void adbg_syntax_add_memory_register_register_offset(ref adbg_syntaxer_t p, AdbgSyntaxWidth width,
-	const(char) *register1, const(char) *register2, int offset) {
-	if (p.opIndex >= ADBG_MAX_OPERANDS)
-		return;
-	
-	adbg_syntax_op_t *item = &p.op[p.opIndex++];
-	item.type = AdbgSyntaxType.memory;
-	item.mem.width = width;
-	item.mem.type = AdbgSyntaxMemType.registerRegisterOffset;
-	item.mem.base = register1;
-	item.mem.index = register2;
-	item.mem.disp = offset;
+	item.type = AdbgSyntaxOperand.memory;
+	item.mem.width	= width;
+	item.mem.base	= regbase;
+	item.mem.index	= regindex;
+	item.mem.disp	= disp;
+	item.mem.scale	= scale;
+	item.mem.scaled	= scaled;
 }
 
 //

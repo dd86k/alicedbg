@@ -308,7 +308,7 @@ L_DECODE:
 		return adbg_disasm_x86_op_Jb(p);
 	}
 	
-	return 0;
+	return adbg_oops(AdbgError.illegalInstruction);
 }
 
 private:

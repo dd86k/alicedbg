@@ -10,18 +10,12 @@
  */
 module adbg.error;
 
+// NOTE: Every thing that could go wrong should have an error code.
+
 extern (C):
 __gshared:
 
 /// Self eror codes
-// NOTE: Every thing that could go wrong should have an error code
-//TODO: C runtime errors
-//TODO: Would E-source#-error# be better?
-//      Or make it only our error code and save original OS/source code?
-//        e.g.  2 -> internal
-//             10 -> os error (better than source enum?) -> GetLastError/errno
-//             11 -> external error -> etc.
-//      For example, SQLite translates codes (e.g., SQLITE_PERM)
 enum AdbgError {
 	/// Success!
 	none	= 0,
@@ -35,7 +29,8 @@ enum AdbgError {
 	//
 	// External
 	//
-	system = 90,
+	clib = 90,
+	os = 91,
 	//
 	// Debugger
 	//
@@ -63,13 +58,10 @@ enum AdbgError {
 }
 
 /// Represents an error in alicedbg.
-//TODO: Consider removing source code
-//      Because we (and user app) can call errno/GetLastError in _msg
 struct adbg_error_t {
-	int source;	/// Original error code (OS, runtime, etc.)
-	int code;	/// Error code
 	const(char)* file;	/// File source
 	int line;	/// Line source
+	int code;	/// Error code
 }
 /// Last error in alicedbg.
 adbg_error_t error;
@@ -132,50 +124,37 @@ int adbg_oops(string s = __FILE__, int l = __LINE__)(AdbgError e) {
 	return error.code = e;
 }
 
-/// Internally used to set errors with "system" as source.
-/// Params:
-/// 	s = (Template) Automatically set to __FILE__
-/// 	l = (Template) Automatically set to __LINE__
-/// Returns: System error code
-int adbg_error_system(string s = __FILE__, int l = __LINE__)() {
-	import adbg.sys.err : adbg_sys_errno;
-	error.line = l;
-	error.file = s.ptr;
-	error.source = adbg_sys_errno;
-	return error.code = AdbgError.system;
-}
-
-/*int adbg_error_runtime() {
-	
-}*/
-
 //
 // ANCHOR Error getters
 //
 
-/// Format the last set error code.
-/// Returns: Formatted error code
-const(char) *adbg_error_ext_code() {
-	import core.stdc.stdio : snprintf;
-	import adbg.sys.err : SYS_ERR_FMT;
+int adbg_errno() {
+	return error.code;
+}
+
+int adbg_errno_extern() {
+	import adbg.sys.err : adbg_sys_errno;
+	import core.stdc.errno : errno;
 	
-	enum _BL = 16; /// internal buffer length
-	__gshared char[_BL] m;
-	
-	snprintf(m.ptr, _BL, "E-%u", error.code);
-	return m.ptr;
+	with (AdbgError)
+	switch (error.code) {
+	case clib: return errno;
+	case os:   return adbg_sys_errno;
+	default:   return error.code;
+	}
 }
 
 /// Returns an error message with the last error code set.
 /// Returns: Error message
-// NOTE: Every thing that could go wrong should have an error message
 const(char)* adbg_error_msg(int code = error.code) {
-	import adbg.sys.err : adbg_sys_error;
+	import core.stdc.errno : errno;
+	import core.stdc.string : strerror;
+	import adbg.sys.err : adbg_sys_error, adbg_sys_errno;
 	
 	with (AdbgError)
 	switch (error.code) {
-	case system:
-		return adbg_sys_error(error.source);
+	case clib: return strerror(errno);
+	case os:   return adbg_sys_error(adbg_sys_errno());
 	default:
 		foreach (ref e; errors)
 			if (code == e.code)

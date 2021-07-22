@@ -95,6 +95,10 @@ buildType "disasm-loop" {
 	buildOptions "unittests"
 	sourceFiles "tests/disasm-loop.d"
 }
+buildType "disasm" {
+	buildOptions "unittests"
+	sourceFiles "tests/disasm.d"
+}
 buildType "setjmp" {
 	buildOptions "unittests"
 	sourceFiles "tests/setjmp.d"

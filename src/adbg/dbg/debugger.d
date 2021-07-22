@@ -203,7 +203,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 			envp,	// lpEnvironment
 			null,	// lpCurrentDirectory
 			&si, &pi) == FALSE)
-			return adbg_error_system;
+			return adbg_oops(AdbgError.os);
 		free(b);
 		g_debuggee.hpid = pi.hProcess;
 		g_debuggee.htid = pi.hThread;
@@ -221,7 +221,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 		version (Win64)
 		if (IsWow64Process(g_debuggee.hpid, &g_debuggee.wow64) == FALSE)
-			return adbg_error_system;
+			return adbg_oops(AdbgError.os);
 	} else
 	version (Posix) {
 		// Verify if file exists and we has access to it
@@ -336,11 +336,11 @@ private int __adbg_chld(void* arg) {
 int adbg_attach(int pid, int flags = 0) {
 	version (Windows) {
 		if (DebugActiveProcess(pid) == FALSE)
-			return adbg_error_system;
+			return adbg_oops(AdbgError.os);
 	} else
 	version (Posix) {
 		if (ptrace(PTRACE_SEIZE, pid, null, null) == -1)
-			return adbg_error_system;
+			return adbg_oops(AdbgError.os);
 	}
 	g_debuggee.attached = true;
 	//TODO: Check if the process is really paused
@@ -376,7 +376,7 @@ int adbg_run(int function(exception_t*) userfunc) {
 L_DEBUG_LOOP:
 		g_debuggee.state = AdbgState.running;
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
-			return adbg_error_system;
+			return adbg_oops(AdbgError.os);
 		g_debuggee.state = AdbgState.paused;
 		
 		// Filter events
@@ -440,7 +440,7 @@ L_DEBUG_LOOP:
 			if (ContinueDebugEvent(
 				de.dwProcessId, de.dwThreadId, DBG_CONTINUE) == FALSE) {
 				g_debuggee.state = AdbgState.idle;
-				return adbg_error_system;
+				return adbg_oops(AdbgError.os);
 			}
 			goto L_DEBUG_LOOP;
 		}
@@ -575,7 +575,7 @@ int adbg_bp_rm_addr(size_t addr) {
 int adbg_mm_cread(size_t addr, void *data, uint size) {
 	version (Windows) {
 		if (ReadProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
-			return adbg_error_system;
+			return adbg_oops(AdbgError.os);
 	} else { // Mostly taken from https://www.linuxjournal.com/article/6100
 		import core.stdc.string : memcpy;
 		
@@ -606,7 +606,7 @@ int adbg_mm_cread(size_t addr, void *data, uint size) {
 int adbg_mm_cwrite(size_t addr, void *data, uint size) {
 	version (Windows) {
 		if (WriteProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
-			return adbg_error_system;
+			return adbg_oops(AdbgError.os);
 	} else { // Mostly taken from https://www.linuxjournal.com/article/6100
 		import core.stdc.string : memcpy;
 		

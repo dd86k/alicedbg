@@ -10,7 +10,6 @@ module adbg.sys.err;
 version (Windows) {
 	import core.sys.windows.windows;
 	enum SYS_ERR_FMT = "%08X"; /// Error code format
-	private enum ERR_BUF_SZ = 512;
 } else {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
@@ -24,6 +23,7 @@ extern (C):
 /// Returns: String
 const(char) *adbg_sys_error(int code) {
 	version (Windows) {
+		enum ERR_BUF_SZ = 512;
 		__gshared char [ERR_BUF_SZ]buffer = void;
 		size_t len = FormatMessageA(
 			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_MAX_WIDTH_MASK,
