@@ -1,4 +1,4 @@
-module tests.term.read;
+module tests.readkey;
 
 import std.stdio;
 import term;

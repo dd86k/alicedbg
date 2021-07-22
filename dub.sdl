@@ -6,8 +6,23 @@ copyright "Copyright © 2019-2021 dd86k <dd@dax.moe>"
 license "BSD 3-clause"
 version "0.0.0"
 
-# NOTE: We explicitly specify the betterC flag
-#       Supports older DUB releases, like 0.9.24
+# NOTE: BetterC flag
+#       We explicitly specify the betterC flag to support older DUB releases
+#       Like v0.9.24
+# NOTE: GDC 5.4
+#       Doesn't work, ld whines about missing _tlsstart/_tlsend (TLS) references
+#       value for C++/ObjC but not D:
+#         -fno-rtti
+#         -fno-weak
+#         -fno-threadsafe-statics
+#         -fextern-tls-init
+#       -fno-switch-errors: not a command-line option
+#       -nophoboslib: makes the linker complain more
+#       Tried with "-fno-moduleinfo" "-fno-emit-moduleinfo"
+
+#
+# SECTION Configurations
+#
 
 # Not a subPackage because I want to avoid generating a seperate library
 configuration "application" {
@@ -21,11 +36,10 @@ configuration "library" {
 }
 
 #
-# Debug builds
+# SECTION Build types
 #
 
-# Make the compiler print GC (despite not using it) usage, TLS (thread local
-# storage) usage, and target info for runtime diagnostic purposes.
+# Make the compiler print GC and TLS usage, and target information.
 buildType "debugv" {
 	versions "PrintTargetInfo"
 	buildOptions "debugMode" "debugInfo"
@@ -33,27 +47,18 @@ buildType "debugv" {
 	dflags "-betterC" "--vgc" platform="ldc"
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
-# Ditto but aimed for older dmd versions, ldc 0.17.1, and gdc 5.4
-# NOTE: Doesn't work with GDC 5.4
-#       Linker (ld) whines about missing _tlsstart/_tlsend (TLS) references
+
+# Ditto but aimed for older compiler version
+# Like older dmd versions, ldc 0.17.1, and gdc 6.0
 buildType "debugv0" {
 	versions "PrintTargetInfo"
 	buildOptions "debugMode" "debugInfo"
 	dflags "-vgc" "-vtls" platform="dmd"
 	dflags "--vgc" platform="ldc"
-	# GDC 5.4 notes
-	# value for C++/ObjC but not D:
-	# 	-fno-rtti
-	# 	-fno-weak
-	# 	-fno-threadsafe-statics
-	# 	-fextern-tls-init
-	# -fno-switch-errors: not a command-line option
-	# -nophoboslib: makes the linker complain more
-	# "-fno-moduleinfo" "-fno-emit-moduleinfo"
 	dflags "-ftransition=nogc" "-ftransition=tls" "-fno-exceptions" "-fno-bounds-check" "-fno-assert" "-fno-builtin" platform="gdc"
 }
 
-# Instead of DUB, make the compiler verbose instead.
+# Make the compiler verbose instead of DUB.
 buildType "debugvv" {
 	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" "-v" platform="dmd"
@@ -67,10 +72,6 @@ buildType "debug" {
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
 }
-
-#
-# Release builds
-#
 
 # Compile in release mode.
 buildType "release" {
@@ -87,40 +88,57 @@ buildType "release-nobounds" {
 }
 
 #
-# Specific tests
+# SECTION Unit tests
+#
+# These are separated into their own because they either:
+# - Require interaction;
+# - Or are too lengthy for normal testing.
 #
 
-# Disassembler scrambler test
-buildType "disasm-loop" {
+# disasm: scrambler test
+buildType "test-disasm-loop" {
 	buildOptions "unittests"
 	sourceFiles "tests/disasm-loop.d"
 }
-buildType "disasm" {
+# disasm: decoding/analysis
+buildType "test-disasm" {
 	buildOptions "unittests"
 	sourceFiles "tests/disasm.d"
 }
-buildType "setjmp" {
+# syntaxer: output
+buildType "test-syntax" {
+	buildOptions "unittests"
+	sourceFiles "tests/syntax.d"
+}
+# crt: setjmp
+buildType "test-setjmp" {
 	buildOptions "unittests"
 	sourceFiles "tests/setjmp.d"
 }
-buildType "read" {
+# terminal: readkey
+buildType "test-readkey" {
 	buildOptions "unittests"
-	sourceFiles "tests/read.d"
+	sourceFiles "tests/readkey.d"
 }
-buildType "readline" {
+# terminal: readline
+buildType "test-readline" {
 	buildOptions "unittests"
 	sourceFiles "tests/readline.d"
 }
-buildType "expand" {
+# utils: string expand
+buildType "test-expand" {
 	buildOptions "unittests"
 	sourceFiles "tests/expand.d"
 }
+buildType "test-all" {
+	buildOptions "unittests"
+	sourceFiles "tests/disasm.d" "tests/syntax.d" "tests/expand.d"
+}
 
 #
-# Documentation
+# SECTION Documentation
 #
 
-buildType "ddox" {
-	# Bogus, but brings back ddox
+buildType "ddox" { # Brings back ddox
 	versions "__DDOX"
 }

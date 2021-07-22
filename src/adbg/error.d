@@ -29,8 +29,8 @@ enum AdbgError {
 	//
 	// External
 	//
-	clib = 90,
-	os = 91,
+	clib	= 90,
+	os	= 91,
 	//
 	// Debugger
 	//
