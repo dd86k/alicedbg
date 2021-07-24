@@ -171,7 +171,7 @@ int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
 		uint imax;	/// longest instruction size
 		uint icnt;	/// instruction count
 		uint ills;	/// Number of illegal instructions
-		adbg_disasm_start_buffer(dp, AdbgDisasmMode.size, data, size, 0);
+		adbg_disasm_start_buffer(dp, AdbgDisasmMode.size, data, size);
 L_DISASM_1:
 		with (AdbgError)
 		switch (adbg_disasm(dp, &op)) {
@@ -204,17 +204,17 @@ L_DISASM_1:
 	}
 	
 	uint i;
-	adbg_disasm_start_buffer(dp, AdbgDisasmMode.file, data, size, 0);
+	adbg_disasm_start_buffer(dp, AdbgDisasmMode.file, data, size);
 L_DISASM_2:
 	with (AdbgError)
 	switch (adbg_disasm(dp, &op)) {
 	case none:
-		printf("%08X %-30s %s\n", i, op.machine, op.mnemonic);
+		//printf("%08X %-30s %s\n", i, op.machine, op.mnemonic);
 		i += op.size;
 		goto L_DISASM_2;
 	//TODO: Illegal should be moved with none and disasm takes care of buffer
 	case illegalInstruction:
-		printf("%08X %-30s (bad)\n", i, op.machine);
+		//printf("%08X %-30s (bad)\n", i, op.machine);
 		i += op.size;
 		goto L_DISASM_2;
 	case outOfData: return 0;

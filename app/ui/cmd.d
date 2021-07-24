@@ -296,7 +296,6 @@ int cmd_c_help(int argc, const(char) **argv) {
 	foreach (action; actions)
 		printf(cmd_fmt, action.str, action.desc);
 	
-	
 	return 0;
 }
 
@@ -323,7 +322,7 @@ int cmd_c_quit(int argc, const(char) **argv) {
 //
 
 int cmd_handler(exception_t *ex) {
-	memcpy(&global.last_exception, ex, exception_t.sizeof);
+	memcpy(&globals.last_exception, ex, exception_t.sizeof);
 	
 	printf(
 	"*	Thread %d stopped for: %s ("~SYS_ERR_FMT~")\n",
@@ -336,14 +335,14 @@ int cmd_handler(exception_t *ex) {
 	
 	if (ex.fault) {
 		printf("	Fault address: %zx\n", ex.fault.sz);
-		adbg_disasm_start_debuggee(&global.disasm, AdbgDisasmMode.data, ex.fault.sz);
+		adbg_disasm_start_debuggee(&globals.disasm, AdbgDisasmMode.data, ex.fault.sz);
 		adbg_disasm_opcode_t op = void;
-		if (adbg_disasm(&global.disasm, &op)) {
+		if (adbg_disasm(&globals.disasm, &op)) {
 			printf("	Faulting instruction: (error:%s)\n",
 				adbg_error_msg);
 		} else {
-			printf("	Faulting instruction: [%s] %s\n",
-				op.machine, op.mnemonic);
+			//printf("	Faulting instruction: [%s] %s\n",
+			//	op.machine, op.mnemonic);
 		}
 	}
 	

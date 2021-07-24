@@ -7,8 +7,8 @@
  */
 module adbg.disasm.syntax.intel;
 
-import adbg.disasm : adbg_disasm_t;
-import adbg.disasm.syntaxer;
+import adbg.disasm : adbg_disasm_t, adbg_disasm_operand_t, AdbgDisasmOperand;
+import adbg.utils.str;
 
 extern (C):
 
@@ -18,44 +18,50 @@ private immutable const(char)*[] INTEL_WIDTH = [
 ];
 
 // render intel
-void adbg_syntax_op_intel(ref adbg_syntaxer_t p, ref adbg_syntax_op_t op) {
-	switch (op.type) with (AdbgSyntaxOperand) {
-	case immediate:
-		p.mnemonicBuffer.add("0x%x", op.imm.value);
-		break;
-	case register:
-		p.mnemonicBuffer.add(op.reg.name);
-		break;
+bool adbg_disasm_operand_intel(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_disasm_operand_t op) {
+	switch (op.type) with (AdbgDisasmOperand) {
+	case immediate: return s.addf("0x%x", op.imm.value);
+	case register:  return s.add(op.reg.name);
 	case memory:
-		p.mnemonicBuffer.add(INTEL_WIDTH[op.mem.width]);
-		p.mnemonicBuffer.add(" ptr ");
+		if (s.add(INTEL_WIDTH[op.mem.width]))
+			return true;
+		if (s.add(" ptr "))
+			return true;
 		
 		//TODO: p.decoderOpts.noSegment
-		if (p.segmentRegister) {
-			p.mnemonicBuffer.add(p.segmentRegister);
-			p.mnemonicBuffer.add(':');
+		if (p.opcode.segment) {
+			if (s.add(p.opcode.segment))
+				return true;
+			if (s.add(':'))
+				return true;
 		}
 		
-		p.mnemonicBuffer.add('[');
+		if (s.add('['))
+			return true;
 		
 		if (op.mem.base) { // register-based
-			p.mnemonicBuffer.add(op.mem.base);
+			if (s.add(op.mem.base))
+				return true;
 			if (op.mem.index) {
-				p.mnemonicBuffer.add('+');
-				p.mnemonicBuffer.add(op.mem.index);
+				if (s.add('+'))
+					return true;
+				if (s.add(op.mem.index))
+					return true;
 			}
 			if (op.mem.scale) {
-				p.mnemonicBuffer.add('*');
-				p.mnemonicBuffer.add("%u", op.mem.scale);
+				if (s.add('*'))
+					return true;
+				if (s.addf("%u", op.mem.scale))
+					return true;
 			}
 			if (op.mem.disp) {
-				
+				//TODO: Displacement
 			}
 		} else { // Absolute (+far) or relative address
+			//TODO: address
 		}
 		
-		p.mnemonicBuffer.add(']');
-		break;
+		return s.add(']');
 	default: assert(0);
 	}
 }

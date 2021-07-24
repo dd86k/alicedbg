@@ -16,66 +16,6 @@ extern (C):
 /// An empty string in case compilers does not support pool strings.
 immutable const(char) *empty_string = "";
 
-/// Static string buffer structure
-struct sbuffer_t(int bsize) {
-	size_t index;	/// Current buffer index
-	char[bsize] data;	/// Buffer data
-	alias data this;
-	enum size = bsize;	/// Bufer size
-	
-	/// Add a character into the buffer.
-	/// Params: c = Character
-	/// Returns: Index position
-	size_t add(char c) {
-		if (index < bsize)
-			data[index++] = c;
-		return index;
-	}
-	/// Add a character into the buffer.
-	/// Params: c = Character
-	/// Returns: Index position
-	size_t add(const(char) *s) {
-		for (size_t si; index < bsize && s[si]; ++index, ++si) {
-			data[index] = s[si];
-		}
-		return index;
-	}
-	static if (__VERSION__ >= 2092) {
-		/// Add multiple items into buffer.
-		/// Params: s = printf format specificer
-		/// Returns: Index position
-		pragma(printf)
-		size_t add(const(char) *s, ...) {
-			import adbg.etc.c.stdarg : va_list, va_start;
-			va_list va = void;
-			va_start(va, s);
-			return add(s, va);
-		}
-	} else {
-		/// ditto
-		size_t add(const(char) *s, ...) {
-			import adbg.etc.c.stdarg : va_list, va_start;
-			va_list va = void;
-			va_start(va, s);
-			return add(s, va);
-		}
-	}
-	/// Add multiple items into buffer.
-	/// Params: s = printf format specificer
-	/// Returns: Index position
-	size_t add(const(char) *s, ref va_list va) {
-		import adbg.etc.c.stdio : vsnprintf;
-		return vsnprintf(data.ptr + index, index - bsize, s, va);
-	}
-	
-	/// Prepares and returns null-terminated pointer.
-	/// Return: Character pointer
-	char* cstring() {
-		data[index >= bsize ? index - 1 : index] = 0;
-		return data.ptr;
-	}
-}
-
 //TODO: Rewrite as adbg_util_flatten without snprintf
 //      Internal loop
 size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
@@ -258,6 +198,7 @@ const(char) *adbg_util_strx02(ubyte v, bool upper = false) {
 
 	return cast(char*)b;
 }
+
 /**
  * Quick and dirty conversion function to convert an ushort value to a
  * '0'-padded hexadecimal string. Faster than using vsnprintf.
@@ -341,62 +282,8 @@ const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 }
 
 //
-// Generic string formatting
+// Generic string manipulation
 //
-
-/**
- * Append a constant string to an existing buffer.
- * Params:
- * 	buf  = Existing character buffer
- * 	size = Buffer size
- * 	bufi = Buffer index
- * 	str  = String data
- * Returns: Updated buffer index
- */
-//TODO: Consider deprecating
-size_t adbg_util_stradd(char *buf, size_t size, size_t bufi, const(char) *str) {
-	size_t stri;
-	while (str[stri] && bufi < size) {
-		buf[bufi] = str[stri];
-		++stri; ++bufi;
-	}
-	buf[bufi] = 0;
-	return bufi;
-}
-
-/**
- * Append a formatted string to an existing buffer, calls adbg_util_straddva and adbg_util_stradd.
- * Params:
- * 	buf  = Existing character buffer
- * 	size = Buffer size
- * 	bufi = Buffer index
- * 	f = String format, respects printf format
- * 	... = Additional objects to be formatted
- * Returns: Updated buffer index
- */
-//TODO: Consider deprecating
-size_t adbg_util_straddf(char *buf, size_t size, size_t bufi, const(char) *f, ...) {
-	va_list va = void;
-	va_start(va, f);
-	return adbg_util_straddva(buf, size, bufi, f, va);
-}
-
-/**
- * Append va_list to buffer. Uses an internal 128-character buffer for vsnprintf.
- * Params:
- * 	buf  = Existing character buffer
- * 	size = Buffer size
- * 	bufi = Buffer index
- * 	f = String format, respects printf format
- * 	va = Argument list
- * Returns: Updated buffer index
- */
-//TODO: Consider deprecating
-size_t adbg_util_straddva(char *buf, size_t size, size_t bufi, const(char) *f, va_list va) {
-	char [128]b = void;
-	vsnprintf(cast(char*)b, 128, f, va);
-	return adbg_util_stradd(buf, size, bufi, cast(char*)b);
-}
 
 /**
  * Lower case string buffer ('A' to 'Z' only).
@@ -404,62 +291,89 @@ size_t adbg_util_straddva(char *buf, size_t size, size_t bufi, const(char) *f, v
  * 	buf  = String buffer
  * 	size = Buffer size
  */
-void adbg_util_strlcase(char *buf, size_t size) {
-	for (size_t i; buf[i] && i < size; ++i) {
-		if (buf[i] >= 0x41 && buf[i] <= 0x5A)
+void adbg_util_str_lowercase(char *buf, size_t size) {
+	for (size_t i; buf[i] && i < size; ++i)
+		if (buf[i] >= 'A' && buf[i] <= 'Z')
 			buf[i] += 32;
-	}
 }
 
-/// Quick Format stack size (characters)
-//TODO: Consider deprecating
-private enum STR_QUICK_STACK_SIZE = 128;
-/// Quick Format stacks count
-//TODO: Consider deprecating
-private enum STR_QUICK_STACKS_COUNT = 16;
-/// Quick Format stack limit (count - 1) for index comparason
-//TODO: Consider deprecating
-private enum STR_QUICK_STACKS_LIMIT = STR_QUICK_STACKS_COUNT - 1;
-
-/**
- * Quick format.
- *
- * Quick and very dirty string formatting utility. This serves the purposes to
- * avoid allocating new buffers before appending to (other) existing buffers.
- * Cycles through 16 128-byte internal static buffers (2048 bytes).
- *
- * Params:
- * 	f = Format string
- * 	... = Arguments
- *
- * Returns: String
- */
-//TODO: Consider deprecating
-const(char) *adbg_util_strf(const(char) *f, ...) {
+size_t adbg_util_str_appendc(char *buffer, size_t size, char c) {
+	if (size == 0)
+		return 0;
+	*buffer = c;
+	return 1;
+}
+size_t adbg_util_str_appends(char *buffer, size_t size, const(char) *str) {
+	size_t pos;
+	for (; pos < size && str[pos]; ++pos)
+		buffer[pos] = str[pos];
+	return pos;
+}
+//TODO: Consider adbg_util_str_append_s(char *buffer, size_t size, const(char) *str, size_t size2)
+size_t adbg_util_str_appendf(char *buffer, size_t size, const(char) *fmt, ...) {
 	va_list va = void;
-	va_start(va, f);
-	return adbg_util_strfva(f, va);
+	va_start(va, fmt);
+	return adbg_util_str_appendv(buffer, size, fmt, va);
 }
-/**
- * Quick format.
- *
- * Quick and very dirty string formatting utility. This serves as pushing an
- * existing list to an internal buffer.
- *
- * Params:
- * 	f = Format string
- * 	va = va_list
- *
- * Returns: String
- */
-//TODO: Consider deprecating
-const(char) *adbg_util_strfva(const(char) *f, va_list va) {
-	__gshared size_t strfc; /// buffer selection index
-	__gshared char [STR_QUICK_STACK_SIZE][STR_QUICK_STACKS_COUNT]b = void;
+size_t adbg_util_str_appendv(char *buffer, size_t size, const(char) *fmt, va_list va) {
+	return vsnprintf(buffer, size, fmt, va);
+}
 
-	char *sb = cast(char*)b[strfc];
-	vsnprintf(sb, STR_QUICK_STACK_SIZE, f, va);
-	if (++strfc >= STR_QUICK_STACKS_LIMIT) strfc = 0;
-
-	return sb;
+/// String structure to ease development.
+/// Used in the disassembler.
+struct adbg_string_t {
+	char  *str;	/// String pointer
+	size_t size; 	/// Buffer size
+	size_t left;	/// Buffer size left available
+	size_t pos;	/// Position
+	
+	/// Inits a string position tracker with a buffer and its size.
+	/// This does not create a string.
+	/// Params:
+	/// 	buffer = Buffer pointer.
+	/// 	buffersz = Buffer capacity.
+	this(char *buffer, size_t buffersz) {
+		str  = buffer;
+		size = left = buffersz;
+	}
+	/// Update position with the number of characters written.
+	/// Params: nsize = Number of characters written.
+	/// Returns: True if buffer exhausted.
+	bool update(size_t nsize) {
+		pos += nsize;
+		str += nsize;
+		left -= nsize;
+		return pos < size;
+	}
+	/// Add character to buffer.
+	/// Params: c = Character
+	/// Returns: True if buffer exhausted.
+	bool add(char c) {
+		return update(adbg_util_str_appendc(str, left, c));
+	}
+	/// Add a constant string to buffer.
+	/// Params: s = String
+	/// Returns: True if buffer exhausted.
+	bool add(const(char) *s) {
+		return update(adbg_util_str_appends(str, left, s));
+	}
+	//TODO: adbg_string_t.add_s
+	/// Add multiple items to buffer.
+	/// Params:
+	/// 	fmt = Format specifier.
+	/// 	... = Parameters.
+	/// Returns: True if buffer exhausted.
+	bool addf(const(char) *fmt, ...) {
+		va_list va = void;
+		va_start(va, fmt);
+		return addv(fmt, va);
+	}
+	/// Add a list of items to buffer.
+	/// Params:
+	/// 	fmt = Format specifier
+	/// 	va = va_list object
+	/// Returns: True if buffer exhausted.
+	bool addv(const(char) *fmt, va_list va) {
+		return update(adbg_util_str_appendv(str, left, fmt, va));
+	}
 }

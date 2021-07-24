@@ -17,6 +17,9 @@ public:
 extern (C):
 __gshared:
 
+/// Disassembler string buffer size
+enum DISASM_STRING_BUFFER_SIZE = 128;
+
 /// Application error
 enum AppError {
 	none,
@@ -78,13 +81,14 @@ struct settings_t {
 	// App
 	adbg_disasm_t disasm;	/// Disassembler
 	exception_t last_exception;	/// Last exception
+	char[DISASM_STRING_BUFFER_SIZE] disasmBuffer;	/// For disassembly
 }
 
 /// Global variables.
 ///
 /// This is in one big structure to avoid thinking complexity, and avoids
-/// tracking other stuff. Like, "uhhh what is the variable name again".
-settings_t global;
+/// tracking other stuff. Like, "uhhh what is the variable name again?".
+settings_t globals;
 
 /// Print last library error information to stdout 
 int printerror(const(char)* func = cast(char*)__FUNCTION__)() {

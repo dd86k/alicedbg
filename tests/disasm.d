@@ -6,8 +6,8 @@ import adbg.disasm;
 import adbg.error;
 
 struct InstructionTest {
-	const(char) *expectedMnemonic;
 	ubyte[] data;
+	const(char) *expectedMnemonic;
 }
 
 void test(adbg_disasm_t *disasm, ref immutable(InstructionTest[]) tests) {
@@ -16,7 +16,7 @@ void test(adbg_disasm_t *disasm, ref immutable(InstructionTest[]) tests) {
 		
 		ubyte *p = cast(ubyte*)test.data.ptr;
 		size_t s = test.data.length;
-		adbg_disasm_start_buffer(disasm, AdbgDisasmMode.file, p, s, 0);
+		adbg_disasm_start_buffer(disasm, AdbgDisasmMode.file, p, s);
 		
 		adbg_disasm_opcode_t op = void;
 		int e = adbg_disasm(disasm, &op);
@@ -25,17 +25,14 @@ void test(adbg_disasm_t *disasm, ref immutable(InstructionTest[]) tests) {
 			continue;
 		}
 		
-		adbg_disasm_opcode_info_t info = void;
-		adbg_disasm_opcode_info(disasm, &info);
-		
-		if (strcmp(info.mnemonic, test.expectedMnemonic))
-			fail(test, info, "Mnemonic mismatch");
+		if (strcmp(op.mnemonic, test.expectedMnemonic))
+			fail(test, op, "Mnemonic mismatch");
 		
 		writeln("OK");
 	}
 }
 
-void fail(ref immutable(InstructionTest) test, ref adbg_disasm_opcode_info_t op, string msg) {
+void fail(ref immutable(InstructionTest) test, ref adbg_disasm_opcode_t op, string msg) {
 	writeln("FAILED");
 	printf("expected %s\n", test.expectedMnemonic);
 	printf("got      %s\n", op.mnemonic);
@@ -45,28 +42,28 @@ void fail(ref immutable(InstructionTest) test, ref adbg_disasm_opcode_info_t op,
 
 immutable InstructionTest[] x86_32instructions = [
 	{	// int3
+		[ 0xcc ],
 		"int3",
-		[ 0xcc ]
 	},
 	{	// inc eax
+		[ 0x40 ],
 		"inc",
-		[ 0x40 ]
 	},
 	{	// add dword ptr [eax],al
+		[ 0x00, 0x00 ],
 		"add",
-		[ 0x00, 0x00 ]
 	},
 	{	// add dword ptr [eax],eax
+		[ 0x01, 0x00 ],
 		"add",
-		[ 0x01, 0x00 ]
 	},
 	{	// call dword ptr [eax]
+		[ 0xff, 0x10 ],
 		"call",
-		[ 0xff, 0x10 ]
 	},
 	{	// call dword far ptr [eax]
+		[ 0xff, 0x18 ],
 		"call",
-		[ 0xff, 0x18 ]
 	}
 ];
 

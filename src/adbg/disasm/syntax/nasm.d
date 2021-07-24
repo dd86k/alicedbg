@@ -7,8 +7,8 @@
  */
 module adbg.disasm.syntax.nasm;
 
-import adbg.disasm : adbg_disasm_t;
-import adbg.disasm.syntaxer;
+import adbg.disasm : adbg_disasm_t, adbg_disasm_operand_t;
+import adbg.utils.str;
 
 extern (C):
 
@@ -18,8 +18,10 @@ private immutable const(char)*[] NASM_WIDTH = [
 ];
 
 // render nasm
-void adbg_syntax_op_nasm(ref adbg_syntaxer_t p, ref adbg_syntax_op_t i) {
+bool adbg_disasm_operand_nasm(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_disasm_operand_t op) {
 	
 	
+	
+	return false;
 }
 

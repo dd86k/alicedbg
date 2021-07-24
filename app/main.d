@@ -89,7 +89,7 @@ int cli_march(const(char) *val) {
 	}
 	foreach (setting_platform_t p; platforms) {
 		if (strcmp(val, p.opt) == 0 || strcmp(val, p.alt) == 0) {
-			global.platform = p.val;
+			globals.platform = p.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -111,7 +111,7 @@ int cli_syntax(const(char) *val) {
 	}
 	foreach (setting_syntax_t syntax; syntaxes) {
 		if (strcmp(val, syntax.opt) == 0) {
-			adbg_disasm_opt(&global.disasm, AdbgDisasmOpt.syntax, syntax.val);
+			adbg_disasm_opt(&globals.disasm, AdbgDisasmOpt.syntax, syntax.val);
 			return EXIT_SUCCESS;
 		}
 	}
@@ -123,7 +123,7 @@ int cli_syntax(const(char) *val) {
 //
 
 int cli_file(const(char) *val) {
-	global.file = val;
+	globals.file = val;
 	return EXIT_SUCCESS;
 }
 
@@ -137,13 +137,13 @@ int cli_argsdd(int argi, int argc, const(char) **argv) { // --
 	enum MAX = 16;
 	__gshared const(char) *[MAX] args;
 	
-	global.args = cast(const(char)**)args;
+	globals.args = cast(const(char)**)args;
 	
 	int left = argc - argi; /// to move
 	void **s = cast(void**)(argv+argi);
 	
 	int m = adbg_util_move(
-		cast(void**)&global.args, MAX,
+		cast(void**)&globals.args, MAX,
 		cast(void**)&s, left);
 	
 	debug assert(m == left, "cli_argsdd: 'adbg_util_move' Failed due to small buffer");
@@ -159,7 +159,7 @@ int cli_args(const(char) *val) { // --args
 	if (argc == 0)
 		return EXIT_FAILURE;
 	
-	global.args = cast(const(char)**)argv;
+	globals.args = cast(const(char)**)argv;
 	return EXIT_SUCCESS;
 }
 
@@ -170,9 +170,9 @@ int cli_args(const(char) *val) { // --args
 int cli_env(const(char) *val) {
 	import adbg.utils.str : adbg_util_env;
 	
-	global.env = cast(const(char)**)adbg_util_env(val);
+	globals.env = cast(const(char)**)adbg_util_env(val);
 	
-	if (global.env == null) {
+	if (globals.env == null) {
 		printf("main: Parsing environment failed");
 		return EXIT_FAILURE;
 	}
@@ -185,7 +185,7 @@ int cli_env(const(char) *val) {
 //
 
 int cli_pid(const(char) *val) {
-	global.pid = cast(ushort)strtol(val, null, 10);
+	globals.pid = cast(ushort)strtol(val, null, 10);
 	return EXIT_SUCCESS;
 }
 
@@ -213,7 +213,7 @@ int cli_ui(const(char)* val) {
 	}
 	foreach (setting_ui_t ui; uis) {
 		if (strcmp(val, ui.opt) == 0) {
-			global.ui = ui.val;
+			globals.ui = ui.val;
 			return 0;
 		}
 	}
@@ -225,7 +225,7 @@ int cli_ui(const(char)* val) {
 //
 
 int cli_dump() {
-	global.mode = SettingMode.dump;
+	globals.mode = SettingMode.dump;
 	return EXIT_SUCCESS;
 }
 
@@ -234,7 +234,7 @@ int cli_dump() {
 //
 
 int cli_raw() {
-	global.flags |= DumpOpt.raw;
+	globals.flags |= DumpOpt.raw;
 	return EXIT_SUCCESS;
 }
 
@@ -274,7 +274,7 @@ L_CHAR:
 		return EXIT_SUCCESS;
 	foreach (setting_show_t show; showflags) {
 		if (c == show.opt) {
-			global.flags |= show.val;
+			globals.flags |= show.val;
 			goto L_CHAR;
 		}
 	}
@@ -411,8 +411,8 @@ int main(int argc, const(char)** argv) {
 		bool isopt  = argLong[0] == '-';
 		
 		if (isopt == false) {
-			if (global.file == null) {
-				global.file = argLong;
+			if (globals.file == null) {
+				globals.file = argLong;
 				continue CLI;
 			}
 			
@@ -490,26 +490,26 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
-	switch (global.mode) {
+	switch (globals.mode) {
 	case SettingMode.dump:
-		adbg_disasm_configure(&global.disasm, global.platform);
-		return dump(global.file, &global.disasm, global.flags);
+		adbg_disasm_configure(&globals.disasm, globals.platform);
+		return dump(globals.file, &globals.disasm, globals.flags);
 	case SettingMode.trace:
 		puts("main: tracer not supported at this moment");
 		return EXIT_FAILURE;
 	case SettingMode.debugger:
 		// Pre-load target if specified.
 		// Necessary for loop UI, but optional for others
-		if (global.file) {
-			if (adbg_load(global.file, global.args)) {
+		if (globals.file) {
+			if (adbg_load(globals.file, globals.args)) {
 				printerror;
 				return EXIT_FAILURE;
 			}
 			
-			printf("File '%s' loaded\n", global.file);
+			printf("File '%s' loaded\n", globals.file);
 		}
 		
-		switch (global.ui) {
+		switch (globals.ui) {
 		case SettingUI.loop:	return loop();
 		case SettingUI.cmd:	return cmd();
 		case SettingUI.tui:	return tui();
