@@ -1,8 +1,8 @@
 /**
- * ptrace(2) bindings, since the D stdlib lack them. This module adbg.is only
+ * ptrace(2) bindings, since the D stdlib lacks them. This module is only
  * available on Posix systems where ptrace is available, and is currently
- * based on Glibc 2.25. Support for more runtimes will be implemented
- * here with time.
+ * based on Glibc 2.25 and Musl 1.20. Support for more runtimes and platforms
+ * will be implemented here given time.
  *
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k
@@ -351,7 +351,7 @@ enum NT_VERSION	= 1;	///
  * and system call tracing.
  * 
  * Params:
- * 	req = PTRACE_* request
+ * 	req = PTRACE request
  * 	pid = Process ID number
  * 	addr = Memory pointer
  * 	data = Data pointer

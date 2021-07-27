@@ -23,7 +23,7 @@ bool adbg_disasm_operand_intel(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_d
 	case immediate: return s.addf("0x%x", op.imm.value);
 	case register:  return s.add(op.reg.name);
 	case memory:
-		if (s.add(INTEL_WIDTH[op.mem.width]))
+		if (s.add(INTEL_WIDTH[p.memWidth]))
 			return true;
 		if (s.add(" ptr "))
 			return true;

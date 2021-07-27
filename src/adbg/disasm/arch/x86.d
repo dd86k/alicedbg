@@ -510,7 +510,7 @@ int adbg_disasm_x86_op_Ib(adbg_disasm_t *p) { // Immediate 8-bit
 	if (e == 0) {
 		if (p.mode >= AdbgDisasmMode.file) {
 //			adbg_disasm_add_machine!ubyte(p, i);
-			adbg_disasm_add_immediate(p, i);
+			adbg_disasm_add_immediate(p, AdbgDisasmWidth.i8, &i);
 		}
 	}
 	return e;
@@ -527,16 +527,14 @@ int adbg_disasm_x86_op_Iz(adbg_disasm_t *p) { // Immediate 16/32-bit
 		e = adbg_disasm_fetch!uint(p, &u.i32);
 		if (e == 0) {
 			if (p.mode >= AdbgDisasmMode.file) {
-//				adbg_disasm_add_machine!uint(p, u.i32);
-				adbg_disasm_add_immediate(p, u.i32);
+				adbg_disasm_add_immediate(p, AdbgDisasmWidth.i32, &u.i32);
 			}
 		}
 	} else {
 		e = adbg_disasm_fetch!ushort(p, &u.i16);
 		if (e == 0) {
 			if (p.mode >= AdbgDisasmMode.file) {
-//				adbg_disasm_add_machine!uint(p, u.i16);
-				adbg_disasm_add_immediate(p, u.i16);
+				adbg_disasm_add_immediate(p, AdbgDisasmWidth.i16, &u.i16);
 			}
 		}
 	}
@@ -551,7 +549,7 @@ int adbg_disasm_x86_op_Jb(adbg_disasm_t *p) { // Immediate 8-bit
 			adbg_disasm_calc_offset!ubyte(p, i);
 		if (p.mode >= AdbgDisasmMode.file) {
 //			adbg_disasm_add_machine!ubyte(p, i);
-			adbg_disasm_add_immediate(p, i);
+			adbg_disasm_add_immediate(p, AdbgDisasmWidth.i8, &i);
 		}
 	}
 	return e;

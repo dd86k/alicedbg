@@ -14,7 +14,7 @@ import core.stdc.string;
 extern (C):
 
 /// An empty string in case compilers does not support pool strings.
-immutable const(char) *empty_string = "";
+char *empty_string = cast(char*)"";
 
 //TODO: Rewrite as adbg_util_flatten without snprintf
 //      Internal loop
@@ -298,15 +298,16 @@ void adbg_util_str_lowercase(char *buf, size_t size) {
 }
 
 size_t adbg_util_str_appendc(char *buffer, size_t size, char c) {
-	if (size == 0)
-		return 0;
 	*buffer = c;
+	*(buffer + 1) = 0;
 	return 1;
 }
 size_t adbg_util_str_appends(char *buffer, size_t size, const(char) *str) {
 	size_t pos;
-	for (; pos < size && str[pos]; ++pos)
+	size_t sz = size - 1;
+	for (; pos < sz && str[pos]; ++pos)
 		buffer[pos] = str[pos];
+	buffer[pos] = 0;
 	return pos;
 }
 //TODO: Consider adbg_util_str_append_s(char *buffer, size_t size, const(char) *str, size_t size2)
@@ -323,9 +324,9 @@ size_t adbg_util_str_appendv(char *buffer, size_t size, const(char) *fmt, va_lis
 /// Used in the disassembler.
 struct adbg_string_t {
 	char  *str;	/// String pointer
-	size_t size; 	/// Buffer size
+	size_t size;	/// Buffer size, capacity
 	size_t left;	/// Buffer size left available
-	size_t pos;	/// Position
+	size_t pos;	/// Position, count
 	
 	/// Inits a string position tracker with a buffer and its size.
 	/// This does not create a string.
@@ -334,14 +335,21 @@ struct adbg_string_t {
 	/// 	buffersz = Buffer capacity.
 	this(char *buffer, size_t buffersz) {
 		str  = buffer;
-		size = left = buffersz;
+		size = left = buffersz - 1;
+		pos = 0;
+	}
+	void reset(bool zero = false) {
+		if (zero)
+			for (size_t p; p < size + 1; ++p)
+				str[p] = 0;
+		pos = 0;
+		left = size;
 	}
 	/// Update position with the number of characters written.
 	/// Params: nsize = Number of characters written.
 	/// Returns: True if buffer exhausted.
 	bool update(size_t nsize) {
 		pos += nsize;
-		str += nsize;
 		left -= nsize;
 		return pos < size;
 	}
@@ -349,13 +357,13 @@ struct adbg_string_t {
 	/// Params: c = Character
 	/// Returns: True if buffer exhausted.
 	bool add(char c) {
-		return update(adbg_util_str_appendc(str, left, c));
+		return update(adbg_util_str_appendc(str + pos, left, c));
 	}
 	/// Add a constant string to buffer.
 	/// Params: s = String
 	/// Returns: True if buffer exhausted.
 	bool add(const(char) *s) {
-		return update(adbg_util_str_appends(str, left, s));
+		return update(adbg_util_str_appends(str + pos, left, s));
 	}
 	//TODO: adbg_string_t.add_s
 	/// Add multiple items to buffer.
@@ -370,10 +378,213 @@ struct adbg_string_t {
 	}
 	/// Add a list of items to buffer.
 	/// Params:
-	/// 	fmt = Format specifier
-	/// 	va = va_list object
+	/// 	fmt = Format specifier.
+	/// 	va = va_list object.
 	/// Returns: True if buffer exhausted.
 	bool addv(const(char) *fmt, va_list va) {
-		return update(adbg_util_str_appendv(str, left, fmt, va));
+		return update(adbg_util_str_appendv(str + pos, left, fmt, va));
 	}
+	bool addx8(ubyte v, bool pad = false) {
+		
+		return false;
+	}
+	bool addx16(ushort v, bool pad = false) {
+		for (int shift = 12; pos < size && shift >= 0; shift -= 4) {
+			ushort h = (v >> shift) & 15;
+			if (h == 0 && pad == false) continue;
+			str[pos++] = hexmaplow[h];
+			if (h) pad = true;
+		}
+		str[pos++] = 0;
+		left = size - pos;
+		return pos < size;
+	}
+	bool addx32(uint v, bool pad = false) {
+		for (int shift = 28; pos < size && shift >= 0; shift -= 4) {
+			uint h = (v >> shift) & 15;
+			if (h == 0 && pad == false) continue;
+			str[pos++] = hexmaplow[h];
+			if (h) pad = true;
+		}
+		str[pos++] = 0;
+		left = size - pos;
+		return pos < size;
+	}
+	bool addx64(ulong v, bool pad = false) {
+		for (int shift = 60; pos < size && shift >= 0; shift -= 4) {
+			ulong h = (v >> shift) & 15;
+			if (h == 0 && pad == false) continue;
+			str[pos++] = hexmaplow[h];
+			if (h) pad = true;
+		}
+		str[pos++] = 0;
+		left = size - pos;
+		return pos < size;
+	}
+}
+
+/// 
+unittest {
+	enum BUFFER_SIZE = 64;
+	
+	char[BUFFER_SIZE] buffer = void;
+	
+	printf("adbg_string_t: ");
+	adbg_string_t s = adbg_string_t(buffer.ptr, BUFFER_SIZE);
+	assert(s.left == BUFFER_SIZE - 1);
+	assert(s.size == BUFFER_SIZE - 1);
+	assert(s.pos  == 0);
+	assert(s.str  == &buffer[0]);
+	puts("OK");
+	
+	printf("adbg_string_t.add 'a': ");
+	s.add('a');
+	assert(buffer[0] == 'a');
+	assert(buffer[1] == 0);
+	puts("OK");
+	
+	printf("adbg_string_t.reset: ");
+	s.reset(true);
+	assert(buffer[0] == 0);
+	assert(buffer[1] == 0);
+	assert(s.pos == 0);
+	assert(s.left == BUFFER_SIZE - 1);
+	puts("OK");
+	
+	printf("adbg_string_t.add hello: ");
+	s.add("hello");
+	assert(buffer[0] == 'h');
+	assert(buffer[1] == 'e');
+	assert(buffer[2] == 'l');
+	assert(buffer[3] == 'l');
+	assert(buffer[4] == 'o');
+	assert(buffer[5] == 0);
+	assert(buffer[6] == 0);
+	puts("OK");
+	
+	printf("adbg_string_t.add big text: ");
+	s.reset();
+	assert(s.add(
+		`Lorem ipsum dolor sit amet, consectetur adipiscing elit. `~
+		`Etiam dignissim iaculis lectus. Aliquam volutpat rhoncus dignissim. `~
+		`Donec maximus diam eros, a euismod quam consectetur sit amet. `~
+		`Morbi vel ante viverra, condimentum elit porttitor, tempus metus. `~
+		`Cras eget interdum turpis, vitae egestas ipsum. `~
+		`Nam accumsan aliquam enim, id sodales tellus hendrerit id. `~
+		`Proin vulputate hendrerit accumsan. Etiam vitae tempor libero.`));
+	puts("OK");
+	
+	printf("adbg_string_t.addx16: ");
+	s.reset();
+	s.addx16(0xabcd);
+	assert(buffer[0]  == 'a');
+	assert(buffer[1]  == 'b');
+	assert(buffer[2]  == 'c');
+	assert(buffer[3]  == 'd');
+	assert(buffer[4] == 0);
+	puts("OK");
+	
+	printf("adbg_string_t.addx16 true: ");
+	s.reset();
+	s.addx16(0xee, true);
+	assert(buffer[0]  == '0');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == 'e');
+	assert(buffer[3]  == 'e');
+	assert(buffer[4] == 0);
+	puts("OK");
+	
+	printf("adbg_string_t.addx32: ");
+	s.reset();
+	s.addx32(0x1234_abcd);
+	assert(buffer[0]  == '1');
+	assert(buffer[1]  == '2');
+	assert(buffer[2]  == '3');
+	assert(buffer[3]  == '4');
+	assert(buffer[4]  == 'a');
+	assert(buffer[5]  == 'b');
+	assert(buffer[6]  == 'c');
+	assert(buffer[7]  == 'd');
+	assert(buffer[8] == 0);
+	puts("OK");
+	
+	printf("adbg_string_t.addx32 true: ");
+	s.reset();
+	s.addx32(0xcc, true);
+	assert(buffer[0]  == '0');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '0');
+	assert(buffer[3]  == '0');
+	assert(buffer[4]  == '0');
+	assert(buffer[5]  == '0');
+	assert(buffer[6]  == 'c');
+	assert(buffer[7]  == 'c');
+	assert(buffer[8] == 0);
+	puts("OK");
+	
+	printf("adbg_string_t.addx64: ");
+	s.reset();
+	s.addx64(0xdd86_c0ff_ee08_0486);
+	assert(buffer[0]  == 'd');
+	assert(buffer[1]  == 'd');
+	assert(buffer[2]  == '8');
+	assert(buffer[3]  == '6');
+	assert(buffer[4]  == 'c');
+	assert(buffer[5]  == '0');
+	assert(buffer[6]  == 'f');
+	assert(buffer[7]  == 'f');
+	assert(buffer[8]  == 'e');
+	assert(buffer[9]  == 'e');
+	assert(buffer[10] == '0');
+	assert(buffer[11] == '8');
+	assert(buffer[12] == '0');
+	assert(buffer[13] == '4');
+	assert(buffer[14] == '8');
+	assert(buffer[15] == '6');
+	assert(buffer[16] == 0);
+	puts("OK");
+	
+	printf("adbg_string_t.addx64 0xdd: ");
+	s.reset();
+	s.addx64(0xdd, true);
+	assert(buffer[0]  == '0');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '0');
+	assert(buffer[3]  == '0');
+	assert(buffer[4]  == '0');
+	assert(buffer[5]  == '0');
+	assert(buffer[6]  == '0');
+	assert(buffer[7]  == '0');
+	assert(buffer[8]  == '0');
+	assert(buffer[9]  == '0');
+	assert(buffer[10] == '0');
+	assert(buffer[11] == '0');
+	assert(buffer[12] == '0');
+	assert(buffer[13] == '0');
+	assert(buffer[14] == 'd');
+	assert(buffer[15] == 'd');
+	assert(buffer[16] == 0);
+	puts("OK");
+	
+	printf("adbg_string_t.addx64 0x0: ");
+	s.reset();
+	s.addx64(0, true);
+	assert(buffer[0]  == '0');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '0');
+	assert(buffer[3]  == '0');
+	assert(buffer[4]  == '0');
+	assert(buffer[5]  == '0');
+	assert(buffer[6]  == '0');
+	assert(buffer[7]  == '0');
+	assert(buffer[8]  == '0');
+	assert(buffer[9]  == '0');
+	assert(buffer[10] == '0');
+	assert(buffer[11] == '0');
+	assert(buffer[12] == '0');
+	assert(buffer[13] == '0');
+	assert(buffer[14] == '0');
+	assert(buffer[15] == '0');
+	assert(buffer[16] == 0);
+	puts("OK");
 }

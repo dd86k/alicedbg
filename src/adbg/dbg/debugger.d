@@ -576,22 +576,18 @@ int adbg_mm_cread(size_t addr, void *data, uint size) {
 	version (Windows) {
 		if (ReadProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
 			return adbg_oops(AdbgError.os);
-	} else { // Mostly taken from https://www.linuxjournal.com/article/6100
-		import core.stdc.string : memcpy;
+	} else { // Based on https://www.linuxjournal.com/article/6100
+		c_long *d = cast(c_long*)data;	/// destination
+		int r = size / c_long.sizeof;	/// number of "blocks" to process
 		
-		c_long *user = cast(c_long*)data;	/// user data pointer
-		int i;	/// offset index
-		int j = size / c_long.sizeof;	/// number of "blocks" to process
+		for (; r > 0; --r, ++d, addr += c_long.sizeof)
+			*d = ptrace(PTRACE_PEEKDATA, g_debuggee.pid, addr, null);
 		
-		for (; i < j; ++i, ++user)
-			*user = ptrace(PTRACE_PEEKDATA, g_debuggee.pid,
-				addr + (i * c_long.sizeof), null);
-		
-		j = size % c_long.sizeof;
-		if (j) {
-			c_long r = ptrace(PTRACE_PEEKDATA, g_debuggee.pid,
-				addr + (i * c_long.sizeof), null);
-			memcpy(user, &r, j);
+		r = size % c_long.sizeof;
+		if (r) {
+			c_long c = ptrace(PTRACE_PEEKDATA, g_debuggee.pid, addr, null);
+			ubyte* d8 = cast(ubyte*)d, s8 = cast(ubyte*)&c;
+			for (; r; --r) *d8++ = *s8++; // inlined memcpy
 		}
 	}
 	return 0;
