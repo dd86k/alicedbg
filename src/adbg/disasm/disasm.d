@@ -33,6 +33,8 @@ private import adbg.disasm.syntax.intel,
 //TODO: Disassembler decoder swap bool (for type)
 //TODO: Consider separating renderers (or just do a seperated one for operands)
 //      Might be useful for some but how will that be managed with, say, HLA?
+//TODO: Consider doing syntax settings
+//      e.g., Removing "ptr" out of memory access operands on nasm/intel syntaxes
 
 extern (C):
 
@@ -203,7 +205,7 @@ enum AdbgDisasmHexStyle : ubyte {
 
 version (X86) {
 	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgPlatform.x86;
+	private enum DEFAULT_PLATFORM = AdbgPlatform.x86_32;
 	/// Platform default syntax
 	private enum DEFAULT_SYNTAX = AdbgSyntax.intel;
 } else version (X86_64) {
@@ -248,7 +250,7 @@ struct adbg_disasm_number_t {
 		ubyte  u8;  byte  i8;
 		double f64; float f32;
 	}
-	AdbgDisasmWidth width;
+	AdbgDisasmType width;
 	bool signed;
 }
 
@@ -320,7 +322,7 @@ struct adbg_disasm_t { align(1):
 	/// Current syntax option.
 	AdbgSyntax syntax;
 	/// Memory operation width
-	AdbgDisasmWidth memWidth;
+	AdbgDisasmType memWidth;
 }
 
 // alloc
@@ -522,7 +524,7 @@ void adbg_disasm_machine(adbg_disasm_t *p, char *buffer, size_t size) {
 	
 	size_t edge = op.machineCount - 1;
 	for (size_t i; i < op.machineCount; ++i, ++num) {
-		switch (num.width) with (AdbgDisasmWidth) {
+		switch (num.width) with (AdbgDisasmType) {
 		case i8:       s.addx8(num.i8, true); break;
 		case i16:      s.addx16(num.i16, true); break;
 		case i32, f32: s.addx32(num.i32, true); break;
@@ -541,9 +543,9 @@ public  alias adbg_disasm_delete = free;
 // SECTION Decoder stuff
 //
 
-/// Memory width
+/// Memory type
 package
-enum AdbgDisasmWidth : ubyte {
+enum AdbgDisasmType : ubyte {
 	i8,  i16, i32, i64, i128, i256, i512, i1024,
 	f16, f32, f64, 
 }
@@ -660,6 +662,27 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
 	default: assert(0);
 	}
 	p.current.sz += T.sizeof;
+	if (p.mode >= AdbgDisasmMode.file)
+	if (p.opcode.machineCount < ADBG_MAX_MACHINE) {
+		adbg_disasm_number_t *n = &p.opcode.machine[p.opcode.machineCount++];
+		static if (is(T == ubyte)) {
+			n.i8 = *u;
+			n.width = AdbgDisasmType.i8;
+			n.signed = is(T == byte);
+		} else static if (is(T == ushort)) {
+			n.i16 = *u;
+			n.width = AdbgDisasmType.i16;
+			n.signed = is(T == short);
+		} else static if (is(T == uint)) {
+			n.i32 = *u;
+			n.width = AdbgDisasmType.i32;
+			n.signed = is(T == int);
+		} else static if (is(T == ulong)) {
+			n.i64 = *u;
+			n.width = AdbgDisasmType.i64;
+			n.signed = is(T == long);
+		} else static assert(0, "fetch support type");
+	}
 	return e;
 }
 
@@ -721,7 +744,7 @@ adbg_disasm_operand_t* adbg_disasm_get_operand(adbg_disasm_t *p) {
 }
 
 package
-void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmWidth w, void *v) {
+void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmType w, void *v) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
@@ -729,7 +752,7 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmWidth w, void *v) {
 	item.type = AdbgDisasmOperand.immediate;
 	item.imm.value.width = w;
 	
-	switch (w) with (AdbgDisasmWidth) {
+	switch (w) with (AdbgDisasmType) {
 	case i8:  item.imm.value.u8  = *cast(ubyte*)v;  return;
 	case i16: item.imm.value.u16 = *cast(ushort*)v; return;
 	case i32: item.imm.value.u32 = *cast(uint*)v;   return;
@@ -758,7 +781,7 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 	const(char) *regindex,
 	int disp,
 	//TODO: ushort segment
-	AdbgDisasmWidth width,
+	AdbgDisasmType width,
 	ubyte scale,
 	bool scaled) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)

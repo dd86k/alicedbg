@@ -56,8 +56,8 @@ struct prefixes_t { align(1):
 		ulong all;
 		ushort modes;
 		struct {
-			AdbgDisasmWidth data;	/// Data mode (register only)
-			AdbgDisasmWidth addr;	/// Address mode (address register only)
+			AdbgDisasmType data;	/// Data mode (register only)
+			AdbgDisasmType addr;	/// Address mode (address register only)
 			x86Segment segment;	/// segment override
 			x86Prefix last;	/// SSE/VEX instruction selector
 			bool lock;	/// LOCK prefix
@@ -120,12 +120,12 @@ int adbg_disasm_x86(adbg_disasm_t *p) {
 	// This is a trick I call "I like being memory unsafe just to save
 	// an instruction"
 	version (LittleEndian) {
-		enum MODEPACK64 = AdbgDisasmWidth.i64 | AdbgDisasmWidth.i32 << 8;
+		enum MODEPACK64 = AdbgDisasmType.i64 | AdbgDisasmType.i32 << 8;
 	} else {
-		enum MODEPACK64 = AdbgDisasmWidth.i64 << 8 | AdbgDisasmWidth.i32;
+		enum MODEPACK64 = AdbgDisasmType.i64 << 8 | AdbgDisasmType.i32;
 	}
-	enum MODEPACK32 = AdbgDisasmWidth.i32 | AdbgDisasmWidth.i32 << 8;
-	enum MODEPACK16 = AdbgDisasmWidth.i16 | AdbgDisasmWidth.i16 << 8;
+	enum MODEPACK32 = AdbgDisasmType.i32 | AdbgDisasmType.i32 << 8;
+	enum MODEPACK16 = AdbgDisasmType.i16 | AdbgDisasmType.i16 << 8;
 	
 	x86_internals_t x86 = void;
 	x86.z[3] = x86.z[2] = x86.z[1] = x86.z[0] = 0;
@@ -133,16 +133,16 @@ int adbg_disasm_x86(adbg_disasm_t *p) {
 	with (AdbgPlatform)
 	switch (p.platform) {
 	case x86_64:
-		x86.prefix.addr = AdbgDisasmWidth.i64;
-		x86.prefix.data = AdbgDisasmWidth.i32;
+		x86.prefix.addr = AdbgDisasmType.i64;
+		x86.prefix.data = AdbgDisasmType.i32;
 		break;
 	case x86_32:
-		x86.prefix.addr = AdbgDisasmWidth.i32;
-		x86.prefix.data = AdbgDisasmWidth.i32;
+		x86.prefix.addr = AdbgDisasmType.i32;
+		x86.prefix.data = AdbgDisasmType.i32;
 		break;
 	default:
-		x86.prefix.addr = AdbgDisasmWidth.i16;
-		x86.prefix.data = AdbgDisasmWidth.i16;
+		x86.prefix.addr = AdbgDisasmType.i16;
+		x86.prefix.data = AdbgDisasmType.i16;
 		break;
 	}
 	p.x86 = &x86;
@@ -189,14 +189,14 @@ L_PREFIX:
 		goto L_PREFIX;
 	case 0x66: // Data, in 64-bit+AVX, controlled by REX.W (48H)
 		x86.prefix.addr =
-			x86.prefix.addr == AdbgDisasmWidth.i16 ?
-			AdbgDisasmWidth.i32 : AdbgDisasmWidth.i16;
+			x86.prefix.addr == AdbgDisasmType.i16 ?
+			AdbgDisasmType.i32 : AdbgDisasmType.i16;
 		x86.prefix.last = x86Prefix.data;
 		goto L_PREFIX;
 	case 0x67: // Address, in 64-bit+AVX, controlled by REX.XB (42H,41H)
 		x86.prefix.addr =
-			x86.prefix.addr == AdbgDisasmWidth.i16 ?
-			AdbgDisasmWidth.i32 : AdbgDisasmWidth.i16;
+			x86.prefix.addr == AdbgDisasmType.i16 ?
+			AdbgDisasmType.i32 : AdbgDisasmType.i16;
 		goto L_PREFIX;
 	case 0xd6: // hehe
 		return adbg_oops(AdbgError.illegalInstruction);
@@ -510,7 +510,7 @@ int adbg_disasm_x86_op_Ib(adbg_disasm_t *p) { // Immediate 8-bit
 	if (e == 0) {
 		if (p.mode >= AdbgDisasmMode.file) {
 //			adbg_disasm_add_machine!ubyte(p, i);
-			adbg_disasm_add_immediate(p, AdbgDisasmWidth.i8, &i);
+			adbg_disasm_add_immediate(p, AdbgDisasmType.i8, &i);
 		}
 	}
 	return e;
@@ -523,18 +523,18 @@ int adbg_disasm_x86_op_Iz(adbg_disasm_t *p) { // Immediate 16/32-bit
 	u_t u = void;
 	int e = void;
 	
-	if (p.x86.prefix.data != AdbgDisasmWidth.i16) { // 64/32 modes
+	if (p.x86.prefix.data != AdbgDisasmType.i16) { // 64/32 modes
 		e = adbg_disasm_fetch!uint(p, &u.i32);
 		if (e == 0) {
 			if (p.mode >= AdbgDisasmMode.file) {
-				adbg_disasm_add_immediate(p, AdbgDisasmWidth.i32, &u.i32);
+				adbg_disasm_add_immediate(p, AdbgDisasmType.i32, &u.i32);
 			}
 		}
 	} else {
 		e = adbg_disasm_fetch!ushort(p, &u.i16);
 		if (e == 0) {
 			if (p.mode >= AdbgDisasmMode.file) {
-				adbg_disasm_add_immediate(p, AdbgDisasmWidth.i16, &u.i16);
+				adbg_disasm_add_immediate(p, AdbgDisasmType.i16, &u.i16);
 			}
 		}
 	}
@@ -549,7 +549,7 @@ int adbg_disasm_x86_op_Jb(adbg_disasm_t *p) { // Immediate 8-bit
 			adbg_disasm_calc_offset!ubyte(p, i);
 		if (p.mode >= AdbgDisasmMode.file) {
 //			adbg_disasm_add_machine!ubyte(p, i);
-			adbg_disasm_add_immediate(p, AdbgDisasmWidth.i8, &i);
+			adbg_disasm_add_immediate(p, AdbgDisasmType.i8, &i);
 		}
 	}
 	return e;
@@ -578,12 +578,12 @@ int adbg_disasm_x86_modrm_legacy_opcode(adbg_disasm_t *p, ubyte opcode) {
 	if (e) return e;
 	
 	bool dir = (opcode & 2) != 0; /// mem-reg direction
-	AdbgDisasmWidth width = void;
+	AdbgDisasmType width = void;
 	
 	if (p.x86.vex.W)
-		width = AdbgDisasmWidth.i64;
+		width = AdbgDisasmType.i64;
 	else
-		width = opcode & 1 ? AdbgDisasmWidth.i32 : AdbgDisasmWidth.i16;
+		width = opcode & 1 ? AdbgDisasmType.i32 : AdbgDisasmType.i16;
 	
 	return adbg_disasm_x86_modrm_legacy(p, modrm, width, dir);
 }
@@ -593,7 +593,7 @@ int adbg_disasm_x86_modrm_legacy_modrm(adbg_disasm_t *p, ubyte modrm, bool dir) 
 	
 	return adbg_disasm_x86_modrm_legacy(p, modrm, p.x86.prefix.data, dir);
 }
-int adbg_disasm_x86_modrm_legacy(adbg_disasm_t *p, ubyte modrm, AdbgDisasmWidth wdata, bool dir) {
+int adbg_disasm_x86_modrm_legacy(adbg_disasm_t *p, ubyte modrm, AdbgDisasmType wdata, bool dir) {
 	
 	
 	

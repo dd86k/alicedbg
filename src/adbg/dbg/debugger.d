@@ -227,7 +227,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		// Verify if file exists and we has access to it
 		stat_t st = void;
 		if (stat(path, &st) == -1)
-			return adbg_error_system;
+			return adbg_oops(AdbgError.os);
 		// Proceed normally, execve performs executable checks
 		version (USE_CLONE) { // clone(2)
 			void *chld_stack = mmap(null, ADBG_CHILD_STACK_SIZE,
@@ -235,7 +235,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 				MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
 				-1, 0);
 			if (chld_stack == MAP_FAILED)
-				return adbg_error_system;
+				return adbg_oops(AdbgError.os);
 
 			const(char)*[16] __argv = void;
 			const(char)*[1]  __envp = void;
@@ -266,11 +266,11 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 				CLONE_PTRACE,
 				&chld); // tid
 			if (g_debuggee.pid < 0)
-				return adbg_error_system;
+				return adbg_oops(AdbgError.os);
 		} else { // fork(2)
 			g_debuggee.pid = fork();
 			if (g_debuggee.pid < 0)
-				return adbg_error_system;
+				return adbg_oops(AdbgError.os);
 			if (g_debuggee.pid == 0) { // Child process
 				const(char)*[16] __argv = void;
 				const(char)*[1]  __envp = void;
@@ -319,9 +319,9 @@ version (USE_CLONE)
 private int __adbg_chld(void* arg) {
 	__adbg_child_t *c = cast(__adbg_child_t*)arg;
 	if (ptrace(PTRACE_TRACEME, 0, 0, 0))
-		return adbg_error_system;
+		return adbg_oops(AdbgError.os);
 	execve(c.argv[0], c.argv, c.envp);
-	return adbg_error_system;
+	return adbg_oops(AdbgError.os);
 }
 
 /**
@@ -453,7 +453,7 @@ L_DEBUG_LOOP:
 		
 		if (g_debuggee.pid == -1) {
 			g_debuggee.state = AdbgState.idle;
-			return adbg_error_system;
+			return adbg_oops(AdbgError.os);
 		}
 		
 		g_debuggee.state = AdbgState.paused;
@@ -496,17 +496,17 @@ L_DEBUG_LOOP:
 			siginfo_t sig = void;
 			if (ptrace(PTRACE_GETSIGINFO, g_debuggee.pid, null, &sig) >= 0) {
 				version (CRuntime_Glibc)
-					e.faultaddr = sig._sifields._sigfault.si_addr;
+					e.fault.raw = sig._sifields._sigfault.si_addr;
 				else version (CRuntime_Musl)
-					e.faultaddr = sig.__si_fields.__sigfault.si_addr;
+					e.fault.raw = sig.__si_fields.__sigfault.si_addr;
 				else static assert(0, "hack me");
 			} else {
-				e.faultaddr = null;
+				e.fault.raw = null;
 			}
 			break;
 //		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
 		default:
-			e.faultaddr = null;
+			e.fault.raw = null;
 		}
 		
 		adbg_ex_dbg(&e, g_debuggee.pid, chld_signo);
@@ -517,18 +517,18 @@ L_DEBUG_LOOP:
 			g_debuggee.state = AdbgState.idle; // in either case
 			// Because PTRACE_KILL is deprecated
 			if (kill(g_debuggee.pid, SIGKILL) == -1)
-				return adbg_error_system;
+				return adbg_oops(AdbgError.os);
 			return 0;
 		case step:
 			if (ptrace(PTRACE_SINGLESTEP, g_debuggee.pid, null, null) == -1) {
 				g_debuggee.state = AdbgState.idle;
-				return adbg_error_system;
+				return adbg_oops(AdbgError.os);
 			}
 			goto L_DEBUG_LOOP;
 		case proceed:
 			if (ptrace(PTRACE_CONT, g_debuggee.pid, null, null) == -1) {
 				g_debuggee.state = AdbgState.idle;
-				return adbg_error_system;
+				return adbg_oops(AdbgError.os);
 			}
 			goto L_DEBUG_LOOP;
 		default: assert(0);

@@ -95,42 +95,48 @@ buildType "release-nobounds" {
 # - Or are too lengthy for normal testing.
 #
 
-# disasm: scrambler test
-buildType "test-disasm-loop" {
+# general: utilities, etc.
+buildType "general" {
 	buildOptions "unittests"
-	sourceFiles "tests/disasm-loop.d"
+	sourceFiles "tests/general.d"
+}
+# disasm: mini-fuzzer
+buildType "disasm-fuzzer" {
+	buildOptions "unittests"
+	sourceFiles "tests/disasm-fuzzer.d"
 }
 # disasm: decoding/analysis
-buildType "test-disasm" {
+buildType "disasm-x86" {
 	buildOptions "unittests"
-	sourceFiles "tests/disasm.d"
+	sourceFiles "tests/disasm.d" "tests/disasm-x86.d"
 }
 # syntaxer: output
-buildType "test-syntax" {
+buildType "syntax" {
 	buildOptions "unittests"
 	sourceFiles "tests/syntax.d"
 }
 # crt: setjmp
-buildType "test-setjmp" {
+buildType "setjmp" {
 	buildOptions "unittests"
 	sourceFiles "tests/setjmp.d"
 }
 # terminal: readkey
-buildType "test-readkey" {
+buildType "readkey" {
 	buildOptions "unittests"
 	sourceFiles "tests/readkey.d"
 }
 # terminal: readline
-buildType "test-readline" {
+buildType "readline" {
 	buildOptions "unittests"
 	sourceFiles "tests/readline.d"
 }
 # utils: string expand
-buildType "test-expand" {
+buildType "expand" {
 	buildOptions "unittests"
 	sourceFiles "tests/expand.d"
 }
-buildType "test-all" {
+# Run all non-interactive tests
+buildType "all" {
 	buildOptions "unittests"
 	sourceFiles "tests/disasm.d" "tests/syntax.d" "tests/expand.d"
 }
@@ -139,6 +145,7 @@ buildType "test-all" {
 # SECTION Documentation
 #
 
-buildType "ddox" { # Brings back ddox
+# Brings back ddox
+buildType "ddox" {
 	versions "__DDOX"
 }

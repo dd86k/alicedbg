@@ -1,3 +1,5 @@
+module tests.disasm_fuzzer;
+
 import adbg.disasm, adbg.etc.c;
 import core.stdc.stdlib, core.stdc.time;
 import std.stdio;

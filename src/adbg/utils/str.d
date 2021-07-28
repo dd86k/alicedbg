@@ -14,7 +14,7 @@ import core.stdc.string;
 extern (C):
 
 /// An empty string in case compilers does not support pool strings.
-char *empty_string = cast(char*)"";
+__gshared char *empty_string = cast(char*)"";
 
 //TODO: Rewrite as adbg_util_flatten without snprintf
 //      Internal loop
@@ -175,10 +175,6 @@ private immutable char [16]hexmaplow = "0123456789abcdef";
 /// Hexadecimal map for strx0* functions to provide much faster %X parsing
 private immutable char [16]hexmapupp = "0123456789ABCDEF";
 
-//TODO: adbg_util_strx(T)(char* buffer, size_t bufsz, T v, bool upper = false)
-//      - No leading zeroes
-//      - Mainly for syntax engine (current case, even)
-
 /**
  * Quick and dirty conversion function to convert an ubyte value to a
  * '0'-padded hexadecimal string. Faster than using vsnprintf.
@@ -322,6 +318,8 @@ size_t adbg_util_str_appendv(char *buffer, size_t size, const(char) *fmt, va_lis
 
 /// String structure to ease development.
 /// Used in the disassembler.
+//TODO: Consider just returning number of characters written to buffer
+//      So doing add('a') == 0 is the same as returning true if full
 struct adbg_string_t {
 	char  *str;	/// String pointer
 	size_t size;	/// Buffer size, capacity
@@ -338,6 +336,8 @@ struct adbg_string_t {
 		size = left = buffersz - 1;
 		pos = 0;
 	}
+	/// Reset counters and optionally zero-fill the buffer.
+	/// Params: zero = If true, fills the buffer of zeros.
 	void reset(bool zero = false) {
 		if (zero)
 			for (size_t p; p < size + 1; ++p)
@@ -385,8 +385,14 @@ struct adbg_string_t {
 		return update(adbg_util_str_appendv(str + pos, left, fmt, va));
 	}
 	bool addx8(ubyte v, bool pad = false) {
-		
-		return false;
+		if (left < 3) return true;
+		ubyte vh = v >> 4;
+		ubyte vl = v & 15;
+		if (vh || pad) str[pos++] = hexmaplow[vh];
+		str[pos++] = hexmaplow[vl];
+		str[pos] = 0;
+		left -= 2;
+		return pos < size;
 	}
 	bool addx16(ushort v, bool pad = false) {
 		for (int shift = 12; pos < size && shift >= 0; shift -= 4) {
@@ -395,7 +401,7 @@ struct adbg_string_t {
 			str[pos++] = hexmaplow[h];
 			if (h) pad = true;
 		}
-		str[pos++] = 0;
+		str[pos] = 0;
 		left = size - pos;
 		return pos < size;
 	}
@@ -406,7 +412,7 @@ struct adbg_string_t {
 			str[pos++] = hexmaplow[h];
 			if (h) pad = true;
 		}
-		str[pos++] = 0;
+		str[pos] = 0;
 		left = size - pos;
 		return pos < size;
 	}
@@ -414,177 +420,14 @@ struct adbg_string_t {
 		for (int shift = 60; pos < size && shift >= 0; shift -= 4) {
 			ulong h = (v >> shift) & 15;
 			if (h == 0 && pad == false) continue;
-			str[pos++] = hexmaplow[h];
+			version (D_LP64)
+				str[pos++] = hexmaplow[h];
+			else
+				str[pos++] = hexmaplow[cast(uint)h]; // for 32-bit systems
 			if (h) pad = true;
 		}
-		str[pos++] = 0;
+		str[pos] = 0;
 		left = size - pos;
 		return pos < size;
 	}
-}
-
-/// 
-unittest {
-	enum BUFFER_SIZE = 64;
-	
-	char[BUFFER_SIZE] buffer = void;
-	
-	printf("adbg_string_t: ");
-	adbg_string_t s = adbg_string_t(buffer.ptr, BUFFER_SIZE);
-	assert(s.left == BUFFER_SIZE - 1);
-	assert(s.size == BUFFER_SIZE - 1);
-	assert(s.pos  == 0);
-	assert(s.str  == &buffer[0]);
-	puts("OK");
-	
-	printf("adbg_string_t.add 'a': ");
-	s.add('a');
-	assert(buffer[0] == 'a');
-	assert(buffer[1] == 0);
-	puts("OK");
-	
-	printf("adbg_string_t.reset: ");
-	s.reset(true);
-	assert(buffer[0] == 0);
-	assert(buffer[1] == 0);
-	assert(s.pos == 0);
-	assert(s.left == BUFFER_SIZE - 1);
-	puts("OK");
-	
-	printf("adbg_string_t.add hello: ");
-	s.add("hello");
-	assert(buffer[0] == 'h');
-	assert(buffer[1] == 'e');
-	assert(buffer[2] == 'l');
-	assert(buffer[3] == 'l');
-	assert(buffer[4] == 'o');
-	assert(buffer[5] == 0);
-	assert(buffer[6] == 0);
-	puts("OK");
-	
-	printf("adbg_string_t.add big text: ");
-	s.reset();
-	assert(s.add(
-		`Lorem ipsum dolor sit amet, consectetur adipiscing elit. `~
-		`Etiam dignissim iaculis lectus. Aliquam volutpat rhoncus dignissim. `~
-		`Donec maximus diam eros, a euismod quam consectetur sit amet. `~
-		`Morbi vel ante viverra, condimentum elit porttitor, tempus metus. `~
-		`Cras eget interdum turpis, vitae egestas ipsum. `~
-		`Nam accumsan aliquam enim, id sodales tellus hendrerit id. `~
-		`Proin vulputate hendrerit accumsan. Etiam vitae tempor libero.`));
-	puts("OK");
-	
-	printf("adbg_string_t.addx16: ");
-	s.reset();
-	s.addx16(0xabcd);
-	assert(buffer[0]  == 'a');
-	assert(buffer[1]  == 'b');
-	assert(buffer[2]  == 'c');
-	assert(buffer[3]  == 'd');
-	assert(buffer[4] == 0);
-	puts("OK");
-	
-	printf("adbg_string_t.addx16 true: ");
-	s.reset();
-	s.addx16(0xee, true);
-	assert(buffer[0]  == '0');
-	assert(buffer[1]  == '0');
-	assert(buffer[2]  == 'e');
-	assert(buffer[3]  == 'e');
-	assert(buffer[4] == 0);
-	puts("OK");
-	
-	printf("adbg_string_t.addx32: ");
-	s.reset();
-	s.addx32(0x1234_abcd);
-	assert(buffer[0]  == '1');
-	assert(buffer[1]  == '2');
-	assert(buffer[2]  == '3');
-	assert(buffer[3]  == '4');
-	assert(buffer[4]  == 'a');
-	assert(buffer[5]  == 'b');
-	assert(buffer[6]  == 'c');
-	assert(buffer[7]  == 'd');
-	assert(buffer[8] == 0);
-	puts("OK");
-	
-	printf("adbg_string_t.addx32 true: ");
-	s.reset();
-	s.addx32(0xcc, true);
-	assert(buffer[0]  == '0');
-	assert(buffer[1]  == '0');
-	assert(buffer[2]  == '0');
-	assert(buffer[3]  == '0');
-	assert(buffer[4]  == '0');
-	assert(buffer[5]  == '0');
-	assert(buffer[6]  == 'c');
-	assert(buffer[7]  == 'c');
-	assert(buffer[8] == 0);
-	puts("OK");
-	
-	printf("adbg_string_t.addx64: ");
-	s.reset();
-	s.addx64(0xdd86_c0ff_ee08_0486);
-	assert(buffer[0]  == 'd');
-	assert(buffer[1]  == 'd');
-	assert(buffer[2]  == '8');
-	assert(buffer[3]  == '6');
-	assert(buffer[4]  == 'c');
-	assert(buffer[5]  == '0');
-	assert(buffer[6]  == 'f');
-	assert(buffer[7]  == 'f');
-	assert(buffer[8]  == 'e');
-	assert(buffer[9]  == 'e');
-	assert(buffer[10] == '0');
-	assert(buffer[11] == '8');
-	assert(buffer[12] == '0');
-	assert(buffer[13] == '4');
-	assert(buffer[14] == '8');
-	assert(buffer[15] == '6');
-	assert(buffer[16] == 0);
-	puts("OK");
-	
-	printf("adbg_string_t.addx64 0xdd: ");
-	s.reset();
-	s.addx64(0xdd, true);
-	assert(buffer[0]  == '0');
-	assert(buffer[1]  == '0');
-	assert(buffer[2]  == '0');
-	assert(buffer[3]  == '0');
-	assert(buffer[4]  == '0');
-	assert(buffer[5]  == '0');
-	assert(buffer[6]  == '0');
-	assert(buffer[7]  == '0');
-	assert(buffer[8]  == '0');
-	assert(buffer[9]  == '0');
-	assert(buffer[10] == '0');
-	assert(buffer[11] == '0');
-	assert(buffer[12] == '0');
-	assert(buffer[13] == '0');
-	assert(buffer[14] == 'd');
-	assert(buffer[15] == 'd');
-	assert(buffer[16] == 0);
-	puts("OK");
-	
-	printf("adbg_string_t.addx64 0x0: ");
-	s.reset();
-	s.addx64(0, true);
-	assert(buffer[0]  == '0');
-	assert(buffer[1]  == '0');
-	assert(buffer[2]  == '0');
-	assert(buffer[3]  == '0');
-	assert(buffer[4]  == '0');
-	assert(buffer[5]  == '0');
-	assert(buffer[6]  == '0');
-	assert(buffer[7]  == '0');
-	assert(buffer[8]  == '0');
-	assert(buffer[9]  == '0');
-	assert(buffer[10] == '0');
-	assert(buffer[11] == '0');
-	assert(buffer[12] == '0');
-	assert(buffer[13] == '0');
-	assert(buffer[14] == '0');
-	assert(buffer[15] == '0');
-	assert(buffer[16] == 0);
-	puts("OK");
 }
