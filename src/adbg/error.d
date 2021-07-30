@@ -44,6 +44,7 @@ enum AdbgError {
 	invalidOptionValue	= 204,
 	illegalInstruction	= 220,
 	outOfData	= 221,
+	opcodeLimit	= 222,
 	//
 	// Object server
 	//
@@ -91,6 +92,7 @@ private immutable error_msg_t[] errors = [
 	{ AdbgError.invalidOptionValue, "Invalid value for disassembler option." },
 	{ AdbgError.illegalInstruction, "Illegal instruction." },
 	{ AdbgError.outOfData, "The input buffer has been depleted in an unexpected fashion." },
+	{ AdbgError.opcodeLimit, "The opcode exhausted its architectural limit." },
 	//
 	// Object server
 	//
@@ -154,11 +156,29 @@ const(char)* adbg_error_msg(int code = error.code) {
 	with (AdbgError)
 	switch (error.code) {
 	case clib: return strerror(errno);
-	case os:   return adbg_sys_error(adbg_sys_errno());
+	case os:   return adbg_sys_error(adbg_sys_errno);
 	default:
 		foreach (ref e; errors)
 			if (code == e.code)
 				return e.msg;
 		return defaultMsg;
+	}
+}
+
+version (Trace) {
+	import core.stdc.stdio;
+	import core.stdc.stdarg;
+	
+	private extern (C) int putchar(int);
+	
+	/// Trace application
+	pragma(mangle, "adbg_trace")
+	void trace(string func = __FUNCTION__, int line = __LINE__)
+		(const(char) *fmt, ...) {
+		va_list va;
+		va_start(va, fmt);
+		printf("TRACE:%s:%u: ", func.ptr, line);
+		vprintf(fmt, va);
+		putchar('\n');
 	}
 }

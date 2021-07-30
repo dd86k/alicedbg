@@ -30,11 +30,11 @@ enum ADBG_CHILD_STACK_SIZE	= 1024 * 1024 * 8;
 // Constants
 //
 
-/// Library and application version
+/// Library version
 enum ADBG_VERSION = "0.0.1";
 
 debug enum __BUILDTYPE__ = "debug";	/// Build type
-else  enum __BUILDTYPE__ = "release";	/// Build type
+else  enum __BUILDTYPE__ = "release";	/// Ditto
 
 /// Target information structure
 struct adbg_info_t {
@@ -57,16 +57,16 @@ version (X86) {
 	enum TARGET_PLATFORM = "x86";	/// Platform ABI string
 	public alias opcode_t = ubyte;
 } else version (X86_64) {
-	enum TARGET_PLATFORM = "x86_64";	/// Platform ABI string
+	enum TARGET_PLATFORM = "x86_64";	/// Ditto
 	public alias opcode_t = ubyte;
 } else version (ARM_Thumb) {
-	enum TARGET_PLATFORM = "arm_t32";	/// Platform ABI string
+	enum TARGET_PLATFORM = "arm_t32";	/// Ditto
 	public alias opcode_t = ushort;
 } else version (ARM) {
-	enum TARGET_PLATFORM = "arm_a32";	/// Platform ABI string
+	enum TARGET_PLATFORM = "arm_a32";	/// Ditto
 	public alias opcode_t = uint;
 } else version (AArch64) {
-	enum TARGET_PLATFORM = "arm_a64";	/// Platform ABI string
+	enum TARGET_PLATFORM = "arm_a64";	/// Ditto
 	public alias opcode_t = uint;
 }
 else
@@ -79,21 +79,21 @@ else
 version (CRuntime_Bionic)
 	enum TARGET_CRT = "bionic";	/// Platform CRT string
 else version (CRuntime_DigitalMars)
-	enum TARGET_CRT = "digitalmars";	/// Platform CRT string
+	enum TARGET_CRT = "digitalmars";	/// Ditto
 else version (CRuntime_Glibc)
-	enum TARGET_CRT = "glibc";	/// Platform CRT string
+	enum TARGET_CRT = "glibc";	/// Ditto
 else version (CRuntime_Microsoft)
-	enum TARGET_CRT = "mscvrt";	/// Platform CRT string
+	enum TARGET_CRT = "mscvrt";	/// Ditto
 else version (CRuntime_Musl)
-	enum TARGET_CRT = "musl";	/// Platform CRT string
+	enum TARGET_CRT = "musl";	/// Ditto
 else version (CRuntime_Newlib) // Cygwin
-	enum TARGET_CRT = "newlib";	/// Platform CRT string
+	enum TARGET_CRT = "newlib";	/// Ditto
 else version (CRuntime_UClibc)
-	enum TARGET_CRT = "uclibc";	/// Platform CRT string
+	enum TARGET_CRT = "uclibc";	/// Ditto
 else version (CRuntime_WASI) // WebAssembly
-	enum TARGET_CRT = "wasi";	/// Platform CRT string
+	enum TARGET_CRT = "wasi";	/// Ditto
 else
-	enum TARGET_CRT = "Unknown";	/// Platform CRT string
+	enum TARGET_CRT = "unknown";	/// Ditto
 
 //
 // ANCHOR OS string
@@ -102,85 +102,88 @@ else
 version (Win64)
 	enum TARGET_OS = "win64";	/// Platform OS string
 else version (Win32)
-	enum TARGET_OS = "win32";	/// Platform OS string
+	enum TARGET_OS = "win32";	/// Ditto
 else version (linux)
-	enum TARGET_OS = "linux";	/// Platform OS string
+	enum TARGET_OS = "linux";	/// Ditto
 else version (OSX)
-	enum TARGET_OS = "osx";	/// Platform OS string
+	enum TARGET_OS = "osx";	/// Ditto
 else version (FreeBSD)
-	enum TARGET_OS = "freebsd";	/// Platform OS string
+	enum TARGET_OS = "freebsd";	/// Ditto
 else version (OpenBSD)
-	enum TARGET_OS = "openbsd";	/// Platform OS string
+	enum TARGET_OS = "openbsd";	/// Ditto
 else version (NetBSD)
-	enum TARGET_OS = "netbsd";	/// Platform OS string
+	enum TARGET_OS = "netbsd";	/// Ditto
 else version (DragonflyBSD)
-	enum TARGET_OS = "dragonflybsd";	/// Platform OS string
+	enum TARGET_OS = "dragonflybsd";	/// Ditto
 else version (BSD)
-	enum TARGET_OS = "bsd";	/// Platform OS string
+	enum TARGET_OS = "bsd";	/// Ditto
 else version (Solaris)
-	enum TARGET_OS = "solaris";	/// Platform OS string
+	enum TARGET_OS = "solaris";	/// Ditto
 else version (AIX)
-	enum TARGET_OS = "aix";	/// Platform OS string
+	enum TARGET_OS = "aix";	/// Ditto
 else version (SkyOS)
-	enum TARGET_OS = "skyos";	/// Platform OS string
+	enum TARGET_OS = "skyos";	/// Ditto
 else version (SysV3)
-	enum TARGET_OS = "sysv3";	/// Platform OS string
+	enum TARGET_OS = "sysv3";	/// Ditto
 else version (SysV4)
-	enum TARGET_OS = "sysv4";	/// Platform OS string
+	enum TARGET_OS = "sysv4";	/// Ditto
 else version (Hurd)
-	enum TARGET_OS = "hurd";	/// Platform OS string
+	enum TARGET_OS = "hurd";	/// Ditto
 else version (Android)
-	enum TARGET_OS = "android";	/// Platform OS string
+	enum TARGET_OS = "android";	/// Ditto
 else version (Emscripten)
-	enum TARGET_OS = "emscripten";	/// Platform OS string
+	enum TARGET_OS = "emscripten";	/// Ditto
 else version (PlayStation)
-	enum TARGET_OS = "playstation";	/// Platform OS string
+	enum TARGET_OS = "playstation";	/// Ditto
 else version (PlayStation3)
-	enum TARGET_OS = "playstation3";	/// Platform OS string
+	enum TARGET_OS = "playstation3";	/// Ditto
 else
-	enum TARGET_OS = "unknown";	/// Platform OS string
+	enum TARGET_OS = "unknown";	/// Ditto
 
 //
-// ANCHOR Additional Target Information
+// ANCHOR Compiler support enumerations
+//
+// __VERSION__ is the debugger front-end version
+// GDC (10.3) still on 2.076.1, but it's heavily modified
 //
 
-// Check if compiler supports the getTargetInfo trait
+/// If set, the compiler supports the getTargetInfo trait.
+enum COMPILER_FEAT_TARGETINFO    = __VERSION__ >= 2083;
+/// If set, the compiler supports the printf and scanf pragmas.
+enum COMPILER_FEAT_PRAGMA_PRINTF = __VERSION__ >= 2092;
 
-version (DigitalMars) {
-	private enum COMPILER_FEAT_TARGETINFO = __VERSION__ >= 2083;
-} else version (LDC) {
-	private enum COMPILER_FEAT_TARGETINFO = __VERSION__ >= 2083;
-} else
-	private enum COMPILER_FEAT_TARGETINFO = false;
+//
+// ANCHOR Additional target information
+//
 
 static if (COMPILER_FEAT_TARGETINFO) {
 	/// Target object format string
 	enum TARGET_OBJFMT = __traits(getTargetInfo, "objectFormat");
 	/// Target float ABI string
-	enum TARGET_FLTABI  = __traits(getTargetInfo, "floatAbi");
+	enum TARGET_FLTABI = __traits(getTargetInfo, "floatAbi");
+	private enum __cppinfo = __traits(getTargetInfo, "cppRuntimeLibrary");
 	// Likely to happen on non-Windows platforms
-	private enum __tinfo = __traits(getTargetInfo, "cppRuntimeLibrary");
-	static if (__tinfo == null)
-		enum TARGET_CPPRT = "none"; /// Target C++ Runtime string
+	static if (__cppinfo == null)
+		enum TARGET_CPPRT = "none";	/// Target C++ Runtime string
 	else
-		enum TARGET_CPPRT = __tinfo; /// Target C++ Runtime string
+		enum TARGET_CPPRT = __cppinfo;	/// Ditto
 } else {
 	/// Target object format string
 	enum TARGET_OBJFMT = "unknown";
 	/// Target float ABI string
 	enum TARGET_FLTABI  = "unknown";
 	version (CppRuntime_Gcc)
-		enum TARGET_CPPRT = "libstdc++"; /// Target C++ Runtime string
+		enum TARGET_CPPRT = "libstdc++";	/// Target C++ Runtime string
 	else version (CppRuntime_Microsoft)
-		enum TARGET_CPPRT = "libcmt"; /// Target C++ Runtime string
+		enum TARGET_CPPRT = "libcmt";	/// Ditto
 	else version (CppRuntime_Clang)
-		enum TARGET_CPPRT = "clang"; /// Target C++ Runtime string
+		enum TARGET_CPPRT = "clang";	/// Ditto
 	else version (CppRuntime_DigitalMars)
-		enum TARGET_CPPRT = "dmc++"; /// Target C++ Runtime string
+		enum TARGET_CPPRT = "dmc++";	/// Ditto
 	else version (CppRuntime_Sun)
-		enum TARGET_CPPRT = "sun"; /// Target C++ Runtime string
+		enum TARGET_CPPRT = "sun";	/// Ditto
 	else // assuming none
-		enum TARGET_CPPRT = "none"; /// Target C++ Runtime string
+		enum TARGET_CPPRT = "none";	/// Ditto
 }
 
 //
@@ -191,17 +194,17 @@ static if (COMPILER_FEAT_TARGETINFO) {
 version (MinGW) {
 	enum TARGET_ENV = "mingw";	/// Target environment
 } else version (Cygwin) {
-	enum TARGET_ENV = "cygwin";	/// Target environment
+	enum TARGET_ENV = "cygwin";	/// Ditto
 } else version (CRuntime_Microsoft) {
-	enum TARGET_ENV = "msvc";	/// Target environment
+	enum TARGET_ENV = "msvc";	/// Ditto
 } else version (CRuntime_Glibc) {
-	enum TARGET_ENV = "gnu";	/// Target environment
+	enum TARGET_ENV = "gnu";	/// Ditto
 } else version (CRuntime_Musl) {
-	enum TARGET_ENV = "musl";	/// Target environment
+	enum TARGET_ENV = "musl";	/// Ditto
 } else version (FreeStanding) { // now that would surprise me
-	enum TARGET_ENV = "freestanding";	/// Target environment
+	enum TARGET_ENV = "freestanding";	/// Ditto
 } else {
-	enum TARGET_ENV = "unknown";	/// Target environment
+	enum TARGET_ENV = "unknown";	/// Ditto
 }
 
 version (PrintTargetInfo) {
@@ -226,13 +229,13 @@ struct adbg_address_t {
 	alias raw this;
 	union {
 		size_t  sz;	/// Used internally
-		void   *raw;	/// ditto
-		ubyte  *i8;	/// ditto
-		ushort *i16;	/// ditto
-		uint   *i32;	/// ditto
-		ulong  *i64;	/// ditto
-		float  *f32;	/// ditto
-		double *f64;	/// ditto
+		void   *raw;	/// Ditto
+		ubyte  *i8;	/// Ditto
+		ushort *i16;	/// Ditto
+		uint   *i32;	/// Ditto
+		ulong  *i64;	/// Ditto
+		float  *f32;	/// Ditto
+		double *f64;	/// Ditto
 	}
 }
 

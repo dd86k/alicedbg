@@ -35,6 +35,9 @@ private import adbg.disasm.syntax.intel,
 //      Might be useful for some but how will that be managed with, say, HLA?
 //TODO: Consider doing syntax settings
 //      e.g., Removing "ptr" out of memory access operands on nasm/intel syntaxes
+//TODO: Flow-oriented analysis to mitigate anti-dissassembly techniques
+//      Obviously with a setting (what should be the default?)
+//      Save jmp/call targets
 
 extern (C):
 
@@ -195,12 +198,17 @@ enum AdbgDisasmInput : ubyte {
 	mmfile,	///TODO: MmFile
 }
 
+enum AdbgDisasmNumberType : ubyte {
+	decimal,	/// 
+	hexadecimal,	/// 
+}
 enum AdbgDisasmHexStyle : ubyte {
-	zeroPrefix,	/// 0x0010
+	defaultPrefix,	/// 0x0010, default
 	hSuffix,	/// 0010h
 	hPrefix,	/// 0h0010
 	numberSignPrefix,	/// #0010
 	pourcentPrefix,	/// %0010
+	dollarPrefix,	/// $0010
 }
 
 version (X86) {
@@ -251,7 +259,11 @@ struct adbg_disasm_number_t {
 		double f64; float f32;
 	}
 	AdbgDisasmType width;
-	bool signed;
+	AdbgDisasmNumberType type;
+	union {
+		bool signed;
+		AdbgDisasmHexStyle hexStyle;
+	}
 }
 
 /// The basis of an operation code
@@ -308,13 +320,16 @@ struct adbg_disasm_t { align(1):
 	/// Disassembler operating mode. See the AdbgDisasmMode enumeration for
 	/// more details.
 	AdbgDisasmMode mode;
-	/// User data length that can be processed. If disassembling a debuggee,
-	/// this field is not taken into account.
+	/// User data length that can be processed from the buffer size provided.
+	/// If disassembling a debuggee, this field is not taken into account.
 	size_t left;
-	
+	/// Current opcode length.
+	int size;
+	/// Maximum opcode length. (Architectural limit, exclusive)
+	/// x86: 16 bytes = illegal
+	int max;
 	/// Input mode.
 	AdbgDisasmInput input;
-	
 	/// Decoder formatting options.
 	adbg_disasm_decoder_options_t decoderOpts;
 	/// User formatting options.
@@ -349,6 +364,7 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 	switch (m) {
 	case native: goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
+		p.max = 16;
 		p.decode = &adbg_disasm_x86;
 		break;
 	case riscv32:
@@ -359,8 +375,10 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 	}
 	
 	static if (DEFAULT_SYNTAX == AdbgSyntax.intel) {
+		p.syntax = AdbgSyntax.intel;
 		p.handle = &adbg_disasm_operand_intel;
 	} else {
+		p.syntax = AdbgSyntax.att;
 		p.handle = &adbg_disasm_operand_att;
 	}
 	
@@ -444,66 +462,72 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 	if (p.cookie != ADBG_COOKIE)
 		return adbg_oops(AdbgError.uninitiated);
 	
-	p.opcode = op;
-	
 	// Reset opcode info
 	if (p.mode >= AdbgDisasmMode.file) {
 		with (op) {
 			mnemonic = segment = null;
-			prefixCount = operandCount = 0;
+			machineCount = prefixCount = operandCount = 0;
 		}
 	}
 	
+	p.opcode = op;
+	p.size = 0;
 	p.last = p.current;	// Save address
-	int e = p.decode(p);	// Decode
-	op.size = cast(int)(p.current.sz - p.last.sz);	// opcode size
-	
-	return e;
+	return p.decode(p);	// Decode
 }
 
 void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size) {
 	adbg_string_t s = adbg_string_t(buffer, size);
 	adbg_disasm_opcode_t *op = p.opcode;
 	
+	version (Trace) trace("prefixCount=%u", p.opcode.prefixCount);
+	
 	// Prefixes, skipped if empty or decoder says not to include them
 	if (p.decoderOpts.noPrefixes == false && op.prefixCount) {
 		for (size_t i; i < op.prefixCount; ++i) {
-			if (s.add(op.prefixes[i]))
+			if (s.adds(op.prefixes[i]))
 				return;
-			if (s.add(' '))
+			if (s.addc(' '))
 				return;
 		}
 	}
 	
 	// Mnemonic
-	if (s.add(op.mnemonic))
+	version (Trace) trace("operandCount=%u", p.opcode.operandCount);
+	if (s.adds(op.mnemonic))
 		return;
+	version (Trace) trace("operandCount=%u", p.opcode.operandCount);
 	
 	// Skipping operands if empty
 	if (op.operandCount == 0) return;
+	version (Trace) trace("operandCount=%u", p.opcode.operandCount);
 	
 	// Operands
-	if (s.add(p.userOpts.mnemonicTab ? '\t' : ' '))
+	if (s.addc(p.userOpts.mnemonicTab ? '\t' : ' '))
 		return;
+	
+	version (Trace) trace("operandCount=%u", p.opcode.operandCount);
 	
 	with (AdbgSyntax)
 	switch (p.syntax) {
 	case intel, nasm:
 		--op.operandCount;
+		version (Trace) trace("cringe");
 		for (size_t i; i <= op.operandCount; ++i) {
+			version (Trace) trace("i=%z", i);
 			if (p.handle(p, s, op.operands[i]))
 				return;
 			if (i < op.operandCount)
-				if (s.add(','))
+				if (s.addc(','))
 					return;
 		}
 		return;
 	default:
-		for (size_t i = op.operandCount - 1; i; --i) {
+		for (size_t i = op.operandCount - 1; i >= 0; --i) {
 			if (p.handle(p, s, op.operands[i]))
 				return;
 			if (i > 1)
-				if (s.add(','))
+				if (s.addc(','))
 					return;
 		}
 		return;
@@ -531,7 +555,7 @@ void adbg_disasm_machine(adbg_disasm_t *p, char *buffer, size_t size) {
 		case i64, f64: s.addx64(num.i64, true); break;
 		default:  assert(0);
 		}
-		if (i < edge) s.add(' ');
+		if (i < edge) s.addc(' ');
 	}
 }
 
@@ -576,7 +600,6 @@ package
 struct adbg_disasm_operand_mem_t {
 	const(char) *base;	/// Used for normal usage, otherwise SIB:BASE
 	const(char) *index;	/// SIB:INDEX
-	int disp;	/// Offset or SIB:OFFSET
 	ubyte scale;	/// SIB:SCALE
 	adbg_disasm_number_t offset;	/// Displacement
 	bool scaled;	/// SIB or any scaling mode
@@ -621,9 +644,7 @@ struct adbg_disasm_decoder_options_t { align(1):
 
 //TODO: Display option for integer/byte/float operations
 //      Smart: integer=decimal, bitwise=hex, fpu=float
-//      Should it even be a setting? Otherwise it's a setting for each group
-//TODO: Hex format setting
-//      0x0, 0h, 0h0, #0, $0
+//      A setting for each group (that will be a lot of groups...)
 private
 struct adbg_disasm_user_options_t { align(1):
 	union {
@@ -642,9 +663,12 @@ struct adbg_disasm_user_options_t { align(1):
 /// Params:
 /// 	p = Disassembler structure pointer
 /// 	u = Data pointer
+/// 	add = If true, adds to the machine buffer
 /// Returns: Non-zero on error
 package
-int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
+int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, bool add = true) {
+	if (p.size + T.sizeof >= p.max)
+		return adbg_oops(AdbgError.opcodeLimit);
 	int e = void;
 	with (AdbgDisasmInput)
 	switch (p.input) {
@@ -662,7 +686,8 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u) {
 	default: assert(0);
 	}
 	p.current.sz += T.sizeof;
-	if (p.mode >= AdbgDisasmMode.file)
+	p.size += T.sizeof;
+	if (add && p.mode >= AdbgDisasmMode.file)
 	if (p.opcode.machineCount < ADBG_MAX_MACHINE) {
 		adbg_disasm_number_t *n = &p.opcode.machine[p.opcode.machineCount++];
 		static if (is(T == ubyte)) {
@@ -693,8 +718,43 @@ void adbg_disasm_calc_offset(T)(adbg_disasm_t *p, T u) {
 }
 
 package
-bool adbg_disasm_render_number(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_disasm_number_t n) {
+bool adbg_disasm_render_number(adbg_disasm_t *p,
+	ref adbg_string_t s, ref adbg_disasm_number_t n, bool offset) {
+	__gshared const(char) *prefix = "0x";
 	
+	switch (n.width) with (AdbgDisasmType) {
+	case i8:
+		if (offset) {
+			if (s.addc(n.i8 < 0 ? '-' : '+'))
+				return true;
+		}
+		if (s.adds(prefix)) // temp
+			return true;
+		if (s.addx8(n.i8))
+			return true;
+		break;
+	case i16:
+		if (offset) {
+			if (s.addc(n.i16 < 0 ? '-' : '+'))
+				return true;
+		}
+		if (s.adds(prefix)) // temp
+			return true;
+		if (s.addx16(n.i16))
+			return true;
+		break;
+	case i32:
+		if (offset) {
+			if (s.addc(n.i32 < 0 ? '-' : '+'))
+				return true;
+		}
+		if (s.adds(prefix)) // temp
+			return true;
+		if (s.addx32(n.i32))
+			return true;
+		break;
+	default: assert(0);
+	}
 	
 	return false;
 }
@@ -748,6 +808,8 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmType w, void *v) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
+	version (Trace) trace("type=%u", w);
+	
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
 	item.type = AdbgDisasmOperand.immediate;
 	item.imm.value.width = w;
@@ -768,6 +830,8 @@ void adbg_disasm_add_register(adbg_disasm_t *p, const(char) *register) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
+	version (Trace) trace("register=%s", register);
+	
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
 	item.type     = AdbgDisasmOperand.register;
 	item.reg.name = register;
@@ -779,7 +843,7 @@ package
 void adbg_disasm_add_memory(adbg_disasm_t *p,
 	const(char) *regbase,
 	const(char) *regindex,
-	int disp,
+	adbg_disasm_number_t *disp,
 	//TODO: ushort segment
 	AdbgDisasmType width,
 	ubyte scale,
@@ -787,12 +851,14 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
+	version (Trace) trace("base=%s", regbase);
+	
 	p.memWidth	= width;
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
 	item.type       = AdbgDisasmOperand.memory;
 	item.mem.base	= regbase;
 	item.mem.index	= regindex;
-	item.mem.disp	= disp;
+	item.mem.offset	= *disp;
 	item.mem.scale	= scale;
 	item.mem.scaled	= scaled;
 }

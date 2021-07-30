@@ -314,17 +314,28 @@ int cli_help() {
 debug private enum type = "-debug";
 else  private enum type = "";
 
+// Turns a __VERSION__ number into a string constant
+template STRVER(uint ver) {
+	enum STRVER =
+		cast(char)((ver / 1000) + '0') ~
+		"." ~
+		cast(char)(((ver % 1000) / 100) + '0') ~
+		cast(char)(((ver % 100) / 10) + '0') ~
+		cast(char)((ver % 10) + '0');
+}
+
 immutable(char) *fmt_version =
 "alicedbg "~ADBG_VERSION~type~" (built: "~__TIMESTAMP__~")\n"~
-"Compiler: "~__VENDOR__~" %u.%03u\n"~
+"Compiler: "~__VENDOR__~" "~STRVER!__VERSION__~"\n"~
 "Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
 "Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
 "CRT: "~TARGET_CRT~"\n"~
-"CppRT: "~TARGET_CPPRT~"\n";
+"CppRT: "~TARGET_CPPRT;
 //TODO: Features:
+
 int cli_version() {
 	import d = std.compiler;
-	printf(fmt_version, d.version_major, d.version_minor);
+	puts(fmt_version);
 	exit(0);
 	return 0;
 }

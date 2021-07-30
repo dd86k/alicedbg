@@ -204,12 +204,16 @@ L_DISASM_1:
 	}
 	
 	uint i;
+	char[40] mnemonic = void, machine = void;
 	adbg_disasm_start_buffer(dp, AdbgDisasmMode.file, data, size);
 L_DISASM_2:
 	with (AdbgError)
 	switch (adbg_disasm(dp, &op)) {
 	case none:
 		//printf("%08X %-30s %s\n", i, op.machine, op.mnemonic);
+		adbg_disasm_machine(dp, machine.ptr, 40);
+		adbg_disasm_mnemonic(dp, mnemonic.ptr, 40);
+		printf("%08x  %-30s  %s\n", i, machine.ptr, mnemonic.ptr);
 		i += op.size;
 		goto L_DISASM_2;
 	//TODO: Illegal should be moved with none and disasm takes care of buffer

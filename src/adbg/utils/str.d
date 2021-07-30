@@ -323,7 +323,6 @@ size_t adbg_util_str_appendv(char *buffer, size_t size, const(char) *fmt, va_lis
 struct adbg_string_t {
 	char  *str;	/// String pointer
 	size_t size;	/// Buffer size, capacity
-	size_t left;	/// Buffer size left available
 	size_t pos;	/// Position, count
 	
 	/// Inits a string position tracker with a buffer and its size.
@@ -333,37 +332,37 @@ struct adbg_string_t {
 	/// 	buffersz = Buffer capacity.
 	this(char *buffer, size_t buffersz) {
 		str  = buffer;
-		size = left = buffersz - 1;
-		pos = 0;
+		size = buffersz;
+		pos  = 0;
 	}
 	/// Reset counters and optionally zero-fill the buffer.
 	/// Params: zero = If true, fills the buffer of zeros.
 	void reset(bool zero = false) {
 		if (zero)
-			for (size_t p; p < size + 1; ++p)
+			for (size_t p; p < size; ++p)
 				str[p] = 0;
 		pos = 0;
-		left = size;
-	}
-	/// Update position with the number of characters written.
-	/// Params: nsize = Number of characters written.
-	/// Returns: True if buffer exhausted.
-	bool update(size_t nsize) {
-		pos += nsize;
-		left -= nsize;
-		return pos < size;
 	}
 	/// Add character to buffer.
 	/// Params: c = Character
 	/// Returns: True if buffer exhausted.
-	bool add(char c) {
-		return update(adbg_util_str_appendc(str + pos, left, c));
+	bool addc(char c) {
+		if (pos >= size)
+			return true;
+		char *s = str + pos;
+		*s = c;
+		*(s + 1) = 0;
+		++pos;
+		return false;
 	}
 	/// Add a constant string to buffer.
 	/// Params: s = String
 	/// Returns: True if buffer exhausted.
-	bool add(const(char) *s) {
-		return update(adbg_util_str_appends(str + pos, left, s));
+	bool adds(const(char) *s) {
+		for (size_t si; pos < size && s[si]; ++pos, ++si)
+			str[pos] = s[si];
+		str[pos] = 0;
+		return pos >= size;
 	}
 	//TODO: adbg_string_t.add_s
 	/// Add multiple items to buffer.
@@ -382,17 +381,17 @@ struct adbg_string_t {
 	/// 	va = va_list object.
 	/// Returns: True if buffer exhausted.
 	bool addv(const(char) *fmt, va_list va) {
-		return update(adbg_util_str_appendv(str + pos, left, fmt, va));
+		pos += vsnprintf(str + pos, size - pos, fmt,va);
+		return pos >= size;
 	}
 	bool addx8(ubyte v, bool pad = false) {
-		if (left < 3) return true;
+		if (pos + 3 >= size) return true;
 		ubyte vh = v >> 4;
 		ubyte vl = v & 15;
 		if (vh || pad) str[pos++] = hexmaplow[vh];
 		str[pos++] = hexmaplow[vl];
 		str[pos] = 0;
-		left -= 2;
-		return pos < size;
+		return pos >= size;
 	}
 	bool addx16(ushort v, bool pad = false) {
 		for (int shift = 12; pos < size && shift >= 0; shift -= 4) {
@@ -402,8 +401,7 @@ struct adbg_string_t {
 			if (h) pad = true;
 		}
 		str[pos] = 0;
-		left = size - pos;
-		return pos < size;
+		return pos >= size;
 	}
 	bool addx32(uint v, bool pad = false) {
 		for (int shift = 28; pos < size && shift >= 0; shift -= 4) {
@@ -413,8 +411,7 @@ struct adbg_string_t {
 			if (h) pad = true;
 		}
 		str[pos] = 0;
-		left = size - pos;
-		return pos < size;
+		return pos >= size;
 	}
 	bool addx64(ulong v, bool pad = false) {
 		for (int shift = 60; pos < size && shift >= 0; shift -= 4) {
@@ -427,7 +424,6 @@ struct adbg_string_t {
 			if (h) pad = true;
 		}
 		str[pos] = 0;
-		left = size - pos;
-		return pos < size;
+		return pos >= size;
 	}
 }
