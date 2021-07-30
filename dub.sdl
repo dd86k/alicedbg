@@ -31,7 +31,7 @@ version "0.0.0"
 #       -gdc-betterc build types in the future.
 
 #
-# SECTION Configurations
+# ANCHOR Configurations
 #
 
 # Not a subPackage because I want to avoid generating a seperate library
@@ -46,7 +46,7 @@ configuration "library" {
 }
 
 #
-# SECTION Build types
+# ANCHOR Build types
 #
 
 # Debug build with tracing enabled. This will be extremely verbose and the
@@ -109,7 +109,7 @@ buildType "release-nobounds" {
 }
 
 #
-# SECTION Unit tests
+# ANCHOR Unit tests
 #
 # These are separated into their own because they either:
 # - Require interaction;
@@ -163,7 +163,21 @@ buildType "all" {
 }
 
 #
-# SECTION Documentation
+# ANCHOR External fuzzing
+#
+
+# AFL fuzzing test
+buildType "afl" {
+	toolchainRequirements dmd="no" gdc="no" ldc=">=1.0.0"
+	dflags "-plugin=$AFL_ROOT/afl-llvm-pass.so"
+	sourceFiles "$AFL_ROOT/afl-llvm-rt.o"
+	versions "AFL"
+	buildOptions "debugMode" "debugInfo"
+	dflags "-betterC" platform="ldc"
+}
+
+#
+# ANCHOR Documentation
 #
 
 # Brings back ddox
