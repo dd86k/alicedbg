@@ -19,6 +19,16 @@ version "0.0.0"
 #       -fno-switch-errors: not a command-line option
 #       -nophoboslib: makes the linker complain more
 #       Tried with "-fno-moduleinfo" "-fno-emit-moduleinfo"
+# NOTE: GDC and betterC
+#       Currently (even with GDC 10.3), when compiled with -fno-druntime
+#       (similar to -betterC), the linker will whine about an undefined reference
+#       to __gdc_personality_v0, because the gdc-druntime defines this reference.
+#       Glibc (and subsequently, GCC) has a similiar function,
+#       __gcc_personality_v0, that is served when unwinding the stack, so to
+#       handle exceptions.
+# NOTE: GDC 11.1 and betterC
+#       Yes, it works with -fno-druntime, so it can be possible to add
+#       -gdc-betterc build types in the future.
 
 #
 # SECTION Configurations
@@ -38,6 +48,17 @@ configuration "library" {
 #
 # SECTION Build types
 #
+
+# Debug build with tracing enabled. This will be extremely verbose and the
+# output will be cryptid.
+# Only to be used with small reproductible bugs.
+buildType "trace" {
+	versions "Trace"
+	buildOptions "debugMode" "debugInfo"
+	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
+	dflags "-betterC" "--vgc" platform="ldc"
+	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+}
 
 # Make the compiler print GC and TLS usage, and target information.
 buildType "debugv" {
