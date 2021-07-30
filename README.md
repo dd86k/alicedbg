@@ -5,9 +5,20 @@
 The alicedbg project aims to be a simple debugger, object dumper, and system
 tracer. Either as a stand-alone program or as a library.
 
+Currently, it supports:
+- Windows (msvcrt) and Linux (Glibc and Musl) debugging.
+- x86-16, x86-32, and x86-64 disassembly.
+- The Intel, Nasm, and AT&T syntaxes.
+- ELF and PE32 image dumping.
+- Stand-alone application and DUB integration as a library, both betterC-compatible.
+- Fully supports DMD, GDC, and LDC as much as possible.
+- 3 debugger user interfaces.
+
+All written from scratch for me to learn various internal mechanics.
+
 # Documentation
 
-Most of the help topics can be found in the repository wiki.
+The wiki contains user manuals and development notes.
 
 | Home | Wiki |
 |---|---|
@@ -16,10 +27,3 @@ Most of the help topics can be found in the repository wiki.
 | [Gitlab](https://gitlab.com/dd86k/alicedbg) | [URL](https://gitlab.com/dd86k/alicedbg/-/wikis/home)
 
 Technical manual: TBA
-
-# Branches
-
-| Name | Description |
-|---|---|
-| `master` | Release branch, including release candidates |
-| `dev` | Development branch, unstable |
