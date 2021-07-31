@@ -648,7 +648,8 @@ int adbg_disasm_x86_sib_legacy(adbg_disasm_t *p,
 	const(char) **basereg, const(char) **indexreg, ubyte *scale, adbg_disasm_number_t *disp,
 	ubyte mode) {
 	
-	AdbgDisasmType w = AdbgDisasmType.i32;
+	AdbgDisasmType w = p.platform == AdbgPlatform.x86_64 ?
+		AdbgDisasmType.i64 : AdbgDisasmType.i32;
 	
 	ubyte sib = void;
 	int e = adbg_disasm_fetch!ubyte(p, &sib);

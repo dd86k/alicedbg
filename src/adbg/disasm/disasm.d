@@ -50,7 +50,7 @@ private enum ADBG_MAX_OPERANDS = 4;
 private enum ADBG_MAX_MACHINE  = 16;
 
 /// Don't tell anyone.
-private enum ADBG_COOKIE = 0xccccc0fe;
+private enum ADBG_COOKIE = 0xc0fec0fe;
 
 /// Disassembler ABI
 enum AdbgPlatform : ubyte {
@@ -293,9 +293,9 @@ struct adbg_disasm_t { align(1):
 	adbg_address_t last;	/// Last address, saved from input.
 	
 	/// Decoder function
-	int function(adbg_disasm_t*) decode;
+	int function(adbg_disasm_t*) fdecode;
 	/// Syntax operand handler function
-	bool function(adbg_disasm_t*, ref adbg_string_t, ref adbg_disasm_operand_t) handle;
+	bool function(adbg_disasm_t*, ref adbg_string_t, ref adbg_disasm_operand_t) foperand;
 	union {
 		void *internal;	/// Pointer for internal decoders
 		x86_internals_t *x86;	/// Ditto
@@ -344,6 +344,8 @@ struct adbg_disasm_t { align(1):
 adbg_disasm_t *adbg_disasm_new(AdbgPlatform m) {
 	import core.stdc.stdlib : calloc;
 	
+	version (Trace) trace("platform=%u", m);
+	
 	adbg_disasm_t *s = cast(adbg_disasm_t *)calloc(1, adbg_disasm_t.sizeof);
 	if (s == null) {
 		adbg_oops(AdbgError.allocationFailed);
@@ -360,15 +362,19 @@ adbg_disasm_t *adbg_disasm_new(AdbgPlatform m) {
 
 // configure
 int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
+	version (Trace) trace("platform=%u", m);
+	
 	with (AdbgPlatform)
 	switch (m) {
-	case native: goto case DEFAULT_PLATFORM;
+	case native:
+		m = DEFAULT_PLATFORM;
+		goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
 		p.max = 16;
-		p.decode = &adbg_disasm_x86;
+		p.fdecode = &adbg_disasm_x86;
 		break;
 	case riscv32:
-		p.decode = &adbg_disasm_riscv;
+		p.fdecode = &adbg_disasm_riscv;
 		break;
 	default:
 		return adbg_oops(AdbgError.unsupportedPlatform);
@@ -376,10 +382,10 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 	
 	static if (DEFAULT_SYNTAX == AdbgSyntax.intel) {
 		p.syntax = AdbgSyntax.intel;
-		p.handle = &adbg_disasm_operand_intel;
+		p.foperand = &adbg_disasm_operand_intel;
 	} else {
 		p.syntax = AdbgSyntax.att;
-		p.handle = &adbg_disasm_operand_att;
+		p.foperand = &adbg_disasm_operand_att;
 	}
 	
 	p.platform = m;
@@ -416,6 +422,8 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 	if (p == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
+	version (Trace) trace("opt=%u val=%d", opt, val);
+	
 	with (AdbgDisasmOpt)
 	switch (opt) {
 	case mode:
@@ -432,9 +440,9 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 		p.syntax = cast(AdbgSyntax)val;
 		with (AdbgSyntax)
 		switch (p.syntax) {
-		case intel: p.handle = &adbg_disasm_operand_intel; break;
-		case nasm:  p.handle = &adbg_disasm_operand_nasm; break;
-		case att:   p.handle = &adbg_disasm_operand_att; break;
+		case intel: p.foperand = &adbg_disasm_operand_intel; break;
+		case nasm:  p.foperand = &adbg_disasm_operand_nasm; break;
+		case att:   p.foperand = &adbg_disasm_operand_att; break;
 		default:    return adbg_oops(AdbgError.invalidOptionValue);
 		}
 		break;
@@ -473,7 +481,7 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 	p.opcode = op;
 	p.size = 0;
 	p.last = p.current;	// Save address
-	return p.decode(p);	// Decode
+	return p.fdecode(p);	// Decode
 }
 
 void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size) {
@@ -493,14 +501,11 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size) {
 	}
 	
 	// Mnemonic
-	version (Trace) trace("operandCount=%u", p.opcode.operandCount);
 	if (s.adds(op.mnemonic))
 		return;
-	version (Trace) trace("operandCount=%u", p.opcode.operandCount);
 	
 	// Skipping operands if empty
 	if (op.operandCount == 0) return;
-	version (Trace) trace("operandCount=%u", p.opcode.operandCount);
 	
 	// Operands
 	if (s.addc(p.userOpts.mnemonicTab ? '\t' : ' '))
@@ -510,23 +515,24 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size) {
 	
 	with (AdbgSyntax)
 	switch (p.syntax) {
-	case intel, nasm:
-		--op.operandCount;
-		version (Trace) trace("cringe");
-		for (size_t i; i <= op.operandCount; ++i) {
-			version (Trace) trace("i=%z", i);
-			if (p.handle(p, s, op.operands[i]))
+	case att:
+		// condition is not i >= 0 because i sure love overflows
+		for (size_t i = op.operandCount - 1; i < op.operandCount; --i) {
+			version (Trace) trace("i=%u", cast(uint)i);
+			if (p.foperand(p, s, op.operands[i]))
 				return;
-			if (i < op.operandCount)
+			if (i)
 				if (s.addc(','))
 					return;
 		}
 		return;
 	default:
-		for (size_t i = op.operandCount - 1; i >= 0; --i) {
-			if (p.handle(p, s, op.operands[i]))
+		--op.operandCount;
+		for (size_t i; i <= op.operandCount; ++i) {
+			version (Trace) trace("i=%u", cast(uint)i);
+			if (p.foperand(p, s, op.operands[i]))
 				return;
-			if (i > 1)
+			if (i < op.operandCount)
 				if (s.addc(','))
 					return;
 		}
@@ -669,6 +675,7 @@ package
 int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, bool add = true) {
 	if (p.size + T.sizeof >= p.max)
 		return adbg_oops(AdbgError.opcodeLimit);
+	//TODO: Auto bswap if architecture endian is different than target
 	int e = void;
 	with (AdbgDisasmInput)
 	switch (p.input) {
@@ -693,19 +700,15 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, bool add = true) {
 		static if (is(T == ubyte)) {
 			n.i8 = *u;
 			n.width = AdbgDisasmType.i8;
-			n.signed = is(T == byte);
 		} else static if (is(T == ushort)) {
 			n.i16 = *u;
 			n.width = AdbgDisasmType.i16;
-			n.signed = is(T == short);
 		} else static if (is(T == uint)) {
 			n.i32 = *u;
 			n.width = AdbgDisasmType.i32;
-			n.signed = is(T == int);
 		} else static if (is(T == ulong)) {
 			n.i64 = *u;
 			n.width = AdbgDisasmType.i64;
-			n.signed = is(T == long);
 		} else static assert(0, "fetch support type");
 	}
 	return e;

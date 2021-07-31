@@ -18,7 +18,7 @@ extern (C):
 __gshared:
 
 /// Disassembler string buffer size
-enum DISASM_STRING_BUFFER_SIZE = 128;
+enum DISASM_STRING_BUFFER_SIZE = 40;
 
 /// Application error
 enum AppError {
@@ -60,28 +60,35 @@ immutable setting_syntax_t[] syntaxes = [
 //
 
 /// Application operating mode
-enum SettingMode { debugger, dump, trace }
+enum SettingMode { debugger, dump, analyze }
 
 /// Debugger UIs
 enum SettingUI { cmd, loop, tui, tcpserver }
 
 /// Settings structure for the application (only!)
 struct settings_t {
-	// CLI
-	SettingMode mode;	/// Application mode
-	SettingUI ui;	/// Debugger user interface
-	const(char) *file;	/// Debuggee: file
-	const(char) **args;	/// Debuggee: argument vector
-	const(char) **env;	/// Debuggee: environement vector
-	const(char) *dir;	/// Debuggee: directory
-	uint pid;	/// Debuggee: PID
-	uint flags;	/// Flags to pass to callee
-	AdbgPlatform platform;	/// 
-	AdbgSyntax syntax;	/// 
+	public struct cli_settings_t {
+		// CLI
+		SettingMode mode;	/// Application mode
+		SettingUI ui;	/// Debugger user interface
+		const(char) *file;	/// Debuggee: file
+		const(char) **args;	/// Debuggee: argument vector
+		const(char) **env;	/// Debuggee: environement vector
+		const(char) *dir;	/// Debuggee: directory
+		uint pid;	/// Debuggee: PID
+		uint flags;	/// Flags to pass to callee
+		AdbgSyntax syntax;	/// 
+		AdbgPlatform platform;	/// 
+	}
+	cli_settings_t cli;
 	// App
-	adbg_disasm_t disasm;	/// Disassembler
-	exception_t last_exception;	/// Last exception
-	char[DISASM_STRING_BUFFER_SIZE] disasmBuffer;	/// For disassembly
+	public struct app_settings_t {
+		adbg_disasm_t disasm;	/// Disassembler
+		exception_t last_exception;	/// Last exception
+		char[DISASM_STRING_BUFFER_SIZE] bufferMnemonic;	/// For disassembly
+		char[DISASM_STRING_BUFFER_SIZE] bufferMachine;	/// For disassembly
+	}
+	app_settings_t app;
 }
 
 /// Global variables.

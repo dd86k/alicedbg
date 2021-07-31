@@ -94,15 +94,14 @@ void dump_chapter(const(char) *title) {
 /// 	dopts = Disassembler settings
 /// 	flags = Dumper options
 /// Returns: Error code if non-zero
-int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
-	FILE *f = fopen(file, "rb"); // Handles null file pointers
+int dump() {
+	FILE *f = fopen(globals.cli.file, "rb"); // Handles null file pointers
 	if (f == null) {
 		perror(MODULE);
 		return EXIT_FAILURE;
 	}
 	
-	//TODO: Rework this part for new disasm
-	if (flags & DumpOpt.raw) {
+	if (globals.cli.flags & DumpOpt.raw) {
 		if (fseek(f, 0, SEEK_END)) {
 			perror(MODULE);
 			puts("dump: could not seek file");
@@ -121,7 +120,8 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 			return EXIT_FAILURE;
 		}
 		
-		return dump_disasm(dopts, data, fl, flags);
+		with (globals)
+		return dump_disasm(&app.disasm, data, fl, cli.flags);
 	}
 	
 	adbg_object_t obj = void;
@@ -133,16 +133,16 @@ int dump(const(char) *file, adbg_disasm_t *dopts, int flags) {
 	}
 	
 	// When nothing is set, the default is to show headers
-	if ((flags & 0xFF_FFFF) == 0)
-		flags |= DumpOpt.header;
+	if ((globals.cli.flags & 0xFF_FFFF) == 0)
+		globals.cli.flags |= DumpOpt.header;
 	
-	if (dopts.platform == AdbgPlatform.native)
-		dopts.platform = obj.platform;
+	if (adbg_disasm_configure(&globals.app.disasm, obj.platform))
+		return printerror();
 	
 	dump_t dump = void;
 	dump.obj = &obj;
-	dump.dopts = dopts;
-	dump.flags = flags;
+	dump.dopts = &globals.app.disasm;
+	dump.flags = globals.cli.flags;
 	
 	with (AdbgObjFormat)
 	switch (dump.obj.format) {

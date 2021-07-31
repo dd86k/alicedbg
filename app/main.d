@@ -14,21 +14,21 @@ import adbg.platform;
 import adbg.dbg : adbg_attach, adbg_load;
 import adbg.disasm;
 import adbg.sys.err : adbg_sys_perror;
-import common, dumper, ui;
+import common, ui, dumper, analyzer;
 
 private:
 extern (C):
 __gshared:
 
 //TODO: --loop-log for turning the loop UI into an non-interactive session
-//TODO: --debug/--no-debug: Disable/enable internal SEH from main
+//TODO: --seh/--no-seh: Enable/disable internal SEH
 
 //
 // CLI utils
 //
 
 // if asking for help, so '?' and "help" are accepted
-bool cli_needhelp(const(char) *query) {
+bool wantsHelp(const(char) *query) {
 	switch (query[0]) {
 	case '?': return true;
 	default: return strcmp(query, "help") == 0;
@@ -52,25 +52,27 @@ struct option_t {
 }
 immutable option_t[] options = [
 	// general
-	{ 'm', "march",  "Select architecture for disassembler (default=platform)", true, fa: &cli_march },
-	{ 's', "syntax", "Select disassembler syntax (default=platform)", true, fa: &cli_syntax },
+	{ 'm', "march",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
+	{ 's', "syntax",	"Select disassembler syntax (default=platform)", true, fa: &cli_syntax },
 	// debugger
-	{ 'f', "file", "Debugger: Load executable (default parameter)", true, fa: &cli_file },
-	{ 0,   "args", "Debugger: Supply arguments to executable, '--' works too", true, fa: &cli_args },
-	{ 'E', "env",  "Debugger: Supply environment variables to executable", true, fa: &cli_env },
-	{ 'p', "pid",  "Debugger: Attach to process", true, fa: &cli_pid },
-	{ 'U', "ui",   "Debugger: Select debugger user interface (default=cmd)", true, fa: &cli_ui },
+	{ 'f', "file",	"Debugger: Load executable (default parameter)", true, fa: &cli_file },
+	{ 0,   "args",	"Debugger: Supply arguments to executable, '--' works too", true, fa: &cli_args },
+	{ 'E', "env",	"Debugger: Supply environment variables to executable", true, fa: &cli_env },
+	{ 'p', "pid",	"Debugger: Attach to process", true, fa: &cli_pid },
+	{ 'U', "ui",	"Debugger: Select debugger user interface (default=cmd)", true, fa: &cli_ui },
 	// dumper
-	{ 'D', "dump", "Dumper: Dump an object file", false, &cli_dump },
-	{ 'R', "raw",  "Dumper: Specify object is raw", false, &cli_raw },
-	{ 'S', "show", "Dumper: Select which part of the object to display (default=h)", true, fa: &cli_show },
+	{ 'A', "analyze",	"Dumper: Show detailed information about the first instruction", false, null },
+	{ 'X', "hex",	"Dumper: The input is the following hex string", true, null },
+	{ 'D', "dump",	"Dumper: Dump an object file", false, &cli_dump },
+	{ 'R', "raw",	"Dumper: Specify object is raw", false, &cli_raw },
+	{ 'S', "show",	"Dumper: Select which part of the object to display (default=h)", true, fa: &cli_show },
 	// pages
-	{ 'h', "help",    "Show this help screen and exit", false, &cli_help },
-	{ 0,   "version", "Show the version screen and exit", false, &cli_version },
-	{ 0,   "ver",     "Show the version string and exit", false, &cli_ver },
-	{ 0,   "license", "Show the license page and exit", false, &cli_license },
+	{ 'h', "help",	"Show this help screen and exit", false, &cli_help },
+	{ 0,   "version",	"Show the version screen and exit", false, &cli_version },
+	{ 0,   "ver",	"Show the version string and exit", false, &cli_ver },
+	{ 0,   "license",	"Show the license page and exit", false, &cli_license },
 	// secrets
-	{ 0,   "meow",    "Meow and exit", false, &cli_meow },
+	{ 0,   "meow",	"Meow and exit", false, &cli_meow },
 ];
 enum NUMBER_OF_SECRETS = 1;
 
@@ -79,7 +81,7 @@ enum NUMBER_OF_SECRETS = 1;
 //
 
 int cli_march(const(char) *val) {
-	if (cli_needhelp(val)) {
+	if (wantsHelp(val)) {
 		puts("Available machine architectures:");
 		foreach (setting_platform_t p; platforms) {
 			with (p)
@@ -89,7 +91,7 @@ int cli_march(const(char) *val) {
 	}
 	foreach (setting_platform_t p; platforms) {
 		if (strcmp(val, p.opt) == 0 || strcmp(val, p.alt) == 0) {
-			globals.platform = p.val;
+			globals.cli.platform = p.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -101,7 +103,7 @@ int cli_march(const(char) *val) {
 //
 
 int cli_syntax(const(char) *val) {
-	if (cli_needhelp(val)) {
+	if (wantsHelp(val)) {
 		puts("Available disassembler syntaxes:");
 		foreach (setting_syntax_t syntax; syntaxes) {
 			with (syntax)
@@ -111,7 +113,7 @@ int cli_syntax(const(char) *val) {
 	}
 	foreach (setting_syntax_t syntax; syntaxes) {
 		if (strcmp(val, syntax.opt) == 0) {
-			adbg_disasm_opt(&globals.disasm, AdbgDisasmOpt.syntax, syntax.val);
+			globals.cli.syntax = syntax.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -123,7 +125,7 @@ int cli_syntax(const(char) *val) {
 //
 
 int cli_file(const(char) *val) {
-	globals.file = val;
+	globals.cli.file = val;
 	return EXIT_SUCCESS;
 }
 
@@ -137,13 +139,13 @@ int cli_argsdd(int argi, int argc, const(char) **argv) { // --
 	enum MAX = 16;
 	__gshared const(char) *[MAX] args;
 	
-	globals.args = cast(const(char)**)args;
+	globals.cli.args = cast(const(char)**)args;
 	
 	int left = argc - argi; /// to move
 	void **s = cast(void**)(argv+argi);
 	
 	int m = adbg_util_move(
-		cast(void**)&globals.args, MAX,
+		cast(void**)&globals.cli.args, MAX,
 		cast(void**)&s, left);
 	
 	debug assert(m == left, "cli_argsdd: 'adbg_util_move' Failed due to small buffer");
@@ -159,7 +161,7 @@ int cli_args(const(char) *val) { // --args
 	if (argc == 0)
 		return EXIT_FAILURE;
 	
-	globals.args = cast(const(char)**)argv;
+	globals.cli.args = cast(const(char)**)argv;
 	return EXIT_SUCCESS;
 }
 
@@ -170,9 +172,9 @@ int cli_args(const(char) *val) { // --args
 int cli_env(const(char) *val) {
 	import adbg.utils.str : adbg_util_env;
 	
-	globals.env = cast(const(char)**)adbg_util_env(val);
+	globals.cli.env = cast(const(char)**)adbg_util_env(val);
 	
-	if (globals.env == null) {
+	if (globals.cli.env == null) {
 		printf("main: Parsing environment failed");
 		return EXIT_FAILURE;
 	}
@@ -185,7 +187,7 @@ int cli_env(const(char) *val) {
 //
 
 int cli_pid(const(char) *val) {
-	globals.pid = cast(ushort)strtol(val, null, 10);
+	globals.cli.pid = cast(ushort)strtol(val, null, 10);
 	return EXIT_SUCCESS;
 }
 
@@ -201,10 +203,10 @@ immutable setting_ui_t[] uis = [
 	{ SettingUI.loop,   "loop",   "Simple loop interface (default)" },
 	{ SettingUI.cmd,    "cmd",    "(wip) Command-line interface" },
 //	{ SettingUI.tui,    "tui",    "(wip) Interractive text user interface" },
-//	{ SettingUI.server, "server", "(n/a) TCP/IP server" },
+//	{ SettingUI.server, "server", "(wip) TCP/IP server" },
 ];
 int cli_ui(const(char)* val) {
-	if (cli_needhelp(val)) {
+	if (wantsHelp(val)) {
 		puts("Available UIs:");
 		foreach (setting_ui_t ui; uis) {
 			printf("%-10s%s\n", ui.opt, ui.desc);
@@ -213,7 +215,7 @@ int cli_ui(const(char)* val) {
 	}
 	foreach (setting_ui_t ui; uis) {
 		if (strcmp(val, ui.opt) == 0) {
-			globals.ui = ui.val;
+			globals.cli.ui = ui.val;
 			return 0;
 		}
 	}
@@ -225,7 +227,25 @@ int cli_ui(const(char)* val) {
 //
 
 int cli_dump() {
-	globals.mode = SettingMode.dump;
+	globals.cli.mode = SettingMode.dump;
+	return EXIT_SUCCESS;
+}
+
+//
+// ANCHOR -X/--hex
+//
+
+int cli_hex(const(char) *arg) {
+	
+	return EXIT_SUCCESS;
+}
+
+//
+// ANCHOR -A/--analyze
+//
+
+int cli_analyze() {
+	globals.cli.mode = SettingMode.analyze;
 	return EXIT_SUCCESS;
 }
 
@@ -234,7 +254,7 @@ int cli_dump() {
 //
 
 int cli_raw() {
-	globals.flags |= DumpOpt.raw;
+	globals.cli.flags |= DumpOpt.raw;
 	return EXIT_SUCCESS;
 }
 
@@ -261,7 +281,7 @@ immutable setting_show_t[] showflags = [
 	{ 'A', "Show everything", DumpOpt.everything },
 ];
 int cli_show(const(char) *val) {
-	if (cli_needhelp(val)) {
+	if (wantsHelp(val)) {
 		puts("Available dumper display options:");
 		foreach (setting_show_t show; showflags) {
 			printf("%c\t%s\n", show.opt, show.desc);
@@ -274,7 +294,7 @@ L_CHAR:
 		return EXIT_SUCCESS;
 	foreach (setting_show_t show; showflags) {
 		if (c == show.opt) {
-			globals.flags |= show.val;
+			globals.cli.flags |= show.val;
 			goto L_CHAR;
 		}
 	}
@@ -422,8 +442,8 @@ int main(int argc, const(char)** argv) {
 		bool isopt  = argLong[0] == '-';
 		
 		if (isopt == false) {
-			if (globals.file == null) {
-				globals.file = argLong;
+			if (globals.cli.file == null) {
+				globals.cli.file = argLong;
 				continue CLI;
 			}
 			
@@ -501,26 +521,33 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
-	switch (globals.mode) {
+	with (globals) {
+		adbg_disasm_configure(&app.disasm, cli.platform);
+		adbg_disasm_opt(&app.disasm, AdbgDisasmOpt.syntax, cli.syntax);
+	}
+	
+	switch (globals.cli.mode) {
+	case SettingMode.analyze:
+		return analyze();
 	case SettingMode.dump:
-		adbg_disasm_configure(&globals.disasm, globals.platform);
-		return dump(globals.file, &globals.disasm, globals.flags);
-	case SettingMode.trace:
+		return dump();
+	/*case SettingMode.trace:
 		puts("main: tracer not supported at this moment");
-		return EXIT_FAILURE;
+		return EXIT_FAILURE;*/
 	case SettingMode.debugger:
 		// Pre-load target if specified.
 		// Necessary for loop UI, but optional for others
-		if (globals.file) {
-			if (adbg_load(globals.file, globals.args)) {
+		with (globals.cli)
+		if (file) {
+			if (adbg_load(file, args)) {
 				printerror;
 				return EXIT_FAILURE;
 			}
 			
-			printf("File '%s' loaded\n", globals.file);
+			printf("File '%s' loaded\n", globals.cli.file);
 		}
 		
-		switch (globals.ui) {
+		switch (globals.cli.ui) {
 		case SettingUI.loop:	return loop();
 		case SettingUI.cmd:	return cmd();
 		case SettingUI.tui:	return tui();

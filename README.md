@@ -12,7 +12,7 @@ Currently, it supports:
 - ELF and PE32 image dumping.
 - Stand-alone application and DUB integration as a library, both betterC-compatible.
 - Fully supports DMD, GDC, and LDC as much as possible.
-- 3 debugger user interfaces.
+- 2 debugger user interfaces.
 
 All written from scratch for me to learn various internal mechanics.
 
