@@ -84,6 +84,7 @@ void dump_title(const(char) *title) {
 
 /// Output a dump chapter.
 /// Params: title = Chapter name
+//TODO: Consider renaming to dump_h1
 void dump_chapter(const(char) *title) {
 	printf("\n# %s\n\n", title);
 }
@@ -210,9 +211,8 @@ L_DISASM_2:
 	with (AdbgError)
 	switch (adbg_disasm(dp, &op)) {
 	case none:
-		//printf("%08X %-30s %s\n", i, op.machine, op.mnemonic);
-		adbg_disasm_machine(dp, machine.ptr, 40);
-		adbg_disasm_mnemonic(dp, mnemonic.ptr, 40);
+		adbg_disasm_machine(dp, machine.ptr, 40, &op);
+		adbg_disasm_mnemonic(dp, mnemonic.ptr, 40, &op);
 		printf("%08x  %-30s  %s\n", i, machine.ptr, mnemonic.ptr);
 		i += op.size;
 		goto L_DISASM_2;

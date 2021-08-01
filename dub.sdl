@@ -62,7 +62,7 @@ buildType "trace" {
 
 # Make the compiler print GC and TLS usage, and target information.
 buildType "debugv" {
-	versions "PrintTargetInfo"
+	versions "DebugV" "PrintTargetInfo"
 	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
 	dflags "-betterC" "--vgc" platform="ldc"
@@ -72,7 +72,7 @@ buildType "debugv" {
 # Ditto but aimed for older compiler version
 # Like older dmd versions, ldc 0.17.1, and gdc 6.0
 buildType "debugv0" {
-	versions "PrintTargetInfo"
+	versions "DebugV0" "PrintTargetInfo"
 	buildOptions "debugMode" "debugInfo"
 	dflags "-vgc" "-vtls" platform="dmd"
 	dflags "--vgc" platform="ldc"
@@ -81,6 +81,7 @@ buildType "debugv0" {
 
 # Make the compiler verbose instead of DUB.
 buildType "debugvv" {
+	versions "DebugVV"
 	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" "-v" platform="dmd"
 	dflags "-betterC" "-v" platform="ldc"
@@ -89,6 +90,7 @@ buildType "debugvv" {
 
 # Compile in debug mode.
 buildType "debug" {
+	versions "Debug"
 	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
@@ -96,6 +98,7 @@ buildType "debug" {
 
 # Compile in release mode.
 buildType "release" {
+	versions "Release"
 	buildOptions "releaseMode" "optimize"
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
@@ -103,6 +106,7 @@ buildType "release" {
 
 # Compile in release mode with no bound checking.
 buildType "release-nobounds" {
+	versions "ReleaseNobounds"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck"
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"

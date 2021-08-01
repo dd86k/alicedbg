@@ -61,9 +61,8 @@ immutable option_t[] options = [
 	{ 'p', "pid",	"Debugger: Attach to process", true, fa: &cli_pid },
 	{ 'U', "ui",	"Debugger: Select debugger user interface (default=cmd)", true, fa: &cli_ui },
 	// dumper
-	{ 'A', "analyze",	"Dumper: Show detailed information about the first instruction", false, null },
-	{ 'X', "hex",	"Dumper: The input is the following hex string", true, null },
 	{ 'D', "dump",	"Dumper: Dump an object file", false, &cli_dump },
+	{ 'A', "analyze",	"Dumper: Show detailed information about hex string opcode", false, &cli_analyze },
 	{ 'R', "raw",	"Dumper: Specify object is raw", false, &cli_raw },
 	{ 'S', "show",	"Dumper: Select which part of the object to display (default=h)", true, fa: &cli_show },
 	// pages
@@ -232,15 +231,6 @@ int cli_dump() {
 }
 
 //
-// ANCHOR -X/--hex
-//
-
-int cli_hex(const(char) *arg) {
-	
-	return EXIT_SUCCESS;
-}
-
-//
 // ANCHOR -A/--analyze
 //
 
@@ -311,7 +301,7 @@ int cli_help() {
 	"alicedbg - Aiming to be a simple debugger\n"~
 	"\n"~
 	"USAGE\n"~
-	" alicedbg {--pid ID|[--file] FILE|--dump FILE} [OPTIONS...]\n"~
+	" alicedbg {--pid ID|[--file] FILE|--dump FILE|--analyze HEX} [OPTIONS...]\n"~
 	" alicedbg {-h|--help|--version|--license}\n"~
 	"\n"~
 	"OPTIONS"
@@ -331,8 +321,8 @@ int cli_help() {
 // ANCHOR --version
 //
 
-debug private enum type = "-debug";
-else  private enum type = "";
+debug private enum TYPE = "-"~__BUILDTYPE__;
+else  private enum TYPE = "";
 
 // Turns a __VERSION__ number into a string constant
 template STRVER(uint ver) {
@@ -345,7 +335,7 @@ template STRVER(uint ver) {
 }
 
 immutable(char) *fmt_version =
-"alicedbg "~ADBG_VERSION~type~" (built: "~__TIMESTAMP__~")\n"~
+"alicedbg "~ADBG_VERSION~TYPE~" (built: "~__TIMESTAMP__~")\n"~
 "Compiler: "~__VENDOR__~" "~STRVER!__VERSION__~"\n"~
 "Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
 "Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
@@ -354,7 +344,6 @@ immutable(char) *fmt_version =
 //TODO: Features:
 
 int cli_version() {
-	import d = std.compiler;
 	puts(fmt_version);
 	exit(0);
 	return 0;
@@ -434,35 +423,18 @@ int cli_meow() {
 
 int main(int argc, const(char)** argv) {
 	CLI: for (int argi = 1; argi < argc; ++argi) {
-		const(char) *argLong = argv[argi];
+		const(char) *arg = argv[argi];
 		
-		if (argLong[0] == 0) continue CLI;
-		
-		char argShort = void;
-		bool isopt  = argLong[0] == '-';
-		
-		if (isopt == false) {
-			if (globals.cli.file == null) {
-				globals.cli.file = argLong;
-				continue CLI;
-			}
+		if (arg[1] == '-') { // Long options
+			const(char) *argLong = arg + 2;
 			
-			printf("main: unknown option '%s'\n", argLong);
-			return EXIT_FAILURE;
-		}
-		
-		bool islong = argLong[1] == '-';
-		const(char) *argval = void;
-		
-		if (islong) {
 			// test for "--" (debuggee args)
-			if (argLong[2] == 0) {
+			if (argLong[0] == 0) {
 				if (cli_argsdd(++argi, argc, argv))
 					return EXIT_FAILURE;
-				break;
+				break CLI;
 			}
 			
-			argLong = argLong + 2;
 			L_LONG: foreach (option_t opt; options) {
 				if (strcmp(argLong, opt.val))
 					continue L_LONG;
@@ -475,20 +447,17 @@ int main(int argc, const(char)** argv) {
 				}
 				
 				// with argument
-				if (argi + 1 >= argc) {
+				if (++argi >= argc) {
 					printf("main: missing argument for --%s\n", opt.val);
 					return EXIT_FAILURE;
 				}
-				argval = argv[++argi];
-				if (opt.fa(argval))
+				if (opt.fa(argv[argi]))
 					return EXIT_FAILURE;
-				
 				continue CLI;
 			}
-			printf("main: unknown option '--%s'\n", argLong);
-		} else { // short opt
+		} else if (arg[0] == '-') { // Short options
 			// test for "-" (stdin)
-			argShort = argLong[1];
+			char argShort = arg[1];
 			if (argShort == 0) { // "-"
 				puts("main: standard input not supported");
 				return EXIT_FAILURE;
@@ -506,18 +475,20 @@ int main(int argc, const(char)** argv) {
 				}
 				
 				// with argument
-				if (argi + 1 >= argc) {
+				if (++argi >= argc) {
 					printf("main: missing argument for -%c\n", opt.alt);
 					return EXIT_FAILURE;
 				}
-				argval = argv[++argi];
-				if (opt.fa(argval))
+				if (opt.fa(argv[argi]))
 					return EXIT_FAILURE;
 				continue CLI;
 			}
-			printf("main: unknown option '-%c'\n", argShort);
+		} else if (globals.cli.file == null) { // Default option value
+			globals.cli.file = arg;
+			continue CLI;
 		}
 		
+		printf("main: unknown option '%s'\n", arg);
 		return EXIT_FAILURE;
 	}
 	
@@ -528,12 +499,35 @@ int main(int argc, const(char)** argv) {
 	
 	switch (globals.cli.mode) {
 	case SettingMode.analyze:
+		if (globals.cli.file == null) {
+			puts("main: hex input required");
+			return EXIT_FAILURE;
+		}
+		const(char) *s = globals.cli.file;
+		bool upper = true;
+		size_t bi;
+		for (size_t si; s[si] && bi < BUFFER_HEX_SIZE; ++si) {
+			char c = s[si];
+			ubyte b = void;
+			if (c >= '0' && c <= '9') {
+				b = cast(ubyte)(c - '0');
+			} else if (c >= 'a' && c <= 'f') {
+				b = cast(ubyte)(c - 'a');
+			} else if (c >= 'A' && c <= 'F') {
+				b = cast(ubyte)(c - 'A');
+			} else continue;
+			if (upper) {
+				b <<= 4;
+				globals.app.inputHex[bi] = b;
+			} else {
+				globals.app.inputHex[bi] |= b;
+				++bi;
+			}
+			upper = !upper;
+		}
+		globals.app.inputHexSize = bi;
 		return analyze();
-	case SettingMode.dump:
-		return dump();
-	/*case SettingMode.trace:
-		puts("main: tracer not supported at this moment");
-		return EXIT_FAILURE;*/
+	case SettingMode.dump: return dump();
 	case SettingMode.debugger:
 		// Pre-load target if specified.
 		// Necessary for loop UI, but optional for others

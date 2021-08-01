@@ -33,8 +33,20 @@ enum ADBG_CHILD_STACK_SIZE	= 1024 * 1024 * 8;
 /// Library version
 enum ADBG_VERSION = "0.0.1";
 
-debug enum __BUILDTYPE__ = "debug";	/// Build type
-else  enum __BUILDTYPE__ = "release";	/// Ditto
+version (Trace)
+	enum __BUILDTYPE__ = "trace";	/// Build type
+else version (DebugV0)
+	enum __BUILDTYPE__ = "debugv0";	/// Ditto
+else version (DebugVV)
+	enum __BUILDTYPE__ = "debugvv";	/// Ditto
+else version (Debug)
+	enum __BUILDTYPE__ = "debug";	/// Ditto
+else version (Release)
+	enum __BUILDTYPE__ = "release";	/// Ditto
+else version (ReleaseNobounds)
+	enum __BUILDTYPE__ = "release-nobounds";	/// Ditto
+else debug enum __BUILDTYPE__ = "debug";	/// Ditto
+else enum __BUILDTYPE__ = "release";	/// Ditto
 
 /// Target information structure
 struct adbg_info_t {

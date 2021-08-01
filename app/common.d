@@ -1,5 +1,5 @@
 /**
- * Common global variables and definitions so they can be used throughout the
+ * Common global variables and functions so they can be used throughout the
  * entirety of the program.
  *
  * Authors: dd86k <dd@dax.moe>
@@ -11,14 +11,16 @@ module common;
 import adbg.dbg.exception;
 import adbg.disasm;
 import adbg.error;
-import core.stdc.string : memcpy;
+import core.stdc.stdio : FILE;
 
 public:
 extern (C):
 __gshared:
 
 /// Disassembler string buffer size
-enum DISASM_STRING_BUFFER_SIZE = 40;
+enum BUFFER_DISASM_SIZE = 40;
+/// 
+enum BUFFER_HEX_SIZE = 32;
 
 /// Application error
 enum AppError {
@@ -68,7 +70,6 @@ enum SettingUI { cmd, loop, tui, tcpserver }
 /// Settings structure for the application (only!)
 struct settings_t {
 	public struct cli_settings_t {
-		// CLI
 		SettingMode mode;	/// Application mode
 		SettingUI ui;	/// Debugger user interface
 		const(char) *file;	/// Debuggee: file
@@ -80,14 +81,16 @@ struct settings_t {
 		AdbgSyntax syntax;	/// 
 		AdbgPlatform platform;	/// 
 	}
-	cli_settings_t cli;
-	// App
 	public struct app_settings_t {
 		adbg_disasm_t disasm;	/// Disassembler
 		exception_t last_exception;	/// Last exception
-		char[DISASM_STRING_BUFFER_SIZE] bufferMnemonic;	/// For disassembly
-		char[DISASM_STRING_BUFFER_SIZE] bufferMachine;	/// For disassembly
+		FILE *inputFile;	/// 
+		ubyte[BUFFER_HEX_SIZE] inputHex;	/// 
+		size_t inputHexSize;	/// 
+		char[BUFFER_DISASM_SIZE] bufferMnemonic;	/// For disassembly
+		char[BUFFER_DISASM_SIZE] bufferMachine;	/// For disassembly
 	}
+	cli_settings_t cli;
 	app_settings_t app;
 }
 
@@ -105,8 +108,7 @@ int printerror(const(char)* func = cast(char*)__FUNCTION__)() {
 	
 	debug printf("[%s:%d] ", error.file, error.line);
 	printf("%s: E-%u ", func, adbg_errno);
-	with (AdbgError)
-	switch (error.code) {
+	switch (error.code) with (AdbgError) {
 	case clib: printf("(%d) ", adbg_errno_extern); break;
 	case os: printf("("~SYS_ERR_FMT~") ", adbg_errno_extern); break;
 	default:

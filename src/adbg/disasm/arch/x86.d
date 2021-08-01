@@ -83,7 +83,6 @@ struct x86_internals_t { align(1):
 	union {
 		ulong[4] z;	/// 
 		struct {
-			ushort counter;	/// Instruction decoding counter limit
 			prefixes_t prefix;	/// Prefix data
 			vex_data_t vexraw;	/// VEX raw data
 			vex_t vex;	/// VEX/REX computed fields
@@ -133,7 +132,7 @@ L_PREFIX:
 	
 	//TODO: Consider moving this to the normal decoding process
 	//      Should be part of the normal decoding process since there are
-	//      a lot of these
+	//      a lot of these prefixes
 	//      e.g., 0f ... already has to go through 12 cases
 	switch (opcode) {
 	case 0x26:
@@ -167,14 +166,12 @@ L_PREFIX:
 			adbg_disasm_add_segment(p, segs[x86Segment.gs]);
 		goto L_PREFIX;
 	case 0x66: // Data, in 64-bit+AVX, controlled by REX.W (48H)
-		x86.prefix.addr =
-			x86.prefix.addr == AdbgDisasmType.i16 ?
+		x86.prefix.data = x86.prefix.data == AdbgDisasmType.i16 ?
 			AdbgDisasmType.i32 : AdbgDisasmType.i16;
 		x86.prefix.lastpf = x86Prefix.data;
 		goto L_PREFIX;
 	case 0x67: // Address, in 64-bit+AVX, controlled by REX.XB (42H,41H)
-		x86.prefix.addr =
-			x86.prefix.addr == AdbgDisasmType.i16 ?
+		x86.prefix.addr = x86.prefix.addr == AdbgDisasmType.i16 ?
 			AdbgDisasmType.i32 : AdbgDisasmType.i16;
 		goto L_PREFIX;
 	case 0xd6: // hehe
@@ -562,16 +559,20 @@ int adbg_disasm_x86_modrm_legacy_automatic(adbg_disasm_t *p, ubyte opcode) {
 	int e = adbg_disasm_fetch!ubyte(p, &modrm);
 	if (e) return e;
 	
-	bool dir = (opcode & 2) != 0; /// mem-reg direction
+	bool dir = (opcode & 2) != 0; /// register-memory direction
 	
 	if (p.x86.vex.W)
 		p.x86.prefix.data = AdbgDisasmType.i64;
 	else switch (p.platform) with (AdbgPlatform) {
 	case x86_16:
-		p.x86.prefix.data = opcode & 1 ? AdbgDisasmType.i16 : AdbgDisasmType.i8;
+		with (AdbgDisasmType)
+		if (p.x86.prefix.data != i32) // 66H used
+			p.x86.prefix.data = opcode & 1 ? i16 : i8;
 		break;
 	default:
-		p.x86.prefix.data = opcode & 1 ? AdbgDisasmType.i32 : AdbgDisasmType.i8;
+		with (AdbgDisasmType)
+		if (p.x86.prefix.data != i16) // 66H used
+			p.x86.prefix.data = opcode & 1 ? i32 : i8;
 		break;
 	}
 	
@@ -582,6 +583,8 @@ int adbg_disasm_x86_modrm_legacy(adbg_disasm_t *p, ubyte modrm, bool dir) {
 	ubyte mode = (modrm >> 6) & 3;
 	ubyte reg = (modrm >> 3) & 7;
 	ubyte rm = modrm & 7;
+	
+	//TODO: REX/VEX
 	
 	const(char) *register = void;
 	const(char) *basereg;
@@ -612,14 +615,11 @@ int adbg_disasm_x86_modrm_legacy_rm(adbg_disasm_t *p,
 		return adbg_disasm_x86_sib_legacy(p, basereg, indexreg, scale, disp, mode);
 	
 	//TODO: VEX.B
-	switch (p.platform) with (AdbgPlatform) {
-	case x86_16:
+	if (p.x86.prefix.addr == AdbgDisasmType.i16) {
 		*basereg  = regs_addr16[rm][0];
 		*indexreg = regs_addr16[rm][1];
-		break;
-	default:
+	} else {
 		*basereg  = regs[p.x86.prefix.addr][rm];
-		break;
 	}
 	
 	switch (mode) {
