@@ -27,7 +27,8 @@ private import adbg.disasm.syntax.intel,
 //TODO: Invalid results could be rendered differently
 //      e.g., .byte 0xd6,0xd6 instead of (bad)
 //      1. Check last error code from specifc disasm structure
-//TODO: adbg_disasm_t: bool swap; (set on configuration target endian != isa)
+//TODO: enum AdbgDisasmEndian : ubyte { native, little, big }
+//      adbg_disasm_t: AdbgDisasmEndian endian; (set on config, checked on fetch)
 //TODO: Flow-oriented analysis to mitigate anti-dissassembly techniques
 //      Obviously with a setting (what should be the default?)
 //      Save jmp/call targets
@@ -36,22 +37,25 @@ private import adbg.disasm.syntax.intel,
 //TODO: Move float80 register handling here
 //      This will permit adding Syntax paramter to mnemonic renderer
 //TODO: Consider doing subcodes (extended codes) to specify why instruction is illegal
-//      adbg_disasm_oops(adbg_disasm_t*,AdbgError,AdbgDisasmError);
-//      Or extend current system
-//        adbg_oops(AdbgError,AdbgExtendedError);
+//      - adbg_disasm_oops(adbg_disasm_t*,AdbgError,AdbgDisasmError);
+//      Or extend current system:
+//      - adbg_oops(AdbgError,AdbgExtendedError);
+//TODO: When HLA gets added, add option for alternative SIB syntax
+//      [ebx+2]       -> [ebx][2]
+//      [ebx+ecx*4+8] -> [ebx][ecx][8]
+//      label[ebp-2]  -> label[ebp][-2]
 
 extern (C):
 
-/// Buffer size for prefixes.
-private enum ADBG_MAX_PREFIXES = 8;
-/// Buffer size for operands.
-private enum ADBG_MAX_OPERANDS = 4;
-/// Buffer size for machine groups.
-// x86 max: 15 bytes
-private enum ADBG_MAX_MACHINE  = 16;
-
-/// Don't tell anyone.
-private enum ADBG_COOKIE = 0xc0fec0fe;
+private enum {
+	ADBG_MAX_PREFIXES = 8,	/// Buffer size for prefixes.
+	ADBG_MAX_OPERANDS = 4,	/// Buffer size for operands.
+	ADBG_MAX_MACHINE  = 16,	/// Buffer size for machine groups.
+	ADBG_COOKIE	= 0xcc00ffee,	/// Don't tell anyone.
+	ADBG_X86_MAX	= 15,	/// Maximum instruction size for x86.
+	ADBG_RV32_MAX	= 4,	/// Maximum instruction size for RV32I.
+	ADBG_RV64_MAX	= 8,	/// Maximum instruction size for RV64I.
+}
 
 /// Disassembler ABI
 enum AdbgPlatform : ubyte {
@@ -91,7 +95,7 @@ enum AdbgDisasmMode : ubyte {
 
 /// Assembler syntax
 enum AdbgSyntax : ubyte {
-	/// Platform compiled default for target.
+	/// Native compiled target default. (Default)
 	platform,
 	/// Intel syntax
 	/// Year: 1978
@@ -151,7 +155,7 @@ enum AdbgSyntax : ubyte {
 	///
 	/// Example:
 	/// ---
-	/// mov ([type dword ss:eax+ecx*2-0x20], ecx)
+	/// sseg: mov( [type dword eax+ecx*2-0x20], ecx )
 	/// ---
 //	hyde,
 	///TODO: ARM native syntax.
@@ -174,27 +178,14 @@ enum AdbgSyntax : ubyte {
 //	riscv,
 }
 
-/// Disassembler warnings
-//TODO: Only define warnings that are useful
-enum AdbgDisasmWarning {
-	/// Far jump, call, or return.
-	farAddr	= BIT!(0),
-	/// Loads a segment register.
-	segment	= BIT!(1),
-	/// Privileged instruction.
-	privileged	= BIT!(2),
-	/// I/O instruction.
-	io	= BIT!(3),
-}
-
 /// Disassembler input
 // NOTE: Uh, and why/how I'll do File/MmFile implementations?
 //       There is no point to these two... Unless proven otherwise.
 enum AdbgDisasmInput : ubyte {
 	raw,	/// Buffer
 	debugger,	/// Debuggee
-	file,	///TODO: File
-	mmfile,	///TODO: MmFile
+//	file,	///TODO: File
+//	mmfile,	///TODO: MmFile
 }
 
 enum AdbgDisasmNumberType : ubyte {
@@ -211,40 +202,40 @@ enum AdbgDisasmHexStyle : ubyte {
 }
 
 version (X86) {
-	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgPlatform.x86_32;
-	/// Platform default syntax
-	private enum DEFAULT_SYNTAX = AdbgSyntax.intel;
+	private enum {
+		DEFAULT_PLATFORM = AdbgPlatform.x86_32,	/// Platform default platform
+		DEFAULT_SYNTAX = AdbgSyntax.intel,	/// Platform default syntax
+	}
 } else version (X86_64) {
-	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgPlatform.x86_64;
-	/// Platform default syntax
-	private enum DEFAULT_SYNTAX = AdbgSyntax.intel;
+	private enum {
+		DEFAULT_PLATFORM = AdbgPlatform.x86_64,	/// Ditto
+		DEFAULT_SYNTAX = AdbgSyntax.intel,	/// Ditto
+	}
 } else version (Thumb) {
-	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgPlatform.arm_t32;
-	/// Platform default syntax
-	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: ARM syntax
+	private enum {
+		DEFAULT_PLATFORM = AdbgPlatform.arm_t32,	/// Ditto
+		DEFAULT_SYNTAX = AdbgSyntax.att,	/// Ditto
+	}
 } else version (ARM) {
-	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgPlatform.arm_a32;
-	/// Platform default syntax
-	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: ARM syntax
+	private enum {
+		DEFAULT_PLATFORM = AdbgPlatform.arm_a32,	/// Ditto
+		DEFAULT_SYNTAX = AdbgSyntax.att,	/// Ditto
+	}
 } else version (AArch64) {
-	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgPlatform.arm_a64;
-	/// Platform default syntax
-	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: ARM syntax
+	private enum {
+		DEFAULT_PLATFORM = AdbgPlatform.arm_a64,	/// Ditto
+		DEFAULT_SYNTAX = AdbgSyntax.att,	/// Ditto
+	}
 } else version (RISCV32) {
-	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgPlatform.rv32;
-	/// Platform default syntax
-	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: RISC-V syntax
+	private enum {
+		DEFAULT_PLATFORM = AdbgPlatform.riscv32,	/// Ditto
+		DEFAULT_SYNTAX = AdbgSyntax.att,	/// Ditto
+	}
 } else version (RISCV64) {
-	/// Platform default platform
-	private enum DEFAULT_PLATFORM = AdbgPlatform.rv64;
-	/// Platform default syntax
-	private enum DEFAULT_SYNTAX = AdbgSyntax.att;	//TODO: RISC-V syntax
+	private enum {
+		DEFAULT_PLATFORM = AdbgPlatform.riscv64,	/// Ditto
+		DEFAULT_SYNTAX = AdbgSyntax.att,	/// Ditto
+	}
 } else {
 	static assert(0, "Set default disassembler variables");
 }
@@ -267,15 +258,18 @@ struct adbg_disasm_number_t {
 
 /// The basis of an operation code
 struct adbg_disasm_opcode_t {
+	// size mode:
 	int size;	/// Opcode size
-	const(char) *mnemonic;	/// 
+	// data mode:
+//	bool hasTarget;	/// 
+//	adbg_address_t target;	/// CALL/JMP target
+	// file mode:
 	const(char) *segment;	/// 
+	const(char) *mnemonic;	/// 
 	size_t operandCount;	/// 
 	adbg_disasm_operand_t[ADBG_MAX_OPERANDS] operands;	/// 
 	size_t prefixCount;	/// 
 	const(char)*[ADBG_MAX_PREFIXES] prefixes;	/// 
-//	bool hasTarget;	/// 
-//	adbg_address_t target;	/// CALL/JMP target
 	size_t machineCount;	/// 
 	adbg_disasm_number_t[ADBG_MAX_MACHINE] machine;	/// 
 }
@@ -294,6 +288,7 @@ struct adbg_disasm_t { align(1):
 	/// Decoder function
 	int function(adbg_disasm_t*) fdecode;
 	/// Syntax operand handler function
+	//TODO: Move in _mnemonic one specific syntax float80 situation is fixed
 	bool function(adbg_disasm_t*, ref adbg_string_t, ref adbg_disasm_operand_t) foperand;
 	union {
 		void *internal;	/// Pointer for internal decoders
@@ -369,15 +364,15 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 		m = DEFAULT_PLATFORM;
 		goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
-		p.max = 15;
+		p.max = ADBG_X86_MAX;
 		p.fdecode = &adbg_disasm_x86;
 		break;
 	case riscv32:
-		p.max = 4;
+		p.max = ADBG_RV32_MAX;
 		p.fdecode = &adbg_disasm_riscv;
 		break;
 	/*case riscv64:
-		p.max = 8;
+		p.max = ADBG_RV64_MAX;
 		p.fdecode = &adbg_disasm_riscv;
 		break;*/
 	default:
@@ -493,7 +488,7 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	}
 	
 	// Mnemonic
-	version (Trace) trace("mnemonic=%u", op.mnemonic);
+	version (Trace) trace("mnemonic=%s", op.mnemonic);
 	if (s.adds(op.mnemonic))
 		return;
 	
@@ -567,6 +562,7 @@ public  alias adbg_disasm_delete = free;
 // SECTION Decoder stuff
 //
 
+package enum ADBG_TYPE_NONE = cast(AdbgDisasmType)0;
 /// Memory type
 package
 enum AdbgDisasmType : ubyte {
@@ -601,6 +597,7 @@ struct adbg_disasm_operand_mem_t {
 	const(char) *base;	/// Used for normal usage, otherwise SIB:BASE
 	const(char) *index;	/// SIB:INDEX
 	ubyte scale;	/// SIB:SCALE
+	bool hasOffset;	/// 
 	adbg_disasm_number_t offset;	/// Displacement
 	bool scaled;	/// SIB or any scaling mode
 	//TODO: Call/jmp type (bool: normal/near, far)
@@ -849,11 +846,13 @@ void adbg_disasm_add_register(adbg_disasm_t *p, const(char) *register) {
 
 package
 void adbg_disasm_add_memory(adbg_disasm_t *p,
+	AdbgDisasmType width,
 	const(char) *regbase,
 	const(char) *regindex,
-	adbg_disasm_number_t *disp,
+	AdbgDisasmType dispWidth,
+	void *disp,
 	//TODO: ushort segment
-	AdbgDisasmType width,
+	//TODO: bool far
 	ubyte scale,
 	bool scaled) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
@@ -861,12 +860,34 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 	
 	version (Trace) trace("base=%s", regbase);
 	
-	p.memWidth	= width;
+	p.memWidth      = width;
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
 	item.type       = AdbgDisasmOperand.memory;
 	item.mem.base	= regbase;
 	item.mem.index	= regindex;
-	item.mem.offset	= *disp;
 	item.mem.scale	= scale;
 	item.mem.scaled	= scaled;
+	item.mem.hasOffset = disp != null;
+	
+	if (disp) {
+		item.mem.offset.type	= dispWidth;
+		switch (dispWidth) with (AdbgDisasmType) {
+		case i8:  item.mem.offset.u8  = *cast(ubyte*)disp;  return;
+		case i16: item.mem.offset.u16 = *cast(ushort*)disp; return;
+		case i32: item.mem.offset.u32 = *cast(uint*)disp;   return;
+		case i64: item.mem.offset.u64 = *cast(ulong*)disp;  return;
+		default: assert(0);
+		}
+	}
+}
+
+package
+void adbg_disasm_add_memory_raw(adbg_disasm_t *p, AdbgDisasmType width, adbg_disasm_operand_mem_t *m) {
+	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
+		return;
+	
+	p.memWidth = width;
+	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
+	item.type  = AdbgDisasmOperand.memory;
+	item.mem   = *m;
 }

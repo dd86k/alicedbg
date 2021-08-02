@@ -32,7 +32,7 @@ bool adbg_disasm_operand_att(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_dis
 				return true;
 		}
 		
-		if (op.mem.offset.i32)
+		if (op.mem.hasOffset)
 			if (adbg_disasm_render_number(p, s, op.mem.offset, true))
 				return true;
 		
