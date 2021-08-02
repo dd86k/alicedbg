@@ -2,6 +2,8 @@ module tests.disasm_x86;
 
 import tests.disasm;
 
+//TODO: Test maximum opcode length
+
 immutable InstructionTest[] meta_x86_32 = [
 	{	// int3
 		[ 0xcc ],

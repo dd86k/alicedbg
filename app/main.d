@@ -504,27 +504,31 @@ int main(int argc, const(char)** argv) {
 			return EXIT_FAILURE;
 		}
 		const(char) *s = globals.cli.file;
+		//TODO: Move this in some app.util module
 		bool upper = true;
-		size_t bi;
-		for (size_t si; s[si] && bi < BUFFER_HEX_SIZE; ++si) {
+		ubyte b = void, bh = void;
+		size_t bi, si;
+		for (; bi < BUFFER_HEX_SIZE; ++si) {
 			char c = s[si];
-			ubyte b = void;
+			if (c == 0) break;
+			
 			if (c >= '0' && c <= '9') {
 				b = cast(ubyte)(c - '0');
 			} else if (c >= 'a' && c <= 'f') {
-				b = cast(ubyte)(c - 'a');
+				b = cast(ubyte)(c - 87);
 			} else if (c >= 'A' && c <= 'F') {
-				b = cast(ubyte)(c - 'A');
+				b = cast(ubyte)(c - 55);
 			} else continue;
+			
 			if (upper) {
-				b <<= 4;
-				globals.app.inputHex[bi] = b;
+				bh = cast(ubyte)(b << 4);
 			} else {
-				globals.app.inputHex[bi] |= b;
-				++bi;
+				b |= bh;
+				globals.app.inputHex[bi++] = b;
 			}
 			upper = !upper;
 		}
+		
 		globals.app.inputHexSize = bi;
 		return analyze();
 	case SettingMode.dump: return dump();

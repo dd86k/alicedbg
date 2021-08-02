@@ -26,6 +26,7 @@ private import adbg.disasm.syntax.intel,
 
 //TODO: Invalid results could be rendered differently
 //      e.g., .byte 0xd6,0xd6 instead of (bad)
+//      1. Check last error code from specifc disasm structure
 //TODO: adbg_disasm_t: bool swap; (set on configuration target endian != isa)
 //TODO: Flow-oriented analysis to mitigate anti-dissassembly techniques
 //      Obviously with a setting (what should be the default?)
@@ -34,11 +35,15 @@ private import adbg.disasm.syntax.intel,
 //      With a visibility system
 //TODO: Move float80 register handling here
 //      This will permit adding Syntax paramter to mnemonic renderer
+//TODO: Consider doing subcodes (extended codes) to specify why instruction is illegal
+//      adbg_disasm_oops(adbg_disasm_t*,AdbgError,AdbgDisasmError);
+//      Or extend current system
+//        adbg_oops(AdbgError,AdbgExtendedError);
 
 extern (C):
 
 /// Buffer size for prefixes.
-private enum ADBG_MAX_PREFIXES = 4;
+private enum ADBG_MAX_PREFIXES = 8;
 /// Buffer size for operands.
 private enum ADBG_MAX_OPERANDS = 4;
 /// Buffer size for machine groups.
@@ -252,12 +257,12 @@ struct adbg_disasm_number_t {
 		ubyte  u8;  byte  i8;
 		double f64; float f32;
 	}
-	AdbgDisasmType width;
-	AdbgDisasmNumberType type;
+	AdbgDisasmType type;
+	/*AdbgDisasmNumberStyle ;
 	union {
 		bool signed;
 		AdbgDisasmHexStyle hexStyle;
-	}
+	}*/
 }
 
 /// The basis of an operation code
@@ -318,7 +323,7 @@ struct adbg_disasm_t { align(1):
 	/// If disassembling a debuggee, this field is not taken into account.
 	size_t left;
 	/// Maximum opcode length. (Architectural limit, inclusive)
-	/// x86: 16 bytes = illegal
+	/// x86: >=16 bytes is illegal
 	int max;
 	/// Input mode.
 	AdbgDisasmInput input;
@@ -329,6 +334,8 @@ struct adbg_disasm_t { align(1):
 	/// Current syntax option.
 	AdbgSyntax syntax;
 	/// Memory operation width
+	//TODO: Move this to opcode structure, rename as opWidth
+	//      Affected by memory and immediates
 	AdbgDisasmType memWidth;
 }
 
@@ -503,11 +510,9 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	//      + Syntax-related configuration here instead (direction, etc.).
 	//      - Every call would have the syntax option.
 	
-	size_t opCount = op.operandCount - 1;
 	switch (p.syntax) with (AdbgSyntax) {
 	case att:
-		// condition is not i >= 0 because i sure love overflows
-		for (size_t i = opCount; i < opCount; --i) {
+		for (size_t i = op.operandCount; i-- > 0;) {
 			version (Trace) trace("i=%u", cast(uint)i);
 			if (p.foperand(p, s, op.operands[i]))
 				return;
@@ -517,6 +522,7 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 		}
 		return;
 	default:
+		size_t opCount = op.operandCount - 1;
 		for (size_t i; i <= opCount; ++i) {
 			version (Trace) trace("i=%u", cast(uint)i);
 			if (p.foperand(p, s, op.operands[i]))
@@ -542,7 +548,7 @@ void adbg_disasm_machine(adbg_disasm_t *p, char *buffer, size_t size, adbg_disas
 	
 	size_t edge = op.machineCount - 1;
 	for (size_t i; i < op.machineCount; ++i, ++num) {
-		switch (num.width) with (AdbgDisasmType) {
+		switch (num.type) with (AdbgDisasmType) {
 		case i8:       s.addx8(num.i8, true); break;
 		case i16:      s.addx16(num.i16, true); break;
 		case i32, f32: s.addx32(num.i32, true); break;
@@ -569,7 +575,7 @@ enum AdbgDisasmType : ubyte {
 }
 
 /// Main operand types.
-package
+//package
 enum AdbgDisasmOperand : ubyte {
 	immediate,	/// 
 	register,	/// 
@@ -688,16 +694,16 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, bool add = true) {
 		adbg_disasm_number_t *n = &p.opcode.machine[p.opcode.machineCount++];
 		static if (is(T == ubyte)) {
 			n.i8 = *u;
-			n.width = AdbgDisasmType.i8;
+			n.type = AdbgDisasmType.i8;
 		} else static if (is(T == ushort)) {
 			n.i16 = *u;
-			n.width = AdbgDisasmType.i16;
+			n.type = AdbgDisasmType.i16;
 		} else static if (is(T == uint)) {
 			n.i32 = *u;
-			n.width = AdbgDisasmType.i32;
+			n.type = AdbgDisasmType.i32;
 		} else static if (is(T == ulong)) {
 			n.i64 = *u;
-			n.width = AdbgDisasmType.i64;
+			n.type = AdbgDisasmType.i64;
 		} else static assert(0, "fetch support type");
 	}
 	return e;
@@ -714,7 +720,7 @@ bool adbg_disasm_render_number(adbg_disasm_t *p,
 	ref adbg_string_t s, ref adbg_disasm_number_t n, bool offset) {
 	__gshared const(char) *prefix = "0x";
 	
-	switch (n.width) with (AdbgDisasmType) {
+	switch (n.type) with (AdbgDisasmType) {
 	case i8:
 		if (offset) {
 			if (s.addc(n.i8 < 0 ? '-' : '+'))
@@ -814,7 +820,7 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmType w, void *v) {
 	
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
 	item.type = AdbgDisasmOperand.immediate;
-	item.imm.value.width = w;
+	item.imm.value.type = w;
 	
 	switch (w) with (AdbgDisasmType) {
 	case i8:  item.imm.value.u8  = *cast(ubyte*)v;  return;

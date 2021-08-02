@@ -5,6 +5,9 @@ public import adbg.disasm;
 import core.stdc.string : strcmp;
 import adbg.error;
 
+//TODO: Expected error code
+//TODO: Expected operand count
+//TODO: Expected operands (adbg_disasm_operand_t)
 struct InstructionTest {
 	ubyte[] data;
 	const(char) *expectedMnemonic;
