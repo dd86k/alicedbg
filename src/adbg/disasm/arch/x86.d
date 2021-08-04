@@ -704,6 +704,8 @@ int adbg_disasm_x86_modrm_legacy_rm(adbg_disasm_t *p, adbg_disasm_operand_mem_t 
 	if (p.platform != AdbgPlatform.x86_16 && rm == 0b100 && mode < 3)
 		return adbg_disasm_x86_sib_legacy(p, mem, mode);
 	
+	mem.scaled = false;
+	
 	//TODO: VEX.B
 	if (p.x86.prefix.addr == AdbgDisasmType.i16) {
 		mem.base  = regs_addr16[rm][0];
