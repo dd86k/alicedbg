@@ -8,24 +8,18 @@
 module main;
 
 import core.stdc.stdlib : malloc, strtol, exit, EXIT_SUCCESS, EXIT_FAILURE;
-import core.stdc.string : strcmp, strncpy, strtok;
+import core.stdc.string : strcmp;
 import core.stdc.stdio;
 import adbg.platform;
 import adbg.dbg : adbg_attach, adbg_load;
 import adbg.disasm;
-import adbg.sys.err : adbg_sys_perror;
 import common, ui, dumper, analyzer;
 
 private:
 extern (C):
 __gshared:
 
-//TODO: --loop-log for turning the loop UI into an non-interactive session
-//TODO: --seh/--no-seh: Enable/disable internal SEH
-
-//
-// CLI utils
-//
+//NOTE: The CLI module is meh, waiting on some betterC getopt
 
 // if asking for help, so '?' and "help" are accepted
 bool wantsHelp(const(char) *query) {
@@ -35,11 +29,6 @@ bool wantsHelp(const(char) *query) {
 	}
 }
 
-//TODO: Consider adding 'bool processed' field
-//      Avoids repeating options, may speed-up parsing
-//      * Could be an issue for repeatable options (unless another field added..)
-//TODO: Consider adding 'bool bundled' field
-//      Would allow alt options to be bundled: -DR
 struct option_t {
 	align(4) char alt;
 	immutable(char) *val;
@@ -50,6 +39,8 @@ struct option_t {
 		extern(C) int function(const(char)*) fa;
 	}
 }
+//TODO: --loop-log for turning the loop UI into an non-interactive session
+//TODO: --seh/--no-seh: Enable/disable internal SEH
 immutable option_t[] options = [
 	// general
 	{ 'm', "march",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
@@ -288,7 +279,6 @@ L_CHAR:
 			goto L_CHAR;
 		}
 	}
-	printf("main: unknown display flag '%c'\n", c);
 	return EXIT_FAILURE;
 }
 
@@ -422,8 +412,11 @@ int cli_meow() {
 //TODO: Support --option=value syntax
 
 int main(int argc, const(char)** argv) {
+	const(char) *arg = void;
+	const(char) *val = void;
+	
 	CLI: for (int argi = 1; argi < argc; ++argi) {
-		const(char) *arg = argv[argi];
+		arg = argv[argi];
 		
 		if (arg[1] == '-') { // Long options
 			const(char) *argLong = arg + 2;
@@ -451,8 +444,11 @@ int main(int argc, const(char)** argv) {
 					printf("main: missing argument for --%s\n", opt.val);
 					return EXIT_FAILURE;
 				}
-				if (opt.fa(argv[argi]))
+				val = argv[argi];
+				if (opt.fa(val)) {
+					printf("main: '%s' is an invalid value for --%s", val, argLong);
 					return EXIT_FAILURE;
+				}
 				continue CLI;
 			}
 		} else if (arg[0] == '-') { // Short options
@@ -476,11 +472,14 @@ int main(int argc, const(char)** argv) {
 				
 				// with argument
 				if (++argi >= argc) {
-					printf("main: missing argument for -%c\n", opt.alt);
+					printf("main: missing argument for -%c\n", argShort);
 					return EXIT_FAILURE;
 				}
-				if (opt.fa(argv[argi]))
+				val = argv[argi];
+				if (opt.fa(val)) {
+					printf("main: '%s' is an invalid value for -%c", val, argShort);
 					return EXIT_FAILURE;
+				}
 				continue CLI;
 			}
 		} else if (globals.cli.file == null) { // Default option value

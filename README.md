@@ -3,17 +3,21 @@
 ⚠️ **Early development!** ⚠️
 
 The alicedbg project aims to be a simple debugger, object dumper, and system
-tracer. Either as a stand-alone program or as a library.
+tracer fully compatible with -betterC/-fno-druntime.
 
-Currently, it supports:
+It is available as an application and as a DUB library.
+
+The library supports:
 - Windows (msvcrt) and Linux (Glibc and Musl) debugging.
 - x86-16, x86-32, and x86-64 disassembly.
-- The Intel, Nasm, and AT&T syntaxes.
-- ELF and PE32 image dumping.
-- Stand-alone application and DUB integration as a library, both betterC-compatible.
-- Fully supports DMD, GDC, and LDC as much as possible.
-- 2 debugger user interfaces.
+- The Intel, Nasm, and AT&T, HLA, and TASM syntaxes.
+- DMD, GDC, and LDC compilers.
 
+The application supports:
+- ELF and PE32 image dumping.
+- looping and command-line debugger user interfaces.
+
+⚠️: Currently not accepting Pull Requests.
 All written from scratch for me to learn various internal mechanics.
 
 # Documentation
