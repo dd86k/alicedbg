@@ -26,6 +26,7 @@ enum AdbgError {
 	nullArgument	= 2,
 	allocationFailed	= 3,
 	uninitiated	= 4,
+	notImplemented	= 5,
 	//
 	// External
 	//
@@ -80,6 +81,7 @@ private immutable error_msg_t[] errors = [
 	{ AdbgError.nullArgument, "Parameter is null." },
 	{ AdbgError.allocationFailed, "Memory allocation failed, maybe the machine is out of memory." },
 	{ AdbgError.uninitiated, "Object or structure is uninitiated." },
+	{ AdbgError.notImplemented, "Feature is not yet implemented." },
 	//
 	// Debugger
 	//
@@ -114,15 +116,16 @@ private immutable error_msg_t[] errors = [
 // ANCHOR Error setters
 //
 
-/// Internally used to set errors with "self" as source.
+/// Sets the last error code. The module path and line are automatically
+/// populated.
 /// Params:
-/// 	s = (Template) Automatically set to __FILE__
-/// 	l = (Template) Automatically set to __LINE__
 /// 	e = Error code
+/// 	m = Automatically set to `__MODULE__`
+/// 	l = Automatically set to `__LINE__`
 /// Returns: Error code
-int adbg_oops(AdbgError e, char* s = cast(char*)__FILE__, int l = __LINE__) {
+int adbg_oops(AdbgError e, string m = __MODULE__, int l = __LINE__) {
+	error.file = m.ptr;
 	error.line = l;
-	error.file = s;
 	return error.code = e;
 }
 
