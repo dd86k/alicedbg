@@ -32,21 +32,23 @@ int analyze() {
 		adbg_disasm_mnemonic(&disasm, bufferMnemonic.ptr, BUFFER_DISASM_SIZE, &opcode);
 		puts(bufferMnemonic.ptr);
 		
-		printf("prefixes   :");
-		for (size_t pi; pi < opcode.prefixCount; ++pi) {
-			printf(" %s", opcode.prefixes[pi]);
-		}
-		printf("\nmnemonic   : %s\noperands   :\n", opcode.mnemonic);
-		for (size_t ai; ai < opcode.operandCount; ++ai) {
-			adbg_disasm_operand_t *operand = &opcode.operands[ai];
-			const(char) *extra = void;
-			switch (operand.type) with (AdbgDisasmOperand) {
-			case register:  extra = operand.reg.name; break;
-			case immediate: extra = widths[operand.imm.value.type]; break;
-			case memory:    extra = widths[disasm.memWidth]; break;
-			default:        extra = "?";
+		with (opcode) {
+			printf("prefixes   :");
+			for (size_t pi; pi < prefixCount; ++pi) {
+				printf(" %s", prefixes[pi]);
 			}
-			printf("\t%u. %s: %s\n", cast(uint)ai, operandType[operand.type], extra);
+			printf("\nsegment    : %s\nmnemonic   : %s\noperands   :\n", segment, mnemonic);
+			for (size_t ai; ai < operandCount; ++ai) {
+				adbg_disasm_operand_t *operand = &operands[ai];
+				const(char) *extra = void;
+				switch (operand.type) with (AdbgDisasmOperand) {
+				case register:  extra = operand.reg.name; break;
+				case immediate: extra = widths[operand.imm.value.type]; break;
+				case memory:    extra = widths[disasm.memWidth]; break;
+				default:        extra = "?";
+				}
+				printf("\t%u. %s: %s\n", cast(uint)ai, operandType[operand.type], extra);
+			}
 		}
 	}
 	
