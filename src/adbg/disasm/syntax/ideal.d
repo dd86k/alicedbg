@@ -1,32 +1,34 @@
 /**
- * Implements the Netwide Assembler syntax.
+ * Implements the Borland Ideal Turbo Assembler Enhanced syntax.
  *
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
-module adbg.disasm.syntax.nasm;
+module adbg.disasm.syntax.ideal;
 
 import adbg.disasm, adbg.utils.str;
 
 extern (C):
 
-private immutable const(char)*[] NASM_WIDTH = [
-	"byte",  "word",  "dword", "qword",
-	"oword", "yword", "zword", UNKNOWN_TYPE,
+private immutable const(char)*[] TASM_WIDTH = [
+	"byte",    "word",    "dword",   "qword",
+	"xmmword", "ymmword", "zmmword", UNKNOWN_TYPE,
 	UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE,
 	UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE,
 ];
 
-// render nasm
-bool adbg_disasm_operand_nasm(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_disasm_operand_t op) {
+// render tasm
+bool adbg_disasm_operand_ideal(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_disasm_operand_t op) {
 	switch (op.type) with (AdbgDisasmOperand) {
 	case immediate: return adbg_disasm_render_number(p, s, op.imm.value, false);
 	case register:  return s.adds(op.reg.name);
 	case memory:
-		if (s.adds(NASM_WIDTH[p.memWidth]))
+		if (s.addc('['))
 			return true;
-		if (s.adds(" ptr ["))
+		if (s.adds(TASM_WIDTH[p.memWidth]))
+			return true;
+		if (s.addc(' '))
 			return true;
 		
 		//TODO: p.decoderOpts.noSegment

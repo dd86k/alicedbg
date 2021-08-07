@@ -7,15 +7,15 @@
  */
 module adbg.disasm.syntax.intel;
 
-import adbg.disasm : adbg_disasm_t, adbg_disasm_operand_t, AdbgDisasmOperand,
-	adbg_disasm_render_number;
-import adbg.utils.str;
+import adbg.disasm, adbg.utils.str;
 
 extern (C):
 
 private immutable const(char)*[] INTEL_WIDTH = [
 	"byte",    "word",    "dword",   "qword",
-	"xmmword", "ymmword", "zmmword", "word?"
+	"xmmword", "ymmword", "zmmword", UNKNOWN_TYPE,
+	UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE,
+	UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE,
 ];
 
 // render intel
@@ -70,7 +70,7 @@ bool adbg_disasm_operand_intel(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_d
 				if (s.adds(op.mem.index))
 					return true;
 			}
-			if (op.mem.offset.i32) {
+			if (op.mem.hasOffset) {
 				if (adbg_disasm_render_number(p, s, op.mem.offset, true))
 					return true;
 			}

@@ -90,10 +90,6 @@ void dump_chapter(const(char) *title) {
 }
 
 /// Dump given file to stdout.
-/// Params:
-/// 	file = File path
-/// 	dopts = Disassembler settings
-/// 	flags = Dumper options
 /// Returns: Error code if non-zero
 int dump() {
 	FILE *f = fopen(globals.cli.file, "rb"); // Handles null file pointers

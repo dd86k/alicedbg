@@ -30,6 +30,8 @@ version "0.0.0"
 #       Yes, it works with -fno-druntime, so it can be possible to add
 #       -gdc-betterc build types in the future.
 
+#TODO: Rename versions to AdbgX to avoid conflicts if used as library
+
 #
 # ANCHOR Configurations
 #
@@ -106,7 +108,7 @@ buildType "release" {
 
 # Compile in release mode with no bound checking.
 buildType "release-nobounds" {
-	versions "ReleaseNobounds"
+	versions "Release" "ReleaseNobounds"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck"
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
@@ -115,12 +117,13 @@ buildType "release-nobounds" {
 #
 # ANCHOR Unit tests
 #
-# These are separated into their own because they either:
-# - Require interaction;
-# - Or are too lengthy for normal testing.
+# Individual unit tests exist here since they:
+# - Requires user input;
+# - Are too specific (e.g., crt-specific);
+# - Or are too lengthy.
 #
 
-# general: utilities, etc.
+# default unit test: utilities, etc.
 buildType "general" {
 	buildOptions "unittests"
 	sourceFiles "tests/general.d"
@@ -163,7 +166,7 @@ buildType "expand" {
 # Run all non-interactive tests
 buildType "all" {
 	buildOptions "unittests"
-	sourceFiles "tests/disasm.d" "tests/syntax.d" "tests/expand.d"
+	sourceFiles "tests/general.d" "tests/disasm.d" "tests/syntax.d" "tests/expand.d"
 }
 
 #

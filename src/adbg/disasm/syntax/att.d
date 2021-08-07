@@ -40,24 +40,32 @@ bool adbg_disasm_operand_att(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_dis
 			return true;
 		
 		if (op.mem.scaled) { // SIB
-			if (op.mem.base)
+			if (op.mem.base) {
+				if (s.addc('%'))
+					return true;
 				if (s.adds(op.mem.base))
 					return true;
+			}
 			if (s.addc(','))
 				return true;
-			if (op.mem.index)
+			if (op.mem.index) {
+				if (s.addc('%'))
+					return true;
 				if (s.adds(op.mem.index))
 					return true;
+			}
 			if (s.addc(','))
 				return true;
 			if (op.mem.scale)
 				if (s.addf("%u", op.mem.scale))
 					return true;
 		} else if (op.mem.base) { // register-based
+			if (s.addc('%'))
+				return true;
 			if (s.adds(op.mem.base))
 				return true;
 			if (op.mem.index) {
-				if (s.addc(','))
+				if (s.adds(",%"))
 					return true;
 				if (s.adds(op.mem.index))
 					return true;

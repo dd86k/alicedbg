@@ -31,35 +31,10 @@ enum ADBG_CHILD_STACK_SIZE	= 1024 * 1024 * 8;
 //
 
 /// Library version
-enum ADBG_VERSION = "0.0.1";
+enum ADBG_VERSION = "0.1.0";
 
-version (Trace)
-	enum __BUILDTYPE__ = "trace";	/// Build type
-else version (DebugV0)
-	enum __BUILDTYPE__ = "debugv0";	/// Ditto
-else version (DebugVV)
-	enum __BUILDTYPE__ = "debugvv";	/// Ditto
-else version (Debug)
-	enum __BUILDTYPE__ = "debug";	/// Ditto
-else version (Release)
-	enum __BUILDTYPE__ = "release";	/// Ditto
-else version (ReleaseNobounds)
-	enum __BUILDTYPE__ = "release-nobounds";	/// Ditto
-else debug enum __BUILDTYPE__ = "debug";	/// Ditto
-else enum __BUILDTYPE__ = "release";	/// Ditto
-
-/// Target information structure
-struct adbg_info_t {
-	const(char) *adbgver = ADBG_VERSION;	/// Library/app version
-	const(char) *build   = __BUILDTYPE__;	/// "debug" or "release"
-	const(char) *arch    = TARGET_PLATFORM;	/// ISA
-	const(char) *os      = TARGET_OS;	/// Operating system
-	const(char) *crt     = TARGET_CRT;	/// C runtime
-	const(char) *cpprt   = TARGET_CPPRT;	/// C++ runtime
-	const(char) *env     = TARGET_ENV;	/// Target environment
-	const(char) *objfmt  = TARGET_OBJFMT;	/// Object format (e.g., coff)
-	const(char) *fltabi  = TARGET_FLTABI;	/// Float ABI (hard or soft)
-}
+debug enum __BUILDTYPE__ = "debug";	/// Ditto
+else  enum __BUILDTYPE__ = "release";	/// Ditto
 
 //
 // ANCHOR ABI string
@@ -252,8 +227,21 @@ struct adbg_address_t {
 }
 
 //
-// ANCHOR External functions
+// ANCHOR Functions
 //
+
+/// Target information structure
+struct adbg_info_t {
+	const(char) *adbgver = ADBG_VERSION;	/// Library/app version
+	const(char) *build   = __BUILDTYPE__;	/// "debug" or "release"
+	const(char) *arch    = TARGET_PLATFORM;	/// ISA
+	const(char) *os      = TARGET_OS;	/// Operating system
+	const(char) *crt     = TARGET_CRT;	/// C runtime
+	const(char) *cpprt   = TARGET_CPPRT;	/// C++ runtime
+	const(char) *env     = TARGET_ENV;	/// Target environment
+	const(char) *objfmt  = TARGET_OBJFMT;	/// Object format (e.g., coff)
+	const(char) *fltabi  = TARGET_FLTABI;	/// Float ABI (hard or soft)
+}
 
 /**
  * Get compilation information structure.
