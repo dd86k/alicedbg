@@ -120,9 +120,9 @@ private immutable error_msg_t[] errors = [
 /// 	l = (Template) Automatically set to __LINE__
 /// 	e = Error code
 /// Returns: Error code
-int adbg_oops(string s = __FILE__, int l = __LINE__)(AdbgError e) {
+int adbg_oops(AdbgError e, char* s = cast(char*)__FILE__, int l = __LINE__) {
 	error.line = l;
-	error.file = s.ptr;
+	error.file = s;
 	return error.code = e;
 }
 
