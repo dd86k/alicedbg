@@ -31,12 +31,13 @@ private import adbg.disasm.syntax.intel,
 //      Obviously with a setting (what should be the default?)
 //      Save jmp/call targets
 //TODO: Visibility system for prefixes
-//      Tag system? e.g., groups (bit flags)
+//      Tag system? e.g., groups (ubyte + bitflag)
 //TODO: Move float80 (x87) register handling here
 //      adbg_disasm_add_register: Add register width? index parameter?
 //TODO: Consider doing subcodes (extended codes) to specify why instruction is illegal
 //      e.g., empty buffer, invalid opcode, invalid modrm:reg, lock disallowed, etc.
 //      Option 1. adbg_disasm_oops(adbg_disasm_t*,AdbgDisasmError);
+//                Should set value in struct, and that gets returned.
 //      Option 2. adbg_oops(AdbgError,AdbgExtendedError);
 //      Option 3. Or simply extend the current codes
 //TODO: HLA: Consider adding option for alternative SIB syntax
@@ -461,6 +462,18 @@ int adbg_disasm_start_debuggee(adbg_disasm_t *p, AdbgDisasmMode mode, size_t add
 	p.mode = mode;
 	p.current.sz = p.base.sz = addr;
 	return 0;
+}
+
+int adbg_disasm_once_buffer(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDisasmMode mode, void *buffer, size_t size) {
+	int e = adbg_disasm_start_buffer(p, mode, buffer, size);
+	if (e) return e;
+	return adbg_disasm(p, op);
+}
+
+int adbg_disasm_once_debuggee(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDisasmMode mode, size_t addr) {
+	int e = adbg_disasm_start_debuggee(p, mode, addr);
+	if (e) return e;
+	return adbg_disasm(p, op);
 }
 
 /// Disassemble one instruction.
