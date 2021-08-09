@@ -19,6 +19,7 @@ extern (C):
 //       modes | CS.L=0  CS.D=0  | CS.L=0  CS.D=1  | CS.L=1  CS.D=0  | CS.L=1  CS.D=1  |
 //       LMA=0 | standard 16-bit | standard 32-bit | standard 16-bit | standard 32-bit |
 //       LMA=1 | 16-bit compat.  | 32-bit compat.  | 64-bit          | reserved        |
+// NOTE: bound/invlpga/enter/other opcodes with 2 immediates: no reversed order
 
 //TODO: Additional processors: 8086, 80186, 80386
 //      Critical for 0x0f: 8086=pop cs, 80186+=2-byte

@@ -106,7 +106,7 @@ enum AdbgSyntax : ubyte {
 	/// Year: 1978
 	/// Destination: Left
 	///
-	/// Similar to the Microsoft/Macro Assembler (MASM) syntax.
+	/// Similar to the Macro/Microsoft Assembler (MASM) syntax.
 	/// This is the reference syntax for the x86 instruction set.
 	/// For more information, consult the Intel and AMD reference manuals.
 	///
@@ -116,7 +116,7 @@ enum AdbgSyntax : ubyte {
 	/// ---
 	intel,
 	/// AT&T syntax
-	/// Year: 1975
+	/// Year: 1960s
 	/// Destination: Right
 	///
 	/// For more information, consult the IAS/RSX-11 MACRO-11 Reference
@@ -148,19 +148,19 @@ enum AdbgSyntax : ubyte {
 	///
 	/// Example:
 	/// ---
-	/// mov ecx, [dword ss:eax+ecx*2-0x20]
+	/// mov edx, [dword ss:eax+ecx*2-0x20]
 	/// ---
 	ideal,
-	/// Randall Hyde High Level Assembly Language syntax
-	/// Year: 2008
+	/// High Level Assembly Language syntax
+	/// Year: 1999
 	/// Destination: Right
 	///
-	/// Created by Randy Hyde, this syntax is based on the PL/360 mnemonics.
+	/// Created by Randall Hyde, this syntax is based on the PL/360 mnemonics.
 	/// For more information, consult the HLA Reference Manual.
 	///
 	/// Example:
 	/// ---
-	/// sseg: mov ([type dword eax+ecx*2-0x20], ecx)
+	/// sseg: mov ([type dword eax+ecx*2-0x20], edx)
 	/// ---
 	hyde,
 	///TODO: ARM native syntax.
@@ -284,14 +284,9 @@ struct adbg_disasm_opcode_t {
 /// Disassembler parameters structure. This structure is not meant to be
 /// accessed directly.
 struct adbg_disasm_t { align(1):
-	//
-	// Generic
-	//
-	
 	adbg_address_t current;	/// Current address, used as a program counter.
 	adbg_address_t base;	/// Base address, used for target calculations.
 	adbg_address_t last;	/// Last address, saved from input.
-	
 	/// Decoder function
 	int function(adbg_disasm_t*) fdecode;
 	/// Syntax operand handler function
@@ -302,26 +297,21 @@ struct adbg_disasm_t { align(1):
 		x86_internals_t *x86;	/// Ditto
 		riscv_internals_t *rv;	/// Ditto
 	}
-	/// Opcode information
-	adbg_disasm_opcode_t *opcode;
 	/// Internal cookie. Yummy!
 	uint cookie;
-	
-	//
-	// Options
-	//
-	
-	/// Disassembling Platform.
-	///
-	/// Instruction set architecture platform to disassemble from. See the
-	/// AdbgDisasmPlatform enumeration for more details.
+	/// Instruction set architecture platform to disassemble from.
 	AdbgPlatform platform;
-	/// Operation mode.
-	///
-	/// Disassembler operating mode. See the AdbgDisasmMode enumeration for
-	/// more details.
+	/// Current syntax option.
+	AdbgSyntax syntax;
+	/// Operating mode.
 	AdbgDisasmMode mode;
-	/// User data length that can be processed from the buffer size provided.
+	/// Input mode.
+	AdbgDisasmInput input;
+	/// Opcode information
+	adbg_disasm_opcode_t *opcode;
+	/// Memory operation width
+	AdbgDisasmType memWidth;
+	/// Buffer: When "start buffer" is used, this dictates how much data is left.
 	/// If disassembling a debuggee, this field is not taken into account.
 	size_t left;
 	/// Maximum opcode length. (Architectural limit, inclusive)
@@ -329,16 +319,24 @@ struct adbg_disasm_t { align(1):
 	/// riscv32: >4 illegal
 	/// riscv64: >8 illegal
 	int max;
-	/// Input mode.
-	AdbgDisasmInput input;
-	/// Decoder formatting options.
-	adbg_disasm_decoder_options_t decoderOpts;
-	/// User formatting options.
-	adbg_disasm_user_options_t userOpts;
-	/// Current syntax option.
-	AdbgSyntax syntax;
-	/// Memory operation width
-	AdbgDisasmType memWidth;
+	package union { // Decoder options
+		uint decoderAll;
+		struct {
+			ubyte pfGroups;	///TODO: Prefixes to show/hide, upto 8 groups
+			bool indistinguishable;	///TODO: ATT: Ambiguate instruction
+			bool reverse;	///TODO: ATT: Reverse order
+		}
+	}
+	package union { // User options
+		uint userAll;
+		struct {
+			/// If set, inserts a tab instead of a space between
+			/// mnemonic and operands.
+			bool mnemonicTab;
+			///TODO: Opcodes and operands are not seperated by spaces.
+			bool machinePacked;
+		}
+	}
 }
 
 // alloc
@@ -420,7 +418,7 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 		}
 		break;
 	case mnemonicTab:
-		p.userOpts.mnemonicTab = val != 0;
+		p.mnemonicTab = val != 0;
 		break;
 	default:
 		return adbg_oops(AdbgError.invalidOption);
@@ -492,10 +490,12 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 	if (p.cookie != ADBG_COOKIE)
 		return adbg_oops(AdbgError.uninitiated);
 	
-	// Reset opcode info
-	with (op) {
+	with (op) { // reset opcode
 		mnemonic = segment = null;
 		size = machineCount = prefixCount = operandCount = 0;
+	}
+	with (p) { // reset disasm
+		decoderAll = 0;
 	}
 	
 	p.opcode = op;
@@ -503,11 +503,17 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 	return p.fdecode(p);	// Decode
 }
 
+/// Renders the mnemonic instruction into a buffer.
+/// Params:
+/// 	p = Disassembler
+/// 	buffer = Character buffer
+/// 	size = Buffer size
+/// 	op = Opcode information
 void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
 	if (p.opcode.mnemonic == null)
 		return;
 	
-	__gshared const(char) *comma = ", ";
+	__gshared const(char) *sep = ", ";
 	adbg_string_t s = adbg_string_t(buffer, size);
 	
 	bool isHyde = p.syntax == AdbgSyntax.hyde;
@@ -522,9 +528,9 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 		}
 	}
 	
-	// Prefixes, skipped if empty or decoder says not to include them
+	// Prefixes, skipped if empty
 	version (Trace) trace("prefixCount=%u", op.prefixCount);
-	if (p.decoderOpts.noPrefixes == false && op.prefixCount) {
+	if (op.prefixCount) {
 		for (size_t i; i < op.prefixCount; ++i) {
 			if (s.adds(op.prefixes[i]))
 				return;
@@ -538,11 +544,10 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	if (s.adds(op.mnemonic))
 		return;
 	
-	// Operands
-	// Skipping operands if empty
+	// Operands, skipped if empty
 	version (Trace) trace("operandCount=%u", op.operandCount);
 	if (op.operandCount == 0) return;
-	if (s.addc(p.userOpts.mnemonicTab ? '\t' : ' '))
+	if (s.addc(p.mnemonicTab ? '\t' : ' '))
 		return;
 	
 	//TODO: Consider setting the operand handler function here.
@@ -562,7 +567,7 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 			if (p.foperand(p, s, op.operands[i]))
 				return;
 			if (i)
-				if (s.adds(comma))
+				if (s.adds(sep))
 					return;
 		}
 		if (isHyde)
@@ -576,13 +581,19 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 			if (p.foperand(p, s, op.operands[i]))
 				return;
 			if (i < opCount)
-				if (s.adds(comma))
+				if (s.adds(sep))
 					return;
 		}
 		return;
 	}
 }
 
+/// Renders the machine opcode into a buffer.
+/// Params:
+/// 	p = Disassembler
+/// 	buffer = Character buffer
+/// 	size = Buffer size
+/// 	op = Opcode information
 void adbg_disasm_machine(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
 	import adbg.utils.str : empty_string;
 	
@@ -631,6 +642,9 @@ enum AdbgDisasmOperand : ubyte {
 	memory,	/// 
 }
 
+//TODO: Display option for integer/byte/float operations
+//      Smart: integer=decimal, bitwise=hex, fpu=float
+//      A setting for each group (that will be a lot of groups...)
 /// Immediate operand
 package
 struct adbg_disasm_operand_imm_t {
@@ -664,49 +678,6 @@ struct adbg_disasm_operand_t { align(1):
 		adbg_disasm_operand_imm_t imm;	/// Immediate item
 		adbg_disasm_operand_reg_t reg;	/// Register item
 		adbg_disasm_operand_mem_t mem;	/// Memory operand item
-	}
-}
-
-//TODO: Fetch append to machine option
-//      While automatically appending to the machine buffer is great for
-//      CISC settings, RISC environments tell another story.
-//      For example, RISC-V initially fetches a 2-byte number, but it may be
-//      extended to a 4-byte number with another 2-byte fetch. So since the
-//      instruction is 4-byte, it would not be 2 
-private
-struct adbg_disasm_decoder_options_t { align(1):
-	union {
-		ulong all;	/// Unset when initiated
-		struct {
-			/// Skip prefixes when rendering.
-			///
-			/// Under x86, some prefixes like LOCK can sometimes be
-			/// printed, or not, depending on the instruction.
-			/// If set, the prefixes are not included in the output.
-			// NOTE: Prefix could need of groups (bit flags) in case
-			bool noPrefixes;
-			/// (AT&T syntax) Msnemonic is basic for width modifier.
-			bool primitive;
-			/// (AT&T syntax) Instruction is a far (absolute) call/jump.
-			bool absolute;
-		}
-	}
-}
-
-//TODO: Display option for integer/byte/float operations
-//      Smart: integer=decimal, bitwise=hex, fpu=float
-//      A setting for each group (that will be a lot of groups...)
-private
-struct adbg_disasm_user_options_t { align(1):
-	union {
-		ulong all;	/// Unset when initiated
-		struct {
-			/// If set, inserts a tab instead of a space between
-			/// mnemonic and operands.
-			bool mnemonicTab;
-			/// Opcodes and operands are not seperated by spaces.
-			bool machinePacked;
-		}
 	}
 }
 
