@@ -138,6 +138,8 @@ else
 enum COMPILER_FEAT_TARGETINFO    = __VERSION__ >= 2083;
 /// If set, the compiler supports the printf and scanf pragmas.
 enum COMPILER_FEAT_PRAGMA_PRINTF = __VERSION__ >= 2092;
+/// Compiler supports DIP1034 (bottom type, includes noreturn)
+enum COMPILER_FEAT_NORETURN = __VERSION__ >= 2096;
 
 //
 // ANCHOR Additional target information
@@ -178,7 +180,7 @@ static if (COMPILER_FEAT_TARGETINFO) {
 //        Typically the C library, otherwise system wrappers.
 //
 
-version (MinGW) {
+version (MinGW) { // <- checked first since it's a stub of msvcrt
 	enum TARGET_ENV = "mingw";	/// Target environment
 } else version (Cygwin) {
 	enum TARGET_ENV = "cygwin";	/// Ditto

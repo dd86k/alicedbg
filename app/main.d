@@ -305,7 +305,7 @@ int cli_help() {
 	}
 	puts("\nFor a list of values, for example a list of platforms, type '-m help'");
 	exit(0);
-	return 0;
+	static if (!COMPILER_FEAT_NORETURN) return 0;
 }
 
 //
@@ -337,12 +337,12 @@ immutable(char) *fmt_version =
 int cli_version() {
 	puts(fmt_version);
 	exit(0);
-	return 0;
+	static if (!COMPILER_FEAT_NORETURN) return 0;
 }
 int cli_ver() {
 	puts(ADBG_VERSION);
 	exit(0);
-	return 0;
+	static if (!COMPILER_FEAT_NORETURN) return 0;
 }
 
 //
@@ -382,7 +382,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`
 	);
 	exit(0);
-	return 0;
+	static if (!COMPILER_FEAT_NORETURN) return 0;
 }
 
 //
@@ -403,7 +403,7 @@ int cli_meow() {
 `
 	);
 	exit(0);
-	return 0;
+	static if (!COMPILER_FEAT_NORETURN) return 0;
 }
 
 //
