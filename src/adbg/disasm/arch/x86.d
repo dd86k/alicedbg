@@ -118,7 +118,7 @@ int adbg_disasm_x86(adbg_disasm_t *p) {
 	bool  D    = void;	/// D bit
 	
 L_PREFIX:
-	if (pfCounter >= 4) // x<=4
+	if (pfCounter > 4) // x<=4
 		//TODO: Verify if illegal or skipped
 		return adbg_oops(AdbgError.illegalInstruction);
 	++pfCounter;
@@ -182,7 +182,7 @@ L_PREFIX:
 L_FETCH:
 	e = adbg_disasm_fetch!ubyte(p, &opcode, AdbgDisasmTag.opcode);
 	if (e) return e;
-
+	
 	// Ascending opcodes to make second opcode map closer (branching)
 L_DECODE:
 	if (opcode < 0x40) { // 0H..3FH: Legacy
@@ -410,14 +410,47 @@ L_DECODE:
 				adbg_disasm_add_mnemonic(p, x86.pfRep ? M_PAUSE : M_NOP);
 				return 0;
 			}
-			rm = opcode & 7;
 			adbg_disasm_add_mnemonic(p, M_XCHG);
-			adbg_disasm_add_register(p, regs[x86.pfData][rm]);
+			adbg_disasm_add_register(p, regs[x86.pfData][opcode & 7]);
 			adbg_disasm_add_register(p, regs[x86.pfData][x86Reg.al]);
 			return 0;
 		}
+		switch (opcode) {
+		case 0x98, 0x99:
+			if (p.mode < AdbgDisasmMode.file)
+				return 0;
+			W = opcode == 0x99;
+			if (x86.vexW)
+				adbg_disasm_add_mnemonic(p, W ? M_CQO : M_CDQE);
+			else if (x86.pfData == AdbgDisasmType.i32)
+				adbg_disasm_add_mnemonic(p, W ? M_CDQ : M_CWDE);
+			else
+				adbg_disasm_add_mnemonic(p, W ? M_CWD : M_CBW);
+			return 0;
+		case 0x9a:
+			if (p.platform == AdbgPlatform.x86_64)
+				return adbg_oops(AdbgError.illegalInstruction);
+			if (p.mode >= AdbgDisasmMode.file)
+				adbg_disasm_add_mnemonic(p, M_CALL);
+			return adbg_disasm_x86_op_Ap(p);
+		case 0x9b:
+			if (p.mode < AdbgDisasmMode.file)
+				return 0;
+			adbg_disasm_add_mnemonic(p, M_WAIT);
+			return 0;
+		case 0x9c:
 		
-		return 0;
+			return 0;
+		case 0x9d:
+		
+			return 0;
+		case 0x9e:
+		
+			return 0;
+		default:
+		
+			return 0;
+		}
 	}
 	if (opcode < 0xB0) { // A0H..AFH: 
 		//NOTE: Remainder opcode A0-A3 is real=16b,extended=32b,long=64b
@@ -506,6 +539,14 @@ immutable const(char) *M_XCHG	= "xchg";
 immutable const(char) *M_PAUSE	= "pause";
 immutable const(char) *M_MOV	= "mov";
 immutable const(char) *M_LEA	= "lea";
+immutable const(char) *M_CQO	= "cqo";
+immutable const(char) *M_CDQE	= "cdqe";
+immutable const(char) *M_CDQ	= "cdq";
+immutable const(char) *M_CWDE	= "cwde";
+immutable const(char) *M_CWD	= "cwd";
+immutable const(char) *M_CBW	= "cbw";
+immutable const(char) *M_WAIT	= "wait";
+immutable const(char) *M_CALL	= "call";
 // SSE
 // AVX
 
@@ -724,6 +765,26 @@ int adbg_disasm_x86_op_Jb(adbg_disasm_t *p) {	// Immediate 8-bit
 			adbg_disasm_add_immediate(p, AdbgDisasmType.i8, &i);
 	}
 	return e;
+}
+int adbg_disasm_x86_op_Ap(adbg_disasm_t *p) {	// Segment:
+	ushort segment = void;
+	int e = adbg_disasm_fetch!ushort(p, &segment, AdbgDisasmTag.segment);
+	if (e) return e;
+	void *b = void;
+	if (p.x86.pfData == AdbgDisasmType.i16) {
+		ushort a = void;
+		e = adbg_disasm_fetch!ushort(p, &a, AdbgDisasmTag.immediate);
+		if (e) return e;
+		b = &a;
+	} else {
+		uint a = void;
+		e = adbg_disasm_fetch!uint(p, &a, AdbgDisasmTag.immediate);
+		if (e) return e;
+		b = &a;
+	}
+	adbg_disasm_add_immediate(p, p.x86.pfData, b, segment);
+	p.far = true;
+	return 0;
 }
 
 // !SECTION

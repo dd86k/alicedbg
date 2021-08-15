@@ -117,5 +117,5 @@ void test(string name, adbg_disasm_t *disasm, ref immutable(InstructionTest[]) t
 	if (statError)
 		writefln("%u tests out of %u failed", statError, statTotal);
 	else
-		writefln("all %u tests were successful", statError, statTotal);
+		writefln("all %u tests were successful", statTotal);
 }

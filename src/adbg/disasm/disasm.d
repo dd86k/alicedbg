@@ -89,6 +89,8 @@ enum AdbgDisasmOpt {
 }
 
 /// Disassembler operating mode
+//TODO: Consider using bool values instead of these
+//      e.g., disasm(..., bool populateOp)
 enum AdbgDisasmMode : ubyte {
 	size,	/// Only calculate operation code sizes
 	data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
@@ -202,6 +204,7 @@ enum AdbgDisasmTag : ushort {
 	operand,	/// Instruction operand
 	immediate,	/// 
 	disp,	/// Displacement/Offset
+	segment,	/// Immediate segment value for far calls
 	modrm,	/// x86: ModR/M byte
 	sib,	/// x86: SIB byte
 }
@@ -287,6 +290,7 @@ struct adbg_disasm_machine_t {
 }
 
 /// The basis of an operation code
+//TODO: Consider adding decoder internals here instead
 struct adbg_disasm_opcode_t {
 	// size mode:
 	int size;	/// Opcode size
@@ -300,7 +304,7 @@ struct adbg_disasm_opcode_t {
 	size_t operandCount;	/// Number of operands
 	adbg_disasm_operand_t[ADBG_MAX_OPERANDS] operands;	/// Operands
 	size_t prefixCount;	/// Number of prefixes
-	const(char)*[ADBG_MAX_PREFIXES] prefixes;	/// Prefixes
+	adbg_disasm_prefix_t[ADBG_MAX_PREFIXES] prefixes;	/// Prefixes
 	size_t machineCount;	/// Number of disassembler fetches
 	adbg_disasm_machine_t[ADBG_MAX_MACHINE] machine;	/// Machine bytes
 }
@@ -335,8 +339,8 @@ struct adbg_disasm_t { align(1):
 	adbg_disasm_opcode_t *opcode;
 	/// Memory operation width
 	AdbgDisasmType memWidth;
-	/// Buffer: When "start buffer" is used, this dictates how much data is left.
-	/// If disassembling a debuggee, this field is not taken into account.
+	/// Buffer: This field dictates how much data is left.
+	/// Debuggee: This field is not taken into account.
 	size_t left;
 	/// Maximum opcode length. (Architectural limit, inclusive)
 	/// x86: >15 illegal
@@ -347,8 +351,9 @@ struct adbg_disasm_t { align(1):
 		uint decoderAll;
 		struct {
 			ubyte pfGroups;	///TODO: Prefixes to show/hide, upto 8 groups
-			bool indistinguishable;	///TODO: ATT: Ambiguate instruction
-			bool reverse;	///TODO: ATT: Reverse order
+			bool ambiguity;	///TODO: ATT: Ambiguate instruction
+			bool noReverse;	/// ATT: Do not reverse the order of operands
+			bool far;	/// ATT: Far call
 		}
 	}
 	package union { // User options
@@ -358,7 +363,7 @@ struct adbg_disasm_t { align(1):
 			/// mnemonic and operands.
 			bool mnemonicTab;
 			///TODO: Opcodes and operands are not seperated by spaces.
-			bool machinePacked;
+			bool unpackMachine;
 		}
 	}
 }
@@ -408,6 +413,7 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 		return adbg_oops(AdbgError.unsupportedPlatform);
 	}
 	
+	//TODO: Waiting for x87 handling to be transferred to the syntax engine
 	static if (DEFAULT_SYNTAX == AdbgSyntax.intel) {
 		p.syntax = AdbgSyntax.intel;
 		p.foperand = &adbg_disasm_operand_intel;
@@ -416,8 +422,10 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 		p.foperand = &adbg_disasm_operand_att;
 	}
 	
+	// Defaults
 	p.platform = m;
 	p.cookie = ADBG_COOKIE;
+	p.userAll = 0;
 	return 0;
 }
 
@@ -556,7 +564,7 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	version (Trace) trace("prefixCount=%u", op.prefixCount);
 	if (op.prefixCount) {
 		for (size_t i; i < op.prefixCount; ++i) {
-			if (s.adds(op.prefixes[i]))
+			if (s.adds(op.prefixes[i].name))
 				return;
 			if (s.addc(isHyde ? '.' : ' '))
 				return;
@@ -565,8 +573,14 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	
 	// Mnemonic
 	version (Trace) trace("mnemonic=%s", op.mnemonic);
+	if (p.syntax == AdbgSyntax.att && p.far)
+		if (s.addc('l'))
+			return;
 	if (s.adds(op.mnemonic))
 		return;
+	//TODO: ATT ambiguiate instruction width suffix
+	//if (p.syntax == AdbgSyntax.att && p.ambiguity)
+	//	if (s.addc())
 	
 	// Operands, skipped if empty
 	version (Trace) trace("operandCount=%u", op.operandCount);
@@ -667,6 +681,12 @@ enum AdbgDisasmOperand : ubyte {
 	memory,	/// 
 }
 
+/// Represents an instruction prefix
+struct adbg_disasm_prefix_t {
+	const(char) *name;
+	ubyte group;
+}
+
 //TODO: Display option for integer/byte/float operations
 //      Smart: integer=decimal, bitwise=hex, fpu=float
 //      A setting for each group (that will be a lot of groups...)
@@ -674,7 +694,10 @@ enum AdbgDisasmOperand : ubyte {
 //package
 struct adbg_disasm_operand_imm_t {
 	adbg_disasm_number_t value;
+	//adbg_disasm_number_t value2;
 	ushort segment;
+	//style? (bit op, int op, float, etc.)
+	//bool far/absolute;
 }
 
 /// Register operand
@@ -831,7 +854,8 @@ void adbg_disasm_add_prefix(adbg_disasm_t *p, const(char) *prefix) {
 	if (p.opcode.prefixCount >= ADBG_MAX_PREFIXES)
 		return;
 	
-	p.opcode.prefixes[p.opcode.prefixCount++] = prefix;
+	adbg_disasm_prefix_t *pf = &p.opcode.prefixes[p.opcode.prefixCount++];
+	pf.name = prefix;
 }
 
 //
@@ -870,7 +894,7 @@ adbg_disasm_operand_t* adbg_disasm_get_operand(adbg_disasm_t *p) {
 }
 
 package
-void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmType w, void *v) {
+void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmType w, void *v, ushort segment = 0) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
@@ -880,6 +904,7 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmType w, void *v) {
 	item.type = AdbgDisasmOperand.immediate;
 	item.imm.value.type = w;
 	
+	item.imm.segment = segment;
 	switch (w) with (AdbgDisasmType) {
 	case i8:  item.imm.value.u8  = *cast(ubyte*)v;  return;
 	case i16: item.imm.value.u16 = *cast(ushort*)v; return;

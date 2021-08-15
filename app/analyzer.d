@@ -12,7 +12,7 @@ private __gshared const(char)*[] opWith = [
 ];
 private __gshared const(char)*[] maTags = [
 	"UNKNOWN", "OPCODE", "PREFIX", "OPERAND",
-	"IMMEDIATE", "DISP", "MODRM", "SIB",
+	"IMMEDIATE", "DISP", "SEGMENT", "MODRM", "SIB",
 ];
 
 int analyze() {
@@ -37,7 +37,7 @@ int analyze() {
 		printf("instruction: %s\n", bufferMnemonic.ptr);
 		printf("prefixes   :");
 		for (size_t pi; pi < opcode.prefixCount; ++pi) with (opcode) {
-			printf(" %s", prefixes[pi]);
+			printf(" %s", prefixes[pi].name);
 		}
 		putchar('\n');
 		if (opcode.segment)
@@ -56,10 +56,15 @@ int analyze() {
 		}
 		
 		// segments
+		// 9a aa bb 11 22 33 44
+		// :  :     :.. IMMEDIATE
+		// :  :.. DISP
+		// :.. OPCODE
 		puts("\n== [ SEGMENTS ] ==================");
+		adbg_disasm_machine_t *m = void;
 		int z = void;
 		for (size_t mi; mi < opcode.machineCount; ++mi) with (opcode) {
-			adbg_disasm_machine_t *m = &machine[mi];
+			m = &machine[mi];
 			ubyte *p8 = &m.u8;
 			// NOTE: disasm fetch should be auto swapping these
 			switch (m.type) with (AdbgDisasmType) {
@@ -71,10 +76,22 @@ int analyze() {
 			}
 		}
 		putchar('\n');
-		size_t tc = opcode.machineCount;
-		for (size_t mi; mi < opcode.machineCount; ++mi) with (opcode) {
-			for (size_t ti = tc; --ti;) printf(":  ");
-			printf(":.. %s\n", maTags[machine[--tc].tag]);
+		for (size_t mi = opcode.machineCount; mi--;) with (opcode) {
+			m = &machine[mi];
+			if (mi) {
+				int w = void;
+				for (size_t mii; mii < mi; ++mii) {
+					switch (machine[mii].type) with (AdbgDisasmType) {
+					case i64, f64: w = 7; break;
+					case i32, f32: w = 3; break;
+					case i16:      w = 1; break;
+					default:       w = 0; break;
+					}
+					printf(":  ");
+					while (w-- > 0) printf("   ");
+				}
+			}
+			printf(":.. %s\n", maTags[m.tag]);
 		}
 	}
 	

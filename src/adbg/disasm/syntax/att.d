@@ -17,6 +17,14 @@ extern (C):
 bool adbg_disasm_operand_att(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_disasm_operand_t op) {
 	switch (op.type) with (AdbgDisasmOperand) {
 	case immediate:
+		if (p.far) {
+			if (s.adds("$0x"))
+				return true;
+			if (s.addx16(op.imm.segment))
+				return true;
+			if (s.adds(", "))
+				return true;
+		}
 		if (s.addc('$'))
 			return true;
 		return adbg_disasm_render_number(p, s, op.imm.value, false);
