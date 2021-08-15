@@ -312,9 +312,10 @@ int cmd_c_run(int argc, const(char) **argv) {
 //
 
 int cmd_c_quit(int argc, const(char) **argv) {
+	import adbg.platform : COMPILER_FEAT_NORETURN;
 	//TODO: Quit confirmation if debuggee is alive
 	exit(0);
-	return 0;
+	static if (!COMPILER_FEAT_NORETURN) return 0;
 }
 
 //
