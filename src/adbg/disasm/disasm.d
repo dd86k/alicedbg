@@ -194,6 +194,18 @@ enum AdbgDisasmInput : ubyte {
 //	mmfile,	///TODO: MmFile
 }
 
+/// Machine bytes tag
+enum AdbgDisasmTag : ushort {
+	unknown,	/// Unknown, either now or forever
+	opcode,	/// Operation code
+	prefix,	/// Instruction prefix
+	operand,	/// Instruction operand
+	immediate,	/// 
+	disp,	/// Displacement/Offset
+	modrm,	/// x86: ModR/M byte
+	sib,	/// x86: SIB byte
+}
+
 enum AdbgDisasmNumberType : ubyte {
 	decimal,	/// 
 	hexadecimal,	/// 
@@ -258,8 +270,20 @@ struct adbg_disasm_number_t {
 	/*AdbgDisasmNumberStyle ;
 	union {
 		bool signed;
-		AdbgDisasmHexStyle hexStyle;
+		AdbgDisasmNumType? type;
 	}*/
+}
+
+struct adbg_disasm_machine_t {
+	union {
+		ulong  u64; long  i64;
+		uint   u32; int   i32;
+		ushort u16; short i16;
+		ubyte  u8;  byte  i8;
+		double f64; float f32;
+	}
+	AdbgDisasmType type;
+	AdbgDisasmTag tag;
 }
 
 /// The basis of an operation code
@@ -267,9 +291,9 @@ struct adbg_disasm_opcode_t {
 	// size mode:
 	int size;	/// Opcode size
 	// data mode:
-//	enum targetMode;	/// none, near, far
+//	enum targetMode target;	/// none, near, far
 //	ulong targetAddress;	/// CALL/JMP absolute target
-//	int targetOffset;	/// CALL/JMP relative target
+//	union targetOffset;	/// CALL/JMP relative target
 	// file mode:
 	const(char) *segment;	/// Segment register string
 	const(char) *mnemonic;	/// Instruction mnemonic
@@ -278,7 +302,7 @@ struct adbg_disasm_opcode_t {
 	size_t prefixCount;	/// Number of prefixes
 	const(char)*[ADBG_MAX_PREFIXES] prefixes;	/// Prefixes
 	size_t machineCount;	/// Number of disassembler fetches
-	adbg_disasm_number_t[ADBG_MAX_MACHINE] machine;	/// Machine bytes
+	adbg_disasm_machine_t[ADBG_MAX_MACHINE] machine;	/// Machine bytes
 }
 
 /// Disassembler parameters structure. This structure is not meant to be
@@ -603,8 +627,9 @@ void adbg_disasm_machine(adbg_disasm_t *p, char *buffer, size_t size, adbg_disas
 	}
 	
 	adbg_string_t s = adbg_string_t(buffer, size);
-	adbg_disasm_number_t *num = &op.machine[0];
+	adbg_disasm_machine_t *num = &op.machine[0];
 	
+	//TODO: Unpack option would mean e.g., 4*1byte on i32
 	size_t edge = op.machineCount - 1;
 	for (size_t i; i < op.machineCount; ++i, ++num) {
 		switch (num.type) with (AdbgDisasmType) {
@@ -626,12 +651,12 @@ public  alias adbg_disasm_delete = free;
 // SECTION Decoder stuff
 //
 
-package enum ADBG_TYPE_NONE = cast(AdbgDisasmType)0;
 /// Memory type
-package
+//package
 enum AdbgDisasmType : ubyte {
 	i8,  i16, i32, i64,  i128, i256, i512, i1024,
 	f16, f32, f64, f128,
+	none = 0,
 }
 
 /// Main operand types.
@@ -646,28 +671,28 @@ enum AdbgDisasmOperand : ubyte {
 //      Smart: integer=decimal, bitwise=hex, fpu=float
 //      A setting for each group (that will be a lot of groups...)
 /// Immediate operand
-package
+//package
 struct adbg_disasm_operand_imm_t {
 	adbg_disasm_number_t value;
 	ushort segment;
 }
 
 /// Register operand
-package
+//package
 struct adbg_disasm_operand_reg_t {
 	const(char) *name;
 }
 
 /// Memory operand
-package
+//package
 struct adbg_disasm_operand_mem_t {
-	const(char) *base;	/// Used for normal usage, otherwise SIB:BASE
-	const(char) *index;	/// SIB:INDEX
+	const(char) *base;	/// Base register, (scaled) SIB:BASE
+	const(char) *index;	/// Additional register, (scaled) SIB:INDEX
 	ubyte scale;	/// SIB:SCALE
 	bool hasOffset;	/// 
 	adbg_disasm_number_t offset;	/// Displacement
 	bool scaled;	/// SIB or any scaling mode
-	//TODO: Call/jmp type (bool: normal/near, far)
+	//TODO: Call/jmp type (bool: near/far)
 }
 
 /// Operand structure
@@ -685,16 +710,16 @@ struct adbg_disasm_operand_t { align(1):
 /// Params:
 /// 	p = Disassembler structure pointer
 /// 	u = Data pointer
-/// 	add = If true, adds to the machine buffer
+/// 	tag = Byte tag
 /// Returns: Non-zero on error
+//TODO: Tag data with opcode/prefix/etc. you get the point
 package
-int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, bool add = true) {
+int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, AdbgDisasmTag tag = AdbgDisasmTag.unknown) {
 	if (p.opcode.size + T.sizeof > p.max)
 		return adbg_oops(AdbgError.opcodeLimit);
 	//TODO: Auto bswap if architecture endian is different than target
 	int e = void;
-	with (AdbgDisasmInput)
-	switch (p.input) {
+	switch (p.input) with (AdbgDisasmInput) {
 	case debugger:
 		import adbg.dbg.debugger : adbg_mm_cread;
 		e = adbg_mm_cread(p.current.sz, u, T.sizeof);
@@ -708,11 +733,13 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, bool add = true) {
 		break;
 	default: assert(0);
 	}
+	
 	p.current.sz += T.sizeof;
 	p.opcode.size += T.sizeof;
-	if (add && p.mode >= AdbgDisasmMode.file)
-	if (p.opcode.machineCount < ADBG_MAX_MACHINE) {
-		adbg_disasm_number_t *n = &p.opcode.machine[p.opcode.machineCount++];
+	
+	if (p.mode >= AdbgDisasmMode.file && p.opcode.machineCount < ADBG_MAX_MACHINE) {
+		adbg_disasm_machine_t *n = &p.opcode.machine[p.opcode.machineCount++];
+		n.tag = tag;
 		static if (is(T == ubyte)) {
 			n.i8 = *u;
 			n.type = AdbgDisasmType.i8;
@@ -728,6 +755,12 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, bool add = true) {
 		} else static assert(0, "fetch support type");
 	}
 	return e;
+}
+
+// fix last tag
+package
+void adbg_disasm_fetch_tag(adbg_disasm_t *p, AdbgDisasmTag tag) {
+	p.opcode.machine[p.opcode.machineCount - 1].tag = tag;
 }
 
 // calculate near offset

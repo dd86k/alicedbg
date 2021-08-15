@@ -81,7 +81,7 @@ private immutable error_msg_t[] errors = [
 	{ AdbgError.nullArgument, "Parameter is null." },
 	{ AdbgError.allocationFailed, "Memory allocation failed, maybe the machine is out of memory." },
 	{ AdbgError.uninitiated, "Object or structure is uninitiated." },
-	{ AdbgError.notImplemented, "Feature is not yet implemented." },
+	{ AdbgError.notImplemented, "Unimplemented." },
 	//
 	// Debugger
 	//
