@@ -132,7 +132,7 @@ L_PREFIX:
 	case 0x26, 0x2e, 0x36, 0x3e, 0x64, 0x65: // es/cs/ss/ds/fs/gs
 		x86Segment seg = opcode < 0b01000000 ? // +1 since 0=none (override)
 			cast(x86Segment)((opcode >> 3) - 3) :
-			cast(x86Segment)(opcode - 0x63);
+			cast(x86Segment)(opcode - 0x5f);
 		x86.pfSegment = seg;
 		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_add_segment(p, segs[seg]);
@@ -229,6 +229,8 @@ L_DECODE:
 	}
 	if (opcode < 0x50) { // 40H..4FH: INC/DEC or REX
 		if (p.platform == AdbgPlatform.x86_64) {
+			if (p.mode >= AdbgDisasmMode.file)
+				adbg_disasm_fetch_tag(p, AdbgDisasmTag.prefix);
 			//NOTE: REX cannot be used to extend VEX
 			x86.vexW   = (opcode & 8) != 0;
 			x86.vexRR  = (opcode & 4) != 0;
@@ -421,11 +423,12 @@ L_DECODE:
 				return 0;
 			W = opcode == 0x99;
 			if (x86.vexW)
-				adbg_disasm_add_mnemonic(p, W ? M_CQO : M_CDQE);
+				mnemonic = W ? M_CQO : M_CDQE;
 			else if (x86.pfData == AdbgDisasmType.i32)
-				adbg_disasm_add_mnemonic(p, W ? M_CDQ : M_CWDE);
+				mnemonic = W ? M_CDQ : M_CWDE;
 			else
-				adbg_disasm_add_mnemonic(p, W ? M_CWD : M_CBW);
+				mnemonic = W ? M_CWD : M_CBW;
+			adbg_disasm_add_mnemonic(p, mnemonic);
 			return 0;
 		case 0x9a:
 			if (p.platform == AdbgPlatform.x86_64)
@@ -438,17 +441,21 @@ L_DECODE:
 				return 0;
 			adbg_disasm_add_mnemonic(p, M_WAIT);
 			return 0;
-		case 0x9c:
-		
-			return 0;
-		case 0x9d:
-		
-			return 0;
-		case 0x9e:
-		
+		case 0x9c, 0x9d: // PUSH/POP Fv
+			if (p.mode < AdbgDisasmMode.file)
+				return 0;
+			W = opcode == 0x9d;
+			switch (p.platform) with (AdbgPlatform) {
+			case x86_64: mnemonic = W ? M_POPFQ : M_PUSHFQ; break;
+			case x86_32: mnemonic = W ? M_POPFD : M_PUSHFD; break;
+			default:     mnemonic = W ? M_POPF  : M_PUSHF; break;
+			}
+			adbg_disasm_add_mnemonic(p, mnemonic);
 			return 0;
 		default:
-		
+			if (p.mode < AdbgDisasmMode.file)
+				return 0;
+			adbg_disasm_add_mnemonic(p, opcode == 0x9f ? M_LAHF : M_SAHF);
 			return 0;
 		}
 	}
@@ -547,6 +554,14 @@ immutable const(char) *M_CWD	= "cwd";
 immutable const(char) *M_CBW	= "cbw";
 immutable const(char) *M_WAIT	= "wait";
 immutable const(char) *M_CALL	= "call";
+immutable const(char) *M_POPFQ	= "popfq";
+immutable const(char) *M_PUSHFQ	= "pushfq";
+immutable const(char) *M_POPFD	= "popfd";
+immutable const(char) *M_PUSHFD	= "pushfd";
+immutable const(char) *M_POPF	= "popf";
+immutable const(char) *M_PUSHF	= "pushf";
+immutable const(char) *M_SAHF	= "sahf";
+immutable const(char) *M_LAHF	= "lahf";
 // SSE
 // AVX
 
@@ -580,8 +595,8 @@ enum x86Prefix : ubyte {
 	lock	= 0xf0,	/// 0xF0
 	repne	= 0xf2,	/// 0xF2
 	rep	= 0xf3,	/// 0xF3
+	// SSE:
 	h66	= data,	/// Data operand prefix
-	h67	= addr,	/// Address operand prefix
 	hf2	= repne,	/// REPNE
 	hf3	= rep,	/// REP/REPE
 }
@@ -766,10 +781,9 @@ int adbg_disasm_x86_op_Jb(adbg_disasm_t *p) {	// Immediate 8-bit
 	}
 	return e;
 }
-int adbg_disasm_x86_op_Ap(adbg_disasm_t *p) {	// Segment:
+int adbg_disasm_x86_op_Ap(adbg_disasm_t *p) {	// immediate+segment (in that order)
+	int e = void;
 	ushort segment = void;
-	int e = adbg_disasm_fetch!ushort(p, &segment, AdbgDisasmTag.segment);
-	if (e) return e;
 	void *b = void;
 	if (p.x86.pfData == AdbgDisasmType.i16) {
 		ushort a = void;
@@ -782,6 +796,8 @@ int adbg_disasm_x86_op_Ap(adbg_disasm_t *p) {	// Segment:
 		if (e) return e;
 		b = &a;
 	}
+	e = adbg_disasm_fetch!ushort(p, &segment, AdbgDisasmTag.segment);
+	if (e) return e;
 	adbg_disasm_add_immediate(p, p.x86.pfData, b, segment);
 	p.far = true;
 	return 0;

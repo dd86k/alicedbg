@@ -207,9 +207,12 @@ enum AdbgDisasmTag : ushort {
 	segment,	/// Immediate segment value for far calls
 	modrm,	/// x86: ModR/M byte
 	sib,	/// x86: SIB byte
+	rex,	/// x86: REX byte
+	vex,	/// x86: VEX bytes
+	evex,	/// x86: EVEX bytes
 }
 
-enum AdbgDisasmNumberType : ubyte {
+enum AdbgDisasmNumberStyle : ubyte {
 	decimal,	/// 
 	hexadecimal,	/// 
 }

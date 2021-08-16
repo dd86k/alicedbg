@@ -18,9 +18,9 @@ private __gshared const(char)*[] maTags = [
 int analyze() {
 	with (globals.app) {
 		// input bytes
-		printf("input      : (%u)", cast(uint)globals.app.inputHexSize);
-		for (size_t bi; bi < globals.app.inputHexSize; ++bi)
-			printf(" %02x", globals.app.inputHex[bi]);
+		printf("input      : (%u)", cast(uint)inputHexSize);
+		for (size_t bi; bi < inputHexSize; ++bi)
+			printf(" %02x", inputHex[bi]);
 		putchar('\n');
 		
 		// output bytes
@@ -56,9 +56,9 @@ int analyze() {
 		}
 		
 		// segments
-		// 9a aa bb 11 22 33 44
-		// :  :     :.. IMMEDIATE
-		// :  :.. DISP
+		// 9a 44 33 22 11 bb aa
+		// :  :           :.. SEGMENT
+		// :  :.. IMMEDIATE
 		// :.. OPCODE
 		puts("\n== [ SEGMENTS ] ==================");
 		adbg_disasm_machine_t *m = void;

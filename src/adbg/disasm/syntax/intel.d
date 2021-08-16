@@ -49,42 +49,24 @@ bool adbg_disasm_operand_intel(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_d
 		if (s.addc('['))
 			return true;
 		
-		if (op.mem.scaled) { // SIB
-			if (op.mem.base)
-				if (s.adds(op.mem.base))
-					return true;
-			if (op.mem.index) {
-				if (op.mem.base)
-					if (s.addc('+'))
-						return true;
-				if (s.adds(op.mem.index))
-					return true;
-			}
-			if (op.mem.scale) {
-				if (s.addc('*'))
-					return true;
-				if (s.addf("%u", op.mem.scale))
-					return true;
-			}
-			if (op.mem.hasOffset) {
-				if (adbg_disasm_render_number(p, s, op.mem.offset, true))
-					return true;
-			}
-		} else if (op.mem.base) { // register-based
+		if (op.mem.base)
 			if (s.adds(op.mem.base))
 				return true;
-			if (op.mem.index) {
+		if (op.mem.index) {
+			if (op.mem.base)
 				if (s.addc('+'))
 					return true;
-				if (s.adds(op.mem.index))
-					return true;
-			}
-			if (op.mem.hasOffset) {
-				if (adbg_disasm_render_number(p, s, op.mem.offset, true))
-					return true;
-			}
-		} else { // Absolute (+far) or relative address
-			//TODO: address
+			if (s.adds(op.mem.index))
+				return true;
+		}
+		if (op.mem.scale) {
+			if (s.addf("*%u", op.mem.scale))
+				return true;
+		}
+		if (op.mem.hasOffset) {
+			bool addPlus = op.mem.base != null || op.mem.index != null;
+			if (adbg_disasm_render_number(p, s, op.mem.offset, addPlus))
+				return true;
 		}
 		
 		return s.addc(']');

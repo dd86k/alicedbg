@@ -325,10 +325,8 @@ int cmd_c_quit(int argc, const(char) **argv) {
 int cmd_handler(exception_t *ex) {
 	memcpy(&globals.app.last_exception, ex, exception_t.sizeof);
 	
-	printf(
-	"*	Thread %d stopped for: %s ("~SYS_ERR_FMT~")\n",
-	ex.tid, adbg_exception_string(ex.type), ex.oscode,
-	);
+	printf("*	Thread %d stopped for: %s ("~SYS_ERR_FMT~")\n",
+		ex.tid, adbg_exception_string(ex.type), ex.oscode);
 	
 	int length = void;
 	int argc = void;
@@ -336,14 +334,17 @@ int cmd_handler(exception_t *ex) {
 	
 	if (ex.fault) {
 		printf("	Fault address: %zx\n", ex.fault.sz);
-		adbg_disasm_start_debuggee(&globals.app.disasm, AdbgDisasmMode.data, ex.fault.sz);
 		adbg_disasm_opcode_t op = void;
-		if (adbg_disasm(&globals.app.disasm, &op)) {
-			printf("	Faulting instruction: (error:%s)\n",
-				adbg_error_msg);
-		} else {
-			//printf("	Faulting instruction: [%s] %s\n",
-			//	op.machine, op.mnemonic);
+		if (adbg_disasm_once_debuggee(&globals.app.disasm, &op,
+			AdbgDisasmMode.file, ex.fault.sz)) {
+			printf("	Faulting instruction: (error:%s)\n", adbg_error_msg);
+		} else with (globals.app) {
+			adbg_disasm_mnemonic(&disasm,
+				bufferMnemonic.ptr, BUFFER_DISASM_SIZE, &op);
+			adbg_disasm_machine(&disasm,
+				bufferMachine.ptr, BUFFER_DISASM_SIZE, &op);
+			printf("	Faulting instruction: [%s] %s\n",
+				bufferMachine.ptr, bufferMnemonic.ptr);
 		}
 	}
 	
