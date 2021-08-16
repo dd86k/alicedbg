@@ -327,7 +327,7 @@ template STRVER(uint ver) {
 
 immutable(char) *fmt_version =
 "alicedbg "~ADBG_VERSION~TYPE~" (built: "~__TIMESTAMP__~")\n"~
-"Copyright (c) dd <dd86k> 2019-2021\n"~
+"Copyright (c) dd86k <dd@dax.moe> 2019-2021\n"~
 "Compiler: "~__VENDOR__~" "~STRVER!__VERSION__~"\n"~
 "Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
 "Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
