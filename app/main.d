@@ -7,12 +7,13 @@
  */
 module main;
 
-import core.stdc.stdlib : malloc, strtol, exit, EXIT_SUCCESS, EXIT_FAILURE;
-import core.stdc.string : strcmp;
-import core.stdc.stdio;
 import adbg.platform;
 import adbg.dbg : adbg_attach, adbg_load;
 import adbg.disasm;
+import adbg.etc.c.stdlib : exit;
+import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
+import core.stdc.string : strcmp;
+import core.stdc.stdio;
 import common, ui, dumper, analyzer;
 
 private:
@@ -305,7 +306,7 @@ int cli_help() {
 	}
 	puts("\nFor a list of values, for example a list of platforms, type '-m help'");
 	exit(0);
-	static if (!COMPILER_FEAT_NORETURN) return 0;
+	return 0;
 }
 
 //
@@ -318,8 +319,7 @@ else  private enum TYPE = "";
 // Turns a __VERSION__ number into a string constant
 template STRVER(uint ver) {
 	enum STRVER =
-		cast(char)((ver / 1000) + '0') ~
-		"." ~
+		cast(char)((ver / 1000) + '0') ~ "." ~
 		cast(char)(((ver % 1000) / 100) + '0') ~
 		cast(char)(((ver % 100) / 10) + '0') ~
 		cast(char)((ver % 10) + '0');
@@ -327,6 +327,7 @@ template STRVER(uint ver) {
 
 immutable(char) *fmt_version =
 "alicedbg "~ADBG_VERSION~TYPE~" (built: "~__TIMESTAMP__~")\n"~
+"Copyright (c) dd <dd86k> 2019-2021\n"~
 "Compiler: "~__VENDOR__~" "~STRVER!__VERSION__~"\n"~
 "Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
 "Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
@@ -337,12 +338,12 @@ immutable(char) *fmt_version =
 int cli_version() {
 	puts(fmt_version);
 	exit(0);
-	static if (!COMPILER_FEAT_NORETURN) return 0;
+	return 0;
 }
 int cli_ver() {
 	puts(ADBG_VERSION);
 	exit(0);
-	static if (!COMPILER_FEAT_NORETURN) return 0;
+	return 0;
 }
 
 //
@@ -382,7 +383,7 @@ OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`
 	);
 	exit(0);
-	static if (!COMPILER_FEAT_NORETURN) return 0;
+	return 0;
 }
 
 //
@@ -403,7 +404,7 @@ int cli_meow() {
 `
 	);
 	exit(0);
-	static if (!COMPILER_FEAT_NORETURN) return 0;
+	return 0;
 }
 
 //
