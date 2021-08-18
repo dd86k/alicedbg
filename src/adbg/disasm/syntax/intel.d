@@ -31,7 +31,10 @@ bool adbg_disasm_operand_intel(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_d
 				return true;
 		}
 		return adbg_disasm_render_number(p, s, op.imm.value, false);
-	case register:  return s.adds(op.reg.name);
+	case register:
+		if (s.adds(op.reg.name))
+			return true;
+		return op.reg.isStack ? s.addf("(%u)", op.reg.index) : false;
 	case memory:
 		if (s.adds(INTEL_WIDTH[p.memWidth]))
 			return true;

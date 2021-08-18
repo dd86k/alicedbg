@@ -459,9 +459,50 @@ L_DECODE:
 			return 0;
 		}
 	}
-	if (opcode < 0xB0) { // A0H..AFH: 
-		//NOTE: Remainder opcode A0-A3 is real=16b,extended=32b,long=64b
+	if (opcode < 0xB0) { // A0H..AFH: MOV/MOVS/CMPS/TEST/STOS/LODS/SCAS
+		D = (opcode & 2) != 0;
+		W = opcode & 1;
 		
+		if (opcode < 0xa4) { // MOV
+			union ut {
+				ulong  u64;
+				uint   u32;
+				ushort u16;
+			} ut u = void;
+			
+			switch (x86.pfAddr) with (AdbgDisasmType) {
+			case i16:
+				adbg_disasm_fetch!ushort(p, &u.u16, AdbgDisasmTag.disp);
+				break;
+			case i32:
+				adbg_disasm_fetch!uint(p, &u.u32, AdbgDisasmTag.disp);
+				break;
+			default:
+				adbg_disasm_fetch!ulong(p, &u.u64, AdbgDisasmTag.disp);
+				break;
+			}
+			
+			if (p.mode < AdbgDisasmMode.file)
+				return 0;
+			
+			if (x86.pfSegment == 0)
+				x86.pfSegment = x86Segment.ds;
+			
+			AdbgDisasmType dwidth = W ? x86.pfData : AdbgDisasmType.i8;
+			mnemonic = regs[dwidth][x86Reg.al];
+			adbg_disasm_add_segment(p, segs[x86.pfSegment]);
+			adbg_disasm_add_mnemonic(p, M_MOV);
+			
+			if (D) {
+				adbg_disasm_add_memory(p, dwidth, null, null, x86.pfAddr, &u.u64, 0, false);
+				adbg_disasm_add_register(p, mnemonic);
+			} else {
+				adbg_disasm_add_register(p, mnemonic);
+				adbg_disasm_add_memory(p, dwidth, null, null, x86.pfAddr, &u.u64, 0, false);
+			}
+			return 0;
+		}
+		// MOVS 
 	}
 	
 	return adbg_oops(AdbgError.notImplemented);

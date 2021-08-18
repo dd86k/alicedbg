@@ -706,7 +706,9 @@ struct adbg_disasm_operand_imm_t {
 /// Register operand
 //package
 struct adbg_disasm_operand_reg_t {
-	const(char) *name;
+	const(char) *name;	/// Register name
+	int index;	/// If indexed, adds an index to register
+	bool isStack;	/// x86: Applies to x87
 }
 
 /// Memory operand
@@ -838,7 +840,7 @@ bool adbg_disasm_render_number(adbg_disasm_t *p,
 		}
 		if (s.adds(prefix)) // temp
 			return true;
-		if (s.addx32(n.i32))
+		if (s.addx64(n.i64))
 			return true;
 		break;
 	default: assert(0);
@@ -920,15 +922,18 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmType w, void *v, usho
 // register operand type
 
 package
-void adbg_disasm_add_register(adbg_disasm_t *p, const(char) *register) {
+void adbg_disasm_add_register(adbg_disasm_t *p,
+	const(char) *register, int index = 0, bool indexed = false) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
 	version (Trace) trace("register=%s", register);
 	
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
-	item.type     = AdbgDisasmOperand.register;
-	item.reg.name = register;
+	item.type      = AdbgDisasmOperand.register;
+	item.reg.name  = register;
+	item.reg.index = index;
+	item.reg.isStack = indexed;
 }
 
 // memory operand type
@@ -940,8 +945,6 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 	const(char) *regindex,
 	AdbgDisasmType dispWidth,
 	void *disp,
-	//TODO: ushort segment
-	//TODO: bool far
 	ubyte scale,
 	bool scaled) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
