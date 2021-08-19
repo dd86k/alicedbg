@@ -403,7 +403,7 @@ L_DECODE:
 			return adbg_disasm_x86_op_modrm(p, (opcode & 2) != 0, opcode & 1);
 		}
 	}
-	if (opcode < 0xA0) { // 90H..9FH: XCHG or random stuff
+	if (opcode < 0xa0) { // 90H..9FH: XCHG or random stuff
 		if (opcode < 0x98) { // XCHG
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
@@ -458,7 +458,7 @@ L_DECODE:
 			return 0;
 		}
 	}
-	if (opcode < 0xB0) { // A0H..AFH: MOV/MOVS/CMPS/TEST/STOS/LODS/SCAS
+	if (opcode < 0xb0) { // A0H..AFH: MOV/MOVS/CMPS/TEST/STOS/LODS/SCAS
 		D = (opcode & 2) != 0;
 		W = opcode & 1;
 		AdbgDisasmType dwidth = W ? x86.pfData : AdbgDisasmType.i8;
@@ -537,7 +537,7 @@ L_DECODE:
 			return 0;
 		}
 		// AAH..AFH: STOS/LODS/SCAS
-		if (p.mode < AdbgDisasmMode.file) 
+		if (p.mode < AdbgDisasmMode.file)
 			return 0;
 		
 		opcode = cast(ubyte)((opcode >> 1) - 0x55);
@@ -563,6 +563,17 @@ L_DECODE:
 			adbg_disasm_add_memory2(p, dwidth, &Y);
 			return 0;
 		}
+	}
+	if (opcode < 0xc0) { // B0H..BFH: MOV reg, Ib/Iz
+		W = opcode >= 0xb8;
+		if (p.mode >= AdbgDisasmMode.file) {
+			opcode &= 7;
+			if (x86.vexB) opcode |= 0b1000;
+			AdbgDisasmType dw = W ? x86.pfData : AdbgDisasmType.i8;
+			adbg_disasm_add_mnemonic(p, M_MOV);
+			adbg_disasm_add_register(p, regs[dw][opcode]);
+		}
+		return W ? adbg_disasm_x86_op_Iz(p) : adbg_disasm_x86_op_Ib(p);
 	}
 	
 	return adbg_oops(AdbgError.notImplemented);
@@ -946,7 +957,7 @@ int adbg_disasm_x86_grp1a(adbg_disasm_t *p) {	// ANCHOR Group 1a
 	if (e) return e;
 	
 	ubyte reg  = (modrm >> 3) & 7;
-	if (reg > 0) //TODO: MODRM:REG >=1 -> XOP
+	if (reg > 0) //TODO: XOP
 		return adbg_oops(AdbgError.notImplemented);
 	
 	ubyte mode = modrm >> 6;
