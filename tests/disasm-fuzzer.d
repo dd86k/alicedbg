@@ -4,6 +4,19 @@ import adbg.disasm, adbg.etc.c;
 import core.stdc.stdlib, core.stdc.time;
 import std.stdio;
 
+//TODO: Increment instead of random
+//      with modes: x86-16, x86-32, x86-64
+//      with groups:
+//      +26h/2eh/36h/3eh/64h/65h
+//      +66h
+//      +67h
+//      +0f
+//      +0f 38
+//      +0f 3a
+//      +REX
+//      +VEX
+//      +EVEX
+
 enum BUFSIZE = 3;
 enum size_t MAX_COUNTER = 50_000;
 enum size_t MAX_STAGE = 6;

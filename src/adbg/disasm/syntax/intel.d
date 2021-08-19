@@ -42,8 +42,8 @@ bool adbg_disasm_operand_intel(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_d
 			return true;
 		
 		//TODO: p.decoderOpts.noSegment
-		if (p.opcode.segment) {
-			if (s.adds(p.opcode.segment))
+		if (op.mem.segment) {
+			if (s.adds(op.mem.segment))
 				return true;
 			if (s.addc(':'))
 				return true;

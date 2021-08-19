@@ -339,9 +339,9 @@ int cmd_handler(exception_t *ex) {
 			printf("	Faulting instruction: (error:%s)\n", adbg_error_msg);
 		} else with (globals.app) {
 			adbg_disasm_mnemonic(&disasm,
-				bufferMnemonic.ptr, BUFFER_DISASM_SIZE, &op);
+				bufferMnemonic.ptr, bufferMnemonic.sizeof, &op);
 			adbg_disasm_machine(&disasm,
-				bufferMachine.ptr, BUFFER_DISASM_SIZE, &op);
+				bufferMachine.ptr, bufferMachine.sizeof, &op);
 			printf("	Faulting instruction: [%s] %s\n",
 				bufferMachine.ptr, bufferMnemonic.ptr);
 		}

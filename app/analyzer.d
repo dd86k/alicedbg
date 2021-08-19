@@ -27,21 +27,19 @@ int analyze() {
 		adbg_disasm_opcode_t opcode = void;
 		int err = adbg_disasm_once_buffer(
 			&disasm, &opcode, AdbgDisasmMode.file, &inputHex, inputHexSize);
-		adbg_disasm_machine(&disasm, bufferMachine.ptr, BUFFER_DISASM_SIZE, &opcode);
+		adbg_disasm_machine(&disasm, bufferMachine.ptr, bufferMachine.sizeof, &opcode);
 		printf("output     : (%u) %s\n", opcode.size, bufferMachine.ptr);
 		
 		if (err) return printerror();
 		
 		// mnemonic
-		adbg_disasm_mnemonic(&disasm, bufferMnemonic.ptr, BUFFER_DISASM_SIZE, &opcode);
+		adbg_disasm_mnemonic(&disasm, bufferMnemonic.ptr, bufferMnemonic.sizeof, &opcode);
 		printf("instruction: %s\n", bufferMnemonic.ptr);
 		printf("prefixes   :");
 		for (size_t pi; pi < opcode.prefixCount; ++pi) with (opcode) {
 			printf(" %s", prefixes[pi].name);
 		}
 		putchar('\n');
-		if (opcode.segment)
-			printf("segment    : %s\n", opcode.segment);
 		with (opcode) printf("mnemonic   : %s\noperands   :", mnemonic);
 		for (size_t ai; ai < opcode.operandCount; ++ai) with (opcode) {
 			adbg_disasm_operand_t *operand = &operands[ai];

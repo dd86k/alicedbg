@@ -17,11 +17,6 @@ public:
 extern (C):
 __gshared:
 
-/// Disassembler string buffer size
-enum BUFFER_DISASM_SIZE = 40;
-/// 
-enum BUFFER_HEX_SIZE = 32;
-
 /// Application error
 enum AppError {
 	none,
@@ -87,10 +82,10 @@ struct settings_t {
 		adbg_disasm_t disasm;	/// Disassembler
 		exception_t last_exception;	/// Last exception
 		FILE *inputFile;	/// 
-		ubyte[BUFFER_HEX_SIZE] inputHex;	/// 
+		ubyte[32] inputHex;	/// 
 		size_t inputHexSize;	/// 
-		char[BUFFER_DISASM_SIZE] bufferMnemonic;	/// For disassembly
-		char[BUFFER_DISASM_SIZE] bufferMachine;	/// For disassembly
+		char[60] bufferMnemonic;	/// For disassembly
+		char[40] bufferMachine;	/// For disassembly
 	}
 	cli_settings_t cli;
 	app_settings_t app;

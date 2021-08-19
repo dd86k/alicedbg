@@ -501,7 +501,7 @@ int main(int argc, const(char)** argv) {
 	switch (globals.cli.mode) {
 	case SettingMode.analyze:
 		if (globals.cli.file == null) {
-			puts("main: hex input required");
+			puts("main: base16 input required");
 			return EXIT_FAILURE;
 		}
 		const(char) *s = globals.cli.file;
@@ -509,7 +509,7 @@ int main(int argc, const(char)** argv) {
 		bool upper = true;
 		ubyte b = void, bh = void;
 		size_t bi, si;
-		for (; bi < BUFFER_HEX_SIZE; ++si) {
+		for (; bi < globals.app.inputHex.sizeof; ++si) {
 			char c = s[si];
 			if (c == 0) break;
 			

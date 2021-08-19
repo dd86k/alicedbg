@@ -47,9 +47,9 @@ int loop_handler(exception_t *e) {
 			printf("> %p: (error:%s)\n", e.fault.raw, adbg_error_msg);
 		} else with (globals.app) {
 			adbg_disasm_mnemonic(&disasm,
-				bufferMnemonic.ptr, BUFFER_DISASM_SIZE, &op);
+				bufferMnemonic.ptr, bufferMnemonic.sizeof, &op);
 			adbg_disasm_machine(&disasm,
-				bufferMachine.ptr, BUFFER_DISASM_SIZE, &op);
+				bufferMachine.ptr, bufferMachine.sizeof, &op);
 			printf("> %p: (%s) %s\n",
 				e.fault.raw, bufferMachine.ptr, bufferMnemonic.ptr);
 		}

@@ -302,7 +302,7 @@ struct adbg_disasm_opcode_t {
 //	ulong targetAddress;	/// CALL/JMP absolute target
 //	union targetOffset;	/// CALL/JMP relative target
 	// file mode:
-	const(char) *segment;	/// Segment register string
+	deprecated const(char) *segment;	/// Segment register string
 	const(char) *mnemonic;	/// Instruction mnemonic
 	size_t operandCount;	/// Number of operands
 	adbg_disasm_operand_t[ADBG_MAX_OPERANDS] operands;	/// Operands
@@ -526,7 +526,7 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 		return adbg_oops(AdbgError.uninitiated);
 	
 	with (op) { // reset opcode
-		mnemonic = segment = null;
+		mnemonic = null;
 		size = machineCount = prefixCount = operandCount = 0;
 	}
 	with (p) { // reset disasm
@@ -553,7 +553,8 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	
 	bool isHyde = p.syntax == AdbgSyntax.hyde;
 	
-	if (isHyde) {
+	//TODO: hyde segment
+	/*if (isHyde) {
 		//TODO: p.decoderOpts.noSegment
 		if (p.opcode.segment) {
 			if (s.addc(p.opcode.segment[0]))
@@ -561,7 +562,7 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 			if (s.adds("seg: "))
 				return;
 		}
-	}
+	}*/
 	
 	// Prefixes, skipped if empty
 	version (Trace) trace("prefixCount=%u", op.prefixCount);
@@ -714,6 +715,7 @@ struct adbg_disasm_operand_reg_t {
 /// Memory operand
 //package
 struct adbg_disasm_operand_mem_t {
+	const(char) *segment;	/// Segment register
 	const(char) *base;	/// Base register, (scaled) SIB:BASE
 	const(char) *index;	/// Additional register, (scaled) SIB:INDEX
 	ubyte scale;	/// SIB:SCALE
@@ -743,6 +745,7 @@ struct adbg_disasm_operand_t { align(1):
 //TODO: Tag data with opcode/prefix/etc. you get the point
 package
 int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, AdbgDisasmTag tag = AdbgDisasmTag.unknown) {
+	version (Trace) trace("size=%u", p.opcode.size);
 	if (p.opcode.size + T.sizeof > p.max)
 		return adbg_oops(AdbgError.opcodeLimit);
 	//TODO: Auto bswap if architecture endian is different than target
@@ -762,6 +765,7 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, AdbgDisasmTag tag = AdbgDisasmT
 	default: assert(0);
 	}
 	
+	version (Trace) trace("left=%u", p.left);
 	p.current.sz += T.sizeof;
 	p.opcode.size += T.sizeof;
 	
@@ -880,6 +884,7 @@ void adbg_disasm_add_mnemonic(adbg_disasm_t *p, const(char) *instruction) {
 //
 
 // set segment register
+deprecated
 package
 void adbg_disasm_add_segment(adbg_disasm_t *p, const(char) *segment) {
 	version (Trace) trace("segment=%s", segment);
@@ -891,19 +896,58 @@ void adbg_disasm_add_segment(adbg_disasm_t *p, const(char) *segment) {
 // ANCHOR Operand operations
 //
 
-// immediate operand type
-
+// select operand
 private
 adbg_disasm_operand_t* adbg_disasm_get_operand(adbg_disasm_t *p) {
 	return cast(adbg_disasm_operand_t*)&p.opcode.operands[p.opcode.operandCount++];
 }
 
+// set immediate
+/*package
+void adbg_disasm_set_imm() {
+}*/
+
+// set register
+/*package
+void adbg_disasm_set_reg() {
+}*/
+
+// set memory
 package
-void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmType w, void *v, ushort segment = 0) {
+void adbg_disasm_set_mem(adbg_disasm_operand_mem_t *mem,
+	const(char) *segment,
+	const(char) *regbase,
+	const(char) *regindex,
+	AdbgDisasmType dispWidth,
+	void *disp,
+	ubyte scale,
+	bool scaled) {
+	mem.segment = segment;
+	mem.base    = regbase;
+	mem.index   = regindex;
+	mem.scale   = scale;
+	mem.scaled	 = scaled;
+	mem.hasOffset = disp != null;
+	if (disp) {
+		mem.offset.type = dispWidth;
+		switch (dispWidth) with (AdbgDisasmType) {
+		case i8:  mem.offset.u8  = *cast(ubyte*)disp;  return;
+		case i16: mem.offset.u16 = *cast(ushort*)disp; return;
+		case i32: mem.offset.u32 = *cast(uint*)disp;   return;
+		case i64: mem.offset.u64 = *cast(ulong*)disp;  return;
+		default: assert(0);
+		}
+	}
+}
+
+// add immediate
+package
+void adbg_disasm_add_immediate(adbg_disasm_t *p,
+	AdbgDisasmType w, void *v, ushort segment = 0) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
-	version (Trace) trace("type=%u", w);
+	version (Trace) trace("type=%u v=%p segment=%u", w, v, segment);
 	
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
 	item.type = AdbgDisasmOperand.immediate;
@@ -919,15 +963,14 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p, AdbgDisasmType w, void *v, usho
 	}
 }
 
-// register operand type
-
+// add register
 package
 void adbg_disasm_add_register(adbg_disasm_t *p,
 	const(char) *register, int index = 0, bool indexed = false) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
-	version (Trace) trace("register=%s", register);
+	version (Trace) trace("name=%s index=%d indexed=%d", register, index, indexed);
 	
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
 	item.type      = AdbgDisasmOperand.register;
@@ -936,11 +979,11 @@ void adbg_disasm_add_register(adbg_disasm_t *p,
 	item.reg.isStack = indexed;
 }
 
-// memory operand type
-
+// add memory
 package
 void adbg_disasm_add_memory(adbg_disasm_t *p,
 	AdbgDisasmType width,
+	const(char) *segment,
 	const(char) *regbase,
 	const(char) *regindex,
 	AdbgDisasmType dispWidth,
@@ -950,19 +993,29 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
-	version (Trace) trace("base=%s", regbase);
+	version (Trace) {
+		trace("width=%u base=%s index=%s dwidth=%u disp=%p scale=%u scaled=%d",
+			width, regbase, regindex, dispWidth, disp, scale, scaled);
+		switch (dispWidth) with (AdbgDisasmType) {
+		case i8:  trace("disp=%x", *cast(ubyte*)disp); break;
+		case i16: trace("disp=%x", *cast(ushort*)disp); break;
+		case i32: trace("disp=%x", *cast(uint*)disp); break;
+		case i64: trace("disp=%x", *cast(ulong*)disp); break;
+		default: assert(0);
+		}
+	}
 	
-	p.memWidth      = width;
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
-	item.type       = AdbgDisasmOperand.memory;
-	item.mem.base	= regbase;
-	item.mem.index	= regindex;
-	item.mem.scale	= scale;
-	item.mem.scaled	= scaled;
+	p.memWidth       = width;
+	item.type        = AdbgDisasmOperand.memory;
+	item.mem.segment = segment;
+	item.mem.base    = regbase;
+	item.mem.index   = regindex;
+	item.mem.scale   = scale;
+	item.mem.scaled	 = scaled;
 	item.mem.hasOffset = disp != null;
-	
 	if (disp) {
-		item.mem.offset.type	= dispWidth;
+		item.mem.offset.type = dispWidth;
 		switch (dispWidth) with (AdbgDisasmType) {
 		case i8:  item.mem.offset.u8  = *cast(ubyte*)disp;  return;
 		case i16: item.mem.offset.u16 = *cast(ushort*)disp; return;
@@ -974,7 +1027,7 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 }
 
 package
-void adbg_disasm_add_memory_raw(adbg_disasm_t *p, AdbgDisasmType width, adbg_disasm_operand_mem_t *m) {
+void adbg_disasm_add_memory2(adbg_disasm_t *p, AdbgDisasmType width, adbg_disasm_operand_mem_t *m) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
