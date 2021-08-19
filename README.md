@@ -13,7 +13,7 @@ The library supports:
 - Debugging
   - Windows (msvcrt) and Linux (Glibc and Musl).
 - Disassembly
-  - Platforms: x86-16, x86-32, and x86-64.
+  - Platforms: x86.
   - Syntaxes: Intel, Nasm, and AT&T, HLA, and TASM.
 - Compiles under DMD, GDC, and LDC.
 
@@ -21,11 +21,11 @@ The application supports:
 - Debugging (default)
   - UIs: Loop and command-line
 - Dumping (`-D|--dump`)
-  - ELF and PE32 images.
+  - PE32 and ELF images.
 - Instruction analysis (`-A|--analyze`)
   - Base16 input.
 
-Written from scratch for education purposes.
+Written from scratch for educational purposes.
 
 # Documentation
 
