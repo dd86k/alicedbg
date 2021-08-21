@@ -8,11 +8,21 @@ private __gshared const(char)*[] opType = [
 ];
 private __gshared const(char)*[] opWith = [
 	"i8", "i16", "i32", "i64", "i128", "i256", "i512", "i1024",
-	"f16", "f32", "f64", null, null, null, null, null,
+	"f16", "f32", "f64", "f128", "far", "f80", null, null,
 ];
 private __gshared const(char)*[] maTags = [
-	"UNKNOWN", "OPCODE", "PREFIX", "OPERAND",
-	"IMMEDIATE", "DISP", "SEGMENT", "MODRM", "SIB",
+	"UNKNOWN",
+	"OPCODE",
+	"PREFIX",
+	"OPERAND",
+	"IMMEDIATE",
+	"DISPLACEMENT",
+	"SEGMENT",
+	"MODRM",
+	"SIB",
+	"REX",
+	"VEX",
+	"EVEX",
 ];
 
 int analyze() {
@@ -30,7 +40,10 @@ int analyze() {
 		adbg_disasm_machine(&disasm, bufferMachine.ptr, bufferMachine.sizeof, &opcode);
 		printf("output     : (%u) %s\n", opcode.size, bufferMachine.ptr);
 		
-		if (err) return printerror();
+		if (err) {
+			printf("error      : ");
+			return printerror();
+		}
 		
 		// mnemonic
 		adbg_disasm_mnemonic(&disasm, bufferMnemonic.ptr, bufferMnemonic.sizeof, &opcode);

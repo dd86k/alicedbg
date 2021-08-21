@@ -12,10 +12,8 @@ import adbg.disasm, adbg.utils.str;
 extern (C):
 
 private immutable const(char)*[] TASM_WIDTH = [
-	"byte",    "word",    "dword",   "qword",
-	"xmmword", "ymmword", "zmmword", UNKNOWN_TYPE,
-	UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE,
-	UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE,
+	"byte", "word", "dword", "qword", "xmmword", "ymmword", "zmmword", UNKNOWN_TYPE,
+	"word", "dword", "qword", "xmmword", "fword", "tword", UNKNOWN_TYPE, UNKNOWN_TYPE,
 ];
 
 // render tasm

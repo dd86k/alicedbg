@@ -548,7 +548,6 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	if (p.opcode.mnemonic == null)
 		return;
 	
-	__gshared const(char) *sep = ", ";
 	adbg_string_t s = adbg_string_t(buffer, size);
 	
 	bool isHyde = p.syntax == AdbgSyntax.hyde;
@@ -597,36 +596,48 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	//      + Would also help to move it out of the configuration function.
 	//      + Syntax-related configuration here instead (direction, etc.).
 	//      - Every call would have the syntax option.
+	//TODO: Consider letting syntax do its own things
+	//      e.g., with AT&T, if the two operands are immediates, they do not flip
 	
 	switch (p.syntax) with (AdbgSyntax) {
 	case hyde:
-		if (s.addc('('))
-			return;
-		goto case att;
+		if (s.addc('(')) return;
+		adbg_disasm_mnemonic_right(p, s, op);
+		if (s.addc(')')) return;
+		return;
 	case att:
-		for (size_t i = op.operandCount; i-- > 0;) {
-			version (Trace) trace("i=%u", cast(uint)i);
-			if (p.foperand(p, s, op.operands[i]))
-				return;
-			if (i)
-				if (s.adds(sep))
-					return;
-		}
-		if (isHyde)
-			if (s.addc(')'))
-				return;
+		if (p.noReverse) 
+			adbg_disasm_mnemonic_left(p, s, op);
+		else
+			adbg_disasm_mnemonic_right(p, s, op);
 		return;
 	default:
-		size_t opCount = op.operandCount - 1;
-		for (size_t i; i <= opCount; ++i) {
-			version (Trace) trace("i=%u", cast(uint)i);
-			if (p.foperand(p, s, op.operands[i]))
-				return;
-			if (i < opCount)
-				if (s.adds(sep))
-					return;
-		}
+		adbg_disasm_mnemonic_left(p, s, op);
 		return;
+	}
+}
+private __gshared const(char) *sep = ", ";
+private
+void adbg_disasm_mnemonic_right(adbg_disasm_t *p, ref adbg_string_t str, adbg_disasm_opcode_t *op) {
+	for (size_t i = op.operandCount; i-- > 0;) {
+		version (Trace) trace("i=%u", cast(uint)i);
+		if (p.foperand(p, str, op.operands[i]))
+			return;
+		if (i)
+			if (str.adds(sep))
+				return;
+	}
+}
+private
+void adbg_disasm_mnemonic_left(adbg_disasm_t *p, ref adbg_string_t str, adbg_disasm_opcode_t *op) {
+	size_t opCount = op.operandCount - 1;
+	for (size_t i; i <= opCount; ++i) {
+		version (Trace) trace("i=%u", cast(uint)i);
+		if (p.foperand(p, str, op.operands[i]))
+			return;
+		if (i < opCount)
+			if (str.adds(sep))
+				return;
 	}
 }
 
@@ -673,7 +684,7 @@ public  alias adbg_disasm_delete = free;
 //package
 enum AdbgDisasmType : ubyte {
 	i8,  i16, i32, i64,  i128, i256, i512, i1024,
-	f16, f32, f64, f128,
+	f16, f32, f64, f128, far,  f80,  
 	none = 0,
 }
 
@@ -791,7 +802,7 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, AdbgDisasmTag tag = AdbgDisasmT
 
 // fix last tag
 package
-void adbg_disasm_fetch_tag(adbg_disasm_t *p, AdbgDisasmTag tag) {
+void adbg_disasm_fetch_lasttag(adbg_disasm_t *p, AdbgDisasmTag tag) {
 	p.opcode.machine[p.opcode.machineCount - 1].tag = tag;
 }
 
@@ -877,19 +888,6 @@ void adbg_disasm_add_mnemonic(adbg_disasm_t *p, const(char) *instruction) {
 	version (Trace) trace("mnemonic=%s", instruction);
 	
 	p.opcode.mnemonic = instruction;
-}
-
-//
-// ANCHOR Segment register
-//
-
-// set segment register
-deprecated
-package
-void adbg_disasm_add_segment(adbg_disasm_t *p, const(char) *segment) {
-	version (Trace) trace("segment=%s", segment);
-	
-	p.opcode.segment = segment;
 }
 
 //
