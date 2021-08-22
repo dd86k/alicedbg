@@ -12,8 +12,9 @@ import adbg.disasm, adbg.utils.str;
 extern (C):
 
 private immutable const(char)*[] NASM_WIDTH = [
-	"byte", "word", "dword", "qword", "oword", "yword", "zword", UNKNOWN_TYPE,
-	"word", "dword", "qword", "oword", "fword", "tword", UNKNOWN_TYPE, UNKNOWN_TYPE,
+	null,   "fword", "tword", UNKNOWN_TYPE,
+	UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE,
+	"byte", "word",  "dword", "qword", "oword", "yword", "zword",
 ];
 
 // render nasm
@@ -34,12 +35,13 @@ bool adbg_disasm_operand_nasm(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_di
 			return true;
 		return op.reg.index ? s.addf("(%u)", op.reg.index) : false;
 	case memory:
-		if (s.adds(NASM_WIDTH[p.memWidth]))
-			return true;
-		if (s.adds(" ptr ["))
-			return true;
+		if (p.memWidth) {
+			if (s.adds(NASM_WIDTH[p.memWidth]))
+				return true;
+			if (s.adds(" ptr ["))
+				return true;
+		}
 		
-		//TODO: p.decoderOpts.noSegment
 		if (op.mem.segment) {
 			if (s.adds(op.mem.segment))
 				return true;

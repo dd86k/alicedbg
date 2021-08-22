@@ -12,8 +12,9 @@ import adbg.disasm, adbg.utils.str;
 extern (C):
 
 private immutable const(char)*[] TASM_WIDTH = [
-	"byte", "word", "dword", "qword", "xmmword", "ymmword", "zmmword", UNKNOWN_TYPE,
-	"word", "dword", "qword", "xmmword", "fword", "tword", UNKNOWN_TYPE, UNKNOWN_TYPE,
+	null,   "fword", "tbyte", UNKNOWN_TYPE,
+	UNKNOWN_TYPE,UNKNOWN_TYPE,UNKNOWN_TYPE,UNKNOWN_TYPE,
+	"byte", "word",  "dword", "qword", "xmmword", "ymmword", "zmmword", UNKNOWN_TYPE,
 ];
 
 // render tasm
@@ -25,12 +26,14 @@ bool adbg_disasm_operand_ideal(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_d
 	case memory:
 		if (s.addc('['))
 			return true;
-		if (s.adds(TASM_WIDTH[p.memWidth]))
-			return true;
-		if (s.addc(' '))
-			return true;
 		
-		//TODO: p.decoderOpts.noSegment
+		if (p.memWidth) {
+			if (s.adds(TASM_WIDTH[p.memWidth]))
+				return true;
+			if (s.addc(' '))
+				return true;
+		}
+		
 		if (op.mem.segment) {
 			if (s.adds(op.mem.segment))
 				return true;

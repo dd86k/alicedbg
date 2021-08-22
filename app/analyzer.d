@@ -7,8 +7,9 @@ private __gshared const(char)*[] opType = [
 	"immediate", "register", "memory"
 ];
 private __gshared const(char)*[] opWith = [
-	"i8", "i16", "i32", "i64", "i128", "i256", "i512", "i1024",
-	"f16", "f32", "f64", "f128", "far", "f80", null, null,
+	"none", "far", "f80", null,
+	null,null,null,null,
+	"i8",   "i16", "i32", "i64", "i128", "i256", "i512", "i1024",
 ];
 private __gshared const(char)*[] maTags = [
 	"UNKNOWN",
@@ -79,10 +80,10 @@ int analyze() {
 			ubyte *p8 = &m.u8;
 			// NOTE: disasm fetch should be auto swapping these
 			switch (m.type) with (AdbgDisasmType) {
-			case i8:       z = 1; goto default;
-			case i16:      z = 2; goto default;
-			case i32, f32: z = 4; goto default;
-			case i64, f64: z = 8; goto default;
+			case i8:  z = 1; goto default;
+			case i16: z = 2; goto default;
+			case i32: z = 4; goto default;
+			case i64: z = 8; goto default;
 			default: while (--z >= 0) printf("%02x ", p8[z]);
 			}
 		}
@@ -93,10 +94,10 @@ int analyze() {
 				int w = void;
 				for (size_t mii; mii < mi; ++mii) {
 					switch (machine[mii].type) with (AdbgDisasmType) {
-					case i64, f64: w = 7; break;
-					case i32, f32: w = 3; break;
-					case i16:      w = 1; break;
-					default:       w = 0; break;
+					case i64: w = 7; break;
+					case i32: w = 3; break;
+					case i16: w = 1; break;
+					default:  w = 0; break;
 					}
 					printf(":  ");
 					while (w-- > 0) printf("   ");

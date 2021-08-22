@@ -12,8 +12,9 @@ import adbg.disasm, adbg.utils.str;
 extern (C):
 
 private immutable const(char)*[] HYDE_WIDTH = [
-	"byte", "word", "dword", "qword", "xmmword", "ymmword", "zmmword", UNKNOWN_TYPE,
-	"word", "dword", "qword", "xmmword", "fword", "tword", UNKNOWN_TYPE, UNKNOWN_TYPE,
+	null,   "fword", "tbyte", UNKNOWN_TYPE,
+	UNKNOWN_TYPE,UNKNOWN_TYPE,UNKNOWN_TYPE,UNKNOWN_TYPE,
+	"byte", "word",  "dword", "qword", "xmmword", "ymmword", "zmmword", UNKNOWN_TYPE,
 ];
 
 // render hla
@@ -23,11 +24,14 @@ bool adbg_disasm_operand_hyde(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_di
 	case immediate: return adbg_disasm_render_number(p, s, op.imm.value, false);
 	case register:  return s.adds(op.reg.name);
 	case memory:
-		if (s.adds("[type "))
-			return true;
-		if (s.adds(HYDE_WIDTH[p.memWidth]))
-			return true;
-		if (s.addc(' '))
+		if (p.memWidth) {
+			if (s.adds("[type "))
+				return true;
+			if (s.adds(HYDE_WIDTH[p.memWidth]))
+				return true;
+			if (s.addc(' '))
+				return true;
+		} else if (s.addc('['))
 			return true;
 		
 		if (op.mem.base)

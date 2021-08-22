@@ -42,7 +42,8 @@ struct option_t {
 }
 //TODO: --loop-log for turning the loop UI into an non-interactive session
 //TODO: --seh/--no-seh: Enable/disable internal SEH
-//TODO: --disasm-base: base address (useful for COM files)
+//TODO: -B/--disasm-base: base address (useful for COM files / org 0x100)
+//TODO: -e/--dump-skip: skip N bytes (or do +N)
 immutable option_t[] options = [
 	// general
 	{ 'm', "march",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },

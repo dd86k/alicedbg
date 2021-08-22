@@ -662,10 +662,10 @@ void adbg_disasm_machine(adbg_disasm_t *p, char *buffer, size_t size, adbg_disas
 	size_t edge = op.machineCount - 1;
 	for (size_t i; i < op.machineCount; ++i, ++num) {
 		switch (num.type) with (AdbgDisasmType) {
-		case i8:       s.addx8(num.i8, true); break;
-		case i16:      s.addx16(num.i16, true); break;
-		case i32, f32: s.addx32(num.i32, true); break;
-		case i64, f64: s.addx64(num.i64, true); break;
+		case i8:  s.addx8(num.i8, true); break;
+		case i16: s.addx16(num.i16, true); break;
+		case i32: s.addx32(num.i32, true); break;
+		case i64: s.addx64(num.i64, true); break;
 		default:  assert(0);
 		}
 		if (i < edge) s.addc(' ');
@@ -680,12 +680,11 @@ public  alias adbg_disasm_delete = free;
 // SECTION Decoder stuff
 //
 
-/// Memory type
+/// Data types
 //package
 enum AdbgDisasmType : ubyte {
-	i8,  i16, i32, i64,  i128, i256, i512, i1024,
-	f16, f32, f64, f128, far,  f80,  
-	none = 0,
+	none, far, f80, _res3_, _res4_, _res5_, _res6_, _res7_,
+	i8,   i16, i32, i64, i128, i256, i512, i1024,
 }
 
 /// Main operand types.

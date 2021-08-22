@@ -35,7 +35,6 @@ bool adbg_disasm_operand_att(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_dis
 			return true;
 		return op.reg.isStack ? s.addf("(%u)", op.reg.index) : false;
 	case memory:
-		//TODO: p.decoderOpts.noSegment
 		if (op.mem.segment) {
 			if (s.addc('%'))
 				return true;
