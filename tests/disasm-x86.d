@@ -4,21 +4,21 @@ import adbg.disasm : AdbgDisasmType;
 import tests.disasm;
 
 immutable InstructionTest[] meta_x86_16 = [
-	{	// add dword ptr [eax], al
+	{	// add byte ptr [bx+si], al
 		[ 0x00, 0x00 ],
 		AdbgError.none,
 		"add",
 		[
-			InstructionOperand(AdbgDisasmType.i32, "bx", "si", 0, 0),
+			InstructionOperand(AdbgDisasmType.i8, "bx", "si", 0, 0),
 			InstructionOperand("al"),
 		]
 	},
-	{	// add dword ptr [eax], eax
+	{	// add word ptr [bx+si], ax
 		[ 0x01, 0x00 ],
 		AdbgError.none,
 		"add",
 		[
-			InstructionOperand(AdbgDisasmType.i32, "bx", "si", 0, 0),
+			InstructionOperand(AdbgDisasmType.i16, "bx", "si", 0, 0),
 			InstructionOperand("ax"),
 		]
 	},
@@ -63,6 +63,88 @@ immutable InstructionTest[] meta_x86_32 = [
 		AdbgError.none,
 		"int3",
 	},
+	// SECTION ESCAPES
+	{	// fadd dword ptr [eax]
+		[ 0xd8, 0x00 ],
+		AdbgError.none,
+		"fadd",
+		[
+			InstructionOperand(AdbgDisasmType.i32, "eax", null, 0, 0),
+		]
+	},
+	{	// fmul dword ptr [eax]
+		[ 0xd8, 0x09 ],
+		AdbgError.none,
+		"fmul",
+		[
+			InstructionOperand(AdbgDisasmType.i32, "ecx", null, 0, 0),
+		]
+	},
+	{	// fcom dword ptr [eax]
+		[ 0xd8, 0x10 ],
+		AdbgError.none,
+		"fcom",
+		[
+			InstructionOperand(AdbgDisasmType.i32, "eax", null, 0, 0),
+		]
+	},
+	{	// fcomp dword ptr [eax]
+		[ 0xd8, 0x18 ],
+		AdbgError.none,
+		"fcomp",
+		[
+			InstructionOperand(AdbgDisasmType.i32, "eax", null, 0, 0),
+		]
+	},
+	{	// fsub dword ptr [eax]
+		[ 0xd8, 0x20 ],
+		AdbgError.none,
+		"fsub",
+		[
+			InstructionOperand(AdbgDisasmType.i32, "eax", null, 0, 0),
+		]
+	},
+	{	// fsubr dword ptr [eax]
+		[ 0xd8, 0x28 ],
+		AdbgError.none,
+		"fsubr",
+		[
+			InstructionOperand(AdbgDisasmType.i32, "eax", null, 0, 0),
+		]
+	},
+	{	// fdiv dword ptr [eax]
+		[ 0xd8, 0x30 ],
+		AdbgError.none,
+		"fdiv",
+		[
+			InstructionOperand(AdbgDisasmType.i32, "eax", null, 0, 0),
+		]
+	},
+	{	// fdivr dword ptr [eax]
+		[ 0xd8, 0x38 ],
+		AdbgError.none,
+		"fdivr",
+		[
+			InstructionOperand(AdbgDisasmType.i32, "eax", null, 0, 0),
+		]
+	},
+	{	// fadd dword ptr [eax]
+		[ 0xd8, 0xc1 ],
+		AdbgError.none,
+		"fadd",
+		[
+			InstructionOperand("st", true, 1),
+		]
+	},
+	{	// fadd dword ptr [eax]
+		[ 0xd8, 0xc9 ],
+		AdbgError.none,
+		"fmul",
+		[
+			InstructionOperand("st", true, 1),
+		]
+	},
+	// !SECTION
 	/*{	// call dword ptr [eax]
 		[ 0xff, 0x10 ],
 		AdbgError.none,

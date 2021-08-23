@@ -21,9 +21,11 @@ struct InstructionOperand {
 		type = AdbgDisasmOperand.immediate;
 		imm.value.i32 = immediate;
 	}
-	this(const(char) *register) {
+	this(const(char) *register, bool indexed, int index) {
 		type = AdbgDisasmOperand.register;
 		reg.name = register;
+		reg.indexed = indexed;
+		reg.index = index;
 	}
 	this(AdbgDisasmType width, const(char) *base, const(char) *index, ubyte scale, int offset) {
 		type = AdbgDisasmOperand.register;

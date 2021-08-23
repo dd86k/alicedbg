@@ -24,15 +24,18 @@ extern (C):
 //       https://ftp.gnu.org/old-gnu/Manuals/gas-2.9.1/html_chapter/as_16.html
 // NOTE: F0/F2/F3/66 illegal with VEX/XOP
 
-//TODO: Additional processors: 8086, 80186, 80386
+//TODO: Additional processors: 8086, 80186, 80386, Intel64, AMD64
 //      Critical for 0x0f: 8086=pop cs, 80186+=2-byte
+//      And something else with MOVXSD
 //TODO: Check LOCK
 //      ADC, ADD, AND, BTC, BTR, BTS, CMPXCHG, CMPXCHG8B, CMPXCHG16B,
 //      DEC, INC, NEG, NOT, OR, SBB, SUB, XADD, XCHG, and XOR.
+//      only check if hasLock
 //TODO: Check REPE/REPZ and REPNE/REPNZ
 //      CMPS, CMPSB, CMPSD, CMPSW, SCAS, SCASB, SCASD, and SCASW.
+//      only check if hasRepe/hasRepne
 //TODO: Consider adbg_disasm_x86_add_mnemonic(adbg_disasm_t*,enum)
-//      Could check prefix data with enum value
+//      Could check prefix data (rep/repne/repnz/lock/etc.) with enum value
 
 private
 enum x86Group : ubyte {
@@ -686,6 +689,10 @@ L_PREFIX:
 			return adbg_disasm_x86_escape(p, opcode);
 		}
 	}
+	if (opcode < 0xf0) { // E0H..EFH: 
+		
+	}
+	// F0H..FFH: 
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
@@ -831,8 +838,7 @@ immutable const(char) *M_FLDENV	= "fldenv";
 immutable const(char) *M_FLDCW	= "fldcw";
 immutable const(char) *M_FSTENV	= "fstenv";
 immutable const(char) *M_FSTCW	= "fstcw";
-// ESCAPE D9H REGS
-immutable const(char) *M_FXCH	= "fstcw";
+immutable const(char) *M_FXCH	= "fxch";
 immutable const(char) *M_FNOP	= "fnop";	// D0H
 immutable const(char) *M_FCHS	= "fchs";	// E0H
 immutable const(char) *M_FABS	= "fabs";	// E1H
@@ -846,49 +852,79 @@ immutable const(char) *M_FLDLG2	= "fldlg2";	// ECH
 immutable const(char) *M_FLDLN2	= "fldln2";	// EDH
 immutable const(char) *M_FLDZ	= "fldz";	// EEH
 // ESCAPE DAH
+immutable const(char) *M_FIADD	= "fiadd";
+immutable const(char) *M_FIMUL	= "fimul";
+immutable const(char) *M_FICOM	= "ficom";
+immutable const(char) *M_FICOMP	= "ficomp";
+immutable const(char) *M_FISUB	= "fisub";
+immutable const(char) *M_FISUBR	= "fisubr";
+immutable const(char) *M_FIDIV	= "fidiv";
+immutable const(char) *M_FIDIVR	= "fidivr";
+immutable const(char) *M_FCMOVB	= "fcmovb";	// C0H..C7H
+immutable const(char) *M_FCMOVE	= "fcmove";	// C8H..CFH
+immutable const(char) *M_FCMOVBE	= "fcmovbe";	// D0H..D7H
+immutable const(char) *M_FCMOVU	= "fcmovu";	// D8H..DFH
+immutable const(char) *M_FUCOMPP	= "fucompp";	// E9H
+// ESCAPE DBH
+immutable const(char) *M_FILD	= "fild";
+immutable const(char) *M_FISTTP	= "fisttp";
+immutable const(char) *M_FIST	= "fist";
+immutable const(char) *M_FISTP	= "fistp";
+immutable const(char) *M_FCMOVNB	= "fcmovnb";	// reg=0
+immutable const(char) *M_FCMOVNE	= "fcmovne";	// reg=1
+immutable const(char) *M_FCMOVNBE	= "fcmovnbe";	// reg=2
+immutable const(char) *M_FCMOVNU	= "fcmovnu";	// reg=3
+immutable const(char) *M_FUCOMI	= "fucomi";	// reg=5
+immutable const(char) *M_FCOMI	= "fcomi";	// reg=6
+immutable const(char) *M_FCLEX	= "fclex";	// reg=4 rm=2
+immutable const(char) *M_FINIT	= "finit";	// reg=4 rm=3
+// ESCAPE DCH
+// ESCAPE DDH
+// ESCAPE DEH
+// ESCAPE DFH
 // SSE
 // AVX
 
 // ANCHOR Instruction tables
 
-immutable const(char)*[] M_GRP1 = [ // same for <40H
+immutable const(char)*[8] M_GRP1 = [ // same for <40H
 	M_ADD, M_OR, M_ADC, M_SBB, M_AND, M_SUB, M_XOR, M_CMP
 ];
-immutable const(char)*[] M_GRP2 = [
+immutable const(char)*[8] M_GRP2 = [
 	M_ROL, M_ROR, M_RCL, M_RCR, M_SHL, M_SHR, null, M_SAR
 ];
-immutable const(char)*[] M_ASCII = [
+immutable const(char)*[4] M_ASCII = [
 	M_DAA, M_DAS, M_AAA, M_AAS
 ];
-immutable const(char)*[] M_Jcc = [
+immutable const(char)*[16] M_Jcc = [
 	M_JO, M_JNO, M_JB, M_JNB, M_JZ, M_JNZ, M_JBE, M_JNBE,
 	M_JS, M_JNS, M_JP, M_JNP, M_JL, M_JNL, M_JLE, M_JNLE,
 ];
-immutable const(char)*[] M_STR1 = [
+immutable const(char)*[3] M_STR1 = [
 	M_STOS, M_LODS, M_SCAS
 ];
-immutable const(char)*[] M_X87_D8 = [
+immutable const(char)*[8] M_X87_D8 = [
 	M_FADD, M_FMUL, M_FCOM, M_FCOMP, M_FSUB, M_FSUBR, M_FDIV, M_FDIVR
 ];
-immutable const(char)*[] M_X87_D9 = [
+immutable const(char)*[8] M_X87_D9 = [
 	M_FLD, null, M_FST, M_FSTP, M_FLDENV, M_FLDCW, M_FSTENV, M_FSTCW
 ];
-immutable const(char)*[] M_X87_DA = [
+immutable const(char)*[8] M_X87_DA = [
+	M_FIADD, M_FIMUL, M_FICOM, M_FICOMP, M_FISUB, M_FISUBR, M_FIDIV, M_FIDIVR
+];
+immutable const(char)*[8] M_X87_DB = [
+	M_FILD, M_FISTTP, M_FIST, M_FISTP, null, M_FLD, null, M_FSTP
+];
+immutable const(char)*[8] M_X87_DC = [
 	
 ];
-immutable const(char)*[] M_X87_DB = [
+immutable const(char)*[8] M_X87_DD = [
 	
 ];
-immutable const(char)*[] M_X87_DC = [
+immutable const(char)*[8] M_X87_DE = [
 	
 ];
-immutable const(char)*[] M_X87_DD = [
-	
-];
-immutable const(char)*[] M_X87_DE = [
-	
-];
-immutable const(char)*[] M_X87_DF = [
+immutable const(char)*[8] M_X87_DF = [
 	
 ];
 
@@ -1167,8 +1203,8 @@ int adbg_disasm_x86_escape(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR x87 escap
 	case 0xd9:
 		if (regmode) {
 			switch (reg) {
-			case 0b000: mnemonic = M_FLD; goto L_REGISTER;
-			case 0b001: mnemonic = M_FXCH; goto L_REGISTER;
+			case 0b000: mnemonic = M_FLD; goto L_REG;
+			case 0b001: mnemonic = M_FXCH; goto L_REG;
 			default:
 				switch (modrm) {
 				case 0xd0: mnemonic = M_FNOP; break;
@@ -1197,13 +1233,54 @@ int adbg_disasm_x86_escape(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR x87 escap
 			if (reg == 1)
 				goto L_ILLEGAL;
 			mnemonic = M_X87_D9[reg];
-			goto L_MEMORY;
+			goto L_MEM;
 		}
 	case 0xda:
-	
-		break;
+		if (regmode) {
+			switch (reg) {
+			case 0: mnemonic = M_FCMOVB; goto L_REG;
+			case 1: mnemonic = M_FCMOVE; goto L_REG;
+			case 2: mnemonic = M_FCMOVBE; goto L_REG;
+			case 3: mnemonic = M_FCMOVU; goto L_REG;
+			default:
+			}
+			if (modrm != 0xe9)
+				goto L_ILLEGAL;
+			mnemonic = M_FUCOMPP;
+			goto L_NOOP;
+		} else {
+			width = AdbgDisasmType.i32;
+			mnemonic = M_X87_DA[reg];
+			goto L_MEM;
+		}
 	case 0xdb:
-	
+		if (regmode) {
+			switch (reg) {
+			case 0: mnemonic = M_FCMOVNB; break;
+			case 1: mnemonic = M_FCMOVNE; break;
+			case 2: mnemonic = M_FCMOVNBE; break;
+			case 3: mnemonic = M_FCMOVNU; break;
+			case 5: mnemonic = M_FUCOMI; break;
+			case 6: mnemonic = M_FCOMI; break;
+			case 4:
+				switch (rm) {
+				case 2: mnemonic = M_FCLEX; break;
+				case 3: mnemonic = M_FINIT; break;
+				default: goto L_ILLEGAL;
+				}
+				goto L_NOOP;
+			default: goto L_ILLEGAL;
+			}
+			goto L_REG;
+		} else {
+			if (reg < 4)
+				width = AdbgDisasmType.i32;
+			else if (reg == 5 || reg == 7)
+				width = AdbgDisasmType.f80;
+			else
+				goto L_ILLEGAL;
+			mnemonic = M_X87_DB[reg];
+		}
 		break;
 	case 0xdc:
 	
@@ -1220,28 +1297,35 @@ int adbg_disasm_x86_escape(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR x87 escap
 	}
 	
 	// Default
-	if (regmode) goto L_REGISTER;
-	else         goto L_MEMORY;
+	if (regmode) goto L_REG;
+	else         goto L_MEM;
 	
 L_NOOP: // no operands
 	if (p.mode < AdbgDisasmMode.file)
 		return 0;
 	goto L_MNEMONIC;
 
-L_ST0ONLY: // st0
+L_REGRM: // st(rm)
+	if (p.mode < AdbgDisasmMode.file)
+		return 0;
+	adbg_disasm_add_register(p, st, rm, true);
+	goto L_MNEMONIC;
+
+L_REG: // st(0),st(rm)
 	if (p.mode < AdbgDisasmMode.file)
 		return 0;
 	adbg_disasm_add_register(p, st, 0, true);
+	adbg_disasm_add_register(p, st, rm, true);
 	goto L_MNEMONIC;
-
-L_REGISTER: // st0,st(rm)
+	
+L_REGINV: // st(rm),st(0)
 	if (p.mode < AdbgDisasmMode.file)
 		return 0;
 	adbg_disasm_add_register(p, st, 0, true);
 	adbg_disasm_add_register(p, st, rm, true);
 	goto L_MNEMONIC;
 
-L_MEMORY: // memory operand
+L_MEM: // memory operand
 	if (p.mode < AdbgDisasmMode.file)
 		return 0;
 	if (p.x86.pfSegment == 0)
