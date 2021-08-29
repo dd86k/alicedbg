@@ -353,10 +353,10 @@ struct adbg_disasm_t { align(1):
 	package union { // Decoder options
 		uint decoderAll;
 		struct {
-			ubyte pfGroups;	///TODO: Prefixes to show/hide, upto 8 groups
-			bool ambiguity;	///TODO: ATT: Ambiguate instruction
-			bool noReverse;	/// ATT: Do not reverse the order of operands
-			bool far;	/// ATT: Far call
+			bool decoderNoReverse;	/// ATT: Do not reverse the order of operands
+			bool decoderFar;	/// ATT: Far call
+			ubyte decoderPfGroups;	///TODO: Prefixes to show/hide, upto 8 groups
+			bool decoderAmbiguate;	///TODO: ATT: Ambiguate instruction
 		}
 	}
 	package union { // User options
@@ -364,9 +364,9 @@ struct adbg_disasm_t { align(1):
 		struct {
 			/// If set, inserts a tab instead of a space between
 			/// mnemonic and operands.
-			bool mnemonicTab;
+			bool userMnemonicTab;
 			///TODO: Opcodes and operands are not seperated by spaces.
-			bool unpackMachine;
+			bool userUnpackMachine;
 		}
 	}
 }
@@ -453,7 +453,7 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 		}
 		break;
 	case mnemonicTab:
-		p.mnemonicTab = val != 0;
+		p.userMnemonicTab = val != 0;
 		break;
 	default:
 		return adbg_oops(AdbgError.invalidOption);
@@ -576,7 +576,7 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	
 	// Mnemonic
 	version (Trace) trace("mnemonic=%s", op.mnemonic);
-	if (p.syntax == AdbgSyntax.att && p.far)
+	if (p.syntax == AdbgSyntax.att && p.decoderFar)
 		if (s.addc('l'))
 			return;
 	if (s.adds(op.mnemonic))
@@ -588,7 +588,7 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	// Operands, skipped if empty
 	version (Trace) trace("operandCount=%u", op.operandCount);
 	if (op.operandCount == 0) return;
-	if (s.addc(p.mnemonicTab ? '\t' : ' '))
+	if (s.addc(p.userMnemonicTab ? '\t' : ' '))
 		return;
 	
 	//TODO: Consider setting the operand handler function here.
@@ -606,7 +606,7 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 		if (s.addc(')')) return;
 		return;
 	case att:
-		if (p.noReverse) 
+		if (p.decoderNoReverse) 
 			adbg_disasm_mnemonic_left(p, s, op);
 		else
 			adbg_disasm_mnemonic_right(p, s, op);

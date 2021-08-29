@@ -20,6 +20,8 @@ private:
 extern (C):
 __gshared:
 
+enum COPYRIGHT = "Copyright (c) 2019-2021, dd86k <dd@dax.moe>";
+
 //NOTE: The CLI module is meh, waiting on some betterC getopt
 
 // if asking for help, so '?' and "help" are accepted
@@ -328,7 +330,7 @@ template STRVER(uint ver) {
 
 immutable(char) *fmt_version =
 "alicedbg "~ADBG_VERSION~TYPE~" (built: "~__TIMESTAMP__~")\n"~
-"Copyright (c) dd86k <dd@dax.moe> 2019-2021\n"~
+COPYRIGHT~"\n"~
 "Compiler: "~__VENDOR__~" "~STRVER!__VERSION__~"\n"~
 "Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
 "Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
@@ -355,7 +357,7 @@ int cli_license() {
 	puts(
 `BSD 3-Clause License
 
-Copyright (c) 2019-2021, dd86k <dd@dax.moe>
+`~COPYRIGHT~`
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without

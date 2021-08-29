@@ -21,7 +21,7 @@ private immutable const(char)*[] INTEL_WIDTH = [
 bool adbg_disasm_operand_intel(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_disasm_operand_t op) {
 	switch (op.type) with (AdbgDisasmOperand) {
 	case immediate:
-		if (p.far) {
+		if (p.decoderFar) {
 			if (s.adds("0x"))
 				return true;
 			if (s.addx16(op.imm.segment))
