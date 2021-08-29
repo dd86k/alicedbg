@@ -878,8 +878,13 @@ immutable const(char) *M_FUCOMI	= "fucomi";	// reg=5
 immutable const(char) *M_FCOMI	= "fcomi";	// reg=6
 immutable const(char) *M_FCLEX	= "fclex";	// reg=4 rm=2
 immutable const(char) *M_FINIT	= "finit";	// reg=4 rm=3
-// ESCAPE DCH
 // ESCAPE DDH
+immutable const(char) *M_FRSTOR	= "frstor";
+immutable const(char) *M_FSAVE	= "fsave";
+immutable const(char) *M_FSTSW	= "fstsw";
+immutable const(char) *M_FFREE	= "ffree";	// reg=0
+immutable const(char) *M_FUCOM	= "fucom";	// reg=4
+immutable const(char) *M_FUCOMP	= "fucomp";	// reg=5
 // ESCAPE DEH
 // ESCAPE DFH
 // SSE
@@ -915,11 +920,9 @@ immutable const(char)*[8] M_X87_DA = [
 immutable const(char)*[8] M_X87_DB = [
 	M_FILD, M_FISTTP, M_FIST, M_FISTP, null, M_FLD, null, M_FSTP
 ];
-immutable const(char)*[8] M_X87_DC = [
-	
-];
+// DCH same as D8H
 immutable const(char)*[8] M_X87_DD = [
-	
+	M_FLD, M_FISTTP, M_FST, M_FSTP, M_FRSTOR, null, M_FSAVE, M_FSTSW
 ];
 immutable const(char)*[8] M_X87_DE = [
 	
@@ -1203,8 +1206,8 @@ int adbg_disasm_x86_escape(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR x87 escap
 	case 0xd9:
 		if (regmode) {
 			switch (reg) {
-			case 0b000: mnemonic = M_FLD; goto L_REG;
-			case 0b001: mnemonic = M_FXCH; goto L_REG;
+			case 0b000: mnemonic = M_FLD; goto L_REG0RM;
+			case 0b001: mnemonic = M_FXCH; goto L_REG0RM;
 			default:
 				switch (modrm) {
 				case 0xd0: mnemonic = M_FNOP; break;
@@ -1223,36 +1226,34 @@ int adbg_disasm_x86_escape(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR x87 escap
 				}
 				goto L_NOOP;
 			}
-		} else {
-			switch (reg) {
-			case 0,2,3: width = AdbgDisasmType.i32; break;
-			case 4,6:   width = AdbgDisasmType.none; break;
-			case 5,7:   width = AdbgDisasmType.i16; break;
-			default:    goto L_ILLEGAL;
-			}
-			if (reg == 1)
-				goto L_ILLEGAL;
-			mnemonic = M_X87_D9[reg];
-			goto L_MEM;
 		}
+		switch (reg) {
+		case 0,2,3: width = AdbgDisasmType.i32; break;
+		case 4,6:   width = AdbgDisasmType.none; break;
+		case 5,7:   width = AdbgDisasmType.i16; break;
+		default:    goto L_ILLEGAL;
+		}
+		if (reg == 1)
+			goto L_ILLEGAL;
+		mnemonic = M_X87_D9[reg];
+		goto L_MEM;
 	case 0xda:
 		if (regmode) {
 			switch (reg) {
-			case 0: mnemonic = M_FCMOVB; goto L_REG;
-			case 1: mnemonic = M_FCMOVE; goto L_REG;
-			case 2: mnemonic = M_FCMOVBE; goto L_REG;
-			case 3: mnemonic = M_FCMOVU; goto L_REG;
+			case 0: mnemonic = M_FCMOVB; goto L_REG0RM;
+			case 1: mnemonic = M_FCMOVE; goto L_REG0RM;
+			case 2: mnemonic = M_FCMOVBE; goto L_REG0RM;
+			case 3: mnemonic = M_FCMOVU; goto L_REG0RM;
 			default:
 			}
 			if (modrm != 0xe9)
 				goto L_ILLEGAL;
 			mnemonic = M_FUCOMPP;
 			goto L_NOOP;
-		} else {
-			width = AdbgDisasmType.i32;
-			mnemonic = M_X87_DA[reg];
-			goto L_MEM;
 		}
+		width = AdbgDisasmType.i32;
+		mnemonic = M_X87_DA[reg];
+		goto L_MEM;
 	case 0xdb:
 		if (regmode) {
 			switch (reg) {
@@ -1271,34 +1272,55 @@ int adbg_disasm_x86_escape(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR x87 escap
 				goto L_NOOP;
 			default: goto L_ILLEGAL;
 			}
-			goto L_REG;
-		} else {
-			if (reg < 4)
-				width = AdbgDisasmType.i32;
-			else if (reg == 5 || reg == 7)
-				width = AdbgDisasmType.f80;
-			else
-				goto L_ILLEGAL;
-			mnemonic = M_X87_DB[reg];
+			goto L_REG0RM;
 		}
-		break;
+		if (reg < 4)
+			width = AdbgDisasmType.i32;
+		else if (reg == 5 || reg == 7)
+			width = AdbgDisasmType.f80;
+		else
+			goto L_ILLEGAL;
+		mnemonic = M_X87_DB[reg];
+		goto L_MEM;
 	case 0xdc:
-	
+		mnemonic = M_X87_D8[reg];
+		if (regmode) {
+			switch (reg) {
+			case 2, 3: goto L_ILLEGAL;
+			default: goto L_REGRM0;
+			}
+		}
+		width = AdbgDisasmType.i64;
 		break;
-	case 0xdd:
-	
-		break;
+	case 0xdd: // me
+		if (regmode) {
+			switch (reg) {
+			case 0: mnemonic = M_FFREE; goto L_REGRM;
+			case 2: mnemonic = M_FST; goto L_REGRM;
+			case 3: mnemonic = M_FSTP; goto L_REGRM;
+			case 4: mnemonic = M_FUCOM; goto L_REGRM0;
+			case 5: mnemonic = M_FUCOMP; goto L_REGRM;
+			default: goto L_ILLEGAL;
+			}
+		}
+		switch (reg) {
+		case 0b101: return adbg_oops(AdbgError.illegalInstruction);
+		case 0b100, 0b110: width = AdbgDisasmType.none; break;
+		case 0b111: width = AdbgDisasmType.i16; break;
+		default: width = AdbgDisasmType.i64;
+		}
+		mnemonic = M_X87_D8[reg];
+		goto L_MEM;
 	case 0xde:
-	
+		
 		break;
 	default:
-	
+		
 		break;
 	}
 	
 	// Default
-	if (regmode) goto L_REG;
-	else         goto L_MEM;
+	if (regmode) goto L_REG0RM; else goto L_MEM;
 	
 L_NOOP: // no operands
 	if (p.mode < AdbgDisasmMode.file)
@@ -1311,14 +1333,14 @@ L_REGRM: // st(rm)
 	adbg_disasm_add_register(p, st, rm, true);
 	goto L_MNEMONIC;
 
-L_REG: // st(0),st(rm)
+L_REG0RM: // st(0),st(rm)
 	if (p.mode < AdbgDisasmMode.file)
 		return 0;
 	adbg_disasm_add_register(p, st, 0, true);
 	adbg_disasm_add_register(p, st, rm, true);
 	goto L_MNEMONIC;
 	
-L_REGINV: // st(rm),st(0)
+L_REGRM0: // st(rm),st(0)
 	if (p.mode < AdbgDisasmMode.file)
 		return 0;
 	adbg_disasm_add_register(p, st, 0, true);
