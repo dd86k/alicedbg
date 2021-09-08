@@ -302,7 +302,7 @@ struct adbg_disasm_opcode_t {
 //	ulong targetAddress;	/// CALL/JMP absolute target
 //	union targetOffset;	/// CALL/JMP relative target
 	// file mode:
-	deprecated const(char) *segment;	/// Segment register string
+	const(char) *segmentOverride;	/// Segment register string
 	const(char) *mnemonic;	/// Instruction mnemonic
 	size_t operandCount;	/// Number of operands
 	adbg_disasm_operand_t[ADBG_MAX_OPERANDS] operands;	/// Operands
@@ -526,7 +526,7 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 		return adbg_oops(AdbgError.uninitiated);
 	
 	with (op) { // reset opcode
-		mnemonic = null;
+		mnemonic = segmentOverride = null;
 		size = machineCount = prefixCount = operandCount = 0;
 	}
 	with (p) { // reset disasm
@@ -552,16 +552,15 @@ void adbg_disasm_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	
 	bool isHyde = p.syntax == AdbgSyntax.hyde;
 	
-	//TODO: hyde segment
-	/*if (isHyde) {
-		//TODO: p.decoderOpts.noSegment
-		if (p.opcode.segment) {
-			if (s.addc(p.opcode.segment[0]))
+	// Segment override to target
+	if (isHyde) {
+		if (op.segmentOverride) {
+			if (s.addc(op.operands[0].mem.segment[0]))
 				return;
 			if (s.adds("seg: "))
 				return;
 		}
-	}*/
+	}
 	
 	// Prefixes, skipped if empty
 	version (Trace) trace("prefixCount=%u", op.prefixCount);
@@ -899,15 +898,11 @@ adbg_disasm_operand_t* adbg_disasm_get_operand(adbg_disasm_t *p) {
 	return cast(adbg_disasm_operand_t*)&p.opcode.operands[p.opcode.operandCount++];
 }
 
-// set immediate
-/*package
-void adbg_disasm_set_imm() {
-}*/
-
-// set register
-/*package
-void adbg_disasm_set_reg() {
-}*/
+// add segment override
+package
+void adbg_disasm_add_segment(adbg_disasm_t *p, const(char) *segment) {
+	p.opcode.segmentOverride = segment;
+}
 
 // set memory
 package
@@ -1035,3 +1030,5 @@ void adbg_disasm_add_memory2(adbg_disasm_t *p, AdbgDisasmType width, adbg_disasm
 	item.type  = AdbgDisasmOperand.memory;
 	item.mem   = *m;
 }
+
+// !SECTION

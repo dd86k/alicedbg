@@ -139,6 +139,8 @@ L_PREFIX:
 			cast(x86Seg)((opcode >> 3) - 3) :
 			cast(x86Seg)(opcode - 0x5f);
 		x86.pfSegment = seg;
+		if (p.mode >= AdbgDisasmMode.file)
+			adbg_disasm_add_segment(p, segs[seg]);
 		goto L_PREFIX;
 	// Group 3
 	case 0x66: // Data, in 64-bit+AVX, controlled by REX.W (48H)
@@ -769,9 +771,26 @@ L_PREFIX:
 			return adbg_disasm_x86_op_Jb(p);
 		}
 	}
-	// F0H..FFH: 
-	
-	return adbg_oops(AdbgError.notImplemented);
+	// F1H..FFH: 
+	switch (opcode) {
+	case 0xff: // grp5
+		return adbg_disasm_x86_grp5(p);
+	case 0xfe: // grp4
+		return adbg_disasm_x86_grp4(p);
+	case 0xf6,0xf7: // grp3
+		return adbg_disasm_x86_grp3(p, opcode);
+	default:
+		if (p.mode < AdbgDisasmMode.file)
+			return 0;
+		if (opcode >= 0xf8)
+			mnemonic = M_F8[opcode - 0xf8];
+		else if (opcode >= 0xf4)
+			mnemonic = opcode == 0xf4 ? M_HLT : M_CMC;
+		else
+			mnemonic = M_INT1;
+		adbg_disasm_add_mnemonic(p, mnemonic);
+		return 0;
+	}
 }
 
 private:
@@ -907,6 +926,15 @@ immutable const(char) *M_JRCXZ	= "jrcxz";
 immutable const(char) *M_IN	= "in";
 immutable const(char) *M_OUT	= "out";
 immutable const(char) *M_JMP	= "jmp";
+immutable const(char) *M_INT1	= "int1";
+immutable const(char) *M_HLT	= "hlt";
+immutable const(char) *M_CMC	= "cmc";
+immutable const(char) *M_CLC	= "clc";
+immutable const(char) *M_STC	= "stc";
+immutable const(char) *M_CLI	= "cli";
+immutable const(char) *M_STI	= "sti";
+immutable const(char) *M_CLD	= "cld";
+immutable const(char) *M_STD	= "std";
 // ANCHOR ESCAPE D8H
 immutable const(char) *M_FADD	= "fadd";
 immutable const(char) *M_FMUL	= "fmul";
@@ -1005,6 +1033,9 @@ immutable const(char)*[16] M_Jcc = [
 ];
 immutable const(char)*[3] M_STR1 = [
 	M_STOS, M_LODS, M_SCAS
+];
+immutable const(char)*[6] M_F8 = [
+	M_CLC, M_STC, M_CLI, M_STI, M_CLD, M_STD
 ];
 immutable const(char)*[8] M_X87_D8 = [
 	M_FADD, M_FMUL, M_FCOM, M_FCOMP, M_FSUB, M_FSUBR, M_FDIV, M_FDIVR
@@ -1619,14 +1650,41 @@ int adbg_disasm_x86_grp2(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR Group 2
 	}
 }
 int adbg_disasm_x86_grp3(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR Group 3
+	ubyte modrm = void;
+	int e = adbg_disasm_fetch!ubyte(p, &modrm, AdbgDisasmTag.modrm);
+	if (e) return e;
 	
-	return adbg_oops(AdbgError.notImplemented);
+	ubyte reg = (modrm >> 3) & 7;
+	bool W = opcode & 1;
+	switch (reg) {
+	case 0:
+		e = W ? adbg_disasm_x86_op_Iz(p) : adbg_disasm_x86_op_Ib(p);
+		if (e) return e;
+		if (p.mode < AdbgDisasmMode.file)
+			return 0;
+		adbg_disasm_add_mnemonic(p, M_TEST);
+		return 0;
+	case 0b010:
+		
+		return 0;
+	default: return adbg_oops(AdbgError.illegalInstruction);
+	}
 }
 int adbg_disasm_x86_grp4(adbg_disasm_t *p) {	// ANCHOR Group 4
+	ubyte modrm = void;
+	int e = adbg_disasm_fetch!ubyte(p, &modrm, AdbgDisasmTag.modrm);
+	if (e) return e;
+	
+	
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
 int adbg_disasm_x86_grp5(adbg_disasm_t *p) {	// ANCHOR Group 5
+	ubyte modrm = void;
+	int e = adbg_disasm_fetch!ubyte(p, &modrm, AdbgDisasmTag.modrm);
+	if (e) return e;
+	
+	
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
