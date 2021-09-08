@@ -1664,10 +1664,13 @@ int adbg_disasm_x86_grp3(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR Group 3
 			return 0;
 		adbg_disasm_add_mnemonic(p, M_TEST);
 		return 0;
-	case 0b010:
+	case 1:
+		return adbg_oops(AdbgError.illegalInstruction);
+	default:
+		if (p.mode < AdbgDisasmMode.file)
+			return 0;
+		adbg_disasm_add_mnemonic(p, M_TEST);
 		
-		return 0;
-	default: return adbg_oops(AdbgError.illegalInstruction);
 	}
 }
 int adbg_disasm_x86_grp4(adbg_disasm_t *p) {	// ANCHOR Group 4
