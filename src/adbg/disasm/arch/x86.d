@@ -935,6 +935,11 @@ immutable const(char) *M_CLI	= "cli";
 immutable const(char) *M_STI	= "sti";
 immutable const(char) *M_CLD	= "cld";
 immutable const(char) *M_STD	= "std";
+immutable const(char) *M_NOT	= "not";
+immutable const(char) *M_NEG	= "neg";
+immutable const(char) *M_MUL	= "mul";
+immutable const(char) *M_DIV	= "div";
+immutable const(char) *M_IDIV	= "idiv";
 // ANCHOR ESCAPE D8H
 immutable const(char) *M_FADD	= "fadd";
 immutable const(char) *M_FMUL	= "fmul";
@@ -1650,28 +1655,37 @@ int adbg_disasm_x86_grp2(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR Group 2
 	}
 }
 int adbg_disasm_x86_grp3(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR Group 3
+	immutable static const(char)*[8] M_GRP3 =
+		[ M_TEST, M_TEST, M_NOT, M_NEG, M_MUL, M_IMUL, M_DIV, M_IDIV ];
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(p, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
 	
 	ubyte reg = (modrm >> 3) & 7;
-	bool W = opcode & 1;
-	switch (reg) {
-	case 0:
-		e = W ? adbg_disasm_x86_op_Iz(p) : adbg_disasm_x86_op_Ib(p);
-		if (e) return e;
-		if (p.mode < AdbgDisasmMode.file)
-			return 0;
-		adbg_disasm_add_mnemonic(p, M_TEST);
-		return 0;
-	case 1:
-		return adbg_oops(AdbgError.illegalInstruction);
-	default:
-		if (p.mode < AdbgDisasmMode.file)
-			return 0;
-		adbg_disasm_add_mnemonic(p, M_TEST);
 		
+	// NOTE: libopcode says this is illegal
+	//       Zydis and Capstone allow it as per the AMD reference
+	if (reg == 1)
+		return adbg_oops(AdbgError.illegalInstruction);
+
+	ubyte rm = modrm & 7;
+	ubyte mode = modrm & 7;
+	adbg_disasm_operand_mem_t mem = void;
+	e = adbg_disasm_x86_modrm_rm(p, &mem, mode, rm);
+	if (e) return e;
+	
+	bool W = opcode & 1;
+	
+	if (p.mode >= AdbgDisasmMode.file) {
+		adbg_disasm_add_mnemonic(p, M_GRP3[reg]);
+		AdbgDisasmType width = W ? p.x86.pfData : AdbgDisasmType.i8;
+		adbg_disasm_add_memory2(p, width, &mem);
 	}
+
+	if (reg < 2) {
+		return W ? adbg_disasm_x86_op_Iz(p) : adbg_disasm_x86_op_Ib(p);
+	}
+	return 0;
 }
 int adbg_disasm_x86_grp4(adbg_disasm_t *p) {	// ANCHOR Group 4
 	ubyte modrm = void;

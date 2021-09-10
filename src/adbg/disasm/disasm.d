@@ -751,10 +751,10 @@ struct adbg_disasm_operand_t { align(1):
 /// 	u = Data pointer
 /// 	tag = Byte tag
 /// Returns: Non-zero on error
-//TODO: Tag data with opcode/prefix/etc. you get the point
 package
 int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, AdbgDisasmTag tag = AdbgDisasmTag.unknown) {
-	version (Trace) trace("size=%u", p.opcode.size);
+	version (Trace) trace("size=%u left=%u", p.opcode.size, p.left);
+
 	if (p.opcode.size + T.sizeof > p.max)
 		return adbg_oops(AdbgError.opcodeLimit);
 	//TODO: Auto bswap if architecture endian is different than target
@@ -774,7 +774,6 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, AdbgDisasmTag tag = AdbgDisasmT
 	default: assert(0);
 	}
 	
-	version (Trace) trace("left=%u", p.left);
 	p.current.sz += T.sizeof;
 	p.opcode.size += T.sizeof;
 	

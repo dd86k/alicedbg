@@ -175,9 +175,7 @@ version (Trace) {
 	private extern (C) int putchar(int);
 	
 	/// Trace application
-	pragma(mangle, "adbg_trace")
-	void trace(string func = __FUNCTION__)
-		(const(char) *fmt, ...) {
+	void trace(string func = __FUNCTION__)(const(char) *fmt, ...) {
 		va_list va;
 		va_start(va, fmt);
 		printf("TRACE:%s: ", func.ptr);
