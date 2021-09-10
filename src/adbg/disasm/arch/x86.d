@@ -1667,9 +1667,9 @@ int adbg_disasm_x86_grp3(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR Group 3
 	//       Zydis and Capstone allow it as per the AMD reference
 	if (reg == 1)
 		return adbg_oops(AdbgError.illegalInstruction);
-
+	
 	ubyte rm = modrm & 7;
-	ubyte mode = modrm & 7;
+	ubyte mode = modrm >> 6;
 	adbg_disasm_operand_mem_t mem = void;
 	e = adbg_disasm_x86_modrm_rm(p, &mem, mode, rm);
 	if (e) return e;
@@ -1679,9 +1679,12 @@ int adbg_disasm_x86_grp3(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR Group 3
 	if (p.mode >= AdbgDisasmMode.file) {
 		adbg_disasm_add_mnemonic(p, M_GRP3[reg]);
 		AdbgDisasmType width = W ? p.x86.pfData : AdbgDisasmType.i8;
-		adbg_disasm_add_memory2(p, width, &mem);
+		if (mode == 0b11)
+			adbg_disasm_add_register(p, mem.base);
+		else
+			adbg_disasm_add_memory2(p, width, &mem);
 	}
-
+	
 	if (reg < 2) {
 		return W ? adbg_disasm_x86_op_Iz(p) : adbg_disasm_x86_op_Ib(p);
 	}
