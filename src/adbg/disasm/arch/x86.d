@@ -1062,6 +1062,15 @@ immutable const(char)*[8] M_X87_DF = [
 	M_FILD, M_FISTTP, M_FIST, M_FISTP, M_FBLD, M_FILD, M_FBSTP, M_FISTP
 ];
 
+enum ubyte X86_OP_ALLOW_LOCK  =   0b1;	/// Allows LOCK
+enum ubyte X86_OP_ALLOW_REPNE =  0b10;	/// Allows REPNE
+enum ubyte X86_OP_ALLOW_REPE  = 0b100;	/// Allows REP
+//TODO: x86OpFlags
+immutable ubyte[256] x86OpFlags = [
+	// 00H
+	
+];
+
 // !SECTION
 
 //
@@ -1695,18 +1704,78 @@ int adbg_disasm_x86_grp4(adbg_disasm_t *p) {	// ANCHOR Group 4
 	int e = adbg_disasm_fetch!ubyte(p, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
 	
+	ubyte reg = (modrm >> 3) & 7;
+	const(char) *mnemonic = void;
+	switch (reg) {
+	case 0: mnemonic = M_INC; break;
+	case 1: mnemonic = M_DEC; break;
+	default: return adbg_oops(AdbgError.illegalInstruction);
+	}
 	
-	
-	return adbg_oops(AdbgError.notImplemented);
+	ubyte mode = modrm >> 6;
+	ubyte rm   = modrm & 7;
+	adbg_disasm_operand_mem_t mem = void;
+	e = adbg_disasm_x86_modrm_rm(p, &mem, mode, rm);
+	if (e) return e;
+
+	if (p.mode < AdbgDisasmMode.file)
+		return 0;
+
+	adbg_disasm_add_mnemonic(p, mnemonic);
+	if (mode == 3)
+		adbg_disasm_add_register(p, mem.base);
+	else
+		adbg_disasm_add_memory2(p, AdbgDisasmType.i8, &mem);
+	return 0;
 }
 int adbg_disasm_x86_grp5(adbg_disasm_t *p) {	// ANCHOR Group 5
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(p, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
 	
-	
-	
-	return adbg_oops(AdbgError.notImplemented);
+	ubyte reg = (modrm >> 3) & 7;
+	const(char) *mnemonic = void;
+	switch (reg) {
+	case 0: mnemonic = M_INC; break;
+	case 1: mnemonic = M_DEC; break;
+	case 2: mnemonic = M_CALL;
+		if (p.platform == AdbgPlatform.x86_64)
+			p.x86.pfData = AdbgDisasmType.i64;
+		break;
+	case 3: mnemonic = M_CALL;
+		p.decoderFar = true;
+		p.x86.pfData = AdbgDisasmType.far;
+		break;
+	case 4: mnemonic = M_JMP;
+		if (p.platform == AdbgPlatform.x86_64)
+			p.x86.pfData = AdbgDisasmType.i64;
+		break;
+	case 5: mnemonic = M_JMP;
+		p.decoderFar = true;
+		p.x86.pfData = AdbgDisasmType.far;
+		break;
+	case 6: mnemonic = M_PUSH;
+		if (p.platform == AdbgPlatform.x86_64)
+			p.x86.pfData = AdbgDisasmType.i64;
+		break;
+	default: return adbg_oops(AdbgError.illegalInstruction);
+	}
+
+	ubyte mode = modrm >> 6;
+	ubyte rm   = modrm & 7;
+	adbg_disasm_operand_mem_t mem = void;
+	e = adbg_disasm_x86_modrm_rm(p, &mem, mode, rm);
+	if (e) return e;
+
+	if (p.mode < AdbgDisasmMode.file)
+		return 0;
+
+	adbg_disasm_add_mnemonic(p, mnemonic);
+	if (mode == 3)
+		adbg_disasm_add_register(p, mem.base);
+	else
+		adbg_disasm_add_memory2(p, p.x86.pfData, &mem);
+	return 0;
 }
 int adbg_disasm_x86_grp6(adbg_disasm_t *p) {	// ANCHOR Group 6
 	
@@ -1790,6 +1859,12 @@ int adbg_disasm_x86_grp17(adbg_disasm_t *p) {	// ANCHOR Group 17
 //
 // SECTION ModR/M legacy mechanics
 //
+
+//TODO: adbg_disasm_x86_reg
+//      reg-8
+const(char) *adbg_disasm_x86_reg(adbg_disasm_t *p, AdbgDisasmType width, ubyte reg, bool forceU8) {
+	assert(0, "TODO");
+}
 
 //TODO: modrm extract inline
 //      either full
