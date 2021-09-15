@@ -20,8 +20,8 @@ private immutable const(char)*[] TASM_WIDTH = [
 // render tasm
 bool adbg_disasm_operand_ideal(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_disasm_operand_t op) {
 	switch (op.type) with (AdbgDisasmOperand) {
-	//TODO: far
-	case immediate: return adbg_disasm_render_number(p, s, op.imm.value, false);
+	case immediate: // TODO: Handle absolute
+		return adbg_disasm_render_number(p, s, op.imm.value, false);
 	case register:  return s.adds(op.reg.name);
 	case memory:
 		if (s.addc('['))

@@ -314,6 +314,7 @@ struct adbg_disasm_opcode_t {
 
 /// Disassembler parameters structure. This structure is not meant to be
 /// accessed directly.
+//TODO: Consider combining all the platform internals
 struct adbg_disasm_t { align(1):
 	adbg_address_t current;	/// Current address, used as a program counter.
 	adbg_address_t base;	/// Base address, used for target calculations.
@@ -354,7 +355,7 @@ struct adbg_disasm_t { align(1):
 		uint decoderAll;
 		struct {
 			bool decoderNoReverse;	/// ATT: Do not reverse the order of operands
-			bool decoderFar;	/// ATT: Far call
+			bool decoderFar;	/// ATT: Far call or jump
 			ubyte decoderPfGroups;	///TODO: Prefixes to show/hide, upto 8 groups
 			bool decoderAmbiguate;	///TODO: ATT: Ambiguate instruction
 		}
@@ -706,11 +707,9 @@ struct adbg_disasm_prefix_t {
 /// Immediate operand
 //package
 struct adbg_disasm_operand_imm_t {
-	adbg_disasm_number_t value;
-	//adbg_disasm_number_t value2;
-	ushort segment;
-	//style? (bit op, int op, float, etc.)
-	//bool far/absolute;
+	adbg_disasm_number_t value;	/// 
+	ushort segment;	/// 
+	bool absolute;	/// 
 }
 
 /// Register operand
@@ -731,7 +730,7 @@ struct adbg_disasm_operand_mem_t {
 	bool hasOffset;	/// 
 	adbg_disasm_number_t offset;	/// Displacement
 	bool scaled;	/// SIB or any scaling mode
-	//TODO: Call/jmp type (bool: near/far)
+	bool absolute;	/// 
 }
 
 /// Operand structure
@@ -934,7 +933,7 @@ void adbg_disasm_set_mem(adbg_disasm_operand_mem_t *mem,
 // add immediate
 package
 void adbg_disasm_add_immediate(adbg_disasm_t *p,
-	AdbgDisasmType w, void *v, ushort segment = 0) {
+	AdbgDisasmType w, void *v, ushort segment = 0, bool absolute = false) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
@@ -943,8 +942,8 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p,
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
 	item.type = AdbgDisasmOperand.immediate;
 	item.imm.value.type = w;
-	
-	item.imm.segment = segment;
+	item.imm.segment    = segment;
+	item.imm.absolute   = absolute;
 	switch (w) with (AdbgDisasmType) {
 	case i8:  item.imm.value.u8  = *cast(ubyte*)v;  return;
 	case i16: item.imm.value.u16 = *cast(ushort*)v; return;
@@ -980,7 +979,8 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 	AdbgDisasmType dispWidth,
 	void *disp,
 	ubyte scale,
-	bool scaled) {
+	bool scaled,
+	bool absolute) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
@@ -992,18 +992,19 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 		case i16: trace("disp=%x", *cast(ushort*)disp); break;
 		case i32: trace("disp=%x", *cast(uint*)disp); break;
 		case i64: trace("disp=%x", *cast(ulong*)disp); break;
-		default: assert(0);
+		default:
 		}
 	}
 	
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
-	p.memWidth       = width;
-	item.type        = AdbgDisasmOperand.memory;
-	item.mem.segment = segment;
-	item.mem.base    = regbase;
-	item.mem.index   = regindex;
-	item.mem.scale   = scale;
-	item.mem.scaled	 = scaled;
+	p.memWidth         = width;
+	item.type          = AdbgDisasmOperand.memory;
+	item.mem.segment   = segment;
+	item.mem.base      = regbase;
+	item.mem.index     = regindex;
+	item.mem.scale     = scale;
+	item.mem.scaled	   = scaled;
+	item.mem.absolute  = absolute;
 	item.mem.hasOffset = disp != null;
 	if (disp) {
 		item.mem.offset.type = dispWidth;
@@ -1012,7 +1013,7 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 		case i16: item.mem.offset.u16 = *cast(ushort*)disp; return;
 		case i32: item.mem.offset.u32 = *cast(uint*)disp;   return;
 		case i64: item.mem.offset.u64 = *cast(ulong*)disp;  return;
-		default: assert(0);
+		default: assert(0, "add type");
 		}
 	}
 }

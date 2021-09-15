@@ -73,6 +73,7 @@ enum DumpOpt {
 struct dump_t {
 	adbg_object_t *obj; /// object
 	adbg_disasm_t *dopts; /// disasm options
+	//TODO: Do bools instead
 	int flags; /// display settings
 }
 
@@ -200,6 +201,7 @@ L_DISASM_1:
 		return 0;
 	}
 	
+	adbg_disasm_opt(dp, AdbgDisasmOpt.mnemonicTab, true);
 	uint i;
 	char[40] mnemonic = void, machine = void;
 	adbg_disasm_start_buffer(dp, AdbgDisasmMode.file, data, size);
@@ -214,7 +216,8 @@ L_DISASM_2:
 		goto L_DISASM_2;
 	//TODO: Illegal should be moved with none and disasm takes care of buffer
 	case illegalInstruction:
-		//printf("%08X %-30s (bad)\n", i, op.machine);
+		adbg_disasm_machine(dp, machine.ptr, 40, &op);
+		printf("%08X  %-30s  (bad)\n", i, machine.ptr);
 		i += op.size;
 		goto L_DISASM_2;
 	case outOfData: return 0;

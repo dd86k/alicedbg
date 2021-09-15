@@ -130,6 +130,8 @@ L_PREFIX:
 	int e = adbg_disasm_fetch!ubyte(p, &opcode, AdbgDisasmTag.prefix);
 	if (e) return e;
 	
+	version (Trace) trace("opcode=%x", opcode);
+	
 	// Legacy prefixes must be processed before REX/VEX/EVEX
 	switch (opcode) {
 	// Group 2
@@ -198,7 +200,7 @@ L_PREFIX:
 		if (rm >= 0b110) {
 			if (reg < 4) {
 				adbg_disasm_add_mnemonic(p, W ? M_POP : M_PUSH);
-				adbg_disasm_add_register(p, segs[reg]);
+				adbg_disasm_add_register(p, segs[reg + 1]);
 				return 0;
 			}
 			// Prefixes already taken care of, unless moved here
@@ -685,7 +687,7 @@ L_PREFIX:
 				x86.pfSegment = x86Seg.ds;
 			adbg_disasm_add_mnemonic(p, M_XLAT);
 			adbg_disasm_add_memory(p, AdbgDisasmType.i8, segs[x86.pfSegment],
-				regs[x86.pfAddr][x86Reg.bx], null, AdbgDisasmType.none, null, 0, false);
+				regs[x86.pfAddr][x86Reg.bx], null, AdbgDisasmType.none, null, 0, false, false);
 			return 0;
 		default:
 			return adbg_disasm_x86_escape(p, opcode);
@@ -801,7 +803,10 @@ private:
 
 // ANCHOR 0f: 2-byte escape
 int adbg_disasm_x86_0f(adbg_disasm_t *p) {
+	ubyte opcode = void;
 	
+	int e = adbg_disasm_fetch!ubyte(p, &opcode, AdbgDisasmTag.opcode);
+	if (e) return e;
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
@@ -1189,6 +1194,8 @@ immutable const(char)*[8] regs_mmx = [
 // D: 0=mem, 1=reg
 // W: 0=i8, 1=i16/i32 (i64 if REX.W)
 int adbg_disasm_x86_op_modrm(adbg_disasm_t *p, bool D, bool W) {
+	version (Trace) trace("D=%d W=%d", D, W);
+	
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(p, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -1334,7 +1341,7 @@ int adbg_disasm_x86_op_Ap(adbg_disasm_t *p) {	// immediate+segment (in that orde
 	}
 	e = adbg_disasm_fetch!ushort(p, &segment, AdbgDisasmTag.segment);
 	if (e) return e;
-	adbg_disasm_add_immediate(p, p.x86.pfData, b, segment);
+	adbg_disasm_add_immediate(p, p.x86.pfData, b, segment, true);
 	p.decoderFar = true;
 	return 0;
 }
@@ -1553,7 +1560,7 @@ L_MEM: // memory operand
 	if (p.x86.pfSegment == 0)
 		p.x86.pfSegment = x86Seg.ds;
 	adbg_disasm_add_memory(p, width, segs[p.x86.pfSegment],
-		regs[p.x86.pfAddr][rm], null, AdbgDisasmType.none, null, 0, false);
+		regs[p.x86.pfAddr][rm], null, AdbgDisasmType.none, null, 0, false, false);
 	
 L_MNEMONIC:
 	adbg_disasm_add_mnemonic(p, mnemonic);
@@ -1671,11 +1678,10 @@ int adbg_disasm_x86_grp3(adbg_disasm_t *p, ubyte opcode) {	// ANCHOR Group 3
 	if (e) return e;
 	
 	ubyte reg = (modrm >> 3) & 7;
-		
-	// NOTE: libopcode says this is illegal
+	
+	// NOTE: Group 3 reg=001
+	//       libopcode says this is illegal
 	//       Zydis and Capstone allow it as per the AMD reference
-	if (reg == 1)
-		return adbg_oops(AdbgError.illegalInstruction);
 	
 	ubyte rm = modrm & 7;
 	ubyte mode = modrm >> 6;
@@ -1733,8 +1739,11 @@ int adbg_disasm_x86_grp5(adbg_disasm_t *p) {	// ANCHOR Group 5
 	int e = adbg_disasm_fetch!ubyte(p, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
 	
+	version (Trace) trace("modrm=%x", modrm);
+	
 	ubyte reg = (modrm >> 3) & 7;
 	const(char) *mnemonic = void;
+	bool far;
 	switch (reg) {
 	case 0: mnemonic = M_INC; break;
 	case 1: mnemonic = M_DEC; break;
@@ -1743,16 +1752,14 @@ int adbg_disasm_x86_grp5(adbg_disasm_t *p) {	// ANCHOR Group 5
 			p.x86.pfData = AdbgDisasmType.i64;
 		break;
 	case 3: mnemonic = M_CALL;
-		p.decoderFar = true;
-		p.x86.pfData = AdbgDisasmType.far;
+		far = true;
 		break;
 	case 4: mnemonic = M_JMP;
 		if (p.platform == AdbgPlatform.x86_64)
 			p.x86.pfData = AdbgDisasmType.i64;
 		break;
 	case 5: mnemonic = M_JMP;
-		p.decoderFar = true;
-		p.x86.pfData = AdbgDisasmType.far;
+		far = true;
 		break;
 	case 6: mnemonic = M_PUSH;
 		if (p.platform == AdbgPlatform.x86_64)
@@ -1760,21 +1767,22 @@ int adbg_disasm_x86_grp5(adbg_disasm_t *p) {	// ANCHOR Group 5
 		break;
 	default: return adbg_oops(AdbgError.illegalInstruction);
 	}
-
+	
 	ubyte mode = modrm >> 6;
 	ubyte rm   = modrm & 7;
 	adbg_disasm_operand_mem_t mem = void;
 	e = adbg_disasm_x86_modrm_rm(p, &mem, mode, rm);
 	if (e) return e;
-
+	
 	if (p.mode < AdbgDisasmMode.file)
 		return 0;
-
+	
+	p.decoderFar = far;
 	adbg_disasm_add_mnemonic(p, mnemonic);
 	if (mode == 3)
 		adbg_disasm_add_register(p, mem.base);
 	else
-		adbg_disasm_add_memory2(p, p.x86.pfData, &mem);
+		adbg_disasm_add_memory2(p, far ? AdbgDisasmType.far : p.x86.pfData, &mem);
 	return 0;
 }
 int adbg_disasm_x86_grp6(adbg_disasm_t *p) {	// ANCHOR Group 6
@@ -1877,16 +1885,18 @@ const(char) *adbg_disasm_x86_reg(adbg_disasm_t *p, AdbgDisasmType width, ubyte r
 //        ubyte adbg_disasm_x86_modrm_rm(ubyte modrm)
 
 int adbg_disasm_x86_modrm(adbg_disasm_t *p, ubyte modrm, bool dir) {
+	version (Trace) trace("modrm=%x", modrm);
+	
 	ubyte mode = modrm >> 6;
 	ubyte reg = (modrm >> 3) & 7;
 	ubyte rm = modrm & 7;
 	
-	const(char) *register = void;
-	adbg_disasm_operand_mem_t mem = void;
-	
 	// Configure register/memory stuff
+	adbg_disasm_operand_mem_t mem = void;
 	int e = adbg_disasm_x86_modrm_rm(p, &mem, mode, rm);
 	if (e) return e;
+	
+	const(char) *register = void;
 	adbg_disasm_x86_modrm_reg(p, &register, reg);
 	
 	bool regmode = mode == 3;
@@ -1939,6 +1949,10 @@ int adbg_disasm_x86_modrm_rm(adbg_disasm_t *p, adbg_disasm_operand_mem_t *mem, u
 	
 	switch (mode) {
 	case 0: // no displacement
+		if (rm == 0b110) {
+			mem.base = mem.index = null;
+			goto case 2;
+		}
 		mem.hasOffset = false;
 		return 0;
 	case 1: // +u8 displacement
@@ -1947,7 +1961,7 @@ int adbg_disasm_x86_modrm_rm(adbg_disasm_t *p, adbg_disasm_operand_mem_t *mem, u
 		return adbg_disasm_fetch!ubyte(p, &mem.offset.u8, AdbgDisasmTag.disp);
 	case 2: // +u16/u32 displacement
 		mem.hasOffset = true;
-		switch (p.x86.pfData) with (AdbgDisasmType) {
+		switch (p.x86.pfAddr) with (AdbgDisasmType) {
 		case i16:
 			mem.offset.type = AdbgDisasmType.i16;
 			return adbg_disasm_fetch!ushort(p, &mem.offset.u16, AdbgDisasmTag.disp);
@@ -1999,8 +2013,13 @@ int adbg_disasm_x86_sib(adbg_disasm_t *p, adbg_disasm_operand_mem_t *mem, ubyte 
 		return adbg_disasm_fetch!ubyte(p, &mem.offset.u8, AdbgDisasmTag.disp);
 	case 2:
 		mem.hasOffset = true;
-		mem.offset.type = AdbgDisasmType.i32;
-		return adbg_disasm_fetch!uint(p, &mem.offset.u32, AdbgDisasmTag.disp);
+		if (p.x86.pfAddr == AdbgDisasmType.i16) {
+			mem.offset.type = AdbgDisasmType.i16;
+			return adbg_disasm_fetch!ushort(p, &mem.offset.u16, AdbgDisasmTag.disp);
+		} else {
+			mem.offset.type = AdbgDisasmType.i32;
+			return adbg_disasm_fetch!uint(p, &mem.offset.u32, AdbgDisasmTag.disp);
+		}
 	default: assert(0);
 	}
 }

@@ -17,7 +17,7 @@ extern (C):
 bool adbg_disasm_operand_att(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_disasm_operand_t op) {
 	switch (op.type) with (AdbgDisasmOperand) {
 	case immediate:
-		if (p.decoderFar) {
+		if (op.imm.absolute) {
 			if (s.adds("$0x"))
 				return true;
 			if (s.addx16(op.imm.segment))
@@ -46,6 +46,10 @@ bool adbg_disasm_operand_att(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_dis
 		
 		if (op.mem.hasOffset)
 			if (adbg_disasm_render_number(p, s, op.mem.offset, true))
+				return true;
+		
+		if (op.mem.absolute)
+			if (s.addc('*'))
 				return true;
 		
 		if (s.addc('('))

@@ -33,6 +33,10 @@ template CHAR16(char[2] s) {
 	else
 		enum ushort CHAR16 = (s[1] << 8) | s[0];
 }
+/// 
+@system unittest {
+	assert(CHAR16!"MZ" == 0x5a4d);
+}
 
 /// Turn a 4-character string into a 4-byte number
 /// Params: s = 4-character string

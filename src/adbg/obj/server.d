@@ -226,7 +226,7 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 		
 		if (obj.pe.offset)
 		if (obj.pe.offset >= obj.fsize - PE_HEADER.sizeof)
-			return adbg_oops(AdbgError.unknownObjFormat);
+			return adbg_obj_mz_preload(obj);
 		
 		sig.u32 = *cast(uint*)(obj.buf + obj.pe.offset);
 		
