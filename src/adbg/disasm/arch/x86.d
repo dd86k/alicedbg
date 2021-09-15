@@ -1949,7 +1949,7 @@ int adbg_disasm_x86_modrm_rm(adbg_disasm_t *p, adbg_disasm_operand_mem_t *mem, u
 	
 	switch (mode) {
 	case 0: // no displacement
-		if (rm == 0b110) {
+		if (p.platform == AdbgPlatform.x86_16 && rm == 0b110) {
 			mem.base = mem.index = null;
 			goto case 2;
 		}
