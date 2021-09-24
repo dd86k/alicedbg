@@ -50,7 +50,7 @@ immutable setting_syntax_t[] syntaxes = [
 	{ AdbgSyntax.att,   "att",   "AT&T syntax" },
 	{ AdbgSyntax.intel, "intel", "Intel syntax" },
 	{ AdbgSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
-	{ AdbgSyntax.ideal, "tasm",  "Borland Ideal Turbo Assembly Enhanced syntax" },
+	{ AdbgSyntax.ideal, "ideal", "Borland Ideal Turbo Assembly Enhanced syntax" },
 	{ AdbgSyntax.hyde,  "hyde",  "Randall Hyde High Level Assembly Language syntax" },
 ];
 

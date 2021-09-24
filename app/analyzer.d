@@ -47,7 +47,7 @@ int analyze() {
 		}
 		
 		// mnemonic
-		adbg_disasm_mnemonic(&disasm, bufferMnemonic.ptr, bufferMnemonic.sizeof, &opcode);
+		adbg_disasm_format(&disasm, bufferMnemonic.ptr, bufferMnemonic.sizeof, &opcode);
 		printf("instruction: %s\n", bufferMnemonic.ptr);
 		printf("prefixes   :");
 		for (size_t pi; pi < opcode.prefixCount; ++pi) with (opcode) {

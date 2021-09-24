@@ -210,7 +210,7 @@ L_DISASM_2:
 	switch (adbg_disasm(dp, &op)) {
 	case none:
 		adbg_disasm_machine(dp, machine.ptr, 40, &op);
-		adbg_disasm_mnemonic(dp, mnemonic.ptr, 40, &op);
+		adbg_disasm_format(dp, mnemonic.ptr, 40, &op);
 		printf("%08x  %-30s  %s\n", i, machine.ptr, mnemonic.ptr);
 		i += op.size;
 		goto L_DISASM_2;

@@ -82,7 +82,7 @@ int cmd_loop() {
 // prompt
 //
 
-void cmd_prompt(int err) { // [code*adbg]
+void cmd_prompt(int err) {
 	enum fmt = "[%d adbg%c] ";
 	printf(fmt, err, paused ? '*' : ' ');
 }
@@ -338,7 +338,7 @@ int cmd_handler(exception_t *ex) {
 			AdbgDisasmMode.file, ex.fault.sz)) {
 			printf("	Faulting instruction: (error:%s)\n", adbg_error_msg);
 		} else with (globals.app) {
-			adbg_disasm_mnemonic(&disasm,
+			adbg_disasm_format(&disasm,
 				bufferMnemonic.ptr, bufferMnemonic.sizeof, &op);
 			adbg_disasm_machine(&disasm,
 				bufferMachine.ptr, bufferMachine.sizeof, &op);

@@ -299,12 +299,12 @@ size_t adbg_util_str_appendc(char *buffer, size_t size, char c) {
 	return 1;
 }
 size_t adbg_util_str_appends(char *buffer, size_t size, const(char) *str) {
-	size_t pos;
+	size_t length;
 	size_t sz = size - 1;
-	for (; pos < sz && str[pos]; ++pos)
-		buffer[pos] = str[pos];
-	buffer[pos] = 0;
-	return pos;
+	for (; length < sz && str[length]; ++length)
+		buffer[length] = str[length];
+	buffer[length] = 0;
+	return length;
 }
 //TODO: Consider adbg_util_str_append_s(char *buffer, size_t size, const(char) *str, size_t size2)
 size_t adbg_util_str_appendf(char *buffer, size_t size, const(char) *fmt, ...) {
@@ -323,7 +323,7 @@ size_t adbg_util_str_appendv(char *buffer, size_t size, const(char) *fmt, va_lis
 struct adbg_string_t {
 	char  *str;	/// String pointer
 	size_t size;	/// Buffer size, capacity
-	size_t pos;	/// Position, count
+	size_t length;	/// Position, count
 	
 	/// Inits a string position tracker with a buffer and its size.
 	/// This does not create a string.
@@ -333,7 +333,7 @@ struct adbg_string_t {
 	this(char *buffer, size_t buffersz) {
 		str  = buffer;
 		size = buffersz;
-		pos  = 0;
+		length  = 0;
 	}
 	/// Reset counters and optionally zero-fill the buffer.
 	/// Params: zero = If true, fills the buffer of zeros.
@@ -341,28 +341,28 @@ struct adbg_string_t {
 		if (zero)
 			for (size_t p; p < size; ++p)
 				str[p] = 0;
-		pos = 0;
+		length = 0;
 	}
 	/// Add character to buffer.
 	/// Params: c = Character
 	/// Returns: True if buffer exhausted.
 	bool addc(char c) {
-		if (pos >= size)
+		if (length >= size)
 			return true;
-		char *s = str + pos;
+		char *s = str + length;
 		*s = c;
 		*(s + 1) = 0;
-		++pos;
+		++length;
 		return false;
 	}
 	/// Add a constant string to buffer.
 	/// Params: s = String
 	/// Returns: True if buffer exhausted.
 	bool adds(const(char) *s) {
-		for (size_t si; pos < size && s[si]; ++pos, ++si)
-			str[pos] = s[si];
-		str[pos] = 0;
-		return pos >= size;
+		for (size_t si; length < size && s[si]; ++length, ++si)
+			str[length] = s[si];
+		str[length] = 0;
+		return length >= size;
 	}
 	//TODO: adbg_string_t.add_s
 	/// Add multiple items to buffer.
@@ -381,49 +381,49 @@ struct adbg_string_t {
 	/// 	va = va_list object.
 	/// Returns: True if buffer exhausted.
 	bool addv(const(char) *fmt, va_list va) {
-		pos += vsnprintf(str + pos, size - pos, fmt,va);
-		return pos >= size;
+		length += vsnprintf(str + length, size - length, fmt,va);
+		return length >= size;
 	}
 	bool addx8(ubyte v, bool pad = false) {
-		if (pos + 3 >= size) return true;
+		if (length + 3 >= size) return true;
 		ubyte vh = v >> 4;
 		ubyte vl = v & 15;
-		if (vh || pad) str[pos++] = hexmaplow[vh];
-		str[pos++] = hexmaplow[vl];
-		str[pos] = 0;
-		return pos >= size;
+		if (vh || pad) str[length++] = hexmaplow[vh];
+		str[length++] = hexmaplow[vl];
+		str[length] = 0;
+		return length >= size;
 	}
 	bool addx16(ushort v, bool pad = false) {
-		for (int shift = 12; pos < size && shift >= 0; shift -= 4) {
+		for (int shift = 12; length < size && shift >= 0; shift -= 4) {
 			ushort h = (v >> shift) & 15;
 			if (h == 0 && pad == false) continue;
-			str[pos++] = hexmaplow[h];
+			str[length++] = hexmaplow[h];
 			if (h) pad = true;
 		}
-		str[pos] = 0;
-		return pos >= size;
+		str[length] = 0;
+		return length >= size;
 	}
 	bool addx32(uint v, bool pad = false) {
-		for (int shift = 28; pos < size && shift >= 0; shift -= 4) {
+		for (int shift = 28; length < size && shift >= 0; shift -= 4) {
 			uint h = (v >> shift) & 15;
 			if (h == 0 && pad == false) continue;
-			str[pos++] = hexmaplow[h];
+			str[length++] = hexmaplow[h];
 			if (h) pad = true;
 		}
-		str[pos] = 0;
-		return pos >= size;
+		str[length] = 0;
+		return length >= size;
 	}
 	bool addx64(ulong v, bool pad = false) {
-		for (int shift = 60; pos < size && shift >= 0; shift -= 4) {
+		for (int shift = 60; length < size && shift >= 0; shift -= 4) {
 			ulong h = (v >> shift) & 15;
 			if (h == 0 && pad == false) continue;
 			version (D_LP64)
-				str[pos++] = hexmaplow[h];
+				str[length++] = hexmaplow[h];
 			else
-				str[pos++] = hexmaplow[cast(uint)h]; // for 32-bit systems
+				str[length++] = hexmaplow[cast(uint)h]; // for 32-bit systems
 			if (h) pad = true;
 		}
-		str[pos] = 0;
-		return pos >= size;
+		str[length] = 0;
+		return length >= size;
 	}
 }

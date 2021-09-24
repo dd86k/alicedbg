@@ -15,7 +15,7 @@ The library supports:
 - Disassembly
   - Platforms: x86.
   - Syntaxes: Intel, Nasm, and AT&T, HLA, and TASM.
-- Compiles under DMD, GDC, and LDC.
+- Supports the DMD, GDC, and LDC compilers.
 
 The application supports:
 - Debugging (default)

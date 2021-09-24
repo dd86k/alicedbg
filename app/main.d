@@ -415,6 +415,7 @@ int cli_meow() {
 //
 
 //TODO: Support --option=value syntax
+//TODO: Support stdin (-) for -A, -D
 
 int main(int argc, const(char)** argv) {
 	const(char) *arg = void;

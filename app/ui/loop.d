@@ -46,7 +46,7 @@ int loop_handler(exception_t *e) {
 			AdbgDisasmMode.file, e.fault.sz)) {
 			printf("> %p: (error:%s)\n", e.fault.raw, adbg_error_msg);
 		} else with (globals.app) {
-			adbg_disasm_mnemonic(&disasm,
+			adbg_disasm_format(&disasm,
 				bufferMnemonic.ptr, bufferMnemonic.sizeof, &op);
 			adbg_disasm_machine(&disasm,
 				bufferMachine.ptr, bufferMachine.sizeof, &op);
