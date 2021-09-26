@@ -171,9 +171,9 @@ int adbg_util_move(void **dst, int dstsz, void **src, int srcsz) {
 //
 
 /// Hexadecimal map for strx0* functions to provide much faster %x parsing
-private immutable char [16]hexmaplow = "0123456789abcdef";
+private immutable char [16]hexMapLower = "0123456789abcdef";
 /// Hexadecimal map for strx0* functions to provide much faster %X parsing
-private immutable char [16]hexmapupp = "0123456789ABCDEF";
+private immutable char [16]hexMapUpper = "0123456789ABCDEF";
 
 /**
  * Quick and dirty conversion function to convert an ubyte value to a
@@ -186,7 +186,7 @@ private immutable char [16]hexmapupp = "0123456789ABCDEF";
 const(char) *adbg_util_strx02(ubyte v, bool upper = false) {
 	__gshared char [3]b = void;
 
-	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
+	const(char) *h = cast(char*)(upper ? hexMapUpper : hexMapLower);
 
 	b[0] = h[v >> 4];
 	b[1] = h[v & 0xF];
@@ -206,7 +206,7 @@ const(char) *adbg_util_strx02(ubyte v, bool upper = false) {
 const(char) *adbg_util_strx04(ushort v, bool upper = false) {
 	__gshared char [5]b = void;
 
-	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
+	const(char) *h = cast(char*)(upper ? hexMapUpper : hexMapLower);
 
 	b[4] = 0;
 	b[3] = h[v & 0xF];
@@ -228,7 +228,7 @@ const(char) *adbg_util_strx04(ushort v, bool upper = false) {
 const(char) *adbg_util_strx08(uint v, bool upper = false) {
 	__gshared char [9]b = void;
 
-	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
+	const(char) *h = cast(char*)(upper ? hexMapUpper : hexMapLower);
 
 	b[8] = 0;
 	b[7] = h[v & 0xF];
@@ -254,7 +254,7 @@ const(char) *adbg_util_strx08(uint v, bool upper = false) {
 const(char) *adbg_util_strx016(ulong v, bool upper = false) {
 	__gshared char [17]b = void;
 
-	const(char) *h = cast(char*)(upper ? hexmapupp : hexmaplow);
+	const(char) *h = cast(char*)(upper ? hexMapUpper : hexMapLower);
 
 	b[16] = 0;
 	b[15] = h[v & 0xF];
@@ -320,9 +320,15 @@ size_t adbg_util_str_appendv(char *buffer, size_t size, const(char) *fmt, va_lis
 /// Used in the disassembler.
 //TODO: Consider just returning number of characters written to buffer
 //      So doing add('a') == 0 is the same as returning true if full
+//TODO: Consider adbg_string_t.add_s for +length
+//      Why?
+//TODO: Consider adbg_string_t.addm(string...)(string args)
+//      Test in godbolt first
+//TODO: Add decimal
+//      addd8/addd16/addd32/addd64(T v, bool signed)
 struct adbg_string_t {
 	char  *str;	/// String pointer
-	size_t size;	/// Buffer size, capacity
+	size_t size;	/// Buffer capacity
 	size_t length;	/// Position, count
 	
 	/// Inits a string position tracker with a buffer and its size.
@@ -349,22 +355,21 @@ struct adbg_string_t {
 	bool addc(char c) {
 		if (length >= size)
 			return true;
-		char *s = str + length;
+		char *s = str + length++;
 		*s = c;
 		*(s + 1) = 0;
-		++length;
 		return false;
 	}
 	/// Add a constant string to buffer.
 	/// Params: s = String
 	/// Returns: True if buffer exhausted.
 	bool adds(const(char) *s) {
-		for (size_t si; length < size && s[si]; ++length, ++si)
+		size_t sz = size - 1;
+		for (size_t si; length < sz && s[si]; ++length, ++si)
 			str[length] = s[si];
 		str[length] = 0;
-		return length >= size;
+		return length >= sz;
 	}
-	//TODO: adbg_string_t.add_s
 	/// Add multiple items to buffer.
 	/// Params:
 	/// 	fmt = Format specifier.
@@ -384,43 +389,63 @@ struct adbg_string_t {
 		length += vsnprintf(str + length, size - length, fmt,va);
 		return length >= size;
 	}
+	/// Add a hexadecimal byte to buffer.
+	/// Params:
+	/// 	v = ubyte value.
+	/// 	pad = If set, pads with zero.
+	/// Returns: True if buffer exhausted.
 	bool addx8(ubyte v, bool pad = false) {
 		if (length + 3 >= size) return true;
 		ubyte vh = v >> 4;
 		ubyte vl = v & 15;
-		if (vh || pad) str[length++] = hexmaplow[vh];
-		str[length++] = hexmaplow[vl];
+		if (vh || pad) str[length++] = hexMapLower[vh];
+		str[length++] = hexMapLower[vl];
 		str[length] = 0;
 		return length >= size;
 	}
+	/// Add a hexadecimal 16-bit value to buffer.
+	/// Params:
+	/// 	v = ushort value.
+	/// 	pad = If set, pads with zero.
+	/// Returns: True if buffer exhausted.
 	bool addx16(ushort v, bool pad = false) {
 		for (int shift = 12; length < size && shift >= 0; shift -= 4) {
 			ushort h = (v >> shift) & 15;
-			if (h == 0 && pad == false) continue;
-			str[length++] = hexmaplow[h];
+			if (h == 0 && pad == false && shift > 0) continue;
+			str[length++] = hexMapLower[h];
 			if (h) pad = true;
 		}
 		str[length] = 0;
 		return length >= size;
 	}
+	/// Add a hexadecimal 32-bit value to buffer.
+	/// Params:
+	/// 	v = uint value.
+	/// 	pad = If set, pads with zero.
+	/// Returns: True if buffer exhausted.
 	bool addx32(uint v, bool pad = false) {
 		for (int shift = 28; length < size && shift >= 0; shift -= 4) {
 			uint h = (v >> shift) & 15;
-			if (h == 0 && pad == false) continue;
-			str[length++] = hexmaplow[h];
+			if (h == 0 && pad == false && shift > 0) continue;
+			str[length++] = hexMapLower[h];
 			if (h) pad = true;
 		}
 		str[length] = 0;
 		return length >= size;
 	}
+	/// Add a hexadecimal 64-bit value to buffer.
+	/// Params:
+	/// 	v = ulong value.
+	/// 	pad = If set, pads with zero.
+	/// Returns: True if buffer exhausted.
 	bool addx64(ulong v, bool pad = false) {
 		for (int shift = 60; length < size && shift >= 0; shift -= 4) {
 			ulong h = (v >> shift) & 15;
-			if (h == 0 && pad == false) continue;
+			if (h == 0 && pad == false && shift > 0) continue;
 			version (D_LP64)
-				str[length++] = hexmaplow[h];
-			else
-				str[length++] = hexmaplow[cast(uint)h]; // for 32-bit systems
+				str[length++] = hexMapLower[h];
+			else // for 32-bit systems
+				str[length++] = hexMapLower[cast(uint)h];
 			if (h) pad = true;
 		}
 		str[length] = 0;

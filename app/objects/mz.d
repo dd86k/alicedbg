@@ -37,7 +37,7 @@ int dump_mz(dump_t *dump) {
 private:
 
 void dump_mz_hdr(adbg_object_t *obj) {
-	dump_chapter("Header");
+	dump_h1("Header");
 	printf(
 	"e_cblp      %04Xh\t(%u)\n"~
 	"e_cp        %04Xh\t(%u)\n"~
@@ -71,7 +71,7 @@ void dump_mz_hdr(adbg_object_t *obj) {
 }
 
 void dump_mz_relocs(adbg_object_t *obj) {
-	dump_chapter("Relocations");
+	dump_h1("Relocations");
 	
 	ushort relocs = obj.mz.hdr.e_crlc;
 	mz_reloc *reloc = obj.mz.relocs;
@@ -87,7 +87,7 @@ void dump_mz_relocs(adbg_object_t *obj) {
 }
 
 void dump_mz_disasm(dump_t *dump) {
-	dump_chapter("Disassembly");
+	dump_h1("Disassembly");
 	
 	uint start = dump.obj.mz.hdr.e_cparh * 16;
 	if (start < mz_hdr.sizeof || start >= dump.obj.fsize) {

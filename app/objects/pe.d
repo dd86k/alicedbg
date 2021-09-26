@@ -59,7 +59,7 @@ private:
 
 // Returns true if the machine value is unknown
 bool dump_pe_hdr(adbg_object_t *obj) {
-	dump_chapter("Header");
+	dump_h1("Header");
 	
 	const(char) *str_mach = adbg_obj_pe_machine(obj.pe.hdr.Machine);
 	
@@ -128,7 +128,7 @@ bool dump_pe_hdr(adbg_object_t *obj) {
 }
 
 void dump_pe_opthdr(adbg_object_t *obj) {
-	dump_chapter("Optional Header");
+	dump_h1("Optional Header");
 	
 	const(char) *str_mag = adbg_obj_pe_magic(obj.pe.opthdr.Magic);
 	if (str_mag == null) {
@@ -316,7 +316,7 @@ void dump_pe_opthdr(adbg_object_t *obj) {
 }
 
 void dump_pe_dirs(adbg_object_t *obj) {
-	dump_chapter("Directories");
+	dump_h1("Directories");
 	with (obj.pe.dir)
 	printf(
 	"Directory                RVA       Size\n"~
@@ -355,7 +355,7 @@ void dump_pe_dirs(adbg_object_t *obj) {
 }
 
 void dump_pe_sections(adbg_object_t *obj) {
-	dump_chapter("Sections");
+	dump_h1("Sections");
 	for (ushort si; si < obj.pe.hdr.NumberOfSections; ++si) {
 		PE_SECTION_ENTRY section = obj.pe.sections[si];
 		
@@ -454,7 +454,7 @@ void dump_pe_sections(adbg_object_t *obj) {
 
 /*void dump_pe_loadconfig(adbg_object_t *obj) {
 	
-	dump_chapter("Load Configuration");
+	dump_h1("Load Configuration");
 	
 	if (obj.pe.loadconfig == null) { // LOAD_CONFIGURATION
 		puts("No 
@@ -694,7 +694,7 @@ void dump_pe_sections(adbg_object_t *obj) {
 
 // NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
 void dump_pe_imports(adbg_object_t *obj) {
-	dump_chapter("Imports");
+	dump_h1("Imports");
 	
 	if (obj.pe.imports == null || obj.pe.hdr.SizeOfOptionalHeader == 0) {
 		puts("No imports were found");
@@ -761,7 +761,7 @@ void dump_pe_imports(adbg_object_t *obj) {
 }
 
 void dump_pe_debug(adbg_object_t *obj) {
-	dump_chapter("Debug");
+	dump_h1("Debug");
 	
 	if (obj.pe.debugdir == null) {
 		puts("No debug directory found");
@@ -853,7 +853,7 @@ L_DEBUG_PDB20:
 }
 
 void dump_pe_disasm(dump_t *dump) {
-	dump_chapter("Disassembly");
+	dump_h1("Disassembly");
 	
 	bool all = (dump.flags & DumpOpt.disasm_all) != 0;
 	ushort nb = dump.obj.pe.hdr.NumberOfSections;

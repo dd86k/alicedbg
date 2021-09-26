@@ -7,7 +7,7 @@ import core.stdc.string;
 unittest {
 	import adbg.utils.str : adbg_string_t;
 	
-	enum BUFFER_SIZE = 64;
+	enum BUFFER_SIZE = 80;
 	enum LAST_ITEM = BUFFER_SIZE - 1;
 	
 	char[BUFFER_SIZE] buffer = void;
@@ -17,19 +17,19 @@ unittest {
 	printf("adbg_string_t: ");
 	adbg_string_t s = adbg_string_t(buffer.ptr, BUFFER_SIZE);
 	assert(s.size == BUFFER_SIZE);
-	assert(s.pos  == 0);
+	assert(s.length  == 0);
 	assert(s.str  == &buffer[0]);
 	puts("OK");
 	
 	// reset
 	
 	printf("adbg_string_t.reset: ");
-	s.pos = 3;
+	s.length = 3;
 	s.reset(true);
 	assert(buffer[0] == 0);
 	assert(buffer[1] == 0);
 	assert(buffer[LAST_ITEM] == 0);
-	assert(s.pos == 0);
+	assert(s.length == 0);
 	puts("OK");
 	
 	// add(char)
@@ -78,7 +78,6 @@ unittest {
 	assert(lorem.length > s.size);
 	assert(s.adds(lorem.ptr));
 	assert(buffer[0] == 'L');
-	assert(buffer[LAST_ITEM] == lorem[LAST_ITEM]);
 	puts("OK");
 	
 	s.reset(true);
@@ -93,8 +92,23 @@ unittest {
 	s.reset();
 	printf("adbg_string_t.addx8: ");
 	assert(s.addx8(0xe0) == false);
-	assert(buffer[0]  == 'e');
-	assert(buffer[1]  == '0');
+	assert(buffer[0] == 'e');
+	assert(buffer[1] == '0');
+	assert(buffer[2] == 0);
+	puts("OK");
+	
+	s.reset();
+	printf("adbg_string_t.addx8 0 false: ");
+	assert(s.addx8(0) == false);
+	assert(buffer[0] == '0');
+	assert(buffer[1] == 0);
+	puts("OK");
+	
+	s.reset();
+	printf("adbg_string_t.addx8 0 true: ");
+	assert(s.addx8(0, true) == false);
+	assert(buffer[0] == '0');
+	assert(buffer[1] == '0');
 	assert(buffer[2] == 0);
 	puts("OK");
 	
@@ -108,8 +122,8 @@ unittest {
 	s.reset();
 	printf("adbg_string_t.addx8 0x3 true: ");
 	assert(s.addx8(0xe, true) == false);
-	assert(buffer[0]  == '0');
-	assert(buffer[1]  == 'e');
+	assert(buffer[0] == '0');
+	assert(buffer[1] == 'e');
 	assert(buffer[2] == 0);
 	puts("OK");
 	
@@ -117,10 +131,10 @@ unittest {
 	printf("adbg_string_t.addx8 multiple: ");
 	assert(s.addx8(0x80) == false);
 	assert(s.addx8(0x86) == false);
-	assert(buffer[0]  == '8');
-	assert(buffer[1]  == '0');
-	assert(buffer[2]  == '8');
-	assert(buffer[3]  == '6');
+	assert(buffer[0] == '8');
+	assert(buffer[1] == '0');
+	assert(buffer[2] == '8');
+	assert(buffer[3] == '6');
 	assert(buffer[4] == 0);
 	puts("OK");
 	
@@ -129,38 +143,45 @@ unittest {
 	s.reset();
 	printf("adbg_string_t.addx16: ");
 	assert(s.addx16(0xabcd) == false);
-	assert(buffer[0]  == 'a');
-	assert(buffer[1]  == 'b');
-	assert(buffer[2]  == 'c');
-	assert(buffer[3]  == 'd');
+	assert(buffer[0] == 'a');
+	assert(buffer[1] == 'b');
+	assert(buffer[2] == 'c');
+	assert(buffer[3] == 'd');
 	assert(buffer[4] == 0);
 	puts("OK");
 	
 	s.reset();
 	printf("adbg_string_t.addx16 false: ");
 	assert(s.addx16(0xff) == false);
-	assert(buffer[0]  == 'f');
-	assert(buffer[1]  == 'f');
+	assert(buffer[0] == 'f');
+	assert(buffer[1] == 'f');
 	assert(buffer[2] == 0);
 	puts("OK");
 	
 	s.reset();
 	printf("adbg_string_t.addx16 true: ");
 	assert(s.addx16(0xee, true) == false);
-	assert(buffer[0]  == '0');
-	assert(buffer[1]  == '0');
-	assert(buffer[2]  == 'e');
-	assert(buffer[3]  == 'e');
+	assert(buffer[0] == '0');
+	assert(buffer[1] == '0');
+	assert(buffer[2] == 'e');
+	assert(buffer[3] == 'e');
 	assert(buffer[4] == 0);
 	puts("OK");
 	
 	s.reset();
-	printf("adbg_string_t.addx16 0x0: ");
+	printf("adbg_string_t.addx16 0 false: ");
+	assert(s.addx16(0) == false);
+	assert(buffer[0] == '0');
+	assert(buffer[1] == 0);
+	puts("OK");
+	
+	s.reset();
+	printf("adbg_string_t.addx16 0 true: ");
 	assert(s.addx16(0, true) == false);
-	assert(buffer[0]  == '0');
-	assert(buffer[1]  == '0');
-	assert(buffer[2]  == '0');
-	assert(buffer[3]  == '0');
+	assert(buffer[0] == '0');
+	assert(buffer[1] == '0');
+	assert(buffer[2] == '0');
+	assert(buffer[3] == '0');
 	assert(buffer[4] == 0);
 	puts("OK");
 	
@@ -224,7 +245,14 @@ unittest {
 	puts("OK");
 	
 	s.reset();
-	printf("adbg_string_t.addx32 0x0: ");
+	printf("adbg_string_t.addx32 0 false: ");
+	assert(s.addx32(0) == false);
+	assert(buffer[0]  == '0');
+	assert(buffer[1] == 0);
+	puts("OK");
+	
+	s.reset();
+	printf("adbg_string_t.addx32 0 true: ");
 	assert(s.addx32(0, true) == false);
 	assert(buffer[0]  == '0');
 	assert(buffer[1]  == '0');
@@ -303,7 +331,14 @@ unittest {
 	puts("OK");
 	
 	s.reset();
-	printf("adbg_string_t.addx64 0x0: ");
+	printf("adbg_string_t.addx64 0 false: ");
+	assert(s.addx64(0) == false);
+	assert(buffer[0]  == '0');
+	assert(buffer[1] == 0);
+	puts("OK");
+	
+	s.reset();
+	printf("adbg_string_t.addx64 0 true: ");
 	assert(s.addx64(0, true) == false);
 	assert(buffer[0]  == '0');
 	assert(buffer[1]  == '0');

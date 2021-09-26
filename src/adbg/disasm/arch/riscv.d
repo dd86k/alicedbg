@@ -1,11 +1,18 @@
 /**
  * RISC-V RV32/RV64 decoder.
  *
+ * Incomplete, about 5% done. Mostly RV32.
+ *
+ * Version: 1
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
 module adbg.disasm.arch.riscv;
+
+//TODO: Control-flow analysis
+//TODO: adbg_disasm_fetch_unify
+//      Make it so two fetches into a type.. SOMEHOW
 
 import adbg.error;
 import adbg.disasm.disasm;
@@ -13,44 +20,31 @@ import adbg.utils.bit;
 
 extern (C):
 
-struct riscv_internals_t { align(1):
-	union {
-		uint op;
-		version (LittleEndian)
-			public struct { align(1): ushort op1, op2; }
-		else
-			public struct { align(1): ushort op2, op1; }
-	}
-}
-
-version (0):
-
-//TODO: Functions to process opcodes by types (C.I, I, C.J, J, etc.)
-//      1. rv32_ci(string, int) e.g. rv32_ci("c.jal", op);
-//      2. rv32_ci(string, string, int) e.g. rv32_ci("c.jal", "x1", 0x20);
-
 /// Disassemble RISC-V
 /// Note: So far only does risc-v-32
 /// Params: p = Disassembler parameters
 int adbg_disasm_riscv(adbg_disasm_t *p) {
-	return 0;
-	/+
 	riscv_internals_t i = void;
-//	p.rv = &i;
-
-	// RISC-V C ext. fetches by "halfword" (16-bit)
-	i.op1 = *p.ai16;
-	++p.ai16;
-
+	i.disasm = p;
+	
+	switch (p.platform) with (AdbgPlatform) {
+	case riscv32: i.nativeWidth = AdbgDisasmType.i32; break;
+	case riscv64: i.nativeWidth = AdbgDisasmType.i64; break;
+//	case riscv128: i.nativeWidth = AdbgDisasmType.i128; break;
+	default: assert(0, "Invalid RISC-V platform");
+	}
+	
+	// Fetch by "halfword" (16-bit)
+	int e = adbg_disasm_fetch!ushort(p, &i.op1, AdbgDisasmTag.opcode);
+	if (e) return e;
+	
 	//
 	// RISC-V Compressed (RVC) Extension
 	//
-
+	
 	switch (i.op1 & 3) {
 	case 0:
-		if (p.mode >= AdbgDisasmMode.file)
-			adbg_disasm_push_x16(p, i.op1);
-		switch (i.op1 & OP_RVC_FUNC_MASK) {
+		switch (i.op1 & OP_RVC_FUNC) {
 		case OP_RVC_FUNC_000: // C.ADDI4SPN
 			int imm = i.op1 >> 5;
 			if (imm == 0) {
@@ -59,9 +53,9 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			int rd = (i.op1 >> 2) & 7;
-			adbg_disasm_push_str(p, "c.addi4spn");
-			adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rd));
-			adbg_disasm_push_imm(p, imm);
+			adbg_disasm_add_mnemonic(i.disasm, "c.addi4spn");
+			adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rd));
+			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		case OP_RVC_FUNC_110: // C.SW
 			if (p.mode < AdbgDisasmMode.file)
@@ -69,22 +63,18 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			int rs1 = (i.op1 >> 7) & 7;
 			int rs2 = (i.op1 >> 2) & 7;
 			int imm = (i.op1 >> 9) & 7;
-			if (i.op1 & BIT!(6))
-				imm |= 1;
-			if (i.op1 & BIT!(5))
-				imm = -imm;
-			adbg_disasm_push_str(p, "c.sw");
-			adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rs1));
-			adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rs2));
-			adbg_disasm_push_imm(p, imm);
+			if (i.op1 & BIT!(6)) imm |= 1;
+			if (i.op1 & BIT!(5)) imm = -imm;
+			adbg_disasm_add_mnemonic(i.disasm, "c.sw");
+			adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rs1));
+			adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rs2));
+			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		default: // Yes, 000 is illegal
 			return adbg_oops(AdbgError.illegalInstruction);
 		}
 	case 1:
-		if (p.mode >= AdbgDisasmMode.file)
-			adbg_disasm_push_x16(p, i.op1);
-		switch (i.op1 & OP_RVC_FUNC_MASK) {
+		switch (i.op1 & OP_RVC_FUNC) {
 		case OP_RVC_FUNC_000:
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
@@ -93,34 +83,34 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 				int imm = (i.op1 >> 2) & 31;
 				if (i.op1 & BIT!(12)) imm = -imm;
 				const(char) *rdstr = adbg_disasm_riscv_abi_reg(rd);
-				adbg_disasm_push_str(p, rd == 2 ? "c.addi16sp" : "c.addi");
-				adbg_disasm_push_reg(p, rdstr);
-				adbg_disasm_push_reg(p, rdstr);
-				adbg_disasm_push_imm(p, imm);
+				adbg_disasm_add_mnemonic(i.disasm, rd == 2 ? "c.addi16sp" : "c.addi");
+				adbg_disasm_add_register(i.disasm, rdstr);
+				adbg_disasm_add_register(i.disasm, rdstr);
+				adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			} else { // C.NOP (rd == 0)
-				adbg_disasm_push_str(p, "c.nop");
+				adbg_disasm_add_mnemonic(i.disasm, "c.nop");
 			}
 			return 0;
 		case OP_RVC_FUNC_001: // C.JAL
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
-			adbg_disasm_push_str(p, "c.jal");
-			adbg_disasm_push_imm(p, adbg_disasm_riscv_imm_cj(i.op1));
+			int imm = adbg_disasm_riscv_imm_cj(i.op1);
+			adbg_disasm_add_mnemonic(i.disasm, "c.jal");
+			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		case OP_RVC_FUNC_100: // C.GRP1_1
 			int rd = (i.op1 >> 7) & 7;
 			switch (i.op1 & 0xC00) { // op[11:10]
 			case 0:	// C.SRLI
 			
-				return 0;
+				assert(0, "TODO");
 			case 0x400:	// C.SRAI
 			
-				return 0;
+				assert(0, "TODO");
 			case 0x800:	// C.ANDI
 			
-				return 0;
-			default: // C00H C.GRP1_1_1
-				int rs2 = (i.op1 >> 2) & 7;
+				assert(0, "TODO");
+			default: // 0xc00: C.GRP1_1_1
 				const(char) *m = void;
 				switch (i.op1 & 0x1060) { // op[12|6:5]
 				case 0:	     m = "c.sub"; break;
@@ -133,18 +123,17 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 				}
 				if (p.mode < AdbgDisasmMode.file)
 					return 0;
-				adbg_disasm_push_str(p, m);
-				adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rd));
-				adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rd));
-				adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rs2));
+				int rs2 = (i.op1 >> 2) & 7;
+				adbg_disasm_add_mnemonic(i.disasm, m);
+				adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rd));
+				adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rd));
+				adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rs2));
 				return 0;
 			}
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 	case 2:
-		if (p.mode >= AdbgDisasmMode.file)
-			adbg_disasm_push_x16(p, i.op1);
-		switch (i.op1 & OP_RVC_FUNC_MASK) {
+		switch (i.op1 & OP_RVC_FUNC) {
 		case OP_RVC_FUNC_010:
 			int rd = (i.op1 >> 7) & 31;
 			if (rd == 0) {
@@ -153,11 +142,10 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			int imm = (i.op1 >> 2) & 31;
-			if (i.op1 & BIT!(12))
-				imm |= BIT!(5);
-			adbg_disasm_push_str(p, "c.lwsp");
-			adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rd));
-			adbg_disasm_push_imm(p, imm);
+			if (i.op1 & BIT!(12)) imm |= BIT!(5);
+			adbg_disasm_add_mnemonic(i.disasm, "c.lwsp");
+			adbg_disasm_add_register(p, adbg_disasm_riscv_abi_reg(rd));
+			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		case OP_RVC_FUNC_100:
 			if (p.mode < AdbgDisasmMode.file)
@@ -166,25 +154,25 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			int rs2 = (i.op1 >> 2) & 31;
 			if (i.op1 & BIT!(12)) {
 				if (rs2) {
-					adbg_disasm_push_str(p, "c.add");
-					adbg_disasm_push_reg(p, adbg_disasm_riscv_rvc_abi_reg(rd));
-					adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rs2));
+					adbg_disasm_add_mnemonic(i.disasm, "c.add");
+					adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rd));
+					adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_abi_reg(rs2));
 				} else {
 					if (rd) {
-						adbg_disasm_push_str(p, "c.jalr");
-						adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rd));
+						adbg_disasm_add_mnemonic(p, "c.jalr");
+						adbg_disasm_add_register(p, adbg_disasm_riscv_abi_reg(rd));
 					} else {
-						adbg_disasm_push_str(p, "c.ebreak");
+						adbg_disasm_add_mnemonic(p, "c.ebreak");
 					}
 				}
 			} else {
 				if (rs2) {
-					adbg_disasm_push_str(p, "c.mv");
-					adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rd));
-					adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rs2));
+					adbg_disasm_add_mnemonic(p, "c.mv");
+					adbg_disasm_add_register(p, adbg_disasm_riscv_abi_reg(rd));
+					adbg_disasm_add_register(p, adbg_disasm_riscv_abi_reg(rs2));
 				} else {
-					adbg_disasm_push_str(p, "c.jr");
-					adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rd));
+					adbg_disasm_add_mnemonic(p, "c.jr");
+					adbg_disasm_add_register(p, adbg_disasm_riscv_abi_reg(rd));
 				}
 			}
 			return 0;
@@ -193,28 +181,28 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 				return 0;
 			int rs2 = (i.op1 >> 2) & 31;
 			int imm = (i.op1 >> 7) & 63;
-			adbg_disasm_push_str(p, "c.swsp");
-			adbg_disasm_push_memregimm(p, adbg_disasm_riscv_abi_reg(rs2), imm, MemWidth.i32);
+			adbg_disasm_add_mnemonic(p, "c.swsp");
+			adbg_disasm_add_memory(i.disasm, i.nativeWidth,
+				null, adbg_disasm_riscv_abi_reg(rs2), null,
+				AdbgDisasmType.i32, &imm,
+				false, false, false);
 			return 0;
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 	default: // 11 >= 16b
 	}
-
+	
 	//
 	// RISC-V 32-bit
 	//
-
-	i.op2 = *p.ai16;
-	++p.ai16;
 	
-	if (p.mode >= AdbgDisasmMode.file)
-		adbg_disasm_push_x32(p, i.op);
+	e = adbg_disasm_fetch!ushort(p, &i.op2, AdbgDisasmTag.opcode);
+	if (e) return e;
 	
-	switch (i.op & OP_MASK) {
+	switch (i.op & OPCODE) {
 	case 19: // (0010011) RV32I: ADDI/SLTI/SLTIU/XORI/ORI/ANDI
 		const(char) *m = void;
-		switch (i.op & OP_FUNC_MASK) {
+		switch (i.op & OP_FUNC) {
 		case OP_FUNC_000: m = "addi"; break;
 		case OP_FUNC_010: m = "slti"; break;
 		case OP_FUNC_011: m = "sltiu"; break;
@@ -228,18 +216,18 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		int imm = i.op >> 20;
 		int rs1 = (i.op >> 15) & 31;
 		int rd = (i.op >> 7) & 31;
-		adbg_disasm_push_str(p, m);
-		adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rd));
-		adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rs1));
-		adbg_disasm_push_imm(p, imm);
+		adbg_disasm_add_mnemonic(i.disasm, m);
+		adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_abi_reg(rd));
+		adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_abi_reg(rs1));
+		adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 		return 0;
 	case 35: // (0100011) RV32I: SB/SH/SW
 		const(char) *m = void;
-		int w = void;
-		switch (i.op & OP_FUNC_MASK) {
-		case OP_FUNC_000: m = "sb"; w = MemWidth.i8; break;
-		case OP_FUNC_001: m = "sh"; w = MemWidth.i16; break;
-		case OP_FUNC_010: m = "sw"; w = MemWidth.i32; break;
+		AdbgDisasmType w = void;
+		switch (i.op & OP_FUNC) {
+		case OP_FUNC_000: m = "sb"; w = AdbgDisasmType.i8; break;
+		case OP_FUNC_001: m = "sh"; w = AdbgDisasmType.i16; break;
+		case OP_FUNC_010: m = "sw"; w = AdbgDisasmType.i32; break;
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 		if (p.mode < AdbgDisasmMode.file)
@@ -247,22 +235,37 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		int imm = adbg_disasm_riscv_imm_s(i.op);
 		int rs1 = (i.op >> 15) & 31;
 		int rs2 = (i.op >> 20) & 31;
-		adbg_disasm_push_str(p, m);
-		adbg_disasm_push_memregimm(p, adbg_disasm_riscv_abi_reg(rs1), imm, w);
-		adbg_disasm_push_reg(p, adbg_disasm_riscv_abi_reg(rs2));
+		adbg_disasm_add_mnemonic(i.disasm, m);
+		adbg_disasm_add_memory(i.disasm, w,
+			null, adbg_disasm_riscv_abi_reg(rs1), null,
+			AdbgDisasmType.i32, &imm,
+			false, false, false);
+		adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_abi_reg(rs2));
 		return 0;
 	default: return adbg_oops(AdbgError.illegalInstruction);
 	}
-	+/
 }
 
 private:
+
+struct riscv_internals_t { align(1):
+	adbg_disasm_t *disasm;
+	union {
+		uint op;
+		//TODO: An array with OPCODE_LOW/HIGH constants seem better...
+		version (LittleEndian)
+			public struct { align(1): ushort op1, op2; }
+		else
+			public struct { align(1): ushort op2, op1; }
+	}
+	AdbgDisasmType nativeWidth;
+}
 
 //
 // Enumerations, masks
 //
 
-enum OP_FUNC_MASK = OP_FUNC_111;	/// bit[14:12]
+enum OP_FUNC = OP_FUNC_111;	/// bit[14:12]
 enum OP_FUNC_000 = 0;
 enum OP_FUNC_001 = 0x1000;
 enum OP_FUNC_010 = 0x2000;
@@ -271,8 +274,8 @@ enum OP_FUNC_100 = 0x4000;
 enum OP_FUNC_101 = 0x5000;
 enum OP_FUNC_110 = 0x6000;
 enum OP_FUNC_111 = 0x7000;
-enum OP_MASK = 0x7F;	/// bit[6:0]
-enum OP_RVC_FUNC_MASK = OP_RVC_FUNC_111;	/// bit[15:13]
+enum OPCODE = 0x7F;	/// bit[6:0]
+enum OP_RVC_FUNC = OP_RVC_FUNC_111;	/// bit[15:13]
 enum OP_RVC_FUNC_000 = 0;
 enum OP_RVC_FUNC_001 = 0x2000;
 enum OP_RVC_FUNC_010 = 0x4000;

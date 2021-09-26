@@ -44,7 +44,8 @@ private import adbg.disasm.syntax.intel,
 //      [ebx+2]       -> [ebx][2]
 //      [ebx+ecx*4+8] -> [ebx][ecx][8]
 //      label[ebp-2]  -> label[ebp][-2]
-//TODO: Consider adding syntax options (3[RDI], .rodata[00h][RIP])
+//TODO: Consider adding alternative syntax options
+//      e.g., 3[RDI], .rodata[00h][RIP]
 
 extern (C):
 
@@ -295,9 +296,12 @@ struct adbg_disasm_machine_t {
 /// The basis of an operation code
 //TODO: Consider adding decoder internals here instead
 struct adbg_disasm_opcode_t {
+	//TODO: Success bool or last error code in opcode structure
+	//      Would help formatter to ouput .byte 0xaa,0xbb etc.
 	// size mode:
 	int size;	/// Opcode size
 	// data mode:
+	//TODO: Jump/call target in opcode structure
 //	enum targetMode target;	/// none, near, far
 //	ulong targetAddress;	/// CALL/JMP absolute target
 //	union targetOffset;	/// CALL/JMP relative target
@@ -324,11 +328,6 @@ struct adbg_disasm_t { align(1):
 	/// Syntax operand handler function
 	//TODO: Move in _mnemonic one specific syntax float80 situation is fixed
 	bool function(adbg_disasm_t*, ref adbg_string_t, ref adbg_disasm_operand_t) foperand;
-	union {
-		void *internal;	/// Pointer for internal decoders
-		x86_internals_t *x86;	/// Ditto
-		riscv_internals_t *rv;	/// Ditto
-	}
 	/// Internal cookie. Yummy!
 	uint cookie;
 	/// Instruction set architecture platform to disassemble from.
@@ -557,6 +556,7 @@ size_t adbg_disasm_format_prefixes(adbg_disasm_t *p, char *buffer, size_t size, 
 	adbg_string_t s = adbg_string_t(buffer, size);
 	return adbg_disasm_format_prefixes2(p, s, op);
 }
+private
 size_t adbg_disasm_format_prefixes2(adbg_disasm_t *p, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
 	// Prefixes, skipped if empty
 	version (Trace) trace("count=%u", op.prefixCount);
@@ -594,6 +594,7 @@ size_t adbg_disasm_format_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, 
 	adbg_string_t s = adbg_string_t(buffer, size);
 	return adbg_disasm_format_mnemonic2(p, s, op);
 }
+private
 size_t adbg_disasm_format_mnemonic2(adbg_disasm_t *p, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
 	version (Trace) trace("mnemonic=%s", op.mnemonic);
 	
@@ -616,6 +617,7 @@ size_t adbg_disasm_format_operands(adbg_disasm_t *p, char *buffer, size_t size, 
 	adbg_string_t s = adbg_string_t(buffer, size);
 	return adbg_disasm_format_operands2(p, s, op);
 }
+private
 size_t adbg_disasm_format_operands2(adbg_disasm_t *p, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
 	version (Trace) trace("count=%u", op.operandCount);
 	
@@ -766,6 +768,9 @@ struct adbg_disasm_operand_imm_t {
 	adbg_disasm_number_t value;	/// 
 	ushort segment;	/// 
 	bool absolute;	/// 
+	//TODO: AdbgDisasmImmPurpose
+	//      default -> decimal
+	//      bitop -> hex
 }
 
 /// Register operand
@@ -995,7 +1000,15 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p,
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
-	version (Trace) trace("type=%u v=%p segment=%u", width, v, segment);
+	version (Trace) {
+		switch (width) with (AdbgDisasmType) {
+		case i8:  trace("segment=%u v=%u", segment, *cast(ubyte*)v); break;
+		case i16: trace("segment=%u v=%u", segment, *cast(ushort*)v); break;
+		case i32: trace("segment=%u v=%u", segment, *cast(uint*)v); break;
+		case i64: trace("segment=%u v=%llu", segment, *cast(ulong*)v); break;
+		default: assert(0);
+		}
+	}
 	
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
 	item.type = AdbgDisasmOperand.immediate;

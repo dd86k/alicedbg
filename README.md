@@ -14,12 +14,12 @@ The library supports:
   - Windows (msvcrt) and Linux (Glibc and Musl).
 - Disassembly
   - Platforms: x86.
-  - Syntaxes: Intel, Nasm, and AT&T, HLA, and TASM.
+  - Syntaxes: Intel, NASM, and AT&T, Hyde Randall High Level Assembly, and Borland Turbo Assembler (enhanced mode).
 - Supports the DMD, GDC, and LDC compilers.
 
 The application supports:
-- Debugging (default)
-  - UIs: Loop and command-line
+- Debugging (default mode)
+  - Interfaces: Loop and command-line (default)
 - Dumping (`-D|--dump`)
   - PE32 and ELF images.
 - Instruction analysis (`-A|--analyze`)

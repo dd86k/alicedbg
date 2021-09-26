@@ -33,7 +33,7 @@ int dump_elf(dump_t *dump) {
 private:
 
 void dump_elf_hdr(adbg_object_t *obj) {
-	dump_chapter("Header");
+	dump_h1("Header");
 	
 	ubyte h_class = obj.elf.hdr32.e_ident[ELF_EI_CLASS];
 	ubyte h_data = obj.elf.hdr32.e_ident[ELF_EI_DATA];
@@ -129,7 +129,7 @@ void dump_elf_hdr(adbg_object_t *obj) {
 }
 
 void dump_elf_phdr(adbg_object_t *obj) {
-	dump_chapter("Segments");
+	dump_h1("Segments");
 	
 	ushort nb = void;
 	ushort i;
@@ -201,7 +201,7 @@ void dump_elf_phdr(adbg_object_t *obj) {
 }
 
 void dump_elf_sections(adbg_object_t *obj) {
-	dump_chapter("Sections");
+	dump_h1("Sections");
 	
 	char *strtable = void;	/// string table location
 	ushort nb = void;	/// number of sections
@@ -318,7 +318,7 @@ void dump_elf_sections(adbg_object_t *obj) {
 }
 
 void dump_elf_disasm(dump_t *dump) {
-	dump_chapter("Disassembly");
+	dump_h1("Disassembly");
 	
 	bool all = (dump.flags & DumpOpt.disasm_all) != 0;
 	

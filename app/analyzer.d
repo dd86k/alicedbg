@@ -90,7 +90,8 @@ int analyze() {
 		putchar('\n');
 		// Machine tags
 		//TODO: If last is of the same tag, make it so the same line is used
-		//      dc 00
+		//      0f 01 00
+		//      :     :.. MODRM
 		//      :.. OPCODE
 		for (size_t mi = opcode.machineCount; mi--;) with (opcode) {
 			m = &machine[mi];

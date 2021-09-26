@@ -85,8 +85,7 @@ void dump_title(const(char) *title) {
 
 /// Output a dump chapter.
 /// Params: title = Chapter name
-//TODO: Consider renaming to dump_h1
-void dump_chapter(const(char) *title) {
+void dump_h1(const(char) *title) {
 	printf("\n# %s\n\n", title);
 }
 
@@ -204,6 +203,7 @@ L_DISASM_1:
 	adbg_disasm_opt(dp, AdbgDisasmOpt.mnemonicTab, true);
 	uint i;
 	char[40] mnemonic = void, machine = void;
+	const(char)* mnptr = void, maptr = void;
 	adbg_disasm_start_buffer(dp, AdbgDisasmMode.file, data, size);
 L_DISASM_2:
 	with (AdbgError)
@@ -211,16 +211,19 @@ L_DISASM_2:
 	case none:
 		adbg_disasm_machine(dp, machine.ptr, 40, &op);
 		adbg_disasm_format(dp, mnemonic.ptr, 40, &op);
-		printf("%08x  %-30s  %s\n", i, machine.ptr, mnemonic.ptr);
-		i += op.size;
-		goto L_DISASM_2;
+		maptr = machine.ptr;
+		mnptr = mnemonic.ptr;
+		break;
 	//TODO: Illegal should be moved with none and disasm takes care of buffer
 	case illegalInstruction:
 		adbg_disasm_machine(dp, machine.ptr, 40, &op);
-		printf("%08X  %-30s  (bad)\n", i, machine.ptr);
-		i += op.size;
-		goto L_DISASM_2;
+		maptr = machine.ptr;
+		mnptr = "(bad)";
+		break;
 	case outOfData: return 0;
 	default: return printerror();
 	}
+	printf("%8x  %-25s  %s\n", i, maptr, mnptr);
+	i += op.size;
+	goto L_DISASM_2;
 }
