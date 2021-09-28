@@ -16,8 +16,7 @@ extern (C):
 /// An empty string in case compilers does not support pool strings.
 __gshared char *empty_string = cast(char*)"";
 
-//TODO: Rewrite as adbg_util_flatten without snprintf
-//      Internal loop
+//TODO: adbg_util_argv_flatten: custom loop
 size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 	import core.stdc.stdio : snprintf;
 	if (argv == null)
@@ -45,7 +44,6 @@ size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 /// 	processed.
 /// Note: The internal buffer is 2048 characters and processes up to 32 items.
 char** adbg_util_expand(const(char) *str, int *argc) {
-	import core.stdc.ctype : isalnum, ispunct;
 	enum BUFFER_LEN   = 2048;
 	enum BUFFER_ITEMS = 32;
 	__gshared char[BUFFER_LEN] _buffer;	/// internal string buffer
@@ -293,39 +291,21 @@ void adbg_util_str_lowercase(char *buf, size_t size) {
 			buf[i] += 32;
 }
 
-size_t adbg_util_str_appendc(char *buffer, size_t size, char c) {
-	*buffer = c;
-	*(buffer + 1) = 0;
-	return 1;
-}
-size_t adbg_util_str_appends(char *buffer, size_t size, const(char) *str) {
-	size_t length;
-	size_t sz = size - 1;
-	for (; length < sz && str[length]; ++length)
-		buffer[length] = str[length];
-	buffer[length] = 0;
-	return length;
-}
-//TODO: Consider adbg_util_str_append_s(char *buffer, size_t size, const(char) *str, size_t size2)
-size_t adbg_util_str_appendf(char *buffer, size_t size, const(char) *fmt, ...) {
-	va_list va = void;
-	va_start(va, fmt);
-	return adbg_util_str_appendv(buffer, size, fmt, va);
-}
-size_t adbg_util_str_appendv(char *buffer, size_t size, const(char) *fmt, va_list va) {
-	return vsnprintf(buffer, size, fmt, va);
-}
-
-/// String structure to ease development.
+/// Internal structure used to append an existing buffer new typed elements.
 /// Used in the disassembler.
-//TODO: Consider just returning number of characters written to buffer
-//      So doing add('a') == 0 is the same as returning true if full
 //TODO: Consider adbg_string_t.add_s for +length
-//      Why?
-//TODO: Consider adbg_string_t.addm(string...)(string args)
+//      Why? This has literally no use
+//TODO: Consider adbg_string_t.addm(T...)(T args)
 //      Test in godbolt first
+//      char -> addc
+//      const(char)* -> adds
+//      ubyte -> addx8
+//      etc
 //TODO: Add decimal
-//      addd8/addd16/addd32/addd64(T v, bool signed)
+//      addu8/addu16/addu32/addu64(T v, bool signed)
+//TODO: Consider having settings instead of arguments
+//      bool pad    = false;
+//      bool signed = false;
 struct adbg_string_t {
 	char  *str;	/// String pointer
 	size_t size;	/// Buffer capacity

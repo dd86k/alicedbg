@@ -10,7 +10,6 @@
 module adbg.disasm.disasm;
 
 import adbg.error;
-private import adbg.utils.bit : swapfunc16, swapfunc32, swapfunc64, BIT;
 private import adbg.utils.str;
 private import adbg.platform : adbg_address_t;
 private import adbg.disasm.arch.x86,
@@ -29,7 +28,10 @@ private import adbg.disasm.syntax.intel,
 //      Configured when _configure is called, used for fetching
 //TODO: Flow-oriented analysis to mitigate anti-dissassembly techniques
 //      Obviously with a setting (what should be the default?)
-//      Save jmp/call targets
+//      adbg_disasm_cfa(bool)
+//        true : malloc table with X initial entries
+//        false: free table
+//      Save jmp/call targets in allocated table
 //TODO: Visibility system for prefixes
 //      Tag system? e.g., groups (ubyte + bitflag)
 //TODO: Move float80 (x87) register handling here
@@ -46,6 +48,11 @@ private import adbg.disasm.syntax.intel,
 //      label[ebp-2]  -> label[ebp][-2]
 //TODO: Consider adding alternative syntax options
 //      e.g., 3[RDI], .rodata[00h][RIP]
+//TODO: Support for pseudo-instructions
+//      bool userBaseInstruction
+//      If true, tells decoder to get the base instruction instead
+//      In RISC-V, addi x0,x0,0 is basically nop, and nop is the 
+//      pseudo-instruction
 
 extern (C):
 

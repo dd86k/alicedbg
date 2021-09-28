@@ -35,7 +35,7 @@ extern (C):
 //TODO: Check REPE/REPZ and REPNE/REPNZ
 //      CMPS, CMPSB, CMPSD, CMPSW, SCAS, SCASB, SCASD, and SCASW.
 //      only check if hasRepe/hasRepne
-//TODO: Have sectioned "flag tables" for e.g., 0..0x40, 0x40..0x50, etc.
+//TODO: Maybe flag table to check LOCK/REP support?
 
 // ANCHOR legacy map
 int adbg_disasm_x86(adbg_disasm_t *p) {
@@ -175,8 +175,7 @@ L_PREFIX:
 	}
 	if (opcode < 0x50) { // 40H..4FH: INC/DEC or REX
 		if (p.platform == AdbgPlatform.x86_64) {
-			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_fetch_lasttag(p, AdbgDisasmTag.rex);
+			adbg_disasm_fetch_lasttag(p, AdbgDisasmTag.rex);
 			//NOTE: REX cannot be used to extend VEX
 			i.vex.W   = (opcode & 8) != 0;
 			i.vex.RR  = (opcode & 4) != 0;
@@ -809,12 +808,38 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 			if (i.disasm.mode >= AdbgDisasmMode.file)
 				adbg_disasm_add_mnemonic(i.disasm, M_LSL);
 			return adbg_disasm_x86_op_modrm3(i, AdbgDisasmType.i16, true);
-		case 5: return 0;
-		case 6: return 0;
-		case 7: return 0;
-		case 8: return 0;
-		case 11: return 0;
-		case 13: return 0;
+		case 5:
+			if (i.disasm.platform != AdbgPlatform.x86_64)
+				return adbg_oops(AdbgError.illegalInstruction);
+			if (i.disasm.mode >= AdbgDisasmMode.file)
+				adbg_disasm_add_mnemonic(i.disasm, M_SYSCALL);
+			return 0;
+		case 6:
+			if (i.disasm.mode >= AdbgDisasmMode.file)
+				adbg_disasm_add_mnemonic(i.disasm, M_CLTS);
+			return 0;
+		case 7:
+			if (i.disasm.platform != AdbgPlatform.x86_64)
+				return adbg_oops(AdbgError.illegalInstruction);
+			if (i.disasm.mode >= AdbgDisasmMode.file)
+				adbg_disasm_add_mnemonic(i.disasm, M_SYSRET);
+			return 0;
+		case 8:
+			if (i.disasm.mode >= AdbgDisasmMode.file)
+				adbg_disasm_add_mnemonic(i.disasm, M_INVD);
+			return 0;
+		case 9:
+			if (i.disasm.mode >= AdbgDisasmMode.file)
+				adbg_disasm_add_mnemonic(i.disasm, i.pf.rep ? M_WBNOINVD : M_WBINVD);
+			return 0;
+		case 0xb: // UD2 + modrm
+			return 0;
+		case 0xd: // PREFETCH
+			return 0;
+		case 0xe: // FEMMS
+			return 0;
+		case 0xf: // 3DNow!
+			return 0;
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 	}
@@ -1066,6 +1091,12 @@ immutable const(char) *M_SWAPGS	= "swapgs";
 immutable const(char) *M_RDTSCP	= "rdtscp";
 immutable const(char) *M_LAR	= "lar";
 immutable const(char) *M_LSL	= "lsl";
+immutable const(char) *M_SYSCALL	= "syscall";
+immutable const(char) *M_CLTS	= "clts";
+immutable const(char) *M_SYSRET	= "sysret";
+immutable const(char) *M_INVD	= "invd";
+immutable const(char) *M_WBNOINVD	= "wbnoinvd";
+immutable const(char) *M_WBINVD	= "wbinvd";
 // ANCHOR MAP 0F 38
 // ANCHOR MAP 0F 3A
 

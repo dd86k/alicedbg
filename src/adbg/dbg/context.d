@@ -8,6 +8,8 @@
 module adbg.dbg.context;
 
 import adbg.dbg.debugger : g_debuggee;
+private import core.stdc.stdio : snprintf;
+private import core.stdc.stdarg;
 
 version (Windows) {
 	import adbg.sys.windows.wow64;
@@ -128,14 +130,13 @@ void adbg_ctx_get(thread_context_t *ctx) {
 /// Params: reg = register_t structure
 /// Returns: Formatted hexadecimal string
 const(char) *adbg_ctx_reg_hex(register_t *reg) {
-	import adbg.utils.str : adbg_util_str_appendf;
 	enum SZ = 18;
 	__gshared char[SZ] buffer;
 	switch (reg.type) with (AdbgRegisterSize) {
-	case u8:  adbg_util_str_appendf(buffer.ptr, SZ, "%02x", reg.u8); break;
-	case u16: adbg_util_str_appendf(buffer.ptr, SZ, "%04x", reg.u16); break;
-	case u32: adbg_util_str_appendf(buffer.ptr, SZ, "%08x", reg.u32); break;
-	case u64: adbg_util_str_appendf(buffer.ptr, SZ, "%016llx", reg.u64); break;
+	case u8:  snprintf(buffer.ptr, SZ, "%02x", reg.u8); break;
+	case u16: snprintf(buffer.ptr, SZ, "%04x", reg.u16); break;
+	case u32: snprintf(buffer.ptr, SZ, "%08x", reg.u32); break;
+	case u64: snprintf(buffer.ptr, SZ, "%016llx", reg.u64); break;
 	default:  assert(0);
 	}
 	return buffer.ptr;
@@ -145,17 +146,16 @@ const(char) *adbg_ctx_reg_hex(register_t *reg) {
 /// Params: reg = register_t structure
 /// Returns: Formatted string
 const(char) *adbg_ctx_reg_val(register_t *reg) {
-	import adbg.utils.str : adbg_util_str_appendf;
 	enum SZ = 18;
 	__gshared char[SZ] buffer;
 	with (AdbgRegisterSize)
 	switch (reg.type) {
-	case u8:  adbg_util_str_appendf(buffer.ptr, SZ, "%u", reg.u8); break;
-	case u16: adbg_util_str_appendf(buffer.ptr, SZ, "%u", reg.u16); break;
-	case u32: adbg_util_str_appendf(buffer.ptr, SZ, "%u", reg.u32); break;
-	case u64: adbg_util_str_appendf(buffer.ptr, SZ, "%llu", reg.u64); break;
-	case f32: adbg_util_str_appendf(buffer.ptr, SZ, "%f", reg.f32); break;
-	case f64: adbg_util_str_appendf(buffer.ptr, SZ, "%f", reg.f64); break;
+	case u8:  snprintf(buffer.ptr, SZ, "%u", reg.u8); break;
+	case u16: snprintf(buffer.ptr, SZ, "%u", reg.u16); break;
+	case u32: snprintf(buffer.ptr, SZ, "%u", reg.u32); break;
+	case u64: snprintf(buffer.ptr, SZ, "%llu", reg.u64); break;
+	case f32: snprintf(buffer.ptr, SZ, "%f", reg.f32); break;
+	case f64: snprintf(buffer.ptr, SZ, "%f", reg.f64); break;
 	default:  assert(0);
 	}
 	return buffer.ptr;
