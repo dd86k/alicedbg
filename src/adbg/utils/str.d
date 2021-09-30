@@ -306,6 +306,8 @@ void adbg_util_str_lowercase(char *buf, size_t size) {
 //TODO: Consider having settings instead of arguments
 //      bool pad    = false;
 //      bool signed = false;
+//TODO: bool positive parameter
+//      Adds '+' if >=0
 struct adbg_string_t {
 	char  *str;	/// String pointer
 	size_t size;	/// Buffer capacity
@@ -375,7 +377,7 @@ struct adbg_string_t {
 	/// 	pad = If set, pads with zero.
 	/// Returns: True if buffer exhausted.
 	bool addx8(ubyte v, bool pad = false) {
-		if (length + 3 >= size) return true;
+		if (length + 4 >= size) return true;
 		ubyte vh = v >> 4;
 		ubyte vl = v & 15;
 		if (vh || pad) str[length++] = hexMapLower[vh];

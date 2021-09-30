@@ -239,7 +239,7 @@ L_PREFIX:
 			}
 			adbg_disasm_add_mnemonic(p, mnemonic);
 			adbg_disasm_operand_mem_t mem = void;
-			adbg_disasm_set_memory(&mem, segs[seg], regbase, null, AdbgDisasmType.none, null, 0, false);
+			adbg_disasm_set_memory(&mem, segs[seg], regbase, null, AdbgDisasmType.none, null, 0, false, false);
 			if (D) {
 				adbg_disasm_add_register(p, dx);
 				adbg_disasm_add_memory2(p, mw, &mem);
@@ -442,7 +442,7 @@ L_PREFIX:
 			
 			mnemonic = regs[dwidth][x86Reg.al]; // al/ax/eax
 			adbg_disasm_operand_mem_t O = void;
-			adbg_disasm_set_memory(&O, segs[i.pf.segment], null, null, i.pf.addr, &u.u64, 0, false);
+			adbg_disasm_set_memory(&O, segs[i.pf.segment], null, null, i.pf.addr, &u.u64, 0, false, false);
 			
 			adbg_disasm_add_mnemonic(p, M_MOV);
 			if (D) {
@@ -462,8 +462,8 @@ L_PREFIX:
 				i.pf.segment = x86Seg.ds;
 			
 			adbg_disasm_add_mnemonic(p, opcode < 0xa6 ? M_MOVS : M_CMPS);
-			adbg_disasm_set_memory(&X, segs[x86Seg.es], regs[i.pf.addr][x86Reg.di], null, AdbgDisasmType.none, null, 0, false);
-			adbg_disasm_set_memory(&Y, segs[i.pf.segment], regs[i.pf.addr][x86Reg.si], null, AdbgDisasmType.none, null, 0, false);
+			adbg_disasm_set_memory(&X, segs[x86Seg.es], regs[i.pf.addr][x86Reg.di], null, AdbgDisasmType.none, null, 0, false, false);
+			adbg_disasm_set_memory(&Y, segs[i.pf.segment], regs[i.pf.addr][x86Reg.si], null, AdbgDisasmType.none, null, 0, false, false);
 			if (D) {
 				adbg_disasm_add_memory2(p, dwidth, &Y);
 				adbg_disasm_add_memory2(p, dwidth, &X);
@@ -493,9 +493,9 @@ L_PREFIX:
 		mnemonic = regs[dwidth][x86Reg.al];
 		
 		if (D) {
-			adbg_disasm_set_memory(&Y, null, regs[i.pf.addr][x86Reg.di], null, AdbgDisasmType.none, null, 0, false);
+			adbg_disasm_set_memory(&Y, null, regs[i.pf.addr][x86Reg.di], null, AdbgDisasmType.none, null, 0, false, false);
 		} else {
-			adbg_disasm_set_memory(&X, segs[i.pf.segment], regs[i.pf.addr][x86Reg.si], null, AdbgDisasmType.none, null, 0, false);
+			adbg_disasm_set_memory(&X, segs[i.pf.segment], regs[i.pf.addr][x86Reg.si], null, AdbgDisasmType.none, null, 0, false, false);
 		}
 		switch (opcode) {
 		case 0:

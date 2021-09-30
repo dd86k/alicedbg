@@ -44,18 +44,20 @@ enum AdbgRegisterSize {
 struct register_t {
 	AdbgRegisterSize type;	/// Register type (size)
 	union {
-		ubyte  u8;	/// Register data: ubyte (u8)
-		ushort u16;	/// Register data: ushort (u16)
-		uint   u32;	/// Register data: uint (u32)
 		ulong  u64;	/// Register data: ulong (u64)
-		float  f32;	/// Register data: float (f32)
+		uint   u32;	/// Register data: uint (u32)
+		ushort u16;	/// Register data: ushort (u16)
+		ubyte  u8;	/// Register data: ubyte (u8)
 		double f64;	/// Register data: double (f64)
+		float  f32;	/// Register data: float (f32)
 	}
 	const(char) *name;	/// Register name from adbg_ex_reg_init
 }
 
 /// Represents a thread context structure with the register values once a
 /// process is paused.
+//TODO: Consider doing an immutable array
+//      And still support WOW64
 struct thread_context_t {
 	/// Register count in registers field, populated by
 	/// adbg_ex_reg_init.

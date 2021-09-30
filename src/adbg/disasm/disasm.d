@@ -771,7 +771,7 @@ struct adbg_disasm_prefix_t {
 //      A setting for each group (that will be a lot of groups...)
 /// Immediate operand
 //package
-struct adbg_disasm_operand_imm_t {
+struct adbg_disasm_operand_imm_t { align(1):
 	adbg_disasm_number_t value;	/// 
 	ushort segment;	/// 
 	bool absolute;	/// 
@@ -782,7 +782,7 @@ struct adbg_disasm_operand_imm_t {
 
 /// Register operand
 //package
-struct adbg_disasm_operand_reg_t {
+struct adbg_disasm_operand_reg_t { align(1):
 	const(char) *name;	/// Register name
 	int index;	/// If indexed, adds an index to register
 	bool isStack;	/// x86: Applies to x87
@@ -790,15 +790,15 @@ struct adbg_disasm_operand_reg_t {
 
 /// Memory operand
 //package
-struct adbg_disasm_operand_mem_t {
+struct adbg_disasm_operand_mem_t { align(1):
 	const(char) *segment;	/// Segment register
 	const(char) *base;	/// Base register, (scaled) SIB:BASE
 	const(char) *index;	/// Additional register, (scaled) SIB:INDEX
 	ubyte scale;	/// SIB:SCALE
-	bool hasOffset;	/// 
+	bool hasOffset;	/// Has memory offset
 	adbg_disasm_number_t offset;	/// Displacement
 	bool scaled;	/// SIB or any scaling mode
-	bool absolute;	/// 
+	bool absolute;	/// Absolute address jump or call
 }
 
 /// Operand structure
@@ -878,10 +878,17 @@ void adbg_disasm_calc_offset(T)(adbg_disasm_t *p, T u) {
 	//TODO: adbg_disasm_offset
 }
 
+/// Render a number onto a string.
+/// Params:
+/// 	s = String.
+/// 	n = Number.
+/// 	addPlus = If true, adds '+' if it's a positive number. Often an offset with a register.
+/// 	hideZero = If true, the number is not printed at all if equals to zero.
+/// Returns: True if buffer was exhausted.
 package
-bool adbg_disasm_render_number(adbg_disasm_t *p,
-	ref adbg_string_t s, ref adbg_disasm_number_t n, bool offset) {
-	__gshared const(char) *prefix = "0x";
+bool adbg_disasm_render_number(ref adbg_string_t s, ref adbg_disasm_number_t n,
+	bool addPlus, bool hideZero) {
+	__gshared const(char) *hexPrefix = "0x";
 	
 	//TODO: function table
 	//      adbg_disasm_render_number_minus0(T)
@@ -889,49 +896,63 @@ bool adbg_disasm_render_number(adbg_disasm_t *p,
 	
 	switch (n.type) with (AdbgDisasmType) {
 	case i8:
-		if (offset) {
-			if (s.addc(n.i8 < 0 ? '-' : '+'))
+		if (hideZero && n.i8 == 0)
+			return false;
+		if (addPlus && n.i8 >= 0)
+			if (s.addc('+'))
 				return true;
+		if (n.i8 < 0) {
+			if (s.addc('-'))
+				return true;
+			n.u8 = cast(ubyte)((~cast(int)n.u8) + 1);
 		}
-		if (s.adds(prefix)) // temp
+		if (s.adds(hexPrefix)) // temp
 			return true;
-		if (s.addx8(n.i8))
-			return true;
-		break;
+		return s.addx8(n.i8);
 	case i16:
-		if (offset) {
-			if (s.addc(n.i16 < 0 ? '-' : '+'))
+		if (hideZero && n.i16 == 0)
+			return false;
+		if (addPlus && n.i16 >= 0)
+			if (s.addc('+'))
 				return true;
+		if (n.i16 < 0) {
+			if (s.addc('-'))
+				return true;
+			n.u16 = cast(ushort)((~cast(int)n.u16) + 1);
 		}
-		if (s.adds(prefix)) // temp
+		if (s.adds(hexPrefix)) // temp
 			return true;
-		if (s.addx16(n.i16))
-			return true;
-		break;
+		return s.addx16(n.i16);
 	case i32:
-		if (offset) {
-			if (s.addc(n.i32 < 0 ? '-' : '+'))
+		if (hideZero && n.i32 == 0)
+			return false;
+		if (addPlus && n.i32 >= 0)
+			if (s.addc('+'))
 				return true;
+		if (n.i32 < 0) {
+			if (s.addc('-'))
+				return true;
+			n.u32 = cast(uint)(~n.u32 + 1);
 		}
-		if (s.adds(prefix)) // temp
+		if (s.adds(hexPrefix)) // temp
 			return true;
-		if (s.addx32(n.i32))
-			return true;
-		break;
+		return s.addx32(n.i32);
 	case i64:
-		if (offset) {
-			if (s.addc(n.i64 < 0 ? '-' : '+'))
+		if (hideZero && n.i64 == 0)
+			return false;
+		if (addPlus && n.i64 >= 0)
+			if (s.addc('+'))
 				return true;
+		if (n.i64 < 0) {
+			if (s.addc('-'))
+				return true;
+			n.u64 = cast(uint)(~n.u64 + 1);
 		}
-		if (s.adds(prefix)) // temp
+		if (s.adds(hexPrefix)) // temp
 			return true;
-		if (s.addx64(n.i64))
-			return true;
-		break;
+		return s.addx64(n.i64);
 	default: assert(0);
 	}
-	
-	return false;
 }
 
 //
@@ -981,12 +1002,13 @@ package
 void adbg_disasm_set_memory(adbg_disasm_operand_mem_t *mem,
 	const(char) *segment, const(char) *regbase, const(char) *regindex,
 	AdbgDisasmType dispWidth, void *disp,
-	ubyte scale, bool scaled) {
-	mem.segment = segment;
-	mem.base    = regbase;
-	mem.index   = regindex;
-	mem.scale   = scale;
+	ubyte scale, bool scaled, bool absolute) {
+	mem.segment   = segment;
+	mem.base      = regbase;
+	mem.index     = regindex;
+	mem.scale     = scale;
 	mem.scaled    = scaled;
+	mem.absolute  = absolute;
 	mem.hasOffset = disp != null;
 	if (disp) {
 		mem.offset.type = dispWidth;

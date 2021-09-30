@@ -29,7 +29,7 @@ bool adbg_disasm_operand_intel(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_d
 			if (s.addc(':'))
 				return true;
 		}
-		return adbg_disasm_render_number(p, s, op.imm.value, false);
+		return adbg_disasm_render_number(s, op.imm.value, false, false);
 	case register:
 		if (s.adds(op.reg.name))
 			return true;
@@ -68,7 +68,7 @@ bool adbg_disasm_operand_intel(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_d
 		}
 		if (op.mem.hasOffset) {
 			bool addPlus = op.mem.base != null || op.mem.index != null;
-			if (adbg_disasm_render_number(p, s, op.mem.offset, addPlus))
+			if (adbg_disasm_render_number(s, op.mem.offset, addPlus, false))
 				return true;
 		}
 		

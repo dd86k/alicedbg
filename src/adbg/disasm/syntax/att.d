@@ -1,5 +1,10 @@
 /**
- * Implemets the AT&T syntax.
+ * Implements the AT&T syntax.
+ *
+ * Example:
+ * ---
+ * sub %al, *(%rcx)
+ * ---
  *
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k
@@ -27,7 +32,7 @@ bool adbg_disasm_operand_att(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_dis
 		}
 		if (s.addc('$'))
 			return true;
-		return adbg_disasm_render_number(p, s, op.imm.value, false);
+		return adbg_disasm_render_number(s, op.imm.value, false, false);
 	case register:
 		if (s.addc('%'))
 			return true;
@@ -45,7 +50,7 @@ bool adbg_disasm_operand_att(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_dis
 		}
 		
 		if (op.mem.hasOffset)
-			if (adbg_disasm_render_number(p, s, op.mem.offset, true))
+			if (adbg_disasm_render_number(s, op.mem.offset, false, false))
 				return true;
 		
 		if (op.mem.absolute)
@@ -86,8 +91,6 @@ bool adbg_disasm_operand_att(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_dis
 				if (s.adds(op.mem.index))
 					return true;
 			}
-		} else { // Absolute (+far) or relative address
-			//TODO: address
 		}
 		
 		return s.addc(')');
