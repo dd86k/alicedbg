@@ -832,11 +832,15 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 			if (i.disasm.mode >= AdbgDisasmMode.file)
 				adbg_disasm_add_mnemonic(i.disasm, i.pf.rep ? M_WBNOINVD : M_WBINVD);
 			return 0;
-		case 0xb: // UD2 + modrm
+		case 0xb: // UD2
+			if (i.disasm.mode >= AdbgDisasmMode.file)
+				adbg_disasm_add_mnemonic(i.disasm, M_UD2);
 			return 0;
 		case 0xd: // PREFETCH
-			return 0;
+			return adbg_disasm_x86_group_prefetch(i);
 		case 0xe: // FEMMS
+			if (i.disasm.mode >= AdbgDisasmMode.file)
+				adbg_disasm_add_mnemonic(i.disasm, M_FEMMS);
 			return 0;
 		case 0xf: // 3DNow!
 			return 0;
@@ -1097,6 +1101,8 @@ immutable const(char) *M_SYSRET	= "sysret";
 immutable const(char) *M_INVD	= "invd";
 immutable const(char) *M_WBNOINVD	= "wbnoinvd";
 immutable const(char) *M_WBINVD	= "wbinvd";
+immutable const(char) *M_UD2	= "ud2";
+immutable const(char) *M_FEMMS	= "femms";
 // ANCHOR MAP 0F 38
 // ANCHOR MAP 0F 3A
 
@@ -2109,6 +2115,37 @@ int adbg_disasm_x86_grp16(ref x86_internals_t i) {	// ANCHOR Group 16
 int adbg_disasm_x86_grp17(ref x86_internals_t i) {	// ANCHOR Group 17
 	
 	return adbg_oops(AdbgError.notImplemented);
+}
+int adbg_disasm_x86_group_prefetch(ref x86_internals_t i) {	// ANCHOR Group PREFETCH
+	ubyte modrm = void;
+	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
+	if (e) return e;
+	
+	ubyte mode = modrm >> 6;
+	ubyte rm   = modrm & 7;
+	
+	adbg_disasm_operand_mem_t mem = void;
+	e = adbg_disasm_x86_modrm_rm(i, &mem, mode, rm);
+	if (e) return e;
+	
+	if (i.disasm.mode < AdbgDisasmMode.file)
+		return 0;
+	
+	ubyte reg  = (modrm >> 3) & 7;
+	
+	const(char) *m = void;
+	switch (reg) {
+	case 1:  m = "prefetchw"; break;
+	case 2:  m = "prefetchwt1"; break;
+	default: m = "prefetch";
+	}
+	
+	if (i.pf.segment == 0)
+		mem.segment = segs[x86Seg.ds];
+	
+	adbg_disasm_add_mnemonic(i.disasm, m);
+	adbg_disasm_add_memory2(i.disasm, AdbgDisasmType.i8, &mem);
+	return 0;
 }
 
 // !SECTION
