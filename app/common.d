@@ -52,6 +52,7 @@ immutable setting_syntax_t[] syntaxes = [
 	{ AdbgSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
 	{ AdbgSyntax.ideal, "ideal", "Borland Ideal Turbo Assembly Enhanced syntax" },
 	{ AdbgSyntax.hyde,  "hyde",  "Randall Hyde High Level Assembly Language syntax" },
+	{ AdbgSyntax.riscv, "riscv", "RISC-V native syntax" },
 ];
 
 //

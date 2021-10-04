@@ -293,7 +293,7 @@ L_PREFIX:
 	}
 	if (opcode < 0x90) { // 80H..8FH: more random stuff
 		if (opcode < 0x84) // ANCHOR Group 1
-			return adbg_disasm_x86_grp1(i, opcode);
+			return adbg_disasm_x86_group1(i, opcode);
 		if (opcode < 0x88) { // TEST/XCHG
 			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_add_mnemonic(p, opcode <= 0x86 ? M_TEST : M_XCHG);
@@ -345,7 +345,7 @@ L_PREFIX:
 				adbg_disasm_add_mnemonic(p, M_LEA);
 			return adbg_disasm_x86_op_modrm2(i, opcode, true, true);
 		case 0x8f: // ANCHOR Group 1a (includes XOP)
-			return adbg_disasm_x86_grp1a(i);
+			return adbg_disasm_x86_group1a(i);
 		default: // 88H..8BH: MOV EbGb/EvGv/GbEb/GvEv
 			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_add_mnemonic(p, M_MOV);
@@ -606,14 +606,14 @@ L_PREFIX:
 			adbg_disasm_add_mnemonic(p, mnemonic);
 			return 0;
 		case 0xc0, 0xc1:
-			return adbg_disasm_x86_grp2(i, opcode);
+			return adbg_disasm_x86_group2(i, opcode);
 		default: // C6H..C7H
-			return adbg_disasm_x86_grp11(i, opcode);
+			return adbg_disasm_x86_group11(i, opcode);
 		}
 	}
 	if (opcode < 0xe0) { // D0H..DFH: GRP2/AAM/AAD/XLAT/ESCAPE
 		if (opcode < 0xd4)
-			return adbg_disasm_x86_grp2(i, opcode);
+			return adbg_disasm_x86_group2(i, opcode);
 		switch (opcode) {
 		case 0xd4, 0xd5:
 			if (p.platform == AdbgPlatform.x86_64)
@@ -719,11 +719,11 @@ L_PREFIX:
 	// F1H..FFH: 
 	switch (opcode) {
 	case 0xff: // grp5
-		return adbg_disasm_x86_grp5(i);
+		return adbg_disasm_x86_group5(i);
 	case 0xfe: // grp4
-		return adbg_disasm_x86_grp4(i);
+		return adbg_disasm_x86_group4(i);
 	case 0xf6,0xf7: // grp3
-		return adbg_disasm_x86_grp3(i, opcode);
+		return adbg_disasm_x86_group3(i, opcode);
 	default:
 		if (p.mode < AdbgDisasmMode.file)
 			return 0;
@@ -798,8 +798,8 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 	
 	if (opcode < 0x10) {
 		switch (opcode) {
-		case 0: return adbg_disasm_x86_grp6(i);
-		case 1: return adbg_disasm_x86_grp7(i);
+		case 0: return adbg_disasm_x86_group6(i);
+		case 1: return adbg_disasm_x86_group7(i);
 		case 2:
 			if (i.disasm.mode >= AdbgDisasmMode.file)
 				adbg_disasm_add_mnemonic(i.disasm, M_LAR);
@@ -843,7 +843,7 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 				adbg_disasm_add_mnemonic(i.disasm, M_FEMMS);
 			return 0;
 		case 0xf: // 3DNow!
-			return 0;
+			return adbg_disasm_x86_3dnow(i);
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 	}
@@ -861,6 +861,59 @@ int adbg_disasm_x86_0f_38(ref x86_internals_t i) {
 int adbg_disasm_x86_0f_3a(ref x86_internals_t i) {
 	
 	return adbg_oops(AdbgError.notImplemented);
+}
+
+// ANCHOR 0f 0f: 3DNow!
+// 0Fh 0Fh [ModRM] [SIB] [displacement] imm8_opcode
+int adbg_disasm_x86_3dnow(ref x86_internals_t i) {
+	ubyte modrm = void;
+	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
+	if (e) return e;
+	
+	adbg_disasm_operand_mem_t mem = void;
+	e = adbg_disasm_x86_modrm_rm(i, &mem, modrm >> 6, modrm & 7);
+	if (e) return e;
+	
+	ubyte opcode = void;
+	e = adbg_disasm_fetch!ubyte(i.disasm, &opcode, AdbgDisasmTag.opcode);
+	if (e) return e;
+	
+	const(char) *m = void;
+	switch (opcode) { //TODO: Find pattern for 3DNow?
+	case 0xc:  m = "pi2fw"; break;
+	case 0xd:  m = "pi2fd"; break;
+	case 0x1c: m = "pf2iw"; break;
+	case 0x1d: m = "pf2id"; break;
+	case 0x8a: m = "pfnacc"; break;
+	case 0x8e: m = "pfpnacc"; break;
+	case 0x90: m = "pfcmpge"; break;
+	case 0x94: m = "pfmin"; break;
+	case 0x96: m = "pfrcp"; break;
+	case 0x97: m = "pfrsqrt"; break;
+	case 0x9a: m = "pfsub"; break;
+	case 0x9e: m = "pfadd"; break;
+	case 0xa0: m = "pfcmpgt"; break;
+	case 0xa4: m = "pfmax"; break;
+	case 0xa6: m = "pfrcpit1"; break;
+	case 0xa7: m = "pfrsqit1"; break;
+	case 0xaa: m = "pfsubr"; break;
+	case 0xae: m = "pfacc"; break;
+	case 0xb0: m = "pfcmpeq"; break;
+	case 0xb4: m = "pfmul"; break;
+	case 0xb6: m = "pfrcpit2"; break;
+	case 0xb7: m = "pmulhrw"; break;
+	case 0xbb: m = "pswapd"; break;
+	case 0xbf: m = "pavgusb"; break;
+	default: return adbg_oops(AdbgError.illegalInstruction);
+	}
+	
+	if (i.disasm.mode < AdbgDisasmMode.file)
+		return 0;
+	
+	adbg_disasm_add_mnemonic(i.disasm, m);
+	adbg_disasm_add_register(i.disasm, regs_mmx[(modrm >> 3) & 7]);
+	adbg_disasm_add_memory2(i.disasm, AdbgDisasmType.i64, &mem);
+	return 0;
 }
 
 // !SECTION
@@ -1443,7 +1496,7 @@ int adbg_disasm_x86_escape(ref x86_internals_t i, ubyte opcode) {	// ANCHOR x87 
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
 	
-	//TODO: Consider following Volume 2 Appendix B.17 encoding
+	//TODO: Consider following decoding by Intel's Volume 2 Appendix B.17 format
 	
 	i.disasm.decoderNoReverse = true;
 	const(char) *mnemonic = void;
@@ -1613,7 +1666,7 @@ L_NOOP: // no operands
 		return 0;
 	goto L_MNEMONIC;
 	
-L_REGAX:
+L_REGAX: // AX register
 	if (i.disasm.mode < AdbgDisasmMode.file)
 		return 0;
 	adbg_disasm_add_register(i.disasm, regs[AdbgDisasmType.i16][x86Reg.ax]);
@@ -1654,7 +1707,7 @@ L_MNEMONIC:
 L_ILLEGAL:
 	return adbg_oops(AdbgError.illegalInstruction);
 }
-int adbg_disasm_x86_grp1(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 1
+int adbg_disasm_x86_group1(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 1
 	if (i.disasm.platform == AdbgPlatform.x86_64 && opcode == 0x82)
 		return adbg_oops(AdbgError.illegalInstruction);
 	
@@ -1684,7 +1737,7 @@ int adbg_disasm_x86_grp1(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 
 	
 	return opcode != 0x81 ? adbg_disasm_x86_op_Ib(i) : adbg_disasm_x86_op_Iz(i);
 }
-int adbg_disasm_x86_grp1a(ref x86_internals_t i) {	// ANCHOR Group 1a
+int adbg_disasm_x86_group1a(ref x86_internals_t i) {	// ANCHOR Group 1a
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -1709,7 +1762,7 @@ int adbg_disasm_x86_grp1a(ref x86_internals_t i) {	// ANCHOR Group 1a
 	}
 	return 0;
 }
-int adbg_disasm_x86_grp2(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 2
+int adbg_disasm_x86_group2(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 2
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -1756,7 +1809,7 @@ int adbg_disasm_x86_grp2(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 
 		return 0;
 	}
 }
-int adbg_disasm_x86_grp3(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 3
+int adbg_disasm_x86_group3(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 3
 	immutable static const(char)*[8] M_GRP3 =
 		[ M_TEST, M_TEST, M_NOT, M_NEG, M_MUL, M_IMUL, M_DIV, M_IDIV ];
 	ubyte modrm = void;
@@ -1791,7 +1844,7 @@ int adbg_disasm_x86_grp3(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 
 	}
 	return 0;
 }
-int adbg_disasm_x86_grp4(ref x86_internals_t i) {	// ANCHOR Group 4
+int adbg_disasm_x86_group4(ref x86_internals_t i) {	// ANCHOR Group 4
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -1820,7 +1873,7 @@ int adbg_disasm_x86_grp4(ref x86_internals_t i) {	// ANCHOR Group 4
 		adbg_disasm_add_memory2(i.disasm, AdbgDisasmType.i8, &mem);
 	return 0;
 }
-int adbg_disasm_x86_grp5(ref x86_internals_t i) {	// ANCHOR Group 5
+int adbg_disasm_x86_group5(ref x86_internals_t i) {	// ANCHOR Group 5
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -1875,7 +1928,7 @@ int adbg_disasm_x86_grp5(ref x86_internals_t i) {	// ANCHOR Group 5
 		adbg_disasm_add_memory2(i.disasm, far ? AdbgDisasmType.far : i.pf.data, &mem);
 	return 0;
 }
-int adbg_disasm_x86_grp6(ref x86_internals_t i) {	// ANCHOR Group 6
+int adbg_disasm_x86_group6(ref x86_internals_t i) {	// ANCHOR Group 6
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -1928,7 +1981,7 @@ int adbg_disasm_x86_grp6(ref x86_internals_t i) {	// ANCHOR Group 6
 		adbg_disasm_add_memory2(i.disasm, i.pf.data, &mem);
 	return 0;
 }
-int adbg_disasm_x86_grp7(ref x86_internals_t i) {	// ANCHOR Group 7
+int adbg_disasm_x86_group7(ref x86_internals_t i) {	// ANCHOR Group 7
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -2048,19 +2101,19 @@ L_NONE:
 L_ILLEGAL:
 	return adbg_oops(AdbgError.illegalInstruction);
 }
-int adbg_disasm_x86_grp8(ref x86_internals_t i) {	// ANCHOR Group 8
+int adbg_disasm_x86_group8(ref x86_internals_t i) {	// ANCHOR Group 8
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_grp9(ref x86_internals_t i) {	// ANCHOR Group 9
+int adbg_disasm_x86_group9(ref x86_internals_t i) {	// ANCHOR Group 9
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_grp10(ref x86_internals_t i) {	// ANCHOR Group 10
+int adbg_disasm_x86_group10(ref x86_internals_t i) {	// ANCHOR Group 10
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_grp11(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 11
+int adbg_disasm_x86_group11(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 11
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -2092,27 +2145,27 @@ int adbg_disasm_x86_grp11(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group
 	}
 	return c6 ? adbg_disasm_x86_op_Ib(i) : adbg_disasm_x86_op_Iz(i);
 }
-int adbg_disasm_x86_grp12(ref x86_internals_t i) {	// ANCHOR Group 12
+int adbg_disasm_x86_group12(ref x86_internals_t i) {	// ANCHOR Group 12
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_grp13(ref x86_internals_t i) {	// ANCHOR Group 13
+int adbg_disasm_x86_group13(ref x86_internals_t i) {	// ANCHOR Group 13
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_grp14(ref x86_internals_t i) {	// ANCHOR Group 14
+int adbg_disasm_x86_group14(ref x86_internals_t i) {	// ANCHOR Group 14
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_grp15(ref x86_internals_t i) {	// ANCHOR Group 15
+int adbg_disasm_x86_group15(ref x86_internals_t i) {	// ANCHOR Group 15
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_grp16(ref x86_internals_t i) {	// ANCHOR Group 16
+int adbg_disasm_x86_group16(ref x86_internals_t i) {	// ANCHOR Group 16
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_grp17(ref x86_internals_t i) {	// ANCHOR Group 17
+int adbg_disasm_x86_group17(ref x86_internals_t i) {	// ANCHOR Group 17
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
@@ -2229,6 +2282,7 @@ int adbg_disasm_x86_modrm_rm(ref x86_internals_t i, adbg_disasm_operand_mem_t *m
 	mem.scaled = false;
 	mem.scale  = 0;
 	mem.segment = segs[i.pf.segment];
+	mem.absolute = false;
 	
 	//TODO: VEX.B
 	if (i.pf.addr == AdbgDisasmType.i16) {

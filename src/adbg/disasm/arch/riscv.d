@@ -27,13 +27,6 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 	riscv_internals_t i = void;
 	i.disasm = p;
 	
-	switch (p.platform) with (AdbgPlatform) {
-	case riscv32: i.nativeWidth = AdbgDisasmType.i32; break;
-	case riscv64: i.nativeWidth = AdbgDisasmType.i64; break;
-//	case riscv128: i.nativeWidth = AdbgDisasmType.i128; break;
-	default: assert(0, "Invalid RISC-V platform");
-	}
-	
 	// Fetch by "halfword" (16-bit)
 	int e = adbg_disasm_fetch!ushort(p, &i.op1, AdbgDisasmTag.opcode);
 	if (e) return e;
@@ -47,14 +40,14 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		switch (i.op1 & OP_RVC_FUNC) {
 		case OP_RVC_FUNC_000: // C.ADDI4SPN
 			int imm = i.op1 >> 5;
-			if (imm == 0) {
+			if (imm == 0)
 				return adbg_oops(AdbgError.illegalInstruction);
-			}
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			int rd = (i.op1 >> 2) & 7;
-			adbg_disasm_add_mnemonic(i.disasm, "c.addi4spn");
-			adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rd));
+			adbg_disasm_add_mnemonic(i.disasm, RV_ADDI);
+			adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rd));
+			adbg_disasm_add_register(i.disasm, rvregs[RiscvReg.x2]);
 			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		case OP_RVC_FUNC_110: // C.SW
@@ -65,9 +58,9 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			int imm = (i.op1 >> 9) & 7;
 			if (i.op1 & BIT!(6)) imm |= 1;
 			if (i.op1 & BIT!(5)) imm = -imm;
-			adbg_disasm_add_mnemonic(i.disasm, "c.sw");
-			adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rs1));
-			adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rs2));
+			adbg_disasm_add_mnemonic(i.disasm, RV_SW);
+			adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rs1));
+			adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rs2));
 			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		default: // Yes, 000 is illegal
@@ -79,23 +72,24 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			int rd = (i.op1 >> 7) & 31; /// rd/rs1 (op[11:7])
-			if (rd) { // C.ADDI
+			if (rd) { // C.ADDI/C.ADDI16SP
 				int imm = (i.op1 >> 2) & 31;
 				if (i.op1 & BIT!(12)) imm = -imm;
-				const(char) *rdstr = adbg_disasm_riscv_abi_reg(rd);
-				adbg_disasm_add_mnemonic(i.disasm, rd == 2 ? "c.addi16sp" : "c.addi");
+				const(char) *rdstr = rvregs[rd];
+				//TODO: C.ADDI16SP nzimm[4|6|8:7|5]
+				adbg_disasm_add_mnemonic(i.disasm, RV_ADDI);
 				adbg_disasm_add_register(i.disasm, rdstr);
 				adbg_disasm_add_register(i.disasm, rdstr);
 				adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			} else { // C.NOP (rd == 0)
-				adbg_disasm_add_mnemonic(i.disasm, "c.nop");
+				adbg_disasm_add_mnemonic(i.disasm, RV_NOP);
 			}
 			return 0;
 		case OP_RVC_FUNC_001: // C.JAL
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
-			int imm = adbg_disasm_riscv_imm_cj(i.op1);
-			adbg_disasm_add_mnemonic(i.disasm, "c.jal");
+			int imm = adbg_disasm_rv_imm_cj(i.op1);
+			adbg_disasm_add_mnemonic(i.disasm, RV_JAL);
 			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		case OP_RVC_FUNC_100: // C.GRP1_1
@@ -103,48 +97,47 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			switch (i.op1 & 0xC00) { // op[11:10]
 			case 0:	// C.SRLI
 			
-				assert(0, "TODO");
+				return adbg_oops(AdbgError.notImplemented);
 			case 0x400:	// C.SRAI
 			
-				assert(0, "TODO");
+				return adbg_oops(AdbgError.notImplemented);
 			case 0x800:	// C.ANDI
 			
-				assert(0, "TODO");
+				return adbg_oops(AdbgError.notImplemented);
 			default: // 0xc00: C.GRP1_1_1
 				const(char) *m = void;
 				switch (i.op1 & 0x1060) { // op[12|6:5]
-				case 0:	     m = "c.sub"; break;
-				case 0x20:   m = "c.xor"; break;
-				case 0x40:   m = "c.or"; break;
-				case 0x60:   m = "c.and"; break;
-				case 0x1000: m = "c.subw"; break;
-				case 0x1020: m = "c.addw"; break;
+				case 0:	     m = "sub"; break;
+				case 0x20:   m = "xor"; break;
+				case 0x40:   m = "or"; break;
+				case 0x60:   m = "and"; break;
+				case 0x1000: m = "subw"; break;
+				case 0x1020: m = "addw"; break;
 				default: return adbg_oops(AdbgError.illegalInstruction);
 				}
 				if (p.mode < AdbgDisasmMode.file)
 					return 0;
 				int rs2 = (i.op1 >> 2) & 7;
 				adbg_disasm_add_mnemonic(i.disasm, m);
-				adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rd));
-				adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rd));
-				adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rs2));
+				adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rd));
+				adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rd));
+				adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rs2));
 				return 0;
 			}
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 	case 2:
-		switch (i.op1 & OP_RVC_FUNC) {
+		switch (i.op1 & OP_RVC_FUNC) { // C.LWSP
 		case OP_RVC_FUNC_010:
 			int rd = (i.op1 >> 7) & 31;
-			if (rd == 0) {
+			if (rd == 0)
 				return adbg_oops(AdbgError.illegalInstruction);
-			}
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			int imm = (i.op1 >> 2) & 31;
 			if (i.op1 & BIT!(12)) imm |= BIT!(5);
-			adbg_disasm_add_mnemonic(i.disasm, "c.lwsp");
-			adbg_disasm_add_register(p, adbg_disasm_riscv_abi_reg(rd));
+			adbg_disasm_add_mnemonic(i.disasm, "lwsp");
+			adbg_disasm_add_register(p, rvregs[rd]);
 			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		case OP_RVC_FUNC_100:
@@ -153,37 +146,38 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			int rd  = (i.op1 >> 7) & 31; // or rd
 			int rs2 = (i.op1 >> 2) & 31;
 			if (i.op1 & BIT!(12)) {
-				if (rs2) {
-					adbg_disasm_add_mnemonic(i.disasm, "c.add");
-					adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_rvc_abi_reg(rd));
-					adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_abi_reg(rs2));
+				if (rs2) { // C.ADD
+					adbg_disasm_add_mnemonic(i.disasm, RV_ADD);
+					adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rd));
+					adbg_disasm_add_register(i.disasm, rvregs[rs2]);
 				} else {
-					if (rd) {
-						adbg_disasm_add_mnemonic(p, "c.jalr");
-						adbg_disasm_add_register(p, adbg_disasm_riscv_abi_reg(rd));
-					} else {
-						adbg_disasm_add_mnemonic(p, "c.ebreak");
+					if (rd) { // C.JALR
+						adbg_disasm_add_mnemonic(p, RV_JALR);
+						adbg_disasm_add_register(p, rvregs[rd]);
+					} else { // C.EBREAK
+						adbg_disasm_add_mnemonic(p, RV_EBREAK);
 					}
 				}
 			} else {
-				if (rs2) {
-					adbg_disasm_add_mnemonic(p, "c.mv");
-					adbg_disasm_add_register(p, adbg_disasm_riscv_abi_reg(rd));
-					adbg_disasm_add_register(p, adbg_disasm_riscv_abi_reg(rs2));
-				} else {
-					adbg_disasm_add_mnemonic(p, "c.jr");
-					adbg_disasm_add_register(p, adbg_disasm_riscv_abi_reg(rd));
+				if (rs2) { // C.MV
+					adbg_disasm_add_mnemonic(p, RV_MV);
+					adbg_disasm_add_register(p, rvregs[rd]);
+					adbg_disasm_add_register(p, rvregs[rs2]);
+				} else { // C.JR
+					adbg_disasm_add_mnemonic(p, RV_JR);
+					adbg_disasm_add_register(p, rvregs[rd]);
 				}
 			}
 			return 0;
-		case OP_RVC_FUNC_110:
+		case OP_RVC_FUNC_110: // C.SWSP
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			int rs2 = (i.op1 >> 2) & 31;
 			int imm = (i.op1 >> 7) & 63;
-			adbg_disasm_add_mnemonic(p, "c.swsp");
-			adbg_disasm_add_memory(i.disasm, i.nativeWidth,
-				null, adbg_disasm_riscv_abi_reg(rs2), null,
+			adbg_disasm_add_mnemonic(p, RV_SW);
+			adbg_disasm_add_register(i.disasm, rvregs[rs2]);
+			adbg_disasm_add_memory(i.disasm, AdbgDisasmType.i32,
+				null, rvregs[RiscvReg.x2], null,
 				AdbgDisasmType.i32, &imm,
 				false, false, false);
 			return 0;
@@ -203,12 +197,12 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 	case 19: // (0010011) RV32I: ADDI/SLTI/SLTIU/XORI/ORI/ANDI
 		const(char) *m = void;
 		switch (i.op & OP_FUNC) {
-		case OP_FUNC_000: m = "addi"; break;
-		case OP_FUNC_010: m = "slti"; break;
-		case OP_FUNC_011: m = "sltiu"; break;
-		case OP_FUNC_100: m = "xori"; break;
-		case OP_FUNC_110: m = "ori"; break;
-		case OP_FUNC_111: m = "andi"; break;
+		case OP_FUNC_000: m = RV_ADDI; break;
+		case OP_FUNC_010: m = RV_SLTI; break;
+		case OP_FUNC_011: m = RV_SLTIU; break;
+		case OP_FUNC_100: m = RV_XORI; break;
+		case OP_FUNC_110: m = RV_ORI; break;
+		case OP_FUNC_111: m = RV_ANDI; break;
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 		if (p.mode < AdbgDisasmMode.file)
@@ -217,30 +211,30 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		int rs1 = (i.op >> 15) & 31;
 		int rd = (i.op >> 7) & 31;
 		adbg_disasm_add_mnemonic(i.disasm, m);
-		adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_abi_reg(rd));
-		adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_abi_reg(rs1));
+		adbg_disasm_add_register(i.disasm, rvregs[rd]);
+		adbg_disasm_add_register(i.disasm, rvregs[rs1]);
 		adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 		return 0;
 	case 35: // (0100011) RV32I: SB/SH/SW
 		const(char) *m = void;
 		AdbgDisasmType w = void;
 		switch (i.op & OP_FUNC) {
-		case OP_FUNC_000: m = "sb"; w = AdbgDisasmType.i8; break;
-		case OP_FUNC_001: m = "sh"; w = AdbgDisasmType.i16; break;
-		case OP_FUNC_010: m = "sw"; w = AdbgDisasmType.i32; break;
+		case OP_FUNC_000: m = RV_SB; w = AdbgDisasmType.i8; break;
+		case OP_FUNC_001: m = RV_SH; w = AdbgDisasmType.i16; break;
+		case OP_FUNC_010: m = RV_SW; w = AdbgDisasmType.i32; break;
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 		if (p.mode < AdbgDisasmMode.file)
 			return 0;
-		int imm = adbg_disasm_riscv_imm_s(i.op);
+		int imm = adbg_disasm_rv_imm_s(i.op);
 		int rs1 = (i.op >> 15) & 31;
 		int rs2 = (i.op >> 20) & 31;
 		adbg_disasm_add_mnemonic(i.disasm, m);
 		adbg_disasm_add_memory(i.disasm, w,
-			null, adbg_disasm_riscv_abi_reg(rs1), null,
+			null, rvregs[rs1], null,
 			AdbgDisasmType.i32, &imm,
 			false, false, false);
-		adbg_disasm_add_register(i.disasm, adbg_disasm_riscv_abi_reg(rs2));
+		adbg_disasm_add_register(i.disasm, rvregs[rs2]);
 		return 0;
 	default: return adbg_oops(AdbgError.illegalInstruction);
 	}
@@ -258,7 +252,6 @@ struct riscv_internals_t { align(1):
 		else
 			public struct { align(1): ushort op2, op1; }
 	}
-	AdbgDisasmType nativeWidth;
 }
 
 //
@@ -289,34 +282,63 @@ enum OP_RVC_FUNC_111 = 0xE000;
 // Registers
 //
 
-/// Get ABI register name by a 4 or 5-bit field. (e.g. sp instead of x2)
-/// Only the first definition is taken (i.e. s0 over fp) to comply with objdump.
-/// Caller is responsible for masking the input value.
-/// Params: s = 5-bit selector
-/// Returns: Register string
-const(char) *adbg_disasm_riscv_abi_reg(int s) {
-	__gshared const(char) *[]rv32_regs = [
-		"zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", // x0-x7
-		"s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",   // x8-15
-		"a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7",   // x16-x23
-		"s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6", // x24-x31
-	];
-	return rv32_regs[s];
+enum RiscvReg {
+	x0,  x1,  x2,  x3,  x4,  x5,  x6,  x7,
+	x8,  x9,  x10, x11, x12, x13, x14, x15,
+	x16, x17, x18, x19, x20, x21, x22, x23,
+	x24, x25, x26, x27, x28, x29, x30, x31,
+	zero	= x0,	ra	= x1,
+	sp	= x2,	gp	= x3,
+	tp	= x4,	t0	= x5,
+	t1	= x6,	t2	= x7,
+	s0	= x8,	s1	= x9,
+	a0	= x10,	a1	= x11,
+	a2	= x12,	a3	= x13,
+	a4	= x14,	a5  	= x15,
+	a6	= x16,	a7	= x17,
+	s2	= x18,	s3	= x19,
+	s4	= x20,	s5	= x21,
+	s6	= x22,	s7  	= x23,
+	s8	= x24,	s9	= x25,
+	s10	= x26,	s11	= x27,
+	t3	= x28,	t4	= x29,
+	t5	= x30,	t6	= x31,
 }
+
+immutable const(char)*[32] rvregs = [
+	"zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", // x0-x7
+	"s0", "s1", "a0", "a1", "a2", "a3", "a4", "a5",   // x8-15
+	"a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7",   // x16-x23
+	"s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6", // x24-x31
+];
+
+immutable const(char) *RV_NOP	= "nop";
+immutable const(char) *RV_SB	= "sb";
+immutable const(char) *RV_SH	= "sh";
+immutable const(char) *RV_SW	= "sw";
+immutable const(char) *RV_ADDI	= "addi";
+immutable const(char) *RV_SLTI	= "slti";
+immutable const(char) *RV_SLTIU	= "sltiu";
+immutable const(char) *RV_XORI	= "xori";
+immutable const(char) *RV_ORI	= "ori";
+immutable const(char) *RV_ANDI	= "andi";
+immutable const(char) *RV_J	= "j";
+immutable const(char) *RV_JR	= "jr";
+immutable const(char) *RV_JAL	= "jal";
+immutable const(char) *RV_MV	= "mv";
+immutable const(char) *RV_ADD	= "add";
+immutable const(char) *RV_JALR	= "jalr";
+immutable const(char) *RV_EBREAK	= "ebreak";
 
 /// Get a register (ABI) from the 3-bit field from RVC instructions.
 /// Caller is responsible for masking the input value.
 /// Params: s = 3-bit value
 /// Returns: Register string
-const(char) *adbg_disasm_riscv_rvc_abi_reg(int s) {
-	return adbg_disasm_riscv_abi_reg(s + 8);
+const(char) *adbg_disasm_rv_c_reg(int s) {
+	return rvregs[s + 8];
 }
 
-//
-// Helpers
-//
-
-int adbg_disasm_riscv_imm_cj(ushort op) {	// C.J type
+int adbg_disasm_rv_imm_cj(ushort op) {	// C.J type
 	// inspired by objdump 2.28 (include/opcode/riscv.h)
 	return	((op & 0x38) >> 2) |
 		((op & BIT!(11)) >> 7) |
@@ -328,7 +350,7 @@ int adbg_disasm_riscv_imm_cj(ushort op) {	// C.J type
 		(-(op & BIT!(12)) >> 1);
 }
 
-int adbg_disasm_riscv_imm_s(uint op) {	// S type
+int adbg_disasm_rv_imm_s(uint op) {	// S type
 	return	((op >> 7) & 31 |
 		((op >> 20) & 4095) |
 		(-((op >> 19) & 0x8_0000)));

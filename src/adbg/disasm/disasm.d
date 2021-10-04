@@ -18,7 +18,8 @@ private import adbg.disasm.syntax.intel,
 	adbg.disasm.syntax.nasm,
 	adbg.disasm.syntax.att,
 	adbg.disasm.syntax.ideal,
-	adbg.disasm.syntax.hyde;
+	adbg.disasm.syntax.hyde,
+	adbg.disasm.syntax.rv;
 
 //TODO: Invalid results could be rendered differently
 //      e.g., .byte 0xd6,0xd6 instead of (bad)
@@ -34,8 +35,6 @@ private import adbg.disasm.syntax.intel,
 //      Save jmp/call targets in allocated table
 //TODO: Visibility system for prefixes
 //      Tag system? e.g., groups (ubyte + bitflag)
-//TODO: Move float80 (x87) register handling here
-//      adbg_disasm_add_register: Add register width? index parameter?
 //TODO: Consider doing subcodes (extended codes) to specify why instruction is illegal
 //      e.g., empty buffer, invalid opcode, invalid modrm:reg, lock disallowed, etc.
 //      Option 1. adbg_disasm_oops(adbg_disasm_t*,AdbgDisasmError);
@@ -49,7 +48,7 @@ private import adbg.disasm.syntax.intel,
 //TODO: Consider adding alternative syntax options
 //      e.g., 3[RDI], .rodata[00h][RIP]
 //TODO: Support for pseudo-instructions
-//      bool userBaseInstruction
+//      and setting bool userNoPseudoInstructions
 //      If true, tells decoder to get the base instruction instead
 //      In RISC-V, addi x0,x0,0 is basically nop, and nop is the 
 //      pseudo-instruction
@@ -74,11 +73,11 @@ enum AdbgPlatform : ubyte {
 	x86_16,	/// (WIP) 8086, 80186, 80286
 	x86_32,	/// (WIP) 80386/i386, not to be confused with x32
 	x86_64,	/// (WIP) AMD64, EM64T/Intel64, x64
-	arm_t32,	/// (TODO) ARM T32 (thumb)
-	arm_a32,	/// (TODO) ARM A32 (arm)
-	arm_a64,	/// (TODO) ARM A64 (aarch64)
+	arm_t32,	///TODO: ARM T32 (thumb)
+	arm_a32,	///TODO: ARM A32 (arm)
+	arm_a64,	///TODO: ARM A64 (aarch64)
 	riscv32,	/// (WIP) RISC-V 32-bit
-	riscv64,	/// (TODO) RISC-V 64-bit
+	riscv64,	///TODO: RISC-V 64-bit
 }
 
 /// Disassembler options
@@ -173,6 +172,15 @@ enum AdbgSyntax : ubyte {
 	/// sseg: mov ([type dword eax+ecx*2-0x20], edx)
 	/// ---
 	hyde,
+	/// RISC-V native syntax.
+	/// Year: 2010
+	/// Destination: Left
+	///
+	/// Example:
+	/// ---
+	/// lw t0, 0(a0)
+	/// ---
+	riscv,
 	///TODO: ARM native syntax.
 	/// Year: 1985
 	/// Destination: Left
@@ -182,21 +190,12 @@ enum AdbgSyntax : ubyte {
 	/// ldr r0, [r1]
 	/// ---
 //	arm,
-	///TODO: RISC-V native syntax.
-	/// Year: 2010
-	/// Destination: Left
-	///
-	/// Example:
-	/// ---
-	/// lw x13, 0(x13)
-	/// ---
-//	riscv,
 }
 
 /// Disassembler input
 // NOTE: Uh, and why/how I'll do File/MmFile implementations?
 //       There is no point to these two... Unless proven otherwise.
-//       Raw: Dumper could go by chunks of 32 bytes, smartly
+//       Raw: Dumper could go by chunks of 32 bytes, smartly (buffer)
 enum AdbgDisasmInput : ubyte {
 	raw,	/// Buffer
 	debugger,	/// Debuggee
@@ -220,15 +219,17 @@ enum AdbgDisasmTag : ushort {
 	evex,	/// x86: EVEX bytes
 }
 
+//TODO: Number preferred style or instruction/immediate purpose
 enum AdbgDisasmNumberStyle : ubyte {
 	decimal,	/// 
 	hexadecimal,	/// 
 }
+//TODO: AdbgDisasmHexStyle
 enum AdbgDisasmHexStyle : ubyte {
 	defaultPrefix,	/// 0x0010, default
 	hSuffix,	/// 0010h
 	hPrefix,	/// 0h0010
-	numberSignPrefix,	/// #0010
+	poundPrefix,	/// #0010
 	pourcentPrefix,	/// %0010
 	dollarPrefix,	/// $0010
 }
@@ -281,11 +282,6 @@ struct adbg_disasm_number_t {
 		double f64; float f32;
 	}
 	AdbgDisasmType type;
-	/*AdbgDisasmNumberStyle ;
-	union {
-		bool signed;
-		AdbgDisasmNumType? type;
-	}*/
 }
 
 struct adbg_disasm_machine_t {
@@ -325,7 +321,6 @@ struct adbg_disasm_opcode_t {
 
 /// Disassembler parameters structure. This structure is not meant to be
 /// accessed directly.
-//TODO: Consider combining all the platform internals
 struct adbg_disasm_t { align(1):
 	adbg_address_t current;	/// Current address, used as a program counter.
 	adbg_address_t base;	/// Base address, used for target calculations.
@@ -418,10 +413,14 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 	case x86_16, x86_32, x86_64:
 		p.limit = ADBG_X86_MAX;
 		p.fdecode = &adbg_disasm_x86;
+		p.syntax = AdbgSyntax.intel;
+		p.foperand = &adbg_disasm_operand_intel;
 		break;
 	case riscv32:
 		p.limit = ADBG_RV32_MAX;
 		p.fdecode = &adbg_disasm_riscv;
+		p.syntax = AdbgSyntax.riscv;
+		p.foperand = &adbg_disasm_operand_riscv;
 		break;
 	/*case riscv64:
 		p.limit = ADBG_RV64_MAX;
@@ -429,14 +428,6 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 		break;*/
 	default:
 		return adbg_oops(AdbgError.unsupportedPlatform);
-	}
-	
-	static if (DEFAULT_SYNTAX == AdbgSyntax.intel) {
-		p.syntax = AdbgSyntax.intel;
-		p.foperand = &adbg_disasm_operand_intel;
-	} else {
-		p.syntax = AdbgSyntax.att;
-		p.foperand = &adbg_disasm_operand_att;
 	}
 	
 	// Defaults
@@ -635,9 +626,9 @@ size_t adbg_disasm_format_operands2(adbg_disasm_t *p, ref adbg_string_t s, adbg_
 	
 	switch (p.syntax) with (AdbgSyntax) {
 	case hyde:
-		if (s.addc('(')) return s.length;
+		if (s.adds("( ")) return s.length;
 		adbg_disasm_format_operands_right(p, s, op);
-		if (s.addc(')')) return s.length;
+		if (s.adds(" );")) return s.length;
 		return s.length;
 	case att:
 		if (p.decoderNoReverse) 
@@ -667,15 +658,15 @@ size_t adbg_disasm_format(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	
 	adbg_disasm_format_mnemonic2(p, s, op);
 	
-	if (op.operandCount) {
-		if (s.addc(p.userMnemonicTab ? '\t' : ' '))
-			return s.length;
+	if (op.operandCount || p.syntax == AdbgSyntax.hyde) {
+		if (p.syntax != AdbgSyntax.hyde)
+			if (s.addc(p.userMnemonicTab ? '\t' : ' '))
+				return s.length;
 		
 		return adbg_disasm_format_operands2(p, s, op);
 	}
 	
 	return s.length;
-	
 }
 
 private __gshared const(char) *sep = ", ";
