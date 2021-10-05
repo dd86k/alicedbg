@@ -32,14 +32,14 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 	if (e) return e;
 	
 	//
-	// RISC-V Compressed (RVC) Extension
+	// ANCHOR RVC
 	//
 	
 	switch (i.op1 & 3) {
 	case 0:
 		switch (i.op1 & OP_RVC_FUNC) {
 		case OP_RVC_FUNC_000: // C.ADDI4SPN
-			int imm = i.op1 >> 5;
+			int imm = i.op1 >> 7;
 			if (imm == 0)
 				return adbg_oops(AdbgError.illegalInstruction);
 			if (p.mode < AdbgDisasmMode.file)
@@ -74,9 +74,9 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			int rd = (i.op1 >> 7) & 31; /// rd/rs1 (op[11:7])
 			if (rd) { // C.ADDI/C.ADDI16SP
 				int imm = (i.op1 >> 2) & 31;
-				if (i.op1 & BIT!(12)) imm = -imm;
 				const(char) *rdstr = rvregs[rd];
 				//TODO: C.ADDI16SP nzimm[4|6|8:7|5]
+				if (i.op1 & BIT!(12)) imm = -imm;
 				adbg_disasm_add_mnemonic(i.disasm, RV_ADDI);
 				adbg_disasm_add_register(i.disasm, rdstr);
 				adbg_disasm_add_register(i.disasm, rdstr);
@@ -107,12 +107,12 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			default: // 0xc00: C.GRP1_1_1
 				const(char) *m = void;
 				switch (i.op1 & 0x1060) { // op[12|6:5]
-				case 0:	     m = "sub"; break;
-				case 0x20:   m = "xor"; break;
-				case 0x40:   m = "or"; break;
-				case 0x60:   m = "and"; break;
-				case 0x1000: m = "subw"; break;
-				case 0x1020: m = "addw"; break;
+				case 0:	     m = RV_SUB; break;
+				case 0x20:   m = RV_XOR; break;
+				case 0x40:   m = RV_OR; break;
+				case 0x60:   m = RV_AND; break;
+				case 0x1000: m = RV_SUBW; break;
+				case 0x1020: m = RV_ADDW; break;
 				default: return adbg_oops(AdbgError.illegalInstruction);
 				}
 				if (p.mode < AdbgDisasmMode.file)
@@ -136,9 +136,11 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 				return 0;
 			int imm = (i.op1 >> 2) & 31;
 			if (i.op1 & BIT!(12)) imm |= BIT!(5);
-			adbg_disasm_add_mnemonic(i.disasm, "lwsp");
+			adbg_disasm_add_mnemonic(i.disasm, RV_LW);
 			adbg_disasm_add_register(p, rvregs[rd]);
-			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
+			adbg_disasm_add_memory(i.disasm, AdbgDisasmType.i32,
+				null, rvregs[RiscvReg.sp], null,
+				AdbgDisasmType.i32, &imm, false, false, false);
 			return 0;
 		case OP_RVC_FUNC_100:
 			if (p.mode < AdbgDisasmMode.file)
@@ -164,8 +166,12 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 					adbg_disasm_add_register(p, rvregs[rd]);
 					adbg_disasm_add_register(p, rvregs[rs2]);
 				} else { // C.JR
-					adbg_disasm_add_mnemonic(p, RV_JR);
-					adbg_disasm_add_register(p, rvregs[rd]);
+					if (rd == RiscvReg.ra) {
+						adbg_disasm_add_mnemonic(p, RV_RET);
+					} else {
+						adbg_disasm_add_mnemonic(p, RV_JR);
+						adbg_disasm_add_register(p, rvregs[rd]);
+					}
 				}
 			}
 			return 0;
@@ -187,7 +193,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 	}
 	
 	//
-	// RISC-V 32-bit
+	// ANCHOR RV32/64G
 	//
 	
 	e = adbg_disasm_fetch!ushort(p, &i.op2, AdbgDisasmTag.opcode);
@@ -196,8 +202,10 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 	switch (i.op & OPCODE) {
 	case 19: // (0010011) RV32I: ADDI/SLTI/SLTIU/XORI/ORI/ANDI
 		const(char) *m = void;
+		int imm = i.op >> 20;
+		int rs1 = (i.op >> 15) & 31;
 		switch (i.op & OP_FUNC) {
-		case OP_FUNC_000: m = RV_ADDI; break;
+		case OP_FUNC_000: m = rs1 ? RV_ADDI : RV_LI; break;
 		case OP_FUNC_010: m = RV_SLTI; break;
 		case OP_FUNC_011: m = RV_SLTIU; break;
 		case OP_FUNC_100: m = RV_XORI; break;
@@ -207,12 +215,11 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		}
 		if (p.mode < AdbgDisasmMode.file)
 			return 0;
-		int imm = i.op >> 20;
-		int rs1 = (i.op >> 15) & 31;
 		int rd = (i.op >> 7) & 31;
 		adbg_disasm_add_mnemonic(i.disasm, m);
 		adbg_disasm_add_register(i.disasm, rvregs[rd]);
-		adbg_disasm_add_register(i.disasm, rvregs[rs1]);
+		if (rs1)
+			adbg_disasm_add_register(i.disasm, rvregs[rs1]);
 		adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 		return 0;
 	case 35: // (0100011) RV32I: SB/SH/SW
@@ -325,10 +332,19 @@ immutable const(char) *RV_ANDI	= "andi";
 immutable const(char) *RV_J	= "j";
 immutable const(char) *RV_JR	= "jr";
 immutable const(char) *RV_JAL	= "jal";
+immutable const(char) *RV_RET	= "ret";
 immutable const(char) *RV_MV	= "mv";
 immutable const(char) *RV_ADD	= "add";
 immutable const(char) *RV_JALR	= "jalr";
 immutable const(char) *RV_EBREAK	= "ebreak";
+immutable const(char) *RV_LW	= "lw";
+immutable const(char) *RV_LI	= "li";
+immutable const(char) *RV_SUB	= "sub";
+immutable const(char) *RV_XOR	= "xor";
+immutable const(char) *RV_OR	= "or";
+immutable const(char) *RV_AND	= "and";
+immutable const(char) *RV_SUBW	= "subw";
+immutable const(char) *RV_ADDW	= "addw";
 
 /// Get a register (ABI) from the 3-bit field from RVC instructions.
 /// Caller is responsible for masking the input value.

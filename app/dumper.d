@@ -202,28 +202,33 @@ L_DISASM_1:
 	
 	adbg_disasm_opt(dp, AdbgDisasmOpt.mnemonicTab, true);
 	uint i;
-	char[40] mnemonic = void, machine = void;
-	const(char)* mnptr = void, maptr = void;
+	char[40] machine = void, prefix = void, mnemonic = void, operands = void;
+	const(char)* maptr = void, prptr = void, mnptr = void, opptr = void;
 	adbg_disasm_start_buffer(dp, AdbgDisasmMode.file, data, size);
 L_DISASM_2:
-	with (AdbgError)
-	switch (adbg_disasm(dp, &op)) {
+	switch (adbg_disasm(dp, &op)) with (AdbgError) {
 	case none:
 		adbg_disasm_machine(dp, machine.ptr, 40, &op);
-		adbg_disasm_format(dp, mnemonic.ptr, 40, &op);
+		adbg_disasm_format_prefixes(dp, prefix.ptr, 40, &op);
+		adbg_disasm_format_mnemonic(dp, mnemonic.ptr, 40, &op);
+		adbg_disasm_format_operands(dp, operands.ptr, 40, &op);
 		maptr = machine.ptr;
+		prptr = prefix.ptr;
 		mnptr = mnemonic.ptr;
+		opptr = operands.ptr;
 		break;
 	//TODO: Illegal should be moved with none and disasm takes care of buffer
 	case illegalInstruction:
 		adbg_disasm_machine(dp, machine.ptr, 40, &op);
 		maptr = machine.ptr;
+		prptr = "";
 		mnptr = "(bad)";
+		opptr = "";
 		break;
 	case outOfData: return 0;
 	default: return printerror();
 	}
-	printf("%8x  %-25s  %s\n", i, maptr, mnptr);
+	printf("%8x  %-22s  %s%-12s%s\n", i, maptr, prptr, mnptr, opptr);
 	i += op.size;
 	goto L_DISASM_2;
 }

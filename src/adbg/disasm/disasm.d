@@ -298,18 +298,16 @@ struct adbg_disasm_machine_t {
 
 /// The basis of an operation code
 //TODO: Consider adding decoder internals here instead
-struct adbg_disasm_opcode_t {
+struct adbg_disasm_opcode_t { align(1):
 	//TODO: Success bool or last error code in opcode structure
 	//      Would help formatter to ouput .byte 0xaa,0xbb etc.
 	// size mode:
 	int size;	/// Opcode size
 	// data mode:
 	//TODO: Jump/call target in opcode structure
-//	enum targetMode target;	/// none, near, far
-//	ulong targetAddress;	/// CALL/JMP absolute target
-//	union targetOffset;	/// CALL/JMP relative target
+//	ulong targetAddress;	/// CALL/JMP calculated target (absolute)
 	// file mode:
-	const(char) *segmentOverride;	/// Segment register string
+	const(char) *segment;	/// Last segment register string override
 	const(char) *mnemonic;	/// Instruction mnemonic
 	size_t operandCount;	/// Number of operands
 	adbg_disasm_operand_t[ADBG_MAX_OPERANDS] operands;	/// Operands
@@ -317,6 +315,9 @@ struct adbg_disasm_opcode_t {
 	adbg_disasm_prefix_t[ADBG_MAX_PREFIXES] prefixes;	/// Prefixes
 	size_t machineCount;	/// Number of disassembler fetches
 	adbg_disasm_machine_t[ADBG_MAX_MACHINE] machine;	/// Machine bytes
+	// analysis mode:
+	// struct:
+	//   target information (label)
 }
 
 /// Disassembler parameters structure. This structure is not meant to be
@@ -531,7 +532,7 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 		return adbg_oops(AdbgError.uninitiated);
 	
 	with (op) { // reset opcode
-		mnemonic = segmentOverride = null;
+		mnemonic = segment = null;
 		size = machineCount = prefixCount = operandCount = 0;
 	}
 	with (p) { // reset disasm
@@ -547,7 +548,7 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 
 size_t adbg_disasm_format_prefixes(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
 	if (p.opcode.prefixCount == 0) {
-		buffer = empty_string;
+		buffer[0] = 0;
 		return 0;
 	}
 	
@@ -562,7 +563,7 @@ size_t adbg_disasm_format_prefixes2(adbg_disasm_t *p, ref adbg_string_t s, adbg_
 	bool isHyde = p.syntax == AdbgSyntax.hyde;
 	
 	if (isHyde) {
-		if (op.segmentOverride) {
+		if (op.segment) {
 			if (s.addc(op.operands[0].mem.segment[0]))
 				return s.length;
 			if (s.adds("seg: "))
@@ -585,7 +586,7 @@ size_t adbg_disasm_format_prefixes2(adbg_disasm_t *p, ref adbg_string_t s, adbg_
 }
 size_t adbg_disasm_format_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
 	if (p.opcode.mnemonic == null) {
-		buffer = empty_string;
+		buffer[0] = 0;
 		return 0;
 	}
 	
@@ -608,7 +609,7 @@ size_t adbg_disasm_format_mnemonic2(adbg_disasm_t *p, ref adbg_string_t s, adbg_
 }
 size_t adbg_disasm_format_operands(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
 	if (p.opcode.operandCount == 0) {
-		buffer = empty_string;
+		buffer[0] = 0;
 		return 0;
 	}
 	
@@ -985,7 +986,7 @@ adbg_disasm_operand_t* adbg_disasm_get_operand(adbg_disasm_t *p) {
 // add segment override
 package
 void adbg_disasm_add_segment(adbg_disasm_t *p, const(char) *segment) {
-	p.opcode.segmentOverride = segment;
+	p.opcode.segment = segment;
 }
 
 // set memory

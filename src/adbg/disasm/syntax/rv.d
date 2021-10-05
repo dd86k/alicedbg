@@ -50,7 +50,7 @@ bool adbg_disasm_operand_riscv(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_d
 				if (s.adds(op.mem.base))
 					return true;
 			}
-			if (s.addc(','))
+			if (s.addc('+'))
 				return true;
 			if (op.mem.index)
 				if (s.adds(op.mem.index))

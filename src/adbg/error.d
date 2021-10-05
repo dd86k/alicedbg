@@ -175,10 +175,10 @@ version (Trace) {
 	private extern (C) int putchar(int);
 	
 	/// Trace application
-	void trace(string func = __FUNCTION__)(const(char) *fmt, ...) {
+	void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
 		va_list va;
 		va_start(va, fmt);
-		printf("TRACE:%s: ", func.ptr);
+		printf("TRACE:%s:%u: ", func.ptr, line);
 		vprintf(fmt, va);
 		putchar('\n');
 	}

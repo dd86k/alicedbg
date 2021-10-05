@@ -86,7 +86,7 @@ L_PREFIX:
 			cast(x86Seg)(opcode - 0x5f);
 		i.pf.segment = seg;
 		if (p.mode >= AdbgDisasmMode.file)
-			adbg_disasm_add_segment(p, segs[seg]);
+			adbg_disasm_add_segment(p, x86segs[seg]);
 		goto L_PREFIX;
 	// Group 3
 	case 0x66: // Data, in 64-bit+AVX, controlled by REX.W (48H)
@@ -143,8 +143,8 @@ L_PREFIX:
 		// push/pop
 		if (rm >= 0b110) {
 			if (reg < 4) {
-				adbg_disasm_add_mnemonic(p, W ? M_POP : M_PUSH);
-				adbg_disasm_add_register(p, segs[reg + 1]);
+				adbg_disasm_add_mnemonic(p, W ? X86_POP : X86_PUSH);
+				adbg_disasm_add_register(p, x86segs[reg + 1]);
 				return 0;
 			}
 			// Prefixes already taken care of, unless moved here
@@ -155,18 +155,18 @@ L_PREFIX:
 			// 37h	00 110 111	aaa
 			// 3fh	00 111 111	aas
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_register(p, M_ASCII[reg & 3]);
+				adbg_disasm_add_register(p, X86_ASCII[reg & 3]);
 			return 0;
 		}
 		
 		if (p.mode >= AdbgDisasmMode.file)
-			adbg_disasm_add_mnemonic(p, M_GRP1[reg]);
+			adbg_disasm_add_mnemonic(p, X86_GRP1[reg]);
 		
 		// immediate
 		if (rm >= 0b100) {
 			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_add_register(p,
-					regs[i.pf.data][x86Reg.eax]);
+					x86regs[i.pf.data][x86Reg.eax]);
 			return W ? adbg_disasm_x86_op_Iz(i) : adbg_disasm_x86_op_Ib(i);
 		}
 		
@@ -188,8 +188,8 @@ L_PREFIX:
 		}
 		if (p.mode >= AdbgDisasmMode.file) {
 			ubyte r = opcode & 7;
-			adbg_disasm_add_mnemonic(p, opcode >= 0x48 ? M_DEC : M_INC);
-			adbg_disasm_add_register(p, regs[i.pf.data][r]);
+			adbg_disasm_add_mnemonic(p, opcode >= 0x48 ? X86_DEC : X86_INC);
+			adbg_disasm_add_register(p, x86regs[i.pf.data][r]);
 		}
 		return 0;
 	}
@@ -197,8 +197,8 @@ L_PREFIX:
 		if (p.mode >= AdbgDisasmMode.file) {
 			ubyte m = opcode & 7;
 			if (i.vex.RR) m |= 0b1000;
-			adbg_disasm_add_mnemonic(p, opcode < 0x58 ? M_PUSH : M_POP);
-			adbg_disasm_add_register(p, regs[i.pf.data][m]);
+			adbg_disasm_add_mnemonic(p, opcode < 0x58 ? X86_PUSH : X86_POP);
+			adbg_disasm_add_register(p, x86regs[i.pf.data][m]);
 		}
 		return 0;
 	}
@@ -226,20 +226,20 @@ L_PREFIX:
 				return 0;
 			
 			AdbgDisasmType mw = W ? i.pf.data : AdbgDisasmType.i8;
-			const(char) *regbase = regs[i.pf.addr][x86Reg.di];
-			const(char) *dx = regs[i.pf.data][x86Reg.dx];
+			const(char) *regbase = x86regs[i.pf.addr][x86Reg.di];
+			const(char) *dx = x86regs[i.pf.data][x86Reg.dx];
 			x86Seg seg = i.pf.segment;
 			if (D) { // outs
-				mnemonic = M_OUTS;
+				mnemonic = X86_OUTS;
 				if (seg) // default if unset
 					seg = x86Seg.ds;
 			} else {
-				mnemonic = M_INS;
+				mnemonic = X86_INS;
 				seg = x86Seg.es;
 			}
 			adbg_disasm_add_mnemonic(p, mnemonic);
 			adbg_disasm_operand_mem_t mem = void;
-			adbg_disasm_set_memory(&mem, segs[seg], regbase, null, AdbgDisasmType.none, null, 0, false, false);
+			adbg_disasm_set_memory(&mem, x86segs[seg], regbase, null, AdbgDisasmType.none, null, 0, false, false);
 			if (D) {
 				adbg_disasm_add_register(p, dx);
 				adbg_disasm_add_memory2(p, mw, &mem);
@@ -276,7 +276,7 @@ L_PREFIX:
 			D = (opcode & 2) != 0;
 			
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, W ? M_IMUL : M_PUSH);
+				adbg_disasm_add_mnemonic(p, W ? X86_IMUL : X86_PUSH);
 			
 			if (W) { // imul
 				e = adbg_disasm_x86_op_modrm(i, true, true);
@@ -288,7 +288,7 @@ L_PREFIX:
 	}
 	if (opcode < 0x80) { // 70H..7FH: Jcc
 		if (p.mode >= AdbgDisasmMode.file)
-			adbg_disasm_add_mnemonic(p, M_Jcc[opcode & 15]);
+			adbg_disasm_add_mnemonic(p, X86_Jcc[opcode & 15]);
 		return adbg_disasm_x86_op_Jb(i);
 	}
 	if (opcode < 0x90) { // 80H..8FH: more random stuff
@@ -296,7 +296,7 @@ L_PREFIX:
 			return adbg_disasm_x86_group1(i, opcode);
 		if (opcode < 0x88) { // TEST/XCHG
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, opcode <= 0x86 ? M_TEST : M_XCHG);
+				adbg_disasm_add_mnemonic(p, opcode <= 0x86 ? X86_TEST : X86_XCHG);
 			return adbg_disasm_x86_op_modrm(i, false, opcode & 1);
 		}
 		switch (opcode) {
@@ -320,8 +320,8 @@ L_PREFIX:
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			
-			const(char) *seg = segs[reg + 1];
-			adbg_disasm_add_mnemonic(p, M_MOV);
+			const(char) *seg = x86segs[reg + 1];
+			adbg_disasm_add_mnemonic(p, X86_MOV);
 			if (D) {
 				adbg_disasm_add_register(p, seg);
 				if (W)
@@ -342,13 +342,13 @@ L_PREFIX:
 			if (opcode >= 0b11000000)
 				return adbg_oops(AdbgError.illegalInstruction);
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_LEA);
+				adbg_disasm_add_mnemonic(p, X86_LEA);
 			return adbg_disasm_x86_op_modrm2(i, opcode, true, true);
 		case 0x8f: // ANCHOR Group 1a (includes XOP)
 			return adbg_disasm_x86_group1a(i);
 		default: // 88H..8BH: MOV EbGb/EvGv/GbEb/GvEv
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_MOV);
+				adbg_disasm_add_mnemonic(p, X86_MOV);
 			return adbg_disasm_x86_op_modrm(i, (opcode & 2) != 0, opcode & 1);
 		}
 	}
@@ -357,12 +357,12 @@ L_PREFIX:
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			if (opcode == 0x90) {
-				adbg_disasm_add_mnemonic(p, i.pf.rep ? M_PAUSE : M_NOP);
+				adbg_disasm_add_mnemonic(p, i.pf.rep ? X86_PAUSE : X86_NOP);
 				return 0;
 			}
-			adbg_disasm_add_mnemonic(p, M_XCHG);
-			adbg_disasm_add_register(p, regs[i.pf.data][opcode & 7]);
-			adbg_disasm_add_register(p, regs[i.pf.data][x86Reg.al]);
+			adbg_disasm_add_mnemonic(p, X86_XCHG);
+			adbg_disasm_add_register(p, x86regs[i.pf.data][opcode & 7]);
+			adbg_disasm_add_register(p, x86regs[i.pf.data][x86Reg.al]);
 			return 0;
 		}
 		switch (opcode) {
@@ -371,9 +371,9 @@ L_PREFIX:
 				return 0;
 			W = opcode == 0x99;
 			switch (i.pf.data) with (AdbgDisasmType) {
-			case i64: mnemonic = W ? M_CQO : M_CDQE; break;
-			case i32: mnemonic = W ? M_CDQ : M_CWDE; break;
-			default:  mnemonic = W ? M_CWD : M_CBW; break;
+			case i64: mnemonic = W ? X86_CQO : X86_CDQE; break;
+			case i32: mnemonic = W ? X86_CDQ : X86_CWDE; break;
+			default:  mnemonic = W ? X86_CWD : X86_CBW; break;
 			}
 			adbg_disasm_add_mnemonic(p, mnemonic);
 			return 0;
@@ -381,28 +381,28 @@ L_PREFIX:
 			if (p.platform == AdbgPlatform.x86_64)
 				return adbg_oops(AdbgError.illegalInstruction);
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_CALL);
+				adbg_disasm_add_mnemonic(p, X86_CALL);
 			return adbg_disasm_x86_op_Ap(i);
 		case 0x9b:
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
-			adbg_disasm_add_mnemonic(p, M_WAIT);
+			adbg_disasm_add_mnemonic(p, X86_WAIT);
 			return 0;
 		case 0x9c, 0x9d: // PUSH/POP Fv
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			W = opcode == 0x9d;
 			switch (p.platform) with (AdbgPlatform) {
-			case x86_64: mnemonic = W ? M_POPFQ : M_PUSHFQ; break;
-			case x86_32: mnemonic = W ? M_POPFD : M_PUSHFD; break;
-			default:     mnemonic = W ? M_POPF  : M_PUSHF; break;
+			case x86_64: mnemonic = W ? X86_POPFQ : X86_PUSHFQ; break;
+			case x86_32: mnemonic = W ? X86_POPFD : X86_PUSHFD; break;
+			default:     mnemonic = W ? X86_POPF  : X86_PUSHF; break;
 			}
 			adbg_disasm_add_mnemonic(p, mnemonic);
 			return 0;
 		default:
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
-			adbg_disasm_add_mnemonic(p, opcode == 0x9f ? M_LAHF : M_SAHF);
+			adbg_disasm_add_mnemonic(p, opcode == 0x9f ? X86_LAHF : X86_SAHF);
 			return 0;
 		}
 	}
@@ -440,11 +440,11 @@ L_PREFIX:
 			if (i.pf.segment == 0)
 				i.pf.segment = x86Seg.ds;
 			
-			mnemonic = regs[dwidth][x86Reg.al]; // al/ax/eax
+			mnemonic = x86regs[dwidth][x86Reg.al]; // al/ax/eax
 			adbg_disasm_operand_mem_t O = void;
-			adbg_disasm_set_memory(&O, segs[i.pf.segment], null, null, i.pf.addr, &u.u64, 0, false, false);
+			adbg_disasm_set_memory(&O, x86segs[i.pf.segment], null, null, i.pf.addr, &u.u64, 0, false, false);
 			
-			adbg_disasm_add_mnemonic(p, M_MOV);
+			adbg_disasm_add_mnemonic(p, X86_MOV);
 			if (D) {
 				adbg_disasm_add_memory2(p, dwidth, &O);
 				adbg_disasm_add_register(p, mnemonic);
@@ -461,9 +461,9 @@ L_PREFIX:
 			if (i.pf.segment == 0)
 				i.pf.segment = x86Seg.ds;
 			
-			adbg_disasm_add_mnemonic(p, opcode < 0xa6 ? M_MOVS : M_CMPS);
-			adbg_disasm_set_memory(&X, segs[x86Seg.es], regs[i.pf.addr][x86Reg.di], null, AdbgDisasmType.none, null, 0, false, false);
-			adbg_disasm_set_memory(&Y, segs[i.pf.segment], regs[i.pf.addr][x86Reg.si], null, AdbgDisasmType.none, null, 0, false, false);
+			adbg_disasm_add_mnemonic(p, opcode < 0xa6 ? X86_MOVS : X86_CMPS);
+			adbg_disasm_set_memory(&X, x86segs[x86Seg.es], x86regs[i.pf.addr][x86Reg.di], null, AdbgDisasmType.none, null, 0, false, false);
+			adbg_disasm_set_memory(&Y, x86segs[i.pf.segment], x86regs[i.pf.addr][x86Reg.si], null, AdbgDisasmType.none, null, 0, false, false);
 			if (D) {
 				adbg_disasm_add_memory2(p, dwidth, &Y);
 				adbg_disasm_add_memory2(p, dwidth, &X);
@@ -475,8 +475,8 @@ L_PREFIX:
 		}
 		if (opcode < 0xaa) { // A8H..A9H: TEST
 			if (p.mode >= AdbgDisasmMode.file) {
-				adbg_disasm_add_mnemonic(p, M_TEST);
-				adbg_disasm_add_register(p, regs[dwidth][x86Reg.al]);
+				adbg_disasm_add_mnemonic(p, X86_TEST);
+				adbg_disasm_add_register(p, x86regs[dwidth][x86Reg.al]);
 			}
 			if (W)
 				adbg_disasm_x86_op_Iz(i);
@@ -489,13 +489,13 @@ L_PREFIX:
 			return 0;
 		
 		opcode = cast(ubyte)((opcode >> 1) - 0x55);
-		adbg_disasm_add_mnemonic(p, M_STR1[opcode]);
-		mnemonic = regs[dwidth][x86Reg.al];
+		adbg_disasm_add_mnemonic(p, X86_STR1[opcode]);
+		mnemonic = x86regs[dwidth][x86Reg.al];
 		
 		if (D) {
-			adbg_disasm_set_memory(&Y, null, regs[i.pf.addr][x86Reg.di], null, AdbgDisasmType.none, null, 0, false, false);
+			adbg_disasm_set_memory(&Y, null, x86regs[i.pf.addr][x86Reg.di], null, AdbgDisasmType.none, null, 0, false, false);
 		} else {
-			adbg_disasm_set_memory(&X, segs[i.pf.segment], regs[i.pf.addr][x86Reg.si], null, AdbgDisasmType.none, null, 0, false, false);
+			adbg_disasm_set_memory(&X, x86segs[i.pf.segment], x86regs[i.pf.addr][x86Reg.si], null, AdbgDisasmType.none, null, 0, false, false);
 		}
 		switch (opcode) {
 		case 0:
@@ -518,8 +518,8 @@ L_PREFIX:
 			opcode &= 7;
 			if (i.vex.B) opcode |= 0b1000;
 			AdbgDisasmType dw = W ? i.pf.data : AdbgDisasmType.i8;
-			adbg_disasm_add_mnemonic(p, M_MOV);
-			adbg_disasm_add_register(p, regs[dw][opcode]);
+			adbg_disasm_add_mnemonic(p, X86_MOV);
+			adbg_disasm_add_register(p, x86regs[dw][opcode]);
 		}
 		return W ? adbg_disasm_x86_op_Iz(i) : adbg_disasm_x86_op_Ib(i);
 	}
@@ -532,14 +532,14 @@ L_PREFIX:
 				return adbg_oops(AdbgError.notImplemented);
 			}
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_LES);
+				adbg_disasm_add_mnemonic(p, X86_LES);
 			return adbg_disasm_x86_op_GzMp(i);
 		case 0xc5: // LDS / VEX 3B
 			if (p.platform == AdbgPlatform.x86_64) {
 				return adbg_oops(AdbgError.notImplemented);
 			}
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_LDS);
+				adbg_disasm_add_mnemonic(p, X86_LDS);
 			return adbg_disasm_x86_op_GzMp(i);
 		case 0xc2: // RET imm16
 			e = adbg_disasm_fetch!ushort(p, &Iw, AdbgDisasmTag.immediate);
@@ -549,7 +549,7 @@ L_PREFIX:
 			goto case;
 		case 0xc3: // RET
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_RET);
+				adbg_disasm_add_mnemonic(p, X86_RET);
 			return 0;
 		case 0xc8: // ENTER
 			e = adbg_disasm_fetch!ushort(p, &Iw, AdbgDisasmTag.immediate);
@@ -558,14 +558,14 @@ L_PREFIX:
 			if (e) return e;
 			if (p.mode >= AdbgDisasmMode.file) {
 				p.decoderNoReverse = true;
-				adbg_disasm_add_mnemonic(p, M_ENTER);
+				adbg_disasm_add_mnemonic(p, X86_ENTER);
 				adbg_disasm_add_immediate(p, AdbgDisasmType.i16, &Iw);
 				adbg_disasm_add_immediate(p, AdbgDisasmType.i8, &opcode);
 			}
 			return 0;
 		case 0xc9: // LEAVE
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_LEAVE);
+				adbg_disasm_add_mnemonic(p, X86_LEAVE);
 			return 0;
 		case 0xca: // far RET Iw
 			e = adbg_disasm_fetch!ushort(p, &Iw, AdbgDisasmTag.immediate);
@@ -575,17 +575,17 @@ L_PREFIX:
 			goto case;
 		case 0xcb: // far RET
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_RETF);
+				adbg_disasm_add_mnemonic(p, X86_RETF);
 			return 0;
 		case 0xcc: // int3
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_INT3);
+				adbg_disasm_add_mnemonic(p, X86_INT3);
 			return 0;
 		case 0xcd: // int imm8
 			e = adbg_disasm_fetch!ubyte(p, &opcode, AdbgDisasmTag.immediate);
 			if (e) return e;
 			if (p.mode >= AdbgDisasmMode.file) {
-				adbg_disasm_add_mnemonic(p, M_INT);
+				adbg_disasm_add_mnemonic(p, X86_INT);
 				adbg_disasm_add_immediate(p, AdbgDisasmType.i16, &opcode);
 			}
 			return 0;
@@ -593,15 +593,15 @@ L_PREFIX:
 			if (p.platform == AdbgPlatform.x86_64)
 				return adbg_oops(AdbgError.illegalInstruction);
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_INTO);
+				adbg_disasm_add_mnemonic(p, X86_INTO);
 			return 0;
 		case 0xcf: // iret/d/q
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			switch (i.pf.data) with (AdbgDisasmType) {
-			case i64: mnemonic = M_IRETQ; break;
-			case i32: mnemonic = M_IRETD; break;
-			default:  mnemonic = M_IRET; break;
+			case i64: mnemonic = X86_IRETQ; break;
+			case i32: mnemonic = X86_IRETD; break;
+			default:  mnemonic = X86_IRET; break;
 			}
 			adbg_disasm_add_mnemonic(p, mnemonic);
 			return 0;
@@ -619,7 +619,7 @@ L_PREFIX:
 			if (p.platform == AdbgPlatform.x86_64)
 				return adbg_oops(AdbgError.illegalInstruction);
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, opcode == 0xd4 ? M_AAM : M_AAD);
+				adbg_disasm_add_mnemonic(p, opcode == 0xd4 ? X86_AAM : X86_AAD);
 			return adbg_disasm_x86_op_Ib(i);
 		case 0xd6:
 			return adbg_oops(AdbgError.illegalInstruction);
@@ -628,9 +628,9 @@ L_PREFIX:
 				return 0;
 			if (i.pf.segment == 0)
 				i.pf.segment = x86Seg.ds;
-			adbg_disasm_add_mnemonic(p, M_XLAT);
-			adbg_disasm_add_memory(p, AdbgDisasmType.i8, segs[i.pf.segment],
-				regs[i.pf.addr][x86Reg.bx], null, AdbgDisasmType.none, null, 0, false, false);
+			adbg_disasm_add_mnemonic(p, X86_XLAT);
+			adbg_disasm_add_memory(p, AdbgDisasmType.i8, x86segs[i.pf.segment],
+				x86regs[i.pf.addr][x86Reg.bx], null, AdbgDisasmType.none, null, 0, false, false);
 			return 0;
 		default:
 			return adbg_disasm_x86_escape(i, opcode);
@@ -640,14 +640,14 @@ L_PREFIX:
 		if (opcode < 0xe4) { // LOOP/JCXZ
 			if (p.mode >= AdbgDisasmMode.file) {
 				switch (opcode) {
-				case 0xf0: mnemonic = M_LOOPNE; break;
-				case 0xf1: mnemonic = M_LOOPE; break;
-				case 0xf2: mnemonic = M_LOOP; break;
+				case 0xf0: mnemonic = X86_LOOPNE; break;
+				case 0xf1: mnemonic = X86_LOOPE; break;
+				case 0xf2: mnemonic = X86_LOOP; break;
 				default:
 					switch (p.platform) with (AdbgPlatform) {
-					case x86_16: mnemonic = M_JCXZ; break;
-					case x86_32: mnemonic = M_JECXZ; break;
-					default:     mnemonic = M_JRCXZ; break;
+					case x86_16: mnemonic = X86_JCXZ; break;
+					case x86_32: mnemonic = X86_JECXZ; break;
+					default:     mnemonic = X86_JRCXZ; break;
 					}
 				}
 				adbg_disasm_add_mnemonic(p, mnemonic);
@@ -671,17 +671,17 @@ L_PREFIX:
 			// Unaffected by REX
 			if (i.pf.data == AdbgDisasmType.i64)
 				i.pf.data = AdbgDisasmType.i32;
-			mnemonic = W ? regs[i.pf.data][x86Reg.ax] :
-				regs[AdbgDisasmType.i8][x86Reg.ax];
+			mnemonic = W ? x86regs[i.pf.data][x86Reg.ax] :
+				x86regs[AdbgDisasmType.i8][x86Reg.ax];
 			
-			adbg_disasm_add_mnemonic(p, D ? M_OUT : M_IN);
+			adbg_disasm_add_mnemonic(p, D ? X86_OUT : X86_IN);
 			if (S) {
 				if (D) {
-					adbg_disasm_add_register(p, regs[AdbgDisasmType.i16][x86Reg.dx]);
+					adbg_disasm_add_register(p, x86regs[AdbgDisasmType.i16][x86Reg.dx]);
 					adbg_disasm_add_register(p, mnemonic);
 				} else {
 					adbg_disasm_add_register(p, mnemonic);
-					adbg_disasm_add_register(p, regs[AdbgDisasmType.i16][x86Reg.dx]);
+					adbg_disasm_add_register(p, x86regs[AdbgDisasmType.i16][x86Reg.dx]);
 				}
 			} else {
 				if (D) {
@@ -698,21 +698,21 @@ L_PREFIX:
 		switch (opcode) {
 		case 0xe8:
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_CALL);
+				adbg_disasm_add_mnemonic(p, X86_CALL);
 			return adbg_disasm_x86_op_Jz(i);
 		case 0xe9:
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_JMP);
+				adbg_disasm_add_mnemonic(p, X86_JMP);
 			return adbg_disasm_x86_op_Jz(i);
 		case 0xea:
 			if (p.platform == AdbgPlatform.x86_64)
 				return adbg_oops(AdbgError.illegalInstruction);
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_JMP);
+				adbg_disasm_add_mnemonic(p, X86_JMP);
 			return adbg_disasm_x86_op_Ap(i);
 		default: // EBH
 			if (p.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(p, M_JMP);
+				adbg_disasm_add_mnemonic(p, X86_JMP);
 			return adbg_disasm_x86_op_Jb(i);
 		}
 	}
@@ -728,11 +728,11 @@ L_PREFIX:
 		if (p.mode < AdbgDisasmMode.file)
 			return 0;
 		if (opcode >= 0xf8)
-			mnemonic = M_F8[opcode - 0xf8];
+			mnemonic = X86_F8[opcode - 0xf8];
 		else if (opcode >= 0xf4)
-			mnemonic = opcode == 0xf4 ? M_HLT : M_CMC;
+			mnemonic = opcode == 0xf4 ? X86_HLT : X86_CMC;
 		else
-			mnemonic = M_INT1;
+			mnemonic = X86_INT1;
 		adbg_disasm_add_mnemonic(p, mnemonic);
 		return 0;
 	}
@@ -802,45 +802,45 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 		case 1: return adbg_disasm_x86_group7(i);
 		case 2:
 			if (i.disasm.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(i.disasm, M_LAR);
+				adbg_disasm_add_mnemonic(i.disasm, X86_LAR);
 			return adbg_disasm_x86_op_modrm3(i, AdbgDisasmType.i16, true);
 		case 3:
 			if (i.disasm.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(i.disasm, M_LSL);
+				adbg_disasm_add_mnemonic(i.disasm, X86_LSL);
 			return adbg_disasm_x86_op_modrm3(i, AdbgDisasmType.i16, true);
 		case 5:
 			if (i.disasm.platform != AdbgPlatform.x86_64)
 				return adbg_oops(AdbgError.illegalInstruction);
 			if (i.disasm.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(i.disasm, M_SYSCALL);
+				adbg_disasm_add_mnemonic(i.disasm, X86_SYSCALL);
 			return 0;
 		case 6:
 			if (i.disasm.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(i.disasm, M_CLTS);
+				adbg_disasm_add_mnemonic(i.disasm, X86_CLTS);
 			return 0;
 		case 7:
 			if (i.disasm.platform != AdbgPlatform.x86_64)
 				return adbg_oops(AdbgError.illegalInstruction);
 			if (i.disasm.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(i.disasm, M_SYSRET);
+				adbg_disasm_add_mnemonic(i.disasm, X86_SYSRET);
 			return 0;
 		case 8:
 			if (i.disasm.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(i.disasm, M_INVD);
+				adbg_disasm_add_mnemonic(i.disasm, X86_INVD);
 			return 0;
 		case 9:
 			if (i.disasm.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(i.disasm, i.pf.rep ? M_WBNOINVD : M_WBINVD);
+				adbg_disasm_add_mnemonic(i.disasm, i.pf.rep ? X86_WBNOINVD : X86_WBINVD);
 			return 0;
 		case 0xb: // UD2
 			if (i.disasm.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(i.disasm, M_UD2);
+				adbg_disasm_add_mnemonic(i.disasm, X86_UD2);
 			return 0;
 		case 0xd: // PREFETCH
 			return adbg_disasm_x86_group_prefetch(i);
 		case 0xe: // FEMMS
 			if (i.disasm.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(i.disasm, M_FEMMS);
+				adbg_disasm_add_mnemonic(i.disasm, X86_FEMMS);
 			return 0;
 		case 0xf: // 3DNow!
 			return adbg_disasm_x86_3dnow(i);
@@ -911,7 +911,7 @@ int adbg_disasm_x86_3dnow(ref x86_internals_t i) {
 		return 0;
 	
 	adbg_disasm_add_mnemonic(i.disasm, m);
-	adbg_disasm_add_register(i.disasm, regs_mmx[(modrm >> 3) & 7]);
+	adbg_disasm_add_register(i.disasm, x86mmx[(modrm >> 3) & 7]);
 	adbg_disasm_add_memory2(i.disasm, AdbgDisasmType.i64, &mem);
 	return 0;
 }
@@ -924,280 +924,280 @@ int adbg_disasm_x86_3dnow(ref x86_internals_t i) {
 //
 
 // ANCHOR Legacy
-immutable const(char) *M_ADD	= "add";
-immutable const(char) *M_OR	= "or";
-immutable const(char) *M_PUSH	= "push";
-immutable const(char) *M_POP	= "pop";
-immutable const(char) *M_ADC	= "adc";
-immutable const(char) *M_SBB	= "sbb";
-immutable const(char) *M_AND	= "and";
-immutable const(char) *M_SUB	= "sub";
-immutable const(char) *M_XOR	= "xor";
-immutable const(char) *M_CMP	= "cmp";
-immutable const(char) *M_DAA	= "daa";
-immutable const(char) *M_DAS	= "das";
-immutable const(char) *M_AAA	= "aaa"; // not the battery format
-immutable const(char) *M_AAS	= "aas";
-immutable const(char) *M_INC	= "inc";
-immutable const(char) *M_DEC	= "dec";
-immutable const(char) *M_PUSHA	= "pusha";
-immutable const(char) *M_PUSHD	= "pushd";
-immutable const(char) *M_BOUND	= "bound";
-immutable const(char) *M_ARPL	= "arpl";
-immutable const(char) *M_MOVSXD	= "movsxd";
-immutable const(char) *M_IMUL	= "imul";
-immutable const(char) *M_INS	= "ins";
-immutable const(char) *M_OUTS	= "outs";
-immutable const(char) *M_JO	= "jo";
-immutable const(char) *M_JNO	= "jno";
-immutable const(char) *M_JB	= "jb";
-immutable const(char) *M_JNB	= "jnb";
-immutable const(char) *M_JZ	= "jz";
-immutable const(char) *M_JNZ	= "jnz";
-immutable const(char) *M_JBE	= "jbe";
-immutable const(char) *M_JNBE	= "jnbe";
-immutable const(char) *M_JS	= "js";
-immutable const(char) *M_JNS	= "jns";
-immutable const(char) *M_JP	= "jp";
-immutable const(char) *M_JNP	= "jnp";
-immutable const(char) *M_JL	= "jl";
-immutable const(char) *M_JNL	= "jnl";
-immutable const(char) *M_JLE	= "jle";
-immutable const(char) *M_JNLE	= "jnle";
-immutable const(char) *M_TEST	= "test";
-immutable const(char) *M_NOP	= "nop";
-immutable const(char) *M_XCHG	= "xchg";
-immutable const(char) *M_PAUSE	= "pause";
-immutable const(char) *M_MOV	= "mov";
-immutable const(char) *M_LEA	= "lea";
-immutable const(char) *M_CQO	= "cqo";
-immutable const(char) *M_CDQE	= "cdqe";
-immutable const(char) *M_CDQ	= "cdq";
-immutable const(char) *M_CWDE	= "cwde";
-immutable const(char) *M_CWD	= "cwd";
-immutable const(char) *M_CBW	= "cbw";
-immutable const(char) *M_WAIT	= "wait";
-immutable const(char) *M_CALL	= "call";
-immutable const(char) *M_POPFQ	= "popfq";
-immutable const(char) *M_PUSHFQ	= "pushfq";
-immutable const(char) *M_POPFD	= "popfd";
-immutable const(char) *M_PUSHFD	= "pushfd";
-immutable const(char) *M_POPF	= "popf";
-immutable const(char) *M_PUSHF	= "pushf";
-immutable const(char) *M_SAHF	= "sahf";
-immutable const(char) *M_LAHF	= "lahf";
-immutable const(char) *M_MOVS	= "movs";
-immutable const(char) *M_CMPS	= "cmps";
-immutable const(char) *M_STOS	= "stos";
-immutable const(char) *M_LODS	= "lods";
-immutable const(char) *M_SCAS	= "scas";
-immutable const(char) *M_ROL	= "rol";
-immutable const(char) *M_ROR	= "ror";
-immutable const(char) *M_RCL	= "rcl";
-immutable const(char) *M_RCR	= "rcr";
-immutable const(char) *M_SHL	= "shl";
-immutable const(char) *M_SHR	= "shr";
-immutable const(char) *M_SAR	= "sar";
-immutable const(char) *M_LES	= "les";
-immutable const(char) *M_LDS	= "lds";
-immutable const(char) *M_RET	= "ret";
-immutable const(char) *M_RETF	= "retf";
-immutable const(char) *M_ENTER	= "enter";
-immutable const(char) *M_LEAVE	= "leave";
-immutable const(char) *M_INT	= "int";
-immutable const(char) *M_INT3	= "int3";
-immutable const(char) *M_INTO	= "into";
-immutable const(char) *M_IRET	= "iret";
-immutable const(char) *M_IRETD	= "iretd";
-immutable const(char) *M_IRETQ	= "iretq";
-immutable const(char) *M_XABORT	= "xabort";
-immutable const(char) *M_XBEGIN	= "xbegin";
-immutable const(char) *M_AAM	= "aam";
-immutable const(char) *M_AAD	= "aad";
-immutable const(char) *M_XLAT	= "xlat";
-immutable const(char) *M_LOOPNE	= "loopne";
-immutable const(char) *M_LOOPE	= "loope";
-immutable const(char) *M_LOOP	= "loop";
-immutable const(char) *M_JCXZ	= "jcxz";
-immutable const(char) *M_JECXZ	= "jecxz";
-immutable const(char) *M_JRCXZ	= "jrcxz";
-immutable const(char) *M_IN	= "in";
-immutable const(char) *M_OUT	= "out";
-immutable const(char) *M_JMP	= "jmp";
-immutable const(char) *M_INT1	= "int1";
-immutable const(char) *M_HLT	= "hlt";
-immutable const(char) *M_CMC	= "cmc";
-immutable const(char) *M_CLC	= "clc";
-immutable const(char) *M_STC	= "stc";
-immutable const(char) *M_CLI	= "cli";
-immutable const(char) *M_STI	= "sti";
-immutable const(char) *M_CLD	= "cld";
-immutable const(char) *M_STD	= "std";
-immutable const(char) *M_NOT	= "not";
-immutable const(char) *M_NEG	= "neg";
-immutable const(char) *M_MUL	= "mul";
-immutable const(char) *M_DIV	= "div";
-immutable const(char) *M_IDIV	= "idiv";
+immutable const(char) *X86_ADD	= "add";
+immutable const(char) *X86_OR	= "or";
+immutable const(char) *X86_PUSH	= "push";
+immutable const(char) *X86_POP	= "pop";
+immutable const(char) *X86_ADC	= "adc";
+immutable const(char) *X86_SBB	= "sbb";
+immutable const(char) *X86_AND	= "and";
+immutable const(char) *X86_SUB	= "sub";
+immutable const(char) *X86_XOR	= "xor";
+immutable const(char) *X86_CMP	= "cmp";
+immutable const(char) *X86_DAA	= "daa";
+immutable const(char) *X86_DAS	= "das";
+immutable const(char) *X86_AAA	= "aaa"; // not the battery format
+immutable const(char) *X86_AAS	= "aas";
+immutable const(char) *X86_INC	= "inc";
+immutable const(char) *X86_DEC	= "dec";
+immutable const(char) *X86_PUSHA	= "pusha";
+immutable const(char) *X86_PUSHD	= "pushd";
+immutable const(char) *X86_BOUND	= "bound";
+immutable const(char) *X86_ARPL	= "arpl";
+immutable const(char) *X86_MOVSXD	= "movsxd";
+immutable const(char) *X86_IMUL	= "imul";
+immutable const(char) *X86_INS	= "ins";
+immutable const(char) *X86_OUTS	= "outs";
+immutable const(char) *X86_JO	= "jo";
+immutable const(char) *X86_JNO	= "jno";
+immutable const(char) *X86_JB	= "jb";
+immutable const(char) *X86_JNB	= "jnb";
+immutable const(char) *X86_JZ	= "jz";
+immutable const(char) *X86_JNZ	= "jnz";
+immutable const(char) *X86_JBE	= "jbe";
+immutable const(char) *X86_JNBE	= "jnbe";
+immutable const(char) *X86_JS	= "js";
+immutable const(char) *X86_JNS	= "jns";
+immutable const(char) *X86_JP	= "jp";
+immutable const(char) *X86_JNP	= "jnp";
+immutable const(char) *X86_JL	= "jl";
+immutable const(char) *X86_JNL	= "jnl";
+immutable const(char) *X86_JLE	= "jle";
+immutable const(char) *X86_JNLE	= "jnle";
+immutable const(char) *X86_TEST	= "test";
+immutable const(char) *X86_NOP	= "nop";
+immutable const(char) *X86_XCHG	= "xchg";
+immutable const(char) *X86_PAUSE	= "pause";
+immutable const(char) *X86_MOV	= "mov";
+immutable const(char) *X86_LEA	= "lea";
+immutable const(char) *X86_CQO	= "cqo";
+immutable const(char) *X86_CDQE	= "cdqe";
+immutable const(char) *X86_CDQ	= "cdq";
+immutable const(char) *X86_CWDE	= "cwde";
+immutable const(char) *X86_CWD	= "cwd";
+immutable const(char) *X86_CBW	= "cbw";
+immutable const(char) *X86_WAIT	= "wait";
+immutable const(char) *X86_CALL	= "call";
+immutable const(char) *X86_POPFQ	= "popfq";
+immutable const(char) *X86_PUSHFQ	= "pushfq";
+immutable const(char) *X86_POPFD	= "popfd";
+immutable const(char) *X86_PUSHFD	= "pushfd";
+immutable const(char) *X86_POPF	= "popf";
+immutable const(char) *X86_PUSHF	= "pushf";
+immutable const(char) *X86_SAHF	= "sahf";
+immutable const(char) *X86_LAHF	= "lahf";
+immutable const(char) *X86_MOVS	= "movs";
+immutable const(char) *X86_CMPS	= "cmps";
+immutable const(char) *X86_STOS	= "stos";
+immutable const(char) *X86_LODS	= "lods";
+immutable const(char) *X86_SCAS	= "scas";
+immutable const(char) *X86_ROL	= "rol";
+immutable const(char) *X86_ROR	= "ror";
+immutable const(char) *X86_RCL	= "rcl";
+immutable const(char) *X86_RCR	= "rcr";
+immutable const(char) *X86_SHL	= "shl";
+immutable const(char) *X86_SHR	= "shr";
+immutable const(char) *X86_SAR	= "sar";
+immutable const(char) *X86_LES	= "les";
+immutable const(char) *X86_LDS	= "lds";
+immutable const(char) *X86_RET	= "ret";
+immutable const(char) *X86_RETF	= "retf";
+immutable const(char) *X86_ENTER	= "enter";
+immutable const(char) *X86_LEAVE	= "leave";
+immutable const(char) *X86_INT	= "int";
+immutable const(char) *X86_INT3	= "int3";
+immutable const(char) *X86_INTO	= "into";
+immutable const(char) *X86_IRET	= "iret";
+immutable const(char) *X86_IRETD	= "iretd";
+immutable const(char) *X86_IRETQ	= "iretq";
+immutable const(char) *X86_XABORT	= "xabort";
+immutable const(char) *X86_XBEGIN	= "xbegin";
+immutable const(char) *X86_AAM	= "aam";
+immutable const(char) *X86_AAD	= "aad";
+immutable const(char) *X86_XLAT	= "xlat";
+immutable const(char) *X86_LOOPNE	= "loopne";
+immutable const(char) *X86_LOOPE	= "loope";
+immutable const(char) *X86_LOOP	= "loop";
+immutable const(char) *X86_JCXZ	= "jcxz";
+immutable const(char) *X86_JECXZ	= "jecxz";
+immutable const(char) *X86_JRCXZ	= "jrcxz";
+immutable const(char) *X86_IN	= "in";
+immutable const(char) *X86_OUT	= "out";
+immutable const(char) *X86_JMP	= "jmp";
+immutable const(char) *X86_INT1	= "int1";
+immutable const(char) *X86_HLT	= "hlt";
+immutable const(char) *X86_CMC	= "cmc";
+immutable const(char) *X86_CLC	= "clc";
+immutable const(char) *X86_STC	= "stc";
+immutable const(char) *X86_CLI	= "cli";
+immutable const(char) *X86_STI	= "sti";
+immutable const(char) *X86_CLD	= "cld";
+immutable const(char) *X86_STD	= "std";
+immutable const(char) *X86_NOT	= "not";
+immutable const(char) *X86_NEG	= "neg";
+immutable const(char) *X86_MUL	= "mul";
+immutable const(char) *X86_DIV	= "div";
+immutable const(char) *X86_IDIV	= "idiv";
 // ANCHOR ESCAPE D8H
-immutable const(char) *M_FADD	= "fadd";
-immutable const(char) *M_FMUL	= "fmul";
-immutable const(char) *M_FCOM	= "fcom";
-immutable const(char) *M_FCOMP	= "fcomp";
-immutable const(char) *M_FSUB	= "fsub";
-immutable const(char) *M_FSUBR	= "fsubr";
-immutable const(char) *M_FDIV	= "fdiv";
-immutable const(char) *M_FDIVR	= "fdivr";
+immutable const(char) *X86_FADD	= "fadd";
+immutable const(char) *X86_FMUL	= "fmul";
+immutable const(char) *X86_FCOM	= "fcom";
+immutable const(char) *X86_FCOMP	= "fcomp";
+immutable const(char) *X86_FSUB	= "fsub";
+immutable const(char) *X86_FSUBR	= "fsubr";
+immutable const(char) *X86_FDIV	= "fdiv";
+immutable const(char) *X86_FDIVR	= "fdivr";
 // ANCHOR ESCAPE D9H
-immutable const(char) *M_FLD	= "fld";
-immutable const(char) *M_FST	= "fst";
-immutable const(char) *M_FSTP	= "fstp";
-immutable const(char) *M_FLDENV	= "fldenv";
-immutable const(char) *M_FLDCW	= "fldcw";
-immutable const(char) *M_FSTENV	= "fstenv";
-immutable const(char) *M_FSTCW	= "fstcw";
-immutable const(char) *M_FXCH	= "fxch";
-immutable const(char) *M_FNOP	= "fnop";	// D0H
-immutable const(char) *M_FCHS	= "fchs";	// E0H
-immutable const(char) *M_FABS	= "fabs";	// E1H
-immutable const(char) *M_FTST	= "ftst";	// E4H
-immutable const(char) *M_FXAM	= "fxam";	// E5H
-immutable const(char) *M_FLD1	= "fld1";	// E8H
-immutable const(char) *M_FLDL2T	= "fldl2t";	// E9H
-immutable const(char) *M_FLDL2E	= "fldl2e";	// EAH
-immutable const(char) *M_FLDPI	= "fldpi";	// EBH
-immutable const(char) *M_FLDLG2	= "fldlg2";	// ECH
-immutable const(char) *M_FLDLN2	= "fldln2";	// EDH
-immutable const(char) *M_FLDZ	= "fldz";	// EEH
+immutable const(char) *X86_FLD	= "fld";
+immutable const(char) *X86_FST	= "fst";
+immutable const(char) *X86_FSTP	= "fstp";
+immutable const(char) *X86_FLDENV	= "fldenv";
+immutable const(char) *X86_FLDCW	= "fldcw";
+immutable const(char) *X86_FSTENV	= "fstenv";
+immutable const(char) *X86_FSTCW	= "fstcw";
+immutable const(char) *X86_FXCH	= "fxch";
+immutable const(char) *X86_FNOP	= "fnop";	// D0H
+immutable const(char) *X86_FCHS	= "fchs";	// E0H
+immutable const(char) *X86_FABS	= "fabs";	// E1H
+immutable const(char) *X86_FTST	= "ftst";	// E4H
+immutable const(char) *X86_FXAM	= "fxam";	// E5H
+immutable const(char) *X86_FLD1	= "fld1";	// E8H
+immutable const(char) *X86_FLDL2T	= "fldl2t";	// E9H
+immutable const(char) *X86_FLDL2E	= "fldl2e";	// EAH
+immutable const(char) *X86_FLDPI	= "fldpi";	// EBH
+immutable const(char) *X86_FLDLG2	= "fldlg2";	// ECH
+immutable const(char) *X86_FLDLN2	= "fldln2";	// EDH
+immutable const(char) *X86_FLDZ	= "fldz";	// EEH
 // ANCHOR ESCAPE DAH
-immutable const(char) *M_FIADD	= "fiadd";
-immutable const(char) *M_FIMUL	= "fimul";
-immutable const(char) *M_FICOM	= "ficom";
-immutable const(char) *M_FICOMP	= "ficomp";
-immutable const(char) *M_FISUB	= "fisub";
-immutable const(char) *M_FISUBR	= "fisubr";
-immutable const(char) *M_FIDIV	= "fidiv";
-immutable const(char) *M_FIDIVR	= "fidivr";
-immutable const(char) *M_FCMOVB	= "fcmovb";	// C0H..C7H
-immutable const(char) *M_FCMOVE	= "fcmove";	// C8H..CFH
-immutable const(char) *M_FCMOVBE	= "fcmovbe";	// D0H..D7H
-immutable const(char) *M_FCMOVU	= "fcmovu";	// D8H..DFH
-immutable const(char) *M_FUCOMPP	= "fucompp";	// E9H
+immutable const(char) *X86_FIADD	= "fiadd";
+immutable const(char) *X86_FIMUL	= "fimul";
+immutable const(char) *X86_FICOM	= "ficom";
+immutable const(char) *X86_FICOMP	= "ficomp";
+immutable const(char) *X86_FISUB	= "fisub";
+immutable const(char) *X86_FISUBR	= "fisubr";
+immutable const(char) *X86_FIDIV	= "fidiv";
+immutable const(char) *X86_FIDIVR	= "fidivr";
+immutable const(char) *X86_FCMOVB	= "fcmovb";	// C0H..C7H
+immutable const(char) *X86_FCMOVE	= "fcmove";	// C8H..CFH
+immutable const(char) *X86_FCMOVBE	= "fcmovbe";	// D0H..D7H
+immutable const(char) *X86_FCMOVU	= "fcmovu";	// D8H..DFH
+immutable const(char) *X86_FUCOMPP	= "fucompp";	// E9H
 // ANCHOR ESCAPE DBH
-immutable const(char) *M_FILD	= "fild";
-immutable const(char) *M_FISTTP	= "fisttp";
-immutable const(char) *M_FIST	= "fist";
-immutable const(char) *M_FISTP	= "fistp";
-immutable const(char) *M_FCMOVNB	= "fcmovnb";	// reg=0
-immutable const(char) *M_FCMOVNE	= "fcmovne";	// reg=1
-immutable const(char) *M_FCMOVNBE	= "fcmovnbe";	// reg=2
-immutable const(char) *M_FCMOVNU	= "fcmovnu";	// reg=3
-immutable const(char) *M_FUCOMI	= "fucomi";	// reg=5
-immutable const(char) *M_FCOMI	= "fcomi";	// reg=6
-immutable const(char) *M_FCLEX	= "fclex";	// reg=4 rm=2
-immutable const(char) *M_FINIT	= "finit";	// reg=4 rm=3
+immutable const(char) *X86_FILD	= "fild";
+immutable const(char) *X86_FISTTP	= "fisttp";
+immutable const(char) *X86_FIST	= "fist";
+immutable const(char) *X86_FISTP	= "fistp";
+immutable const(char) *X86_FCMOVNB	= "fcmovnb";	// reg=0
+immutable const(char) *X86_FCMOVNE	= "fcmovne";	// reg=1
+immutable const(char) *X86_FCMOVNBE	= "fcmovnbe";	// reg=2
+immutable const(char) *X86_FCMOVNU	= "fcmovnu";	// reg=3
+immutable const(char) *X86_FUCOMI	= "fucomi";	// reg=5
+immutable const(char) *X86_FCOMI	= "fcomi";	// reg=6
+immutable const(char) *X86_FCLEX	= "fclex";	// reg=4 rm=2
+immutable const(char) *X86_FINIT	= "finit";	// reg=4 rm=3
 // ANCHOR ESCAPE DDH
-immutable const(char) *M_FRSTOR	= "frstor";
-immutable const(char) *M_FSAVE	= "fsave";
-immutable const(char) *M_FSTSW	= "fstsw";
-immutable const(char) *M_FFREE	= "ffree";	// reg=0
-immutable const(char) *M_FUCOM	= "fucom";	// reg=4
-immutable const(char) *M_FUCOMP	= "fucomp";	// reg=5
+immutable const(char) *X86_FRSTOR	= "frstor";
+immutable const(char) *X86_FSAVE	= "fsave";
+immutable const(char) *X86_FSTSW	= "fstsw";
+immutable const(char) *X86_FFREE	= "ffree";	// reg=0
+immutable const(char) *X86_FUCOM	= "fucom";	// reg=4
+immutable const(char) *X86_FUCOMP	= "fucomp";	// reg=5
 // ANCHOR ESCAPE DEH
-immutable const(char) *M_FADDP	= "faddp";
-immutable const(char) *M_MULP	= "mulp";
-immutable const(char) *M_SUBRP	= "subrp";
-immutable const(char) *M_SUBP	= "subp";
-immutable const(char) *M_DIVRP	= "divrp";
-immutable const(char) *M_DIVP	= "divp";
-immutable const(char) *M_FCOMPP	= "fcompp";
+immutable const(char) *X86_FADDP	= "faddp";
+immutable const(char) *X86_MULP	= "mulp";
+immutable const(char) *X86_SUBRP	= "subrp";
+immutable const(char) *X86_SUBP	= "subp";
+immutable const(char) *X86_DIVRP	= "divrp";
+immutable const(char) *X86_DIVP	= "divp";
+immutable const(char) *X86_FCOMPP	= "fcompp";
 // ANCHOR ESCAPE DFH
-immutable const(char) *M_FBLD	= "fbld";
-immutable const(char) *M_FBSTP	= "fbstp";
-immutable const(char) *M_FUCOMIP	= "fucomip";
-immutable const(char) *M_FCOMIP	= "fcomip";
+immutable const(char) *X86_FBLD	= "fbld";
+immutable const(char) *X86_FBSTP	= "fbstp";
+immutable const(char) *X86_FUCOMIP	= "fucomip";
+immutable const(char) *X86_FCOMIP	= "fcomip";
 // ANCHOR MAP 0F
-immutable const(char) *M_SLDT	= "sldt";
-immutable const(char) *M_STR	= "str";
-immutable const(char) *M_LLDT	= "lldt";
-immutable const(char) *M_LTR	= "ltr";
-immutable const(char) *M_VERR	= "verr";
-immutable const(char) *M_VERW	= "verw";
-immutable const(char) *M_SGDT	= "sgdt";
-immutable const(char) *M_SIDT	= "sidt";
-immutable const(char) *M_LGDT	= "lgdt";
-immutable const(char) *M_LIDT	= "lidt";
-immutable const(char) *M_SMSW	= "smsw";
-immutable const(char) *M_LMSW	= "lmsw";
-immutable const(char) *M_INVLPG	= "invlpg";
-immutable const(char) *M_VMCALL	= "vmcall";
-immutable const(char) *M_VMLAUNCH	= "vmlaunch";
-immutable const(char) *M_VMRESUME	= "vmresume";
-immutable const(char) *M_VMXOFF	= "vmxoff";
-immutable const(char) *M_MONITOR	= "monitor";
-immutable const(char) *M_MWAIT	= "mwait";
-immutable const(char) *M_CLAC	= "clac";
-immutable const(char) *M_STAC	= "stac";
-immutable const(char) *M_ENCLS	= "encls";
-immutable const(char) *M_XGETBV	= "xgetbv";
-immutable const(char) *M_XSETBV	= "xsetbv";
-immutable const(char) *M_VMFUNC	= "vmfunc";
-immutable const(char) *M_XEND	= "xend";
-immutable const(char) *M_XTEST	= "xtest";
-immutable const(char) *M_ENCLU	= "enclu";
-immutable const(char) *M_SWAPGS	= "swapgs";
-immutable const(char) *M_RDTSCP	= "rdtscp";
-immutable const(char) *M_LAR	= "lar";
-immutable const(char) *M_LSL	= "lsl";
-immutable const(char) *M_SYSCALL	= "syscall";
-immutable const(char) *M_CLTS	= "clts";
-immutable const(char) *M_SYSRET	= "sysret";
-immutable const(char) *M_INVD	= "invd";
-immutable const(char) *M_WBNOINVD	= "wbnoinvd";
-immutable const(char) *M_WBINVD	= "wbinvd";
-immutable const(char) *M_UD2	= "ud2";
-immutable const(char) *M_FEMMS	= "femms";
+immutable const(char) *X86_SLDT	= "sldt";
+immutable const(char) *X86_STR	= "str";
+immutable const(char) *X86_LLDT	= "lldt";
+immutable const(char) *X86_LTR	= "ltr";
+immutable const(char) *X86_VERR	= "verr";
+immutable const(char) *X86_VERW	= "verw";
+immutable const(char) *X86_SGDT	= "sgdt";
+immutable const(char) *X86_SIDT	= "sidt";
+immutable const(char) *X86_LGDT	= "lgdt";
+immutable const(char) *X86_LIDT	= "lidt";
+immutable const(char) *X86_SMSW	= "smsw";
+immutable const(char) *X86_LMSW	= "lmsw";
+immutable const(char) *X86_INVLPG	= "invlpg";
+immutable const(char) *X86_VMCALL	= "vmcall";
+immutable const(char) *X86_VMLAUNCH	= "vmlaunch";
+immutable const(char) *X86_VMRESUME	= "vmresume";
+immutable const(char) *X86_VMXOFF	= "vmxoff";
+immutable const(char) *X86_MONITOR	= "monitor";
+immutable const(char) *X86_MWAIT	= "mwait";
+immutable const(char) *X86_CLAC	= "clac";
+immutable const(char) *X86_STAC	= "stac";
+immutable const(char) *X86_ENCLS	= "encls";
+immutable const(char) *X86_XGETBV	= "xgetbv";
+immutable const(char) *X86_XSETBV	= "xsetbv";
+immutable const(char) *X86_VMFUNC	= "vmfunc";
+immutable const(char) *X86_XEND	= "xend";
+immutable const(char) *X86_XTEST	= "xtest";
+immutable const(char) *X86_ENCLU	= "enclu";
+immutable const(char) *X86_SWAPGS	= "swapgs";
+immutable const(char) *X86_RDTSCP	= "rdtscp";
+immutable const(char) *X86_LAR	= "lar";
+immutable const(char) *X86_LSL	= "lsl";
+immutable const(char) *X86_SYSCALL	= "syscall";
+immutable const(char) *X86_CLTS	= "clts";
+immutable const(char) *X86_SYSRET	= "sysret";
+immutable const(char) *X86_INVD	= "invd";
+immutable const(char) *X86_WBNOINVD	= "wbnoinvd";
+immutable const(char) *X86_WBINVD	= "wbinvd";
+immutable const(char) *X86_UD2	= "ud2";
+immutable const(char) *X86_FEMMS	= "femms";
 // ANCHOR MAP 0F 38
 // ANCHOR MAP 0F 3A
 
 // ANCHOR Instruction tables
 
-immutable const(char)*[8] M_GRP1 = [ // same for <40H
-	M_ADD, M_OR, M_ADC, M_SBB, M_AND, M_SUB, M_XOR, M_CMP
+immutable const(char)*[8] X86_GRP1 = [ // same for <40H
+	X86_ADD, X86_OR, X86_ADC, X86_SBB, X86_AND, X86_SUB, X86_XOR, X86_CMP
 ];
-immutable const(char)*[8] M_GRP2 = [
-	M_ROL, M_ROR, M_RCL, M_RCR, M_SHL, M_SHR, null, M_SAR
+immutable const(char)*[8] X86_GRP2 = [
+	X86_ROL, X86_ROR, X86_RCL, X86_RCR, X86_SHL, X86_SHR, null, X86_SAR
 ];
-immutable const(char)*[4] M_ASCII = [
-	M_DAA, M_DAS, M_AAA, M_AAS
+immutable const(char)*[4] X86_ASCII = [
+	X86_DAA, X86_DAS, X86_AAA, X86_AAS
 ];
-immutable const(char)*[16] M_Jcc = [
-	M_JO, M_JNO, M_JB, M_JNB, M_JZ, M_JNZ, M_JBE, M_JNBE,
-	M_JS, M_JNS, M_JP, M_JNP, M_JL, M_JNL, M_JLE, M_JNLE,
+immutable const(char)*[16] X86_Jcc = [
+	X86_JO, X86_JNO, X86_JB, X86_JNB, X86_JZ, X86_JNZ, X86_JBE, X86_JNBE,
+	X86_JS, X86_JNS, X86_JP, X86_JNP, X86_JL, X86_JNL, X86_JLE, X86_JNLE,
 ];
-immutable const(char)*[3] M_STR1 = [
-	M_STOS, M_LODS, M_SCAS
+immutable const(char)*[3] X86_STR1 = [
+	X86_STOS, X86_LODS, X86_SCAS
 ];
-immutable const(char)*[6] M_F8 = [
-	M_CLC, M_STC, M_CLI, M_STI, M_CLD, M_STD
+immutable const(char)*[6] X86_F8 = [
+	X86_CLC, X86_STC, X86_CLI, X86_STI, X86_CLD, X86_STD
 ];
-immutable const(char)*[8] M_X87_D8 = [
-	M_FADD, M_FMUL, M_FCOM, M_FCOMP, M_FSUB, M_FSUBR, M_FDIV, M_FDIVR
+immutable const(char)*[8] X86_X87_D8 = [
+	X86_FADD, X86_FMUL, X86_FCOM, X86_FCOMP, X86_FSUB, X86_FSUBR, X86_FDIV, X86_FDIVR
 ];
-immutable const(char)*[8] M_X87_D9 = [
-	M_FLD, null, M_FST, M_FSTP, M_FLDENV, M_FLDCW, M_FSTENV, M_FSTCW
+immutable const(char)*[8] X86_X87_D9 = [
+	X86_FLD, null, X86_FST, X86_FSTP, X86_FLDENV, X86_FLDCW, X86_FSTENV, X86_FSTCW
 ];
-immutable const(char)*[8] M_X87_DA = [
-	M_FIADD, M_FIMUL, M_FICOM, M_FICOMP, M_FISUB, M_FISUBR, M_FIDIV, M_FIDIVR
+immutable const(char)*[8] X86_X87_DA = [
+	X86_FIADD, X86_FIMUL, X86_FICOM, X86_FICOMP, X86_FISUB, X86_FISUBR, X86_FIDIV, X86_FIDIVR
 ];
-immutable const(char)*[8] M_X87_DB = [
-	M_FILD, M_FISTTP, M_FIST, M_FISTP, null, M_FLD, null, M_FSTP
+immutable const(char)*[8] X86_X87_DB = [
+	X86_FILD, X86_FISTTP, X86_FIST, X86_FISTP, null, X86_FLD, null, X86_FSTP
 ];
 // DCH same as D8H
-immutable const(char)*[8] M_X87_DD = [
-	M_FLD, M_FISTTP, M_FST, M_FSTP, M_FRSTOR, null, M_FSAVE, M_FSTSW
+immutable const(char)*[8] X86_X87_DD = [
+	X86_FLD, X86_FISTTP, X86_FST, X86_FSTP, X86_FRSTOR, null, X86_FSAVE, X86_FSTSW
 ];
-immutable const(char)*[8] M_X87_DF = [
-	M_FILD, M_FISTTP, M_FIST, M_FISTP, M_FBLD, M_FILD, M_FBSTP, M_FISTP
+immutable const(char)*[8] X86_X87_DF = [
+	X86_FILD, X86_FISTTP, X86_FIST, X86_FISTP, X86_FBLD, X86_FILD, X86_FBSTP, X86_FISTP
 ];
 
 // !SECTION
@@ -1223,7 +1223,7 @@ enum x86Seg : ubyte {
 	none, es, cs, ss, ds, fs, gs
 }
 /// Segment strings
-immutable const(char)*[7] segs = [
+immutable const(char)*[7] x86segs = [
 	null, "es", "cs", "ss", "ds", "fs", "gs"
 ];
 
@@ -1270,7 +1270,7 @@ enum x86Reg { // ModRM order
 	tmm0	= 0,	tmm1	= 1,	tmm2	= 2,	tmm3	= 3,
 	tmm4	= 4,	tmm5	= 5,	tmm6	= 6,	tmm7	= 7,
 }
-immutable const(char)*[16][16] regs = [
+immutable const(char)*[16][16] x86regs = [
 	//TODO: const(char) *adbg_disasm_x86_reg(width, i)
 	[], [], [], [], [], [], [], [], // self-imposed garbage
 	[ // 8b, excluding REX special cases
@@ -1296,14 +1296,14 @@ immutable const(char)*[16][16] regs = [
 		"zmm8", "zmm9", "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15",
 	]
 ];
-immutable const(char)*[2][8] regs_addr16 = [ // modrm:rm16
+immutable const(char)*[2][8] x86regs16 = [ // modrm:rm16
 	[ "bx", "si" ], [ "bx", "di" ], [ "bp", "si" ], [ "bp", "di" ],
 	[ "si", null ], [ "di", null ], [ "bp", null ], [ "bx", null ],
 ];
-immutable const(char)*[8] regs_mmx = [
+immutable const(char)*[8] x86mmx = [
 	"mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7"
 ];
-/*immutable const(char)*[8] regs_amx = [
+/*immutable const(char)*[8] x86amx = [
 	"tmm0", "tmm1", "tmm2", "tmm3", "tmm4", "tmm5", "tmm6", "tmm7"
 ];*/
 
@@ -1312,8 +1312,6 @@ immutable const(char)*[8] regs_mmx = [
 //
 // SECTION Operand types
 //
-
-//TODO: "fetch" modrm and auto set reg/mem?
 
 /// EbGb/EvGv/GbEb/GvEv, auto modrm
 // D: 0=mem, 1=reg
@@ -1334,6 +1332,8 @@ int adbg_disasm_x86_op_modrm(ref x86_internals_t i, bool D, bool W) {
 // D: 0=mem, 1=reg
 // W: 0=i8, 1=i16/i32 (i64 if REX.W)
 int adbg_disasm_x86_op_modrm2(ref x86_internals_t i, ubyte modrm, bool D, bool W) {
+	version (Trace) trace("modrm=%x D=%d W=%d", modrm, D, W);
+	
 	if (W == false)
 		i.pf.data = AdbgDisasmType.i8;
 	
@@ -1342,6 +1342,8 @@ int adbg_disasm_x86_op_modrm2(ref x86_internals_t i, ubyte modrm, bool D, bool W
 /// EbGb/EvGv/GbEb/GvEv, auto modrm with width
 // D: 0=mem, 1=reg
 int adbg_disasm_x86_op_modrm3(ref x86_internals_t i, AdbgDisasmType width, bool D) {
+	version (Trace) trace("width=%u D=%u", width, D);
+	
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -1510,27 +1512,27 @@ int adbg_disasm_x86_escape(ref x86_internals_t i, ubyte opcode) {	// ANCHOR x87 
 	switch (opcode) {
 	case 0xd8:
 		width = AdbgDisasmType.i32;
-		mnemonic = M_X87_D8[reg];
+		mnemonic = X86_X87_D8[reg];
 		if (regmode) goto L_REG0RM; else goto L_MEM;
 	case 0xd9:
 		if (regmode) {
 			switch (reg) {
-			case 0b000: mnemonic = M_FLD; goto L_REG0RM;
-			case 0b001: mnemonic = M_FXCH; goto L_REG0RM;
+			case 0b000: mnemonic = X86_FLD; goto L_REG0RM;
+			case 0b001: mnemonic = X86_FXCH; goto L_REG0RM;
 			default:
 				switch (modrm) {
-				case 0xd0: mnemonic = M_FNOP; break;
-				case 0xe1: mnemonic = M_FCHS; break;
-				case 0xe2: mnemonic = M_FABS; break;
-				case 0xe4: mnemonic = M_FTST; break;
-				case 0xe5: mnemonic = M_FXAM; break;
-				case 0xe8: mnemonic = M_FLD1; break;
-				case 0xe0: mnemonic = M_FLDL2T; break;
-				case 0xea: mnemonic = M_FLDL2E; break;
-				case 0xeb: mnemonic = M_FLDPI; break;
-				case 0xec: mnemonic = M_FLDLG2; break;
-				case 0xed: mnemonic = M_FLDLN2; break;
-				case 0xee: mnemonic = M_FLDZ; break;
+				case 0xd0: mnemonic = X86_FNOP; break;
+				case 0xe1: mnemonic = X86_FCHS; break;
+				case 0xe2: mnemonic = X86_FABS; break;
+				case 0xe4: mnemonic = X86_FTST; break;
+				case 0xe5: mnemonic = X86_FXAM; break;
+				case 0xe8: mnemonic = X86_FLD1; break;
+				case 0xe0: mnemonic = X86_FLDL2T; break;
+				case 0xea: mnemonic = X86_FLDL2E; break;
+				case 0xeb: mnemonic = X86_FLDPI; break;
+				case 0xec: mnemonic = X86_FLDLG2; break;
+				case 0xed: mnemonic = X86_FLDLN2; break;
+				case 0xee: mnemonic = X86_FLDZ; break;
 				default: goto L_ILLEGAL;
 				}
 				goto L_NOOP;
@@ -1544,38 +1546,38 @@ int adbg_disasm_x86_escape(ref x86_internals_t i, ubyte opcode) {	// ANCHOR x87 
 		}
 		if (reg == 1)
 			goto L_ILLEGAL;
-		mnemonic = M_X87_D9[reg];
+		mnemonic = X86_X87_D9[reg];
 		goto L_MEM;
 	case 0xda:
 		if (regmode) {
 			switch (reg) {
-			case 0: mnemonic = M_FCMOVB; goto L_REG0RM;
-			case 1: mnemonic = M_FCMOVE; goto L_REG0RM;
-			case 2: mnemonic = M_FCMOVBE; goto L_REG0RM;
-			case 3: mnemonic = M_FCMOVU; goto L_REG0RM;
+			case 0: mnemonic = X86_FCMOVB; goto L_REG0RM;
+			case 1: mnemonic = X86_FCMOVE; goto L_REG0RM;
+			case 2: mnemonic = X86_FCMOVBE; goto L_REG0RM;
+			case 3: mnemonic = X86_FCMOVU; goto L_REG0RM;
 			default:
 			}
 			if (modrm != 0xe9)
 				goto L_ILLEGAL;
-			mnemonic = M_FUCOMPP;
+			mnemonic = X86_FUCOMPP;
 			goto L_NOOP;
 		}
 		width = AdbgDisasmType.i32;
-		mnemonic = M_X87_DA[reg];
+		mnemonic = X86_X87_DA[reg];
 		goto L_MEM;
 	case 0xdb:
 		if (regmode) {
 			switch (reg) {
-			case 0: mnemonic = M_FCMOVNB; break;
-			case 1: mnemonic = M_FCMOVNE; break;
-			case 2: mnemonic = M_FCMOVNBE; break;
-			case 3: mnemonic = M_FCMOVNU; break;
-			case 5: mnemonic = M_FUCOMI; break;
-			case 6: mnemonic = M_FCOMI; break;
+			case 0: mnemonic = X86_FCMOVNB; break;
+			case 1: mnemonic = X86_FCMOVNE; break;
+			case 2: mnemonic = X86_FCMOVNBE; break;
+			case 3: mnemonic = X86_FCMOVNU; break;
+			case 5: mnemonic = X86_FUCOMI; break;
+			case 6: mnemonic = X86_FCOMI; break;
 			case 4:
 				switch (rm) {
-				case 2: mnemonic = M_FCLEX; break;
-				case 3: mnemonic = M_FINIT; break;
+				case 2: mnemonic = X86_FCLEX; break;
+				case 3: mnemonic = X86_FINIT; break;
 				default: goto L_ILLEGAL;
 				}
 				goto L_NOOP;
@@ -1589,10 +1591,10 @@ int adbg_disasm_x86_escape(ref x86_internals_t i, ubyte opcode) {	// ANCHOR x87 
 			width = AdbgDisasmType.f80;
 		else
 			goto L_ILLEGAL;
-		mnemonic = M_X87_DB[reg];
+		mnemonic = X86_X87_DB[reg];
 		goto L_MEM;
 	case 0xdc:
-		mnemonic = M_X87_D8[reg];
+		mnemonic = X86_X87_D8[reg];
 		if (regmode) {
 			switch (reg) {
 			case 2, 3: goto L_ILLEGAL;
@@ -1604,11 +1606,11 @@ int adbg_disasm_x86_escape(ref x86_internals_t i, ubyte opcode) {	// ANCHOR x87 
 	case 0xdd: // me
 		if (regmode) {
 			switch (reg) {
-			case 0: mnemonic = M_FFREE; goto L_REGRM;
-			case 2: mnemonic = M_FST; goto L_REGRM;
-			case 3: mnemonic = M_FSTP; goto L_REGRM;
-			case 4: mnemonic = M_FUCOM; goto L_REGRM0;
-			case 5: mnemonic = M_FUCOMP; goto L_REGRM;
+			case 0: mnemonic = X86_FFREE; goto L_REGRM;
+			case 2: mnemonic = X86_FST; goto L_REGRM;
+			case 3: mnemonic = X86_FSTP; goto L_REGRM;
+			case 4: mnemonic = X86_FUCOM; goto L_REGRM0;
+			case 5: mnemonic = X86_FUCOMP; goto L_REGRM;
 			default: goto L_ILLEGAL;
 			}
 		}
@@ -1618,26 +1620,26 @@ int adbg_disasm_x86_escape(ref x86_internals_t i, ubyte opcode) {	// ANCHOR x87 
 		case 0b111: width = AdbgDisasmType.i16; break;
 		default: width = AdbgDisasmType.i64;
 		}
-		mnemonic = M_X87_D8[reg];
+		mnemonic = X86_X87_D8[reg];
 		goto L_MEM;
 	case 0xde:
 		if (regmode) {
 			switch (reg) {
-			case 0: mnemonic = M_FADDP; goto L_REGRM0;
-			case 1: mnemonic = M_MULP; goto L_REGRM0;
-			case 4: mnemonic = M_SUBRP; goto L_REGRM0;
-			case 5: mnemonic = M_SUBP; goto L_REGRM0;
-			case 6: mnemonic = M_DIVRP; goto L_REGRM0;
-			case 7: mnemonic = M_DIVP; goto L_REGRM0;
+			case 0: mnemonic = X86_FADDP; goto L_REGRM0;
+			case 1: mnemonic = X86_MULP; goto L_REGRM0;
+			case 4: mnemonic = X86_SUBRP; goto L_REGRM0;
+			case 5: mnemonic = X86_SUBP; goto L_REGRM0;
+			case 6: mnemonic = X86_DIVRP; goto L_REGRM0;
+			case 7: mnemonic = X86_DIVP; goto L_REGRM0;
 			default:
 			}
 			if (modrm != 0xd9)
 				goto L_ILLEGAL;
-			mnemonic = M_FCOMPP;
+			mnemonic = X86_FCOMPP;
 			goto L_NOOP;
 		}
 		width = AdbgDisasmType.i16;
-		mnemonic = M_X87_DA[reg];
+		mnemonic = X86_X87_DA[reg];
 		goto L_MEM;
 	default: // DFH
 		if (regmode) {
@@ -1645,10 +1647,10 @@ int adbg_disasm_x86_escape(ref x86_internals_t i, ubyte opcode) {	// ANCHOR x87 
 			case 4:
 				if (modrm != 0xe0)
 					goto L_ILLEGAL;
-				mnemonic = M_FSTSW;
+				mnemonic = X86_FSTSW;
 				goto L_REGAX;
-			case 5: mnemonic = M_FUCOMIP; goto L_REG0RM;
-			case 6: mnemonic = M_FCOMIP; goto L_REG0RM;
+			case 5: mnemonic = X86_FUCOMIP; goto L_REG0RM;
+			case 6: mnemonic = X86_FCOMIP; goto L_REG0RM;
 			default: goto L_ILLEGAL;
 			}
 		}
@@ -1657,7 +1659,7 @@ int adbg_disasm_x86_escape(ref x86_internals_t i, ubyte opcode) {	// ANCHOR x87 
 		case 0b101, 0b111: width = AdbgDisasmType.i64; break;
 		default: width = AdbgDisasmType.i16;
 		}
-		mnemonic = M_X87_DF[reg];
+		mnemonic = X86_X87_DF[reg];
 		goto L_MEM;
 	}
 	
@@ -1669,7 +1671,7 @@ L_NOOP: // no operands
 L_REGAX: // AX register
 	if (i.disasm.mode < AdbgDisasmMode.file)
 		return 0;
-	adbg_disasm_add_register(i.disasm, regs[AdbgDisasmType.i16][x86Reg.ax]);
+	adbg_disasm_add_register(i.disasm, x86regs[AdbgDisasmType.i16][x86Reg.ax]);
 	goto L_MNEMONIC;
 	
 L_REGRM: // st(rm)
@@ -1697,8 +1699,8 @@ L_MEM: // memory operand
 		return 0;
 	if (i.pf.segment == 0)
 		i.pf.segment = x86Seg.ds;
-	adbg_disasm_add_memory(i.disasm, width, segs[i.pf.segment],
-		regs[i.pf.addr][rm], null, AdbgDisasmType.none, null, 0, false, false);
+	adbg_disasm_add_memory(i.disasm, width, x86segs[i.pf.segment],
+		x86regs[i.pf.addr][rm], null, AdbgDisasmType.none, null, 0, false, false);
 	
 L_MNEMONIC:
 	adbg_disasm_add_mnemonic(i.disasm, mnemonic);
@@ -1728,7 +1730,7 @@ int adbg_disasm_x86_group1(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Grou
 	if (e) return e;
 	
 	if (i.disasm.mode >= AdbgDisasmMode.file) {
-		adbg_disasm_add_mnemonic(i.disasm, M_GRP1[(modrm >> 3) & 7]);
+		adbg_disasm_add_mnemonic(i.disasm, X86_GRP1[(modrm >> 3) & 7]);
 		if (mode == 3)
 			adbg_disasm_add_register(i.disasm, m.base);
 		else
@@ -1754,7 +1756,7 @@ int adbg_disasm_x86_group1a(ref x86_internals_t i) {	// ANCHOR Group 1a
 	if (e) return e;
 	
 	if (i.disasm.mode >= AdbgDisasmMode.file) {
-		adbg_disasm_add_mnemonic(i.disasm, M_POP);
+		adbg_disasm_add_mnemonic(i.disasm, X86_POP);
 		if (mode == 3)
 			adbg_disasm_add_register(i.disasm, m.base);
 		else
@@ -1782,7 +1784,7 @@ int adbg_disasm_x86_group2(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Grou
 	if (e) return e;
 	
 	if (i.disasm.mode >= AdbgDisasmMode.file) {
-		adbg_disasm_add_mnemonic(i.disasm, M_GRP2[reg]);
+		adbg_disasm_add_mnemonic(i.disasm, X86_GRP2[reg]);
 		if (mode == 0b11)
 			adbg_disasm_add_register(i.disasm, mem.base);
 		else
@@ -1805,13 +1807,13 @@ int adbg_disasm_x86_group2(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Grou
 		return 0;
 	default: // cl
 		if (i.disasm.mode >= AdbgDisasmMode.file)
-			adbg_disasm_add_register(i.disasm, regs[AdbgDisasmType.i8][x86Reg.cl]);
+			adbg_disasm_add_register(i.disasm, x86regs[AdbgDisasmType.i8][x86Reg.cl]);
 		return 0;
 	}
 }
 int adbg_disasm_x86_group3(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Group 3
-	immutable static const(char)*[8] M_GRP3 =
-		[ M_TEST, M_TEST, M_NOT, M_NEG, M_MUL, M_IMUL, M_DIV, M_IDIV ];
+	immutable static const(char)*[8] X86_GRP3 =
+		[ X86_TEST, X86_TEST, X86_NOT, X86_NEG, X86_MUL, X86_IMUL, X86_DIV, X86_IDIV ];
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -1831,7 +1833,7 @@ int adbg_disasm_x86_group3(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Grou
 	bool W = opcode & 1;
 	
 	if (i.disasm.mode >= AdbgDisasmMode.file) {
-		adbg_disasm_add_mnemonic(i.disasm, M_GRP3[reg]);
+		adbg_disasm_add_mnemonic(i.disasm, X86_GRP3[reg]);
 		AdbgDisasmType width = W ? i.pf.data : AdbgDisasmType.i8;
 		if (mode == 0b11)
 			adbg_disasm_add_register(i.disasm, mem.base);
@@ -1852,8 +1854,8 @@ int adbg_disasm_x86_group4(ref x86_internals_t i) {	// ANCHOR Group 4
 	ubyte reg = (modrm >> 3) & 7;
 	const(char) *mnemonic = void;
 	switch (reg) {
-	case 0: mnemonic = M_INC; break;
-	case 1: mnemonic = M_DEC; break;
+	case 0: mnemonic = X86_INC; break;
+	case 1: mnemonic = X86_DEC; break;
 	default: return adbg_oops(AdbgError.illegalInstruction);
 	}
 	
@@ -1884,27 +1886,27 @@ int adbg_disasm_x86_group5(ref x86_internals_t i) {	// ANCHOR Group 5
 	const(char) *mnemonic = void;
 	bool far;
 	switch (reg) {
-	case 0: mnemonic = M_INC; break;
-	case 1: mnemonic = M_DEC; break;
-	case 2: mnemonic = M_CALL;
+	case 0: mnemonic = X86_INC; break;
+	case 1: mnemonic = X86_DEC; break;
+	case 2: mnemonic = X86_CALL;
 		if (i.disasm.platform == AdbgPlatform.x86_64)
 			i.pf.data = AdbgDisasmType.i64;
 		break;
 	case 3:
-		mnemonic = M_CALL;
+		mnemonic = X86_CALL;
 		far = true;
 		break;
 	case 4:
-		mnemonic = M_JMP;
+		mnemonic = X86_JMP;
 		if (i.disasm.platform == AdbgPlatform.x86_64)
 			i.pf.data = AdbgDisasmType.i64;
 		break;
 	case 5:
-		mnemonic = M_JMP;
+		mnemonic = X86_JMP;
 		far = true;
 		break;
 	case 6:
-		mnemonic = M_PUSH;
+		mnemonic = X86_PUSH;
 		if (i.disasm.platform == AdbgPlatform.x86_64)
 			i.pf.data = AdbgDisasmType.i64;
 		break;
@@ -1942,27 +1944,27 @@ int adbg_disasm_x86_group6(ref x86_internals_t i) {	// ANCHOR Group 6
 	switch (reg) {
 	case 0:
 		with (AdbgDisasmType) i.pf.data = modeReg ? i32 : i16;
-		m = M_SLDT;
+		m = X86_SLDT;
 		break;
 	case 1:
 		with (AdbgDisasmType) i.pf.data = modeReg ? i32 : i16;
-		m = M_STR;
+		m = X86_STR;
 		break;
 	case 2:
 		i.pf.data = AdbgDisasmType.i16;
-		m = M_LLDT;
+		m = X86_LLDT;
 		break;
 	case 3:
 		i.pf.data = AdbgDisasmType.i16;
-		m = M_LTR;
+		m = X86_LTR;
 		break;
 	case 4:
 		i.pf.data = AdbgDisasmType.i16;
-		m = M_VERR;
+		m = X86_VERR;
 		break;
 	case 5:
 		i.pf.data = AdbgDisasmType.i16;
-		m = M_VERW;
+		m = X86_VERW;
 		break;
 	default: return adbg_oops(AdbgError.illegalInstruction);
 	}
@@ -2000,48 +2002,48 @@ int adbg_disasm_x86_group7(ref x86_internals_t i) {	// ANCHOR Group 7
 	case 0:
 		if (modeReg) {
 			switch (rm) {
-			case 0b001: m = M_VMCALL; break;
-			case 0b010: m = M_VMLAUNCH; break;
-			case 0b011: m = M_VMRESUME; break;
-			case 0b100: m = M_VMXOFF; break;
+			case 0b001: m = X86_VMCALL; break;
+			case 0b010: m = X86_VMLAUNCH; break;
+			case 0b011: m = X86_VMRESUME; break;
+			case 0b100: m = X86_VMXOFF; break;
 			default: goto L_ILLEGAL;
 			}
 			goto L_NONE;
 		} else {
-			m = M_SGDT;
+			m = X86_SGDT;
 			i.pf.data = AdbgDisasmType.none;
 			goto L_MEM;
 		}
 	case 1:
 		if (modeReg) {
 			switch (rm) {
-			case 0b000: m = M_MONITOR; break;
-			case 0b001: m = M_MWAIT; break;
-			case 0b010: m = M_CLAC; break;
-			case 0b011: m = M_STAC; break;
-			case 0b111: m = M_ENCLS; break;
+			case 0b000: m = X86_MONITOR; break;
+			case 0b001: m = X86_MWAIT; break;
+			case 0b010: m = X86_CLAC; break;
+			case 0b011: m = X86_STAC; break;
+			case 0b111: m = X86_ENCLS; break;
 			default: goto L_ILLEGAL;
 			}
 			goto L_NONE;
 		} else {
-			m = M_SIDT;
+			m = X86_SIDT;
 			i.pf.data = AdbgDisasmType.none;
 			goto L_MEM;
 		}
 	case 2:
 		if (modeReg) {
 			switch (rm) {
-			case 0b000: m = M_XGETBV; break;
-			case 0b001: m = M_XSETBV; break;
-			case 0b100: m = M_VMFUNC; break;
-			case 0b101: m = M_XEND; break;
-			case 0b110: m = M_XTEST; break;
-			case 0b111: m = M_ENCLU; break;
+			case 0b000: m = X86_XGETBV; break;
+			case 0b001: m = X86_XSETBV; break;
+			case 0b100: m = X86_VMFUNC; break;
+			case 0b101: m = X86_XEND; break;
+			case 0b110: m = X86_XTEST; break;
+			case 0b111: m = X86_ENCLU; break;
 			default: goto L_ILLEGAL;
 			}
 			goto L_NONE;
 		} else {
-			m = M_LGDT;
+			m = X86_LGDT;
 			i.pf.data = AdbgDisasmType.none;
 			goto L_MEM;
 		}
@@ -2049,17 +2051,17 @@ int adbg_disasm_x86_group7(ref x86_internals_t i) {	// ANCHOR Group 7
 		if (modeReg) {
 			goto L_ILLEGAL;
 		} else {
-			m = M_LIDT;
+			m = X86_LIDT;
 			i.pf.data = AdbgDisasmType.none;
 			goto L_MEM;
 		}
 	case 4:
-		m = M_SMSW;
+		m = X86_SMSW;
 		if (modeReg == false)
 			i.pf.data = AdbgDisasmType.none;
 		goto L_MEM;
 	case 6:
-		m = M_LMSW;
+		m = X86_LMSW;
 		if (modeReg == false)
 			i.pf.data = AdbgDisasmType.none;
 		goto L_MEM;
@@ -2069,14 +2071,14 @@ int adbg_disasm_x86_group7(ref x86_internals_t i) {	// ANCHOR Group 7
 			case 0:
 				if (i.disasm.platform != AdbgPlatform.x86_64)
 					return adbg_oops(AdbgError.illegalInstruction);
-				m = M_INVLPG;
+				m = X86_INVLPG;
 				break;
-			case 1: m = M_RDTSCP; break;
+			case 1: m = X86_RDTSCP; break;
 			default: return adbg_oops(AdbgError.illegalInstruction);
 			}
 			goto L_NONE;
 		} else {
-			m = M_LMSW;
+			m = X86_LMSW;
 		}
 		goto L_MEM;
 	default: goto L_ILLEGAL;
@@ -2128,7 +2130,7 @@ int adbg_disasm_x86_group11(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Gro
 		adbg_disasm_operand_mem_t mem = void;
 		e = adbg_disasm_x86_modrm_rm(i, &mem, mode, rm);
 		if (i.disasm.mode >= AdbgDisasmMode.file) {
-			adbg_disasm_add_mnemonic(i.disasm, M_MOV);
+			adbg_disasm_add_mnemonic(i.disasm, X86_MOV);
 			if (mode == 0b11)
 				adbg_disasm_add_register(i.disasm, mem.base);
 			else
@@ -2139,7 +2141,7 @@ int adbg_disasm_x86_group11(ref x86_internals_t i, ubyte opcode) {	// ANCHOR Gro
 		if (mode < 0b11)
 			return adbg_oops(AdbgError.illegalInstruction);
 		if (i.disasm.mode >= AdbgDisasmMode.file)
-			adbg_disasm_add_mnemonic(i.disasm, c6 ? M_XABORT : M_XBEGIN);
+			adbg_disasm_add_mnemonic(i.disasm, c6 ? X86_XABORT : X86_XBEGIN);
 		break;
 	default: return adbg_oops(AdbgError.illegalInstruction);
 	}
@@ -2194,7 +2196,7 @@ int adbg_disasm_x86_group_prefetch(ref x86_internals_t i) {	// ANCHOR Group PREF
 	}
 	
 	if (i.pf.segment == 0)
-		mem.segment = segs[x86Seg.ds];
+		mem.segment = x86segs[x86Seg.ds];
 	
 	adbg_disasm_add_mnemonic(i.disasm, m);
 	adbg_disasm_add_memory2(i.disasm, AdbgDisasmType.i8, &mem);
@@ -2232,6 +2234,7 @@ int adbg_disasm_x86_group_prefetch(ref x86_internals_t i) {	// ANCHOR Group PREF
 /// 	dir = If set, the register is the destination, otherwise register/memory.
 /// Returns: Error code
 int adbg_disasm_x86_modrm(ref x86_internals_t i, ubyte modrm, AdbgDisasmType width, bool dir) {
+	version (Trace) trace("modrm=%x width=%u dir=%u", modrm, width, dir);
 	ubyte mode = modrm >> 6;
 	ubyte reg = (modrm >> 3) & 7;
 	ubyte rm = modrm & 7;
@@ -2264,32 +2267,33 @@ int adbg_disasm_x86_modrm(ref x86_internals_t i, ubyte modrm, AdbgDisasmType wid
 }
 void adbg_disasm_x86_modrm_reg(ref x86_internals_t i, const(char) **basereg, ubyte reg) {
 	version (Trace) trace("reg=%x", reg);
-	immutable static const(char)*[] regs8rex = [ "spl", "bpl", "sil", "dil" ];
+	immutable static const(char)*[] x86regs8rex = [ "spl", "bpl", "sil", "dil" ];
 	if (i.hasRex && i.pf.data == AdbgDisasmType.i8) {
 		if (reg >= 4 && reg <= 7) {
-			*basereg = regs8rex[reg - 4];
+			*basereg = x86regs8rex[reg - 4];
 			return;
 		}
 	}
-	*basereg = regs[i.pf.data][reg];
+	*basereg = x86regs[i.pf.data][reg];
 }
 int adbg_disasm_x86_modrm_rm(ref x86_internals_t i, adbg_disasm_operand_mem_t *mem, ubyte mode, ubyte rm) {
-	version (Trace) trace("mode=%x rm=%x", mode, rm);
+	version (Trace) trace("mem=%p mode=%x rm=%x", mem, mode, rm);
+	
+	mem.segment = x86segs[i.pf.segment];
 	
 	if (i.disasm.platform != AdbgPlatform.x86_16 && rm == 0b100 && mode < 3)
 		return adbg_disasm_x86_sib(i, mem, mode);
 	
-	mem.scaled = false;
-	mem.scale  = 0;
-	mem.segment = segs[i.pf.segment];
+	mem.scale    = 0;
+	mem.scaled   = false;
 	mem.absolute = false;
 	
 	//TODO: VEX.B
 	if (i.pf.addr == AdbgDisasmType.i16) {
-		mem.base  = regs_addr16[rm][0];
-		mem.index = regs_addr16[rm][1];
+		mem.base  = x86regs16[rm][0];
+		mem.index = x86regs16[rm][1];
 	} else {
-		mem.base  = regs[i.pf.addr][rm];
+		mem.base  = x86regs[i.pf.addr][rm];
 		mem.index = null;
 	}
 	
@@ -2338,12 +2342,12 @@ int adbg_disasm_x86_sib(ref x86_internals_t i, adbg_disasm_operand_mem_t *mem, u
 	
 	if (hasScaling) {
 		mem.scale = 1 << (sib >> 6);
-		mem.index = regs[w][index];
-		mem.base  = regs[w][base];
+		mem.index = x86regs[w][index];
+		mem.base  = x86regs[w][base];
 	} else {
 		mem.scale = 0;
 		mem.index = null;
-		mem.base  = noBase ? null : regs[w][base];
+		mem.base  = noBase ? null : x86regs[w][base];
 	}
 	
 	switch (mode) {
