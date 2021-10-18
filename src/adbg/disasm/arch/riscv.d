@@ -11,7 +11,7 @@
 module adbg.disasm.arch.riscv;
 
 //TODO: Control-flow analysis
-//TODO: adbg_disasm_fetch_unify
+//TODO: adbg_disasm_fetch_unite for RVC -> RV32/64G
 //      Make it so two fetches into a type.. SOMEHOW
 
 import adbg.error;

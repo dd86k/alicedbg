@@ -11,10 +11,10 @@ import adbg.disasm, adbg.utils.str;
 
 extern (C):
 
-private immutable const(char)*[] NASM_WIDTH = [
-	null,   "fword", "tword", UNKNOWN_TYPE,
-	UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE, UNKNOWN_TYPE,
-	"byte", "word",  "dword", "qword", "oword", "yword", "zword",
+private immutable const(char)*[16] NASM_WIDTH = [
+	null, 
+	"byte", "word",  "dword", "qword", "oword", "yword", "zword", TYPE_UNKNOWN,
+	"fword", "tword", TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN,
 ];
 
 // render nasm

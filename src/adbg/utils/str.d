@@ -346,6 +346,7 @@ struct adbg_string_t {
 	/// Params: s = String
 	/// Returns: True if buffer exhausted.
 	bool adds(const(char) *s) {
+		//TODO: Handle null pointers
 		size_t sz = size - 1;
 		for (size_t si; length < sz && s[si]; ++length, ++si)
 			str[length] = s[si];

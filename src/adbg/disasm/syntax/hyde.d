@@ -11,10 +11,10 @@ import adbg.disasm, adbg.utils.str;
 
 extern (C):
 
-private immutable const(char)*[] HYDE_WIDTH = [
-	null,   "fword", "tbyte", UNKNOWN_TYPE,
-	UNKNOWN_TYPE,UNKNOWN_TYPE,UNKNOWN_TYPE,UNKNOWN_TYPE,
-	"byte", "word",  "dword", "qword", "xmmword", "ymmword", "zmmword", UNKNOWN_TYPE,
+private immutable const(char)*[16] HYDE_WIDTH = [
+	null,
+	"byte",  "word",  "dword", "qword", "xmmword", "ymmword", "zmmword", TYPE_UNKNOWN,
+	"fword", "tbyte", TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN, TYPE_UNKNOWN,
 ];
 
 // render hla

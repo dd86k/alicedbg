@@ -1,17 +1,24 @@
+/**
+ * Instruction analyzer.
+ *
+ * Authors: dd86k <dd@dax.moe>
+ * Copyright: © 2019-2021 dd86k
+ * License: BSD-3-Clause
+ */
 module analyzer;
 
 import adbg.etc.c.stdio, adbg.disasm.disasm;
 import common;
 
-private __gshared const(char)*[] opType = [
+private __gshared const(char)*[AdbgDisasmOperand.length] opType = [
 	"immediate", "register", "memory"
 ];
-private __gshared const(char)*[] opWith = [
-	"none", "far", "f80", null,
-	null,null,null,null,
-	"i8",   "i16", "i32", "i64", "i128", "i256", "i512", "i1024",
+private __gshared const(char)*[AdbgDisasmType.length] opWith = [
+	"none",
+	"i8",  "i16", "i32", "i64", "i128", "i256", "i512", "i1024",
+	"far", "f80", null, null, null, null, null,
 ];
-private __gshared const(char)*[] maTags = [
+private __gshared const(char)*[12] maTags = [
 	"UNKNOWN",
 	"OPCODE",
 	"PREFIX",
@@ -80,12 +87,13 @@ int analyze() {
 			ubyte *p8 = &m.u8;
 			// NOTE: disasm fetch should be auto swapping these
 			switch (m.type) with (AdbgDisasmType) {
-			case i8:  z = 1; goto default;
-			case i16: z = 2; goto default;
-			case i32: z = 4; goto default;
-			case i64: z = 8; goto default;
-			default: while (--z >= 0) printf("%02x ", p8[z]);
+			case i8:  z = 1; break;
+			case i16: z = 2; break;
+			case i32: z = 4; break;
+			case i64: z = 8; break;
+			default: continue;
 			}
+			while (--z >= 0) printf("%02x ", p8[z]);
 		}
 		putchar('\n');
 		// Machine tags
@@ -102,7 +110,7 @@ int analyze() {
 					case i64: w = 7; break;
 					case i32: w = 3; break;
 					case i16: w = 1; break;
-					default:  w = 0; break;
+					default: continue;
 					}
 					printf(":  ");
 					while (w-- > 0) printf("   ");

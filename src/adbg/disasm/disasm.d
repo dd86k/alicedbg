@@ -47,7 +47,7 @@ private import adbg.disasm.syntax.intel,
 //      label[ebp-2]  -> label[ebp][-2]
 //TODO: Consider adding alternative syntax options
 //      e.g., 3[RDI], .rodata[00h][RIP]
-//TODO: Support for pseudo-instructions
+//TODO: Support for no pseudo-instructions
 //      and setting bool userNoPseudoInstructions
 //      If true, tells decoder to get the base instruction instead
 //      In RISC-V, addi x0,x0,0 is basically nop, and nop is the 
@@ -55,16 +55,16 @@ private import adbg.disasm.syntax.intel,
 
 extern (C):
 
-package immutable const(char) *UNKNOWN_TYPE = "word?";
+package immutable const(char) *TYPE_UNKNOWN = "word?";
 
 private enum {
 	ADBG_MAX_PREFIXES = 8,	/// Buffer size for prefixes.
 	ADBG_MAX_OPERANDS = 4,	/// Buffer size for operands.
 	ADBG_MAX_MACHINE  = 16,	/// Buffer size for machine groups.
 	ADBG_COOKIE	= 0xcc00ffee,	/// Don't tell anyone.
-	ADBG_X86_MAX	= 15,	/// Inclusive maximum instruction size for x86.
-	ADBG_RV32_MAX	= 4,	/// Inclusive maximum instruction size for RV32I.
-	ADBG_RV64_MAX	= 8,	/// Inclusive maximum instruction size for RV64I.
+	ADBG_MAX_X86	= 15,	/// Inclusive maximum instruction size for x86.
+	ADBG_MAX_RV32	= 4,	/// Inclusive maximum instruction size for RV32I.
+	ADBG_MAX_RV64	= 8,	/// Inclusive maximum instruction size for RV64I.
 }
 
 /// Disassembler platform
@@ -102,14 +102,15 @@ enum AdbgDisasmMode : ubyte {
 	size,	/// Only calculate operation code sizes
 	data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
 	file,	/// Machine code and instruction mnemonics formatting
-	full	/// (TODO) Analysis
+	full	///TODO: Analysis
 }
 
 /// Assembler syntax
 enum AdbgSyntax : ubyte {
 	/// Native compiled target default. (Default)
-	/// x86: Intel
-	/// riscv: AT&T (for the moment being)
+	/// The default syntax for each platform is listed below.
+	/// x86: intel
+	/// riscv: riscv
 	platform,
 	/// Intel syntax
 	/// Year: 1978
@@ -178,7 +179,7 @@ enum AdbgSyntax : ubyte {
 	///
 	/// Example:
 	/// ---
-	/// lw t0, 0(a0)
+	/// lw t0, 12(sp)
 	/// ---
 	riscv,
 	///TODO: ARM native syntax.
@@ -187,7 +188,7 @@ enum AdbgSyntax : ubyte {
 	///
 	/// Example:
 	/// ---
-	/// ldr r0, [r1]
+	/// mov r0, [fp, #-8]
 	/// ---
 //	arm,
 }
@@ -199,8 +200,8 @@ enum AdbgSyntax : ubyte {
 enum AdbgDisasmInput : ubyte {
 	raw,	/// Buffer
 	debugger,	/// Debuggee
-//	file,	///TODO: File
-//	mmfile,	///TODO: MmFile
+//	file,
+//	mmfile,
 }
 
 /// Machine bytes tag
@@ -224,14 +225,34 @@ enum AdbgDisasmNumberStyle : ubyte {
 	decimal,	/// 
 	hexadecimal,	/// 
 }
-//TODO: AdbgDisasmHexStyle
+//TODO: AdbgDisasmHexStyle (syntax setting?)
+//NOTE: May conflict with syntax styles being constant values
 enum AdbgDisasmHexStyle : ubyte {
-	defaultPrefix,	/// 0x0010, default
-	hSuffix,	/// 0010h
-	hPrefix,	/// 0h0010
-	poundPrefix,	/// #0010
-	pourcentPrefix,	/// %0010
-	dollarPrefix,	/// $0010
+	defaultPrefix,	/// 0x10, default
+	hSuffix,	/// 10h
+	hPrefix,	/// 0h10
+	poundPrefix,	/// #10
+	pourcentPrefix,	/// %10
+	dollarPrefix,	/// $10
+}
+
+/// Data types
+//TODO: Rename to AdbgDataType?
+enum AdbgDisasmType : ubyte {
+	none,
+	i8,  i16, i32, i64, i128, i256, i512, i1024,
+	far, f80, res11, res12, res13, res14, res15,
+	
+	length = res15 + 1,
+}
+
+/// Main operand types.
+enum AdbgDisasmOperand : ubyte {
+	immediate,	/// 
+	register,	/// 
+	memory,	/// 
+	
+	length = memory + 1,
 }
 
 version (X86) {
@@ -270,7 +291,7 @@ version (X86) {
 		DEFAULT_SYNTAX = AdbgSyntax.att,	/// Ditto
 	}
 } else {
-	static assert(0, "Set default disassembler variables");
+	static assert(0, "DEFAULT_PLATFORM and DEFAULT_SYNTAX unset");
 }
 
 struct adbg_disasm_number_t {
@@ -297,7 +318,6 @@ struct adbg_disasm_machine_t {
 }
 
 /// The basis of an operation code
-//TODO: Consider adding decoder internals here instead
 struct adbg_disasm_opcode_t { align(1):
 	//TODO: Success bool or last error code in opcode structure
 	//      Would help formatter to ouput .byte 0xaa,0xbb etc.
@@ -329,7 +349,7 @@ struct adbg_disasm_t { align(1):
 	/// Decoder function
 	int function(adbg_disasm_t*) fdecode;
 	/// Syntax operand handler function
-	//TODO: Move in _mnemonic one specific syntax float80 situation is fixed
+	//TODO: Move in format functions once format option is passed as a parameter
 	bool function(adbg_disasm_t*, ref adbg_string_t, ref adbg_disasm_operand_t) foperand;
 	/// Internal cookie. Yummy!
 	uint cookie;
@@ -361,10 +381,10 @@ struct adbg_disasm_t { align(1):
 	package union { // Decoder options
 		uint decoderAll;
 		struct {
-			bool decoderNoReverse;	/// ATT: Do not reverse the order of operands
-			bool decoderFar;	/// ATT: Far call or jump
-			ubyte decoderPfGroups;	///TODO: Prefixes to show/hide, upto 8 groups
-			bool decoderAmbiguate;	///TODO: ATT: Ambiguate instruction
+			bool decoderNoReverse;	/// ATT: Do not reverse the order of operands. (e.g., FP or 2 immediates)
+			bool decoderFar;	/// ATT: Far call or jump. Set when Type is far.
+			ubyte decoderPfGroups;	///TODO: Prefixes to show/hide, upto 8 groups.
+			bool decoderAmbiguate;	///TODO: ATT: Ambiguate instruction.
 		}
 	}
 	package union { // User options
@@ -408,24 +428,26 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 	
 	with (AdbgPlatform)
 	switch (m) {
-	case native:
+	case native: // equals 0
 		m = DEFAULT_PLATFORM;
 		goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
-		p.limit = ADBG_X86_MAX;
+		p.limit = ADBG_MAX_X86;
 		p.fdecode = &adbg_disasm_x86;
 		p.syntax = AdbgSyntax.intel;
 		p.foperand = &adbg_disasm_operand_intel;
 		break;
 	case riscv32:
-		p.limit = ADBG_RV32_MAX;
+		p.limit = ADBG_MAX_RV32;
 		p.fdecode = &adbg_disasm_riscv;
 		p.syntax = AdbgSyntax.riscv;
 		p.foperand = &adbg_disasm_operand_riscv;
 		break;
 	/*case riscv64:
-		p.limit = ADBG_RV64_MAX;
+		p.limit = ADBG_MAX_RV64;
 		p.fdecode = &adbg_disasm_riscv;
+		p.syntax = AdbgSyntax.riscv;
+		p.foperand = &adbg_disasm_operand_riscv;
 		break;*/
 	default:
 		return adbg_oops(AdbgError.unsupportedPlatform);
@@ -448,13 +470,15 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 	with (AdbgDisasmOpt)
 	switch (opt) {
 	case syntax:
+		//TODO: To deprecate
 		p.syntax = cast(AdbgSyntax)val;
 		switch (p.syntax) with (AdbgSyntax) {
-		case intel: p.foperand = &adbg_disasm_operand_intel; break;
-		case nasm:  p.foperand = &adbg_disasm_operand_nasm; break;
-		case att:   p.foperand = &adbg_disasm_operand_att; break;
-		case ideal: p.foperand = &adbg_disasm_operand_ideal; break;
-		case hyde:  p.foperand = &adbg_disasm_operand_hyde; break;
+		case intel:  p.foperand = &adbg_disasm_operand_intel; break;
+		case nasm:   p.foperand = &adbg_disasm_operand_nasm; break;
+		case att:    p.foperand = &adbg_disasm_operand_att; break;
+		case ideal:  p.foperand = &adbg_disasm_operand_ideal; break;
+		case hyde:   p.foperand = &adbg_disasm_operand_hyde; break;
+		case riscv:  p.foperand = &adbg_disasm_operand_riscv; break;
 		default:    return adbg_oops(AdbgError.invalidOptionValue);
 		}
 		break;
@@ -545,6 +569,8 @@ int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
 }
 
 //TODO: Add AdbgSyntax to formatting functions
+//      In theory, opcode struct should have all the data it needs
+//      Maybe transfer decoder settings into opcode structure?
 
 size_t adbg_disasm_format_prefixes(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
 	if (p.opcode.prefixCount == 0) {
@@ -564,7 +590,7 @@ size_t adbg_disasm_format_prefixes2(adbg_disasm_t *p, ref adbg_string_t s, adbg_
 	
 	if (isHyde) {
 		if (op.segment) {
-			if (s.addc(op.operands[0].mem.segment[0]))
+			if (s.addc(op.segment[0]))
 				return s.length;
 			if (s.adds("seg: "))
 				return s.length;
@@ -735,22 +761,6 @@ public  alias adbg_disasm_free = free;
 //
 // SECTION Decoder stuff
 //
-
-/// Data types
-//package
-//TODO: Rename to AdbgDataType?
-enum AdbgDisasmType : ubyte {
-	none, far, f80, _res3_, _res4_, _res5_, _res6_, _res7_,
-	i8,   i16, i32, i64, i128, i256, i512, i1024,
-}
-
-/// Main operand types.
-//package
-enum AdbgDisasmOperand : ubyte {
-	immediate,	/// 
-	register,	/// 
-	memory,	/// 
-}
 
 /// Represents an instruction prefix
 struct adbg_disasm_prefix_t {

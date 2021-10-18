@@ -58,6 +58,7 @@ int adbg_disasm_x86(adbg_disasm_t *p) {
 	}
 	
 	int pfCounter;
+	int e = void;
 	const(char) *mnemonic = void;
 	ubyte opcode = void;
 	ubyte mode = void;	/// modrm:mode
@@ -69,9 +70,10 @@ int adbg_disasm_x86(adbg_disasm_t *p) {
 L_PREFIX:
 	if (pfCounter > 4) // x<=4
 		//TODO: Verify if illegal or skipped
-		return adbg_oops(AdbgError.illegalInstruction);
+		//return adbg_oops(AdbgError.illegalInstruction);
+		goto L_OPCODE;
 	
-	int e = adbg_disasm_fetch!ubyte(p, &opcode, AdbgDisasmTag.prefix);
+	e = adbg_disasm_fetch!ubyte(p, &opcode, AdbgDisasmTag.prefix);
 	if (e) return e;
 	
 	version (Trace) trace("opcode=%x", opcode);
@@ -93,7 +95,7 @@ L_PREFIX:
 		++pfCounter;
 		i.pf.data = p.platform == AdbgPlatform.x86_16 ?
 			AdbgDisasmType.i32 : AdbgDisasmType.i16;
-		i.pf.select = x86Prefix.data;
+		i.pf.select = x86Select.data;
 		goto L_PREFIX;
 	// Group 4
 	case 0x67: // Address, in 64-bit+AVX, controlled by REX.XB (42H,41H)
@@ -114,14 +116,14 @@ L_PREFIX:
 	case 0xf2:
 		++pfCounter;
 		i.pf.repne = true;
-		i.pf.select = x86Prefix.repne;
+		i.pf.select = x86Select.repne;
 		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_add_prefix(p, "repne");
 		goto L_PREFIX;
 	case 0xf3:
 		++pfCounter;
 		i.pf.rep = true;
-		i.pf.select = x86Prefix.rep;
+		i.pf.select = x86Select.rep;
 		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_add_prefix(p, "rep");
 		goto L_PREFIX;
@@ -130,6 +132,7 @@ L_PREFIX:
 			adbg_disasm_fetch_lasttag(p, AdbgDisasmTag.opcode);
 	}
 	
+L_OPCODE:
 	// Ascending opcodes to make second opcode map closer (branching)
 	if (opcode < 0x40) { // 0H..3FH: Legacy
 		// Most used instructions these days are outside of this map.
@@ -747,7 +750,7 @@ struct x86_internals_t { align(1):
 		AdbgDisasmType data;	/// Data mode (register only)
 		AdbgDisasmType addr;	/// Address mode (address register only)
 		x86Seg segment;	/// segment override
-		x86Prefix select;	/// SSE/VEX instruction selector
+		x86Select select;	/// SSE/VEX instruction selector
 		bool lock;	/// LOCK prefix
 		bool rep;	/// REP/REPE prefix
 		bool repne;	/// REPNE prefix
@@ -791,12 +794,15 @@ struct x86_internals_t { align(1):
 
 // ANCHOR 0f: 2-byte escape
 int adbg_disasm_x86_0f(ref x86_internals_t i) {
+	const(char) *m = void;
 	ubyte opcode = void;
 	
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &opcode, AdbgDisasmTag.opcode);
 	if (e) return e;
 	
 	if (opcode < 0x10) {
+		if (i.hasVex)
+			return adbg_oops(AdbgError.illegalInstruction);
 		switch (opcode) {
 		case 0: return adbg_disasm_x86_group6(i);
 		case 1: return adbg_disasm_x86_group7(i);
@@ -846,6 +852,14 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 			return adbg_disasm_x86_3dnow(i);
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
+	}
+	if (opcode < 0x20) { // 10H..1FH:
+		if (opcode == 0x18)
+			return adbg_disasm_x86_group16(i);
+		
+		
+		
+		
 	}
 	
 	return adbg_oops(AdbgError.notImplemented);
@@ -1217,6 +1231,16 @@ enum x86Prefix : ubyte {
 	xf2	= repne,	/// REPNE
 	xf3	= rep,	/// REP/REPE
 }
+/// Instruction prefix selection, Intel sequence, 0-based for optimization
+enum x86Select : ubyte {
+	none,
+	x66,
+	xf3,
+	xf2,
+	data  = x66,
+	repne = xf2,
+	rep   = xf3
+}
 
 /// Segment register overrides
 enum x86Seg : ubyte {
@@ -1270,9 +1294,9 @@ enum x86Reg { // ModRM order
 	tmm0	= 0,	tmm1	= 1,	tmm2	= 2,	tmm3	= 3,
 	tmm4	= 4,	tmm5	= 5,	tmm6	= 6,	tmm7	= 7,
 }
-immutable const(char)*[16][16] x86regs = [
-	//TODO: const(char) *adbg_disasm_x86_reg(width, i)
-	[], [], [], [], [], [], [], [], // self-imposed garbage
+immutable const(char)*[16][9] x86regs = [
+	//TODO: Consider const(char) *adbg_disasm_x86_reg(width, i)
+	[], // no types
 	[ // 8b, excluding REX special cases
 		"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh",
 		"r8b", "r9b", "r10b", "r11b", "r12b", "r13b", "r14b", "r15b"
@@ -1300,10 +1324,10 @@ immutable const(char)*[2][8] x86regs16 = [ // modrm:rm16
 	[ "bx", "si" ], [ "bx", "di" ], [ "bp", "si" ], [ "bp", "di" ],
 	[ "si", null ], [ "di", null ], [ "bp", null ], [ "bx", null ],
 ];
-immutable const(char)*[8] x86mmx = [
+immutable const(char)*[8] x86mmx = [ // 64b
 	"mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7"
 ];
-/*immutable const(char)*[8] x86amx = [
+/*immutable const(char)*[8] x86amx = [ // While they are 1KiB, this is not AVX-1024
 	"tmm0", "tmm1", "tmm2", "tmm3", "tmm4", "tmm5", "tmm6", "tmm7"
 ];*/
 
@@ -2163,9 +2187,38 @@ int adbg_disasm_x86_group15(ref x86_internals_t i) {	// ANCHOR Group 15
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_group16(ref x86_internals_t i) {	// ANCHOR Group 16
+int adbg_disasm_x86_group16(ref x86_internals_t i) {	// ANCHOR Group 16 (Prefetch)
+	ubyte modrm = void;
+	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
+	if (e) return e;
 	
-	return adbg_oops(AdbgError.notImplemented);
+	ubyte mode = modrm >> 6;
+	ubyte rm   = modrm & 7;
+	
+	adbg_disasm_operand_mem_t mem = void;
+	e = adbg_disasm_x86_modrm_rm(i, &mem, mode, rm);
+	if (e) return e;
+	
+	if (i.disasm.mode < AdbgDisasmMode.file)
+		return 0;
+	
+	ubyte reg  = (modrm >> 3) & 7;
+	
+	const(char) *m = void;
+	switch (reg) {
+	case 0:  m = "prefetchnta"; break;
+	case 1:  m = "prefetcht0"; break;
+	case 2:  m = "prefetcht1"; break;
+	case 3:  m = "prefetcht2"; break;
+	default: m = "nop";
+	}
+	
+	if (i.pf.segment == 0)
+		mem.segment = x86segs[x86Seg.ds];
+	
+	adbg_disasm_add_mnemonic(i.disasm, m);
+	adbg_disasm_add_memory2(i.disasm, AdbgDisasmType.i8, &mem);
+	return 0;
 }
 int adbg_disasm_x86_group17(ref x86_internals_t i) {	// ANCHOR Group 17
 	

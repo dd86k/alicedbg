@@ -79,6 +79,7 @@ struct settings_t {
 		AdbgSyntax syntax;	/// 
 		AdbgPlatform platform;	/// 
 	}
+	cli_settings_t cli;
 	public struct app_settings_t {
 		adbg_disasm_t disasm;	/// Disassembler
 		exception_t last_exception;	/// Last exception
@@ -88,7 +89,6 @@ struct settings_t {
 		char[60] bufferMnemonic;	/// For disassembly
 		char[40] bufferMachine;	/// For disassembly
 	}
-	cli_settings_t cli;
 	app_settings_t app;
 }
 
