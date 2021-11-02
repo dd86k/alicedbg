@@ -378,6 +378,8 @@ struct adbg_disasm_t { align(1):
 	int limit;
 	/// Memory operation width
 	AdbgDisasmType memWidth;
+	//TODO: Do these are bit flags
+	//      They are not accessed as often as I would think
 	package union { // Decoder options
 		uint decoderAll;
 		struct {

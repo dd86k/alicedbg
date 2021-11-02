@@ -110,7 +110,7 @@ int analyze() {
 					case i64: w = 7; break;
 					case i32: w = 3; break;
 					case i16: w = 1; break;
-					default: continue;
+					default:  w = 0; break;
 					}
 					printf(":  ");
 					while (w-- > 0) printf("   ");
