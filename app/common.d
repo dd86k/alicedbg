@@ -67,6 +67,7 @@ enum SettingUI { cmd, loop, tui, tcpserver }
 
 /// Settings structure for the application (only!)
 struct settings_t {
+	/// CLI settings
 	public struct cli_settings_t {
 		SettingMode mode;	/// Application mode
 		SettingUI ui;	/// Debugger user interface
@@ -78,9 +79,9 @@ struct settings_t {
 		uint flags;	/// Flags to pass to callee
 		AdbgSyntax syntax;	/// 
 		AdbgPlatform platform;	/// 
-	}
-	cli_settings_t cli;
-	public struct app_settings_t {
+	} cli_settings_t cli;	/// CLI settings
+	/// App settings
+	public struct app_settings_t {	/// 
 		adbg_disasm_t disasm;	/// Disassembler
 		exception_t last_exception;	/// Last exception
 		FILE *inputFile;	/// 
@@ -88,8 +89,7 @@ struct settings_t {
 		size_t inputHexSize;	/// 
 		char[60] bufferMnemonic;	/// For disassembly
 		char[40] bufferMachine;	/// For disassembly
-	}
-	app_settings_t app;
+	} app_settings_t app;	/// App settings
 }
 
 /// Global variables.

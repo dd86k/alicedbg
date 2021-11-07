@@ -60,11 +60,11 @@ int adbg_disasm_x86(adbg_disasm_t *p) {
 	int e = void;
 	const(char) *mnemonic = void;
 	ubyte opcode = void;
-	ubyte mode = void;	/// modrm:mode
-	ubyte reg  = void;	/// modrm:reg
-	ubyte rm   = void;	/// modrm:rm
-	bool  W    = void;	/// W bit
-	bool  D    = void;	/// D bit
+	ubyte mode   = void;	/// modrm:mode
+	ubyte reg    = void;	/// modrm:reg
+	ubyte rm     = void;	/// modrm:rm
+	bool  W      = void;	/// W bit
+	bool  D      = void;	/// D bit
 	
 L_PREFIX:
 	if (pfCounter > 4) // x<=4
@@ -90,16 +90,17 @@ L_PREFIX:
 			adbg_disasm_add_segment(p, x86segs[seg]);
 		goto L_PREFIX;
 	// Group 3
-	case 0x66: // Data, in 64-bit+AVX, controlled by REX.W (48H)
+	case 0x66: // Data
 		++pfCounter;
-		i.has.data = true;
+		i.has |= x86Has.data;
 		i.pf.data = p.platform == AdbgPlatform.x86_16 ?
 			AdbgDisasmType.i32 : AdbgDisasmType.i16;
 		i.pf.select = x86Select.data;
 		goto L_PREFIX;
 	// Group 4
-	case 0x67: // Address, in 64-bit+AVX, controlled by REX.XB (42H,41H)
+	case 0x67: // Address
 		++pfCounter;
+		i.has |= x86Has.addr;
 		switch (p.platform) with (AdbgPlatform) {
 		case x86_64: i.pf.addr = AdbgDisasmType.i32; break;
 		case x86_32: i.pf.addr = AdbgDisasmType.i16; break;
@@ -107,22 +108,22 @@ L_PREFIX:
 		}
 		goto L_PREFIX;
 	// Group 1
-	case 0xf0:
+	case 0xf0: // LOCK
 		++pfCounter;
-		i.has.lock = true;
+		i.has |= x86Has.lock;
 		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_add_prefix(p, "lock");
 		goto L_PREFIX;
-	case 0xf2:
+	case 0xf2: // REPNE
 		++pfCounter;
-		i.has.repne = true;
+		i.has = x86Has.repne;
 		i.pf.select = x86Select.repne;
 		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_add_prefix(p, "repne");
 		goto L_PREFIX;
-	case 0xf3:
+	case 0xf3: // REP
 		++pfCounter;
-		i.has.rep = true;
+		i.has = x86Has.rep;
 		i.pf.select = x86Select.rep;
 		if (p.mode >= AdbgDisasmMode.file)
 			adbg_disasm_add_prefix(p, "rep");
@@ -184,7 +185,7 @@ L_OPCODE:
 			i.vex.RR  = (opcode & 4) != 0;
 			i.vex.X   = (opcode & 2) != 0;
 			i.vex.B   = (opcode & 1) != 0;
-			i.has.rex = true;
+			i.has |= x86Has.rex;
 			if (i.vex.W)
 				i.pf.data = AdbgDisasmType.i64;
 			goto L_PREFIX;
@@ -360,7 +361,8 @@ L_OPCODE:
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			if (opcode == 0x90) {
-				adbg_disasm_add_mnemonic(p, i.has.rep ? X86_PAUSE : X86_NOP);
+				adbg_disasm_add_mnemonic(p,
+					i.has & x86Has.rep ? X86_PAUSE : X86_NOP);
 				return 0;
 			}
 			adbg_disasm_add_mnemonic(p, X86_XCHG);
@@ -531,7 +533,7 @@ L_OPCODE:
 		switch (opcode) {
 		case 0xc4: // ANCHOR: VEX.3B / LES
 			if (p.platform == AdbgPlatform.x86_64) {
-				if (i.has.legacy || i.has.rex)
+				if (i.has & (x86Has.anyLegacy | x86Has.rex))
 					return adbg_oops(AdbgError.illegalInstruction);
 				
 				// NOTE: Could fetch by ushort but breaks the purpose of tagging
@@ -548,7 +550,7 @@ L_OPCODE:
 				i.vex.vvvv = (~cast(uint)rm >> 3) & 15;
 				i.vex.LL   = (rm >> 2) & 1;
 				i.vex.pp   = rm & 3;
-				i.has.vex  = true;
+				i.has  |= x86Has.vex;
 				
 				switch (opcode & 31) {
 				case 0b00000: return adbg_disasm_x86_0f(i);
@@ -562,7 +564,7 @@ L_OPCODE:
 			return adbg_disasm_x86_op_GzMp(i);
 		case 0xc5: // ANCHOR: VEX.2B / LDS
 			if (p.platform == AdbgPlatform.x86_64) {
-				if (i.has.legacy || i.has.rex)
+				if (i.has & (x86Has.anyLegacy | x86Has.rex))
 					return adbg_oops(AdbgError.illegalInstruction);
 				
 				e = adbg_disasm_fetch!ubyte(i.disasm, &opcode, AdbgDisasmTag.vex);
@@ -573,7 +575,7 @@ L_OPCODE:
 				i.vex.vvvv = (~cast(uint)opcode >> 3) & 15;
 				i.vex.LL   = (opcode >> 2) & 1;
 				i.vex.pp   = opcode & 3;
-				i.has.vex  = true;
+				i.has  |= x86Has.vex;
 				
 				return adbg_disasm_x86_0f(i);
 			}
@@ -793,12 +795,12 @@ private:
 /// x86 internal structure
 struct x86_internals_t { align(1):
 	adbg_disasm_t *disasm;	/// Disassembler
+	uint has;	/// Has a certain prefix
 	private struct Prefix { align(1):
 		AdbgDisasmType data;	/// Data register mode width
 		AdbgDisasmType addr;	/// Address register mode width
 		x86Seg segment;	/// Segment override
 		x86Select select;	/// SSE/VEX instruction selector
-		uint res;
 	} Prefix pf;	/// Prefix data
 	private struct VEX { align(1):
 		ubyte LL;	/// VEX.L/EVEX.LL vector length
@@ -819,22 +821,6 @@ struct x86_internals_t { align(1):
 				// Affects: ModRM.RM, SIB.BASE, opcode (non-CS.D?)
 		ubyte aaa;	/// EVEX.aaa
 	} VEX vex;	/// AMD REX and AVX VEX/EVEX data
-	private struct HAS { align(1):
-		union {
-			uint legacy;	/// For VEX/EVEX
-			struct {
-				bool lock;	/// (F0H) LOCK prefix
-				bool rep;	/// (F3H) REP/REPE prefix
-				bool repne;	/// (F2H) REPNE prefix
-				bool data;	/// (66H) Operand prefix
-			}
-		}
-		bool rex;	/// Has REX prefix
-		bool vex;	/// Has VEX prefix
-		bool evex;	/// Has EVEX prefix
-		bool mvex;	/// Has MVEX prefix
-		bool[4] res;	/// 
-	} HAS has;	/// Has attribute
 }
 
 //
@@ -850,10 +836,8 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &opcode, AdbgDisasmTag.opcode);
 	if (e) return e;
 	
-	//TODO: Consider a function table with opcode[7:4]
-	
 	if (opcode < 0x10) {
-		if (i.has.vex)
+		if (i.has & x86Has.anyVex)
 			return adbg_oops(AdbgError.illegalInstruction);
 		switch (opcode) {
 		case 0: return adbg_disasm_x86_group6(i);
@@ -888,7 +872,8 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 			return 0;
 		case 9:
 			if (i.disasm.mode >= AdbgDisasmMode.file)
-				adbg_disasm_add_mnemonic(i.disasm, i.has.rep ? X86_WBNOINVD : X86_WBINVD);
+				adbg_disasm_add_mnemonic(i.disasm,
+					i.has & x86Has.rep ? X86_WBNOINVD : X86_WBINVD);
 			return 0;
 		case 0xb: // UD2
 			if (i.disasm.mode >= AdbgDisasmMode.file)
@@ -921,7 +906,7 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 			switch (opcode) {
 			case 0x18: return adbg_disasm_x86_group16(i, mem, reg);
 			case 0x1e: // AMD
-				if (mode != 3 || reg != 1 || i.has.rep == false)
+				if (mode != 3 || reg != 1 || (i.has & x86Has.rep) == 0)
 					break;
 				if (i.disasm.mode < AdbgDisasmMode.file)
 					return 0;
@@ -1044,6 +1029,24 @@ int adbg_disasm_x86_3dnow(ref x86_internals_t i) {
 //TODO: Consider avoiding defining multiple symbols where possible.
 //      + An array (or multiple) would reduce the number of symbols generated.
 //      + Could add metadata to array (bitflags but I don't know)
+
+enum x86Disallow : ushort {
+	LOCK	= 1 << 1,
+	REP	= 1 << 2,
+	REPNE	= 1 << 3,
+	BND	= 1 << 4,
+	XACQUIRE	= 1 << 5,
+	Segment	= 1 << 6,
+	
+	VEX	= 1 << 8,
+	EVEX	= 1 << 9,
+	MVEX	= 1 << 10,
+}
+
+struct x86Instruction {
+	const(char) *mnemonic;
+	ushort flags;
+}
 
 // ANCHOR Legacy
 immutable const(char) *X86_ADD	= "add";
@@ -1327,6 +1330,27 @@ immutable const(char)*[8] X86_X87_DF = [
 //
 // SECTION Definitions
 //
+
+/// 
+enum x86Has : uint {
+	// legacy[7:0]
+	data  = 1,
+	addr  = 1 << 1,
+	lock  = 1 << 2,
+	repne = 1 << 3,
+	rep   = 1 << 4,
+	anyLegacy = 0xff,
+	// rex[15:8]
+	rex   = 1 << 8,
+	anyRex = 0xff00,
+	// vex[24:16]
+	vex   = 1 << 16,
+	xop   = 1 << 17,
+	mvex  = 1 << 18,
+	evex  = 1 << 19,
+	anyVex = 0xff_0000,
+	// reserved[32:25]
+}
 
 /// x86 prefixes
 enum x86Prefix : ubyte {
@@ -2416,7 +2440,7 @@ int adbg_disasm_x86_modrm(ref x86_internals_t i, ubyte modrm, AdbgDisasmType wid
 void adbg_disasm_x86_modrm_reg(ref x86_internals_t i, const(char) **basereg, ubyte reg) {
 	version (Trace) trace("reg=%x", reg);
 	static immutable const(char)*[] x86regs8rex = [ "spl", "bpl", "sil", "dil" ];
-	if (i.has.rex && i.pf.data == AdbgDisasmType.i8) {
+	if (i.has & x86Has.rex && i.pf.data == AdbgDisasmType.i8) {
 		if (reg >= 4 && reg <= 7) {
 			*basereg = x86regs8rex[reg - 4];
 			return;

@@ -38,7 +38,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 	switch (i.op1 & 3) {
 	case 0:
 		switch (i.op1 & OP_RVC_FUNC) {
-		case OP_RVC_FUNC_000: // C.ADDI4SPN
+		case OP_RVC_FUNC_000: // C.ADDI4SPN -> ADDI REG,SP,IMM
 			int imm = i.op1 >> 7;
 			if (imm == 0)
 				return adbg_oops(AdbgError.illegalInstruction);
@@ -50,7 +50,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			adbg_disasm_add_register(i.disasm, rvregs[RiscvReg.x2]);
 			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
-		case OP_RVC_FUNC_110: // C.SW
+		case OP_RVC_FUNC_110: // C.SW -> SW REG1,REG2,IMM
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			int rs1 = (i.op1 >> 7) & 7;
@@ -72,7 +72,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			int rd = (i.op1 >> 7) & 31; /// rd/rs1 (op[11:7])
-			if (rd) { // C.ADDI/C.ADDI16SP
+			if (rd) { // C.ADDI/C.ADDI16SP -> ADDI REG,REG,IMM
 				int imm = (i.op1 >> 2) & 31;
 				const(char) *rdstr = rvregs[rd];
 				//TODO: C.ADDI16SP nzimm[4|6|8:7|5]
@@ -85,7 +85,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 				adbg_disasm_add_mnemonic(i.disasm, RV_NOP);
 			}
 			return 0;
-		case OP_RVC_FUNC_001: // C.JAL
+		case OP_RVC_FUNC_001: // C.JAL -> JAL IMM
 			if (p.mode < AdbgDisasmMode.file)
 				return 0;
 			int imm = adbg_disasm_rv_imm_cj(i.op1);

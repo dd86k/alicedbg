@@ -16,6 +16,52 @@ extern (C):
 /// An empty string in case compilers does not support pool strings.
 __gshared char *empty_string = cast(char*)"";
 
+/// Convert a hex string into a byte array.
+/// Params:
+/// 	dst = Destination buffer.
+/// 	sz = Destination buffer capacity in bytes.
+/// 	src = Source string buffer.
+/// 	newsz = New destination size in bytes.
+/// Returns: Error code if non-zero.
+int adbg_util_hex_array(ubyte *dst, size_t sz, const(char) *src, ref size_t newsz) {
+	bool upper = true;
+	ubyte b = void, bh = void;
+	size_t di, si;
+	for (; di < sz; ++si) {
+		char c = src[si];
+		if (c == 0) break;
+		
+		if (c >= '0' && c <= '9') {
+			b = cast(ubyte)(c - '0');
+		} else if (c >= 'a' && c <= 'f') {
+			b = cast(ubyte)(c - 87);
+		} else if (c >= 'A' && c <= 'F') {
+			b = cast(ubyte)(c - 55);
+		} else continue;
+		
+		if (upper) {
+			bh = cast(ubyte)(b << 4);
+		} else {
+			b |= bh;
+			dst[di++] = b;
+		}
+		upper = !upper;
+	}
+	newsz = di;
+	return di >= sz;
+}
+
+/// adbg_util_hex_array
+@system unittest {
+	ubyte[8] buf = void;
+	size_t sz = void;
+	assert(adbg_util_hex_array(buf.ptr, 8, "12AAcc", sz) == 0);
+	assert(sz == 3);
+	assert(buf[0] == 0x12);
+	assert(buf[1] == 0xaa);
+	assert(buf[2] == 0xcc);
+}
+
 //TODO: adbg_util_argv_flatten: custom loop
 size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 	import core.stdc.stdio : snprintf;
@@ -346,11 +392,13 @@ struct adbg_string_t {
 	/// Params: s = String
 	/// Returns: True if buffer exhausted.
 	bool adds(const(char) *s) {
-		//TODO: Handle null pointers
 		size_t sz = size - 1;
+		if (s == null)
+			goto L_RET;
 		for (size_t si; length < sz && s[si]; ++length, ++si)
 			str[length] = s[si];
 		str[length] = 0;
+	L_RET:
 		return length >= sz;
 	}
 	/// Add multiple items to buffer.

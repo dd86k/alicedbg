@@ -10,6 +10,7 @@ module main;
 import adbg.platform;
 import adbg.dbg : adbg_attach, adbg_load;
 import adbg.disasm;
+import adbg.utils.str : adbg_util_hex_array;
 import adbg.etc.c.stdlib : exit;
 import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
@@ -508,33 +509,10 @@ int main(int argc, const(char)** argv) {
 			puts("main: base16 input required");
 			return EXIT_FAILURE;
 		}
-		const(char) *s = globals.cli.file;
-		//TODO: Move this in some app.util module
-		bool upper = true;
-		ubyte b = void, bh = void;
-		size_t bi, si;
-		for (; bi < globals.app.inputHex.sizeof; ++si) {
-			char c = s[si];
-			if (c == 0) break;
-			
-			if (c >= '0' && c <= '9') {
-				b = cast(ubyte)(c - '0');
-			} else if (c >= 'a' && c <= 'f') {
-				b = cast(ubyte)(c - 87);
-			} else if (c >= 'A' && c <= 'F') {
-				b = cast(ubyte)(c - 55);
-			} else continue;
-			
-			if (upper) {
-				bh = cast(ubyte)(b << 4);
-			} else {
-				b |= bh;
-				globals.app.inputHex[bi++] = b;
-			}
-			upper = !upper;
-		}
 		
-		globals.app.inputHexSize = bi;
+		with (globals) adbg_util_hex_array(
+			cast(ubyte*)app.inputHex, 32, cli.file, app.inputHexSize);
+		
 		return analyze();
 	case SettingMode.dump: return dump();
 	case SettingMode.debugger:

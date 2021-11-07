@@ -14,8 +14,7 @@ private import core.stdc.stdarg;
 version (Windows) {
 	import adbg.sys.windows.wow64;
 	import core.sys.windows.windows;
-} else
-version (Posix) {
+} else version (Posix) {
 	import adbg.sys.linux.user;
 	import adbg.sys.posix.ptrace;
 	import core.sys.posix.signal;
