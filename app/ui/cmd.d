@@ -7,7 +7,8 @@
  */
 module ui.cmd;
 
-import adbg.etc.c.stdio, adbg.etc.c.stdlib;
+import adbg.etc.c.stdio;
+import adbg.etc.c.stdlib : exit;
 import adbg.error;
 import adbg.dbg.debugger, adbg.dbg.exception, adbg.dbg.context;
 import adbg.sys.err;

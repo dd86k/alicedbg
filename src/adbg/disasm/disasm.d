@@ -586,7 +586,7 @@ size_t adbg_disasm_format_prefixes(adbg_disasm_t *p, char *buffer, size_t size, 
 private
 size_t adbg_disasm_format_prefixes2(adbg_disasm_t *p, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
 	// Prefixes, skipped if empty
-	version (Trace) trace("count=%u", op.prefixCount);
+	version (Trace) trace("count=%zu", op.prefixCount);
 	
 	bool isHyde = p.syntax == AdbgSyntax.hyde;
 	
@@ -646,7 +646,7 @@ size_t adbg_disasm_format_operands(adbg_disasm_t *p, char *buffer, size_t size, 
 }
 private
 size_t adbg_disasm_format_operands2(adbg_disasm_t *p, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
-	version (Trace) trace("count=%u", op.operandCount);
+	version (Trace) trace("count=%zu", op.operandCount);
 	
 	//TODO: Consider letting syntax do its own things
 	//      e.g., with AT&T, if the two operands are immediates, they do not flip
@@ -673,7 +673,7 @@ size_t adbg_disasm_format_operands2(adbg_disasm_t *p, ref adbg_string_t s, adbg_
 
 /// 
 size_t adbg_disasm_format(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	version (Trace) trace("size=%u", size);
+	version (Trace) trace("size=%zu", size);
 	
 	if (p.opcode.mnemonic == null) {
 		buffer = empty_string;
@@ -770,11 +770,11 @@ struct adbg_disasm_prefix_t {
 	ubyte group;
 }
 
+/// Immediate operand type.
+//package
 //TODO: Display option for integer/byte/float operations
 //      Smart: integer=decimal, bitwise=hex, fpu=float
 //      A setting for each group (that will be a lot of groups...)
-/// Immediate operand
-//package
 struct adbg_disasm_operand_imm_t { align(1):
 	adbg_disasm_number_t value;	/// 
 	ushort segment;	/// 
@@ -784,15 +784,18 @@ struct adbg_disasm_operand_imm_t { align(1):
 	//      bitop -> hex
 }
 
-/// Register operand
+/// Register operand type.
 //package
+//TODO: Consider "stack register" type
 struct adbg_disasm_operand_reg_t { align(1):
 	const(char) *name;	/// Register name
+	const(char) *mask1;	/// Mask register (e.g., {k2} when EVEX.aaa=010)
+	const(char) *mask2;	/// Mask register (e.g., {z} when EVEX.z=1)
 	int index;	/// If indexed, adds an index to register
 	bool isStack;	/// x86: Applies to x87
 }
 
-/// Memory operand
+/// Memory operand type.
 //package
 struct adbg_disasm_operand_mem_t { align(1):
 	const(char) *segment;	/// Segment register
@@ -824,7 +827,7 @@ struct adbg_disasm_operand_t { align(1):
 /// Returns: Non-zero on error
 package
 int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, AdbgDisasmTag tag = AdbgDisasmTag.unknown) {
-	version (Trace) trace("size=%u left=%u", p.opcode.size, p.left);
+	version (Trace) trace("size=%u left=%zu", p.opcode.size, p.left);
 
 	if (p.opcode.size + T.sizeof > p.limit)
 		return adbg_oops(AdbgError.opcodeLimit);
@@ -1059,17 +1062,20 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p,
 
 // add register
 package
-void adbg_disasm_add_register(adbg_disasm_t *p,
-	const(char) *register, int index = 0, bool indexed = false) {
+void adbg_disasm_add_register(adbg_disasm_t *p, const(char) *register,
+	const(char) *mask1 = null, const(char) *mask2 = null,
+	int index = 0, bool indexed = false) {
 	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
 	version (Trace) trace("name=%s index=%d indexed=%d", register, index, indexed);
 	
 	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
-	item.type      = AdbgDisasmOperand.register;
-	item.reg.name  = register;
-	item.reg.index = index;
+	item.type        = AdbgDisasmOperand.register;
+	item.reg.name    = register;
+	item.reg.mask1   = mask1;
+	item.reg.mask2   = mask2;
+	item.reg.index   = index;
 	item.reg.isStack = indexed;
 }
 
@@ -1090,7 +1096,7 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 		case i8:  trace("disp=%x", *cast(ubyte*)disp); break;
 		case i16: trace("disp=%x", *cast(ushort*)disp); break;
 		case i32: trace("disp=%x", *cast(uint*)disp); break;
-		case i64: trace("disp=%x", *cast(ulong*)disp); break;
+		case i64: trace("disp=%llx", *cast(ulong*)disp); break;
 		default:
 		}
 	}

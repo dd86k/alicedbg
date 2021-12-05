@@ -13,7 +13,7 @@ The library supports:
 - Debugging
   - Windows (msvcrt) and Linux (Glibc and Musl).
 - Disassembly
-  - Platforms: x86.
+  - Platforms: x86, risc-v.
   - Syntaxes: Intel, NASM, and AT&T, Hyde Randall High Level Assembly, and Borland Turbo Assembler (enhanced mode).
 - Supports the DMD, GDC, and LDC compilers.
 

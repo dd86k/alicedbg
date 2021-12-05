@@ -27,6 +27,7 @@ enum AdbgError {
 	allocationFailed	= 3,
 	uninitiated	= 4,
 	notImplemented	= 5,
+	softAssert	= 80,
 	//
 	// External
 	//
@@ -82,6 +83,7 @@ private immutable error_msg_t[] errors = [
 	{ AdbgError.allocationFailed, "Memory allocation failed, maybe the machine is out of memory." },
 	{ AdbgError.uninitiated, "Object or structure is uninitiated." },
 	{ AdbgError.notImplemented, "Unimplemented." },
+	{ AdbgError.softAssert, "Soft assert." },
 	//
 	// Debugger
 	//
@@ -169,17 +171,30 @@ const(char)* adbg_error_msg(int code = error.code) {
 }
 
 version (Trace) {
-	import core.stdc.stdio;
-	import core.stdc.stdarg;
+	import core.stdc.stdio, core.stdc.stdarg;
+	private import adbg.platform : COMPILER_FEAT_PRAGMA_PRINTF;
 	
 	private extern (C) int putchar(int);
 	
-	/// Trace application
-	void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
-		va_list va;
-		va_start(va, fmt);
-		printf("TRACE:%s:%u: ", func.ptr, line);
-		vprintf(fmt, va);
-		putchar('\n');
+	//TODO: Maybe use mixin() but ehhh
+	static if (COMPILER_FEAT_PRAGMA_PRINTF) {
+		/// Trace application
+		pragma(printf)
+		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
+			va_list va;
+			va_start(va, fmt);
+			printf("TRACE:%s:%u: ", func.ptr, line);
+			vprintf(fmt, va);
+			putchar('\n');
+		}
+	} else {
+		/// Trace application
+		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
+			va_list va;
+			va_start(va, fmt);
+			printf("TRACE:%s:%u: ", func.ptr, line);
+			vprintf(fmt, va);
+			putchar('\n');
+		}
 	}
 }

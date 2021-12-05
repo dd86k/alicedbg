@@ -10,8 +10,12 @@
  */
 module adbg.disasm.arch.x86;
 
+// The decoder is quite messy.
+// You have been warned.
+
 import adbg.error;
 import adbg.disasm.disasm;
+private import adbg.utils.bit : BIT;
 
 extern (C):
 
@@ -20,9 +24,10 @@ extern (C):
 //       modes | CS.L=0  CS.D=0  | CS.L=0  CS.D=1  | CS.L=1  CS.D=0  | CS.L=1  CS.D=1  |
 //       LMA=0 | standard 16-bit | standard 32-bit | standard 16-bit | standard 32-bit |
 //       LMA=1 | 16-bit compat.  | 32-bit compat.  | 64-bit          | reserved        |
-// NOTE: bound/invlpga/enter/other opcodes with 2 immediates: no reversed order
+// NOTE: AT&T: bound/invlpga/enter/other opcodes with 2 immediates: no reversed order
 //       https://ftp.gnu.org/old-gnu/Manuals/gas-2.9.1/html_chapter/as_16.html
-// NOTE: F0/F2/F3/66 illegal with VEX/XOP
+// NOTE: If-ranges saves a few instructions over switch (opcode >> 4)
+// NOTE: Struct .init without a ctor is much better (when fields are aligned)
 
 //TODO: Control-flow analysis
 //TODO: Additional processors: 8086, 80186, 80386, Intel64, AMD64
@@ -33,10 +38,14 @@ extern (C):
 //      DEC, INC, NEG, NOT, OR, SBB, SUB, XADD, XCHG, and XOR.
 //      only check if hasLock
 //TODO: Check REPE/REPZ and REPNE/REPNZ
+//      Low priority because Intel defines on for others being undefined (not strict).
 //      CMPS, CMPSB, CMPSD, CMPSW, SCAS, SCASB, SCASD, and SCASW.
 //      only check if hasRepe/hasRepne
 //TODO: Maybe flag table to check LOCK/REP support?
 
+/// Internal entry point for the x86 decoder.
+/// Params: p = adbg_disasm_t pointer.
+/// Returns: Error code.
 int adbg_disasm_x86(adbg_disasm_t *p) {
 	x86_internals_t i;
 	i.disasm = p;
@@ -185,7 +194,7 @@ L_OPCODE:
 			i.vex.RR  = (opcode & 4) != 0;
 			i.vex.X   = (opcode & 2) != 0;
 			i.vex.B   = (opcode & 1) != 0;
-			i.has |= x86Has.rex;
+			i.has    |= x86Has.anyRex;
 			if (i.vex.W)
 				i.pf.data = AdbgDisasmType.i64;
 			goto L_PREFIX;
@@ -256,8 +265,57 @@ L_OPCODE:
 		
 		switch (opcode) {
 		case 0x62:
-			if (p.platform == AdbgPlatform.x86_64) //TODO: EVEX
-				return adbg_oops(AdbgError.illegalInstruction);
+			if (p.platform == AdbgPlatform.x86_64) { // ANCHOR: MVEX/EVEX
+				if (i.has & X86_ILLEGAL_PF_VEX)
+					return adbg_oops(AdbgError.illegalInstruction);
+				
+				ubyte P0 = void, P1 = void, P2 = void;
+				
+				e = adbg_disasm_fetch!ubyte(i.disasm, &P0, AdbgDisasmTag.evex);
+				if (e) return e;
+				e = adbg_disasm_fetch!ubyte(i.disasm, &P1, AdbgDisasmTag.evex);
+				if (e) return e;
+				e = adbg_disasm_fetch!ubyte(i.disasm, &P2, AdbgDisasmTag.evex);
+				if (e) return e;
+				
+				if (P1 & BIT!2) { //TODO: MVEX
+					ubyte mm = P0 & 15;
+					
+					if (mm > 2)
+						return adbg_oops(AdbgError.illegalInstruction);
+					
+					//TODO: EVEX.b
+					i.vex.RR    = (P0 < 0x80) | (((P0 & BIT!4) == 0) << 1);
+					i.vex.X     = (P0 & BIT!6) == 0;
+					i.vex.B     = (P0 & BIT!5) == 0;
+					i.vex.W     = (P1 >= 0x80);
+					i.vex.vvvv  = (P1 >> 3) & 15;
+					i.vex.pp    = (P1 & 3);
+					i.vex.zaaa  = P2 & 0x80; // EVEX.z
+					i.vex.LL    = ((P2 & BIT!6) == 0) | ((P2 & BIT!5) != 0);
+					if (i.vex.LL == 3) // 1024-bit vector
+						return adbg_oops(AdbgError.illegalInstruction);
+					i.vex.vvvv |= ((P2 & BIT!3) == 0) << 1; // EVEX.V'
+					i.vex.zaaa |= (P2 & 7); // EVEX.aaa
+					i.pf.data   = cast(AdbgDisasmType)(i.vex.LL + 7);
+					i.has      |= x86Has.evex;
+					
+					version (Trace)
+						trace("[evex] RR=%u X=%u B=%u W=%u Vvvvv=%u "~
+						"mm=%u pp=%u zaaa=0x%x LL=%u",
+						i.vex.RR, i.vex.X, i.vex.B, i.vex.W, i.vex.vvvv,
+						mm, i.vex.pp, i.vex.zaaa, i.vex.LL);
+					
+					switch (mm) { // EVEX.mm
+					case 1: return adbg_disasm_x86_0f(i);
+					case 2: return adbg_disasm_x86_0f38(i);
+					case 3: return adbg_disasm_x86_0f3a(i);
+					default: return adbg_oops(AdbgError.illegalInstruction);
+					}
+				} else { // EVEX
+					return adbg_oops(AdbgError.notImplemented);
+				}
+			}
 			
 			if (p.mode >= AdbgDisasmMode.file)
 				adbg_disasm_add_mnemonic(p, "bound");
@@ -483,11 +541,7 @@ L_OPCODE:
 				adbg_disasm_add_mnemonic(p, X86_TEST);
 				adbg_disasm_add_register(p, x86regs[dwidth][x86Reg.al]);
 			}
-			if (W)
-				adbg_disasm_x86_op_Iz(i);
-			else
-				adbg_disasm_x86_op_Ib(i);
-			return 0;
+			return W ? adbg_disasm_x86_op_Iz(i) : adbg_disasm_x86_op_Ib(i);
 		}
 		// AAH..AFH: STOS/LODS/SCAS
 		if (p.mode < AdbgDisasmMode.file)
@@ -533,30 +587,41 @@ L_OPCODE:
 		switch (opcode) {
 		case 0xc4: // ANCHOR: VEX.3B / LES
 			if (p.platform == AdbgPlatform.x86_64) {
-				if (i.has & (x86Has.anyLegacy | x86Has.rex))
+				// NOTE: F0/F2/F3/66 illegal with VEX/XOP
+				//       I think 67H is still premitted
+				if (i.has & X86_ILLEGAL_PF_VEX)
 					return adbg_oops(AdbgError.illegalInstruction);
 				
 				// NOTE: Could fetch by ushort but breaks the purpose of tagging
+				//       Compared to what, Zydis?
 				e = adbg_disasm_fetch!ubyte(i.disasm, &opcode, AdbgDisasmTag.vex);
 				if (e) return e;
 				e = adbg_disasm_fetch!ubyte(i.disasm, &rm, AdbgDisasmTag.vex);
 				if (e) return e;
 				
 				// (C4H) VEX.3B: 11000100 RXBmmmmm WvvvvLpp
-				i.vex.RR   = opcode < 0x80;
-				i.vex.X	   = (opcode & 0x40) == 0;
-				i.vex.X	   = (opcode & 0x20) == 0;
-				i.vex.W    = rm >= 0x80;
-				i.vex.vvvv = (~cast(uint)rm >> 3) & 15;
-				i.vex.LL   = (rm >> 2) & 1;
-				i.vex.pp   = rm & 3;
-				i.has  |= x86Has.vex;
+				i.vex.RR    = opcode < 0x80;
+				i.vex.X	    = (opcode >> 6) & 1;
+				i.vex.B	    = (opcode >> 5) & 1;
+				i.vex.W     = rm >= 0x80;
+				i.vex.vvvv  = (~cast(uint)rm >> 3) & 15;
+				i.vex.LL    = (rm >> 2) & 1;
+				i.vex.pp    = rm & 3;
+				i.has      |= x86Has.vex;
+				i.pf.select = cast(x86Select)i.vex.pp;
+				with (AdbgDisasmType) i.pf.data = i.vex.LL ? i256 : i128;
+				
+				version (Trace)
+					trace("[vex.3b] R=%u X=%u B=%u W=%u"~
+					"vvvv=%u L=%u pp=%u ",
+					i.vex.RR, i.vex.X, i.vex.B, i.vex.W,
+					i.vex.vvvv, i.vex.LL, i.vex.pp);
 				
 				switch (opcode & 31) {
-				case 0b00000: return adbg_disasm_x86_0f(i);
-				case 0b00001: return adbg_disasm_x86_0f38(i);
-				case 0b00010: return adbg_disasm_x86_0f3a(i);
-				default:      return adbg_oops(AdbgError.illegalInstruction);
+				case 0:  return adbg_disasm_x86_0f(i);
+				case 1:  return adbg_disasm_x86_0f38(i);
+				case 2:  return adbg_disasm_x86_0f3a(i);
+				default: return adbg_oops(AdbgError.illegalInstruction);
 				}
 			}
 			if (p.mode >= AdbgDisasmMode.file)
@@ -564,18 +629,25 @@ L_OPCODE:
 			return adbg_disasm_x86_op_GzMp(i);
 		case 0xc5: // ANCHOR: VEX.2B / LDS
 			if (p.platform == AdbgPlatform.x86_64) {
-				if (i.has & (x86Has.anyLegacy | x86Has.rex))
+				if (i.has & X86_ILLEGAL_PF_VEX)
 					return adbg_oops(AdbgError.illegalInstruction);
 				
 				e = adbg_disasm_fetch!ubyte(i.disasm, &opcode, AdbgDisasmTag.vex);
 				if (e) return e;
 				
 				// (C5H) VEX.2B: 11000101 RvvvvLpp
-				i.vex.RR   = opcode < 0x80;
-				i.vex.vvvv = (~cast(uint)opcode >> 3) & 15;
-				i.vex.LL   = (opcode >> 2) & 1;
-				i.vex.pp   = opcode & 3;
-				i.has  |= x86Has.vex;
+				i.vex.RR    = opcode < 0x80;
+				i.vex.vvvv  = (~cast(uint)opcode >> 3) & 15;
+				i.vex.LL    = (opcode >> 2) & 1;
+				i.vex.pp    = opcode & 3;
+				i.has      |= x86Has.vex;
+				i.pf.select = cast(x86Select)i.vex.pp;
+				with (AdbgDisasmType) i.pf.data = i.vex.LL ? i256 : i128;
+				
+				version (Trace)
+					trace("[vex.2b] R=%u vvvv=%u L=%u pp=%u",
+					i.vex.RR, i.vex.vvvv, i.vex.LL, i.vex.pp
+					);
 				
 				return adbg_disasm_x86_0f(i);
 			}
@@ -804,8 +876,9 @@ struct x86_internals_t { align(1):
 	} Prefix pf;	/// Prefix data
 	private struct VEX { align(1):
 		ubyte LL;	/// VEX.L/EVEX.LL vector length
-				// 0=scalar/i128, 1=i256, 2=i512, 3=i1024 (reserved)
-		ubyte pp;	/// VEX.pp opcode extension
+				// VEX:  0=scalar/i128, 1=i256
+				// EVEX: 2=i512, 3=i1024 (reserved)
+		ubyte pp;	/// VEX.pp opcode extension (pf.select should be updated)
 				// 0=NONE, 1=66H, 2=F2H, 3=F3H
 		ubyte vvvv;	/// VEX.vvvv register selector
 				// NOTE: Limited to 3 bits in x86-32
@@ -813,13 +886,13 @@ struct x86_internals_t { align(1):
 				// Affects: Register width+size
 				// 0=CS.D, 1=64-bit size
 		ubyte RR;	/// REX.R/VEX.R/EVEX.RR ModRM.REG extension
-				// Affects: ModRM.REG
-				// 0=REG:+0, 1=REG:+0b1000, 2=, 3=
+				// VEX:  0=+0, 1=+0b1000
+				// EVEX: 2=+0b1_0000, 3=Reserved
 		bool  X;	/// REX.X/VEX.X
 				// Affects: SIB.INDEX
 		bool  B;	/// REX.B/VEX.B
 				// Affects: ModRM.RM, SIB.BASE, opcode (non-CS.D?)
-		ubyte aaa;	/// EVEX.aaa
+		ubyte zaaa;	/// EVEX.z | EVEX.aaa
 	} VEX vex;	/// AMD REX and AVX VEX/EVEX data
 }
 
@@ -830,14 +903,17 @@ struct x86_internals_t { align(1):
 // ANCHOR 0f: 2-byte escape
 int adbg_disasm_x86_0f(ref x86_internals_t i) {
 	const(char) *m = void;
+	adbg_disasm_operand_mem_t mem = void;
+	int opflags = void;
 	ubyte opcode = void;
 	ubyte modrm = void;
+	bool vexmode = (i.has & x86Has.anyVex) != 0;
 	
 	int e = adbg_disasm_fetch!ubyte(i.disasm, &opcode, AdbgDisasmTag.opcode);
 	if (e) return e;
 	
 	if (opcode < 0x10) {
-		if (i.has & x86Has.anyVex)
+		if (vexmode)
 			return adbg_oops(AdbgError.illegalInstruction);
 		switch (opcode) {
 		case 0: return adbg_disasm_x86_group6(i);
@@ -890,7 +966,7 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 	}
-	if (opcode < 0x20) { // 10H..18H:
+	if (opcode < 0x20) { // 10H..1FH:
 		e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
 		if (e) return e;
 		
@@ -899,7 +975,6 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 		ubyte rm   = modrm & 7;
 		
 		if (opcode >= 0x18) {
-			adbg_disasm_operand_mem_t mem = void;
 			e = adbg_disasm_x86_modrm_rm(i, &mem, mode, rm);
 			if (e) return e;
 			
@@ -925,30 +1000,67 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 			return 0;
 		}
 		
+		static immutable const(char)* X86_M_VMOVUPS = "vmovups";
+		static immutable const(char)* X86_M_VMOVUPD = "vmovupd";
+		static immutable const(char)* X86_M_VMOVUSS = "vmovuss";
+		static immutable const(char)* X86_M_VMOVUSD = "vmovusd";
 		
+		switch (opcode) {
+		case 0x10:
+			switch (i.pf.select) with (x86Select) {
+			default:
+				m = X86_M_VMOVUPS;
+				opflags = X86VEX!(Vps, Wps);
+				break;
+			case x86Select.rep:
+				m = X86_M_VMOVUPD;
+				opflags = X86VEX!(Vpd, Wpd);
+				break;
+			case x86Select.repne:
+				m = X86_M_VMOVUSS;
+				opflags = X86VEX!(Vx, Hx, Wss);
+				break;
+			case x86Select.data:
+				m = X86_M_VMOVUSD;
+				opflags = X86VEX!(Vx, Hx, Wsd);
+				break;
+			}
+			break;
+		case 0x11:
+		case 0x12:
+		case 0x13:
+		case 0x14:
+		case 0x15:
+		case 0x16:
+		default:
+		}
 		
-		/+ubyte o = (opcode >> 1) & 3;
-		// 0001_0000
-		static immutable const(char)*[4] x86_vex_10h = [
-			"vmovups", "vmovupd", "vmovss", "vmovsd"
+		if (i.disasm.mode >= AdbgDisasmMode.file)
+			adbg_disasm_add_mnemonic(i.disasm, m + !vexmode);
+		
+		return adbg_disasm_x86_op_vex_modrm2(i, opflags, modrm);
+	}
+	if (opcode < 0x30) { // 20H..2FH:
+		return adbg_oops(AdbgError.notImplemented);
+	}
+	if (opcode < 0x40) { // 30H..3FH:
+		return adbg_oops(AdbgError.notImplemented);
+	}
+	if (opcode < 0x50) { // 40H..4FH: CMOVcc Gv, Ev
+		if (vexmode)
+			return adbg_oops(AdbgError.illegalInstruction);
+		
+		static immutable const(char)*[16] x86_M_CMOVcc = [
+			"cmovo", "cmovno", "cmovb", "cmovae",
+			"cmove", "cmovne", "cmovbe", "cmova",
+			"cmovs", "cmovns", "cmovp", "cmovnp",
+			"cmovl", "cmovnl", "cmovle", "cmovnle",
 		];
-		// 0001_0010
-		static immutable const(char)*[4] x86_vex_12h = [
-			"vmovlps", "vmovlpd", "vmovsldup", "vmovddup"
-		];
 		
-		/*switch (opcode) {
-		case 
-		}*/
+		if (i.disasm.mode >= AdbgDisasmMode.file)
+			adbg_disasm_add_mnemonic(i.disasm, x86_M_CMOVcc[opcode & 15]);
 		
-		//e = adbg_disasm_x86_vex(i, x86_vex_10h[opcode - 0x10][i.pf.select]);
-		
-		
-		
-		if (i.disasm.mode < AdbgDisasmMode.file)
-			return 0;+/
-		
-		
+		return adbg_disasm_x86_op_modrm(i, true, true);
 	}
 	
 	return adbg_oops(AdbgError.notImplemented);
@@ -1029,24 +1141,6 @@ int adbg_disasm_x86_3dnow(ref x86_internals_t i) {
 //TODO: Consider avoiding defining multiple symbols where possible.
 //      + An array (or multiple) would reduce the number of symbols generated.
 //      + Could add metadata to array (bitflags but I don't know)
-
-enum x86Disallow : ushort {
-	LOCK	= 1 << 1,
-	REP	= 1 << 2,
-	REPNE	= 1 << 3,
-	BND	= 1 << 4,
-	XACQUIRE	= 1 << 5,
-	Segment	= 1 << 6,
-	
-	VEX	= 1 << 8,
-	EVEX	= 1 << 9,
-	MVEX	= 1 << 10,
-}
-
-struct x86Instruction {
-	const(char) *mnemonic;
-	ushort flags;
-}
 
 // ANCHOR Legacy
 immutable const(char) *X86_ADD	= "add";
@@ -1334,23 +1428,1066 @@ immutable const(char)*[8] X86_X87_DF = [
 /// 
 enum x86Has : uint {
 	// legacy[7:0]
-	data  = 1,
-	addr  = 1 << 1,
-	lock  = 1 << 2,
-	repne = 1 << 3,
-	rep   = 1 << 4,
-	anyLegacy = 0xff,
+	data	= 1,	/// Bit_0: 66H
+	addr	= 1 << 1,	/// Bit_1: 67H
+	lock	= 1 << 2,	/// Bit_2: F0H
+	repne	= 1 << 3,	/// Bit_3: F2H
+	rep	= 1 << 4,	/// Bit_4: F3H
+	anyLegacy	= 0xff,	/// Any legacy prefixes except segment overrides
 	// rex[15:8]
-	rex   = 1 << 8,
-	anyRex = 0xff00,
+	// NOTE: Reserved for REX.RXBW if we really need it
+	//       The internal VEX fields already serve as an alias anyway.
+/*	rex   = 1 << 8,	/// Bit_8: REX
+	rexR	= 1 << 8,	/// Bit_8: REX.R (ModRM.reg +16)
+	rexX	= 1 << 9,	/// Bit_9: REX.X (SIB.index +16)
+	rexB	= 1 << 10,	/// Bit_10: REX.B (ModRM.rm|SIB.base|opcode.reg +16)
+	rexW	= 1 << 11,	/// Bit_11: REX.W (64-bit register promotion)*/
+	anyRex	= 0xff00,	/// Any REX bits/presence
 	// vex[24:16]
-	vex   = 1 << 16,
-	xop   = 1 << 17,
-	mvex  = 1 << 18,
-	evex  = 1 << 19,
-	anyVex = 0xff_0000,
+	vex	= 1 << 16,	/// C4H/VEX.3B and C5H/VEX.2B prefixes
+	xop	= 1 << 17,	/// 8FH/XOP prefix
+	mvex	= 1 << 18,	/// 62H/MVEX prefix
+	evex	= 1 << 19,	/// 62H/EVEX prefix
+	anyVex	= 0xff_0000,	/// Any VEX/XOP/MVEX/EVEX prefix
 	// reserved[32:25]
 }
+
+/// Illegal prefixes for VEX.2B/VEX.3B/MVEX/EVEX and possibly XOP
+enum X86_ILLEGAL_PF_VEX =
+	x86Has.lock | x86Has.repne | x86Has.rep | x86Has.data | x86Has.anyRex;
+
+immutable uint[256] x86_disallow_legacy = [
+/* 00 */ 0,
+/* 01 */ 0,
+/* 02 */ 0,
+/* 03 */ 0,
+/* 04 */ 0,
+/* 05 */ 0,
+/* 06 */ 0,
+/* 07 */ 0,
+/* 08 */ 0,
+/* 09 */ 0,
+/* 0a */ 0,
+/* 0b */ 0,
+/* 0c */ 0,
+/* 0d */ 0,
+/* 0e */ 0,
+/* 0f */ 0,
+/* 10 */ 0,
+/* 11 */ 0,
+/* 12 */ 0,
+/* 13 */ 0,
+/* 14 */ 0,
+/* 15 */ 0,
+/* 16 */ 0,
+/* 17 */ 0,
+/* 18 */ 0,
+/* 19 */ 0,
+/* 1a */ 0,
+/* 1b */ 0,
+/* 1c */ 0,
+/* 1d */ 0,
+/* 1e */ 0,
+/* 1f */ 0,
+/* 20 */ 0,
+/* 21 */ 0,
+/* 22 */ 0,
+/* 23 */ 0,
+/* 24 */ 0,
+/* 25 */ 0,
+/* 26 */ 0,
+/* 27 */ 0,
+/* 28 */ 0,
+/* 29 */ 0,
+/* 2a */ 0,
+/* 2b */ 0,
+/* 2c */ 0,
+/* 2d */ 0,
+/* 2e */ 0,
+/* 2f */ 0,
+/* 30 */ 0,
+/* 31 */ 0,
+/* 32 */ 0,
+/* 33 */ 0,
+/* 34 */ 0,
+/* 35 */ 0,
+/* 36 */ 0,
+/* 37 */ 0,
+/* 38 */ 0,
+/* 39 */ 0,
+/* 3a */ 0,
+/* 3b */ 0,
+/* 3c */ 0,
+/* 3d */ 0,
+/* 3e */ 0,
+/* 3f */ 0,
+/* 40 */ 0,
+/* 41 */ 0,
+/* 42 */ 0,
+/* 43 */ 0,
+/* 44 */ 0,
+/* 45 */ 0,
+/* 46 */ 0,
+/* 47 */ 0,
+/* 48 */ 0,
+/* 49 */ 0,
+/* 4a */ 0,
+/* 4b */ 0,
+/* 4c */ 0,
+/* 4d */ 0,
+/* 4e */ 0,
+/* 4f */ 0,
+/* 50 */ 0,
+/* 51 */ 0,
+/* 52 */ 0,
+/* 53 */ 0,
+/* 54 */ 0,
+/* 55 */ 0,
+/* 56 */ 0,
+/* 57 */ 0,
+/* 58 */ 0,
+/* 59 */ 0,
+/* 5a */ 0,
+/* 5b */ 0,
+/* 5c */ 0,
+/* 5d */ 0,
+/* 5e */ 0,
+/* 5f */ 0,
+/* 60 */ 0,
+/* 61 */ 0,
+/* 62 */ 0,
+/* 63 */ 0,
+/* 64 */ 0,
+/* 65 */ 0,
+/* 66 */ 0,
+/* 67 */ 0,
+/* 68 */ 0,
+/* 69 */ 0,
+/* 6a */ 0,
+/* 6b */ 0,
+/* 6c */ 0,
+/* 6d */ 0,
+/* 6e */ 0,
+/* 6f */ 0,
+/* 70 */ 0,
+/* 71 */ 0,
+/* 72 */ 0,
+/* 73 */ 0,
+/* 74 */ 0,
+/* 75 */ 0,
+/* 76 */ 0,
+/* 77 */ 0,
+/* 78 */ 0,
+/* 79 */ 0,
+/* 7a */ 0,
+/* 7b */ 0,
+/* 7c */ 0,
+/* 7d */ 0,
+/* 7e */ 0,
+/* 7f */ 0,
+/* 80 */ 0,
+/* 81 */ 0,
+/* 82 */ 0,
+/* 83 */ 0,
+/* 84 */ 0,
+/* 85 */ 0,
+/* 86 */ 0,
+/* 87 */ 0,
+/* 88 */ 0,
+/* 89 */ 0,
+/* 8a */ 0,
+/* 8b */ 0,
+/* 8c */ 0,
+/* 8d */ 0,
+/* 8e */ 0,
+/* 8f */ 0,
+/* 90 */ 0,
+/* 91 */ 0,
+/* 92 */ 0,
+/* 93 */ 0,
+/* 94 */ 0,
+/* 95 */ 0,
+/* 96 */ 0,
+/* 97 */ 0,
+/* 98 */ 0,
+/* 99 */ 0,
+/* 9a */ 0,
+/* 9b */ 0,
+/* 9c */ 0,
+/* 9d */ 0,
+/* 9e */ 0,
+/* 9f */ 0,
+/* a0 */ 0,
+/* a1 */ 0,
+/* a2 */ 0,
+/* a3 */ 0,
+/* a4 */ 0,
+/* a5 */ 0,
+/* a6 */ 0,
+/* a7 */ 0,
+/* a8 */ 0,
+/* a9 */ 0,
+/* aa */ 0,
+/* ab */ 0,
+/* ac */ 0,
+/* ad */ 0,
+/* ae */ 0,
+/* af */ 0,
+/* b0 */ 0,
+/* b1 */ 0,
+/* b2 */ 0,
+/* b3 */ 0,
+/* b4 */ 0,
+/* b5 */ 0,
+/* b6 */ 0,
+/* b7 */ 0,
+/* b8 */ 0,
+/* b9 */ 0,
+/* ba */ 0,
+/* bb */ 0,
+/* bc */ 0,
+/* bd */ 0,
+/* be */ 0,
+/* bf */ 0,
+/* c0 */ 0,
+/* c1 */ 0,
+/* c2 */ 0,
+/* c3 */ 0,
+/* c4 */ 0,
+/* c5 */ 0,
+/* c6 */ 0,
+/* c7 */ 0,
+/* c8 */ 0,
+/* c9 */ 0,
+/* ca */ 0,
+/* cb */ 0,
+/* cc */ 0,
+/* cd */ 0,
+/* ce */ 0,
+/* cf */ 0,
+/* d0 */ 0,
+/* d1 */ 0,
+/* d2 */ 0,
+/* d3 */ 0,
+/* d4 */ 0,
+/* d5 */ 0,
+/* d6 */ 0,
+/* d7 */ 0,
+/* d8 */ 0,
+/* d9 */ 0,
+/* da */ 0,
+/* db */ 0,
+/* dc */ 0,
+/* dd */ 0,
+/* de */ 0,
+/* df */ 0,
+/* e0 */ 0,
+/* e1 */ 0,
+/* e2 */ 0,
+/* e3 */ 0,
+/* e4 */ 0,
+/* e5 */ 0,
+/* e6 */ 0,
+/* e7 */ 0,
+/* e8 */ 0,
+/* e9 */ 0,
+/* ea */ 0,
+/* eb */ 0,
+/* ec */ 0,
+/* ed */ 0,
+/* ee */ 0,
+/* ef */ 0,
+/* f0 */ 0,
+/* f1 */ 0,
+/* f2 */ 0,
+/* f3 */ 0,
+/* f4 */ 0,
+/* f5 */ 0,
+/* f6 */ 0,
+/* f7 */ 0,
+/* f8 */ 0,
+/* f9 */ 0,
+/* fa */ 0,
+/* fb */ 0,
+/* fc */ 0,
+/* fd */ 0,
+/* fe */ 0,
+/* ff */ 0,
+];
+immutable uint[256] x86_disallow_0f = [
+/* 00 */ 0,
+/* 01 */ 0,
+/* 02 */ 0,
+/* 03 */ 0,
+/* 04 */ 0,
+/* 05 */ 0,
+/* 06 */ 0,
+/* 07 */ 0,
+/* 08 */ 0,
+/* 09 */ 0,
+/* 0a */ 0,
+/* 0b */ 0,
+/* 0c */ 0,
+/* 0d */ 0,
+/* 0e */ 0,
+/* 0f */ 0,
+/* 10 */ 0,
+/* 11 */ 0,
+/* 12 */ 0,
+/* 13 */ 0,
+/* 14 */ 0,
+/* 15 */ 0,
+/* 16 */ 0,
+/* 17 */ 0,
+/* 18 */ 0,
+/* 19 */ 0,
+/* 1a */ 0,
+/* 1b */ 0,
+/* 1c */ 0,
+/* 1d */ 0,
+/* 1e */ 0,
+/* 1f */ 0,
+/* 20 */ 0,
+/* 21 */ 0,
+/* 22 */ 0,
+/* 23 */ 0,
+/* 24 */ 0,
+/* 25 */ 0,
+/* 26 */ 0,
+/* 27 */ 0,
+/* 28 */ 0,
+/* 29 */ 0,
+/* 2a */ 0,
+/* 2b */ 0,
+/* 2c */ 0,
+/* 2d */ 0,
+/* 2e */ 0,
+/* 2f */ 0,
+/* 30 */ 0,
+/* 31 */ 0,
+/* 32 */ 0,
+/* 33 */ 0,
+/* 34 */ 0,
+/* 35 */ 0,
+/* 36 */ 0,
+/* 37 */ 0,
+/* 38 */ 0,
+/* 39 */ 0,
+/* 3a */ 0,
+/* 3b */ 0,
+/* 3c */ 0,
+/* 3d */ 0,
+/* 3e */ 0,
+/* 3f */ 0,
+/* 40 */ 0,
+/* 41 */ 0,
+/* 42 */ 0,
+/* 43 */ 0,
+/* 44 */ 0,
+/* 45 */ 0,
+/* 46 */ 0,
+/* 47 */ 0,
+/* 48 */ 0,
+/* 49 */ 0,
+/* 4a */ 0,
+/* 4b */ 0,
+/* 4c */ 0,
+/* 4d */ 0,
+/* 4e */ 0,
+/* 4f */ 0,
+/* 50 */ 0,
+/* 51 */ 0,
+/* 52 */ 0,
+/* 53 */ 0,
+/* 54 */ 0,
+/* 55 */ 0,
+/* 56 */ 0,
+/* 57 */ 0,
+/* 58 */ 0,
+/* 59 */ 0,
+/* 5a */ 0,
+/* 5b */ 0,
+/* 5c */ 0,
+/* 5d */ 0,
+/* 5e */ 0,
+/* 5f */ 0,
+/* 60 */ 0,
+/* 61 */ 0,
+/* 62 */ 0,
+/* 63 */ 0,
+/* 64 */ 0,
+/* 65 */ 0,
+/* 66 */ 0,
+/* 67 */ 0,
+/* 68 */ 0,
+/* 69 */ 0,
+/* 6a */ 0,
+/* 6b */ 0,
+/* 6c */ 0,
+/* 6d */ 0,
+/* 6e */ 0,
+/* 6f */ 0,
+/* 70 */ 0,
+/* 71 */ 0,
+/* 72 */ 0,
+/* 73 */ 0,
+/* 74 */ 0,
+/* 75 */ 0,
+/* 76 */ 0,
+/* 77 */ 0,
+/* 78 */ 0,
+/* 79 */ 0,
+/* 7a */ 0,
+/* 7b */ 0,
+/* 7c */ 0,
+/* 7d */ 0,
+/* 7e */ 0,
+/* 7f */ 0,
+/* 80 */ 0,
+/* 81 */ 0,
+/* 82 */ 0,
+/* 83 */ 0,
+/* 84 */ 0,
+/* 85 */ 0,
+/* 86 */ 0,
+/* 87 */ 0,
+/* 88 */ 0,
+/* 89 */ 0,
+/* 8a */ 0,
+/* 8b */ 0,
+/* 8c */ 0,
+/* 8d */ 0,
+/* 8e */ 0,
+/* 8f */ 0,
+/* 90 */ 0,
+/* 91 */ 0,
+/* 92 */ 0,
+/* 93 */ 0,
+/* 94 */ 0,
+/* 95 */ 0,
+/* 96 */ 0,
+/* 97 */ 0,
+/* 98 */ 0,
+/* 99 */ 0,
+/* 9a */ 0,
+/* 9b */ 0,
+/* 9c */ 0,
+/* 9d */ 0,
+/* 9e */ 0,
+/* 9f */ 0,
+/* a0 */ 0,
+/* a1 */ 0,
+/* a2 */ 0,
+/* a3 */ 0,
+/* a4 */ 0,
+/* a5 */ 0,
+/* a6 */ 0,
+/* a7 */ 0,
+/* a8 */ 0,
+/* a9 */ 0,
+/* aa */ 0,
+/* ab */ 0,
+/* ac */ 0,
+/* ad */ 0,
+/* ae */ 0,
+/* af */ 0,
+/* b0 */ 0,
+/* b1 */ 0,
+/* b2 */ 0,
+/* b3 */ 0,
+/* b4 */ 0,
+/* b5 */ 0,
+/* b6 */ 0,
+/* b7 */ 0,
+/* b8 */ 0,
+/* b9 */ 0,
+/* ba */ 0,
+/* bb */ 0,
+/* bc */ 0,
+/* bd */ 0,
+/* be */ 0,
+/* bf */ 0,
+/* c0 */ 0,
+/* c1 */ 0,
+/* c2 */ 0,
+/* c3 */ 0,
+/* c4 */ 0,
+/* c5 */ 0,
+/* c6 */ 0,
+/* c7 */ 0,
+/* c8 */ 0,
+/* c9 */ 0,
+/* ca */ 0,
+/* cb */ 0,
+/* cc */ 0,
+/* cd */ 0,
+/* ce */ 0,
+/* cf */ 0,
+/* d0 */ 0,
+/* d1 */ 0,
+/* d2 */ 0,
+/* d3 */ 0,
+/* d4 */ 0,
+/* d5 */ 0,
+/* d6 */ 0,
+/* d7 */ 0,
+/* d8 */ 0,
+/* d9 */ 0,
+/* da */ 0,
+/* db */ 0,
+/* dc */ 0,
+/* dd */ 0,
+/* de */ 0,
+/* df */ 0,
+/* e0 */ 0,
+/* e1 */ 0,
+/* e2 */ 0,
+/* e3 */ 0,
+/* e4 */ 0,
+/* e5 */ 0,
+/* e6 */ 0,
+/* e7 */ 0,
+/* e8 */ 0,
+/* e9 */ 0,
+/* ea */ 0,
+/* eb */ 0,
+/* ec */ 0,
+/* ed */ 0,
+/* ee */ 0,
+/* ef */ 0,
+/* f0 */ 0,
+/* f1 */ 0,
+/* f2 */ 0,
+/* f3 */ 0,
+/* f4 */ 0,
+/* f5 */ 0,
+/* f6 */ 0,
+/* f7 */ 0,
+/* f8 */ 0,
+/* f9 */ 0,
+/* fa */ 0,
+/* fb */ 0,
+/* fc */ 0,
+/* fd */ 0,
+/* fe */ 0,
+/* ff */ 0,
+];
+immutable uint[256] x86_disallow_0f38 = [
+/* 00 */ 0,
+/* 01 */ 0,
+/* 02 */ 0,
+/* 03 */ 0,
+/* 04 */ 0,
+/* 05 */ 0,
+/* 06 */ 0,
+/* 07 */ 0,
+/* 08 */ 0,
+/* 09 */ 0,
+/* 0a */ 0,
+/* 0b */ 0,
+/* 0c */ 0,
+/* 0d */ 0,
+/* 0e */ 0,
+/* 0f */ 0,
+/* 10 */ 0,
+/* 11 */ 0,
+/* 12 */ 0,
+/* 13 */ 0,
+/* 14 */ 0,
+/* 15 */ 0,
+/* 16 */ 0,
+/* 17 */ 0,
+/* 18 */ 0,
+/* 19 */ 0,
+/* 1a */ 0,
+/* 1b */ 0,
+/* 1c */ 0,
+/* 1d */ 0,
+/* 1e */ 0,
+/* 1f */ 0,
+/* 20 */ 0,
+/* 21 */ 0,
+/* 22 */ 0,
+/* 23 */ 0,
+/* 24 */ 0,
+/* 25 */ 0,
+/* 26 */ 0,
+/* 27 */ 0,
+/* 28 */ 0,
+/* 29 */ 0,
+/* 2a */ 0,
+/* 2b */ 0,
+/* 2c */ 0,
+/* 2d */ 0,
+/* 2e */ 0,
+/* 2f */ 0,
+/* 30 */ 0,
+/* 31 */ 0,
+/* 32 */ 0,
+/* 33 */ 0,
+/* 34 */ 0,
+/* 35 */ 0,
+/* 36 */ 0,
+/* 37 */ 0,
+/* 38 */ 0,
+/* 39 */ 0,
+/* 3a */ 0,
+/* 3b */ 0,
+/* 3c */ 0,
+/* 3d */ 0,
+/* 3e */ 0,
+/* 3f */ 0,
+/* 40 */ 0,
+/* 41 */ 0,
+/* 42 */ 0,
+/* 43 */ 0,
+/* 44 */ 0,
+/* 45 */ 0,
+/* 46 */ 0,
+/* 47 */ 0,
+/* 48 */ 0,
+/* 49 */ 0,
+/* 4a */ 0,
+/* 4b */ 0,
+/* 4c */ 0,
+/* 4d */ 0,
+/* 4e */ 0,
+/* 4f */ 0,
+/* 50 */ 0,
+/* 51 */ 0,
+/* 52 */ 0,
+/* 53 */ 0,
+/* 54 */ 0,
+/* 55 */ 0,
+/* 56 */ 0,
+/* 57 */ 0,
+/* 58 */ 0,
+/* 59 */ 0,
+/* 5a */ 0,
+/* 5b */ 0,
+/* 5c */ 0,
+/* 5d */ 0,
+/* 5e */ 0,
+/* 5f */ 0,
+/* 60 */ 0,
+/* 61 */ 0,
+/* 62 */ 0,
+/* 63 */ 0,
+/* 64 */ 0,
+/* 65 */ 0,
+/* 66 */ 0,
+/* 67 */ 0,
+/* 68 */ 0,
+/* 69 */ 0,
+/* 6a */ 0,
+/* 6b */ 0,
+/* 6c */ 0,
+/* 6d */ 0,
+/* 6e */ 0,
+/* 6f */ 0,
+/* 70 */ 0,
+/* 71 */ 0,
+/* 72 */ 0,
+/* 73 */ 0,
+/* 74 */ 0,
+/* 75 */ 0,
+/* 76 */ 0,
+/* 77 */ 0,
+/* 78 */ 0,
+/* 79 */ 0,
+/* 7a */ 0,
+/* 7b */ 0,
+/* 7c */ 0,
+/* 7d */ 0,
+/* 7e */ 0,
+/* 7f */ 0,
+/* 80 */ 0,
+/* 81 */ 0,
+/* 82 */ 0,
+/* 83 */ 0,
+/* 84 */ 0,
+/* 85 */ 0,
+/* 86 */ 0,
+/* 87 */ 0,
+/* 88 */ 0,
+/* 89 */ 0,
+/* 8a */ 0,
+/* 8b */ 0,
+/* 8c */ 0,
+/* 8d */ 0,
+/* 8e */ 0,
+/* 8f */ 0,
+/* 90 */ 0,
+/* 91 */ 0,
+/* 92 */ 0,
+/* 93 */ 0,
+/* 94 */ 0,
+/* 95 */ 0,
+/* 96 */ 0,
+/* 97 */ 0,
+/* 98 */ 0,
+/* 99 */ 0,
+/* 9a */ 0,
+/* 9b */ 0,
+/* 9c */ 0,
+/* 9d */ 0,
+/* 9e */ 0,
+/* 9f */ 0,
+/* a0 */ 0,
+/* a1 */ 0,
+/* a2 */ 0,
+/* a3 */ 0,
+/* a4 */ 0,
+/* a5 */ 0,
+/* a6 */ 0,
+/* a7 */ 0,
+/* a8 */ 0,
+/* a9 */ 0,
+/* aa */ 0,
+/* ab */ 0,
+/* ac */ 0,
+/* ad */ 0,
+/* ae */ 0,
+/* af */ 0,
+/* b0 */ 0,
+/* b1 */ 0,
+/* b2 */ 0,
+/* b3 */ 0,
+/* b4 */ 0,
+/* b5 */ 0,
+/* b6 */ 0,
+/* b7 */ 0,
+/* b8 */ 0,
+/* b9 */ 0,
+/* ba */ 0,
+/* bb */ 0,
+/* bc */ 0,
+/* bd */ 0,
+/* be */ 0,
+/* bf */ 0,
+/* c0 */ 0,
+/* c1 */ 0,
+/* c2 */ 0,
+/* c3 */ 0,
+/* c4 */ 0,
+/* c5 */ 0,
+/* c6 */ 0,
+/* c7 */ 0,
+/* c8 */ 0,
+/* c9 */ 0,
+/* ca */ 0,
+/* cb */ 0,
+/* cc */ 0,
+/* cd */ 0,
+/* ce */ 0,
+/* cf */ 0,
+/* d0 */ 0,
+/* d1 */ 0,
+/* d2 */ 0,
+/* d3 */ 0,
+/* d4 */ 0,
+/* d5 */ 0,
+/* d6 */ 0,
+/* d7 */ 0,
+/* d8 */ 0,
+/* d9 */ 0,
+/* da */ 0,
+/* db */ 0,
+/* dc */ 0,
+/* dd */ 0,
+/* de */ 0,
+/* df */ 0,
+/* e0 */ 0,
+/* e1 */ 0,
+/* e2 */ 0,
+/* e3 */ 0,
+/* e4 */ 0,
+/* e5 */ 0,
+/* e6 */ 0,
+/* e7 */ 0,
+/* e8 */ 0,
+/* e9 */ 0,
+/* ea */ 0,
+/* eb */ 0,
+/* ec */ 0,
+/* ed */ 0,
+/* ee */ 0,
+/* ef */ 0,
+/* f0 */ 0,
+/* f1 */ 0,
+/* f2 */ 0,
+/* f3 */ 0,
+/* f4 */ 0,
+/* f5 */ 0,
+/* f6 */ 0,
+/* f7 */ 0,
+/* f8 */ 0,
+/* f9 */ 0,
+/* fa */ 0,
+/* fb */ 0,
+/* fc */ 0,
+/* fd */ 0,
+/* fe */ 0,
+/* ff */ 0,
+];
+immutable uint[256] x86_disallow_0f3a = [
+/* 00 */ 0,
+/* 01 */ 0,
+/* 02 */ 0,
+/* 03 */ 0,
+/* 04 */ 0,
+/* 05 */ 0,
+/* 06 */ 0,
+/* 07 */ 0,
+/* 08 */ 0,
+/* 09 */ 0,
+/* 0a */ 0,
+/* 0b */ 0,
+/* 0c */ 0,
+/* 0d */ 0,
+/* 0e */ 0,
+/* 0f */ 0,
+/* 10 */ 0,
+/* 11 */ 0,
+/* 12 */ 0,
+/* 13 */ 0,
+/* 14 */ 0,
+/* 15 */ 0,
+/* 16 */ 0,
+/* 17 */ 0,
+/* 18 */ 0,
+/* 19 */ 0,
+/* 1a */ 0,
+/* 1b */ 0,
+/* 1c */ 0,
+/* 1d */ 0,
+/* 1e */ 0,
+/* 1f */ 0,
+/* 20 */ 0,
+/* 21 */ 0,
+/* 22 */ 0,
+/* 23 */ 0,
+/* 24 */ 0,
+/* 25 */ 0,
+/* 26 */ 0,
+/* 27 */ 0,
+/* 28 */ 0,
+/* 29 */ 0,
+/* 2a */ 0,
+/* 2b */ 0,
+/* 2c */ 0,
+/* 2d */ 0,
+/* 2e */ 0,
+/* 2f */ 0,
+/* 30 */ 0,
+/* 31 */ 0,
+/* 32 */ 0,
+/* 33 */ 0,
+/* 34 */ 0,
+/* 35 */ 0,
+/* 36 */ 0,
+/* 37 */ 0,
+/* 38 */ 0,
+/* 39 */ 0,
+/* 3a */ 0,
+/* 3b */ 0,
+/* 3c */ 0,
+/* 3d */ 0,
+/* 3e */ 0,
+/* 3f */ 0,
+/* 40 */ 0,
+/* 41 */ 0,
+/* 42 */ 0,
+/* 43 */ 0,
+/* 44 */ 0,
+/* 45 */ 0,
+/* 46 */ 0,
+/* 47 */ 0,
+/* 48 */ 0,
+/* 49 */ 0,
+/* 4a */ 0,
+/* 4b */ 0,
+/* 4c */ 0,
+/* 4d */ 0,
+/* 4e */ 0,
+/* 4f */ 0,
+/* 50 */ 0,
+/* 51 */ 0,
+/* 52 */ 0,
+/* 53 */ 0,
+/* 54 */ 0,
+/* 55 */ 0,
+/* 56 */ 0,
+/* 57 */ 0,
+/* 58 */ 0,
+/* 59 */ 0,
+/* 5a */ 0,
+/* 5b */ 0,
+/* 5c */ 0,
+/* 5d */ 0,
+/* 5e */ 0,
+/* 5f */ 0,
+/* 60 */ 0,
+/* 61 */ 0,
+/* 62 */ 0,
+/* 63 */ 0,
+/* 64 */ 0,
+/* 65 */ 0,
+/* 66 */ 0,
+/* 67 */ 0,
+/* 68 */ 0,
+/* 69 */ 0,
+/* 6a */ 0,
+/* 6b */ 0,
+/* 6c */ 0,
+/* 6d */ 0,
+/* 6e */ 0,
+/* 6f */ 0,
+/* 70 */ 0,
+/* 71 */ 0,
+/* 72 */ 0,
+/* 73 */ 0,
+/* 74 */ 0,
+/* 75 */ 0,
+/* 76 */ 0,
+/* 77 */ 0,
+/* 78 */ 0,
+/* 79 */ 0,
+/* 7a */ 0,
+/* 7b */ 0,
+/* 7c */ 0,
+/* 7d */ 0,
+/* 7e */ 0,
+/* 7f */ 0,
+/* 80 */ 0,
+/* 81 */ 0,
+/* 82 */ 0,
+/* 83 */ 0,
+/* 84 */ 0,
+/* 85 */ 0,
+/* 86 */ 0,
+/* 87 */ 0,
+/* 88 */ 0,
+/* 89 */ 0,
+/* 8a */ 0,
+/* 8b */ 0,
+/* 8c */ 0,
+/* 8d */ 0,
+/* 8e */ 0,
+/* 8f */ 0,
+/* 90 */ 0,
+/* 91 */ 0,
+/* 92 */ 0,
+/* 93 */ 0,
+/* 94 */ 0,
+/* 95 */ 0,
+/* 96 */ 0,
+/* 97 */ 0,
+/* 98 */ 0,
+/* 99 */ 0,
+/* 9a */ 0,
+/* 9b */ 0,
+/* 9c */ 0,
+/* 9d */ 0,
+/* 9e */ 0,
+/* 9f */ 0,
+/* a0 */ 0,
+/* a1 */ 0,
+/* a2 */ 0,
+/* a3 */ 0,
+/* a4 */ 0,
+/* a5 */ 0,
+/* a6 */ 0,
+/* a7 */ 0,
+/* a8 */ 0,
+/* a9 */ 0,
+/* aa */ 0,
+/* ab */ 0,
+/* ac */ 0,
+/* ad */ 0,
+/* ae */ 0,
+/* af */ 0,
+/* b0 */ 0,
+/* b1 */ 0,
+/* b2 */ 0,
+/* b3 */ 0,
+/* b4 */ 0,
+/* b5 */ 0,
+/* b6 */ 0,
+/* b7 */ 0,
+/* b8 */ 0,
+/* b9 */ 0,
+/* ba */ 0,
+/* bb */ 0,
+/* bc */ 0,
+/* bd */ 0,
+/* be */ 0,
+/* bf */ 0,
+/* c0 */ 0,
+/* c1 */ 0,
+/* c2 */ 0,
+/* c3 */ 0,
+/* c4 */ 0,
+/* c5 */ 0,
+/* c6 */ 0,
+/* c7 */ 0,
+/* c8 */ 0,
+/* c9 */ 0,
+/* ca */ 0,
+/* cb */ 0,
+/* cc */ 0,
+/* cd */ 0,
+/* ce */ 0,
+/* cf */ 0,
+/* d0 */ 0,
+/* d1 */ 0,
+/* d2 */ 0,
+/* d3 */ 0,
+/* d4 */ 0,
+/* d5 */ 0,
+/* d6 */ 0,
+/* d7 */ 0,
+/* d8 */ 0,
+/* d9 */ 0,
+/* da */ 0,
+/* db */ 0,
+/* dc */ 0,
+/* dd */ 0,
+/* de */ 0,
+/* df */ 0,
+/* e0 */ 0,
+/* e1 */ 0,
+/* e2 */ 0,
+/* e3 */ 0,
+/* e4 */ 0,
+/* e5 */ 0,
+/* e6 */ 0,
+/* e7 */ 0,
+/* e8 */ 0,
+/* e9 */ 0,
+/* ea */ 0,
+/* eb */ 0,
+/* ec */ 0,
+/* ed */ 0,
+/* ee */ 0,
+/* ef */ 0,
+/* f0 */ 0,
+/* f1 */ 0,
+/* f2 */ 0,
+/* f3 */ 0,
+/* f4 */ 0,
+/* f5 */ 0,
+/* f6 */ 0,
+/* f7 */ 0,
+/* f8 */ 0,
+/* f9 */ 0,
+/* fa */ 0,
+/* fb */ 0,
+/* fc */ 0,
+/* fd */ 0,
+/* fe */ 0,
+/* ff */ 0,
+];
 
 /// x86 prefixes
 enum x86Prefix : ubyte {
@@ -1426,8 +2563,9 @@ enum x86Reg { // ModRM order
 	tmm0	= 0,	tmm1	= 1,	tmm2	= 2,	tmm3	= 3,
 	tmm4	= 4,	tmm5	= 5,	tmm6	= 6,	tmm7	= 7,
 }
-immutable const(char)*[16][9] x86regs = [
-	//TODO: Consider const(char) *adbg_disasm_x86_reg(width, i)
+//TODO: Consider splitting vector/GP registers to stop wasting space
+//TODO: Consider const(char) *adbg_disasm_x86_reg(width, i)
+immutable const(char)*[32][9] x86regs = [
 	[], // no types
 	[ // 8b, excluding REX special cases
 		"al", "cl", "dl", "bl", "ah", "ch", "dh", "bh",
@@ -1442,14 +2580,20 @@ immutable const(char)*[16][9] x86regs = [
 		"rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi",
 		"r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
 	], [ // 128b
-		"xmm0", "xmm1", "xmm2", "xmm3", "xmm4", "xmm5", "xmm6", "xmm7",
-		"xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15"
+		"xmm0",  "xmm1",  "xmm2",  "xmm3",  "xmm4",  "xmm5",  "xmm6",  "xmm7",
+		"xmm8",  "xmm9",  "xmm10", "xmm11", "xmm12", "xmm13", "xmm14", "xmm15",
+		"xmm16", "xmm17", "xmm18", "xmm19", "xmm20", "xmm21", "xmm22", "xmm23",
+		"xmm24", "xmm25", "xmm26", "xmm27", "xmm28", "xmm29", "xmm30", "xmm31"
 	], [ // 256b
-		"ymm0", "ymm1", "ymm2", "ymm3", "ymm4", "ymm5", "ymm6", "ymm7",
-		"ymm8", "ymm9", "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15",
+		"ymm0",  "ymm1",  "ymm2",  "ymm3",  "ymm4",  "ymm5",  "ymm6",  "ymm7",
+		"ymm8",  "ymm9",  "ymm10", "ymm11", "ymm12", "ymm13", "ymm14", "ymm15",
+		"ymm16", "ymm17", "ymm18", "ymm19", "ymm20", "ymm21", "ymm22", "ymm23",
+		"ymm24", "ymm25", "ymm26", "ymm27", "ymm28", "ymm29", "ymm30", "ymm31"
 	], [ // 512b
-		"zmm0", "zmm1", "zmm2", "zmm3", "zmm4", "zmm5", "zmm6", "zmm7",
-		"zmm8", "zmm9", "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15",
+		"zmm0",  "zmm1",  "zmm2",  "zmm3",  "zmm4",  "zmm5",  "zmm6",  "zmm7",
+		"zmm8",  "zmm9",  "zmm10", "zmm11", "zmm12", "zmm13", "zmm14", "zmm15",
+		"zmm16", "zmm17", "zmm18", "zmm19", "zmm20", "zmm21", "zmm22", "zmm23",
+		"zmm24", "zmm25", "zmm26", "zmm27", "zmm28", "zmm29", "zmm30", "zmm31"
 	]
 ];
 immutable const(char)*[2][8] x86regs16 = [ // modrm:rm16
@@ -1459,7 +2603,7 @@ immutable const(char)*[2][8] x86regs16 = [ // modrm:rm16
 immutable const(char)*[8] x86mmx = [ // 64b
 	"mm0", "mm1", "mm2", "mm3", "mm4", "mm5", "mm6", "mm7"
 ];
-/*immutable const(char)*[8] x86amx = [ // While they are 1KiB, this is not AVX-1024
+/*immutable const(char)*[8] x86amx = [ // Not to be confused with AVX-1024
 	"tmm0", "tmm1", "tmm2", "tmm3", "tmm4", "tmm5", "tmm6", "tmm7"
 ];*/
 
@@ -1833,21 +2977,21 @@ L_REGAX: // AX register
 L_REGRM: // st(rm)
 	if (i.disasm.mode < AdbgDisasmMode.file)
 		return 0;
-	adbg_disasm_add_register(i.disasm, st, rm, true);
+	adbg_disasm_add_register(i.disasm, null, null, st, rm, true);
 	goto L_MNEMONIC;
 	
 L_REG0RM: // st(0),st(rm)
 	if (i.disasm.mode < AdbgDisasmMode.file)
 		return 0;
-	adbg_disasm_add_register(i.disasm, st, 0, true);
-	adbg_disasm_add_register(i.disasm, st, rm, true);
+	adbg_disasm_add_register(i.disasm, null, null, st, 0, true);
+	adbg_disasm_add_register(i.disasm, null, null, st, rm, true);
 	goto L_MNEMONIC;
 	
 L_REGRM0: // st(rm),st(0)
 	if (i.disasm.mode < AdbgDisasmMode.file)
 		return 0;
-	adbg_disasm_add_register(i.disasm, st, 0, true);
-	adbg_disasm_add_register(i.disasm, st, rm, true);
+	adbg_disasm_add_register(i.disasm, null, null, st, 0, true);
+	adbg_disasm_add_register(i.disasm, null, null, st, rm, true);
 	goto L_MNEMONIC;
 
 L_MEM: // memory operand
@@ -2381,12 +3525,6 @@ int adbg_disasm_x86_group_prefetch(ref x86_internals_t i) {	// ANCHOR Group PREF
 // SECTION ModR/M legacy mechanics
 //
 
-//TODO: adbg_disasm_x86_reg
-//      reg-8
-/*const(char) *adbg_disasm_x86_reg(ref x86_internals_t i, AdbgDisasmType width, ubyte reg, bool forceU8) {
-	assert(0, "TODO");
-}*/
-
 //TODO: modrm extraction
 //      either full
 //        int adbg_disasm_x86_modrm_extract(ref x86_internals_t i, ref ubyte mode, ref ubyte reg, ref ubyte rm)
@@ -2440,7 +3578,7 @@ int adbg_disasm_x86_modrm(ref x86_internals_t i, ubyte modrm, AdbgDisasmType wid
 void adbg_disasm_x86_modrm_reg(ref x86_internals_t i, const(char) **basereg, ubyte reg) {
 	version (Trace) trace("reg=%x", reg);
 	static immutable const(char)*[] x86regs8rex = [ "spl", "bpl", "sil", "dil" ];
-	if (i.has & x86Has.rex && i.pf.data == AdbgDisasmType.i8) {
+	if (i.has & x86Has.anyRex && i.pf.data == AdbgDisasmType.i8) {
 		if (reg >= 4 && reg <= 7) {
 			*basereg = x86regs8rex[reg - 4];
 			return;
@@ -2549,47 +3687,261 @@ int adbg_disasm_x86_sib(ref x86_internals_t i, adbg_disasm_operand_mem_t *mem, u
 // !SECTION
 
 //
-// SECTION AVX mechanics
+// SECTION SSE/AVX mechanics
 //
 
-enum x86VexMode : ushort {
-	V = 1 << 8,
-	W = 2 << 8,
-	H = 3 << 8,
-	M = 4 << 8,
+immutable const(char)*[8] x86masks = [
+	null, "k1", "k2", "k3", "k4", "k5", "k6", "k7",
+];
+immutable const(char) *x86zmask = "z";
+
+/// ModRM Addressing Modes seen in SSE/AVX maps.
+enum x86VexMode {
+	V = 1,	/// SSE/AVX ModRM Register
+	W = 2,	/// SSE/AVX ModRM Memory/Register
+	H = 3,	/// VEX.vvvv Register
+	M = 4,	/// GP ModRM Memory
+	G = 5,	/// GP ModRM Register
+	E = 6,	/// GP ModRM Memory/Register
+	P = 7,	/// MMX ModRM.reg register
+	Q = 8,	/// MMX ModRM.reg register or 64-bit memory operand
+	R = 9,	/// ModRM.rm refers to a GP register
+	// pseudo-types
+	I = 16,	/// Immediate
+	L = 17,	/// XMM/YMM register out of Ib[7:4]
 }
 
-enum x86VexType : ushort {
-	pd,
-	ps,
-	x,
-	sd,
-	ss,
-	q,
+/// ModRM Vex Types seen in SSE/AVX maps.
+enum x86VexType {
+	pd = 1,	/// 
+	ps,	/// 
+	x,	/// 
+	sd,	/// 
+	ss,	/// 
+	q,	/// 
+	// pseudo-types
+	b = 16,	/// Byte
 }
 
-enum Vps = x86VexMode.V | x86VexType.ps;
-enum Vpd = x86VexMode.V | x86VexType.pd;
-enum Wps = x86VexMode.W | x86VexType.ps;
-enum Wss = x86VexMode.W | x86VexType.ss;
-enum Wsd = x86VexMode.W | x86VexType.sd;
-enum Wpd = x86VexMode.W | x86VexType.pd;
-enum Hx  = x86VexMode.H | x86VexType.x;
-enum Vx  = x86VexMode.V | x86VexType.x;
+enum x86VexFlag {
+	// Extra operands
+	Lx      = 1 << 20,
+	Ib      = 1 << 21,
+	// Setting flags
+	dir	= 1 << 24,
+	vsib	= 1 << 25,
+	vexvvvv	= 1 << 26,
+	ignoreVexL	= 1 << 27,
+	// Trip flags
+}
 
-int adbg_disasm_x86_vex(ref x86_internals_t i, ubyte modrm, ushort dst, ushort mid, ushort src) {
+// NOTE: Disallowance should be done before entering the vex/modrm functions.
+// NOTE: VEX bit flags
+//         ++-------- X86VEXext
+//         || ++----- X86VEXdst
+//         || ||++--- X86VEXsrc or X86VEXext
+//       FFFF_FFFFh - Operands specifiers
+//       |||| |||+--- Source type
+//       |||| ||+---- Source addressing method
+//       |||| |+----- Destination type
+//       |||| +------ Destination addressing method
+//       |||+-------- Non-destructive register width
+//       ||+---0000b- Extra flags
+//       ||    |||+-- Set: Add Ib
+//       ||    ||+--- Set: Add Lx
+//       ||    |+---- Set: 
+//       ||    +----- Set: 
+//       |+----0000b- Setting flags
+//       |     |||+-- Set: Direction to ModRM.reg
+//       |     ||+--- Set: VSIB (reg,rm,reg + SIB.index=XMM/YMM).
+//       |     |+---- Set: 
+//       |     +----- Set: 
+//       +-----0000b- Trip flags
+//             |||+-- Set: Trip if ModRM.mod=memory.
+//             ||+--- Set: Trip if ModRM.mod=register.
+//             |+---- Set: 
+//             +----- Set: 
+
+template x86OP(int mode, int type) {
+	enum x86OP = (mode << 4) | type;
+}
+
+// AVX operands
+// Should be able to be directly translated to SSE operands
+enum Vps = x86OP!(x86VexMode.V, x86VexType.ps);
+enum Vpd = x86OP!(x86VexMode.V, x86VexType.pd);
+enum Vss = x86OP!(x86VexMode.V, x86VexType.ss);
+enum Vsd = x86OP!(x86VexMode.V, x86VexType.sd);
+enum Vx  = x86OP!(x86VexMode.V, x86VexType.x);
+enum Wps = x86OP!(x86VexMode.W, x86VexType.ps);
+enum Wss = x86OP!(x86VexMode.W, x86VexType.ss);
+enum Wsd = x86OP!(x86VexMode.W, x86VexType.sd);
+enum Wpd = x86OP!(x86VexMode.W, x86VexType.pd);
+enum Hx  = x86OP!(x86VexMode.H, x86VexType.x);
+// Pseudo-operands
+enum Ib  = x86OP!(x86VexMode.I, x86VexType.b);
+enum Lx  = x86OP!(x86VexMode.L, x86VexType.x);
+
+template X86VEXdst(int e) {
+	enum X86VEXdst = e << 8;
+}
+template X86VEXm(int e) {
+	enum T = e >> 4;
+	static if (T == x86VexMode.H) {
+		enum X86VEXm = (e & 15) << 16;
+	} else enum X86VEXm = 0;
+}
+template X86VEXsrc(int e) {
+	enum X86VEXsrc = cast(ubyte)e | X86VEXm!(e) | X86VEXe!(e);
+}
+template X86VEXe(int e) {
+	static if (e == Ib) {
+		enum X86VEXe = x86VexFlag.Ib;
+	} else static if (e == Lx) {
+		enum X86VEXe = x86VexFlag.Lx;
+	} else enum X86VEXe = 0;
+}
+template X86VEXext(int e) {
+	enum X86VEXext = e | X86VEXe!(e);
+}
+/// Main template to form operand bitfields.
+/// Params:
+/// 	first = Destination
+/// 	second = Source or non-destructive spec
+/// 	third = Source or extra
+/// 	fourth = Extra
+template X86VEX(int first, int second, int third = 0, int fourth = 0) {
+	enum X86VEX =
+		X86VEXdst!(first)  |
+		X86VEXsrc!(second) |
+		X86VEXsrc!(third)  |
+		X86VEXext!(fourth);
+}
+
+int adbg_disasm_x86_op_Lx(ref x86_internals_t i) {
+	ubyte modrm = void;
+	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
+	if (e) return e;
 	
-	//m = x86_vex_10h[opcode - 0x10][i.pf.select].mnemonic;
-	//if (i.hasVex == false)
-	//	++m;
+	if (i.disasm.mode < AdbgDisasmMode.file)
+		return 0;
+	
+	adbg_disasm_add_register(i.disasm, x86regs[i.pf.data][modrm >> 4]);
+	return 0;
+}
+
+int adbg_disasm_x86_op_vex_modrm(ref x86_internals_t i, uint ops) {
+	ubyte modrm = void;
+	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
+	return e ? e : adbg_disasm_x86_op_vex_modrm2(i, ops, modrm);
+}
+int adbg_disasm_x86_op_vex_modrm2(ref x86_internals_t i, uint ops, ubyte modrm) {
+	version (Trace) trace("ops=0x%x modrm=%x", ops, modrm);
+	
+	adbg_disasm_operand_mem_t amem = void;
+	const(char) *areg = void;
+	
+	int e = void;
+	ubyte dstMode = (ops >> 12) & 15;
+	ubyte dstType = (ops >> 8) & 15;
+	ubyte srcMode = (ops >> 4) & 15;
+	ubyte srcType = ops & 15;
+	ubyte mod  = modrm >> 6;
+	ubyte reg  = (modrm >> 3) & 7;
+	ubyte rm   = modrm & 7;
+	bool modeFile   = i.disasm.mode >= AdbgDisasmMode.file;
+	bool dstReg = (ops & x86VexFlag.dir) != 0;
+	bool modeVex = (i.has & x86Has.anyVex) != 0;
+	
+	if (modeVex == false) {
+		i.pf.data = AdbgDisasmType.i128;
+	}
+	
+	//TODO: VSIB
+	//      reg,vvvv,rm -> reg,rm(vvvv)
+	
+	// destination
+	switch (dstMode) with (x86VexMode) {
+	case V:
+		adbg_disasm_x86_modrm_reg(i, &areg, reg);
+		if (modeFile)
+			adbg_disasm_add_register(i.disasm,
+				areg,
+				x86masks[i.vex.zaaa & 7],
+				i.vex.zaaa >= 0x80 ? x86zmask : null);
+		break;
+	case W:
+		e = adbg_disasm_x86_modrm_rm(i, &amem, mod, rm);
+		if (e) return e;
+		if (modeFile) {
+			if (mod == 3)
+				adbg_disasm_add_register(i.disasm, amem.base);
+			else
+				adbg_disasm_add_memory2(i.disasm, i.pf.data, &amem);
+		}
+		break;
+	default: return adbg_oops(AdbgError.softAssert);
+	}
+	
+	// non-destructive source
+	ubyte midType = (ops >> 16) & 15;
+	if (modeVex && midType) {
+		adbg_disasm_x86_modrm_reg(i, &areg, i.vex.vvvv);
+		if (modeFile)
+			adbg_disasm_add_register(i.disasm, areg);
+	}
+	
+	// source
+	switch (srcMode) with (x86VexMode) {
+	case V:
+		adbg_disasm_x86_modrm_reg(i, &areg, reg);
+		if (modeFile)
+			adbg_disasm_add_register(i.disasm, areg);
+		break;
+	case W:
+		e = adbg_disasm_x86_modrm_rm(i, &amem, mod, rm);
+		if (e) return e;
+		if (modeFile) {
+			if (mod == 3)
+				adbg_disasm_add_register(i.disasm, amem.base);
+			else
+				adbg_disasm_add_memory2(i.disasm, i.pf.data, &amem);
+		}
+		break;
+	default: return adbg_oops(AdbgError.softAssert);
+	}
+	
+	// extras
+	if (ops & x86VexFlag.Lx) {
+		e = adbg_disasm_x86_op_Lx(i);
+		if (e) return e;
+	}
+	
+	if (ops & x86VexFlag.Ib)
+		return adbg_disasm_x86_op_Ib(i);
 	
 	return 0;
 }
 
-int adbg_disasm_x86_vex_modrm(ref x86_internals_t i, ubyte modrm, AdbgDisasmType width, bool dir) {
+int adbg_disasm_x86_op_avx_mode(ref x86_internals_t i, ref AdbgDisasmOperand oprd, ubyte op) {
 	
 	
-	return adbg_oops(AdbgError.notImplemented);
+	return 0;
+}
+int adbg_disasm_x86_op_avx_type(ref x86_internals_t i, ref AdbgDisasmType type, ubyte op) {
+	
+	
+	return 0;
+}
+int adbg_disasm_x86_op_sse_mode(ref x86_internals_t i, ref AdbgDisasmOperand oprd, ubyte op) {
+	
+	
+	return 0;
+}
+int adbg_disasm_x86_op_sse_type(ref x86_internals_t i, ref AdbgDisasmType type, ubyte op) {
+	
+	
+	return 0;
 }
 
 // !SECTION

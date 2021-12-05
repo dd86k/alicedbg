@@ -21,7 +21,7 @@ private:
 extern (C):
 __gshared:
 
-enum COPYRIGHT = "Copyright (c) 2019-2021, dd86k <dd@dax.moe>";
+enum COPYRIGHT = "Copyright (c) 2019-2021 dd86k <dd@dax.moe>";
 
 //NOTE: The CLI module is meh, waiting on some betterC getopt
 
@@ -62,6 +62,7 @@ immutable option_t[] options = [
 	{ 'A', "analyze",	"Dumper: Show detailed information about hex string opcode", false, &cli_analyze },
 	{ 'R', "raw",	"Dumper: Specify object is raw", false, &cli_raw },
 	{ 'S', "show",	"Dumper: Select which part of the object to display (default=h)", true, fa: &cli_show },
+//	{ 'l', "length",	"Dumper: ", true, &cli_length },
 	// pages
 	{ 'h', "help",	"Show this help screen and exit", false, &cli_help },
 	{ 0,   "version",	"Show the version screen and exit", false, &cli_version },
@@ -332,6 +333,8 @@ template STRVER(uint ver) {
 immutable(char) *fmt_version =
 "alicedbg "~ADBG_VERSION~TYPE~" (built: "~__TIMESTAMP__~")\n"~
 COPYRIGHT~"\n"~
+"License: BSD 3-Clause\n"~
+"Homepage: <https://git.dd86k.space/dd86k/alicedbg>\n"~
 "Compiler: "~__VENDOR__~" "~STRVER!__VERSION__~"\n"~
 "Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
 "Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~

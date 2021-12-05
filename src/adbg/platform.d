@@ -131,7 +131,11 @@ else
 // ANCHOR Compiler support enumerations
 //
 // __VERSION__ is the debugger front-end version
-// GDC (10.3) still on 2.076.1, but it's heavily modified
+// GDC 5.4:  Likely 2.068.1
+// GDC 8.4:  2.068.1
+// GDC 10.3: 2.076.1, but it's heavily modified
+// GDC 11.2: 2.076.1
+// GDC 12.0: 2.098.0-beta.1 (or 2.098.1 at release)
 //
 
 /// If set, the compiler supports the getTargetInfo trait.

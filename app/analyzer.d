@@ -10,15 +10,15 @@ module analyzer;
 import adbg.etc.c.stdio, adbg.disasm.disasm;
 import common;
 
-private __gshared const(char)*[AdbgDisasmOperand.length] opType = [
+private immutable const(char)*[AdbgDisasmOperand.length] opType = [
 	"immediate", "register", "memory"
 ];
-private __gshared const(char)*[AdbgDisasmType.length] opWith = [
+private immutable const(char)*[AdbgDisasmType.length] opWith = [
 	"none",
 	"i8",  "i16", "i32", "i64", "i128", "i256", "i512", "i1024",
 	"far", "f80", null, null, null, null, null,
 ];
-private __gshared const(char)*[12] maTags = [
+private immutable const(char)*[12] maTags = [
 	"UNKNOWN",
 	"OPCODE",
 	"PREFIX",
