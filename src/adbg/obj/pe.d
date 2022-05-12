@@ -406,10 +406,10 @@ struct PE_DEBUG_DATA_CODEVIEW_PDB70 { align(1):
 // putty-x86 0.73: 92
 // putty-amd64 0.73: 148
 enum PE_LOAD_CONFIG32_LIMIT_XP = 64;
-enum PE_LOAD_CONFIG32_LIMIT_VI = PE_LOAD_CONFIG_DIR32.GuardFlags.offsetof + 4;
+enum PE_LOAD_CONFIG32_LIMIT_7 = PE_LOAD_CONFIG_DIR32.GuardFlags.offsetof + 4;
 enum PE_LOAD_CONFIG32_LIMIT_8 = PE_LOAD_CONFIG_DIR32.GuardLongJumpTargetCount.offsetof + 4;
 enum PE_LOAD_CONFIG64_LIMIT_XP = PE_LOAD_CONFIG_DIR64.SecurityCookie.offsetof + 4;
-enum PE_LOAD_CONFIG64_LIMIT_VI = PE_LOAD_CONFIG_DIR64.GuardFlags.offsetof + 4;
+enum PE_LOAD_CONFIG64_LIMIT_7 = PE_LOAD_CONFIG_DIR64.GuardFlags.offsetof + 4;
 enum PE_LOAD_CONFIG64_LIMIT_8 = PE_LOAD_CONFIG_DIR64.GuardLongJumpTargetCount.offsetof + 4;
 
 struct PE_LOAD_CONFIG_CODE_INTEGRITY { align(1):
@@ -420,7 +420,9 @@ struct PE_LOAD_CONFIG_CODE_INTEGRITY { align(1):
 }
 
 /// IMAGE_LOAD_CONFIG_DIRECTORY32
+//TODO: Map sizes to WindowsNT versions
 struct PE_LOAD_CONFIG_DIR32 { align(1):
+	// Windows XP and after
 	uint32_t Size; // Doc: Characteristics, header: Size, Windows XP=64
 	uint32_t TimeDateStamp; // time_t
 	uint16_t MajorVersion;
@@ -438,7 +440,7 @@ struct PE_LOAD_CONFIG_DIR32 { align(1):
 	uint16_t CSDVersion;
 	uint16_t Reserved1;
 	uint32_t EditList;
-	// Windows XP's limit
+	// Windows 7 and after
 	uint32_t SecurityCookie;
 	uint32_t SEHandlerTable;
 	uint32_t SEHandlerCount;
@@ -446,14 +448,14 @@ struct PE_LOAD_CONFIG_DIR32 { align(1):
 	uint32_t GuardCFDispatchFunctionPointer;
 	uint32_t GuardCFFunctionTable;
 	uint32_t GuardCFFunctionCount;
-	// Windows 7's limit?
+	// Windows 8 and after?
 	uint32_t GuardFlags;
 	PE_LOAD_CONFIG_CODE_INTEGRITY CodeIntegrity;
 	uint32_t GuardAddressTakenIatEntryTable;
 	uint32_t GuardAddressTakenIatEntryCount;
 	uint32_t GuardLongJumpTargetTable;
 	uint32_t GuardLongJumpTargetCount; // Windows 8's limit?
-	// Windows 10's limit?
+	// Windows 10 and after?
 	uint32_t DynamicValueRelocTable;	// VA
 	uint32_t CHPEMetadataPointer;
 	uint32_t GuardRFFailureRoutine;	// VA
@@ -469,6 +471,7 @@ struct PE_LOAD_CONFIG_DIR32 { align(1):
 }
 
 /// IMAGE_LOAD_CONFIG_DIRECTORY64
+//TODO: Map sizes to WindowsNT versions
 struct PE_LOAD_CONFIG_DIR64 { align(1):
 	uint32_t Size; // Characteristics
 	uint32_t TimeDateStamp; // time_t
@@ -494,13 +497,14 @@ struct PE_LOAD_CONFIG_DIR64 { align(1):
 	uint64_t GuardCFDispatchFunctionPointer;
 	uint64_t GuardCFFunctionTable;
 	uint64_t GuardCFFunctionCount;
-	uint32_t GuardFlags; // Windows 7's limit?
+	uint32_t GuardFlags;
+	// Windows 8 and after?
 	PE_LOAD_CONFIG_CODE_INTEGRITY CodeIntegrity;
 	uint64_t GuardAddressTakenIatEntryTable;
 	uint64_t GuardAddressTakenIatEntryCount;
 	uint64_t GuardLongJumpTargetTable;
 	uint64_t GuardLongJumpTargetCount;
-	// Windows 10?
+	// Windows 10 and after?
 	uint64_t DynamicValueRelocTable;         // VA
 	uint64_t CHPEMetadataPointer;            // VA
 	uint64_t GuardRFFailureRoutine;          // VA
@@ -558,18 +562,19 @@ int adbg_obj_pe_preload(adbg_object_t *obj) {
 	uint sections = obj.pe.hdr.NumberOfSections;
 	for (uint si; si < sections; ++si) {
 		PE_SECTION_ENTRY s = obj.pe.sections[si];
+		
+		uint va = s.VirtualAddress;
 
-		if (obj.pe.imports == null)
-		if (s.VirtualAddress <= obj.pe.dir.ImportTable.rva &&
-			s.VirtualAddress + s.SizeOfRawData > obj.pe.dir.ImportTable.rva) {
+		// Was was this check about again?
+		// va + s.SizeOfRawData > obj.pe.dir.ImportTable.rva
+		
+		if (va == obj.pe.dir.ImportTable.rva) {
 			obj.pe.imports = cast(PE_IMPORT_DESCRIPTOR*)
 				(obj.buf + (s.PointerToRawData +
 				(obj.pe.dir.ImportTable.rva - s.VirtualAddress)));
 		}
 
-		if (obj.pe.debugdir == null)
-		if (s.VirtualAddress <= obj.pe.dir.DebugDirectory.rva &&
-			s.VirtualAddress + s.SizeOfRawData > obj.pe.dir.DebugDirectory.rva) {
+		if (va == obj.pe.dir.DebugDirectory.rva) {
 			obj.pe.debugdir = cast(PE_DEBUG_DIRECTORY*)
 				(obj.buf + (s.PointerToRawData +
 				(obj.pe.dir.DebugDirectory.rva - s.VirtualAddress)));
@@ -582,6 +587,7 @@ int adbg_obj_pe_preload(adbg_object_t *obj) {
 	case PE_MACHINE_AMD64: obj.platform = x86_64; break;
 	case PE_MACHINE_I386: obj.platform = x86_32; break;
 	case PE_MACHINE_RISCV32: obj.platform = riscv32; break;
+	//TODO: Should error or have "unknown" value
 	default: obj.platform = AdbgPlatform.native;
 	}
 	
