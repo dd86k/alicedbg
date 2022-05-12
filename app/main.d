@@ -333,7 +333,7 @@ template STRVER(uint ver) {
 immutable(char) *fmt_version =
 "alicedbg "~ADBG_VERSION~TYPE~" (built: "~__TIMESTAMP__~")\n"~
 COPYRIGHT~"\n"~
-"License: BSD 3-Clause\n"~
+"License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
 "Homepage: <https://git.dd86k.space/dd86k/alicedbg>\n"~
 "Compiler: "~__VENDOR__~" "~STRVER!__VERSION__~"\n"~
 "Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~

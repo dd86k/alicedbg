@@ -268,6 +268,8 @@ L_OPCODE:
 			if (p.platform == AdbgPlatform.x86_64) { // ANCHOR: MVEX/EVEX
 				if (i.has & X86_ILLEGAL_PF_VEX)
 					return adbg_oops(AdbgError.illegalInstruction);
+					
+				adbg_disasm_fetch_lasttag(i.disasm, AdbgDisasmTag.evex);
 				
 				ubyte P0 = void, P1 = void, P2 = void;
 				
@@ -1002,8 +1004,8 @@ int adbg_disasm_x86_0f(ref x86_internals_t i) {
 		
 		static immutable const(char)* X86_M_VMOVUPS = "vmovups";
 		static immutable const(char)* X86_M_VMOVUPD = "vmovupd";
-		static immutable const(char)* X86_M_VMOVUSS = "vmovuss";
-		static immutable const(char)* X86_M_VMOVUSD = "vmovusd";
+		static immutable const(char)* X86_M_VMOVUSS = "vmovss";
+		static immutable const(char)* X86_M_VMOVUSD = "vmovsd";
 		
 		switch (opcode) {
 		case 0x10:
@@ -3695,121 +3697,122 @@ immutable const(char)*[8] x86masks = [
 ];
 immutable const(char) *x86zmask = "z";
 
-/// ModRM Addressing Modes seen in SSE/AVX maps.
-enum x86VexMode {
-	V = 1,	/// SSE/AVX ModRM Register
-	W = 2,	/// SSE/AVX ModRM Memory/Register
-	H = 3,	/// VEX.vvvv Register
-	M = 4,	/// GP ModRM Memory
-	G = 5,	/// GP ModRM Register
-	E = 6,	/// GP ModRM Memory/Register
-	P = 7,	/// MMX ModRM.reg register
-	Q = 8,	/// MMX ModRM.reg register or 64-bit memory operand
-	R = 9,	/// ModRM.rm refers to a GP register
-	// pseudo-types
-	I = 16,	/// Immediate
-	L = 17,	/// XMM/YMM register out of Ib[7:4]
+//NOTE: AVX bitflags
+//TODO: Redo bitflags AGAIN
+// - adbg_x86_check_class(x86Class.E12NP)
+//   - Reduced checks (modrm function deals with modrm errors)
+// Modes (original -> transformed):
+// - G -> reg
+// - V -> reg
+// - W -> regMem
+// - H -> extra
+// Extra flags:
+// - Ib
+// - Hx (if effective VEX.vvvv != 0 when Hx is unset = #UB)
+// - Lx (imm8[7:4] as reg)
+// Examples:
+// - Vpd, Wpd
+//   - dst
+//     - Mode.reg (V)
+//     - Width.i64
+//   - src
+//     - Mode.regmem (W)
+//     - Width.i64
+// - Wss, Hx, Vss
+//   - dst
+//     - Mode.regmem (W)
+//     - Width.i32 (ss)
+//   - src
+//     - Mode.reg (V)
+//     - Width.i32 (ss)
+//   - extra flags
+//     - Hx
+
+enum x86AvxMode {
+	G,	/// Generial-purpose register (e.g., AX)
+	P,	/// MMX Register
+	Q,	/// MMX Register or memory
+	U,	/// AVX Register from ModRM.rm
+	V,	/// AVX Register from ModRM.reg
+	W,	/// AVX Register or memory
+	I,	/// Immediate
+	H,	/// Non-desctructive register from VEX.vvvv
+	L,
+}
+enum x86AvxWidth { // Used to override MMX/SSE/AVX widths
+	s,	/// i32 - Single-precision
+	ss = s,	/// i32
+	ps = s,	/// i32
+	d,	/// i64
+	sd = d,	/// i64
+	pd = d,	/// i64
+}
+enum x86ModrmMode {
+	/// Destination or source is register (ModRM.reg).
+	reg,
+	/// Destination or source is either register or memory (ModRM.rm)
+	/// depending on ModRM.mode.
+	rm,
+	/// Destination or source is memory-only (Modrm.mode != 3).
+	rmMemOnly,
+	/// Destination or source is register-only.
+	rmRegOnly,
+}
+enum x86AvxExtra {
+	includesIb	= BIT!(20),
+	includesH	= BIT!(21),
+	includesLx	= BIT!(22),
 }
 
-/// ModRM Vex Types seen in SSE/AVX maps.
-enum x86VexType {
-	pd = 1,	/// 
-	ps,	/// 
-	x,	/// 
-	sd,	/// 
-	ss,	/// 
-	q,	/// 
-	// pseudo-types
-	b = 16,	/// Byte
+template x86AvxOp(int mode, int width) {
+	enum x86AvxOp = (mode << 4) | width;
 }
 
-enum x86VexFlag {
-	// Extra operands
-	Lx      = 1 << 20,
-	Ib      = 1 << 21,
-	// Setting flags
-	dir	= 1 << 24,
-	vsib	= 1 << 25,
-	vexvvvv	= 1 << 26,
-	ignoreVexL	= 1 << 27,
-	// Trip flags
+template x86AvxOpDst(int op) {
+	
+}
+template x86AvxOpSrc(int op) {
+	
+}
+template x86AvxOpSrcEx(int op) {
+	
+}
+template x86AvxOps(int dst, int src, int src2, int src3) {
 }
 
-// NOTE: Disallowance should be done before entering the vex/modrm functions.
-// NOTE: VEX bit flags
-//         ++-------- X86VEXext
-//         || ++----- X86VEXdst
-//         || ||++--- X86VEXsrc or X86VEXext
-//       FFFF_FFFFh - Operands specifiers
-//       |||| |||+--- Source type
-//       |||| ||+---- Source addressing method
-//       |||| |+----- Destination type
-//       |||| +------ Destination addressing method
-//       |||+-------- Non-destructive register width
-//       ||+---0000b- Extra flags
-//       ||    |||+-- Set: Add Ib
-//       ||    ||+--- Set: Add Lx
-//       ||    |+---- Set: 
-//       ||    +----- Set: 
-//       |+----0000b- Setting flags
-//       |     |||+-- Set: Direction to ModRM.reg
-//       |     ||+--- Set: VSIB (reg,rm,reg + SIB.index=XMM/YMM).
-//       |     |+---- Set: 
-//       |     +----- Set: 
-//       +-----0000b- Trip flags
-//             |||+-- Set: Trip if ModRM.mod=memory.
-//             ||+--- Set: Trip if ModRM.mod=register.
-//             |+---- Set: 
-//             +----- Set: 
+/// AVX Exception Classes
+// NOTE: Embedded broadcast is not supported with the ".nb" suffix
+enum x86AVXExceptionClass { // Fault suppression depends on Mem operand
+	E1,	/// Type 1, Vector Moves/Load/Stores, with fault suppression
+	E1NF,	/// Type 1, Vector Non-temporal Stores, No Fault suppression
+	E2,	/// Type 2, FP Vector Load+op, supports fault suppression
+	E2NF,	/// Type 2, FP Vector Load+op, No Fault suppression
+	E3,	/// Type 3, FP Scalar/Partial Vector, Load+Op, supports fault suppression
+	E3NF,	/// Type 3, FP Scalar/Partial Vector, Load+Op, No Fault suppression
+	E4,	/// Type 4, Integer Vector Load+op, supports fault suppression
+	E4nb,	/// Type 4, Integer Vector Load+op, supports fault suppression + .nb prefix
+	E4NF,	/// Type 4, Integer Vector Load+op, No Fault suppression
+	E4NFnb,	/// Type 4, Integer Vector Load+op, No Fault suppression + .nb prefix
+	E5,	/// Type 5, Legacy-like Promotion, supports fault suppression
+	E5NF,	/// Type 5, Legacy-like Promotion, No Fault suppression
+	E6,	/// Type 6, supports fault suppression
+	E6NF,	/// Type 6, No Fault suppression
+	E7NM128,	/// Type 7, No Memory
+	E8NM,	/// Type 8, No Memory
+	E9,	/// Type 9, supports fault suppression
+	E9NF,	/// Type 9, No Fault suppression
+	E10,	/// Type 10,
+	E10NF,	/// Type 10,
+	E11,	/// Type 11,
+	E12,	/// Type 12,
+}
 
+deprecated
 template x86OP(int mode, int type) {
 	enum x86OP = (mode << 4) | type;
 }
 
-// AVX operands
-// Should be able to be directly translated to SSE operands
-enum Vps = x86OP!(x86VexMode.V, x86VexType.ps);
-enum Vpd = x86OP!(x86VexMode.V, x86VexType.pd);
-enum Vss = x86OP!(x86VexMode.V, x86VexType.ss);
-enum Vsd = x86OP!(x86VexMode.V, x86VexType.sd);
-enum Vx  = x86OP!(x86VexMode.V, x86VexType.x);
-enum Wps = x86OP!(x86VexMode.W, x86VexType.ps);
-enum Wss = x86OP!(x86VexMode.W, x86VexType.ss);
-enum Wsd = x86OP!(x86VexMode.W, x86VexType.sd);
-enum Wpd = x86OP!(x86VexMode.W, x86VexType.pd);
-enum Hx  = x86OP!(x86VexMode.H, x86VexType.x);
-// Pseudo-operands
-enum Ib  = x86OP!(x86VexMode.I, x86VexType.b);
-enum Lx  = x86OP!(x86VexMode.L, x86VexType.x);
-
-template X86VEXdst(int e) {
-	enum X86VEXdst = e << 8;
-}
-template X86VEXm(int e) {
-	enum T = e >> 4;
-	static if (T == x86VexMode.H) {
-		enum X86VEXm = (e & 15) << 16;
-	} else enum X86VEXm = 0;
-}
-template X86VEXsrc(int e) {
-	enum X86VEXsrc = cast(ubyte)e | X86VEXm!(e) | X86VEXe!(e);
-}
-template X86VEXe(int e) {
-	static if (e == Ib) {
-		enum X86VEXe = x86VexFlag.Ib;
-	} else static if (e == Lx) {
-		enum X86VEXe = x86VexFlag.Lx;
-	} else enum X86VEXe = 0;
-}
-template X86VEXext(int e) {
-	enum X86VEXext = e | X86VEXe!(e);
-}
-/// Main template to form operand bitfields.
-/// Params:
-/// 	first = Destination
-/// 	second = Source or non-destructive spec
-/// 	third = Source or extra
-/// 	fourth = Extra
+deprecated
 template X86VEX(int first, int second, int third = 0, int fourth = 0) {
 	enum X86VEX =
 		X86VEXdst!(first)  |
@@ -3819,14 +3822,14 @@ template X86VEX(int first, int second, int third = 0, int fourth = 0) {
 }
 
 int adbg_disasm_x86_op_Lx(ref x86_internals_t i) {
-	ubyte modrm = void;
-	int e = adbg_disasm_fetch!ubyte(i.disasm, &modrm, AdbgDisasmTag.modrm);
+	ubyte reg = void;
+	int e = adbg_disasm_fetch!ubyte(i.disasm, &reg, AdbgDisasmTag.immediate);
 	if (e) return e;
 	
 	if (i.disasm.mode < AdbgDisasmMode.file)
 		return 0;
 	
-	adbg_disasm_add_register(i.disasm, x86regs[i.pf.data][modrm >> 4]);
+	adbg_disasm_add_register(i.disasm, x86regs[i.pf.data][reg >> 4]);
 	return 0;
 }
 
@@ -3923,25 +3926,9 @@ int adbg_disasm_x86_op_vex_modrm2(ref x86_internals_t i, uint ops, ubyte modrm) 
 	return 0;
 }
 
-int adbg_disasm_x86_op_avx_mode(ref x86_internals_t i, ref AdbgDisasmOperand oprd, ubyte op) {
+void adbg_disasm_x86_op_avx_modrm_op(ref x86_internals_t i, ubyte op) {
 	
-	
-	return 0;
 }
-int adbg_disasm_x86_op_avx_type(ref x86_internals_t i, ref AdbgDisasmType type, ubyte op) {
-	
-	
-	return 0;
-}
-int adbg_disasm_x86_op_sse_mode(ref x86_internals_t i, ref AdbgDisasmOperand oprd, ubyte op) {
-	
-	
-	return 0;
-}
-int adbg_disasm_x86_op_sse_type(ref x86_internals_t i, ref AdbgDisasmType type, ubyte op) {
-	
-	
-	return 0;
-}
+
 
 // !SECTION

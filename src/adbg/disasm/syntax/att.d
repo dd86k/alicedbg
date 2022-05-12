@@ -33,7 +33,17 @@ bool adbg_disasm_operand_att(adbg_disasm_t *p, ref adbg_string_t s, ref adbg_dis
 			return true;
 		if (s.adds(op.reg.name))
 			return true;
-		return op.reg.isStack ? s.addf("(%u)", op.reg.index) : false;
+		if (op.reg.isStack)
+			if (s.addf("(%u)", op.reg.index))
+				return true;
+		if (op.reg.mask1) {
+			if (s.addf(" {%s}", op.reg.mask1))
+				return true;
+			if (op.reg.mask2)
+				if (s.addf("{%s}", op.reg.mask2))
+					return true;
+		}
+		return false;
 	case memory:
 		if (op.mem.segment) {
 			if (s.addc('%'))

@@ -35,13 +35,23 @@ private immutable const(char)*[12] maTags = [
 
 int analyze() {
 	with (globals.app) {
-		// input bytes
+		//
+		// ANCHOR: input bytes
+		//
+		// input      : (6) 62 f1 7c ca 10 00
+		//
+		
 		printf("input      : (%u)", cast(uint)inputHexSize);
 		for (size_t bi; bi < inputHexSize; ++bi)
 			printf(" %02x", inputHex[bi]);
 		putchar('\n');
 		
-		// output bytes
+		//
+		// ANCHOR: output bytes
+		//
+		// output     : (6) 62 f1 7c ca 10 00
+		//
+		
 		adbg_disasm_opcode_t opcode = void;
 		int err = adbg_disasm_once_buffer(
 			&disasm, &opcode, AdbgDisasmMode.file, &inputHex, inputHexSize);
@@ -53,7 +63,15 @@ int analyze() {
 			return printerror();
 		}
 		
-		// mnemonic
+		//
+		// ANCHOR: instruction/prefixes/mnemonic/operands
+		//
+		// instruction: vmovups zmm0 {k2}{z}, zmmword ptr [rax]
+		// prefixes   :
+		// mnemonic   : vmovups
+		// operands   : register=zmm0 memory=i512
+		//
+		
 		adbg_disasm_format(&disasm, bufferMnemonic.ptr, bufferMnemonic.sizeof, &opcode);
 		printf("instruction: %s\n", bufferMnemonic.ptr);
 		printf("prefixes   :");
@@ -74,11 +92,25 @@ int analyze() {
 			printf(" %s=%s", opType[operand.type], extra);
 		}
 		
-		// segments
-		// 9a 44 33 22 11 bb aa
-		// :  :           :.. SEGMENT
-		// :  :.. IMMEDIATE
-		// :.. OPCODE
+		//
+		// ANCHOR: segments
+		//
+		// Shamelessly inspired by Zydis
+		//
+		// == [ SEGMENTS ] ==================
+		// 62 f1 7c ca 10 00
+		// :           :  :.. MODRM
+		// :           :.. OPCODE
+		// :.. EVEX
+		//
+		
+		//TODO: Properly support multi-byte opcodes (like.. anything RISC)
+		//TODO: Displaying same machine tags
+		//      If last is of the same tag, make it so the same line is used
+		//      0f 01 00
+		//      :     :.. MODRM
+		//      :.. OPCODE
+		
 		puts("\n== [ SEGMENTS ] ==================");
 		adbg_disasm_machine_t *m = void;
 		int z = void;
@@ -97,10 +129,6 @@ int analyze() {
 		}
 		putchar('\n');
 		// Machine tags
-		//TODO: If last is of the same tag, make it so the same line is used
-		//      0f 01 00
-		//      :     :.. MODRM
-		//      :.. OPCODE
 		for (size_t mi = opcode.machineCount; mi--;) with (opcode) {
 			m = &machine[mi];
 			if (mi) {
