@@ -23,78 +23,78 @@ extern (C):
 /// Disassemble RISC-V
 /// Note: So far only does risc-v-32
 /// Params: p = Disassembler parameters
-int adbg_disasm_riscv(adbg_disasm_t *p) {
-	riscv_internals_t i = void;
-	i.disasm = p;
+int adbg_disasm_riscv(adbg_disasm_t *disasm) {
+	riscv_internals_t state = void;
+	state.disasm = disasm;
 	
 	// Fetch by "halfword" (16-bit)
-	int e = adbg_disasm_fetch!ushort(p, &i.op1, AdbgDisasmTag.opcode);
+	int e = adbg_disasm_fetch!ushort(&state.op1, disasm, AdbgDisasmTag.opcode);
 	if (e) return e;
 	
 	//
 	// ANCHOR RVC
 	//
 	
-	switch (i.op1 & 3) {
+	switch (state.op1 & 3) {
 	case 0:
-		switch (i.op1 & OP_RVC_FUNC) {
+		switch (state.op1 & OP_RVC_FUNC) {
 		case OP_RVC_FUNC_000: // C.ADDI4SPN -> ADDI REG,SP,IMM
-			int imm = i.op1 >> 7;
+			int imm = state.op1 >> 7;
 			if (imm == 0)
 				return adbg_oops(AdbgError.illegalInstruction);
-			if (p.mode < AdbgDisasmMode.file)
+			if (disasm.mode < AdbgDisasmMode.file)
 				return 0;
-			int rd = (i.op1 >> 2) & 7;
-			adbg_disasm_add_mnemonic(i.disasm, RV_ADDI);
-			adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rd));
-			adbg_disasm_add_register(i.disasm, rvregs[RiscvReg.x2]);
-			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
+			int rd = (state.op1 >> 2) & 7;
+			adbg_disasm_add_mnemonic(state.disasm, RV_ADDI);
+			adbg_disasm_add_register(state.disasm, adbg_disasm_rv_c_reg(rd));
+			adbg_disasm_add_register(state.disasm, rvregs[Register.x2]);
+			adbg_disasm_add_immediate(state.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		case OP_RVC_FUNC_110: // C.SW -> SW REG1,REG2,IMM
-			if (p.mode < AdbgDisasmMode.file)
+			if (disasm.mode < AdbgDisasmMode.file)
 				return 0;
-			int rs1 = (i.op1 >> 7) & 7;
-			int rs2 = (i.op1 >> 2) & 7;
-			int imm = (i.op1 >> 9) & 7;
-			if (i.op1 & BIT!(6)) imm |= 1;
-			if (i.op1 & BIT!(5)) imm = -imm;
-			adbg_disasm_add_mnemonic(i.disasm, RV_SW);
-			adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rs1));
-			adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rs2));
-			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
+			int rs1 = (state.op1 >> 7) & 7;
+			int rs2 = (state.op1 >> 2) & 7;
+			int imm = (state.op1 >> 9) & 7;
+			if (state.op1 & BIT!(6)) imm |= 1;
+			if (state.op1 & BIT!(5)) imm = -imm;
+			adbg_disasm_add_mnemonic(state.disasm, RV_SW);
+			adbg_disasm_add_register(state.disasm, adbg_disasm_rv_c_reg(rs1));
+			adbg_disasm_add_register(state.disasm, adbg_disasm_rv_c_reg(rs2));
+			adbg_disasm_add_immediate(state.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		default: // Yes, 000 is illegal
 			return adbg_oops(AdbgError.illegalInstruction);
 		}
 	case 1:
-		switch (i.op1 & OP_RVC_FUNC) {
+		switch (state.op1 & OP_RVC_FUNC) {
 		case OP_RVC_FUNC_000:
-			if (p.mode < AdbgDisasmMode.file)
+			if (disasm.mode < AdbgDisasmMode.file)
 				return 0;
-			int rd = (i.op1 >> 7) & 31; /// rd/rs1 (op[11:7])
+			int rd = (state.op1 >> 7) & 31; /// rd/rs1 (op[11:7])
 			if (rd) { // C.ADDI/C.ADDI16SP -> ADDI REG,REG,IMM
-				int imm = (i.op1 >> 2) & 31;
+				int imm = (state.op1 >> 2) & 31;
 				const(char) *rdstr = rvregs[rd];
 				//TODO: C.ADDI16SP nzimm[4|6|8:7|5]
-				if (i.op1 & BIT!(12)) imm = -imm;
-				adbg_disasm_add_mnemonic(i.disasm, RV_ADDI);
-				adbg_disasm_add_register(i.disasm, rdstr);
-				adbg_disasm_add_register(i.disasm, rdstr);
-				adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
+				if (state.op1 & BIT!(12)) imm = -imm;
+				adbg_disasm_add_mnemonic(state.disasm, RV_ADDI);
+				adbg_disasm_add_register(state.disasm, rdstr);
+				adbg_disasm_add_register(state.disasm, rdstr);
+				adbg_disasm_add_immediate(state.disasm, AdbgDisasmType.i32, &imm);
 			} else { // C.NOP (rd == 0)
-				adbg_disasm_add_mnemonic(i.disasm, RV_NOP);
+				adbg_disasm_add_mnemonic(state.disasm, RV_NOP);
 			}
 			return 0;
 		case OP_RVC_FUNC_001: // C.JAL -> JAL IMM
-			if (p.mode < AdbgDisasmMode.file)
+			if (disasm.mode < AdbgDisasmMode.file)
 				return 0;
-			int imm = adbg_disasm_rv_imm_cj(i.op1);
-			adbg_disasm_add_mnemonic(i.disasm, RV_JAL);
-			adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
+			int imm = adbg_disasm_rv_imm_cj(state.op1);
+			adbg_disasm_add_mnemonic(state.disasm, RV_JAL);
+			adbg_disasm_add_immediate(state.disasm, AdbgDisasmType.i32, &imm);
 			return 0;
 		case OP_RVC_FUNC_100: // C.GRP1_1
-			int rd = (i.op1 >> 7) & 7;
-			switch (i.op1 & 0xC00) { // op[11:10]
+			int rd = (state.op1 >> 7) & 7;
+			switch (state.op1 & 0xC00) { // op[11:10]
 			case 0:	// C.SRLI
 			
 				return adbg_oops(AdbgError.notImplemented);
@@ -106,7 +106,7 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 				return adbg_oops(AdbgError.notImplemented);
 			default: // 0xc00: C.GRP1_1_1
 				const(char) *m = void;
-				switch (i.op1 & 0x1060) { // op[12|6:5]
+				switch (state.op1 & 0x1060) { // op[12|6:5]
 				case 0:	     m = RV_SUB; break;
 				case 0x20:   m = RV_XOR; break;
 				case 0x40:   m = RV_OR; break;
@@ -115,75 +115,75 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 				case 0x1020: m = RV_ADDW; break;
 				default: return adbg_oops(AdbgError.illegalInstruction);
 				}
-				if (p.mode < AdbgDisasmMode.file)
+				if (disasm.mode < AdbgDisasmMode.file)
 					return 0;
-				int rs2 = (i.op1 >> 2) & 7;
-				adbg_disasm_add_mnemonic(i.disasm, m);
-				adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rd));
-				adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rd));
-				adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rs2));
+				int rs2 = (state.op1 >> 2) & 7;
+				adbg_disasm_add_mnemonic(state.disasm, m);
+				adbg_disasm_add_register(state.disasm, adbg_disasm_rv_c_reg(rd));
+				adbg_disasm_add_register(state.disasm, adbg_disasm_rv_c_reg(rd));
+				adbg_disasm_add_register(state.disasm, adbg_disasm_rv_c_reg(rs2));
 				return 0;
 			}
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
 	case 2:
-		switch (i.op1 & OP_RVC_FUNC) { // C.LWSP
+		switch (state.op1 & OP_RVC_FUNC) { // C.LWSP
 		case OP_RVC_FUNC_010:
-			int rd = (i.op1 >> 7) & 31;
+			int rd = (state.op1 >> 7) & 31;
 			if (rd == 0)
 				return adbg_oops(AdbgError.illegalInstruction);
-			if (p.mode < AdbgDisasmMode.file)
+			if (disasm.mode < AdbgDisasmMode.file)
 				return 0;
-			int imm = (i.op1 >> 2) & 31;
-			if (i.op1 & BIT!(12)) imm |= BIT!(5);
-			adbg_disasm_add_mnemonic(i.disasm, RV_LW);
-			adbg_disasm_add_register(p, rvregs[rd]);
-			adbg_disasm_add_memory(i.disasm, AdbgDisasmType.i32,
-				null, rvregs[RiscvReg.sp], null,
+			int imm = (state.op1 >> 2) & 31;
+			if (state.op1 & BIT!(12)) imm |= BIT!(5);
+			adbg_disasm_add_mnemonic(state.disasm, RV_LW);
+			adbg_disasm_add_register(disasm, rvregs[rd]);
+			adbg_disasm_add_memory(state.disasm, AdbgDisasmType.i32,
+				null, rvregs[Register.sp], null,
 				AdbgDisasmType.i32, &imm, false, false, false);
 			return 0;
 		case OP_RVC_FUNC_100:
-			if (p.mode < AdbgDisasmMode.file)
+			if (disasm.mode < AdbgDisasmMode.file)
 				return 0;
-			int rd  = (i.op1 >> 7) & 31; // or rd
-			int rs2 = (i.op1 >> 2) & 31;
-			if (i.op1 & BIT!(12)) {
+			int rd  = (state.op1 >> 7) & 31; // or rd
+			int rs2 = (state.op1 >> 2) & 31;
+			if (state.op1 & BIT!(12)) {
 				if (rs2) { // C.ADD
-					adbg_disasm_add_mnemonic(i.disasm, RV_ADD);
-					adbg_disasm_add_register(i.disasm, adbg_disasm_rv_c_reg(rd));
-					adbg_disasm_add_register(i.disasm, rvregs[rs2]);
+					adbg_disasm_add_mnemonic(state.disasm, RV_ADD);
+					adbg_disasm_add_register(state.disasm, adbg_disasm_rv_c_reg(rd));
+					adbg_disasm_add_register(state.disasm, rvregs[rs2]);
 				} else {
 					if (rd) { // C.JALR
-						adbg_disasm_add_mnemonic(p, RV_JALR);
-						adbg_disasm_add_register(p, rvregs[rd]);
+						adbg_disasm_add_mnemonic(disasm, RV_JALR);
+						adbg_disasm_add_register(disasm, rvregs[rd]);
 					} else { // C.EBREAK
-						adbg_disasm_add_mnemonic(p, RV_EBREAK);
+						adbg_disasm_add_mnemonic(disasm, RV_EBREAK);
 					}
 				}
 			} else {
 				if (rs2) { // C.MV
-					adbg_disasm_add_mnemonic(p, RV_MV);
-					adbg_disasm_add_register(p, rvregs[rd]);
-					adbg_disasm_add_register(p, rvregs[rs2]);
+					adbg_disasm_add_mnemonic(disasm, RV_MV);
+					adbg_disasm_add_register(disasm, rvregs[rd]);
+					adbg_disasm_add_register(disasm, rvregs[rs2]);
 				} else { // C.JR
-					if (rd == RiscvReg.ra) {
-						adbg_disasm_add_mnemonic(p, RV_RET);
+					if (rd == Register.ra) {
+						adbg_disasm_add_mnemonic(disasm, RV_RET);
 					} else {
-						adbg_disasm_add_mnemonic(p, RV_JR);
-						adbg_disasm_add_register(p, rvregs[rd]);
+						adbg_disasm_add_mnemonic(disasm, RV_JR);
+						adbg_disasm_add_register(disasm, rvregs[rd]);
 					}
 				}
 			}
 			return 0;
 		case OP_RVC_FUNC_110: // C.SWSP
-			if (p.mode < AdbgDisasmMode.file)
+			if (disasm.mode < AdbgDisasmMode.file)
 				return 0;
-			int rs2 = (i.op1 >> 2) & 31;
-			int imm = (i.op1 >> 7) & 63;
-			adbg_disasm_add_mnemonic(p, RV_SW);
-			adbg_disasm_add_register(i.disasm, rvregs[rs2]);
-			adbg_disasm_add_memory(i.disasm, AdbgDisasmType.i32,
-				null, rvregs[RiscvReg.x2], null,
+			int rs2 = (state.op1 >> 2) & 31;
+			int imm = (state.op1 >> 7) & 63;
+			adbg_disasm_add_mnemonic(disasm, RV_SW);
+			adbg_disasm_add_register(state.disasm, rvregs[rs2]);
+			adbg_disasm_add_memory(state.disasm, AdbgDisasmType.i32,
+				null, rvregs[Register.x2], null,
 				AdbgDisasmType.i32, &imm,
 				false, false, false);
 			return 0;
@@ -196,15 +196,15 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 	// ANCHOR RV32/64G
 	//
 	
-	e = adbg_disasm_fetch!ushort(p, &i.op2, AdbgDisasmTag.opcode);
+	e = adbg_disasm_fetch!ushort(&state.op2, disasm, AdbgDisasmTag.opcode);
 	if (e) return e;
 	
-	switch (i.op & OPCODE) {
+	switch (state.op & OPCODE) {
 	case 19: // (0010011) RV32I: ADDI/SLTI/SLTIU/XORI/ORI/ANDI
 		const(char) *m = void;
-		int imm = i.op >> 20;
-		int rs1 = (i.op >> 15) & 31;
-		switch (i.op & OP_FUNC) {
+		int imm = state.op >> 20;
+		int rs1 = (state.op >> 15) & 31;
+		switch (state.op & OP_FUNC) {
 		case OP_FUNC_000: m = rs1 ? RV_ADDI : RV_LI; break;
 		case OP_FUNC_010: m = RV_SLTI; break;
 		case OP_FUNC_011: m = RV_SLTIU; break;
@@ -213,35 +213,35 @@ int adbg_disasm_riscv(adbg_disasm_t *p) {
 		case OP_FUNC_111: m = RV_ANDI; break;
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
-		if (p.mode < AdbgDisasmMode.file)
+		if (disasm.mode < AdbgDisasmMode.file)
 			return 0;
-		int rd = (i.op >> 7) & 31;
-		adbg_disasm_add_mnemonic(i.disasm, m);
-		adbg_disasm_add_register(i.disasm, rvregs[rd]);
+		int rd = (state.op >> 7) & 31;
+		adbg_disasm_add_mnemonic(state.disasm, m);
+		adbg_disasm_add_register(state.disasm, rvregs[rd]);
 		if (rs1)
-			adbg_disasm_add_register(i.disasm, rvregs[rs1]);
-		adbg_disasm_add_immediate(i.disasm, AdbgDisasmType.i32, &imm);
+			adbg_disasm_add_register(state.disasm, rvregs[rs1]);
+		adbg_disasm_add_immediate(state.disasm, AdbgDisasmType.i32, &imm);
 		return 0;
 	case 35: // (0100011) RV32I: SB/SH/SW
 		const(char) *m = void;
 		AdbgDisasmType w = void;
-		switch (i.op & OP_FUNC) {
+		switch (state.op & OP_FUNC) {
 		case OP_FUNC_000: m = RV_SB; w = AdbgDisasmType.i8; break;
 		case OP_FUNC_001: m = RV_SH; w = AdbgDisasmType.i16; break;
 		case OP_FUNC_010: m = RV_SW; w = AdbgDisasmType.i32; break;
 		default: return adbg_oops(AdbgError.illegalInstruction);
 		}
-		if (p.mode < AdbgDisasmMode.file)
+		if (disasm.mode < AdbgDisasmMode.file)
 			return 0;
-		int imm = adbg_disasm_rv_imm_s(i.op);
-		int rs1 = (i.op >> 15) & 31;
-		int rs2 = (i.op >> 20) & 31;
-		adbg_disasm_add_mnemonic(i.disasm, m);
-		adbg_disasm_add_memory(i.disasm, w,
+		int imm = adbg_disasm_rv_imm_s(state.op);
+		int rs1 = (state.op >> 15) & 31;
+		int rs2 = (state.op >> 20) & 31;
+		adbg_disasm_add_mnemonic(state.disasm, m);
+		adbg_disasm_add_memory(state.disasm, w,
 			null, rvregs[rs1], null,
 			AdbgDisasmType.i32, &imm,
 			false, false, false);
-		adbg_disasm_add_register(i.disasm, rvregs[rs2]);
+		adbg_disasm_add_register(state.disasm, rvregs[rs2]);
 		return 0;
 	default: return adbg_oops(AdbgError.illegalInstruction);
 	}
@@ -289,7 +289,7 @@ enum OP_RVC_FUNC_111 = 0xE000;
 // Registers
 //
 
-enum RiscvReg {
+enum Register {
 	x0,  x1,  x2,  x3,  x4,  x5,  x6,  x7,
 	x8,  x9,  x10, x11, x12, x13, x14, x15,
 	x16, x17, x18, x19, x20, x21, x22, x23,

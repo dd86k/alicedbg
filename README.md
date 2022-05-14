@@ -5,16 +5,17 @@
 ⚠️ Currently not accepting Pull Requests ⚠️
 
 The alicedbg project aims to be a simple debugger, object dumper, and system
-tracer fully compatible with -betterC/-fno-druntime.
+tracer fully compatible in BetterC (-betterC/-fno-druntime).
 
 It is available as an application and as a DUB library.
 
 The library supports:
-- Debugging
-  - Windows (msvcrt) and Linux (Glibc and Musl).
-- Disassembly
-  - Platforms: x86, risc-v.
-  - Syntaxes: Intel, NASM, and AT&T, Hyde Randall High Level Assembly, and Borland Turbo Assembler (enhanced mode).
+- Debugger
+  - Windows (msvcrt)
+  - Linux (Glibc and Musl)
+- Disassembler
+  - Platforms: x86, risc-v
+  - Syntaxes: Intel, NASM, and AT&T, Hyde Randall High Level Assembly, and Borland Turbo Assembler (TASM enhanced mode).
 - Supports the DMD, GDC, and LDC compilers.
 
 The application supports:

@@ -21,7 +21,51 @@ private:
 extern (C):
 __gshared:
 
-enum COPYRIGHT = "Copyright (c) 2019-2021 dd86k <dd@dax.moe>";
+enum COPYRIGHT = "Copyright (c) 2019-2022 dd86k <dd@dax.moe>";
+
+immutable(char) *page_license =
+`BSD 3-Clause License
+
+`~COPYRIGHT~`
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
+
+
+immutable(char) *page_version =
+"alicedbg "~FULL_VERSION~" (built: "~__TIMESTAMP__~")\n"~
+COPYRIGHT~"\n"~
+"License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
+"Homepage: <https://git.dd86k.space/dd86k/alicedbg>\n"~
+"Compiler: "~__VENDOR__~" "~STRVER!__VERSION__~"\n"~
+"Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
+"Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
+"CRT: "~TARGET_CRT~"\n"~
+"CppRT: "~TARGET_CPPRT;
+//TODO: Features:
 
 //NOTE: The CLI module is meh, waiting on some betterC getopt
 
@@ -318,8 +362,8 @@ int cli_help() {
 // ANCHOR --version
 //
 
-debug private enum TYPE = "-"~__BUILDTYPE__;
-else  private enum TYPE = "";
+debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__;
+else  enum FULL_VERSION = ADBG_VERSION;
 
 // Turns a __VERSION__ number into a string constant
 template STRVER(uint ver) {
@@ -330,20 +374,8 @@ template STRVER(uint ver) {
 		cast(char)((ver % 10) + '0');
 }
 
-immutable(char) *fmt_version =
-"alicedbg "~ADBG_VERSION~TYPE~" (built: "~__TIMESTAMP__~")\n"~
-COPYRIGHT~"\n"~
-"License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
-"Homepage: <https://git.dd86k.space/dd86k/alicedbg>\n"~
-"Compiler: "~__VENDOR__~" "~STRVER!__VERSION__~"\n"~
-"Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
-"Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
-"CRT: "~TARGET_CRT~"\n"~
-"CppRT: "~TARGET_CPPRT;
-//TODO: Features:
-
 int cli_version() {
-	puts(fmt_version);
+	puts(page_version);
 	exit(0);
 	return 0;
 }
@@ -352,43 +384,8 @@ int cli_ver() {
 	exit(0);
 	return 0;
 }
-
-//
-// ANCHOR --license
-//
-
 int cli_license() {
-	puts(
-`BSD 3-Clause License
-
-`~COPYRIGHT~`
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-
-1. Redistributions of source code must retain the above copyright notice, this
-   list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright notice,
-   this list of conditions and the following disclaimer in the documentation
-   and/or other materials provided with the distribution.
-
-3. Neither the name of the copyright holder nor the names of its
-   contributors may be used to endorse or promote products derived from
-   this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`
-	);
+	puts(page_license);
 	exit(0);
 	return 0;
 }
@@ -425,6 +422,7 @@ int main(int argc, const(char)** argv) {
 	const(char) *arg = void;
 	const(char) *val = void;
 	
+	//TODO: util in app/ for separating args
 	CLI: for (int argi = 1; argi < argc; ++argi) {
 		arg = argv[argi];
 		
@@ -513,6 +511,7 @@ int main(int argc, const(char)** argv) {
 			return EXIT_FAILURE;
 		}
 		
+		//TODO: Should be allocated?
 		with (globals) adbg_util_hex_array(
 			cast(ubyte*)app.inputHex, 32, cli.file, app.inputHexSize);
 		

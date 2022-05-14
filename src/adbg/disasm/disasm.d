@@ -197,7 +197,7 @@ enum AdbgSyntax : ubyte {
 // NOTE: Uh, and why/how I'll do File/MmFile implementations?
 //       There is no point to these two... Unless proven otherwise.
 //       Raw: Dumper could go by chunks of 32 bytes, smartly (buffer)
-enum AdbgDisasmInput : ubyte {
+enum AdbgDisasmSource : ubyte {
 	raw,	/// Buffer
 	debugger,	/// Debuggee
 //	file,
@@ -364,8 +364,8 @@ struct adbg_disasm_t { align(1):
 	//      bool modeFile;
 	/// Operating mode.
 	AdbgDisasmMode mode;
-	/// Input mode.
-	AdbgDisasmInput input;
+	/// Source mode.
+	AdbgDisasmSource source;
 	/// Opcode information
 	adbg_disasm_opcode_t *opcode;
 	/// Buffer: This field dictates how much data is left.
@@ -384,7 +384,7 @@ struct adbg_disasm_t { align(1):
 		uint decoderAll;
 		struct {
 			bool decoderNoReverse;	/// ATT: Do not reverse the order of operands. (e.g., FP or 2 immediates)
-			bool decoderFar;	/// ATT: Far call or jump. Set when Type is far.
+			bool decoderFar;	/// ATT: Far call or jumdisasm. Set when Type is far.
 			ubyte decoderPfGroups;	///TODO: Prefixes to show/hide, upto 8 groups.
 			bool decoderAmbiguate;	///TODO: ATT: Ambiguate instruction.
 		}
@@ -425,7 +425,7 @@ adbg_disasm_t *adbg_disasm_alloc(AdbgPlatform m) {
 }
 
 // configure
-int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
+int adbg_disasm_configure(adbg_disasm_t *disasm, AdbgPlatform m) {
 	version (Trace) trace("platform=%u", m);
 	
 	with (AdbgPlatform)
@@ -434,37 +434,37 @@ int adbg_disasm_configure(adbg_disasm_t *p, AdbgPlatform m) {
 		m = DEFAULT_PLATFORM;
 		goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
-		p.limit = ADBG_MAX_X86;
-		p.fdecode = &adbg_disasm_x86;
-		p.syntax = AdbgSyntax.intel;
-		p.foperand = &adbg_disasm_operand_intel;
+		disasm.limit = ADBG_MAX_X86;
+		disasm.fdecode = &adbg_disasm_x86;
+		disasm.syntax = AdbgSyntax.intel;
+		disasm.foperand = &adbg_disasm_operand_intel;
 		break;
 	case riscv32:
-		p.limit = ADBG_MAX_RV32;
-		p.fdecode = &adbg_disasm_riscv;
-		p.syntax = AdbgSyntax.riscv;
-		p.foperand = &adbg_disasm_operand_riscv;
+		disasm.limit = ADBG_MAX_RV32;
+		disasm.fdecode = &adbg_disasm_riscv;
+		disasm.syntax = AdbgSyntax.riscv;
+		disasm.foperand = &adbg_disasm_operand_riscv;
 		break;
 	/*case riscv64:
-		p.limit = ADBG_MAX_RV64;
-		p.fdecode = &adbg_disasm_riscv;
-		p.syntax = AdbgSyntax.riscv;
-		p.foperand = &adbg_disasm_operand_riscv;
+		disasm.limit = ADBG_MAX_RV64;
+		disasm.fdecode = &adbg_disasm_riscv;
+		disasm.syntax = AdbgSyntax.riscv;
+		disasm.foperand = &adbg_disasm_operand_riscv;
 		break;*/
 	default:
 		return adbg_oops(AdbgError.unsupportedPlatform);
 	}
 	
 	// Defaults
-	p.platform = m;
-	p.cookie = ADBG_COOKIE;
-	p.userAll = 0;
+	disasm.platform = m;
+	disasm.cookie = ADBG_COOKIE;
+	disasm.userAll = 0;
 	return 0;
 }
 
 // set option
-int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
-	if (p == null)
+int adbg_disasm_opt(adbg_disasm_t *disasm, AdbgDisasmOpt opt, int val) {
+	if (disasm == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
 	version (Trace) trace("opt=%u val=%d", opt, val);
@@ -473,19 +473,19 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 	switch (opt) {
 	case syntax:
 		//TODO: To deprecate
-		p.syntax = cast(AdbgSyntax)val;
-		switch (p.syntax) with (AdbgSyntax) {
-		case intel:  p.foperand = &adbg_disasm_operand_intel; break;
-		case nasm:   p.foperand = &adbg_disasm_operand_nasm; break;
-		case att:    p.foperand = &adbg_disasm_operand_att; break;
-		case ideal:  p.foperand = &adbg_disasm_operand_ideal; break;
-		case hyde:   p.foperand = &adbg_disasm_operand_hyde; break;
-		case riscv:  p.foperand = &adbg_disasm_operand_riscv; break;
+		disasm.syntax = cast(AdbgSyntax)val;
+		switch (disasm.syntax) with (AdbgSyntax) {
+		case intel:  disasm.foperand = &adbg_disasm_operand_intel; break;
+		case nasm:   disasm.foperand = &adbg_disasm_operand_nasm; break;
+		case att:    disasm.foperand = &adbg_disasm_operand_att; break;
+		case ideal:  disasm.foperand = &adbg_disasm_operand_ideal; break;
+		case hyde:   disasm.foperand = &adbg_disasm_operand_hyde; break;
+		case riscv:  disasm.foperand = &adbg_disasm_operand_riscv; break;
 		default:    return adbg_oops(AdbgError.invalidOptionValue);
 		}
 		break;
 	case mnemonicTab:
-		p.userMnemonicTab = val != 0;
+		disasm.userMnemonicTab = val != 0;
 		break;
 	default:
 		return adbg_oops(AdbgError.invalidOption);
@@ -501,14 +501,14 @@ int adbg_disasm_opt(adbg_disasm_t *p, AdbgDisasmOpt opt, int val) {
 /// 	buffer = Buffer pointer.
 /// 	size = Buffer size.
 /// Returns: Error code
-int adbg_disasm_start_buffer(adbg_disasm_t *p, AdbgDisasmMode mode, void *buffer, size_t size) {
-	if (p == null)
+int adbg_disasm_start_buffer(adbg_disasm_t *disasm, AdbgDisasmMode mode, void *buffer, size_t size) {
+	if (disasm == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
-	p.input = AdbgDisasmInput.raw;
-	p.mode = mode;
-	p.current.raw = p.base.raw = buffer;
-	p.left = size;
+	disasm.source = AdbgDisasmSource.raw;
+	disasm.mode = mode;
+	disasm.current.raw = disasm.base.raw = buffer;
+	disasm.left = size;
 	return 0;
 }
 
@@ -519,26 +519,26 @@ int adbg_disasm_start_buffer(adbg_disasm_t *p, AdbgDisasmMode mode, void *buffer
 /// 	mode = Disassembly mode.
 /// 	addr = Debuggee address.
 /// Returns: Error code
-int adbg_disasm_start_debuggee(adbg_disasm_t *p, AdbgDisasmMode mode, size_t addr) {
-	if (p == null)
+int adbg_disasm_start_debuggee(adbg_disasm_t *disasm, AdbgDisasmMode mode, size_t addr) {
+	if (disasm == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
-	p.input = AdbgDisasmInput.debugger;
-	p.mode = mode;
-	p.current.sz = p.base.sz = addr;
+	disasm.source = AdbgDisasmSource.debugger;
+	disasm.mode = mode;
+	disasm.current.sz = disasm.base.sz = addr;
 	return 0;
 }
 
-int adbg_disasm_once_buffer(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDisasmMode mode, void *buffer, size_t size) {
-	int e = adbg_disasm_start_buffer(p, mode, buffer, size);
+int adbg_disasm_once_buffer(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op, AdbgDisasmMode mode, void *buffer, size_t size) {
+	int e = adbg_disasm_start_buffer(disasm, mode, buffer, size);
 	if (e) return e;
-	return adbg_disasm(p, op);
+	return adbg_disasm(disasm, op);
 }
 
-int adbg_disasm_once_debuggee(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDisasmMode mode, size_t addr) {
-	int e = adbg_disasm_start_debuggee(p, mode, addr);
+int adbg_disasm_once_debuggee(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op, AdbgDisasmMode mode, size_t addr) {
+	int e = adbg_disasm_start_debuggee(disasm, mode, addr);
 	if (e) return e;
-	return adbg_disasm(p, op);
+	return adbg_disasm(disasm, op);
 }
 
 /// Disassemble one instruction.
@@ -551,44 +551,55 @@ int adbg_disasm_once_debuggee(adbg_disasm_t *p, adbg_disasm_opcode_t *op, AdbgDi
 /// 	p = Disassembler structure.
 /// 	op = Opcode information structure.
 /// Returns: Non-zero indicates an error has occured.
-int adbg_disasm(adbg_disasm_t *p, adbg_disasm_opcode_t *op) {
-	if (p == null || op == null)
+int adbg_disasm(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op) {
+	if (disasm == null || op == null)
 		return adbg_oops(AdbgError.nullArgument);
-	if (p.cookie != ADBG_COOKIE)
+	if (disasm.cookie != ADBG_COOKIE)
 		return adbg_oops(AdbgError.uninitiated);
+	
+	//TODO: longjmp
+	//      Trust me, if I had working longjmp bindings on Windows, I
+	//      would have absolutely make the decoders longjmp back here
+	//      on error
 	
 	with (op) { // reset opcode
 		mnemonic = segment = null;
 		size = machineCount = prefixCount = operandCount = 0;
 	}
-	with (p) { // reset disasm
+	with (disasm) { // reset disasm
 		decoderAll = 0;
 	}
 	
-	p.opcode = op;
-	p.last = p.current;	// Save address
-	return p.fdecode(p);	// Decode
+	extern (C)
+	int function(adbg_disasm_t*) decode = disasm.fdecode;
+	
+	if (decode == null)
+		return adbg_oops(AdbgError.uninitiated);
+	
+	disasm.opcode = op;
+	disasm.last = disasm.current;	// Save address
+	return decode(disasm);	// Decode
 }
 
 //TODO: Add AdbgSyntax to formatting functions
 //      In theory, opcode struct should have all the data it needs
 //      Maybe transfer decoder settings into opcode structure?
 
-size_t adbg_disasm_format_prefixes(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	if (p.opcode.prefixCount == 0) {
+size_t adbg_disasm_format_prefixes(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
+	if (disasm.opcode.prefixCount == 0) {
 		buffer[0] = 0;
 		return 0;
 	}
 	
 	adbg_string_t s = adbg_string_t(buffer, size);
-	return adbg_disasm_format_prefixes2(p, s, op);
+	return adbg_disasm_format_prefixes2(disasm, s, op);
 }
 private
-size_t adbg_disasm_format_prefixes2(adbg_disasm_t *p, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
+size_t adbg_disasm_format_prefixes2(adbg_disasm_t *disasm, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
 	// Prefixes, skipped if empty
 	version (Trace) trace("count=%zu", op.prefixCount);
 	
-	bool isHyde = p.syntax == AdbgSyntax.hyde;
+	bool isHyde = disasm.syntax == AdbgSyntax.hyde;
 	
 	if (isHyde) {
 		if (op.segment) {
@@ -612,40 +623,40 @@ size_t adbg_disasm_format_prefixes2(adbg_disasm_t *p, ref adbg_string_t s, adbg_
 	
 	return s.length;
 }
-size_t adbg_disasm_format_mnemonic(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	if (p.opcode.mnemonic == null) {
+size_t adbg_disasm_format_mnemonic(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
+	if (disasm.opcode.mnemonic == null) {
 		buffer[0] = 0;
 		return 0;
 	}
 	
 	adbg_string_t s = adbg_string_t(buffer, size);
-	return adbg_disasm_format_mnemonic2(p, s, op);
+	return adbg_disasm_format_mnemonic2(disasm, s, op);
 }
 private
-size_t adbg_disasm_format_mnemonic2(adbg_disasm_t *p, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
+size_t adbg_disasm_format_mnemonic2(adbg_disasm_t *disasm, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
 	version (Trace) trace("mnemonic=%s", op.mnemonic);
 	
-	if (p.syntax == AdbgSyntax.att && p.decoderFar)
+	if (disasm.syntax == AdbgSyntax.att && disasm.decoderFar)
 		if (s.addc('l'))
 			return s.length;
 	s.adds(op.mnemonic);
 	//TODO: ATT ambiguiate instruction width suffix
-	//if (p.syntax == AdbgSyntax.att && p.ambiguity)
+	//if (disasm.syntax == AdbgSyntax.att && disasm.ambiguity)
 	//	if (s.addc())
 	
 	return s.length;
 }
-size_t adbg_disasm_format_operands(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	if (p.opcode.operandCount == 0) {
+size_t adbg_disasm_format_operands(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
+	if (disasm.opcode.operandCount == 0) {
 		buffer[0] = 0;
 		return 0;
 	}
 	
 	adbg_string_t s = adbg_string_t(buffer, size);
-	return adbg_disasm_format_operands2(p, s, op);
+	return adbg_disasm_format_operands2(disasm, s, op);
 }
 private
-size_t adbg_disasm_format_operands2(adbg_disasm_t *p, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
+size_t adbg_disasm_format_operands2(adbg_disasm_t *disasm, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
 	version (Trace) trace("count=%zu", op.operandCount);
 	
 	//TODO: Consider letting syntax do its own things
@@ -653,29 +664,29 @@ size_t adbg_disasm_format_operands2(adbg_disasm_t *p, ref adbg_string_t s, adbg_
 	//      As in, do that here instead of the decoder
 	//      But then, which architectures does that affect?
 	
-	switch (p.syntax) with (AdbgSyntax) {
+	switch (disasm.syntax) with (AdbgSyntax) {
 	case hyde:
 		if (s.adds("( ")) return s.length;
-		adbg_disasm_format_operands_right(p, s, op);
+		adbg_disasm_format_operands_right(disasm, s, op);
 		if (s.adds(" );")) return s.length;
 		return s.length;
 	case att:
-		if (p.decoderNoReverse) 
-			adbg_disasm_format_operands_left(p, s, op);
+		if (disasm.decoderNoReverse) 
+			adbg_disasm_format_operands_left(disasm, s, op);
 		else
-			adbg_disasm_format_operands_right(p, s, op);
+			adbg_disasm_format_operands_right(disasm, s, op);
 		return s.length;
 	default:
-		adbg_disasm_format_operands_left(p, s, op);
+		adbg_disasm_format_operands_left(disasm, s, op);
 		return s.length;
 	}
 }
 
 /// 
-size_t adbg_disasm_format(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
+size_t adbg_disasm_format(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
 	version (Trace) trace("size=%zu", size);
 	
-	if (p.opcode.mnemonic == null) {
+	if (disasm.opcode.mnemonic == null) {
 		buffer = empty_string;
 		return 0;
 	}
@@ -683,16 +694,16 @@ size_t adbg_disasm_format(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 	adbg_string_t s = adbg_string_t(buffer, size);
 	
 	if (op.prefixCount)
-		adbg_disasm_format_prefixes2(p, s, op);
+		adbg_disasm_format_prefixes2(disasm, s, op);
 	
-	adbg_disasm_format_mnemonic2(p, s, op);
+	adbg_disasm_format_mnemonic2(disasm, s, op);
 	
-	if (op.operandCount || p.syntax == AdbgSyntax.hyde) {
-		if (p.syntax != AdbgSyntax.hyde)
-			if (s.addc(p.userMnemonicTab ? '\t' : ' '))
+	if (op.operandCount || disasm.syntax == AdbgSyntax.hyde) {
+		if (disasm.syntax != AdbgSyntax.hyde)
+			if (s.addc(disasm.userMnemonicTab ? '\t' : ' '))
 				return s.length;
 		
-		return adbg_disasm_format_operands2(p, s, op);
+		return adbg_disasm_format_operands2(disasm, s, op);
 	}
 	
 	return s.length;
@@ -700,10 +711,10 @@ size_t adbg_disasm_format(adbg_disasm_t *p, char *buffer, size_t size, adbg_disa
 
 private __gshared const(char) *sep = ", ";
 private
-void adbg_disasm_format_operands_right(adbg_disasm_t *p, ref adbg_string_t str, adbg_disasm_opcode_t *op) {
+void adbg_disasm_format_operands_right(adbg_disasm_t *disasm, ref adbg_string_t str, adbg_disasm_opcode_t *op) {
 	for (size_t i = op.operandCount; i-- > 0;) {
 		version (Trace) trace("i=%u", cast(uint)i);
-		if (p.foperand(p, str, op.operands[i]))
+		if (disasm.foperand(disasm, str, op.operands[i]))
 			return;
 		if (i)
 			if (str.adds(sep))
@@ -711,11 +722,11 @@ void adbg_disasm_format_operands_right(adbg_disasm_t *p, ref adbg_string_t str, 
 	}
 }
 private
-void adbg_disasm_format_operands_left(adbg_disasm_t *p, ref adbg_string_t str, adbg_disasm_opcode_t *op) {
+void adbg_disasm_format_operands_left(adbg_disasm_t *disasm, ref adbg_string_t str, adbg_disasm_opcode_t *op) {
 	size_t opCount = op.operandCount - 1;
 	for (size_t i; i <= opCount; ++i) {
 		version (Trace) trace("i=%u", cast(uint)i);
-		if (p.foperand(p, str, op.operands[i]))
+		if (disasm.foperand(disasm, str, op.operands[i]))
 			return;
 		if (i < opCount)
 			if (str.adds(sep))
@@ -729,7 +740,7 @@ void adbg_disasm_format_operands_left(adbg_disasm_t *p, ref adbg_string_t str, a
 /// 	buffer = Character buffer
 /// 	size = Buffer size
 /// 	op = Opcode information
-size_t adbg_disasm_machine(adbg_disasm_t *p, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
+size_t adbg_disasm_machine(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
 	import adbg.utils.str : empty_string;
 	
 	if (buffer == null || op.machineCount == 0) {
@@ -821,53 +832,64 @@ struct adbg_disasm_operand_t { align(1):
 
 /// (Internal) Fetch data from data source.
 /// Params:
-/// 	p = Disassembler structure pointer
-/// 	u = Data pointer
+/// 	data = Data pointer
+/// 	disasm = Disassembler structure pointer
 /// 	tag = Byte tag
 /// Returns: Non-zero on error
 package
-int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, AdbgDisasmTag tag = AdbgDisasmTag.unknown) {
-	version (Trace) trace("size=%u left=%zu", p.opcode.size, p.left);
+int adbg_disasm_fetch(T)(void *data, adbg_disasm_t *disasm, AdbgDisasmTag tag = AdbgDisasmTag.unknown) {
+	version (Trace) trace("size=%u left=%zu", disasm.opcode.size, disasm.left);
 
-	if (p.opcode.size + T.sizeof > p.limit)
+	if (disasm.opcode.size + T.sizeof > disasm.limit)
 		return adbg_oops(AdbgError.opcodeLimit);
 	
+	T* u = cast(T*)data;
+	
 	//TODO: Auto bswap if architecture endian is different than target
-	//      enum bool SWAP = TargetEndian != p.platform && T.sizeof > 1
+	//      enum bool SWAP = TargetEndian != disasm.platform && T.sizeof > 1
+	//TODO: Function pointer instead of switch?
 	int e = void;
-	switch (p.input) with (AdbgDisasmInput) {
+	switch (disasm.source) with (AdbgDisasmSource) {
 	case debugger:
 		import adbg.dbg.debugger : adbg_mm_cread;
-		e = adbg_mm_cread(p.current.sz, u, T.sizeof);
+		e = adbg_mm_cread(disasm.current.sz, data, T.sizeof);
 		break;
 	case raw:
-		if (p.left < T.sizeof)
+		if (disasm.left < T.sizeof)
 			return adbg_oops(AdbgError.outOfData);
-		*u = *cast(T*)p.current;
-		p.left -= T.sizeof;
+		*cast(T*)data = *cast(T*)disasm.current;
+		disasm.left -= T.sizeof;
 		e = 0;
 		break;
 	default: assert(0);
 	}
 	
-	p.current.sz += T.sizeof;
-	p.opcode.size += T.sizeof;
+	disasm.current.sz += T.sizeof;
+	disasm.opcode.size += T.sizeof;
 	
-	if (p.mode >= AdbgDisasmMode.file && p.opcode.machineCount < ADBG_MAX_MACHINE) {
-		adbg_disasm_machine_t *n = &p.opcode.machine[p.opcode.machineCount++];
+	if (disasm.mode >= AdbgDisasmMode.file &&
+		disasm.opcode.machineCount < ADBG_MAX_MACHINE) {
+		adbg_disasm_machine_t *n =
+			&disasm.opcode.machine[disasm.opcode.machineCount++];
 		n.tag = tag;
 		static if (is(T == ubyte)) {
-			n.i8 = *u;
+			n.i8 = *cast(T*)data;
 			n.type = AdbgDisasmType.i8;
 		} else static if (is(T == ushort)) {
-			n.i16 = *u;
+			n.i16 = *cast(T*)data;
 			n.type = AdbgDisasmType.i16;
 		} else static if (is(T == uint)) {
-			n.i32 = *u;
+			n.i32 = *cast(T*)data;
 			n.type = AdbgDisasmType.i32;
 		} else static if (is(T == ulong)) {
-			n.i64 = *u;
+			n.i64 = *cast(T*)data;
 			n.type = AdbgDisasmType.i64;
+		/*} else static if (is(T == float)) {
+			n.f32 = *cast(T*)data;
+			n.type = AdbgDisasmType.f32;
+		} else static if (is(T == double)) {
+			n.f64 = *cast(T*)data;
+			n.type = AdbgDisasmType.f64;*/
 		} else static assert(0, "fetch support type");
 	}
 	return e;
@@ -875,14 +897,14 @@ int adbg_disasm_fetch(T)(adbg_disasm_t *p, T *u, AdbgDisasmTag tag = AdbgDisasmT
 
 // fix last tag
 package
-void adbg_disasm_fetch_lasttag(adbg_disasm_t *p, AdbgDisasmTag tag) {
-	p.opcode.machine[p.opcode.machineCount - 1].tag = tag;
+void adbg_disasm_fetch_lasttag(adbg_disasm_t *disasm, AdbgDisasmTag tag) {
+	disasm.opcode.machine[disasm.opcode.machineCount - 1].tag = tag;
 }
 
 // calculate near offset
+//TODO: Rename to adbg_disasm_offset
 package
-void adbg_disasm_calc_offset(T)(adbg_disasm_t *p, T u) {
-	//TODO: adbg_disasm_offset
+void adbg_disasm_calc_offset(T)(adbg_disasm_t *disasm, T u) {
 }
 
 /// Render a number onto a string.
@@ -968,11 +990,11 @@ bool adbg_disasm_render_number(ref adbg_string_t s, ref adbg_disasm_number_t n,
 
 // add prefix in prefix buffer
 package
-void adbg_disasm_add_prefix(adbg_disasm_t *p, const(char) *prefix) {
-	if (p.opcode.prefixCount >= ADBG_MAX_PREFIXES)
+void adbg_disasm_add_prefix(adbg_disasm_t *disasm, const(char) *prefix) {
+	if (disasm.opcode.prefixCount >= ADBG_MAX_PREFIXES)
 		return;
 	
-	adbg_disasm_prefix_t *pf = &p.opcode.prefixes[p.opcode.prefixCount++];
+	adbg_disasm_prefix_t *pf = &disasm.opcode.prefixes[disasm.opcode.prefixCount++];
 	pf.name = prefix;
 }
 
@@ -982,10 +1004,10 @@ void adbg_disasm_add_prefix(adbg_disasm_t *p, const(char) *prefix) {
 
 // set instruction mnemonic
 package
-void adbg_disasm_add_mnemonic(adbg_disasm_t *p, const(char) *instruction) {
+void adbg_disasm_add_mnemonic(adbg_disasm_t *disasm, const(char) *instruction) {
 	version (Trace) trace("mnemonic=%s", instruction);
 	
-	p.opcode.mnemonic = instruction;
+	disasm.opcode.mnemonic = instruction;
 }
 
 //
@@ -994,14 +1016,14 @@ void adbg_disasm_add_mnemonic(adbg_disasm_t *p, const(char) *instruction) {
 
 // select operand
 private
-adbg_disasm_operand_t* adbg_disasm_get_operand(adbg_disasm_t *p) {
-	return cast(adbg_disasm_operand_t*)&p.opcode.operands[p.opcode.operandCount++];
+adbg_disasm_operand_t* adbg_disasm_get_operand(adbg_disasm_t *disasm) {
+	return cast(adbg_disasm_operand_t*)&disasm.opcode.operands[disasm.opcode.operandCount++];
 }
 
 // add segment override
 package
-void adbg_disasm_add_segment(adbg_disasm_t *p, const(char) *segment) {
-	p.opcode.segment = segment;
+void adbg_disasm_add_segment(adbg_disasm_t *disasm, const(char) *segment) {
+	disasm.opcode.segment = segment;
 }
 
 // set memory
@@ -1031,9 +1053,9 @@ void adbg_disasm_set_memory(adbg_disasm_operand_mem_t *mem,
 
 // add immediate
 package
-void adbg_disasm_add_immediate(adbg_disasm_t *p,
+void adbg_disasm_add_immediate(adbg_disasm_t *disasm,
 	AdbgDisasmType width, void *v, ushort segment = 0, bool absolute = false) {
-	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
+	if (disasm.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
 	version (Trace) {
@@ -1046,7 +1068,7 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p,
 		}
 	}
 	
-	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
+	adbg_disasm_operand_t *item = adbg_disasm_get_operand(disasm);
 	item.type = AdbgDisasmOperand.immediate;
 	item.imm.value.type = width;
 	item.imm.segment    = segment;
@@ -1062,15 +1084,15 @@ void adbg_disasm_add_immediate(adbg_disasm_t *p,
 
 // add register
 package
-void adbg_disasm_add_register(adbg_disasm_t *p, const(char) *register,
+void adbg_disasm_add_register(adbg_disasm_t *disasm, const(char) *register,
 	const(char) *mask1 = null, const(char) *mask2 = null,
 	int index = 0, bool indexed = false) {
-	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
+	if (disasm.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
 	version (Trace) trace("name=%s index=%d indexed=%d", register, index, indexed);
 	
-	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
+	adbg_disasm_operand_t *item = adbg_disasm_get_operand(disasm);
 	item.type        = AdbgDisasmOperand.register;
 	item.reg.name    = register;
 	item.reg.mask1   = mask1;
@@ -1081,12 +1103,12 @@ void adbg_disasm_add_register(adbg_disasm_t *p, const(char) *register,
 
 // add memory
 package
-void adbg_disasm_add_memory(adbg_disasm_t *p,
+void adbg_disasm_add_memory(adbg_disasm_t *disasm,
 	AdbgDisasmType width, const(char) *segment,
 	const(char) *regbase, const(char) *regindex,
 	AdbgDisasmType dispWidth, void *disp,
 	ubyte scale, bool scaled, bool absolute) {
-	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
+	if (disasm.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
 	version (Trace) {
@@ -1101,8 +1123,8 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 		}
 	}
 	
-	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
-	p.memWidth         = width;
+	adbg_disasm_operand_t *item = adbg_disasm_get_operand(disasm);
+	disasm.memWidth         = width;
 	item.type          = AdbgDisasmOperand.memory;
 	item.mem.segment   = segment;
 	item.mem.base      = regbase;
@@ -1124,14 +1146,14 @@ void adbg_disasm_add_memory(adbg_disasm_t *p,
 }
 
 package
-void adbg_disasm_add_memory2(adbg_disasm_t *p, AdbgDisasmType width, adbg_disasm_operand_mem_t *m) {
-	if (p.opcode.operandCount >= ADBG_MAX_OPERANDS)
+void adbg_disasm_add_memory2(adbg_disasm_t *disasm, AdbgDisasmType width, adbg_disasm_operand_mem_t *m) {
+	if (disasm.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
 	version (Trace) trace("m=%p", m);
 	
-	p.memWidth = width;
-	adbg_disasm_operand_t *item = adbg_disasm_get_operand(p);
+	disasm.memWidth = width;
+	adbg_disasm_operand_t *item = adbg_disasm_get_operand(disasm);
 	item.type  = AdbgDisasmOperand.memory;
 	item.mem   = *m;
 }
