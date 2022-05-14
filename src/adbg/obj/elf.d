@@ -14,7 +14,7 @@ module adbg.obj.elf;
 import adbg.error;
 import adbg.obj.def;
 import adbg.obj.server : adbg_object_t, AdbgObjFormat;
-import adbg.disasm.disasm : AdbgPlatform;
+import adbg.disassembler : AdbgPlatform;
 
 // NOTE: The string table section is typically named .shstrtab
 

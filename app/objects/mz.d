@@ -9,7 +9,7 @@ module objects.mz;
 
 import core.stdc.stdio;
 import adbg.obj.server;
-import adbg.disasm.disasm : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
+import adbg.disassembler : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
 import adbg.obj.mz;
 import dumper;
 

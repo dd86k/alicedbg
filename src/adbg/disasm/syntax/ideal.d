@@ -7,7 +7,7 @@
  */
 module adbg.disasm.syntax.ideal;
 
-import adbg.disasm, adbg.utils.str;
+import adbg.disassembler, adbg.utils.str;
 
 extern (C):
 

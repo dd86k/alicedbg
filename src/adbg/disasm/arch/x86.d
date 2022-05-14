@@ -14,7 +14,7 @@ module adbg.disasm.arch.x86;
 // You have been warned.
 
 import adbg.error;
-import adbg.disasm.disasm;
+import adbg.disassembler;
 private import adbg.utils.bit : BIT;
 
 extern (C):

@@ -10,7 +10,7 @@ module dumper;
 import core.stdc.stdio;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc;
 import adbg.error;
-import adbg.disasm, adbg.obj.server;
+import adbg.disassembler, adbg.obj.server;
 import adbg.obj.server;
 import adbg.utils.bit : BIT;
 import common, objects;

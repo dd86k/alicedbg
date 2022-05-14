@@ -9,7 +9,7 @@ module main;
 
 import adbg.platform;
 import adbg.dbg : adbg_attach, adbg_load;
-import adbg.disasm;
+import adbg.disassembler;
 import adbg.utils.str : adbg_util_hex_array;
 import adbg.etc.c.stdlib : exit;
 import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;

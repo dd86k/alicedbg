@@ -7,7 +7,7 @@
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
-module adbg.disasm.disasm;
+module adbg.disassembler;
 
 import adbg.error;
 private import adbg.utils.str;

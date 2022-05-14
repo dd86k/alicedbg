@@ -15,7 +15,7 @@ module adbg.disasm.arch.riscv;
 //      Make it so two fetches into a type.. SOMEHOW
 
 import adbg.error;
-import adbg.disasm.disasm;
+import adbg.disassembler;
 import adbg.utils.bit;
 
 extern (C):

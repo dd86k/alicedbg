@@ -19,7 +19,7 @@ module adbg.obj.pe;
 import core.stdc.inttypes;
 import adbg.error;
 import adbg.obj.server;
-import adbg.disasm.disasm : AdbgPlatform; // ISA translation
+import adbg.disassembler : AdbgPlatform; // ISA translation
 import adbg.utils.uid : UID;
 
 extern (C):

@@ -9,7 +9,7 @@
 module common;
 
 import adbg.dbg.exception;
-import adbg.disasm;
+import adbg.disassembler;
 import adbg.error;
 import core.stdc.stdio : FILE;
 

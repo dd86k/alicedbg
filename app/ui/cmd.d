@@ -13,7 +13,7 @@ import adbg.error;
 import adbg.dbg.debugger, adbg.dbg.exception, adbg.dbg.context;
 import adbg.sys.err;
 import adbg.utils.str;
-import adbg.disasm.disasm;
+import adbg.disassembler;
 import core.stdc.string;
 import common, term;
 

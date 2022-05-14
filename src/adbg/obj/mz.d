@@ -8,7 +8,7 @@
 module adbg.obj.mz;
 
 import adbg.obj.server : AdbgObjFormat, adbg_object_t;
-import adbg.disasm.disasm : AdbgPlatform;
+import adbg.disassembler : AdbgPlatform;
 
 private enum ERESWDS = 0x10;
 

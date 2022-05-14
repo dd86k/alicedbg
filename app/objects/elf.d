@@ -9,7 +9,7 @@ module objects.elf;
 
 import adbg.etc.c.stdio;
 import adbg.obj.server;
-import adbg.disasm.disasm : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
+import adbg.disassembler : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
 import adbg.obj.elf;
 import dumper;
 

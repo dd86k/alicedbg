@@ -1,5 +1,5 @@
 /**
- * Loop on exceptions and continue whenever possible. No user input for this UI.
+ * Loop on exceptions and continue whenever possible.
  *
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2021 dd86k
@@ -10,7 +10,7 @@ module ui.loop;
 import core.stdc.string : memcpy;
 import adbg.etc.c.stdio;
 import adbg.dbg, adbg.sys.err : SYS_ERR_FMT;
-import adbg.disasm, adbg.error;
+import adbg.disassembler, adbg.error;
 import common, term;
 
 //TODO: loop option or new ui for just logging in faults

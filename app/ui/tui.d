@@ -5,12 +5,13 @@
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
+//TODO: Remove ui, will be done in a separate project
 module ui.tui;
 
 import core.stdc.stdio, core.stdc.string : memcpy;
 import adbg.error;
 import adbg.dbg;
-import adbg.disasm;
+import adbg.disassembler;
 import term;
 import common;
 
