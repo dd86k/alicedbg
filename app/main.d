@@ -19,9 +19,11 @@ import common, ui, dumper, analyzer;
 
 private:
 extern (C):
-__gshared:
 
 enum COPYRIGHT = "Copyright (c) 2019-2022 dd86k <dd@dax.moe>";
+
+debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__;
+else  enum FULL_VERSION = ADBG_VERSION;
 
 immutable(char) *page_license =
 `BSD 3-Clause License
@@ -53,7 +55,6 @@ SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
-
 
 immutable(char) *page_version =
 "alicedbg "~FULL_VERSION~" (built: "~__TIMESTAMP__~")\n"~
@@ -361,9 +362,6 @@ int cli_help() {
 //
 // ANCHOR --version
 //
-
-debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__;
-else  enum FULL_VERSION = ADBG_VERSION;
 
 // Turns a __VERSION__ number into a string constant
 template STRVER(uint ver) {

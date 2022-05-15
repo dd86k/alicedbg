@@ -14,6 +14,7 @@ import core.stdc.string;
 extern (C):
 
 /// An empty string in case compilers does not support pool strings.
+//TODO: Made it const(char)*? Forgot why it's char*.
 __gshared char *empty_string = cast(char*)"";
 
 /// Convert a hex string into a byte array.

@@ -13,7 +13,6 @@ module adbg.error;
 // NOTE: Every thing that could go wrong should have an error code.
 
 extern (C):
-__gshared:
 
 /// Self eror codes
 enum AdbgError {
@@ -67,7 +66,7 @@ struct adbg_error_t {
 	int code;	/// Error code
 }
 /// Last error in alicedbg.
-adbg_error_t error;
+__gshared adbg_error_t error;
 
 private struct error_msg_t {
 	uint code;

@@ -64,7 +64,6 @@ else version (ARM) {
 	static assert(0, "Missing BREAKPOINT value for target platform");
 
 extern (C):
-__gshared:
 
 /// Actions that a user function handler may return
 public
@@ -137,8 +136,8 @@ struct __adbg_child_t {
 	const(char) **argv, envp;
 }
 
-package debuggee_t g_debuggee;	/// Debuggee information
-private int g_options;	/// Debugger options
+package __gshared debuggee_t g_debuggee;	/// Debuggee information
+private __gshared int g_options;	/// Debugger options
 
 //TODO: Load/Attach flags
 //      - processOnly (only this process)
@@ -541,25 +540,26 @@ L_DEBUG_LOOP:
 //
 
 int adbg_bp_add(size_t addr) {
-	if (g_debuggee.bpindex >= ADBG_MAX_BREAKPOINTS - 1)
+	return adbg_oops(AdbgError.notImplemented);
+	/*if (g_debuggee.bpindex >= ADBG_MAX_BREAKPOINTS - 1)
 		return 2;
 	breakpoint_t *bp = &g_debuggee.breakpoints[g_debuggee.bpindex];
-	assert(0);
+	assert(0);*/
 }
 breakpoint_t* adbg_bp_index(int index) {
-	assert(0, "adbg_bp_index not implemented");
+	return null;
 }
 breakpoint_t* adbg_bp_addr(size_t addr) {
-	assert(0, "adbg_bp_addr not implemented");
+	return null;
 }
 int adbg_bp_list(breakpoint_t [ADBG_MAX_BREAKPOINTS]*l, uint *n) {
-	assert(0, "adbg_bp_list not implemented");
+	return adbg_oops(AdbgError.notImplemented);
 }
 int adbg_bp_rm_index(int index) {
-	assert(0, "adbg_bp_rm_index not implemented");
+	return adbg_oops(AdbgError.notImplemented);
 }
 int adbg_bp_rm_addr(size_t addr) {
-	assert(0, "adbg_bp_rm_addr not implemented");
+	return adbg_oops(AdbgError.notImplemented);
 }
 
 //
@@ -578,7 +578,7 @@ int adbg_mm_cread(size_t addr, void *data, uint size) {
 			return adbg_oops(AdbgError.os);
 	} else { // Based on https://www.linuxjournal.com/article/6100
 		c_long *d = cast(c_long*)data;	/// destination
-		int r = size / c_long.sizeof;	/// number of "blocks" to process
+		int r = size / c_long.sizeof;	/// number of "long"s to read
 		
 		for (; r > 0; --r, ++d, addr += c_long.sizeof)
 			*d = ptrace(PTRACE_PEEKDATA, g_debuggee.pid, addr, null);
@@ -586,8 +586,8 @@ int adbg_mm_cread(size_t addr, void *data, uint size) {
 		r = size % c_long.sizeof;
 		if (r) {
 			c_long c = ptrace(PTRACE_PEEKDATA, g_debuggee.pid, addr, null);
-			ubyte* d8 = cast(ubyte*)d, s8 = cast(ubyte*)&c;
-			for (; r; --r) *d8++ = *s8++; // inlined memcpy
+			ubyte* dest8 = cast(ubyte*)d, src8 = cast(ubyte*)&c;
+			for (; r; --r) *dest8++ = *src8++; // inlined memcpy
 		}
 	}
 	return 0;

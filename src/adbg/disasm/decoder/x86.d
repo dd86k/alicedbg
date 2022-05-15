@@ -8,7 +8,7 @@
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
-module adbg.disasm.arch.x86;
+module adbg.disasm.decoder.x86;
 
 // The decoder is quite messy.
 // You have been warned.

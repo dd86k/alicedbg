@@ -15,7 +15,6 @@ import core.stdc.stdio : FILE;
 
 public:
 extern (C):
-__gshared:
 
 /// Application error
 enum AppError {
@@ -96,7 +95,7 @@ struct settings_t {
 ///
 /// This is in one big structure to avoid thinking complexity, and avoids
 /// tracking other stuff. Like, "uhhh what is the variable name again?".
-settings_t globals;
+__gshared settings_t globals;
 
 /// Print last library error information to stdout 
 int printerror(const(char)* func = cast(char*)__FUNCTION__) {

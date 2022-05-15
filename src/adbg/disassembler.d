@@ -12,14 +12,8 @@ module adbg.disassembler;
 import adbg.error;
 private import adbg.utils.str;
 private import adbg.platform : adbg_address_t;
-private import adbg.disasm.arch.x86,
-	adbg.disasm.arch.riscv;
-private import adbg.disasm.syntax.intel,
-	adbg.disasm.syntax.nasm,
-	adbg.disasm.syntax.att,
-	adbg.disasm.syntax.ideal,
-	adbg.disasm.syntax.hyde,
-	adbg.disasm.syntax.rv;
+private import adbg.disasm.decoders;
+public import adbg.disasm.formatter;
 
 //TODO: Invalid results could be rendered differently
 //      e.g., .byte 0xd6,0xd6 instead of (bad)
@@ -54,8 +48,6 @@ private import adbg.disasm.syntax.intel,
 //      pseudo-instruction
 
 extern (C):
-
-package immutable const(char) *TYPE_UNKNOWN = "word?";
 
 private enum {
 	ADBG_MAX_PREFIXES = 8,	/// Buffer size for prefixes.
@@ -220,24 +212,9 @@ enum AdbgDisasmTag : ushort {
 	evex,	/// x86: EVEX bytes
 }
 
-//TODO: Number preferred style or instruction/immediate purpose
-enum AdbgDisasmNumberStyle : ubyte {
-	decimal,	/// 
-	hexadecimal,	/// 
-}
-//TODO: AdbgDisasmHexStyle (syntax setting?)
-//NOTE: May conflict with syntax styles being constant values
-enum AdbgDisasmHexStyle : ubyte {
-	defaultPrefix,	/// 0x10, default
-	hSuffix,	/// 10h
-	hPrefix,	/// 0h10
-	poundPrefix,	/// #10
-	pourcentPrefix,	/// %10
-	dollarPrefix,	/// $10
-}
-
 /// Data types
-//TODO: Rename to AdbgDataType?
+//TODO: Rename to AdbgDataType? Move to its own module? Definitions?
+//TODO: f64 and f32?
 enum AdbgDisasmType : ubyte {
 	none,
 	i8,  i16, i32, i64, i128, i256, i512, i1024,
@@ -283,12 +260,12 @@ version (X86) {
 } else version (RISCV32) {
 	private enum {
 		DEFAULT_PLATFORM = AdbgPlatform.riscv32,	/// Ditto
-		DEFAULT_SYNTAX = AdbgSyntax.att,	/// Ditto
+		DEFAULT_SYNTAX = AdbgSyntax.riscv,	/// Ditto
 	}
 } else version (RISCV64) {
 	private enum {
 		DEFAULT_PLATFORM = AdbgPlatform.riscv64,	/// Ditto
-		DEFAULT_SYNTAX = AdbgSyntax.att,	/// Ditto
+		DEFAULT_SYNTAX = AdbgSyntax.riscv,	/// Ditto
 	}
 } else {
 	static assert(0, "DEFAULT_PLATFORM and DEFAULT_SYNTAX unset");
@@ -372,13 +349,14 @@ struct adbg_disasm_t { align(1):
 	/// Debuggee: This field is not taken into account.
 	size_t left;
 	/// Architectural limit length for an opcode in bytes.
-	/// x86: >15
-	/// riscv32: >4
-	/// riscv64: >8
+	/// Past this number, the decoder will automatically trip.
+	/// x86: 15 bytes
+	/// riscv32: 4 bytes
+	/// riscv64: 8 bytes
 	int limit;
 	/// Memory operation width
 	AdbgDisasmType memWidth;
-	//TODO: Do these are bit flags
+	//TODO: Redo these as bit flags
 	//      They are not accessed as often as I would think
 	package union { // Decoder options
 		uint decoderAll;
@@ -410,7 +388,7 @@ adbg_disasm_t *adbg_disasm_alloc(AdbgPlatform m) {
 	
 	version (Trace) trace("platform=%u", m);
 	
-	adbg_disasm_t *s = cast(adbg_disasm_t *)calloc(1, adbg_disasm_t.sizeof);
+	adbg_disasm_t *s = cast(adbg_disasm_t*)calloc(1, adbg_disasm_t.sizeof);
 	if (s == null) {
 		adbg_oops(AdbgError.allocationFailed);
 		return null;
@@ -472,8 +450,7 @@ int adbg_disasm_opt(adbg_disasm_t *disasm, AdbgDisasmOpt opt, int val) {
 	with (AdbgDisasmOpt)
 	switch (opt) {
 	case syntax:
-		//TODO: To deprecate
-		disasm.syntax = cast(AdbgSyntax)val;
+		disasm.syntax = cast(AdbgSyntax)val; //TODO: To deprecate (??)
 		switch (disasm.syntax) with (AdbgSyntax) {
 		case intel:  disasm.foperand = &adbg_disasm_operand_intel; break;
 		case nasm:   disasm.foperand = &adbg_disasm_operand_nasm; break;
@@ -481,7 +458,7 @@ int adbg_disasm_opt(adbg_disasm_t *disasm, AdbgDisasmOpt opt, int val) {
 		case ideal:  disasm.foperand = &adbg_disasm_operand_ideal; break;
 		case hyde:   disasm.foperand = &adbg_disasm_operand_hyde; break;
 		case riscv:  disasm.foperand = &adbg_disasm_operand_riscv; break;
-		default:    return adbg_oops(AdbgError.invalidOptionValue);
+		default:     return adbg_oops(AdbgError.invalidOptionValue);
 		}
 		break;
 	case mnemonicTab:
@@ -502,7 +479,7 @@ int adbg_disasm_opt(adbg_disasm_t *disasm, AdbgDisasmOpt opt, int val) {
 /// 	size = Buffer size.
 /// Returns: Error code
 int adbg_disasm_start_buffer(adbg_disasm_t *disasm, AdbgDisasmMode mode, void *buffer, size_t size) {
-	if (disasm == null)
+	if (disasm == null || buffer == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
 	disasm.source = AdbgDisasmSource.raw;
@@ -581,199 +558,9 @@ int adbg_disasm(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op) {
 	return decode(disasm);	// Decode
 }
 
-//TODO: Add AdbgSyntax to formatting functions
-//      In theory, opcode struct should have all the data it needs
-//      Maybe transfer decoder settings into opcode structure?
-
-size_t adbg_disasm_format_prefixes(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	if (disasm.opcode.prefixCount == 0) {
-		buffer[0] = 0;
-		return 0;
-	}
-	
-	adbg_string_t s = adbg_string_t(buffer, size);
-	return adbg_disasm_format_prefixes2(disasm, s, op);
-}
-private
-size_t adbg_disasm_format_prefixes2(adbg_disasm_t *disasm, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
-	// Prefixes, skipped if empty
-	version (Trace) trace("count=%zu", op.prefixCount);
-	
-	bool isHyde = disasm.syntax == AdbgSyntax.hyde;
-	
-	if (isHyde) {
-		if (op.segment) {
-			if (s.addc(op.segment[0]))
-				return s.length;
-			if (s.adds("seg: "))
-				return s.length;
-		}
-	}
-	
-	char c = isHyde ? '.' : ' ';
-	
-	if (op.prefixCount) {
-		for (size_t i; i < op.prefixCount; ++i) {
-			if (s.adds(op.prefixes[i].name))
-				return s.length;
-			if (s.addc(c))
-				return s.length;
-		}
-	}
-	
-	return s.length;
-}
-size_t adbg_disasm_format_mnemonic(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	if (disasm.opcode.mnemonic == null) {
-		buffer[0] = 0;
-		return 0;
-	}
-	
-	adbg_string_t s = adbg_string_t(buffer, size);
-	return adbg_disasm_format_mnemonic2(disasm, s, op);
-}
-private
-size_t adbg_disasm_format_mnemonic2(adbg_disasm_t *disasm, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
-	version (Trace) trace("mnemonic=%s", op.mnemonic);
-	
-	if (disasm.syntax == AdbgSyntax.att && disasm.decoderFar)
-		if (s.addc('l'))
-			return s.length;
-	s.adds(op.mnemonic);
-	//TODO: ATT ambiguiate instruction width suffix
-	//if (disasm.syntax == AdbgSyntax.att && disasm.ambiguity)
-	//	if (s.addc())
-	
-	return s.length;
-}
-size_t adbg_disasm_format_operands(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	if (disasm.opcode.operandCount == 0) {
-		buffer[0] = 0;
-		return 0;
-	}
-	
-	adbg_string_t s = adbg_string_t(buffer, size);
-	return adbg_disasm_format_operands2(disasm, s, op);
-}
-private
-size_t adbg_disasm_format_operands2(adbg_disasm_t *disasm, ref adbg_string_t s, adbg_disasm_opcode_t *op) {
-	version (Trace) trace("count=%zu", op.operandCount);
-	
-	//TODO: Consider letting syntax do its own things
-	//      e.g., with AT&T, if the two operands are immediates, they do not flip
-	//      As in, do that here instead of the decoder
-	//      But then, which architectures does that affect?
-	
-	switch (disasm.syntax) with (AdbgSyntax) {
-	case hyde:
-		if (s.adds("( ")) return s.length;
-		adbg_disasm_format_operands_right(disasm, s, op);
-		if (s.adds(" );")) return s.length;
-		return s.length;
-	case att:
-		if (disasm.decoderNoReverse) 
-			adbg_disasm_format_operands_left(disasm, s, op);
-		else
-			adbg_disasm_format_operands_right(disasm, s, op);
-		return s.length;
-	default:
-		adbg_disasm_format_operands_left(disasm, s, op);
-		return s.length;
-	}
-}
-
-/// 
-size_t adbg_disasm_format(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	version (Trace) trace("size=%zu", size);
-	
-	if (disasm.opcode.mnemonic == null) {
-		buffer = empty_string;
-		return 0;
-	}
-	
-	adbg_string_t s = adbg_string_t(buffer, size);
-	
-	if (op.prefixCount)
-		adbg_disasm_format_prefixes2(disasm, s, op);
-	
-	adbg_disasm_format_mnemonic2(disasm, s, op);
-	
-	if (op.operandCount || disasm.syntax == AdbgSyntax.hyde) {
-		if (disasm.syntax != AdbgSyntax.hyde)
-			if (s.addc(disasm.userMnemonicTab ? '\t' : ' '))
-				return s.length;
-		
-		return adbg_disasm_format_operands2(disasm, s, op);
-	}
-	
-	return s.length;
-}
-
-private __gshared const(char) *sep = ", ";
-private
-void adbg_disasm_format_operands_right(adbg_disasm_t *disasm, ref adbg_string_t str, adbg_disasm_opcode_t *op) {
-	for (size_t i = op.operandCount; i-- > 0;) {
-		version (Trace) trace("i=%u", cast(uint)i);
-		if (disasm.foperand(disasm, str, op.operands[i]))
-			return;
-		if (i)
-			if (str.adds(sep))
-				return;
-	}
-}
-private
-void adbg_disasm_format_operands_left(adbg_disasm_t *disasm, ref adbg_string_t str, adbg_disasm_opcode_t *op) {
-	size_t opCount = op.operandCount - 1;
-	for (size_t i; i <= opCount; ++i) {
-		version (Trace) trace("i=%u", cast(uint)i);
-		if (disasm.foperand(disasm, str, op.operands[i]))
-			return;
-		if (i < opCount)
-			if (str.adds(sep))
-				return;
-	}
-}
-
-/// Renders the machine opcode into a buffer.
-/// Params:
-/// 	p = Disassembler
-/// 	buffer = Character buffer
-/// 	size = Buffer size
-/// 	op = Opcode information
-size_t adbg_disasm_machine(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	import adbg.utils.str : empty_string;
-	
-	if (buffer == null || op.machineCount == 0) {
-		buffer = empty_string;
-		return 0;
-	}
-	
-	adbg_string_t s = adbg_string_t(buffer, size);
-	adbg_disasm_machine_t *num = &op.machine[0];
-	
-	//TODO: Unpack option would mean e.g., 4*1byte on i32
-	size_t edge = op.machineCount - 1;
-	A: for (size_t i; i < op.machineCount; ++i, ++num) {
-		switch (num.type) with (AdbgDisasmType) {
-		case i8:  if (s.addx8(num.i8, true)) break A; break;
-		case i16: if (s.addx16(num.i16, true)) break A; break;
-		case i32: if (s.addx32(num.i32, true)) break A; break;
-		case i64: if (s.addx64(num.i64, true)) break A; break;
-		default:  assert(0);
-		}
-		if (i < edge) s.addc(' ');
-	}
-	
-	return s.length;
-}
-
 private import core.stdc.stdlib : free;
 /// Frees a previously allocated disassembly structure.
 public  alias adbg_disasm_free = free;
-
-//
-// SECTION Decoder stuff
-//
 
 /// Represents an instruction prefix
 struct adbg_disasm_prefix_t {
@@ -798,6 +585,7 @@ struct adbg_disasm_operand_imm_t { align(1):
 /// Register operand type.
 //package
 //TODO: Consider "stack register" type
+//      How would this benefit?
 struct adbg_disasm_operand_reg_t { align(1):
 	const(char) *name;	/// Register name
 	const(char) *mask1;	/// Mask register (e.g., {k2} when EVEX.aaa=010)
@@ -842,8 +630,6 @@ int adbg_disasm_fetch(T)(void *data, adbg_disasm_t *disasm, AdbgDisasmTag tag = 
 
 	if (disasm.opcode.size + T.sizeof > disasm.limit)
 		return adbg_oops(AdbgError.opcodeLimit);
-	
-	T* u = cast(T*)data;
 	
 	//TODO: Auto bswap if architecture endian is different than target
 	//      enum bool SWAP = TargetEndian != disasm.platform && T.sizeof > 1
@@ -905,83 +691,6 @@ void adbg_disasm_fetch_lasttag(adbg_disasm_t *disasm, AdbgDisasmTag tag) {
 //TODO: Rename to adbg_disasm_offset
 package
 void adbg_disasm_calc_offset(T)(adbg_disasm_t *disasm, T u) {
-}
-
-/// Render a number onto a string.
-/// Params:
-/// 	s = String.
-/// 	n = Number.
-/// 	addPlus = If true, adds '+' if it's a positive number. Often an offset with a register.
-/// 	hideZero = If true, the number is not printed at all if equals to zero.
-/// Returns: True if buffer was exhausted.
-package
-bool adbg_disasm_render_number(ref adbg_string_t s, ref adbg_disasm_number_t n,
-	bool addPlus, bool hideZero) {
-	__gshared const(char) *hexPrefix = "0x";
-	
-	//TODO: function table
-	//      adbg_disasm_render_number_minus0(T)
-	//      addx{8,16,32,64}
-	
-	switch (n.type) with (AdbgDisasmType) {
-	case i8:
-		if (hideZero && n.i8 == 0)
-			return false;
-		if (addPlus && n.i8 >= 0)
-			if (s.addc('+'))
-				return true;
-		if (n.i8 < 0) {
-			if (s.addc('-'))
-				return true;
-			n.u8 = cast(ubyte)((~cast(int)n.u8) + 1);
-		}
-		if (s.adds(hexPrefix)) // temp
-			return true;
-		return s.addx8(n.i8);
-	case i16:
-		if (hideZero && n.i16 == 0)
-			return false;
-		if (addPlus && n.i16 >= 0)
-			if (s.addc('+'))
-				return true;
-		if (n.i16 < 0) {
-			if (s.addc('-'))
-				return true;
-			n.u16 = cast(ushort)((~cast(int)n.u16) + 1);
-		}
-		if (s.adds(hexPrefix)) // temp
-			return true;
-		return s.addx16(n.i16);
-	case i32:
-		if (hideZero && n.i32 == 0)
-			return false;
-		if (addPlus && n.i32 >= 0)
-			if (s.addc('+'))
-				return true;
-		if (n.i32 < 0) {
-			if (s.addc('-'))
-				return true;
-			n.u32 = cast(uint)(~n.u32 + 1);
-		}
-		if (s.adds(hexPrefix)) // temp
-			return true;
-		return s.addx32(n.i32);
-	case i64:
-		if (hideZero && n.i64 == 0)
-			return false;
-		if (addPlus && n.i64 >= 0)
-			if (s.addc('+'))
-				return true;
-		if (n.i64 < 0) {
-			if (s.addc('-'))
-				return true;
-			n.u64 = cast(uint)(~n.u64 + 1);
-		}
-		if (s.adds(hexPrefix)) // temp
-			return true;
-		return s.addx64(n.i64);
-	default: assert(0);
-	}
 }
 
 //
@@ -1157,5 +866,3 @@ void adbg_disasm_add_memory2(adbg_disasm_t *disasm, AdbgDisasmType width, adbg_d
 	item.type  = AdbgDisasmOperand.memory;
 	item.mem   = *m;
 }
-
-// !SECTION

@@ -17,7 +17,6 @@ import core.sys.posix.ucontext;
 //TODO: adbg_seh_set (Posix)
 
 extern (C):
-__gshared:
 
 private
 enum NULL_SIGACTION = cast(sigaction_t*)0;
@@ -52,9 +51,9 @@ public int adbg_seh_set(checkpoint_t *c) {
 
 private:
 
-jmp_buf mjbuf;
-exception_t mexception;
-bool sehinit;
+__gshared jmp_buf mjbuf;
+__gshared exception_t mexception;
+__gshared bool sehinit;
 
 /// See http://man7.org/linux/man-pages/man2/sigaction.2.html
 void adbg_seh_action(int sig, siginfo_t *si, void *p) {

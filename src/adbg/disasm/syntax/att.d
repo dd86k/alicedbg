@@ -7,8 +7,8 @@
  */
 module adbg.disasm.syntax.att;
 
-import adbg.disassembler : adbg_disasm_t, adbg_disasm_operand_t, AdbgDisasmOperand,
-	adbg_disasm_render_number;
+import adbg.disassembler : adbg_disasm_t, adbg_disasm_operand_t, AdbgDisasmOperand;
+import adbg.disasm.formatter;
 import adbg.utils.str;
 
 extern (C):

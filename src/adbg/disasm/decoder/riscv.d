@@ -8,7 +8,7 @@
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
-module adbg.disasm.arch.riscv;
+module adbg.disasm.decoder.riscv;
 
 //TODO: Control-flow analysis
 //TODO: adbg_disasm_fetch_unite for RVC -> RV32/64G

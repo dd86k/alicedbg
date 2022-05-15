@@ -18,7 +18,6 @@ import core.stdc.string;
 import common, term;
 
 extern (C):
-__gshared:
 
 /// Enter the command-line loop
 /// Returns: Error code
@@ -48,11 +47,11 @@ private:
 // Private globals
 //
 
-immutable const(char) *cmd_fmt   = " %-10s                      %s\n";
-immutable const(char) *cmd_fmta  = " %-10s %-20s %s\n";
-bool continue_; /// if user wants to continue
-bool paused;	/// if debuggee is paused
-int lasterror;	/// last command error
+__gshared immutable const(char) *cmd_fmt   = " %-10s                      %s\n";
+__gshared immutable const(char) *cmd_fmta  = " %-10s %-20s %s\n";
+__gshared bool continue_; /// if user wants to continue
+__gshared bool paused;	/// if debuggee is paused
+__gshared int lasterror;	/// last command error
 
 //
 // loop

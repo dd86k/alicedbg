@@ -15,7 +15,6 @@ private alias sys = core.stdc.stdlib.system;
 //TODO: Consider using PDCurses instead
 
 extern (C):
-__gshared:
 
 version (Windows) {
 	private import core.sys.windows.windows;
@@ -81,7 +80,7 @@ enum TermConfig {
 	noNewline = 1 << 0,
 }
 
-private int term_opts; // default to 0
+private __gshared int term_opts; // default to 0
 
 //
 // ANCHOR Initiation
