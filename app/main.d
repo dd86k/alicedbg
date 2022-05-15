@@ -22,9 +22,6 @@ extern (C):
 
 enum COPYRIGHT = "Copyright (c) 2019-2022 dd86k <dd@dax.moe>";
 
-debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__;
-else  enum FULL_VERSION = ADBG_VERSION;
-
 immutable(char) *page_license =
 `BSD 3-Clause License
 
@@ -56,6 +53,9 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
 
+debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__;
+else  enum FULL_VERSION = ADBG_VERSION;
+
 immutable(char) *page_version =
 "alicedbg "~FULL_VERSION~" (built: "~__TIMESTAMP__~")\n"~
 COPYRIGHT~"\n"~
@@ -65,8 +65,8 @@ COPYRIGHT~"\n"~
 "Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
 "Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
 "CRT: "~TARGET_CRT~"\n"~
-"CppRT: "~TARGET_CPPRT;
-//TODO: Features:
+"CppRT: "~TARGET_CPPRT~"\n"~
+"DFlags:"~D_FEATURES;
 
 //NOTE: The CLI module is meh, waiting on some betterC getopt
 

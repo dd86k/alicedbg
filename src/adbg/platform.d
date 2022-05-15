@@ -163,8 +163,12 @@ static if (COMPILER_FEAT_TARGETINFO) {
 } else {
 	/// Target object format string
 	enum TARGET_OBJFMT = "unknown";
-	/// Target float ABI string
-	enum TARGET_FLTABI  = "unknown";
+	version (D_HardFloat)
+		enum TARGET_FLTABI  = "hard"; /// Target float ABI string
+	else version (D_SoftFloat)
+		enum TARGET_FLTABI  = "soft"; /// Ditto
+	else
+		enum TARGET_FLTABI  = "unknown"; /// Ditto
 	version (CppRuntime_Gcc)
 		enum TARGET_CPPRT = "libstdc++";	/// Target C++ Runtime string
 	else version (CppRuntime_Microsoft)
@@ -213,6 +217,26 @@ version (PrintTargetInfo) {
 }
 
 //
+// ANCHOR Other D flags
+//
+
+version (D_PIC) private enum PIC = " pic";
+else            private enum PIC = "";
+version (D_PIE) private enum PIE = " pie";
+else            private enum PIE = "";
+version (D_SIMD) private enum SIMD = " simd";
+else             private enum SIMD = "";
+version (D_AVX) private enum AVX = " avx";
+else            private enum AVX = "";
+version (D_AVX2) private enum AVX2 = " avx2";
+else             private enum AVX2 = "";
+version (D_NoBoundsChecks) private enum NoBoundsCheck = " nobounds";
+else                       private enum NoBoundsCheck = "";
+
+/// Misc. D flags
+enum D_FEATURES = PIC~PIE~SIMD~AVX~AVX2~NoBoundsCheck;
+
+//
 // Core structures
 //
 
@@ -247,6 +271,7 @@ struct adbg_info_t {
 	const(char) *env     = TARGET_ENV;	/// Target environment
 	const(char) *objfmt  = TARGET_OBJFMT;	/// Object format (e.g., coff)
 	const(char) *fltabi  = TARGET_FLTABI;	/// Float ABI (hard or soft)
+	const(char) *dflags  = D_FEATURES;	/// Float ABI (hard or soft)
 }
 
 /**
@@ -254,6 +279,6 @@ struct adbg_info_t {
  * Returns: AdbgInfo structure pointer
  */
 immutable(adbg_info_t)* adbg_info() {
-	immutable static adbg_info_t info;
+	static immutable adbg_info_t info;
 	return &info;
 }
