@@ -88,8 +88,7 @@ enum AdbgDisasmOpt {
 }
 
 /// Disassembler operating mode
-//TODO: Consider using bool values instead of these
-//      e.g., disasm(..., bool populateOp)
+//TODO: Consider making these feature bits instead of modes
 enum AdbgDisasmMode : ubyte {
 	size,	/// Only calculate operation code sizes
 	data,	/// Opcode sizes with jump locations (e.g. JMP, CALL)
@@ -186,25 +185,27 @@ enum AdbgSyntax : ubyte {
 }
 
 /// Disassembler input
-// NOTE: Uh, and why/how I'll do File/MmFile implementations?
-//       There is no point to these two... Unless proven otherwise.
-//       Raw: Dumper could go by chunks of 32 bytes, smartly (buffer)
+//TODO: Stream (file) mode
+//      Useful for (when 'dumping'):
+//      - stdin
+//      - character/block devices
 enum AdbgDisasmSource : ubyte {
-	raw,	/// Buffer
+	buffer,	/// Buffer
 	debugger,	/// Debuggee
-//	file,
-//	mmfile,
+//	stream,	/// Stream (FILE*)
 }
 
-/// Machine bytes tag
+/// Machine tags when fetching
 enum AdbgDisasmTag : ushort {
 	unknown,	/// Unknown, either now or forever
 	opcode,	/// Operation code
 	prefix,	/// Instruction prefix
 	operand,	/// Instruction operand
-	immediate,	/// 
-	disp,	/// Displacement/Offset
-	segment,	/// Immediate segment value for far calls
+	immediate,	/// Immediate operand
+	// Why is this there when we have .immediate?
+	disp,	/// Displacement/Offset immediate
+	// Why is this there when we have .immediate?
+	segment,	/// Immediate used in far calls
 	modrm,	/// x86: ModR/M byte
 	sib,	/// x86: SIB byte
 	rex,	/// x86: REX byte
@@ -213,7 +214,7 @@ enum AdbgDisasmTag : ushort {
 }
 
 /// Data types
-//TODO: Rename to AdbgDataType? Move to its own module? Definitions?
+//TODO: Rename to AdbgDataType? Move to its own module? Make definitions.d?
 //TODO: f64 and f32?
 enum AdbgDisasmType : ubyte {
 	none,
@@ -268,7 +269,7 @@ version (X86) {
 		DEFAULT_SYNTAX = AdbgSyntax.riscv,	/// Ditto
 	}
 } else {
-	static assert(0, "DEFAULT_PLATFORM and DEFAULT_SYNTAX unset");
+	static assert(0, "Set DEFAULT_PLATFORM and DEFAULT_SYNTAX");
 }
 
 struct adbg_disasm_number_t {
@@ -482,7 +483,7 @@ int adbg_disasm_start_buffer(adbg_disasm_t *disasm, AdbgDisasmMode mode, void *b
 	if (disasm == null || buffer == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
-	disasm.source = AdbgDisasmSource.raw;
+	disasm.source = AdbgDisasmSource.buffer;
 	disasm.mode = mode;
 	disasm.current.raw = disasm.base.raw = buffer;
 	disasm.left = size;
@@ -636,16 +637,16 @@ int adbg_disasm_fetch(T)(void *data, adbg_disasm_t *disasm, AdbgDisasmTag tag = 
 	//TODO: Function pointer instead of switch?
 	int e = void;
 	switch (disasm.source) with (AdbgDisasmSource) {
-	case debugger:
-		import adbg.dbg.debugger : adbg_mm_cread;
-		e = adbg_mm_cread(disasm.current.sz, data, T.sizeof);
-		break;
-	case raw:
+	case buffer:
 		if (disasm.left < T.sizeof)
 			return adbg_oops(AdbgError.outOfData);
 		*cast(T*)data = *cast(T*)disasm.current;
 		disasm.left -= T.sizeof;
 		e = 0;
+		break;
+	case debugger:
+		import adbg.dbg.debugger : adbg_mm_cread;
+		e = adbg_mm_cread(disasm.current.sz, data, T.sizeof);
 		break;
 	default: assert(0);
 	}

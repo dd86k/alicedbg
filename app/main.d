@@ -514,7 +514,7 @@ int main(int argc, const(char)** argv) {
 			cast(ubyte*)app.inputHex, 32, cli.file, app.inputHexSize);
 		
 		return analyze();
-	case SettingMode.dump: return dump();
+	case SettingMode.dump: return app_dump();
 	case SettingMode.debugger:
 		// Pre-load target if specified.
 		// Necessary for loop UI, but optional for others
@@ -529,9 +529,8 @@ int main(int argc, const(char)** argv) {
 		}
 		
 		switch (globals.cli.ui) {
-		case SettingUI.loop:	return loop();
-		case SettingUI.cmd:	return cmd();
-		case SettingUI.tui:	return tui();
+		case SettingUI.loop:	return app_loop();
+		case SettingUI.cmd:	return app_cmd();
 		case SettingUI.tcpserver:
 			puts("main: tcp-server not yet supported");
 			return EXIT_FAILURE;

@@ -5,7 +5,7 @@
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
-module objects.mz;
+module dump.mz;
 
 import core.stdc.stdio;
 import adbg.obj.server;

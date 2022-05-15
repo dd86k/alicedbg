@@ -5,7 +5,7 @@
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
-module objects.elf;
+module dump.elf;
 
 import adbg.etc.c.stdio;
 import adbg.obj.server;

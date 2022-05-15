@@ -18,7 +18,7 @@ import common, term;
 extern (C):
 
 /// Starts loop UI
-int loop() {
+int app_loop() {
 	if (adbg_state != AdbgState.loaded) {
 		puts("loop: No program loaded");
 		return 1;

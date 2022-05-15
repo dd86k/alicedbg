@@ -5,7 +5,7 @@
  * Copyright: © 2019-2021 dd86k
  * License: BSD-3-Clause
  */
-module objects.pe;
+module dump.pe;
 
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE;
 import adbg.etc.c.stdio;

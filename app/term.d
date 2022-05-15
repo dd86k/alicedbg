@@ -103,47 +103,22 @@ int term_init() {
 	return 0;
 }
 
-/// Initiate term as TUI
-/// Returns: Non-zero on error
-int term_tui_init() {
-	version (Windows) {
-		handleOld = handleOut;
-		handleOut = CreateConsoleScreenBuffer(
-			GENERIC_READ | GENERIC_WRITE,
-			FILE_SHARE_READ | FILE_SHARE_WRITE,
-			NULL,
-			CONSOLE_TEXTMODE_BUFFER,
-			NULL);
-		if (handleOut == INVALID_HANDLE_VALUE || handleOut == NULL)
-			return 1;
-		if (SetConsoleMode(handleOut, 0) == FALSE)
-			return 2;
-		if (SetConsoleActiveScreenBuffer(handleOut) == FALSE)
-			return 3;
-		WindowSize ws = void;
-		term_size(&ws);
-		if (term_init_buffer(&ws))
-			return 4;
-	}
-	return 0;
-}
-
 /// Configure terminal settings with the TermConfig enumeration
 /// Params: flags = New set of flags
 void term_config(int flags) {
 	term_opts = flags;
 }
 
-//-/ Restore console buf
+// Restore console buf
 /*void term_restore() {
 	version (Windows) {
 		SetConsoleActiveScreenBuffer(hOld);
 	}
 }*/
 
-/// Set terminal window resize event handler
-/// Params: f = Handler function
-void term_event_resize(void function(ushort,ushort) f) {
+// Set terminal window resize event handler
+// Params: f = Handler function
+/*void term_event_resize(void function(ushort,ushort) f) {
 	version (Windows) {
 		term_resize_handler = f;
 	} else
@@ -153,53 +128,15 @@ void term_event_resize(void function(ushort,ushort) f) {
 		sa.sa_handler = &term_event_resize_posix;
 		sigaction(SIGWINCH, &sa, cast(sigaction_t*)0);
 	}
-}
+}*/
 
-/// Internal Posix function for handling initial resize signal
-version (Posix) private
+// Internal Posix function for handling initial resize signal
+/*version (Posix) private
 void term_event_resize_posix(int) {
 	WindowSize ws = void;
 	term_size(&ws);
 	term_resize_handler(ws.width, ws.height);
-}
-
-/**
- * Initiate terminal intermediate screen buf. (Windows) This can be used
- * after a resive event, but it's done automatically. (Posix) No-op
- * Params:
- * 	s = Terminal window buflen
- */
-private
-int term_init_buffer(WindowSize *s) {
-	import core.stdc.stdlib : realloc, malloc;
-	version (Windows) {
-		const size_t bsize = s.height * s.width;
-		// lpBuffer
-		ibuf = cast(CHAR_INFO*)realloc(ibuf,
-			CHAR_INFO.sizeof * bsize);
-		// dwBufferSize
-		ibuf_size.X = s.width;
-		ibuf_size.Y = s.height;
-		// dwBufferCoord
-		//cbuffer_coord.X =
-		//cbuffer_coord.Y = 0;
-		// lpWriteRegion
-		//ibuf_rect.Top = ibuf_rect.Left = 0;
-		ibuf_rect.Right  = cast(short)(s.width - 1);
-		ibuf_rect.Bottom = cast(short)(s.height - 1);
-		// init
-		CONSOLE_SCREEN_BUFFER_INFO csbi = void;
-		GetConsoleScreenBufferInfo(handleOut, &csbi);
-		for (size_t i; i < bsize; ++i) {
-			ibuf[i].AsciiChar = ' ';
-			ibuf[i].Attributes = csbi.wAttributes;
-			/*	BACKGROUND_BLUE |
-				FOREGROUND_INTENSITY |
-				FOREGROUND_BLUE | FOREGROUND_GREEN | FOREGROUND_RED;*/
-		}
-	}
-	return 0;
-}
+}*/
 
 /// Invert console color with defaultColor
 /*void term_color_invert() {
@@ -279,6 +216,7 @@ void term_curpos(int x, int y) {
 	}
 }
 
+//TODO: Return structure instead
 void term_get_curpos(int *x, int *y) {
 	version (Windows) { // 0-based
 		CONSOLE_SCREEN_BUFFER_INFO csbi = void;
@@ -293,80 +231,6 @@ void term_get_curpos(int *x, int *y) {
 		tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
 		--*y; --*x;
 	}
-}
-
-//
-// ANCHOR TUI specifics
-//
-
-void term_tui_curpos(int x, int y) {
-	version (Windows) { // 0-based
-		ibuf_x = cast(ushort)x;
-		ibuf_y = cast(ushort)y;
-	} else
-	version (Posix) { // 1-based
-		printf("\033[u;%uH", y + 1, x + 1);
-	}
-}
-
-void term_tui_get_curpos(int *x, int *y) {
-	version (Windows) { // 0-based
-		*x = ibuf_x;
-		*y = ibuf_y;
-	} else
-	version (Posix) { // 1-based
-		term_get_curpos(x, y);
-	}
-}
-
-/**
- *
- *
- */
-void term_tui_write(const(char) *s) {
-	version (Windows) {
-		size_t si, bi = (ibuf_w * ibuf_y) + ibuf_x;
-		while (s[si]) {
-			ibuf[bi].AsciiChar = s[si];
-			++bi; ++si;
-		}
-	} else {
-		fputs(s, stdout);
-	}
-}
-
-/**
- *
- *
- */
-void term_tui_writef(const(char) *f, ...) {
-	char [1024]buf = void;
-	va_list va = void;
-	va_start(va, f);
-	vsnprintf(cast(char*)buf, 1024, f, va);
-	term_tui_write(cast(char*)buf);
-}
-
-/**
- *
- */
-void term_tui_flush() {
-	version (Windows) {
-		WriteConsoleOutputA(handleOut,
-			ibuf, ibuf_size, ibuf_pos, &ibuf_rect);
-	} else fflush(stdout);
-}
-
-void term_tui_clear() {
-	version (Windows) {
-		size_t m = ibuf_w * ibuf_h;
-		for (size_t i; i < m; ++i) {
-			ibuf[i].AsciiChar = ' ';
-		}
-	} else version (Posix) {
-		term_clear;
-	}
-	else static assert(0, "Clear: Not implemented");
 }
 
 //

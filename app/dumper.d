@@ -13,7 +13,8 @@ import adbg.error;
 import adbg.disassembler, adbg.obj.server;
 import adbg.obj.server;
 import adbg.utils.bit : BIT;
-import common, objects;
+import adbg.utils.file;
+import common, dump;
 
 extern (C):
 
@@ -91,34 +92,25 @@ void dump_h1(const(char) *title) {
 
 /// Dump given file to stdout.
 /// Returns: Error code if non-zero
-int dump() {
-	FILE *f = fopen(globals.cli.file, "rb"); // Handles null file pointers
-	if (f == null) {
-		perror(MODULE);
-		return EXIT_FAILURE;
-	}
+int app_dump() {
 	
 	if (globals.cli.flags & DumpOpt.raw) {
-		if (fseek(f, 0, SEEK_END)) {
-			perror(MODULE);
-			puts("dump: could not seek file");
-			return EXIT_FAILURE;
-		}
-		uint fl = cast(uint)ftell(f);
-		fseek(f, 0, SEEK_SET); // rewind binding is broken
+		size_t size;
+		ubyte *buffer = adbg_util_readall(&size, globals.cli.file);
 		
-		void *data = malloc(fl);
-		if (data == null) {
-			perror(MODULE);
-			return EXIT_FAILURE;
-		}
-		if (fread(data, fl, 1, f) == 0) {
+		if (buffer == null) {
 			perror(MODULE);
 			return EXIT_FAILURE;
 		}
 		
 		with (globals)
-		return dump_disasm(&app.disasm, data, fl, cli.flags);
+		return dump_disasm(&app.disasm, buffer, size, cli.flags);
+	}
+	
+	FILE *f = fopen(globals.cli.file, "rb"); // Handles null file pointers
+	if (f == null) {
+		perror(MODULE);
+		return EXIT_FAILURE;
 	}
 	
 	adbg_object_t obj = void;
@@ -159,7 +151,7 @@ int dump() {
 /// 	size = Data size
 /// 	flags = Configuration flags
 /// Returns: Status code
-int dump_disasm(adbg_disasm_t *dp, void* data, uint size, int flags) {
+int dump_disasm(adbg_disasm_t *dp, void* data, size_t size, int flags) {
 	adbg_disasm_opcode_t op = void;
 	
 	if (flags & DumpOpt.disasm_stats) {

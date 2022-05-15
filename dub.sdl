@@ -30,7 +30,7 @@ version "0.0.0"
 #       Yes, it works with -fno-druntime, so it can be possible to add
 #       -gdc-betterc build types in the future.
 
-#TODO: Rename versions to AdbgX to avoid conflicts if used as library
+#TODO: Consider renaming version Trace to AdbgTrace to avoid library conflicts
 
 #
 # ANCHOR Configurations

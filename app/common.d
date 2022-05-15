@@ -62,7 +62,7 @@ immutable setting_syntax_t[] syntaxes = [
 enum SettingMode { debugger, dump, analyze }
 
 /// Debugger UIs
-enum SettingUI { cmd, loop, tui, tcpserver }
+enum SettingUI { cmd, loop, tcpserver }
 
 /// Settings structure for the application (only!)
 struct settings_t {

@@ -21,7 +21,7 @@ extern (C):
 
 /// Enter the command-line loop
 /// Returns: Error code
-int cmd() {
+int app_cmd() {
 	term_init;
 	return cmd_loop;
 }
