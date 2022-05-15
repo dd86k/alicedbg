@@ -2,7 +2,7 @@
  * String helper functions. Simple string functions to aid redundant typing.
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: © 2019-2021 dd86k
+ * Copyright: © 2019-2022 dd86k <dd@dax.moe>
  * License: BSD-3-Clause
  */
 module adbg.utils.str;

@@ -4,7 +4,7 @@
  * This module is responsable for disassembling and formatting machine code.
  *
  * Authors: dd86k <dd@dax.moe>
- * Copyright: © 2019-2021 dd86k
+ * Copyright: © 2019-2022 dd86k <dd@dax.moe>
  * License: BSD-3-Clause
  */
 module adbg.disassembler;
