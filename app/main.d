@@ -22,7 +22,7 @@ extern (C):
 
 enum COPYRIGHT = "Copyright (c) 2019-2022 dd86k <dd@dax.moe>";
 
-immutable(char) *page_license =
+__gshared immutable(char) *page_license =
 `BSD 3-Clause License
 
 `~COPYRIGHT~`
@@ -56,7 +56,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
 debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__;
 else  enum FULL_VERSION = ADBG_VERSION;
 
-immutable(char) *page_version =
+__gshared immutable(char) *page_version =
 "alicedbg "~FULL_VERSION~" (built: "~__TIMESTAMP__~")\n"~
 COPYRIGHT~"\n"~
 "License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
@@ -94,7 +94,7 @@ struct option_t {
 //TODO: -e/--dump-skip: skip N bytes (or do +N)
 immutable option_t[] options = [
 	// general
-	{ 'm', "march",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
+	{ 'a', "arch",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
 	{ 's', "syntax",	"Select disassembler syntax (default=platform)", true, fa: &cli_syntax },
 	// debugger
 	{ 'f', "file",	"Debugger: Load executable (default parameter)", true, fa: &cli_file },
