@@ -66,12 +66,12 @@ version (Posix) {
 	}
 	
 	private enum TERM_ATTR = ~(ICANON | ECHO);
-	private termios old_tio = void, new_tio = void;
 	private enum SIGWINCH = 28;
+	private __gshared termios old_tio = void, new_tio = void;
 }
 
 /// User defined function for resize events
-private
+private __gshared
 void function(ushort,ushort) term_resize_handler;
 
 /// Terminal configuration options
@@ -210,8 +210,7 @@ void term_curpos(int x, int y) {
 	version (Windows) { // 0-based
 		COORD c = { cast(SHORT)x, cast(SHORT)y };
 		SetConsoleCursorPosition(handleOut, c);
-	} else
-	version (Posix) { // 1-based
+	} else version (Posix) { // 1-based
 		printf("\033[%d;%dH", y + 1, x + 1);
 	}
 }
@@ -223,13 +222,15 @@ void term_get_curpos(int *x, int *y) {
 		GetConsoleScreenBufferInfo(handleOut, &csbi);
 		*x = csbi.dwCursorPosition.X;
 		*y = csbi.dwCursorPosition.Y;
-	} else
-	version (Posix) { // 1-based
+	} else version (Posix) { // 1-based
+		int _x = void, _y = void;
 		tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
 		printf("\033[6n");
-		fscanf(stdin, "\033[%d;%dR", y, x); // row, col
+		version (GNU) scanf("\033[%d;%dR", _y, _x); // row, col
+		else          scanf("\033[%d;%dR", &_y, &_x); // row, col
 		tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
-		--*y; --*x;
+		*x = --_x;
+		*y = --_y;
 	}
 }
 
@@ -284,8 +285,7 @@ L_READ_AGAIN:
 		default: // Menu and Focus events
 			goto L_READ_AGAIN;
 		}
-	} else
-	version (Posix) {
+	} else version (Posix) {
 		//TODO: Get modifier keys states
 		// or better yet
 		//TODO: See console_ioctl for KDGETKEYCODE
@@ -360,7 +360,8 @@ L_END:
 //      or just term_event_ctrld (etc.)
 //TODO: damage-based display (putchar)
 //      instead of reprinting the whole string at every stroke
-//      yes, it's very noticeable on windows
+//      yes, it's very noticeable on windows (because of cursor positioning?)
+//TODO: Use realloc with enum INITBSZ = 2048
 /// Read a line from input keystrokes
 /// Params: length = Pointer that will contain the number of characters in the buffer
 /// Returns: Internal buffer pointer
