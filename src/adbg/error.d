@@ -26,7 +26,7 @@ enum AdbgError {
 	allocationFailed	= 3,
 	uninitiated	= 4,
 	notImplemented	= 5,
-	softAssert	= 80,
+	fault	= 80,
 	//
 	// External
 	//
@@ -82,7 +82,7 @@ private immutable error_msg_t[] errors = [
 	{ AdbgError.allocationFailed, "Memory allocation failed, maybe the machine is out of memory." },
 	{ AdbgError.uninitiated, "Object or structure is uninitiated." },
 	{ AdbgError.notImplemented, "Unimplemented." },
-	{ AdbgError.softAssert, "Soft assert." },
+	{ AdbgError.fault, "Soft assert." },
 	//
 	// Debugger
 	//

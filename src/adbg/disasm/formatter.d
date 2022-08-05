@@ -15,6 +15,7 @@ public import adbg.disasm.syntax.intel,
 	adbg.disasm.syntax.rv;
 package import adbg.disassembler;
 package import adbg.utils.str;
+package import adbg.error;
 
 //TODO: Number preferred style or instruction/immediate purpose
 //TODO: Make override with 'default' member? (for syntax default)

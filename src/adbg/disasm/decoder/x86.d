@@ -1,9 +1,6 @@
 /**
- * Linear 8086/x86/amd64 decoder.
+ * Linear x86 decoder.
  *
- * Supported extensions: MMX, Extended MMX
- *
- * Version: 4
  * Authors: dd86k <dd@dax.moe>
  * Copyright: © 2019-2022 dd86k <dd@dax.moe>
  * License: BSD-3-Clause
@@ -21,7 +18,7 @@ extern (C):
 
 // NOTE: x86-64 operation modes
 //       LMA=0: Legal Mode, LMA=1: Long Mode, CS.L: long, CS.D: dword
-//       modes | CS.L=0  CS.D=0  | CS.L=0  CS.D=1  | CS.L=1  CS.D=0  | CS.L=1  CS.D=1  |
+//             | CS.L=0  CS.D=0  | CS.L=0  CS.D=1  | CS.L=1  CS.D=0  | CS.L=1  CS.D=1  |
 //       LMA=0 | standard 16-bit | standard 32-bit | standard 16-bit | standard 32-bit |
 //       LMA=1 | 16-bit compat.  | 32-bit compat.  | 64-bit          | reserved        |
 // NOTE: AT&T: bound/invlpga/enter/other opcodes with 2 immediates: no reversed order
@@ -48,7 +45,7 @@ extern (C):
 /// Params: p = adbg_disasm_t pointer.
 /// Returns: Error code.
 int adbg_disasm_x86(adbg_disasm_t *disasm) {
-	x86_internals_t state;
+	x86_state_t state;
 	state.disasm = disasm;
 	
 	switch (disasm.platform) with (AdbgPlatform) {
@@ -879,16 +876,16 @@ private:
 //              Notes:             '      ''''        '
 
 /// x86 internal structure
-struct x86_internals_t { align(1):
+struct x86_state_t { align(1):
 	adbg_disasm_t *disasm;	/// Disassembler
 	uint has;	/// Has a certain prefix
-	private struct Prefix { align(1):
+	struct Prefix { align(1):
 		AdbgDisasmType data;	/// Data register mode width
 		AdbgDisasmType addr;	/// Address register mode width
 		x86Seg segment;	/// Segment override
 		x86Select select;	/// SSE/VEX instruction selector
 	} Prefix pf;	/// Prefix data
-	private struct VEX { align(1):
+	struct VEX { align(1):
 		ubyte LL;	/// VEX.L/EVEX.LL vector length
 				// VEX:  0=scalar/i128, 1=i256
 				// EVEX: 2=i512, 3=i1024 (reserved)
@@ -907,7 +904,9 @@ struct x86_internals_t { align(1):
 		bool  B;	/// REX.B/VEX.B
 				// Affects: ModRM.RM, SIB.BASE, opcode (non-CS.D?)
 		ubyte zaaa;	/// EVEX.z | EVEX.aaa
-	} VEX vex;	/// AMD REX and AVX VEX/EVEX data
+	} VEX vex;	/// REX and AVX VEX/EVEX data
+	bool vsib;
+	private bool[3] res;
 }
 
 //
@@ -915,20 +914,19 @@ struct x86_internals_t { align(1):
 //
 
 // ANCHOR 0f: 2-byte escape
-int adbg_disasm_x86_0f(ref x86_internals_t state) {
+int adbg_disasm_x86_0f(ref x86_state_t state) {
 	const(char) *m = void;
 	adbg_disasm_operand_mem_t mem = void;
-	int opflags = void;
-	ubyte opcode = void;
 	ubyte modrm = void;
-	bool vexmode = (state.has & x86Has.anyVex) != 0;
 	
+	ubyte opcode = void;
 	int e = adbg_disasm_fetch!ubyte(&opcode, state.disasm, AdbgDisasmTag.opcode);
 	if (e) return e;
 	
 	if (opcode < 0x10) {
-		if (vexmode)
+		if (state.has & x86Has.anyVex)
 			return adbg_oops(AdbgError.illegalInstruction);
+		
 		switch (opcode) {
 		case 0: return adbg_disasm_x86_group6(state);
 		case 1: return adbg_disasm_x86_group7(state);
@@ -1050,9 +1048,9 @@ int adbg_disasm_x86_0f(ref x86_internals_t state) {
 		}
 		
 		if (state.disasm.mode >= AdbgDisasmMode.file)
-			adbg_disasm_add_mnemonic(state.disasm, m + !vexmode);
+			adbg_disasm_add_mnemonic(state.disasm,
+				m + !(state.has & x86Has.anyVex));
 		
-		//return adbg_disasm_x86_op_vex_modrm2(state, opflags, modrm);
 		return adbg_oops(AdbgError.notImplemented);
 	}
 	if (opcode < 0x30) { // 20H..2FH:
@@ -1062,7 +1060,7 @@ int adbg_disasm_x86_0f(ref x86_internals_t state) {
 		return adbg_oops(AdbgError.notImplemented);
 	}
 	if (opcode < 0x50) { // 40H..4FH: CMOVcc Gv, Ev
-		if (vexmode)
+		if (state.has & x86Has.anyVex)
 			return adbg_oops(AdbgError.illegalInstruction);
 		
 		static immutable const(char)*[16] x86_M_CMOVcc = [
@@ -1082,20 +1080,20 @@ int adbg_disasm_x86_0f(ref x86_internals_t state) {
 }
 
 // ANCHOR 0f 38: 3-byte escape
-int adbg_disasm_x86_0f38(ref x86_internals_t state) {
+int adbg_disasm_x86_0f38(ref x86_state_t state) {
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
 
 // ANCHOR 0f 3a: 3-byte escape
-int adbg_disasm_x86_0f3a(ref x86_internals_t state) {
+int adbg_disasm_x86_0f3a(ref x86_state_t state) {
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
 
 // ANCHOR 0f 0f: 3DNow!
 // 0Fh 0Fh [ModRM] [SIB] [displacement] imm8_opcode
-int adbg_disasm_x86_3dnow(ref x86_internals_t state) {
+int adbg_disasm_x86_3dnow(ref x86_state_t state) {
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -2631,7 +2629,7 @@ immutable const(char)*[8] x86mmx = [ // 64b
 /// EbGb/EvGv/GbEb/GvEv, auto modrm
 // D: 0=mem, 1=reg
 // W: 0=i8, 1=i16/i32 (disasm64 if REX.W)
-int adbg_disasm_x86_op_modrm(ref x86_internals_t state, bool D, bool W) {
+int adbg_disasm_x86_op_modrm(ref x86_state_t state, bool D, bool W) {
 	version (Trace) trace("D=%d W=%d", D, W);
 	
 	ubyte modrm = void;
@@ -2646,7 +2644,7 @@ int adbg_disasm_x86_op_modrm(ref x86_internals_t state, bool D, bool W) {
 /// EbGb/EvGv/GbEb/GvEv, manual modrm
 // D: (direction bit) 0=mem, 1=reg
 // W: (wide bit) 0=i8, 1=i16/i32 (disasm64 if REX.W)
-int adbg_disasm_x86_op_modrm2(ref x86_internals_t state, ubyte modrm, bool D, bool W) {
+int adbg_disasm_x86_op_modrm2(ref x86_state_t state, ubyte modrm, bool D, bool W) {
 	version (Trace) trace("modrm=%x D=%d W=%d", modrm, D, W);
 	
 	if (W == false)
@@ -2656,7 +2654,7 @@ int adbg_disasm_x86_op_modrm2(ref x86_internals_t state, ubyte modrm, bool D, bo
 }
 /// EbGb/EvGv/GbEb/GvEv, auto modrm with width
 // D: 0=mem, 1=reg
-int adbg_disasm_x86_op_modrm3(ref x86_internals_t state, AdbgDisasmType width, bool D) {
+int adbg_disasm_x86_op_modrm3(ref x86_state_t state, AdbgDisasmType width, bool D) {
 	version (Trace) trace("width=%u D=%u", width, D);
 	
 	ubyte modrm = void;
@@ -2665,7 +2663,7 @@ int adbg_disasm_x86_op_modrm3(ref x86_internals_t state, AdbgDisasmType width, b
 	
 	return adbg_disasm_x86_modrm(state, modrm, width, D);
 }
-int adbg_disasm_x86_op_Ib(ref x86_internals_t state) {	// Immediate 8-bit
+int adbg_disasm_x86_op_Ib(ref x86_state_t state) {	// Immediate 8-bit
 	ubyte v = void;
 	int e = adbg_disasm_fetch!ubyte(&v, state.disasm, AdbgDisasmTag.immediate);
 	if (e) return e;
@@ -2673,7 +2671,7 @@ int adbg_disasm_x86_op_Ib(ref x86_internals_t state) {	// Immediate 8-bit
 		adbg_disasm_add_immediate(state.disasm, AdbgDisasmType.i8, &v);
 	return 0;
 }
-int adbg_disasm_x86_op_Iz(ref x86_internals_t state) {	// Immediate 16/32-bit
+int adbg_disasm_x86_op_Iz(ref x86_state_t state) {	// Immediate 16/32-bit
 	union u_t {
 		uint i32;
 		ushort i16;
@@ -2697,7 +2695,7 @@ int adbg_disasm_x86_op_Iz(ref x86_internals_t state) {	// Immediate 16/32-bit
 	
 	return e;
 }
-int adbg_disasm_x86_op_GvMa(ref x86_internals_t state) {	// BOUND
+int adbg_disasm_x86_op_GvMa(ref x86_state_t state) {	// BOUND
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -2719,7 +2717,7 @@ int adbg_disasm_x86_op_GvMa(ref x86_internals_t state) {	// BOUND
 	adbg_disasm_add_memory2(state.disasm, cast(AdbgDisasmType)(state.pf.data + 1), &mem);
 	return 0;
 }
-int adbg_disasm_x86_op_GzMp(ref x86_internals_t state) { // LDS/LES
+int adbg_disasm_x86_op_GzMp(ref x86_state_t state) { // LDS/LES
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -2743,7 +2741,7 @@ int adbg_disasm_x86_op_GzMp(ref x86_internals_t state) { // LDS/LES
 	adbg_disasm_add_memory2(state.disasm, AdbgDisasmType.far, &mem);
 	return 0;
 }
-int adbg_disasm_x86_op_Jb(ref x86_internals_t state) {	// Target immediate 8-bit
+int adbg_disasm_x86_op_Jb(ref x86_state_t state) {	// Target immediate 8-bit
 	ubyte v = void;
 	int e = adbg_disasm_fetch!ubyte(&v, state.disasm, AdbgDisasmTag.immediate);
 	if (e == 0) {
@@ -2754,7 +2752,7 @@ int adbg_disasm_x86_op_Jb(ref x86_internals_t state) {	// Target immediate 8-bit
 	}
 	return e;
 }
-int adbg_disasm_x86_op_Jz(ref x86_internals_t state) {	// Target immediate
+int adbg_disasm_x86_op_Jz(ref x86_state_t state) {	// Target immediate
 	int e = void;
 	switch (state.pf.data) with (AdbgDisasmType) {
 	case i16:
@@ -2777,7 +2775,7 @@ int adbg_disasm_x86_op_Jz(ref x86_internals_t state) {	// Target immediate
 		return 0;
 	}
 }
-int adbg_disasm_x86_op_Ap(ref x86_internals_t state) {	// immediate+segment (disasmn that order)
+int adbg_disasm_x86_op_Ap(ref x86_state_t state) {	// immediate+segment (disasmn that order)
 	int e = void;
 	ushort segment = void;
 	void *b = void;
@@ -2805,7 +2803,7 @@ int adbg_disasm_x86_op_Ap(ref x86_internals_t state) {	// immediate+segment (dis
 // SECTION Operand groups
 //
 
-int adbg_disasm_x86_escape(ref x86_internals_t state, ubyte opcode) {	// ANCHOR x87 escape
+int adbg_disasm_x86_escape(ref x86_state_t state, ubyte opcode) {	// ANCHOR x87 escape
 	immutable static const(char) *st = "st";
 	version (Trace) trace("opcode=%x", opcode);
 	
@@ -3024,7 +3022,7 @@ L_MNEMONIC:
 L_ILLEGAL:
 	return adbg_oops(AdbgError.illegalInstruction);
 }
-int adbg_disasm_x86_group1(ref x86_internals_t state, ubyte opcode) {	// ANCHOR Group 1
+int adbg_disasm_x86_group1(ref x86_state_t state, ubyte opcode) {	// ANCHOR Group 1
 	if (state.disasm.platform == AdbgPlatform.x86_64 && opcode == 0x82)
 		return adbg_oops(AdbgError.illegalInstruction);
 	
@@ -3056,7 +3054,7 @@ int adbg_disasm_x86_group1(ref x86_internals_t state, ubyte opcode) {	// ANCHOR 
 		adbg_disasm_x86_op_Ib(state) :
 		adbg_disasm_x86_op_Iz(state);
 }
-int adbg_disasm_x86_group1a(ref x86_internals_t state) {	// ANCHOR Group 1a
+int adbg_disasm_x86_group1a(ref x86_state_t state) {	// ANCHOR Group 1a
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -3081,7 +3079,7 @@ int adbg_disasm_x86_group1a(ref x86_internals_t state) {	// ANCHOR Group 1a
 	}
 	return 0;
 }
-int adbg_disasm_x86_group2(ref x86_internals_t state, ubyte opcode) {	// ANCHOR Group 2
+int adbg_disasm_x86_group2(ref x86_state_t state, ubyte opcode) {	// ANCHOR Group 2
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -3128,7 +3126,7 @@ int adbg_disasm_x86_group2(ref x86_internals_t state, ubyte opcode) {	// ANCHOR 
 		return 0;
 	}
 }
-int adbg_disasm_x86_group3(ref x86_internals_t state, ubyte opcode) {	// ANCHOR Group 3
+int adbg_disasm_x86_group3(ref x86_state_t state, ubyte opcode) {	// ANCHOR Group 3
 	immutable static const(char)*[8] X86_GRP3 =
 		[ X86_TEST, X86_TEST, X86_NOT, X86_NEG, X86_MUL, X86_IMUL, X86_DIV, X86_IDIV ];
 	ubyte modrm = void;
@@ -3165,7 +3163,7 @@ int adbg_disasm_x86_group3(ref x86_internals_t state, ubyte opcode) {	// ANCHOR 
 	}
 	return 0;
 }
-int adbg_disasm_x86_group4(ref x86_internals_t state) {	// ANCHOR Group 4
+int adbg_disasm_x86_group4(ref x86_state_t state) {	// ANCHOR Group 4
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -3194,7 +3192,7 @@ int adbg_disasm_x86_group4(ref x86_internals_t state) {	// ANCHOR Group 4
 		adbg_disasm_add_memory2(state.disasm, AdbgDisasmType.i8, &mem);
 	return 0;
 }
-int adbg_disasm_x86_group5(ref x86_internals_t state) {	// ANCHOR Group 5
+int adbg_disasm_x86_group5(ref x86_state_t state) {	// ANCHOR Group 5
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -3249,7 +3247,7 @@ int adbg_disasm_x86_group5(ref x86_internals_t state) {	// ANCHOR Group 5
 		adbg_disasm_add_memory2(state.disasm, far ? AdbgDisasmType.far : state.pf.data, &mem);
 	return 0;
 }
-int adbg_disasm_x86_group6(ref x86_internals_t state) {	// ANCHOR Group 6
+int adbg_disasm_x86_group6(ref x86_state_t state) {	// ANCHOR Group 6
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -3302,7 +3300,7 @@ int adbg_disasm_x86_group6(ref x86_internals_t state) {	// ANCHOR Group 6
 		adbg_disasm_add_memory2(state.disasm, state.pf.data, &mem);
 	return 0;
 }
-int adbg_disasm_x86_group7(ref x86_internals_t state) {	// ANCHOR Group 7
+int adbg_disasm_x86_group7(ref x86_state_t state) {	// ANCHOR Group 7
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -3422,19 +3420,19 @@ L_NONE:
 L_ILLEGAL:
 	return adbg_oops(AdbgError.illegalInstruction);
 }
-int adbg_disasm_x86_group8(ref x86_internals_t state) {	// ANCHOR Group 8
+int adbg_disasm_x86_group8(ref x86_state_t state) {	// ANCHOR Group 8
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_group9(ref x86_internals_t state) {	// ANCHOR Group 9
+int adbg_disasm_x86_group9(ref x86_state_t state) {	// ANCHOR Group 9
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_group10(ref x86_internals_t state) {	// ANCHOR Group 10
+int adbg_disasm_x86_group10(ref x86_state_t state) {	// ANCHOR Group 10
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_group11(ref x86_internals_t state, ubyte opcode) {	// ANCHOR Group 11
+int adbg_disasm_x86_group11(ref x86_state_t state, ubyte opcode) {	// ANCHOR Group 11
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -3468,23 +3466,23 @@ int adbg_disasm_x86_group11(ref x86_internals_t state, ubyte opcode) {	// ANCHOR
 		adbg_disasm_x86_op_Ib(state) :
 		adbg_disasm_x86_op_Iz(state);
 }
-int adbg_disasm_x86_group12(ref x86_internals_t state) {	// ANCHOR Group 12
+int adbg_disasm_x86_group12(ref x86_state_t state) {	// ANCHOR Group 12
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_group13(ref x86_internals_t state) {	// ANCHOR Group 13
+int adbg_disasm_x86_group13(ref x86_state_t state) {	// ANCHOR Group 13
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_group14(ref x86_internals_t state) {	// ANCHOR Group 14
+int adbg_disasm_x86_group14(ref x86_state_t state) {	// ANCHOR Group 14
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_group15(ref x86_internals_t state) {	// ANCHOR Group 15
+int adbg_disasm_x86_group15(ref x86_state_t state) {	// ANCHOR Group 15
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_group16(ref x86_internals_t state, ref adbg_disasm_operand_mem_t mem, ubyte reg) {	// ANCHOR Group 16 (disasmrefetch)
+int adbg_disasm_x86_group16(ref x86_state_t state, ref adbg_disasm_operand_mem_t mem, ubyte reg) {	// ANCHOR Group 16 (disasmrefetch)
 	if (state.disasm.mode < AdbgDisasmMode.file)
 		return 0;
 	
@@ -3504,11 +3502,11 @@ int adbg_disasm_x86_group16(ref x86_internals_t state, ref adbg_disasm_operand_m
 	adbg_disasm_add_memory2(state.disasm, AdbgDisasmType.i8, &mem);
 	return 0;
 }
-int adbg_disasm_x86_group17(ref x86_internals_t state) {	// ANCHOR Group 17
+int adbg_disasm_x86_group17(ref x86_state_t state) {	// ANCHOR Group 17
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_disasm_x86_group_prefetch(ref x86_internals_t state) {	// ANCHOR Group PREFETCH
+int adbg_disasm_x86_group_prefetch(ref x86_state_t state) {	// ANCHOR Group PREFETCH
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(&modrm, state.disasm, AdbgDisasmTag.modrm);
 	if (e) return e;
@@ -3548,7 +3546,7 @@ int adbg_disasm_x86_group_prefetch(ref x86_internals_t state) {	// ANCHOR Group 
 
 //TODO: modrm extraction
 //      either full
-//        int adbg_disasm_x86_modrm_extract(ref x86_internals_t state, ref ubyte mode, ref ubyte reg, ref ubyte rm)
+//        int adbg_disasm_x86_modrm_extract(ref x86_state_t state, ref ubyte mode, ref ubyte reg, ref ubyte rm)
 //      just extract
 //        void adbg_disasm_x86_modrm_extract(ref ubyte mode, ref ubyte reg, ref ubyte rm, ref ubyte modrm)
 //      or partial
@@ -3564,7 +3562,7 @@ int adbg_disasm_x86_group_prefetch(ref x86_internals_t state) {	// ANCHOR Group 
 /// 	width = Memory operation width, different from data and address widths.
 /// 	dir = If set, the register is the destination, otherwise register/memory.
 /// Returns: Error code
-int adbg_disasm_x86_modrm(ref x86_internals_t state, ubyte modrm, AdbgDisasmType width, bool dir) {
+int adbg_disasm_x86_modrm(ref x86_state_t state, ubyte modrm, AdbgDisasmType width, bool dir) {
 	version (Trace) trace("modrm=%x width=%u dir=%u", modrm, width, dir);
 	ubyte mode = modrm >> 6;
 	ubyte reg = (modrm >> 3) & 7;
@@ -3596,7 +3594,7 @@ int adbg_disasm_x86_modrm(ref x86_internals_t state, ubyte modrm, AdbgDisasmType
 	
 	return 0;
 }
-void adbg_disasm_x86_modrm_reg(ref x86_internals_t state, const(char) **basereg, ubyte reg) {
+void adbg_disasm_x86_modrm_reg(ref x86_state_t state, const(char) **basereg, ubyte reg) {
 	version (Trace) trace("reg=%x", reg);
 	static immutable const(char)*[] x86regs8rex = [ "spl", "bpl", "sil", "dil" ];
 	if (state.has & x86Has.anyRex && state.pf.data == AdbgDisasmType.i8) {
@@ -3607,7 +3605,7 @@ void adbg_disasm_x86_modrm_reg(ref x86_internals_t state, const(char) **basereg,
 	}
 	*basereg = x86regs[state.pf.data][reg];
 }
-int adbg_disasm_x86_modrm_rm(ref x86_internals_t state, adbg_disasm_operand_mem_t *mem, ubyte mode, ubyte rm) {
+int adbg_disasm_x86_modrm_rm(ref x86_state_t state, adbg_disasm_operand_mem_t *mem, ubyte mode, ubyte rm) {
 	version (Trace) trace("mem=%p mode=%x rm=%x", mem, mode, rm);
 	
 	mem.segment = x86segs[state.pf.segment];
@@ -3656,7 +3654,7 @@ int adbg_disasm_x86_modrm_rm(ref x86_internals_t state, adbg_disasm_operand_mem_
 		return 0;
 	}
 }
-int adbg_disasm_x86_sib(ref x86_internals_t state, adbg_disasm_operand_mem_t *mem, ubyte mode) {
+int adbg_disasm_x86_sib(ref x86_state_t state, adbg_disasm_operand_mem_t *mem, ubyte mode) {
 	ubyte sib = void;
 	int e = adbg_disasm_fetch!ubyte(&sib, state.disasm, AdbgDisasmTag.sib);
 	if (e) return e;
@@ -3711,88 +3709,16 @@ int adbg_disasm_x86_sib(ref x86_internals_t state, adbg_disasm_operand_mem_t *me
 // SECTION SSE/AVX mechanics
 //
 
+// Tied to instruction:
+// - AVX class exceptions
+// Tied to operand:
+// VSIB, AVX class exceptions
+
 immutable const(char)*[8] x86AVX512masks = [
 	null, "k1", "k2", "k3", "k4", "k5", "k6", "k7",
 ];
 immutable const(char) *x86AVX512zmask = "z";
 
-// NOTE: AVX meta
-//       Because I invested too much in bit trickery (disasmn 32 bits too,
-//       that's a little much!), the current strategy is simply to have an
-//       index to an array of operand definitions.
-
-enum x86AvxMode {
-	G,	/// Generial-purpose register (e.g., EAX)
-	P,	/// MMX Register
-	Q,	/// modrm: MMX Register or memory
-	U,	/// modrm: AVX Register from ModRM.rm
-	V,	/// modrm: AVX Register from ModRM.reg
-	W,	/// modrm: AVX Register or memory
-	I,	/// Immediate
-	H,	/// Non-desctructive register from VEX.vvvv
-	L,	/// 
-}
-
-enum x86AVXOpFlag : ushort {
-	vsib	= BIT!0,
-	addIb	= BIT!8,
-	addH	= BIT!9,
-	addLx	= BIT!10,
-}
-
-struct x86AvxMeta {
-	x86ModrmMode mode;	/// Operand mode (register, memory, etc.)
-	ubyte type;	/// Scalar type ()
-	ubyte width;	/// Scalar width (disasm8, i16, etc.)
-	ubyte exception;	/// SSE or AVX exception class
-	ushort flags;	/// 
-}
-
-enum Vss	= 1;
-
-immutable x86AvxMeta[] x86AVXOps = [
-	// Vss
-	{  },
-];
-
-//NOTE: AVX bitflags
-// - adbg_x86_check_class(x86Class.E12NP)
-//   - Reduced checks (modrm function deals with modrm errors)
-// Modes (original -> transformed):
-// - G -> reg
-// - V -> reg
-// - W -> regMem
-// - H -> extra
-// Extra flags:
-// - Ib
-// - Hx (disasmf effective VEX.vvvv != 0 when Hx is unset = #UB)
-// - Lx (disasmmm8[7:4] as reg)
-// Examples:
-// - Vpd, Wpd
-//   - dst
-//     - Mode.reg (V)
-//     - Width.i64
-//   - src
-//     - Mode.regmem (W)
-//     - Width.i64
-// - Wss, Hx, Vss
-//   - dst
-//     - Mode.regmem (W)
-//     - Width.i32 (ss)
-//   - src
-//     - Mode.reg (V)
-//     - Width.i32 (ss)
-//   - extra flags
-//     - Hx
-
-enum x86AvxWidth { // Used to override MMX/SSE/AVX widths
-	s,	/// i32 - Single-precision
-	ss = s,	/// i32
-	ps = s,	/// i32
-	d,	/// i64
-	sd = d,	/// i64
-	pd = d,	/// i64
-}
 enum x86ModrmMode : ubyte {
 	/// Destination or source is register (ModRM.reg).
 	reg,
@@ -3804,10 +3730,56 @@ enum x86ModrmMode : ubyte {
 	/// Destination or source is register-only.
 	rmRegOnly,
 }
+enum x86AvxMode : ubyte {
+	G,	/// Generial-purpose register (e.g., EAX)
+	P,	/// MMX Register
+	Q,	/// modrm: MMX Register or memory
+	U,	/// modrm: AVX Register from ModRM.rm
+	V,	/// modrm: AVX Register from ModRM.reg
+	W,	/// modrm: AVX Register or memory
+	I,	/// Immediate
+	H,	/// Non-desctructive register from VEX.vvvv (unset=#UB)
+	L,	/// imm8[7:4] is AVX register
+}
+enum x86AvxWidth : ubyte { // Used to override MMX/SSE/AVX widths
+	s,	/// i32 - Single-precision
+	ss,	/// i32
+	ps,	/// i32
+	d,	/// i64
+	sd,	/// i64
+	pd,	/// i64
+}
+
+enum x86AVXOpFlag : ushort { // Added to internal state
+	vsib	= BIT!0,
+	/*addIb	= BIT!8,
+	addH	= BIT!9,
+	addLx	= BIT!10,*/
+}
+
+struct x86Operand {
+	alias full this;
+	union {
+		int full;
+		struct {
+			x86AvxWidth width;
+			x86AvxMode mode;
+		}
+	}
+}
+
+template AVXOP(x86AvxMode mode, x86AvxWidth width) {
+	enum uint AVXOP = mode << 8 | width;
+}
+
+enum {
+	Vss	= AVXOP!(x86AvxMode.V, x86AvxWidth.ss),
+}
 
 /// AVX Exception Classes
 // NOTE: Embedded broadcast is not supported with the ".nb" suffix
-enum x86AVXEx { // Fault suppression depends on Mem operand
+enum x86AVXEx : ubyte { // Fault suppression depends on Mem operand
+	none,	/// 
 	E1,	/// Type 1, Vector Moves/Load/Stores, with fault suppression
 	E1NF,	/// Type 1, Vector Non-temporal Stores, No Fault suppression
 	E2,	/// Type 2, FP Vector Load+op, supports fault suppression
@@ -3832,7 +3804,7 @@ enum x86AVXEx { // Fault suppression depends on Mem operand
 	E12,	/// Type 12,
 }
 
-int adbg_disasm_x86_op_Lx(ref x86_internals_t state) {
+int adbg_disasm_x86_op_Lx(ref x86_state_t state) {
 	ubyte reg = void;
 	int e = adbg_disasm_fetch!ubyte(&reg, state.disasm, AdbgDisasmTag.immediate);
 	if (e) return e;
@@ -3844,20 +3816,86 @@ int adbg_disasm_x86_op_Lx(ref x86_internals_t state) {
 	return 0;
 }
 
-//NOTE: Not a variadic function because that generates more instructions
-int adbg_disasm_x86_ops_avx(ref x86_internals_t state,
-	ushort op1, ushort op2 = 0, ushort op3 = 0, ushort op4 = 0) {
+// Check state with AVX exception class
+int adbg_disasm_x86_avx_check(ref x86_state_t state, x86AVXEx exception) {
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
 
-int adbg_disasm_x86_op_avx(ref x86_internals_t state, ushort op) {
+// Process SSE/AVX operands
+//TODO: Consider variadic function that builds struct with int len + int[4]?
+int adbg_disasm_x86_ops_avx(ref x86_state_t state, immutable(int)[] operands) {
+	bool lx; // Lx
+	bool h;  // Hx
+	
+	/+const(char) *regstr = void;
+	int e = void;
+	
+	// NOTE: Per mode indicate mode dependong on SSE/AVX (?)
+	foreach (int operand; operands) {
+		x86Operand op = void;
+		op.full = operand;
+		
+		switch (op.mode) with (x86AvxMode) {
+		case V:
+			adbg_disasm_x86_modrm_reg(state, &regstr, reg);
+			if (modeFile)
+				adbg_disasm_add_register(state.disasm,
+					regstr,
+					x86masks[state.vex.zaaa & 7],
+					state.vex.zaaa >= 0x80 ? x86zmask : null);
+			break;
+		case W:
+			e = adbg_disasm_x86_modrm_rm(state, &amem, mod, rm);
+			if (e) return e;
+			if (modeFile) {
+				if (mod == 3)
+					adbg_disasm_add_register(state.disasm, amem.base);
+				else
+					adbg_disasm_add_memory2(state.disasm, state.pf.data, &amem);
+			}
+			break;
+		case L:
+			return adbg_disasm_x86_op_Lx(state);
+		default: return adbg_oops(AdbgError.fault);
+		}
+	}+/
+	
+	return adbg_oops(AdbgError.notImplemented);
+}
+
+int adbg_disasm_x86_op_avx(ref x86_state_t state, ushort oprnd) {
 	ubyte modrm = void; // used when op is modrm
 	
+	/*immutable(x86AvxMeta)* op = &x86AVXOps[index - 1];
+	
+	switch (op.mode) with (x86VexMode) {
+	case V:
+		adbg_disasm_x86_modrm_reg(disasm, &areg, reg);
+		if (modeFile)
+			adbg_disasm_add_register(state.disasm,
+				areg,
+				x86masks[state.vex.zaaa & 7],
+				state.vex.zaaa >= 0x80 ? x86zmask : null);
+		break;
+	case W:
+		e = adbg_disasm_x86_modrm_rm(disasm, &amem, mod, rm);
+		if (e) return e;
+		if (modeFile) {
+			if (mod == 3)
+				adbg_disasm_add_register(state.disasm, amem.base);
+			else
+				adbg_disasm_add_memory2(state.disasm, state.pf.data, &amem);
+		}
+		break;
+	default: return adbg_oops(AdbgError.softAssert);
+	}*/
+	
+	
 	return adbg_oops(AdbgError.notImplemented);
 }
 
-int adbg_disasm_x86_op_avx_modrm(ref x86_internals_t state, ubyte modrm) {
+int adbg_disasm_x86_op_avx_modrm(ref x86_state_t state, ubyte modrm) {
 	ubyte mod  = modrm >> 6;
 	ubyte reg  = (modrm >> 3) & 7;
 	ubyte rm   = modrm & 7;
@@ -3866,15 +3904,23 @@ int adbg_disasm_x86_op_avx_modrm(ref x86_internals_t state, ubyte modrm) {
 	
 	return adbg_oops(AdbgError.notImplemented);
 }
+int adbg_disasm_x86_op_avx_sib(ref x86_state_t state, ubyte sib) {
+	// VSIB: Using XMM/YMM as base
+	// - Any VEX prefix is used
+	// - 32-bit: illegal if address override to 16-bit
+	// - 16-bit: permitted if address override to 32-bit
+	
+	return adbg_oops(AdbgError.notImplemented);
+}
 
 /*deprecated
-int adbg_disasm_x86_op_vex_modrm(ref x86_internals_t state, uint ops) {
+int adbg_disasm_x86_op_vex_modrm(ref x86_state_t state, uint ops) {
 	ubyte modrm = void;
 	int e = adbg_disasm_fetch!ubyte(state.disasm, &modrm, AdbgDisasmTag.modrm);
 	return e ? e : adbg_disasm_x86_op_vex_modrm2(disasm, ops, modrm);
 }
 deprecated
-int adbg_disasm_x86_op_vex_modrm2(ref x86_internals_t state, uint ops, ubyte modrm) {
+int adbg_disasm_x86_op_vex_modrm2(ref x86_state_t state, uint ops, ubyte modrm) {
 	version (Trace) trace("ops=0x%x modrm=%x", ops, modrm);
 	
 	adbg_disasm_operand_mem_t amem = void;

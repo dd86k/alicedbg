@@ -383,6 +383,22 @@ struct adbg_disasm_t { align(1):
 	}
 }
 
+package
+template ADBG_TYPE(T) {
+	static if (is(T == ubyte))
+		enum ADBG_TYPE = AdbgDisasmType.i8;
+	else static if (is(T == ushort))
+		enum ADBG_TYPE = AdbgDisasmType.i16;
+	else static if (is(T == uint))
+		enum ADBG_TYPE = AdbgDisasmType.i32;
+	else static if (is(T == ulong))
+		enum ADBG_TYPE = AdbgDisasmType.i64;
+	else static if (is(T == float)) // weird
+		enum ADBG_TYPE = AdbgDisasmType.i32;
+	else static if (is(T == double)) // ditto
+		enum ADBG_TYPE = AdbgDisasmType.i64;
+}
+
 // alloc
 adbg_disasm_t *adbg_disasm_alloc(AdbgPlatform m) {
 	import core.stdc.stdlib : calloc;
@@ -619,6 +635,27 @@ struct adbg_disasm_operand_t { align(1):
 	}
 }
 
+/// Memory displacement
+struct adbg_disasm_disp_t { align(1):
+	AdbgDisasmType type;	/// Displacement type
+	void *value;	/// Displacement value pointer
+}
+
+package
+adbg_disasm_disp_t adbg_disasm_disp(void *data, AdbgDisasmType type) {
+	adbg_disasm_disp_t v = void;
+	v.value = data;
+	v.type = type;
+	return v;
+}
+package
+adbg_disasm_disp_t adbg_disasm_dispt(T)(void *data) {
+	adbg_disasm_disp_t v = void;
+	v.type = ADBG_TYPE!(T);
+	v.value = data;
+	return v;
+}
+
 /// (Internal) Fetch data from data source.
 /// Params:
 /// 	data = Data pointer
@@ -727,7 +764,8 @@ void adbg_disasm_add_mnemonic(adbg_disasm_t *disasm, const(char) *instruction) {
 // select operand
 private
 adbg_disasm_operand_t* adbg_disasm_get_operand(adbg_disasm_t *disasm) {
-	return cast(adbg_disasm_operand_t*)&disasm.opcode.operands[disasm.opcode.operandCount++];
+	return cast(adbg_disasm_operand_t*)
+		&disasm.opcode.operands[disasm.opcode.operandCount++];
 }
 
 // add segment override
@@ -738,10 +776,16 @@ void adbg_disasm_add_segment(adbg_disasm_t *disasm, const(char) *segment) {
 
 // set memory
 package
-void adbg_disasm_set_memory(adbg_disasm_operand_mem_t *mem,
-	const(char) *segment, const(char) *regbase, const(char) *regindex,
-	AdbgDisasmType dispWidth, void *disp,
-	ubyte scale, bool scaled, bool absolute) {
+void adbg_disasm_set_memory(
+	adbg_disasm_operand_mem_t *mem,
+	const(char) *segment,
+	const(char) *regbase,
+	const(char) *regindex,
+	AdbgDisasmType dispWidth,
+	void *disp,
+	ubyte scale,
+	bool scaled,
+	bool absolute) {
 	mem.segment   = segment;
 	mem.base      = regbase;
 	mem.index     = regindex;
@@ -763,8 +807,12 @@ void adbg_disasm_set_memory(adbg_disasm_operand_mem_t *mem,
 
 // add immediate
 package
-void adbg_disasm_add_immediate(adbg_disasm_t *disasm,
-	AdbgDisasmType width, void *v, ushort segment = 0, bool absolute = false) {
+void adbg_disasm_add_immediate(
+	adbg_disasm_t *disasm,
+	AdbgDisasmType width,
+	void *v,
+	ushort segment = 0,
+	bool absolute = false) {
 	if (disasm.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	
@@ -811,13 +859,19 @@ void adbg_disasm_add_register(adbg_disasm_t *disasm, const(char) *register,
 	item.reg.isStack = indexed;
 }
 
-// add memory
+// add memory operand item
 package
-void adbg_disasm_add_memory(adbg_disasm_t *disasm,
-	AdbgDisasmType width, const(char) *segment,
-	const(char) *regbase, const(char) *regindex,
-	AdbgDisasmType dispWidth, void *disp,
-	ubyte scale, bool scaled, bool absolute) {
+void adbg_disasm_add_memory(
+	adbg_disasm_t *disasm,
+	AdbgDisasmType width,
+	const(char) *segment,
+	const(char) *regbase,
+	const(char) *regindex,
+	AdbgDisasmType dispWidth,
+	void *disp,
+	ubyte scale,
+	bool scaled,
+	bool absolute) {
 	if (disasm.opcode.operandCount >= ADBG_MAX_OPERANDS)
 		return;
 	

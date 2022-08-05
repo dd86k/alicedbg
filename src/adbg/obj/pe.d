@@ -581,11 +581,9 @@ int adbg_obj_pe_preload(adbg_object_t *obj) {
 		}
 	}
 	
-	
-	with (AdbgPlatform)
-	switch (obj.pe.hdr.Machine) {
-	case PE_MACHINE_AMD64: obj.platform = x86_64; break;
-	case PE_MACHINE_I386: obj.platform = x86_32; break;
+	with (AdbgPlatform) switch (obj.pe.hdr.Machine) {
+	case PE_MACHINE_I386:    obj.platform = x86_32; break;
+	case PE_MACHINE_AMD64:   obj.platform = x86_64; break;
 	case PE_MACHINE_RISCV32: obj.platform = riscv32; break;
 	//TODO: Should error or have "unknown" value
 	default: obj.platform = AdbgPlatform.native;
