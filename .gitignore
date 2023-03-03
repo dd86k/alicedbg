@@ -8,6 +8,7 @@ docs/
 examples/
 /alicedbg
 alicedbg-test-*
+*.pdb
 *.so
 *.dylib
 *.dll
