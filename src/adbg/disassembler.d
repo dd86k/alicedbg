@@ -682,8 +682,8 @@ int adbg_disasm_fetch(T)(void *data, adbg_disasm_t *disasm, AdbgDisasmTag tag = 
 		e = 0;
 		break;
 	case debugger:
-		import adbg.dbg.debugger : adbg_mm_cread;
-		e = adbg_mm_cread(disasm.current.sz, data, T.sizeof);
+		import adbg.dbg.debugger : adbg_mm_read;
+		e = adbg_mm_read(disasm.current.sz, data, T.sizeof);
 		break;
 	default: assert(0);
 	}

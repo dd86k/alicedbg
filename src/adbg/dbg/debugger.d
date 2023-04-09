@@ -76,11 +76,11 @@ enum AdbgAction {
 	step,	/// Proceed with a single step
 }
 
-/// States the currently debugger state
+/// Debugger status
 public
-enum AdbgState {
+enum AdbgStatus {
 	idle,	/// Waiting for input
-	loaded,	/// Program loaded, waiting to run
+	ready,	/// Program loaded, waiting to run
 	running,	/// Executing debuggee
 	paused,	/// Exception occured
 }
@@ -106,10 +106,12 @@ struct adbg_debugger_event_t {
 
 private
 struct debuggee_t {
-	AdbgState state;
+	AdbgStatus status;
 	breakpoint_t[ADBG_MAX_BREAKPOINTS] breakpoints;
 	size_t bpindex;	/// breakpoint index
-	bool attached;	/// if debuggee was attached to
+	/// Set when debuggee was attached to rather than created.
+	/// This is used in the debugger loop.
+	bool attached;
 	version (Windows) {
 		HANDLE hpid;	/// Process handle
 		HANDLE htid;	/// Thread handle
@@ -160,6 +162,7 @@ private __gshared int g_options;	/// Debugger options
  * 	 flags = Reserved
  * Returns: Zero on success; Otherwise os error code is returned
  */
+//TODO: adbg_create seems more of an appropriate name...
 int adbg_load(const(char) *path, const(char) **argv = null,
 	const(char) *dir = null, const(char) **envp = null,
 	int flags = 0) {
@@ -211,7 +214,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		
 		// Microsoft recommends getting function pointer with
 		// GetProcAddress("kernel32", "IsWow64Process"), but so far
-		// only 64-bit versions of Windows really have WOW64.
+		// all 64-bit versions of Windows have WOW64 (does Embedded too?).
 		// Nevertheless, required to support 32-bit processes under
 		// 64-bit builds.
 		//TODO: IsWow64Process2 support
@@ -221,8 +224,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		version (Win64)
 		if (IsWow64Process(g_debuggee.hpid, &g_debuggee.wow64) == FALSE)
 			return adbg_oops(AdbgError.os);
-	} else
-	version (Posix) {
+	} else version (Posix) {
 		// Verify if file exists and we has access to it
 		stat_t st = void;
 		if (stat(path, &st) == -1)
@@ -309,7 +311,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 	}
 	
 	g_debuggee.attached = false;
-	g_debuggee.state = AdbgState.loaded;
+	g_debuggee.status = AdbgStatus.ready;
 	return 0;
 }
 
@@ -323,6 +325,13 @@ private int __adbg_chld(void* arg) {
 	return adbg_oops(AdbgError.os);
 }
 
+enum {
+	/// Stop debuggee when attached.
+	ADBG_ATTACH_OPT_STOP = 1,
+	/// Don't kill debuggee when debugger exits.
+	ADBG_ATTACH_OPT_EXITKILL = 1 << 1,
+}
+
 /**
  * Attach the debugger to a process ID.
  * Windows: Uses DebugActiveProcess
@@ -330,29 +339,101 @@ private int __adbg_chld(void* arg) {
  * Params:
  * 	pid = Process ID
  * 	flags = Reserved
- * Returns: Non-zero on error: (Posix) errno or (Windows) GetLastError
+ * Returns: OS error code on error
  */
 int adbg_attach(int pid, int flags = 0) {
+	bool stop = (flags & ADBG_ATTACH_OPT_STOP) != 0;
+	bool exitkill = (flags & ADBG_ATTACH_OPT_EXITKILL) != 0;
 	version (Windows) {
+		// Creates events:
+		// - CREATE_PROCESS_DEBUG_EVENT
+		// - CREATE_THREAD_DEBUG_EVENT
 		if (DebugActiveProcess(pid) == FALSE)
 			return adbg_oops(AdbgError.os);
-	} else
-	version (Posix) {
-		if (ptrace(PTRACE_SEIZE, pid, null, null) == -1)
+		
+		g_debuggee.pid = cast(DWORD)pid;
+		
+		// Default is TRUE
+		if (exitkill == false)
+			DebugSetProcessKillOnExit(FALSE);
+		
+		// DebugActiveProcess stops debuggee when attached
+		if (stop == false) {
+			DEBUG_EVENT e = void;
+			
+			wait: while (WaitForDebugEvent(&e, 100)) {
+				switch (e.dwDebugEventCode) {
+				case CREATE_PROCESS_DEBUG_EVENT:
+				case CREATE_THREAD_DEBUG_EVENT:
+					continue;
+				case EXCEPTION_DEBUG_EVENT:
+					ContinueDebugEvent(e.dwProcessId, e.dwThreadId, DBG_CONTINUE);
+					continue;
+				default:
+					break wait;
+				}
+			}
+			
+			// This was my second attempt, but, could be useful later...
+			/*import core.sys.windows.tlhelp32 :
+				CreateToolhelp32Snapshot, Thread32First, Thread32Next,
+				THREADENTRY32, TH32CS_SNAPTHREAD;
+			
+			// CreateToolhelp32Snapshot ignores th32ProcessID for TH32CS_SNAPTHREAD
+			HANDLE h_thread_snapshot =  CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+			if (h_thread_snapshot == INVALID_HANDLE_VALUE)
+				return adbg_oops(AdbgError.os);
+			
+			THREADENTRY32 te32 = void;
+			te32.dwSize = THREADENTRY32.sizeof;
+			
+			// If the first fails, all successive ones will fail
+			if (Thread32First(h_thread_snapshot, &te32) == FALSE)
+			{
+				CloseHandle(h_thread_snapshot);
+				return adbg_oops(AdbgError.os);
+			}
+			
+			do {
+				if (te32.th32OwnerProcessID == pid) {
+					ContinueDebugEvent(pid, te32.th32ThreadID, DBG_CONTINUE);
+				}
+			} while (Thread32Next(h_thread_snapshot, &te32));*/
+		}
+	} else version (Posix) {
+		if (ptrace(stop ? PTRACE_ATTACH : PTRACE_SEIZE, pid, null, null) == -1)
+			return adbg_oops(AdbgError.os);
+		
+		g_debuggee.pid = cast(pid_t)pid;
+		
+		if (exitkill)
+			if (ptrace(PTRACE_SETOPTIONS, pid, null, PTRACE_O_EXITKILL) == -1)
+				return adbg_oops(AdbgError.os);
+	}
+	
+	g_debuggee.attached = true;
+	g_debuggee.status = stop ? AdbgStatus.paused : AdbgStatus.running;
+	return 0;
+}
+
+/// Detach debugger from current process.
+int adbg_detach() {
+	version (Windows) {
+		if (DebugActiveProcessStop(g_debuggee.pid) == FALSE)
+			return adbg_oops(AdbgError.os);
+	} else version (Posix) {
+		if (ptrace(PTRACE_DETACH, g_debuggee.pid, null, null) == -1)
 			return adbg_oops(AdbgError.os);
 	}
-	g_debuggee.attached = true;
-	//TODO: Check if the process is really paused
-	g_debuggee.state = AdbgState.paused;
 	return 0;
 }
 
 /**
- * Get the debugger's current state.
- * Returns: AdbgState enum
+ * Get the debugger's current status.
+ * Returns: AdbgStatus enum
  */
-AdbgState adbg_state() {
-	return g_debuggee.state;
+AdbgStatus adbg_status() {
+	return g_debuggee.status;
 }
 
 /**
@@ -373,10 +454,10 @@ int adbg_run(int function(exception_t*) userfunc) {
 	version (Windows) {
 		DEBUG_EVENT de = void;
 L_DEBUG_LOOP:
-		g_debuggee.state = AdbgState.running;
+		g_debuggee.status = AdbgStatus.running;
 		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
 			return adbg_oops(AdbgError.os);
-		g_debuggee.state = AdbgState.paused;
+		g_debuggee.status = AdbgStatus.paused;
 		
 		// Filter events
 		switch (de.dwDebugEventCode) {
@@ -398,7 +479,7 @@ L_DEBUG_LOOP:
 		
 		adbg_ex_dbg(&e, &de);
 		
-		g_debuggee.state = AdbgState.paused;
+		g_debuggee.status = AdbgStatus.paused;
 		with (AdbgAction)
 		final switch (userfunc(&e)) {
 		case exit:
@@ -406,7 +487,7 @@ L_DEBUG_LOOP:
 				DebugActiveProcessStop(g_debuggee.pid);
 			else
 				ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
-			g_debuggee.state = AdbgState.idle;
+			g_debuggee.status = AdbgStatus.idle;
 			return 0;
 		case step:
 			// Enable single-stepping via Trap flag
@@ -438,24 +519,23 @@ L_DEBUG_LOOP:
 		case proceed:
 			if (ContinueDebugEvent(
 				de.dwProcessId, de.dwThreadId, DBG_CONTINUE) == FALSE) {
-				g_debuggee.state = AdbgState.idle;
+				g_debuggee.status = AdbgStatus.idle;
 				return adbg_oops(AdbgError.os);
 			}
 			goto L_DEBUG_LOOP;
 		}
-	} else
-	version (Posix) {
+	} else version (Posix) {
 		int wstatus = void;
 L_DEBUG_LOOP:
-		g_debuggee.state = AdbgState.running;
+		g_debuggee.status = AdbgStatus.running;
 		g_debuggee.pid = waitpid(-1, &wstatus, 0);
 		
 		if (g_debuggee.pid == -1) {
-			g_debuggee.state = AdbgState.idle;
+			g_debuggee.status = AdbgStatus.idle;
 			return adbg_oops(AdbgError.os);
 		}
 		
-		g_debuggee.state = AdbgState.paused;
+		g_debuggee.status = AdbgStatus.paused;
 		
 		// Bits  Description (Linux)
 		// 6:0   Signo that caused child to exit
@@ -470,7 +550,7 @@ L_DEBUG_LOOP:
 		// it exited and there's nothing more we can do about it.
 		// So return its status code
 		if ((wstatus & 0x7F) != 0x7F) {
-			g_debuggee.state = AdbgState.idle;
+			g_debuggee.status = AdbgStatus.idle;
 			return chld_signo;
 		}
 		
@@ -513,20 +593,20 @@ L_DEBUG_LOOP:
 		with (AdbgAction)
 		switch (userfunc(&e)) {
 		case exit:
-			g_debuggee.state = AdbgState.idle; // in either case
+			g_debuggee.status = AdbgStatus.idle; // in either case
 			// Because PTRACE_KILL is deprecated
 			if (kill(g_debuggee.pid, SIGKILL) == -1)
 				return adbg_oops(AdbgError.os);
 			return 0;
 		case step:
 			if (ptrace(PTRACE_SINGLESTEP, g_debuggee.pid, null, null) == -1) {
-				g_debuggee.state = AdbgState.idle;
+				g_debuggee.status = AdbgStatus.idle;
 				return adbg_oops(AdbgError.os);
 			}
 			goto L_DEBUG_LOOP;
 		case proceed:
 			if (ptrace(PTRACE_CONT, g_debuggee.pid, null, null) == -1) {
-				g_debuggee.state = AdbgState.idle;
+				g_debuggee.status = AdbgStatus.idle;
 				return adbg_oops(AdbgError.os);
 			}
 			goto L_DEBUG_LOOP;
@@ -572,7 +652,7 @@ int adbg_bp_rm_addr(size_t addr) {
 /// 	data = Pointer to data
 /// 	size = Size of data
 /// Returns: Non-zero on error
-int adbg_mm_cread(size_t addr, void *data, uint size) {
+int adbg_mm_read(size_t addr, void *data, uint size) {
 	version (Windows) {
 		if (ReadProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
 			return adbg_oops(AdbgError.os);
@@ -599,7 +679,7 @@ int adbg_mm_cread(size_t addr, void *data, uint size) {
 /// 	data = Pointer to data
 /// 	size = Size of data
 /// Returns: Non-zero on error
-int adbg_mm_cwrite(size_t addr, void *data, uint size) {
+int adbg_mm_write(size_t addr, void *data, uint size) {
 	version (Windows) {
 		if (WriteProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
 			return adbg_oops(AdbgError.os);
@@ -620,4 +700,19 @@ int adbg_mm_cwrite(size_t addr, void *data, uint size) {
 				addr + (i * c_long.sizeof), user);
 	}
 	return 0;
+}
+
+enum {
+	/// 
+	ADBG_SCAN_OPT_UNALIGNED = 1,
+	/// 
+	ADBG_SCAN_OPT_PROGRESS_CB = 1 << 16,
+}
+
+/// Scan debuggee process for a specific value
+int adbg_mm_scan(void* data, size_t size, size_t* addr, ...) {
+	
+	
+	
+	return adbg_oops(AdbgError.notImplemented); // done scanning
 }
