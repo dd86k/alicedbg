@@ -30,12 +30,12 @@ enum AdbgError {
 	//
 	// External
 	//
-	clib	= 90,
+	crt	= 90,
 	os	= 91,
 	//
 	// Debugger
 	//
-	
+	notAttached = 100,
 	//
 	// Disasembler
 	//
@@ -86,6 +86,7 @@ private immutable error_msg_t[] errors = [
 	//
 	// Debugger
 	//
+	{ AdbgError.notAttached, "No processes are attached to debugger." },
 	//
 	// Disassembler
 	//
@@ -144,7 +145,7 @@ int adbg_errno_extern() {
 	
 	with (AdbgError)
 	switch (error.code) {
-	case clib: return errno;
+	case crt: return errno;
 	case os:   return adbg_sys_errno;
 	default:   return error.code;
 	}
@@ -159,8 +160,8 @@ const(char)* adbg_error_msg(int code = error.code) {
 	
 	with (AdbgError)
 	switch (error.code) {
-	case clib: return strerror(errno);
-	case os:   return adbg_sys_error(adbg_sys_errno);
+	case crt: return strerror(errno);
+	case os:  return adbg_sys_error(adbg_sys_errno);
 	default:
 		foreach (ref e; errors)
 			if (code == e.code)
@@ -178,6 +179,7 @@ version (Trace) {
 	//TODO: Maybe use mixin() but ehhh
 	static if (COMPILER_FEAT_PRAGMA_PRINTF) {
 		/// Trace application
+		deprecated("Use adbg_log_trace instead")
 		pragma(printf)
 		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
 			va_list va;
@@ -188,6 +190,7 @@ version (Trace) {
 		}
 	} else {
 		/// Trace application
+		deprecated("Use adbg_log_trace instead")
 		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
 			va_list va;
 			va_start(va, fmt);
