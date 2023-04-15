@@ -369,6 +369,10 @@ int adbg_attach(int pid, int flags = 0) {
 			return adbg_oops(AdbgError.os);
 		
 		g_debuggee.pid = cast(DWORD)pid;
+		g_debuggee.hpid = OpenProcess(
+			PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+			FALSE,
+			cast(DWORD)pid);
 		
 		// Default is TRUE
 		if (exitkill == false)
@@ -747,7 +751,7 @@ int adbg_mm_maps(adbg_mm_map **maps, size_t *count, int flags = 0) {
 		if (EnumProcessModules(g_debuggee.hpid, mods, SIZE, &needed) == FALSE)
 			return adbg_oops(AdbgError.os);
 		
-		DWORD modcount = needed / DWORD.sizeof;
+		DWORD modcount = needed / HMODULE.sizeof;
 		
 		*maps = cast(adbg_mm_map*)malloc(modcount * adbg_mm_map.sizeof);
 		
