@@ -58,7 +58,7 @@ void adbg_log(AdbgLogLevel level, const(char)* msg) {
 	default: assert(0, "Missing level in adbg_log");
 	}
 	
-	snprintf(buffer, buffer_size, "%s: %s", mlevel, msg);
+	snprintf(buffer, buffer_size, "%s: %s\n", mlevel, msg);
 	adbg_log_receiver(buffer);
 }
 

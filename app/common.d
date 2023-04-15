@@ -106,7 +106,7 @@ int printerror(const(char)* func = cast(char*)__FUNCTION__) {
 	debug printf("[%s:%d] ", error.file, error.line);
 	printf("%s: E-%u ", func, adbg_errno);
 	switch (error.code) with (AdbgError) {
-	case clib: printf("(C runtime error %d) ", adbg_errno_extern); break;
+	case crt: printf("(C runtime error %d) ", adbg_errno_extern); break;
 	case os: printf("(OS error "~SYS_ERR_FMT~") ", adbg_errno_extern); break;
 	default:
 	}

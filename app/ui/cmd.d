@@ -8,7 +8,7 @@
 module ui.cmd;
 
 import adbg.etc.c.stdio;
-import adbg.etc.c.stdlib : exit;
+import adbg.etc.c.stdlib : exit, free;
 import adbg.error;
 import adbg.dbg.debugger, adbg.dbg.exception, adbg.dbg.context;
 import adbg.sys.err;
@@ -134,6 +134,11 @@ immutable command_t[] commands = [
 		"help", "<command>",
 		"Show this help screen",
 		&cmd_c_help
+	},
+	{
+		"maps", null,
+		"Show memory maps",
+		&cmd_c_maps
 	},
 	{
 		"quit", null,
@@ -305,6 +310,33 @@ int cmd_c_help(int argc, const(char) **argv) {
 
 int cmd_c_run(int argc, const(char) **argv) {
 	return adbg_run(&cmd_handler);
+}
+
+//
+// maps command
+//
+
+int cmd_c_maps(int argc, const(char) **argv) {
+	if (adbg_status() == AdbgStatus.idle) {
+		puts("error: Attach or spawn debuggee first");
+		return 1;
+	}
+	
+	adbg_mm_map *maps = void;
+	size_t mlen = void;
+	if (adbg_mm_maps(&maps, &mlen))
+	{
+		printf("error: %s\n", adbg_error_msg());
+		return adbg_errno();
+	}
+	for (size_t i; i < mlen; ++i)
+	{
+		adbg_mm_map *map = &maps[i];
+		printf("%16llx %8llx\n", cast(size_t)map.base, map.size);
+	}
+	free(maps);
+	
+	return 0;
 }
 
 //

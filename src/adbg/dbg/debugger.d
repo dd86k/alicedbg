@@ -15,14 +15,17 @@ module adbg.dbg.debugger;
 
 import core.stdc.config : c_long;
 import core.stdc.string : memset;
+import adbg.etc.c.stdlib : malloc, free;
 public import adbg.dbg.exception;
 import adbg.platform, adbg.error;
 
 version (Windows) {
+    pragma(lib, "Psapi.lib"); // for core.sys.windows.psapi
+	
 	import core.sys.windows.windows;
 	import adbg.sys.windows.wow64;
-} else
-version (Posix) {
+	import core.sys.windows.psapi : GetProcessImageFileNameA;
+} else version (Posix) {
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
 	import core.sys.posix.signal : kill, SIGKILL, siginfo_t, raise;
@@ -117,6 +120,7 @@ struct debuggee_t {
 		HANDLE htid;	/// Thread handle
 		int pid;	/// Process identificiation number
 		int tid;	/// Thread identification number
+		char[MAX_PATH] execpath;	/// 
 		version (Win64) int wow64; /// If running under WoW64
 	}
 	version (Posix) {
@@ -141,9 +145,20 @@ struct __adbg_child_t {
 package __gshared debuggee_t g_debuggee;	/// Debuggee information
 private __gshared int g_options;	/// Debugger options
 
-//TODO: Load/Attach flags
-//      - processOnly (only this process)
-//      - useClone (linux only)
+//TODO: adbg_create seems more of an appropriate name...
+
+//TODO: Consider adbg_create(const(char) *path, ...)
+//      ADBG_CREATE_OPT_ARGS - const(char) *args
+//      ADBG_CREATE_OPT_ARGV - const(char) **argv
+//      ADBG_CREATE_OPT_ENVP - const(char) **argv
+//      ADBG_CREATE_OPT_DIR  - const(char) *args
+//      ADBG_CREATE_OPT_DONTSTOP
+//        Make debuggee run as soon as possible
+//      ADBG_CREATE_OPT_CLONE
+//        (Linux) Use clone(2) instead of forking
+//        Shouldn't this stay a compile flag?
+//      ADBG_CREATE_OPT_PROCESS_ONLY
+//        Debug this process only
 
 /**
  * Load executable image into the debugger.
@@ -162,7 +177,6 @@ private __gshared int g_options;	/// Debugger options
  * 	 flags = Reserved
  * Returns: Zero on success; Otherwise os error code is returned
  */
-//TODO: adbg_create seems more of an appropriate name...
 int adbg_load(const(char) *path, const(char) **argv = null,
 	const(char) *dir = null, const(char) **envp = null,
 	int flags = 0) {
@@ -223,6 +237,9 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 		version (Win64)
 		if (IsWow64Process(g_debuggee.hpid, &g_debuggee.wow64) == FALSE)
+			return adbg_oops(AdbgError.os);
+		
+		if (GetProcessImageFileNameA(g_debuggee.hpid, g_debuggee.execpath.ptr, MAX_PATH) == FALSE)
 			return adbg_oops(AdbgError.os);
 	} else version (Posix) {
 		// Verify if file exists and we has access to it
@@ -684,8 +701,6 @@ int adbg_mm_write(size_t addr, void *data, uint size) {
 		if (WriteProcessMemory(g_debuggee.hpid, cast(void*)addr, data, size, null) == 0)
 			return adbg_oops(AdbgError.os);
 	} else { // Mostly taken from https://www.linuxjournal.com/article/6100
-		import core.stdc.string : memcpy;
-		
 		c_long *user = cast(c_long*)data;	/// user data pointer
 		int i;	/// offset index
 		int j = size / c_long.sizeof;	/// number of "blocks" to process
@@ -698,6 +713,61 @@ int adbg_mm_write(size_t addr, void *data, uint size) {
 		if (j)
 			ptrace(PTRACE_POKEDATA, g_debuggee.pid,
 				addr + (i * c_long.sizeof), user);
+	}
+	return 0;
+}
+
+enum {
+	ADBG_MM_OPT_PROCESS_ONLY = 1,
+}
+
+struct adbg_mm_map {
+	const(char) *name;
+	void *base;
+	size_t size;
+}
+
+int adbg_mm_maps(adbg_mm_map **maps, size_t *count, int flags = 0) {
+	version (Windows) {
+		import core.sys.windows.psapi :
+			GetModuleInformation,
+			EnumProcessModules,
+			MODULEINFO;
+		
+		if (g_debuggee.pid == 0) {
+			return adbg_oops(AdbgError.notAttached);
+		}
+		if (maps == null || count == null) {
+			return adbg_oops(AdbgError.nullArgument);
+		}
+		
+		enum SIZE = 512 * HMODULE.sizeof;
+		HMODULE *mods = cast(HMODULE*)malloc(SIZE);
+		DWORD needed = void;
+		if (EnumProcessModules(g_debuggee.hpid, mods, SIZE, &needed) == FALSE)
+			return adbg_oops(AdbgError.os);
+		
+		DWORD modcount = needed / DWORD.sizeof;
+		
+		*maps = cast(adbg_mm_map*)malloc(modcount * adbg_mm_map.sizeof);
+		
+		size_t mi;
+		for (DWORD i; i < modcount; ++i) {
+			HMODULE hmod = mods[i];
+			
+			MODULEINFO minfo = void;
+			if (GetModuleInformation(g_debuggee.hpid, hmod, &minfo, MODULEINFO.sizeof) == FALSE) {
+				continue;
+			}
+			
+			(*maps)[mi].base = minfo.EntryPoint;
+			(*maps)[mi].size = minfo.SizeOfImage;
+			
+			++mi;
+		}
+		*count = mi;
+	} else version (Posix) {
+		//TODO: Prase /proc/{pid}/maps
 	}
 	return 0;
 }
