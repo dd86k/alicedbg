@@ -176,10 +176,10 @@ version (Trace) {
 	
 	private extern (C) int putchar(int);
 	
-	//TODO: Maybe use mixin() but ehhh
+	//TODO: Eventually deprecate this for adbg_log_trace
+	
 	static if (COMPILER_FEAT_PRAGMA_PRINTF) {
 		/// Trace application
-		deprecated("Use adbg_log_trace instead")
 		pragma(printf)
 		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
 			va_list va;
@@ -190,7 +190,6 @@ version (Trace) {
 		}
 	} else {
 		/// Trace application
-		deprecated("Use adbg_log_trace instead")
 		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
 			va_list va;
 			va_start(va, fmt);
