@@ -17,6 +17,114 @@ extern (C):
 //TODO: Made it const(char)*? Forgot why it's char*.
 __gshared char *empty_string = cast(char*)"";
 
+/// Gets the next line out of a file stream.
+/// This skips empty lines.
+/// The extracted line is null-terminated.
+/// Params:
+///   bf = Line buffer input.
+///   bfsz = Line buffer input size.
+///   lnsz = Line length reference.
+///   file = File handle.
+/// Returns: Line length.
+size_t adbg_util_getlinef(char *bf, size_t bfsz, size_t *lnsz, FILE *file) {
+	if (bf == null || bfsz == 0 || lnsz == null || file == null)
+		return 0;
+	
+	import core.stdc.ctype : isprint;
+	
+	size_t i; /// Line buffer index
+	
+	// If fgetc return EOF, it is non-printable
+	for ( ; i < bfsz ; ++i) {
+		int c = fgetc(file);
+		
+		//TODO: Include tab as accepted
+		if (isprint(c) == false)
+			break;
+		
+		bf[i] = cast(char)c;
+	}
+	
+	bf[i] = 0;
+	*lnsz = i;
+	return i;
+}
+
+unittest {
+	import std.stdio : writefln;
+	import std.file : write, tempDir, remove;
+	import std.path : buildPath;
+	import std.string : toStringz;
+	
+	string tmppath = buildPath(tempDir, "alicedbg_unittest");
+	write(tmppath, "123\n\nabc");
+	FILE *fd = fopen(tmppath.toStringz, "r");
+	
+	char[16] line = void;
+	size_t linesz = void;
+	size_t i;
+	while (adbg_util_getlinef(line.ptr, 16, &linesz, fd)) {
+		final switch (++i) {
+		case 1: assert(strncmp(line.ptr, "123", linesz) == 0); break;
+		case 2: assert(strncmp(line.ptr, "abc", linesz) == 0); break;
+		}
+	}
+	
+	fclose(fd);
+	remove(tmppath);
+}
+
+/// Gets the next line out of a file stream.
+/// This skips empty lines.
+/// The extracted line is null-terminated.
+/// Params:
+///   bf = Line buffer input.
+///   bfsz = Line buffer input size.
+///   lnsz = Line length reference.
+///   src = Null-terminated buffer source.
+///   srcidx = Index reminder. It's best advised you don't touch this variable between calls.
+/// Returns: Line length.
+size_t adbg_util_getline(char *bf, size_t bfsz, size_t *lnsz, const(char) *src, size_t *srcidx) {
+	if (bf == null || bfsz == 0 || lnsz == null || src == null || srcidx == null)
+		return 0;
+	
+	import core.stdc.ctype : isprint;
+	
+	size_t i; /// Line buffer index
+	size_t s = *srcidx; /// Source buffer index
+	
+	// checking 0 in for-loop is important because somehow isprint might let it pass?
+	for (; src[s] && i < bfsz; ++i) {
+		int c = src[s++]; // unconditionally prep next pos
+		
+		//TODO: Include tab as accepted
+		if (isprint(c) == false)
+			break;
+		
+		bf[i] = cast(char)c;
+	}
+	
+	bf[i] = 0;
+	*srcidx = s;
+	*lnsz = i;
+	return i;
+}
+
+unittest {
+	import std.stdio : writeln;
+	const(char) *src = "123\n\nabc";
+	char[16] line = void;
+	size_t linesz = void;
+	size_t idx;
+	size_t i;
+	while (adbg_util_getline(line.ptr, 16, &linesz, src, &idx)) {
+		final switch (++i) {
+		case 1: assert(line[0..linesz] == "123"); break;
+		case 2: assert(line[0..linesz] == "abc"); break;
+		}
+	}
+}
+
 /// Convert a hex string into a byte array.
 /// Params:
 /// 	dst = Destination buffer.
@@ -32,6 +140,7 @@ int adbg_util_hex_array(ubyte *dst, size_t sz, const(char) *src, ref size_t news
 		char c = src[si];
 		if (c == 0) break;
 		
+		//TODO: Use isxdigit
 		if (c >= '0' && c <= '9') {
 			b = cast(ubyte)(c - '0');
 		} else if (c >= 'a' && c <= 'f') {
