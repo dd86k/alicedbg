@@ -219,7 +219,7 @@ void cmd_h_load() {
 //
 
 int cmd_c_r(int argc, const(char) **argv) {
-	if (paused == false) {
+	if (adbg_status == AdbgStatus.idle) {
 		puts("No program loaded or not paused");
 		return AppError.pauseRequired;
 	}
@@ -309,6 +309,10 @@ int cmd_c_help(int argc, const(char) **argv) {
 //
 
 int cmd_c_run(int argc, const(char) **argv) {
+	if (adbg_status != AdbgStatus.ready) {
+		puts("No programs loaded");
+		return AppError.alreadyLoaded;
+	}
 	return adbg_run(&cmd_handler);
 }
 
@@ -334,7 +338,7 @@ int cmd_c_maps(int argc, const(char) **argv) {
 		adbg_mm_map *map = &maps[i];
 		printf("%16llx %8llx\n", cast(size_t)map.base, map.size);
 	}
-	free(maps);
+	if (mlen) free(maps);
 	
 	return 0;
 }

@@ -24,6 +24,7 @@ enum AppError {
 	unavailable,
 	loadFailed,
 	pauseRequired,
+	alreadyLoaded,
 }
 
 // Platforms
