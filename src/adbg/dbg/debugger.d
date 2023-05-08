@@ -449,6 +449,17 @@ int adbg_detach() {
 	return 0;
 }
 
+/// Insert a debuggee break.
+//TODO: bool checkDebugger = false
+//      POSIX: https://stackoverflow.com/a/24969863
+void adbg_break() {
+	version (Windows) {
+		DebugBreak();
+	} else version (Posix) {
+		ptrace(PTRACE_TRACEME, 0, null, null);
+	}
+}
+
 /**
  * Get the debugger's current status.
  * Returns: AdbgStatus enum
@@ -721,22 +732,38 @@ int adbg_mm_write(size_t addr, void *data, uint size) {
 	return 0;
 }
 
+// adbg_mm_maps options
 enum {
+	/// Only get the memory regions for this process
 	ADBG_MM_OPT_PROCESS_ONLY = 1,
+	// With given Process ID instead
+	// Permission issues may be raised
+	//ADBG_MM_OPT_PID = 2,
 }
 
+/// Represents a mapped memory region
 struct adbg_mm_map {
-	const(char) *name;
+	//TODO: Name
+	//const(char) *name;
+	/// Base memory region address.
 	void *base;
+	/// Size of region.
 	size_t size;
+	/// Access permissions.
+	/// 
+	int access;
 }
 
-int adbg_mm_maps(adbg_mm_map **maps, size_t *count, int flags = 0) {
+/// Obtain the memory maps for the current process
+int adbg_mm_maps(adbg_mm_map **maps, size_t *count, ...) {
 	version (Windows) {
 		import core.sys.windows.psapi :
 			GetModuleInformation,
 			EnumProcessModules,
 			MODULEINFO;
+		
+		// if (ADBG_MM_OPT_PID)
+		//OpenProcess(
 		
 		if (g_debuggee.pid == 0) {
 			return adbg_oops(AdbgError.notAttached);
@@ -748,14 +775,16 @@ int adbg_mm_maps(adbg_mm_map **maps, size_t *count, int flags = 0) {
 		enum SIZE = 512 * HMODULE.sizeof;
 		HMODULE *mods = cast(HMODULE*)malloc(SIZE);
 		DWORD needed = void;
-		if (EnumProcessModules(g_debuggee.hpid, mods, SIZE, &needed) == FALSE)
+		if (EnumProcessModules(g_debuggee.hpid, mods, SIZE, &needed) == FALSE) {
+			free(mods);
 			return adbg_oops(AdbgError.os);
+		}
 		
 		DWORD modcount = needed / HMODULE.sizeof;
 		
 		*maps = cast(adbg_mm_map*)malloc(modcount * adbg_mm_map.sizeof);
 		
-		size_t mi;
+		size_t mi; /// (user) map index
 		for (DWORD i; i < modcount; ++i) {
 			HMODULE hmod = mods[i];
 			
@@ -769,18 +798,175 @@ int adbg_mm_maps(adbg_mm_map **maps, size_t *count, int flags = 0) {
 			
 			++mi;
 		}
+		
+		free(mods);
 		*count = mi;
-	} else version (Posix) {
-		//TODO: Prase /proc/{pid}/maps
-	}
-	return 0;
+		return 0;
+	} else version (linux) {
+		// Inspired by libscanmem
+		// https://github.com/scanmem/scanmem/blob/main/maps.c
+		import core.stdc.stdio : fopen, sscanf, fseek, ftell, fread, SEEK_END, SEEK_SET, FILE;
+		import core.stdc.config : c_long;
+		import core.stdc.stdlib : malloc, free;
+		import core.sys.linux.unistd : readlink;
+		import adbg.utils.str : adbg_util_getline, adbg_util_getlinef;
+		import core.sys.linux.unistd : read, close;
+		import core.sys.linux.fcntl : open, O_RDONLY;
+		
+		if (g_debuggee.pid == 0) {
+			return adbg_oops(AdbgError.notAttached);
+		}
+		if (maps == null || count == null) {
+			return adbg_oops(AdbgError.nullArgument);
+		}
+		
+		*count = 0;
+		
+		// Formulate proc map path
+		enum PROC_MAPS_LEN = 32;
+		char[PROC_MAPS_LEN] proc_maps = void;
+		snprintf(proc_maps.ptr, PROC_MAPS_LEN, "/proc/%u/maps", g_debuggee.pid);
+		version (Trace) trace("maps: %s", proc_maps.ptr);
+		
+		// Open process maps
+		int fd_maps = open(proc_maps.ptr, O_RDONLY);
+		if (fd_maps == -1)
+			return adbg_oops(AdbgError.os);
+		
+		// Formulate proc exe path
+		enum PROC_EXE_LEN = 32;
+		char[PROC_EXE_LEN] proc_exe = void;
+		snprintf(proc_exe.ptr, PROC_EXE_LEN, "/proc/%u/exe", g_debuggee.pid);
+		
+		// Read link from proc exe for process path (e.g., /usr/bin/cat)
+		enum EXE_PATH_LEN = 256;
+		char[EXE_PATH_LEN] exe_path = void;
+		version (Trace) trace("exe: %s", proc_exe.ptr);
+		ssize_t linksz = readlink(proc_exe.ptr, exe_path.ptr, EXE_PATH_LEN);
+		if (linksz > 0) {
+			exe_path[linksz] = 0;
+		} else { // Fail or empty
+			exe_path[0] = 0;
+		}
+		
+		// Allocate 4 MiB for input maps buffer
+		// WebKit has about 164K worth of maps, for example
+		// And then read as much as possible (not possible with fread)
+		enum READSZ = 4 * 1024 * 1024;
+		//TODO: Consider mmap(2)
+		char *procbuf = cast(char*)malloc(READSZ);
+		if (procbuf == null) {
+			version (Trace) trace("malloc failed");
+			close(fd_maps);
+			return adbg_oops(AdbgError.crt);
+		}
+		ssize_t readsz = read(fd_maps, procbuf, READSZ);
+		if (readsz == -1) {
+			version (Trace) trace("read failed");
+			free(procbuf);
+			close(fd_maps);
+			return adbg_oops(AdbgError.os);
+		}
+		version (Trace) trace("flen=%zu", readsz);
+		
+		// Count number of newlines for number of items to allocate
+		// Cut lines don't have newlines, so no worries here
+		size_t itemcnt;
+		for (size_t i; i < readsz; ++i)
+			if (procbuf[i] == '\n') ++itemcnt;
+		
+		// Allocate map items
+		version (Trace) trace("allocating %zu items", itemcnt);
+		*maps = cast(adbg_mm_map*)malloc(itemcnt * adbg_mm_map.sizeof);
+		if (*maps == null) {
+			free(procbuf);
+			close(fd_maps);
+			return adbg_oops(AdbgError.crt);
+		}
+		
+		// Go through each entry, which may look like this (without header):
+		// Address                   Perm Offset   Dev   inode      Path
+		// 55adaf007000-55adaf009000 r--p 00000000 08:02 1311130    /usr/bin/cat
+		// Perms: r=read, w=write, x=execute, s=shared or p=private (CoW)
+		// Path: Path or [stack], [stack:%id] (3.4 to 4.4), [heap]
+		//       [vdso]: https://lwn.net/Articles/615809/
+		//       [vvar]: Stores a "mirror" of kernel variables required by virt syscalls
+		//       [vsyscall]: Legacy user-kernel (jump?) tables for some syscalls
+		enum LINE_LEN = 256;
+		char[LINE_LEN] line = void;
+		size_t linesz = void; /// line size
+		size_t srcidx; /// maps source buffer index
+		size_t i; /// maps index
+		while (adbg_util_getline(line.ptr, LINE_LEN, &linesz, procbuf, &srcidx)) {
+			size_t range_start = void;
+			size_t range_end   = void;
+			char[4] perms      = void; // rwxp
+			uint offset        = void;
+			uint dev_major     = void;
+			uint dev_minor     = void;
+			uint inode         = void;
+			char[512] path     = void;
+			
+			if (sscanf(line.ptr, "%zx-%zx %4s %x %x:%x %u %512s",
+				&range_start, &range_end,
+				perms.ptr, &offset, &dev_major, &dev_minor, &inode, path.ptr) < 8) {
+				continue;
+			}
+			
+			// ELF load address regions
+			//
+			// When the ELF loader loads an executable or library image into
+			// memory, there is one memory region per section created:
+			// .text (r-x), .rodata (r--), .data (rw-), and .bss (rw-).
+			//
+			// The 'x' permission of .text is used to detect the load address
+			// (start of memory region) and the end of the ELF file in memory.
+			//
+			// .bss section:
+			// - Except for the .bss section, all memory sections typically
+			//   have the same filename of the executable image.
+			// - Empty filenames typically indicates .bss memory regions, and
+			//   may be consecutive with .data memory regions.
+			// - With some ELF images, .bss and .rodata may not be present.
+			//
+			// Resources:
+			// http://en.wikipedia.org/wiki/Executable_and_Linkable_Format
+			// http://wiki.osdev.org/ELF
+			// http://lwn.net/Articles/531148/
+			
+			//TODO: Adjust memory region permissions like libscanmem does
+			
+			version (Trace) trace("entry: %lx %s", range_start, path.ptr);
+			
+			(*maps)[i].base = cast(void*)range_start;
+			(*maps)[i].size = range_end - range_start;
+			
+			++i;
+		}
+		
+		*count = i;
+		free(procbuf);
+		return 0;
+	} else
+		// FreeBSD: procstat(1)
+		// - https://man.freebsd.org/cgi/man.cgi?query=vm_map
+		// - https://github.com/freebsd/freebsd-src/blob/main/lib/libutil/kinfo_getvmmap.c
+		// - args[0] = CTL_KERN
+		// - args[1] = KERN_PROC
+		// - args[2] = KERN_PROC_VMMAP
+		// - args[3] = pid
+		// NetBSD: pmap(1)
+		// OpenBSD: procmap(1)
+		return adbg_oops(AdbgError.notImplemented);
 }
 
 enum {
 	/// 
 	ADBG_SCAN_OPT_UNALIGNED = 1,
 	/// 
-	ADBG_SCAN_OPT_PROGRESS_CB = 1 << 16,
+	ADBG_SCAN_OPT_PROGRESS_CB = 2,
+	/// 
+	ADBG_SCAN_OPT_PID = 3,
 }
 
 /// Scan debuggee process for a specific value
