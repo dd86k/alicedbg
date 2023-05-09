@@ -24,7 +24,8 @@ version (Windows) {
 	
 	import core.sys.windows.windows;
 	import adbg.sys.windows.wow64;
-	import core.sys.windows.psapi : GetProcessImageFileNameA;
+	import core.sys.windows.psapi : GetProcessImageFileNameA,
+		GetMappedFileNameA, GetModuleBaseNameA;
 } else version (Posix) {
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
@@ -741,10 +742,18 @@ enum {
 	//ADBG_MM_OPT_PID = 2,
 }
 
+private enum MM_MAP_NAME_LEN = 512;
+
+enum {
+	ADBG_ACCESS_R = 1,
+	ADBG_ACCESS_W = 1 << 1,
+	ADBG_ACCESS_X = 1 << 2,
+	ADBG_ACCESS_P = 1 << 8,
+	ADBG_ACCESS_S = 1 << 9,
+}
+
 /// Represents a mapped memory region
 struct adbg_mm_map {
-	//TODO: Name
-	//const(char) *name;
 	/// Base memory region address.
 	void *base;
 	/// Size of region.
@@ -752,6 +761,8 @@ struct adbg_mm_map {
 	/// Access permissions.
 	/// 
 	int access;
+	/// 
+	char[MM_MAP_NAME_LEN] name;
 }
 
 /// Obtain the memory maps for the current process
@@ -782,25 +793,54 @@ int adbg_mm_maps(adbg_mm_map **maps, size_t *count, ...) {
 		
 		DWORD modcount = needed / HMODULE.sizeof;
 		
-		*maps = cast(adbg_mm_map*)malloc(modcount * adbg_mm_map.sizeof);
+		adbg_mm_map *map = *maps = cast(adbg_mm_map*)malloc(modcount * adbg_mm_map.sizeof);
 		
-		size_t mi; /// (user) map index
-		for (DWORD i; i < modcount; ++i) {
-			HMODULE hmod = mods[i];
-			
+		size_t i; /// (user) map index
+		for (DWORD mod_i; mod_i < modcount; ++mod_i) {
+			HMODULE mod = mods[mod_i];
 			MODULEINFO minfo = void;
-			if (GetModuleInformation(g_debuggee.hpid, hmod, &minfo, MODULEINFO.sizeof) == FALSE) {
+			if (GetModuleInformation(g_debuggee.hpid, mod, &minfo, MODULEINFO.sizeof) == FALSE) {
 				continue;
 			}
+			// \Device\HarddiskVolume5\xyz.dll
+			if (GetMappedFileNameA(g_debuggee.hpid, minfo.lpBaseOfDll, map.name.ptr, MM_MAP_NAME_LEN) == FALSE) {
+				// xyz.dll
+				if (GetModuleBaseNameA(g_debuggee.hpid, mod, map.name.ptr, MM_MAP_NAME_LEN) == FALSE) {
+					map.name[0] = 0;
+				}
+			}
 			
-			(*maps)[mi].base = minfo.EntryPoint;
-			(*maps)[mi].size = minfo.SizeOfImage;
+			MEMORY_BASIC_INFORMATION mem = void;
+			VirtualQuery(minfo.lpBaseOfDll, &mem, MEMORY_BASIC_INFORMATION.sizeof);
 			
-			++mi;
+			// Needs a bit for Copy-on-Write?
+			if (mem.AllocationProtect & PAGE_EXECUTE_WRITECOPY)
+				map.access = ADBG_ACCESS_R | ADBG_ACCESS_X;
+			else if (mem.AllocationProtect & PAGE_EXECUTE_READWRITE)
+				map.access = ADBG_ACCESS_R | ADBG_ACCESS_W | ADBG_ACCESS_X;
+			else if (mem.AllocationProtect & PAGE_EXECUTE_READ)
+				map.access = ADBG_ACCESS_R | ADBG_ACCESS_X;
+			else if (mem.AllocationProtect & PAGE_EXECUTE)
+				map.access = ADBG_ACCESS_X;
+			else if (mem.AllocationProtect & PAGE_READONLY)
+				map.access = ADBG_ACCESS_R;
+			else if (mem.AllocationProtect & PAGE_READWRITE)
+				map.access = ADBG_ACCESS_R | ADBG_ACCESS_W;
+			else if (mem.AllocationProtect & PAGE_WRITECOPY)
+				map.access = ADBG_ACCESS_R;
+			else
+				map.access = 0;
+			
+			map.access |= mem.Type == MEM_PRIVATE ? ADBG_ACCESS_P : ADBG_ACCESS_S;
+			
+			map.base = minfo.lpBaseOfDll;
+			map.size = minfo.SizeOfImage;
+			
+			++i; ++map;
 		}
 		
 		free(mods);
-		*count = mi;
+		*count = i;
 		return 0;
 	} else version (linux) {
 		// Inspired by libscanmem
@@ -877,8 +917,8 @@ int adbg_mm_maps(adbg_mm_map **maps, size_t *count, ...) {
 		
 		// Allocate map items
 		version (Trace) trace("allocating %zu items", itemcnt);
-		*maps = cast(adbg_mm_map*)malloc(itemcnt * adbg_mm_map.sizeof);
-		if (*maps == null) {
+		adbg_mm_map *map = *maps = cast(adbg_mm_map*)malloc(itemcnt * adbg_mm_map.sizeof);
+		if (map == null) {
 			free(procbuf);
 			close(fd_maps);
 			return adbg_oops(AdbgError.crt);
@@ -905,11 +945,11 @@ int adbg_mm_maps(adbg_mm_map **maps, size_t *count, ...) {
 			uint dev_major     = void;
 			uint dev_minor     = void;
 			uint inode         = void;
-			char[512] path     = void;
+			//char[512] path     = void;
 			
 			if (sscanf(line.ptr, "%zx-%zx %4s %x %x:%x %u %512s",
 				&range_start, &range_end,
-				perms.ptr, &offset, &dev_major, &dev_minor, &inode, path.ptr) < 8) {
+				perms.ptr, &offset, &dev_major, &dev_minor, &inode, map.name.ptr) < 8) {
 				continue;
 			}
 			
@@ -936,12 +976,17 @@ int adbg_mm_maps(adbg_mm_map **maps, size_t *count, ...) {
 			
 			//TODO: Adjust memory region permissions like libscanmem does
 			
-			version (Trace) trace("entry: %lx %s", range_start, path.ptr);
+			version (Trace) trace("entry: %zx %s", range_start, path.ptr);
 			
-			(*maps)[i].base = cast(void*)range_start;
-			(*maps)[i].size = range_end - range_start;
+			map.base = cast(void*)range_start;
+			map.size = range_end - range_start;
 			
-			++i;
+			map.access = perms[3] == 'p' ? ADBG_ACCESS_P : ADBG_ACCESS_S;
+			if (perms[0] == 'r') map.access |= ADBG_ACCESS_R;
+			if (perms[1] == 'w') map.access |= ADBG_ACCESS_W;
+			if (perms[2] == 'x') map.access |= ADBG_ACCESS_X;
+			
+			++i; ++map;
 		}
 		
 		*count = i;

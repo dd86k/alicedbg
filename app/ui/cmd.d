@@ -336,7 +336,7 @@ int cmd_c_maps(int argc, const(char) **argv) {
 	for (size_t i; i < mlen; ++i)
 	{
 		adbg_mm_map *map = &maps[i];
-		printf("%16llx %8llx\n", cast(size_t)map.base, map.size);
+		printf("%16llx %8llx %s\n", cast(size_t)map.base, map.size, map.name.ptr);
 	}
 	if (mlen) free(maps);
 	
