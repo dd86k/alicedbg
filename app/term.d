@@ -20,15 +20,14 @@ version (Windows) {
 	private import core.sys.windows.windows;
 	private enum ALT_PRESSED =  RIGHT_ALT_PRESSED  | LEFT_ALT_PRESSED;
 	private enum CTRL_PRESSED = RIGHT_CTRL_PRESSED | LEFT_CTRL_PRESSED;
-	private HANDLE handleIn, handleOut, handleOld;
+	private __gshared HANDLE handleIn, handleOut, handleOld;
 	// Internal buf
 	//TODO: structure
-	private ushort ibuf_x, ibuf_y, ibuf_w, ibuf_h;
-	private CHAR_INFO *ibuf;
-	private COORD ibuf_size, ibuf_pos;
-	private SMALL_RECT ibuf_rect;
-} else
-version (Posix) {
+	private __gshared ushort ibuf_x, ibuf_y, ibuf_w, ibuf_h;
+	private __gshared CHAR_INFO *ibuf;
+	private __gshared COORD ibuf_size, ibuf_pos;
+	private __gshared SMALL_RECT ibuf_rect;
+} else version (Posix) {
 	private import core.sys.posix.sys.ioctl;
 	private import core.sys.posix.unistd;
 	private import core.sys.posix.termios;
