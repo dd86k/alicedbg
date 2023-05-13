@@ -6,6 +6,10 @@ copyright "Copyright © 2019-2022 dd86k <dd@dax.moe> <dd@dax.moe>"
 license "BSD 3-clause"
 version "0.0.0"
 
+dependency "bindbc-loader" version="~>1.0.3"
+subConfiguration "bindbc-loader" "yesBC"
+
+
 # NOTE: BetterC flag
 #       We explicitly specify the betterC flag to support older DUB releases
 #       Like v0.9.24

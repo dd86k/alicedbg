@@ -32,6 +32,8 @@ enum AdbgError {
 	//
 	crt	= 90,
 	os	= 91,
+	loader	= 92,
+	capstone	= 93,
 	//
 	// Debugger
 	//
@@ -73,7 +75,7 @@ private struct error_msg_t {
 	const(char) *msg;
 }
 private immutable const(char) *defaultMsg = "Internal error.";
-private immutable error_msg_t[] errors = [
+private immutable error_msg_t[] errors_msg = [
 	//
 	// Generics
 	//
@@ -157,13 +159,18 @@ const(char)* adbg_error_msg(int code = error.code) {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
 	import adbg.sys.err : adbg_sys_error, adbg_sys_errno;
+	import bindbc.loader.sharedlib : errors;
 	
 	with (AdbgError)
 	switch (error.code) {
 	case crt: return strerror(errno);
 	case os:  return adbg_sys_error(adbg_sys_errno);
+	case loader:
+		if (errors.length)
+			return errors()[0].message;
+		return defaultMsg;
 	default:
-		foreach (ref e; errors)
+		foreach (ref e; errors_msg)
 			if (code == e.code)
 				return e.msg;
 		return defaultMsg;

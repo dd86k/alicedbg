@@ -61,7 +61,7 @@ __gshared immutable(char) *page_version =
 COPYRIGHT~"\n"~
 "License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
 "Homepage: <https://git.dd86k.space/dd86k/alicedbg>\n"~
-"Compiler: "~__VENDOR__~" "~STRVER!__VERSION__~"\n"~
+"Compiler: "~__VENDOR__~" "~DSTRVER!__VERSION__~"\n"~
 "Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
 "Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
 "CRT: "~TARGET_CRT~"\n"~
@@ -175,7 +175,7 @@ int cli_file(const(char) *val) {
 // ANCHOR --args/--
 //
 
-int cli_argsdd(int argi, int argc, const(char) **argv) { // --
+int cli_args_stop(int argi, int argc, const(char) **argv) { // --
 	import adbg.utils.str : adbg_util_move;
 	
 	enum MAX = 16;
@@ -364,8 +364,8 @@ int cli_help() {
 //
 
 // Turns a __VERSION__ number into a string constant
-template STRVER(uint ver) {
-	enum STRVER =
+template DSTRVER(uint ver) {
+	enum DSTRVER =
 		cast(char)((ver / 1000) + '0') ~ "." ~
 		cast(char)(((ver % 1000) / 100) + '0') ~
 		cast(char)(((ver % 100) / 10) + '0') ~
@@ -373,7 +373,18 @@ template STRVER(uint ver) {
 }
 
 int cli_version() {
+	import adbg.config : CONFIG_DISASM, AdbgConfigDisasm;
 	puts(page_version);
+	static if (CONFIG_DISASM == AdbgConfigDisasm.capstone) {
+		import adbg.include.capstone : capstone_dyn_init, cs_version;
+		if (capstone_dyn_init() == false) {
+			int major = void, minor = void;
+			cs_version(&major, &minor);
+			printf("Capstone: %d.%d\n", major, minor);
+		} else {
+			puts("Capstone: error");
+		}
+	}
 	exit(0);
 	return 0;
 }
@@ -427,9 +438,9 @@ int main(int argc, const(char)** argv) {
 		if (arg[1] == '-') { // Long options
 			const(char) *argLong = arg + 2;
 			
-			// test for "--" (debuggee args)
+			// test for "--" (extra args)
 			if (argLong[0] == 0) {
-				if (cli_argsdd(++argi, argc, argv))
+				if (cli_args_stop(++argi, argc, argv))
 					return EXIT_FAILURE;
 				break CLI;
 			}
@@ -496,6 +507,9 @@ int main(int argc, const(char)** argv) {
 		printf("main: unknown option '%s'\n", arg);
 		return EXIT_FAILURE;
 	}
+	
+	if (adbg_disasm_init())
+		return printerror(__FUNCTION__);
 	
 	with (globals) {
 		adbg_disasm_configure(&app.disasm, cli.platform);

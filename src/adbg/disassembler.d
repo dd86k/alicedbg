@@ -10,10 +10,15 @@
 module adbg.disassembler;
 
 import adbg.error;
+import adbg.config;
 private import adbg.utils.str;
 private import adbg.platform : adbg_address_t;
 private import adbg.disasm.decoders;
 public import adbg.disasm.formatter;
+
+static if (CONFIG_DISASM == AdbgConfigDisasm.capstone) {
+	import adbg.include.capstone;
+}
 
 //TODO: Invalid results could be rendered differently
 //      e.g., .byte 0xd6,0xd6 instead of (bad)
@@ -397,6 +402,24 @@ template ADBG_TYPE(T) {
 		enum ADBG_TYPE = AdbgDisasmType.i32;
 	else static if (is(T == double)) // ditto
 		enum ADBG_TYPE = AdbgDisasmType.i64;
+}
+
+//TODO: Consider making this a "generic" function
+//      e.g., adbg_init (would load other dynlibs we need)
+int adbg_disasm_init() {
+	import adbg.include.capstone : capstone_dyn_init;
+	
+	if (capstone_dyn_init()) {
+		version (Trace) {
+			import bindbc.loader.sharedlib : errors;
+			foreach (e; errors) {
+				trace("%s", e.message);
+			}
+		}
+		return adbg_oops(AdbgError.loader);
+	}
+	
+	return 0;
 }
 
 // alloc
