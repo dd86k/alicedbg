@@ -8,8 +8,8 @@
 module adbg.dbg.context;
 
 import adbg.dbg.debugger : g_debuggee;
-private import core.stdc.stdio : snprintf;
-private import core.stdc.stdarg;
+import adbg.etc.c.stdio : snprintf;
+import core.stdc.stdarg;
 
 version (Windows) {
 	import adbg.sys.windows.wow64;

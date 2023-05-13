@@ -7,7 +7,7 @@
  */
 module adbg.utils.str;
 
-import core.stdc.stdio;
+import adbg.etc.c.stdio;
 import core.stdc.stdarg;
 import core.stdc.string;
 
@@ -174,7 +174,6 @@ int adbg_util_hex_array(ubyte *dst, size_t sz, const(char) *src, ref size_t news
 
 //TODO: adbg_util_argv_flatten: custom loop
 size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
-	import core.stdc.stdio : snprintf;
 	if (argv == null)
 		return 0;
 

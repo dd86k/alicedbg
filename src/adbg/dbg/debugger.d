@@ -16,8 +16,10 @@ module adbg.dbg.debugger;
 import core.stdc.config : c_long;
 import core.stdc.string : memset;
 import adbg.etc.c.stdlib : malloc, free;
-public import adbg.dbg.exception;
+import adbg.etc.c.stdio : snprintf;
 import adbg.platform, adbg.error;
+import adbg.utils.str : adbg_util_argv_flatten;
+public import adbg.dbg.exception;
 
 version (Windows) {
     pragma(lib, "Psapi.lib"); // for core.sys.windows.psapi
@@ -33,7 +35,6 @@ version (Windows) {
 	import core.sys.posix.sys.uio;
 	import core.sys.posix.fcntl : open;
 	import core.stdc.stdlib : exit, malloc, free;
-	import core.stdc.stdio : snprintf;
 	import adbg.sys.posix.mann;
 	import adbg.sys.posix.ptrace;
 	import adbg.sys.posix.unistd;
@@ -185,9 +186,6 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	version (Windows) {
-		import core.stdc.stdlib : malloc, free;
-		import core.stdc.stdio : snprintf;
-		import adbg.utils.str : adbg_util_argv_flatten;
 		int bs = 0x4000; // buffer size, 16 KiB
 		ptrdiff_t bi;
 		char *b = cast(char*)malloc(bs); /// flat buffer

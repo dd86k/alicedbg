@@ -7,7 +7,7 @@
  */
 module adbg.utils.uid;
 
-import core.stdc.stdio;
+import adbg.etc.c.stdio;
 import adbg.utils.bit;
 
 extern (C):

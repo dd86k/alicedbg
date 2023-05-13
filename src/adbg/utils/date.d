@@ -21,7 +21,7 @@ extern (C):
 // windbg.exe x86 (0x2F269970): 1995-01-25
 // putty x64 (0x5D873EBE): Sun Sep 22 15:28:30 2019
 const(char)* ctime32(uint timestamp) {
-	import core.stdc.stdio : snprintf;
+	import adbg.etc.c.stdio : snprintf;
 	
 	enum S_YEAR = 31557600;
 	enum S_MONTH = 2629800;
