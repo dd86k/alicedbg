@@ -508,9 +508,6 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
-	if (adbg_disasm_init())
-		return printerror(__FUNCTION__);
-	
 	with (globals) {
 		adbg_disasm_configure(&app.disasm, cli.platform);
 		adbg_disasm_opt(&app.disasm, AdbgDisasmOpt.syntax, cli.syntax);

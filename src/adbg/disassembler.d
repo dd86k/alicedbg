@@ -16,7 +16,7 @@ private import adbg.platform : adbg_address_t;
 private import adbg.disasm.decoders;
 public import adbg.disasm.formatter;
 
-static if (CONFIG_DISASM == AdbgConfigDisasm.capstone) {
+static if (USE_CAPSTONE) {
 	import adbg.include.capstone;
 }
 
@@ -386,6 +386,10 @@ struct adbg_disasm_t { align(1):
 			bool userUnpackMachine;
 		}
 	}
+	static if (USE_CAPSTONE) {
+		csh cs_handle;
+		cs_insn cs_instruction;
+	}
 }
 
 package
@@ -404,29 +408,30 @@ template ADBG_TYPE(T) {
 		enum ADBG_TYPE = AdbgDisasmType.i64;
 }
 
-//TODO: Consider making this a "generic" function
-//      e.g., adbg_init (would load other dynlibs we need)
-int adbg_disasm_init() {
-	import adbg.include.capstone : capstone_dyn_init;
-	
-	if (capstone_dyn_init()) {
-		version (Trace) {
-			import bindbc.loader.sharedlib : errors;
-			foreach (e; errors) {
-				trace("%s", e.message);
-			}
-		}
-		return adbg_oops(AdbgError.loader);
-	}
-	
-	return 0;
-}
+private __gshared bool lib_cs_loaded = false;
 
 // alloc
 adbg_disasm_t *adbg_disasm_alloc(AdbgPlatform m) {
-	import core.stdc.stdlib : calloc;
+	import core.stdc.stdlib : calloc, free;
 	
 	version (Trace) trace("platform=%u", m);
+	
+	static if (USE_CAPSTONE) {
+		if (lib_cs_loaded == false) {
+			if (capstone_dyn_init()) {
+				version (Trace) {
+					import bindbc.loader.sharedlib : errors;
+					foreach (e; errors) {
+						trace("%s", e.message);
+					}
+				}
+				adbg_oops(AdbgError.loader);
+				return null;
+			}
+			lib_cs_loaded = true;
+			version (Trace) trace("capstone loaded");
+		}
+	}
 	
 	adbg_disasm_t *s = cast(adbg_disasm_t*)calloc(1, adbg_disasm_t.sizeof);
 	if (s == null) {
@@ -446,23 +451,58 @@ adbg_disasm_t *adbg_disasm_alloc(AdbgPlatform m) {
 int adbg_disasm_configure(adbg_disasm_t *disasm, AdbgPlatform m) {
 	version (Trace) trace("platform=%u", m);
 	
+	static if (USE_CAPSTONE) {
+		if (lib_cs_loaded == false) {
+			if (capstone_dyn_init()) {
+				version (Trace) {
+					import bindbc.loader.sharedlib : errors;
+					foreach (e; errors) {
+						trace("%s", e.message);
+					}
+				}
+				return adbg_oops(AdbgError.loader);
+			}
+			lib_cs_loaded = true;
+			version (Trace) trace("capstone loaded");
+		}
+	}
+	
+	static if (USE_CAPSTONE) {
+		int cs_arch, cs_mode;
+	}
+	
 	with (AdbgPlatform)
 	switch (m) {
 	case native: // equals 0
 		m = DEFAULT_PLATFORM;
 		goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
-		disasm.limit = ADBG_MAX_X86;
-		disasm.fdecode = &adbg_disasm_x86;
-		disasm.syntax = AdbgSyntax.intel;
-		disasm.foperand = &adbg_disasm_operand_intel;
+		static if (USE_CAPSTONE) {
+			cs_arch = CS_ARCH_X86;
+			switch (m) with (AdbgPlatform) {
+			case x86_16: cs_mode = CS_MODE_16; break;
+			case x86_32: cs_mode = CS_MODE_32; break;
+			case x86_64: cs_mode = CS_MODE_64; break;
+			default:
+			}
+		} else {
+			disasm.limit = ADBG_MAX_X86;
+			disasm.fdecode = &adbg_disasm_x86;
+			disasm.syntax = AdbgSyntax.intel;
+			disasm.foperand = &adbg_disasm_operand_intel;
+		}
+	
 		break;
 	case riscv32:
-		disasm.limit = ADBG_MAX_RV32;
-		disasm.fdecode = &adbg_disasm_riscv;
-		disasm.syntax = AdbgSyntax.riscv;
-		disasm.foperand = &adbg_disasm_operand_riscv;
-		break;
+		static if (USE_CAPSTONE) { // v5 has support but not v4
+			return adbg_oops(AdbgError.unsupportedPlatform);
+		} else {
+			disasm.limit = ADBG_MAX_RV32;
+			disasm.fdecode = &adbg_disasm_riscv;
+			disasm.syntax = AdbgSyntax.riscv;
+			disasm.foperand = &adbg_disasm_operand_riscv;
+			break;
+		}
 	/*case riscv64:
 		disasm.limit = ADBG_MAX_RV64;
 		disasm.fdecode = &adbg_disasm_riscv;
@@ -471,6 +511,11 @@ int adbg_disasm_configure(adbg_disasm_t *disasm, AdbgPlatform m) {
 		break;*/
 	default:
 		return adbg_oops(AdbgError.unsupportedPlatform);
+	}
+	
+	static if (USE_CAPSTONE) {
+		if (cs_open(cs_arch, cs_mode, &disasm.cs_handle))
+			return adbg_oops(AdbgError.capstone);
 	}
 	
 	// Defaults
@@ -574,33 +619,43 @@ int adbg_disasm(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op) {
 	if (disasm.cookie != ADBG_COOKIE)
 		return adbg_oops(AdbgError.uninitiated);
 	
-	//TODO: longjmp
-	//      Trust me, if I had working longjmp bindings on Windows, I
-	//      would have absolutely make the decoders longjmp back here
-	//      on error
-	
-	with (op) { // reset opcode
-		mnemonic = segment = null;
-		size = machineCount = prefixCount = operandCount = 0;
+	static if (USE_CAPSTONE) {
+		size_t sz = void; /// op size
+		return cs_disasm_iter(disasm.cs_handle,
+			cast(const(ubyte*)*)disasm.current.i8,
+			&sz,
+			&disasm.current.sz,
+			&disasm.cs_instruction) ? 0 : adbg_oops(AdbgError.capstone);
+	} else {
+		with (op) { // reset opcode
+			mnemonic = segment = null;
+			size = machineCount = prefixCount = operandCount = 0;
+		}
+		with (disasm) { // reset disasm
+			decoderAll = 0;
+		}
+		
+		extern (C)
+		int function(adbg_disasm_t*) decode = disasm.fdecode;
+		
+		if (decode == null)
+			return adbg_oops(AdbgError.uninitiated);
+		
+		disasm.opcode = op;
+		disasm.last = disasm.current;	// Save address
+		return decode(disasm);	// Decode
 	}
-	with (disasm) { // reset disasm
-		decoderAll = 0;
-	}
-	
-	extern (C)
-	int function(adbg_disasm_t*) decode = disasm.fdecode;
-	
-	if (decode == null)
-		return adbg_oops(AdbgError.uninitiated);
-	
-	disasm.opcode = op;
-	disasm.last = disasm.current;	// Save address
-	return decode(disasm);	// Decode
 }
 
-private import core.stdc.stdlib : free;
-/// Frees a previously allocated disassembly structure.
-public  alias adbg_disasm_free = free;
+void adbg_disasm_free(adbg_disasm_t *disasm) {
+	import core.stdc.stdlib : free;
+	
+	static if (USE_CAPSTONE) {
+		cs_close(&disasm.cs_handle);
+	}
+	
+	free(disasm);
+}
 
 /// Represents an instruction prefix
 struct adbg_disasm_prefix_t {

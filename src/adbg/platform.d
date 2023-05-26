@@ -7,6 +7,9 @@
  */
 module adbg.platform;
 
+//TODO: has feature xyz should be dynamic
+//      e.g., capstone may not be available, but could be after installing it
+
 // Other interesting versions:
 // - DRuntime_Use_Libunwind
 // - LDC_LLVM_ (LLVM version, e.g., 1100 for 11.0)
@@ -16,6 +19,8 @@ extern (C):
 //
 // ANCHOR Compile settings
 //
+
+//TODO: Move to config module?
 
 /// Amount of pointers to allocate
 enum ADBG_CLI_ARGV_ARRAY_COUNT	= 16;
