@@ -47,8 +47,29 @@ template CHAR32(char[4] s) {
 		enum uint CHAR32 = (s[3] << 24) | (s[2] << 16) | (s[1] << 8) | s[0];
 }
 
+struct adbg_swapper_t {
+	swapfunc16 swap16;
+	swapfunc32 swap32;
+	swapfunc64 swap64;
+}
+
+adbg_swapper_t adbg_config_swapper(bool wantsLSB) {
+	adbg_swapper_t swapper = void;
+	if (wantsLSB == PLATFORM_LSB) {
+		swapper.swap16 = &adbg_util_nop16;
+		swapper.swap32 = &adbg_util_nop32;
+		swapper.swap64 = &adbg_util_nop64;
+	} else {
+		swapper.swap16 = &adbg_util_bswap16;
+		swapper.swap32 = &adbg_util_bswap32;
+		swapper.swap64 = &adbg_util_bswap64;
+	}
+	return swapper;
+}
+
 /// Force a 16-bit number to be in little-endian in memory.
 /// Params: n = 16-bit number 
+deprecated("Unused")
 template LSB16(int n) {
 	version (BigEndian)
 		enum { LSB16 = adbg_util_bswap16(n) }
@@ -57,6 +78,7 @@ template LSB16(int n) {
 }
 /// Force a 32-bit number to be in little-endian in memory.
 /// Params: n = 32-bit number 
+deprecated("Unused")
 template LSB32(int n) {
 	version (BigEndian)
 		enum { LSB32 = adbg_util_bswap32(n) }
@@ -65,6 +87,7 @@ template LSB32(int n) {
 }
 /// Force a 64-bit number to be in little-endian in memory.
 /// Params: n = 64-bit number 
+deprecated("Unused")
 template LSB64(int n) {
 	version (BigEndian)
 		enum { LSB64 = adbg_util_bswap64(n) }
@@ -74,6 +97,7 @@ template LSB64(int n) {
 
 /// Force a 16-bit number to be in big-endian in memory.
 /// Params: n = 16-bit number 
+deprecated("Unused")
 template MSB16(int n) {
 	version (LittleEndian)
 		enum { MSB16 = adbg_util_bswap16(n) }
@@ -82,6 +106,7 @@ template MSB16(int n) {
 }
 /// Force a 32-bit number to be in big-endian in memory.
 /// Params: n = 32-bit number 
+deprecated("Unused")
 template MSB32(int n) {
 	version (LittleEndian)
 		enum { MSB32 = adbg_util_bswap32(n) }
@@ -90,6 +115,7 @@ template MSB32(int n) {
 }
 /// Force a 64-bit number to be in big-endian in memory.
 /// Params: n = 64-bit number 
+deprecated("Unused")
 template MSB64(int n) {
 	version (LittleEndian)
 		enum { MSB64 = adbg_util_bswap64(n) }
@@ -153,17 +179,20 @@ ushort adbg_util_bswap16(ushort v) pure nothrow @nogc {
 /// Byte-swap an 32-bit value.
 /// Params: v = 32-bit value
 /// Returns: Byte-swapped value
-// Source: https://stackoverflow.com/a/19560621
 uint adbg_util_bswap32(uint v) pure nothrow @nogc {
-	v = (v >> 16) | (v << 16);
-	return ((v & 0xFF00FF00) >> 8) | ((v & 0x00FF00FF) << 8);
+	//TODO: Determine when bswap was introduced (at least works for dmd 2.078)
+	import core.bitop : bswap;
+	return bswap(v); // Better intrinsics
+	// Source: https://stackoverflow.com/a/19560621
+	//v = (v >> 16) | (v << 16);
+	//return ((v & 0xFF00FF00) >> 8) | ((v & 0x00FF00FF) << 8);
 }
 
 /// Byte-swap an 64-bit value.
 /// Params: v = 64-bit value
 /// Returns: Byte-swapped value
-// Source: https://stackoverflow.com/a/19560621
 ulong adbg_util_bswap64(ulong v) pure nothrow @nogc {
+	// Source: https://stackoverflow.com/a/19560621
 	v = (v >> 32) | (v << 32);
 	v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
 	return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
