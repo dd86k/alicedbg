@@ -82,6 +82,7 @@ struct settings_t {
 	} cli_settings_t cli;	/// CLI settings
 	/// App settings
 	public struct app_settings_t {	/// 
+		//TODO: Make disasm dynamic? (pointer alloc)
 		adbg_disasm_t disasm;	/// Disassembler
 		exception_t last_exception;	/// Last exception
 		FILE *inputFile;	/// 

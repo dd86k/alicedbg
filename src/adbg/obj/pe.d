@@ -535,7 +535,7 @@ struct PE_SECTION_ENTRY { align(1):
 /// (Internal) Called by the server to preload a PE object.
 /// Params: obj = Object
 /// Returns: Status code
-int adbg_obj_pe_preload(adbg_object_t *obj) {
+int adbg_obj_pe_load(adbg_object_t *obj) {
 	obj.format = AdbgObjFormat.PE;
 	
 	void *offset = obj.buf + obj.pe.offset;

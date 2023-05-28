@@ -38,7 +38,7 @@ struct mz_reloc {
 	ushort segment;
 }
 
-int adbg_obj_mz_preload(adbg_object_t *obj) {
+int adbg_obj_mz_load(adbg_object_t *obj) {
 	obj.format = AdbgObjFormat.MZ;
 	obj.platform = AdbgPlatform.x86_16;
 	obj.mz.hdr = cast(mz_hdr*)obj.buf;

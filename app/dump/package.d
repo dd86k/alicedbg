@@ -7,4 +7,4 @@
  */
 module dump;
 
-public import dump.mz, dump.pe, dump.elf;
+public import dump.mz, dump.pe, dump.elf, dump.macho;

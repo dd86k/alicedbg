@@ -22,11 +22,12 @@ import core.stdc.stdio;
 import core.stdc.config : c_long;
 import adbg.error;
 import adbg.disassembler : AdbgPlatform;
-import adbg.obj.mz, adbg.obj.pe, adbg.obj.elf;
+import adbg.obj.mz, adbg.obj.pe, adbg.obj.elf, adbg.obj.macho;
 import adbg.utils.bit : CHAR16, CHAR32;
 
-//TODO: adbg_obj_is64bit
-//TODO: adbg_obj_ismsb
+//TODO: Revisit the implementation of the object server
+//TODO: const(ubyte) *adbg_obj_section(obj, ".abc");
+//TODO: uint u32 = pointer.fetch!ubyte(offset);
 
 extern (C):
 
@@ -62,12 +63,12 @@ struct adbg_object_impl_t {
 }
 
 /// (Internal) MZ meta structure
-private struct mz_t {
+private struct info_mz_t {
 	mz_hdr *hdr;
 	mz_reloc *relocs;
 }
 /// (Internal) PE meta structure
-private struct pe_t {
+private struct info_pe_t {
 	// Header
 	PE_HEADER *hdr;
 	union {
@@ -93,7 +94,7 @@ private struct pe_t {
 	uint offset; /// PE header file offset
 }
 /// (Internal) ELF meta structure
-private struct elf_t {
+private struct info_elf_t {
 	union {
 		Elf32_Ehdr *hdr32;
 		Elf64_Ehdr *hdr64;
@@ -107,9 +108,20 @@ private struct elf_t {
 		Elf64_Shdr *shdr64;
 	}
 }
+private struct info_macho_t {
+	union {
+		macho_header *hdr;
+		struct {
+			macho_fatmach_header *fathdr;
+			macho_fat_arch *fatarch;
+		}
+	}
+	
+	bool fat, reversed;
+}
 
 private enum IMPL_SIZE = adbg_object_impl_t.sizeof;
-private enum META_SIZE = pe_t.sizeof;
+private enum META_SIZE = info_pe_t.sizeof; // Since it's the largest
 
 /// Represents an object file or module.
 struct adbg_object_t {
@@ -145,9 +157,10 @@ struct adbg_object_t {
 	
 	adbg_object_impl_t impl; /// Internal
 	union {
-		mz_t mz;	/// MZ meta
-		pe_t pe;	/// PE32 meta
-		elf_t elf;	/// ELF meta
+		info_mz_t mz;	/// MZ meta
+		info_pe_t pe;	/// PE32 meta
+		info_elf_t elf;	/// ELF meta
+		info_macho_t macho;	/// Mach-O
 	}
 }
 
@@ -179,8 +192,7 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	
 	obj.file = file;
 	
-	// File size
-	
+	// Get file size
 	if (fseek(obj.file, 0, SEEK_END))
 		return adbg_oops(AdbgError.os);
 	
@@ -192,19 +204,15 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 		return adbg_oops(AdbgError.os);
 	
 	// Allocate
-	
 	obj.buf = malloc(obj.fsize);
-	
 	if (obj.buf == null)
 		return adbg_oops(AdbgError.os);
 	
 	// Read
-	
 	if (fread(obj.buf, obj.fsize, 1, obj.file) == 0)
 		return adbg_oops(AdbgError.os);
 	
-	// Set meta to zero (failsafe for future implementations)
-	
+	// zero internal stuff
 	memset(&obj.impl, 0, IMPL_SIZE + META_SIZE);
 	
 	// Auto-detection
@@ -213,7 +221,14 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 	
 	switch (obj.bufi32[0]) {
 	case CHAR32!"\x7FELF":
-		return adbg_obj_elf_preload(obj);
+		return adbg_obj_elf_load(obj);
+	case MACHO_MAGIC:	// 32-bit LE
+	case MACHO_MAGIC_64:	// 64-bit LE
+	case MACHO_CIGAM:	// 32-bit BE
+	case MACHO_CIGAM_64:	// 64-bit BE
+	case MACHO_FAT_MAGIC:	// Fat LE
+	case MACHO_FAT_CIGAM:	// Fat BE
+		return adbg_obj_macho_load(obj, obj.bufi32[0]);
 	default:
 	}
 	
@@ -225,8 +240,8 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 		obj.pe.offset = obj.bufi32[15]; // 0x3c / 4
 		
 		if (obj.pe.offset)
-		if (obj.pe.offset >= obj.fsize - PE_HEADER.sizeof)
-			return adbg_obj_mz_preload(obj);
+			if (obj.pe.offset >= obj.fsize - PE_HEADER.sizeof)
+				return adbg_obj_mz_load(obj);
 		
 		sig.u32 = *cast(uint*)(obj.buf + obj.pe.offset);
 		
@@ -234,11 +249,11 @@ int adbg_obj_open_file(adbg_object_t *obj, FILE *file) {
 		case CHAR16!"PE":
 			if (sig.u16[1]) // "PE\0\0"
 				return adbg_oops(AdbgError.unknownObjFormat);
-			return adbg_obj_pe_preload(obj);
+			return adbg_obj_pe_load(obj);
 		case CHAR16!"LE", CHAR16!"LX", CHAR16!"NE":
 			return adbg_oops(AdbgError.unsupportedObjFormat);
 		default: // Assume MZ
-			return adbg_obj_mz_preload(obj);
+			return adbg_obj_mz_load(obj);
 		}
 	default:
 		return adbg_oops(AdbgError.unknownObjFormat);

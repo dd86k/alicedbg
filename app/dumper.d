@@ -93,7 +93,6 @@ void dump_h1(const(char) *title) {
 /// Dump given file to stdout.
 /// Returns: Error code if non-zero
 int app_dump() {
-	
 	if (globals.cli.flags & DumpOpt.raw) {
 		size_t size;
 		ubyte *buffer = adbg_util_readall(&size, globals.cli.file);
@@ -122,22 +121,25 @@ int app_dump() {
 	}
 	
 	// When nothing is set, the default is to show headers
+	//TODO: Set header in .init then
 	if ((globals.cli.flags & 0xFF_FFFF) == 0)
 		globals.cli.flags |= DumpOpt.header;
 	
-	if (adbg_disasm_configure(&globals.app.disasm, obj.platform))
-		return printerror();
+	// Only setup disasm if requested
+	if (globals.cli.flags & DumpOpt.disasm)
+		if (adbg_disasm_configure(&globals.app.disasm, obj.platform))
+			return printerror();
 	
 	dump_t dump = void;
 	dump.obj = &obj;
 	dump.dopts = &globals.app.disasm;
 	dump.flags = globals.cli.flags;
 	
-	with (AdbgObjFormat)
-	switch (dump.obj.format) {
-	case MZ: return dump_mz(&dump);
-	case PE: return dump_pe(&dump);
-	case ELF: return dump_elf(&dump);
+	switch (dump.obj.format) with (AdbgObjFormat) {
+	case MZ:	return dump_mz(&dump);
+	case PE:	return dump_pe(&dump);
+	case ELF:	return dump_elf(&dump);
+	case MachO:	return dump_macho(&dump);
 	default:
 		puts("dumper: format not supported");
 		return EXIT_FAILURE;
@@ -154,6 +156,7 @@ int app_dump() {
 int dump_disasm(adbg_disasm_t *dp, void* data, size_t size, int flags) {
 	adbg_disasm_opcode_t op = void;
 	
+	//TODO: Dedicated function
 	if (flags & DumpOpt.disasm_stats) {
 		uint iavg;	/// instruction average size
 		uint imin;	/// smallest instruction size

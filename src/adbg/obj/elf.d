@@ -504,7 +504,7 @@ struct Elf64_Chdr {
 // Functions
 //
 
-int adbg_obj_elf_preload(adbg_object_t *obj) {
+int adbg_obj_elf_load(adbg_object_t *obj) {
 	obj.format = AdbgObjFormat.ELF;
 	obj.elf.hdr32 = cast(Elf32_Ehdr*)obj.buf;
 	
