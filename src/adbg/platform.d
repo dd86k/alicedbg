@@ -65,6 +65,20 @@ else
 	static assert(0, "Platform not supported.");
 
 //
+// ANCHOR Endianness
+//
+
+version (LittleEndian) {
+	enum PLATFORM_LSB = 1;	/// Set if target little-endian
+	enum PLATFORM_MSB = 0;	/// Set if target big-endian
+	enum TARGET_ENDIAN = "lsb";	/// Target endian name
+} else {
+	enum PLATFORM_LSB = 0;	/// Set if target little-endian
+	enum PLATFORM_MSB = 1;	/// Set if target big-endian
+	enum TARGET_ENDIAN = "msb";	/// Target endian name
+}
+
+//
 // ANCHOR CRT string
 //
 
@@ -147,8 +161,10 @@ else
 enum COMPILER_FEAT_TARGETINFO    = __VERSION__ >= 2083;
 /// If set, the compiler supports the printf and scanf pragmas.
 enum COMPILER_FEAT_PRAGMA_PRINTF = __VERSION__ >= 2092;
-/// Compiler supports DIP1034 (bottom type, includes noreturn)
-enum COMPILER_FEAT_NORETURN = __VERSION__ >= 2096;
+/// Compiler supports DIP1034 (bottom type, includes noreturn).
+enum COMPILER_FEAT_NORETURN      = __VERSION__ >= 2096;
+/// Compiler has support for core.int128.
+enum COMPILER_FEAT_INT128        = __VERSION__ >= 2100;
 
 //
 // ANCHOR Additional target information
