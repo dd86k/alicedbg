@@ -18,6 +18,9 @@ extern (C):
 @nogc:
 nothrow:
 
+// NOTE: Wrong extern.
+//       Should be C, but they're defined as D.
+
 /// 
 int putchar(int);
 /// 
@@ -26,10 +29,15 @@ int getchar();
 // NOTE: I really don't know why dmd's lld-link (win64) wouldn't pick up snprintf
 //       from core.stdc.stdio._snprintf, so this is one of those copy-paste fix.
 
-///
-pragma(printf)
-int   _snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
-///
-alias _snprintf snprintf;
+version (Windows) {
+	///
+	pragma(printf)
+	int   _snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
+	alias _snprintf snprintf;
+} else {
+	///
+	pragma(printf)
+	int   snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
+}
 
 public import core.stdc.stdio;
