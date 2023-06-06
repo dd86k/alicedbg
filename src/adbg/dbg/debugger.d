@@ -16,7 +16,7 @@ module adbg.dbg.debugger;
 import core.stdc.config : c_long;
 import core.stdc.string : memset;
 import adbg.etc.c.stdlib : malloc, free;
-import adbg.etc.c.stdio : snprintf;
+import adbg.etc.c.stdio : snprintf, fopen, sscanf, fseek, ftell, fread, SEEK_END, SEEK_SET, FILE;
 import adbg.platform, adbg.error;
 import adbg.utils.str : adbg_util_argv_flatten;
 public import adbg.dbg.exception;
@@ -843,7 +843,6 @@ int adbg_mm_maps(adbg_mm_map **maps, size_t *count, ...) {
 	} else version (linux) {
 		// Inspired by libscanmem
 		// https://github.com/scanmem/scanmem/blob/main/maps.c
-		import core.stdc.stdio : fopen, sscanf, fseek, ftell, fread, SEEK_END, SEEK_SET, FILE;
 		import core.stdc.config : c_long;
 		import core.stdc.stdlib : malloc, free;
 		import core.sys.linux.unistd : readlink;

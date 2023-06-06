@@ -222,14 +222,12 @@ void term_get_curpos(int *x, int *y) {
 		*x = csbi.dwCursorPosition.X;
 		*y = csbi.dwCursorPosition.Y;
 	} else version (Posix) { // 1-based
-		int _x = void, _y = void;
 		tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
 		printf("\033[6n");
-		version (GNU) scanf("\033[%d;%dR", _y, _x); // row, col
-		else          scanf("\033[%d;%dR", &_y, &_x); // row, col
+		scanf("\033[%d;%dR", y, x); // row, col
 		tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
-		*x = --_x;
-		*y = --_y;
+		--*x;
+		--*y;
 	}
 }
 
