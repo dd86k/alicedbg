@@ -22,14 +22,14 @@ alicedbg-test-*
 *.log
 
 # C headers, not ready
-include
+/include/
 
 # Personal stuff (e.g., notes)
-perso/
+/perso/
 
 # Commit message (git commit -t)
 MSG
 
 # AFL stuff
-testcases/
-findings/
+/testcases/
+/findings/
