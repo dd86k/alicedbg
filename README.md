@@ -9,22 +9,11 @@ tracer fully compatible in BetterC (-betterC/-fno-druntime).
 
 It is available as an application and as a DUB library.
 
-The library supports:
-- Debugger
-  - Windows (msvcrt)
-  - Linux (Glibc and Musl)
-- Disassembler
-  - Platforms: x86, risc-v
-  - Syntaxes: Intel, NASM, and AT&T, Hyde Randall High Level Assembly, and Borland Turbo Assembler (TASM enhanced mode).
-- Supports the DMD, GDC, and LDC compilers.
+The current aimed platforms are Windows (msvcrt) and Linux (Glibc, musl).
 
-The application supports:
-- Debugging (default mode)
-  - Interfaces: Loop and command-line (default)
-- Dumping (`-D|--dump`)
-  - PE32 and ELF images.
-- Instruction analysis (`-A|--analyze`)
-  - Base16 input.
+Application features:
+- Debugging (default mode): Loop and command-line (default) interfaces
+- Dumping (`-D|--dump`): PE32, Mach-O, ELF, and raw blobs.
 
 Written from scratch for educational purposes.
 

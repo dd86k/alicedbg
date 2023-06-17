@@ -11,8 +11,7 @@ import adbg.include.capstone.m680x;
 import adbg.include.capstone.m68k;
 import adbg.include.capstone.mips;
 import adbg.include.capstone.ppc;
-import adbg.include.capstone.sparc;
-import adbg.include.capstone.systemz;
+import adbg.include.capstone.sparc;import adbg.include.capstone.systemz;
 import adbg.include.capstone.tms320c64x;
 import adbg.include.capstone.x86;
 import adbg.include.capstone.xcore;
@@ -22,9 +21,7 @@ extern (C):
 /* Capstone Disassembly Engine */
 /* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2016 */
 
-// defined(CAPSTONE_STATIC)
-
-// defined(CAPSTONE_STATIC)
+// Capstone D "header" refined by dd86k <dd@dax.moe>
 
 // Capstone API version
 enum CS_API_MAJOR = 4;
@@ -50,24 +47,24 @@ extern (D) auto CS_MAKE_VERSION(T0, T1)(auto ref T0 major, auto ref T1 minor)
 /// Maximum size of an instruction mnemonic string.
 enum CS_MNEMONIC_SIZE = 32;
 
-// Handle using with all API
-alias csh = c_ulong;
+/// Handle using with all API
+alias csh = size_t;
 
 /// Architecture type
 enum
 {
-    CS_ARCH_ARM = 0, ///< ARM architecture (including Thumb, Thumb-2)
-    CS_ARCH_ARM64 = 1, ///< ARM-64, also called AArch64
-    CS_ARCH_MIPS = 2, ///< Mips architecture
-    CS_ARCH_X86 = 3, ///< X86 architecture (including x86 & x86-64)
-    CS_ARCH_PPC = 4, ///< PowerPC architecture
-    CS_ARCH_SPARC = 5, ///< Sparc architecture
-    CS_ARCH_SYSZ = 6, ///< SystemZ architecture
-    CS_ARCH_XCORE = 7, ///< XCore architecture
-    CS_ARCH_M68K = 8, ///< 68K architecture
+    CS_ARCH_ARM = 0,    ///< ARM architecture (including Thumb, Thumb-2)
+    CS_ARCH_ARM64 = 1,  ///< ARM-64, also called AArch64
+    CS_ARCH_MIPS = 2,   ///< Mips architecture
+    CS_ARCH_X86 = 3,    ///< X86 architecture (including x86 & x86-64)
+    CS_ARCH_PPC = 4,    ///< PowerPC architecture
+    CS_ARCH_SPARC = 5,  ///< Sparc architecture
+    CS_ARCH_SYSZ = 6,   ///< SystemZ architecture
+    CS_ARCH_XCORE = 7,  ///< XCore architecture
+    CS_ARCH_M68K = 8,   ///< 68K architecture
     CS_ARCH_TMS320C64X = 9, ///< TMS320C64x architecture
     CS_ARCH_M680X = 10, ///< 680X architecture
-    CS_ARCH_EVM = 11, ///< Ethereum architecture
+    CS_ARCH_EVM = 11,   ///< Ethereum architecture
     CS_ARCH_MAX = 12,
     CS_ARCH_ALL = 0xFFFF // All architectures - for cs_support()
 }
@@ -86,38 +83,38 @@ enum CS_SUPPORT_X86_REDUCE = CS_ARCH_ALL + 2;
 /// Mode type
 enum
 {
-    CS_MODE_LITTLE_ENDIAN = 0, ///< little-endian mode (default mode)
-    CS_MODE_ARM = 0, ///< 32-bit ARM
-    CS_MODE_16 = 1 << 1, ///< 16-bit mode (X86)
-    CS_MODE_32 = 1 << 2, ///< 32-bit mode (X86)
-    CS_MODE_64 = 1 << 3, ///< 64-bit mode (X86, PPC)
-    CS_MODE_THUMB = 1 << 4, ///< ARM's Thumb mode, including Thumb-2
-    CS_MODE_MCLASS = 1 << 5, ///< ARM's Cortex-M series
-    CS_MODE_V8 = 1 << 6, ///< ARMv8 A32 encodings for ARM
-    CS_MODE_MICRO = 1 << 4, ///< MicroMips mode (MIPS)
-    CS_MODE_MIPS3 = 1 << 5, ///< Mips III ISA
-    CS_MODE_MIPS32R6 = 1 << 6, ///< Mips32r6 ISA
-    CS_MODE_MIPS2 = 1 << 7, ///< Mips II ISA
-    CS_MODE_V9 = 1 << 4, ///< SparcV9 mode (Sparc)
-    CS_MODE_QPX = 1 << 4, ///< Quad Processing eXtensions mode (PPC)
-    CS_MODE_M68K_000 = 1 << 1, ///< M68K 68000 mode
-    CS_MODE_M68K_010 = 1 << 2, ///< M68K 68010 mode
-    CS_MODE_M68K_020 = 1 << 3, ///< M68K 68020 mode
-    CS_MODE_M68K_030 = 1 << 4, ///< M68K 68030 mode
-    CS_MODE_M68K_040 = 1 << 5, ///< M68K 68040 mode
-    CS_MODE_M68K_060 = 1 << 6, ///< M68K 68060 mode
-    CS_MODE_BIG_ENDIAN = 1 << 31, ///< big-endian mode
-    CS_MODE_MIPS32 = CS_MODE_32, ///< Mips32 ISA (Mips)
-    CS_MODE_MIPS64 = CS_MODE_64, ///< Mips64 ISA (Mips)
-    CS_MODE_M680X_6301 = 1 << 1, ///< M680X Hitachi 6301,6303 mode
-    CS_MODE_M680X_6309 = 1 << 2, ///< M680X Hitachi 6309 mode
-    CS_MODE_M680X_6800 = 1 << 3, ///< M680X Motorola 6800,6802 mode
-    CS_MODE_M680X_6801 = 1 << 4, ///< M680X Motorola 6801,6803 mode
-    CS_MODE_M680X_6805 = 1 << 5, ///< M680X Motorola/Freescale 6805 mode
-    CS_MODE_M680X_6808 = 1 << 6, ///< M680X Motorola/Freescale/NXP 68HC08 mode
-    CS_MODE_M680X_6809 = 1 << 7, ///< M680X Motorola 6809 mode
-    CS_MODE_M680X_6811 = 1 << 8, ///< M680X Motorola/Freescale/NXP 68HC11 mode
-    CS_MODE_M680X_CPU12 = 1 << 9, ///< M680X Motorola/Freescale/NXP CPU12
+    CS_MODE_LITTLE_ENDIAN = 0,  /// little-endian mode (default mode)
+    CS_MODE_ARM = 0,        /// 32-bit ARM
+    CS_MODE_16 = 1 << 1,    /// 16-bit mode (X86)
+    CS_MODE_32 = 1 << 2,    /// 32-bit mode (X86)
+    CS_MODE_64 = 1 << 3,    /// 64-bit mode (X86, PPC)
+    CS_MODE_THUMB = 1 << 4, /// ARM's Thumb mode, including Thumb-2
+    CS_MODE_MCLASS = 1 << 5,    /// ARM's Cortex-M series
+    CS_MODE_V8 = 1 << 6,    /// ARMv8 A32 encodings for ARM
+    CS_MODE_MICRO = 1 << 4, /// MicroMips mode (MIPS)
+    CS_MODE_MIPS3 = 1 << 5, /// Mips III ISA
+    CS_MODE_MIPS32R6 = 1 << 6,  /// Mips32r6 ISA
+    CS_MODE_MIPS2 = 1 << 7, /// Mips II ISA
+    CS_MODE_V9 = 1 << 4,    /// SparcV9 mode (Sparc)
+    CS_MODE_QPX = 1 << 4,   /// Quad Processing eXtensions mode (PPC)
+    CS_MODE_M68K_000 = 1 << 1,  /// M68K 68000 mode
+    CS_MODE_M68K_010 = 1 << 2,  /// M68K 68010 mode
+    CS_MODE_M68K_020 = 1 << 3,  /// M68K 68020 mode
+    CS_MODE_M68K_030 = 1 << 4,  /// M68K 68030 mode
+    CS_MODE_M68K_040 = 1 << 5,  /// M68K 68040 mode
+    CS_MODE_M68K_060 = 1 << 6,  /// M68K 68060 mode
+    CS_MODE_BIG_ENDIAN = 1 << 31,   /// big-endian mode
+    CS_MODE_MIPS32 = CS_MODE_32,    /// Mips32 ISA (Mips)
+    CS_MODE_MIPS64 = CS_MODE_64,    /// Mips64 ISA (Mips)
+    CS_MODE_M680X_6301 = 1 << 1,    /// M680X Hitachi 6301,6303 mode
+    CS_MODE_M680X_6309 = 1 << 2,    /// M680X Hitachi 6309 mode
+    CS_MODE_M680X_6800 = 1 << 3,    /// M680X Motorola 6800,6802 mode
+    CS_MODE_M680X_6801 = 1 << 4,    /// M680X Motorola 6801,6803 mode
+    CS_MODE_M680X_6805 = 1 << 5,    /// M680X Motorola/Freescale 6805 mode
+    CS_MODE_M680X_6808 = 1 << 6,    /// M680X Motorola/Freescale/NXP 68HC08 mode
+    CS_MODE_M680X_6809 = 1 << 7,    /// M680X Motorola 6809 mode
+    CS_MODE_M680X_6811 = 1 << 8,    /// M680X Motorola/Freescale/NXP 68HC11 mode
+    CS_MODE_M680X_CPU12 = 1 << 9,   /// M680X Motorola/Freescale/NXP CPU12
     ///< used on M68HC12/HCS12
     CS_MODE_M680X_HCS08 = 1 << 10 ///< M680X Freescale/NXP HCS08 mode
 }
@@ -155,39 +152,39 @@ struct cs_opt_mnem
 /// Runtime option for the disassembled engine
 enum
 {
-    CS_OPT_INVALID = 0, ///< No option specified
-    CS_OPT_SYNTAX = 1, ///< Assembly output syntax
-    CS_OPT_DETAIL = 2, ///< Break down instruction structure into details
-    CS_OPT_MODE = 3, ///< Change engine's mode at run-time
-    CS_OPT_MEM = 4, ///< User-defined dynamic memory related functions
-    CS_OPT_SKIPDATA = 5, ///< Skip data when disassembling. Then engine is in SKIPDATA mode.
-    CS_OPT_SKIPDATA_SETUP = 6, ///< Setup user-defined function for SKIPDATA option
-    CS_OPT_MNEMONIC = 7, ///< Customize instruction mnemonic
-    CS_OPT_UNSIGNED = 8 ///< print immediate operands in unsigned form
+    CS_OPT_INVALID = 0,         /// No option specified
+    CS_OPT_SYNTAX = 1,          /// Assembly output syntax
+    CS_OPT_DETAIL = 2,          /// Break down instruction structure into details
+    CS_OPT_MODE = 3,            /// Change engine's mode at run-time
+    CS_OPT_MEM = 4,             /// User-defined dynamic memory related functions
+    CS_OPT_SKIPDATA = 5,        /// Skip data when disassembling. Then engine is in SKIPDATA mode.
+    CS_OPT_SKIPDATA_SETUP = 6,  /// Setup user-defined function for SKIPDATA option
+    CS_OPT_MNEMONIC = 7,        /// Customize instruction mnemonic
+    CS_OPT_UNSIGNED = 8,        /// print immediate operands in unsigned form
 }
 alias int cs_opt_type;
 
 /// Runtime option value (associated with option type above)
 enum
 {
-    CS_OPT_OFF = 0, ///< Turn OFF an option - default for CS_OPT_DETAIL, CS_OPT_SKIPDATA, CS_OPT_UNSIGNED.
-    CS_OPT_ON = 3, ///< Turn ON an option (CS_OPT_DETAIL, CS_OPT_SKIPDATA).
-    CS_OPT_SYNTAX_DEFAULT = 0, ///< Default asm syntax (CS_OPT_SYNTAX).
-    CS_OPT_SYNTAX_INTEL = 1, ///< X86 Intel asm syntax - default on X86 (CS_OPT_SYNTAX).
-    CS_OPT_SYNTAX_ATT = 2, ///< X86 ATT asm syntax (CS_OPT_SYNTAX).
-    CS_OPT_SYNTAX_NOREGNAME = 3, ///< Prints register name with only number (CS_OPT_SYNTAX)
-    CS_OPT_SYNTAX_MASM = 4 ///< X86 Intel Masm syntax (CS_OPT_SYNTAX).
+    CS_OPT_OFF = 0,     /// Turn OFF an option - default for CS_OPT_DETAIL, CS_OPT_SKIPDATA, CS_OPT_UNSIGNED.
+    CS_OPT_ON = 3,      /// Turn ON an option (CS_OPT_DETAIL, CS_OPT_SKIPDATA).
+    CS_OPT_SYNTAX_DEFAULT = 0,  /// Default asm syntax (CS_OPT_SYNTAX).
+    CS_OPT_SYNTAX_INTEL = 1,    /// X86 Intel asm syntax - default on X86 (CS_OPT_SYNTAX).
+    CS_OPT_SYNTAX_ATT = 2,      /// X86 ATT asm syntax (CS_OPT_SYNTAX).
+    CS_OPT_SYNTAX_NOREGNAME = 3,    /// Prints register name with only number (CS_OPT_SYNTAX)
+    CS_OPT_SYNTAX_MASM = 4,     /// X86 Intel Masm syntax (CS_OPT_SYNTAX).
 }
 alias int cs_opt_value;
 
 /// Common instruction operand types - to be consistent across all architectures.
 enum
 {
-    CS_OP_INVALID = 0, ///< uninitialized/invalid operand.
-    CS_OP_REG = 1, ///< Register operand.
-    CS_OP_IMM = 2, ///< Immediate operand.
-    CS_OP_MEM = 3, ///< Memory operand.
-    CS_OP_FP = 4 ///< Floating-Point operand.
+    CS_OP_INVALID = 0,  /// uninitialized/invalid operand.
+    CS_OP_REG = 1,  /// Register operand.
+    CS_OP_IMM = 2,  /// Immediate operand.
+    CS_OP_MEM = 3,  /// Memory operand.
+    CS_OP_FP = 4,   /// Floating-Point operand.
 }
 alias int cs_op_type;
 
@@ -195,23 +192,23 @@ alias int cs_op_type;
 /// It is possible to combine access types, for example: CS_AC_READ | CS_AC_WRITE
 enum
 {
-    CS_AC_INVALID = 0, ///< Uninitialized/invalid access type.
-    CS_AC_READ = 1 << 0, ///< Operand read from memory or register.
-    CS_AC_WRITE = 1 << 1 ///< Operand write to memory or register.
+    CS_AC_INVALID = 0,  /// Uninitialized/invalid access type.
+    CS_AC_READ = 1 << 0,    /// Operand read from memory or register.
+    CS_AC_WRITE = 1 << 1,   /// Operand write to memory or register.
 }
 alias int cs_ac_type;
 
 /// Common instruction groups - to be consistent across all architectures.
 enum
 {
-    CS_GRP_INVALID = 0, ///< uninitialized/invalid group.
-    CS_GRP_JUMP = 1, ///< all jump instructions (conditional+direct+indirect jumps)
-    CS_GRP_CALL = 2, ///< all call instructions
-    CS_GRP_RET = 3, ///< all return instructions
-    CS_GRP_INT = 4, ///< all interrupt instructions (int+syscall)
-    CS_GRP_IRET = 5, ///< all interrupt return instructions
-    CS_GRP_PRIVILEGE = 6, ///< all privileged instructions
-    CS_GRP_BRANCH_RELATIVE = 7 ///< all relative branching instructions
+    CS_GRP_INVALID = 0, /// uninitialized/invalid group.
+    CS_GRP_JUMP = 1,    /// all jump instructions (conditional+direct+indirect jumps)
+    CS_GRP_CALL = 2,    /// all call instructions
+    CS_GRP_RET = 3,     /// all return instructions
+    CS_GRP_INT = 4,     /// all interrupt instructions (int+syscall)
+    CS_GRP_IRET = 5,    /// all interrupt return instructions
+    CS_GRP_PRIVILEGE = 6,   /// all privileged instructions
+    CS_GRP_BRANCH_RELATIVE = 7, /// all relative branching instructions
 }
 alias int cs_group_type;
 
@@ -281,18 +278,18 @@ struct cs_detail
     /// Architecture-specific instruction info
     union
     {
-        cs_x86 x86; ///< X86 architecture, including 16-bit, 32-bit & 64-bit mode
-        cs_arm64 arm64; ///< ARM64 architecture (aka AArch64)
-        cs_arm arm; ///< ARM architecture (including Thumb/Thumb2)
-        cs_m68k m68k; ///< M68K architecture
-        cs_mips mips; ///< MIPS architecture
-        cs_ppc ppc; ///< PowerPC architecture
-        cs_sparc sparc; ///< Sparc architecture
-        cs_sysz sysz; ///< SystemZ architecture
-        cs_xcore xcore; ///< XCore architecture
-        cs_tms320c64x tms320c64x; ///< TMS320C64x architecture
-        cs_m680x m680x; ///< M680X architecture
-        cs_evm evm; ///< Ethereum architecture
+        cs_x86 x86;     /// X86 architecture, including 16-bit, 32-bit & 64-bit mode
+        cs_arm64 arm64; /// ARM64 architecture (aka AArch64)
+        cs_arm arm;     /// ARM architecture (including Thumb/Thumb2)
+        cs_m68k m68k;   /// M68K architecture
+        cs_mips mips;   /// MIPS architecture
+        cs_ppc ppc;     /// PowerPC architecture
+        cs_sparc sparc; /// Sparc architecture
+        cs_sysz sysz;   /// SystemZ architecture
+        cs_xcore xcore; /// XCore architecture
+        cs_tms320c64x tms320c64x;   /// TMS320C64x architecture
+        cs_m680x m680x; /// M680X architecture
+        cs_evm evm;     /// Ethereum architecture
     }
 }
 
@@ -349,25 +346,29 @@ extern (D) auto CS_INSN_OFFSET(T0, T1)(auto ref T0 insns, auto ref T1 post)
 /// These are values returned by cs_errno()
 enum
 {
-    CS_ERR_OK = 0, ///< No error: everything was fine
-    CS_ERR_MEM = 1, ///< Out-Of-Memory error: cs_open(), cs_disasm(), cs_disasm_iter()
-    CS_ERR_ARCH = 2, ///< Unsupported architecture: cs_open()
-    CS_ERR_HANDLE = 3, ///< Invalid handle: cs_op_count(), cs_op_index()
-    CS_ERR_CSH = 4, ///< Invalid csh argument: cs_close(), cs_errno(), cs_option()
-    CS_ERR_MODE = 5, ///< Invalid/unsupported mode: cs_open()
-    CS_ERR_OPTION = 6, ///< Invalid/unsupported option: cs_option()
-    CS_ERR_DETAIL = 7, ///< Information is unavailable because detail option is OFF
-    CS_ERR_MEMSETUP = 8, ///< Dynamic memory management uninitialized (see CS_OPT_MEM)
-    CS_ERR_VERSION = 9, ///< Unsupported version (bindings)
-    CS_ERR_DIET = 10, ///< Access irrelevant data in "diet" engine
-    CS_ERR_SKIPDATA = 11, ///< Access irrelevant data for "data" instruction in SKIPDATA mode
-    CS_ERR_X86_ATT = 12, ///< X86 AT&T syntax is unsupported (opt-out at compile time)
-    CS_ERR_X86_INTEL = 13, ///< X86 Intel syntax is unsupported (opt-out at compile time)
-    CS_ERR_X86_MASM = 14 ///< X86 Intel syntax is unsupported (opt-out at compile time)
+    CS_ERR_OK = 0,      /// No error: everything was fine
+    CS_ERR_MEM = 1,     /// Out-Of-Memory error: cs_open(), cs_disasm(), cs_disasm_iter()
+    CS_ERR_ARCH = 2,    /// Unsupported architecture: cs_open()
+    CS_ERR_HANDLE = 3,  /// Invalid handle: cs_op_count(), cs_op_index()
+    CS_ERR_CSH = 4,     /// Invalid csh argument: cs_close(), cs_errno(), cs_option()
+    CS_ERR_MODE = 5,    /// Invalid/unsupported mode: cs_open()
+    CS_ERR_OPTION = 6,  /// Invalid/unsupported option: cs_option()
+    CS_ERR_DETAIL = 7,  /// Information is unavailable because detail option is OFF
+    CS_ERR_MEMSETUP = 8,    /// Dynamic memory management uninitialized (see CS_OPT_MEM)
+    CS_ERR_VERSION = 9, /// Unsupported version (bindings)
+    CS_ERR_DIET = 10,   /// Access irrelevant data in "diet" engine
+    CS_ERR_SKIPDATA = 11,   /// Access irrelevant data for "data" instruction in SKIPDATA mode
+    CS_ERR_X86_ATT = 12,    /// X86 AT&T syntax is unsupported (opt-out at compile time)
+    CS_ERR_X86_INTEL = 13,  /// X86 Intel syntax is unsupported (opt-out at compile time)
+    CS_ERR_X86_MASM = 14,   /// X86 Intel syntax is unsupported (opt-out at compile time)
 }
 alias int cs_err;
 
 version (Capstone_Static) {
+
+//
+// ANCHOR: Static config
+//
 
 /**
  Return combined API version & major and minor version numbers.
@@ -738,6 +739,10 @@ cs_err cs_regs_access (
     ubyte* regs_write_count);
 
 } else {
+
+//
+// ANCHOR: Dynamic library
+//
 
 import bindbc.loader;
 import bindbc.loader.sharedlib;
