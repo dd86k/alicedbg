@@ -10,6 +10,8 @@
  */
 module adbg.error;
 
+import adbg.config;
+
 // NOTE: Every thing that could go wrong should have an error code.
 
 extern (C):
@@ -66,6 +68,7 @@ struct adbg_error_t {
 	const(char)* file;	/// File source
 	int line;	/// Line source
 	int code;	/// Error code
+	void *res;	/// Resource
 }
 /// Last error in alicedbg.
 __gshared adbg_error_t error;
@@ -115,21 +118,78 @@ private immutable error_msg_t[] errors_msg = [
 	//
 	{ AdbgError.none, "No errors occured." },
 ];
+version (Windows) {
+	import core.sys.windows.windows;
+	enum SYS_ERR_FMT = "%08X"; /// Error code format
+} else {
+	import core.stdc.errno : errno;
+	import core.stdc.string : strerror;
+	enum SYS_ERR_FMT = "%d"; /// Error code format
+}
+
+/// Get error message from the OS (or CRT) by providing the error code
+/// Params: code = Error code number from OS
+/// Returns: String
+const(char) *adbg_sys_error(int code) {
+	version (Windows) {
+		enum ERR_BUF_SZ = 512;
+		__gshared char [ERR_BUF_SZ]buffer = void;
+		size_t len = FormatMessageA(
+			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_MAX_WIDTH_MASK,
+			null,
+			code,
+			0,	// Default
+			buffer.ptr,
+			ERR_BUF_SZ,
+			null);
+		return len ? cast(char*)buffer : "Unknown error";
+	} else {
+		return strerror(code);
+	}
+}
+
+/// Get the last error code from the OS (or CRT)
+/// Returns: GetLastError from Windows, otherwise errno
+int adbg_sys_errno() {
+	version (Windows)
+		return GetLastError;
+	else
+		return errno;
+}
+
+/// Print code and message to std ala perror
+/// Params:
+/// 	mod = module adbg.name
+/// 	code = Error code
+void adbg_sys_perror(string mod = null)(int code) {
+	import core.stdc.stdio : printf;
+	static if (mod)
+		enum fmt = mod~": ("~SYS_ERR_FMT~") %s\n";
+	else
+		enum fmt = "("~SYS_ERR_FMT~") %s\n";
+	printf(fmt, code, adbg_sys_error(code));
+}
 
 //
 // ANCHOR Error setters
 //
 
+//TODO: Parameters (at least type-safe variadic strings)
+//      adbg_oops(code, "param1", 2);
+//      or with CS: adbg_oops(code, cs_errno(disasm.cs_handle));
 /// Sets the last error code. The module path and line are automatically
 /// populated.
 /// Params:
 /// 	e = Error code
+/// 	res = External resource (handle, etc.)
 /// 	m = Automatically set to `__MODULE__`
 /// 	l = Automatically set to `__LINE__`
 /// Returns: Error code
-int adbg_oops(AdbgError e, string m = __MODULE__, int l = __LINE__) {
+int adbg_oops(AdbgError e, void *res = null, string m = __MODULE__, int l = __LINE__) {
+	version (Trace) trace("code=%d res=%p", e, res);
 	error.file = m.ptr;
 	error.line = l;
+	error.res = res;
 	return error.code = e;
 }
 
@@ -142,14 +202,17 @@ int adbg_errno() {
 }
 
 int adbg_errno_extern() {
-	import adbg.sys.err : adbg_sys_errno;
 	import core.stdc.errno : errno;
+	static if (USE_CAPSTONE) {
+		import adbg.include.capstone : cs_errno, csh;
+	}
 	
 	with (AdbgError)
 	switch (error.code) {
-	case crt: return errno;
-	case os:   return adbg_sys_errno;
-	default:   return error.code;
+	case crt:	return errno;
+	case os:	return adbg_sys_errno;
+	case capstone:	return cs_errno(*cast(csh*)error.res);
+	default:	return error.code;
 	}
 }
 
@@ -158,13 +221,14 @@ int adbg_errno_extern() {
 const(char)* adbg_error_msg(int code = error.code) {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
-	import adbg.sys.err : adbg_sys_error, adbg_sys_errno;
 	import bindbc.loader.sharedlib : errors;
+	static if (USE_CAPSTONE) import adbg.include.capstone : cs_strerror;
 	
 	with (AdbgError)
 	switch (error.code) {
 	case crt: return strerror(errno);
 	case os:  return adbg_sys_error(adbg_sys_errno);
+	case capstone:  return cs_strerror(adbg_sys_errno);
 	case loader:
 		if (errors.length)
 			return errors()[0].message;

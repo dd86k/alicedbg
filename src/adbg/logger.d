@@ -7,9 +7,9 @@
 /// License: BSD-3-Clause
 module adbg.logger;
 
-import adbg.etc.c.stdarg;
-import adbg.etc.c.stdio;
-import adbg.etc.c.stdlib : malloc;
+import adbg.include.c.stdarg;
+import adbg.include.c.stdio;
+import adbg.include.c.stdlib : malloc;
 
 //TODO: Make this thread-safe
 //TODO: Variadic functions

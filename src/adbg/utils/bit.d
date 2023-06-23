@@ -25,6 +25,8 @@ template BIT(int n) if (n < 32) { enum { BIT = 1 << n } }
 /// Params: n = Number of bits
 template BITS(int n) if (n % 8 == 0) { enum { BITS = n << 3 } }
 
+//TODO: TCHAR16, TCHAR16LE, TCHAR16BE, and etc. to .utils.string
+
 /// Turn a 2-character string into a 2-byte number
 /// Params: s = 2-character string
 template CHAR16(char[2] s) {

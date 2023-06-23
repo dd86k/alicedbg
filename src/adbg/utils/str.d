@@ -5,9 +5,9 @@
  * Copyright: © 2019-2022 dd86k <dd@dax.moe>
  * License: BSD-3-Clause
  */
-module adbg.utils.str;
+module adbg.utils.string;
 
-import adbg.etc.c.stdio;
+import adbg.include.c.stdio;
 import core.stdc.stdarg;
 import core.stdc.string;
 
@@ -38,7 +38,7 @@ size_t adbg_util_getlinef(char *bf, size_t bfsz, size_t *lnsz, FILE *file) {
 	for ( ; i < bfsz ; ++i) {
 		int c = fgetc(file);
 		
-		//TODO: Include tab as accepted
+		//TODO: Include tab as accepted character
 		if (isprint(c) == false)
 			break;
 		

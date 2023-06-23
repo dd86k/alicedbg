@@ -8,8 +8,8 @@
 module term;
 
 import core.stdc.stdlib;
-import adbg.etc.c.stdio;
-import adbg.etc.c.stdarg;
+import adbg.include.c.stdio;
+import adbg.include.c.stdarg;
 private alias sys = core.stdc.stdlib.system;
 
 //TODO: Consider using PDCurses instead

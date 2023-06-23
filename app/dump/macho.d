@@ -2,8 +2,8 @@ module dump.macho;
 
 import core.stdc.stdio;
 import adbg.disassembler : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
-import adbg.obj.server;
-import adbg.obj.macho;
+import adbg.server.v1.macho;
+import adbg.server.v1 : adbg_object_t;
 import dumper;
 
 int dump_macho(dump_t *dump) {

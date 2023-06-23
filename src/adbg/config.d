@@ -1,4 +1,4 @@
-/// Project build and internal configurations.
+/// Experimental: Project build and internal configurations.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: dd86k <dd@dax.moe>

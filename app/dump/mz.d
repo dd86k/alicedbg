@@ -8,9 +8,9 @@
 module dump.mz;
 
 import core.stdc.stdio;
-import adbg.obj.server;
 import adbg.disassembler : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
-import adbg.obj.mz;
+import adbg.server.v1.mz;
+import adbg.server.v1 : adbg_object_t;
 import dumper;
 
 extern (C):

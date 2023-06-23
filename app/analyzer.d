@@ -7,7 +7,8 @@
  */
 module analyzer;
 
-import adbg.etc.c.stdio, adbg.disassembler;
+import adbg.include.c.stdio;
+import adbg.disassembler;
 import common;
 
 private immutable const(char)*[AdbgDisasmOperand.length] opType = [
@@ -34,7 +35,7 @@ private immutable const(char)*[12] maTags = [
 ];
 
 int analyze() {
-	with (globals.app) {
+	with (globals) { //TODO: Remove huge ugly scope
 		//
 		// ANCHOR: input bytes
 		//
@@ -53,9 +54,10 @@ int analyze() {
 		//
 		
 		adbg_disasm_opcode_t opcode = void;
-		int err = adbg_disasm_once_buffer(
-			&disasm, &opcode, AdbgDisasmMode.file, &inputHex, inputHexSize);
-		adbg_disasm_machine(&disasm, bufferMachine.ptr, bufferMachine.sizeof, &opcode);
+		int err = adbg_disasm_once_buffer(&dism,
+			&opcode, AdbgDisasmMode.file, &inputHex, inputHexSize);
+		adbg_disasm_machine(&dism,
+			bufferMachine.ptr, bufferMachine.sizeof, &opcode);
 		printf("output     : (%u) %s\n", opcode.size, bufferMachine.ptr);
 		
 		if (err) {
@@ -72,7 +74,7 @@ int analyze() {
 		// operands   : register=zmm0 memory=i512
 		//
 		
-		adbg_disasm_format(&disasm, bufferMnemonic.ptr, bufferMnemonic.sizeof, &opcode);
+		adbg_disasm_format(&dism, bufferMnemonic.ptr, bufferMnemonic.sizeof, &opcode);
 		printf("instruction: %s\n", bufferMnemonic.ptr);
 		printf("prefixes   :");
 		for (size_t pi; pi < opcode.prefixCount; ++pi) with (opcode) {
@@ -86,7 +88,7 @@ int analyze() {
 			switch (operand.type) with (AdbgDisasmOperand) {
 			case register:  extra = operand.reg.name; break;
 			case immediate: extra = opWith[operand.imm.value.type]; break;
-			case memory:    extra = opWith[disasm.memWidth]; break;
+			case memory:    extra = opWith[dism.memWidth]; break;
 			default:        extra = "?";
 			}
 			printf(" %s=%s", opType[operand.type], extra);

@@ -10,8 +10,8 @@ module main;
 import adbg.platform;
 import adbg.dbg : adbg_attach, adbg_load;
 import adbg.disassembler;
-import adbg.utils.str : adbg_util_hex_array;
-import adbg.etc.c.stdlib : exit;
+import adbg.utils.string : adbg_util_hex_array;
+import adbg.include.c.stdlib : exit;
 import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
@@ -56,12 +56,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
 debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__;
 else  enum FULL_VERSION = ADBG_VERSION;
 
+enum __D_VERSION__ = DSTRVER!__VERSION__;
+
 __gshared immutable(char) *page_version =
 "alicedbg "~FULL_VERSION~" (built: "~__TIMESTAMP__~")\n"~
 COPYRIGHT~"\n"~
 "License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
 "Homepage: <https://git.dd86k.space/dd86k/alicedbg>\n"~
-"Compiler: "~__VENDOR__~" "~DSTRVER!__VERSION__~"\n"~
+"Compiler: "~__VENDOR__~" "~__D_VERSION__~"\n"~
 "Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
 "Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
 "CRT: "~TARGET_CRT~"\n"~
@@ -72,10 +74,9 @@ COPYRIGHT~"\n"~
 
 // if asking for help, so '?' and "help" are accepted
 bool wantsHelp(const(char) *query) {
-	switch (query[0]) {
-	case '?': return true;
-	default: return strcmp(query, "help") == 0;
-	}
+	if (query[0] == '?') return true;
+	
+	return strcmp(query, "help") == 0;
 }
 
 struct option_t {
@@ -104,7 +105,6 @@ immutable option_t[] options = [
 	{ 'U', "ui",	"Debugger: Select debugger user interface (default=cmd)", true, fa: &cli_ui },
 	// dumper
 	{ 'D', "dump",	"Dumper: Dump an object file", false, &cli_dump },
-	{ 'A', "analyze",	"Dumper: Show detailed information about hex string opcode", false, &cli_analyze },
 	{ 'R', "raw",	"Dumper: Specify object is raw", false, &cli_raw },
 	{ 'S', "show",	"Dumper: Select which part of the object to display (default=h)", true, fa: &cli_show },
 //	{ 'l', "length",	"Dumper: ", true, &cli_length },
@@ -133,7 +133,7 @@ int cli_march(const(char) *val) {
 	}
 	foreach (setting_platform_t p; platforms) {
 		if (strcmp(val, p.opt) == 0 || strcmp(val, p.alt) == 0) {
-			globals.cli.platform = p.val;
+			globals.platform = p.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -155,7 +155,7 @@ int cli_syntax(const(char) *val) {
 	}
 	foreach (setting_syntax_t syntax; syntaxes) {
 		if (strcmp(val, syntax.opt) == 0) {
-			globals.cli.syntax = syntax.val;
+			globals.syntax = syntax.val;
 			return EXIT_SUCCESS;
 		}
 	}
@@ -167,7 +167,7 @@ int cli_syntax(const(char) *val) {
 //
 
 int cli_file(const(char) *val) {
-	globals.cli.file = val;
+	globals.file = val;
 	return EXIT_SUCCESS;
 }
 
@@ -176,18 +176,18 @@ int cli_file(const(char) *val) {
 //
 
 int cli_args_stop(int argi, int argc, const(char) **argv) { // --
-	import adbg.utils.str : adbg_util_move;
+	import adbg.utils.string : adbg_util_move;
 	
 	enum MAX = 16;
 	__gshared const(char) *[MAX] args;
 	
-	globals.cli.args = cast(const(char)**)args;
+	globals.args = cast(const(char)**)args;
 	
 	int left = argc - argi; /// to move
 	void **s = cast(void**)(argv+argi);
 	
 	int m = adbg_util_move(
-		cast(void**)&globals.cli.args, MAX,
+		cast(void**)&globals.args, MAX,
 		cast(void**)&s, left);
 	
 	debug assert(m == left, "cli_argsdd: 'adbg_util_move' Failed due to small buffer");
@@ -195,7 +195,7 @@ int cli_args_stop(int argi, int argc, const(char) **argv) { // --
 	return EXIT_SUCCESS;
 }
 int cli_args(const(char) *val) { // --args
-	import adbg.utils.str : adbg_util_expand;
+	import adbg.utils.string : adbg_util_expand;
 	
 	int argc = void;
 	char **argv = adbg_util_expand(val, &argc);
@@ -203,7 +203,7 @@ int cli_args(const(char) *val) { // --args
 	if (argc == 0)
 		return EXIT_FAILURE;
 	
-	globals.cli.args = cast(const(char)**)argv;
+	globals.args = cast(const(char)**)argv;
 	return EXIT_SUCCESS;
 }
 
@@ -212,11 +212,11 @@ int cli_args(const(char) *val) { // --args
 //
 
 int cli_env(const(char) *val) {
-	import adbg.utils.str : adbg_util_env;
+	import adbg.utils.string : adbg_util_env;
 	
-	globals.cli.env = cast(const(char)**)adbg_util_env(val);
+	globals.env = cast(const(char)**)adbg_util_env(val);
 	
-	if (globals.cli.env == null) {
+	if (globals.env == null) {
 		printf("main: Parsing environment failed");
 		return EXIT_FAILURE;
 	}
@@ -229,7 +229,7 @@ int cli_env(const(char) *val) {
 //
 
 int cli_pid(const(char) *val) {
-	globals.cli.pid = cast(ushort)strtol(val, null, 10);
+	globals.pid = cast(ushort)strtol(val, null, 10);
 	return EXIT_SUCCESS;
 }
 
@@ -257,7 +257,7 @@ int cli_ui(const(char)* val) {
 	}
 	foreach (setting_ui_t ui; uis) {
 		if (strcmp(val, ui.opt) == 0) {
-			globals.cli.ui = ui.val;
+			globals.ui = ui.val;
 			return 0;
 		}
 	}
@@ -269,7 +269,7 @@ int cli_ui(const(char)* val) {
 //
 
 int cli_dump() {
-	globals.cli.mode = SettingMode.dump;
+	globals.mode = SettingMode.dump;
 	return EXIT_SUCCESS;
 }
 
@@ -278,7 +278,7 @@ int cli_dump() {
 //
 
 int cli_analyze() {
-	globals.cli.mode = SettingMode.analyze;
+	globals.mode = SettingMode.analyze;
 	return EXIT_SUCCESS;
 }
 
@@ -287,7 +287,7 @@ int cli_analyze() {
 //
 
 int cli_raw() {
-	globals.cli.flags |= DumpOpt.raw;
+	globals.flags |= DumpOpt.raw;
 	return EXIT_SUCCESS;
 }
 
@@ -327,7 +327,7 @@ L_CHAR:
 		return EXIT_SUCCESS;
 	foreach (setting_show_t show; showflags) {
 		if (c == show.opt) {
-			globals.cli.flags |= show.val;
+			globals.flags |= show.val;
 			goto L_CHAR;
 		}
 	}
@@ -499,8 +499,8 @@ int main(int argc, const(char)** argv) {
 				}
 				continue CLI;
 			}
-		} else if (globals.cli.file == null) { // Default option value
-			globals.cli.file = arg;
+		} else if (globals.file == null) { // Default option value
+			globals.file = arg;
 			continue CLI;
 		}
 		
@@ -508,38 +508,40 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
-	with (globals) {
-		adbg_disasm_configure(&app.disasm, cli.platform);
-		adbg_disasm_opt(&app.disasm, AdbgDisasmOpt.syntax, cli.syntax);
-	}
+	if (adbg_disasm_init(&globals.dism))
+		return printerror();
+	if (globals.syntax && adbg_disasm_syntax(&globals.dism, globals.syntax))
+		return printerror();
 	
-	switch (globals.cli.mode) {
+	switch (globals.mode) {
 	case SettingMode.analyze:
-		if (globals.cli.file == null) {
+		puts("Not currently available. It will probably be implemented again later.");
+		return 1;
+		/*if (globals.file == null) {
 			puts("main: base16 input required");
 			return EXIT_FAILURE;
 		}
 		
-		//TODO: Should be allocated?
+		//TODO: Should be allocated instead
 		with (globals) adbg_util_hex_array(
-			cast(ubyte*)app.inputHex, 32, cli.file, app.inputHexSize);
+			cast(ubyte*)inputHex, 32, file, inputHexSize);
 		
-		return analyze();
+		return analyze();*/
 	case SettingMode.dump: return app_dump();
 	case SettingMode.debugger:
 		// Pre-load target if specified.
 		// Necessary for loop UI, but optional for others
-		with (globals.cli)
+		with (globals)
 		if (file) {
 			if (adbg_load(file, args)) {
 				printerror;
 				return EXIT_FAILURE;
 			}
 			
-			printf("File '%s' loaded\n", globals.cli.file);
+			printf("File '%s' loaded\n", globals.file);
 		}
 		
-		switch (globals.cli.ui) {
+		switch (globals.ui) {
 		case SettingUI.loop:	return app_loop();
 		case SettingUI.cmd:	return app_cmd();
 		case SettingUI.tcpserver:

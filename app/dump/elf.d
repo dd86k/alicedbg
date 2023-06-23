@@ -7,10 +7,10 @@
  */
 module dump.elf;
 
-import adbg.etc.c.stdio;
-import adbg.obj.server;
+import adbg.include.c.stdio;
 import adbg.disassembler : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
-import adbg.obj.elf;
+import adbg.server.v1;
+import adbg.server.v1.elf;
 import dumper;
 
 extern (C):

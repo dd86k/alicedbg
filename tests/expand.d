@@ -1,6 +1,6 @@
 module tests.utils.argv;
 
-import adbg.utils.str;
+import adbg.utils.string;
 import core.stdc.string, core.stdc.stdio;
 
 unittest {

@@ -1,6 +1,6 @@
 module tests.sys.setjmp;
 
-import adbg.etc.c.setjmp;
+import adbg.include.c.setjmp;
 
 /// 
 unittest {

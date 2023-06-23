@@ -8,6 +8,7 @@
  */
 module common;
 
+import adbg.config;
 import adbg.dbg.exception;
 import adbg.disassembler;
 import adbg.error;
@@ -46,14 +47,21 @@ struct setting_syntax_t {
 	AdbgSyntax val;
 	const(char)* opt, desc;
 }
-immutable setting_syntax_t[] syntaxes = [
-	{ AdbgSyntax.att,   "att",   "AT&T syntax" },
-	{ AdbgSyntax.intel, "intel", "Intel syntax" },
-	{ AdbgSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
-	{ AdbgSyntax.ideal, "ideal", "Borland Ideal Turbo Assembly Enhanced syntax" },
-	{ AdbgSyntax.hyde,  "hyde",  "Randall Hyde High Level Assembly Language syntax" },
-	{ AdbgSyntax.riscv, "riscv", "RISC-V native syntax" },
-];
+static if (USE_CAPSTONE) {
+	immutable setting_syntax_t[] syntaxes = [
+		{ AdbgSyntax.att,   "att",   "AT&T syntax" },
+		{ AdbgSyntax.intel, "intel", "Intel syntax" },
+	];
+} else {
+	immutable setting_syntax_t[] syntaxes = [
+		{ AdbgSyntax.att,   "att",   "AT&T syntax" },
+		{ AdbgSyntax.intel, "intel", "Intel syntax" },
+		{ AdbgSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
+		{ AdbgSyntax.ideal, "ideal", "Borland Ideal Turbo Assembly Enhanced syntax" },
+		{ AdbgSyntax.hyde,  "hyde",  "Randall Hyde High Level Assembly Language syntax" },
+		{ AdbgSyntax.riscv, "riscv", "RISC-V native syntax" },
+	];
+}
 
 //
 // Settings
@@ -68,48 +76,41 @@ enum SettingUI { cmd, loop, tcpserver }
 /// Settings structure for the application (only!)
 struct settings_t {
 	/// CLI settings
-	public struct cli_settings_t {
-		SettingMode mode;	/// Application mode
-		SettingUI ui;	/// Debugger user interface
-		const(char) *file;	/// Debuggee: file
-		const(char) **args;	/// Debuggee: argument vector
-		const(char) **env;	/// Debuggee: environement vector
-		const(char) *dir;	/// Debuggee: directory
-		uint pid;	/// Debuggee: PID
-		uint flags;	/// Flags to pass to callee
-		AdbgSyntax syntax;	/// 
-		AdbgPlatform platform;	/// 
-	} cli_settings_t cli;	/// CLI settings
+	SettingMode mode;	/// Application mode
+	SettingUI ui;	/// Debugger user interface
+	const(char) *file;	/// Debuggee: file
+	const(char) **args;	/// Debuggee: argument vector
+	const(char) **env;	/// Debuggee: environement vector
+	const(char) *dir;	/// Debuggee: directory
+	uint pid;	/// Debuggee: PID
+	uint flags;	/// Flags to pass to callee
+	AdbgSyntax syntax;	/// 
+	AdbgPlatform platform;	/// 
 	/// App settings
-	public struct app_settings_t {	/// 
-		//TODO: Make disasm dynamic? (pointer alloc)
-		adbg_disasm_t disasm;	/// Disassembler
-		exception_t last_exception;	/// Last exception
-		FILE *inputFile;	/// 
-		ubyte[32] inputHex;	/// 
-		size_t inputHexSize;	/// 
-		char[60] bufferMnemonic;	/// For disassembly
-		char[40] bufferMachine;	/// For disassembly
-	} app_settings_t app;	/// App settings
+	adbg_disasm_t dism;	/// Disassembler
+	exception_t last_exception;	/// Last exception
+	FILE *inputFile;	/// 
+	//TODO: Should be allocated
+	ubyte[32] inputHex;	/// 
+	size_t inputHexSize;	/// 
+	char[60] bufferMnemonic;	/// For disassembly
+	char[40] bufferMachine;	/// For disassembly
 }
 
-/// Global variables.
-///
-/// This is in one big structure to avoid thinking complexity, and avoids
-/// tracking other stuff. Like, "uhhh what is the variable name again?".
+/// Global variables. Helps keeping track of app variables.
 __gshared settings_t globals;
 
 /// Print last library error information to stdout 
 int printerror(const(char)* func = cast(char*)__FUNCTION__) {
-	import adbg.etc.c.stdio : printf, puts;
+	import adbg.include.c.stdio : printf, puts;
 	import adbg.error : error;
-	import adbg.sys.err : SYS_ERR_FMT;
 	
 	debug printf("[%s:%d] ", error.file, error.line);
 	printf("%s: E-%u ", func, adbg_errno);
 	switch (error.code) with (AdbgError) {
-	case crt: printf("(C runtime error %d) ", adbg_errno_extern); break;
-	case os: printf("(OS error "~SYS_ERR_FMT~") ", adbg_errno_extern); break;
+	case crt: printf("(CRT:%d) ", adbg_errno_extern); break;
+	case os: printf("(OS:"~SYS_ERR_FMT~") ", adbg_errno_extern); break;
+	case capstone: printf("(CS:%d) ", adbg_errno_extern); break;
 	default:
 	}
 	puts(adbg_error_msg);

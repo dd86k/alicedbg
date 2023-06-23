@@ -5,7 +5,7 @@ import core.stdc.string;
 
 /// 
 unittest {
-	import adbg.utils.str : adbg_string_t;
+	import adbg.utils.string : adbg_string_t;
 	
 	enum BUFFER_SIZE = 80;
 	enum LAST_ITEM = BUFFER_SIZE - 1;

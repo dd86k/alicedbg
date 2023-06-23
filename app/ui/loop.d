@@ -8,8 +8,8 @@
 module ui.loop;
 
 import core.stdc.string : memcpy;
-import adbg.etc.c.stdio;
-import adbg.dbg, adbg.sys.err : SYS_ERR_FMT;
+import adbg.include.c.stdio;
+import adbg.dbg;
 import adbg.disassembler, adbg.error;
 import common, term;
 
@@ -30,26 +30,30 @@ int app_loop() {
 private:
 
 int loop_handler(exception_t *e) {
-	__gshared uint en;
+	__gshared uint ex_num; /// Exception number
 	printf(
 	"\n----------------------------------------\n"~
 	"* EXCEPTION #%u: %s ("~SYS_ERR_FMT~")\n"~
 	"* PID=%u TID=%u\n",
-	en++, adbg_exception_string(e.type), e.oscode,
+	ex_num++, adbg_exception_string(e.type), e.oscode,
 	e.pid, e.tid,
 	);
 	
 	// * Print disassembly, if available
 	if (e.fault) {
 		adbg_disasm_opcode_t op = void;
-		if (adbg_disasm_once_debuggee(&globals.app.disasm, &op,
-			AdbgDisasmMode.file, e.fault.sz)) {
+		if (adbg_disasm_once_debuggee(&globals.dism,
+			&op,
+			AdbgDisasmMode.file,
+			e.fault.sz)) {
 			printf("> %p: (error:%s)\n", e.fault.raw, adbg_error_msg);
-		} else with (globals.app) {
-			adbg_disasm_format(&disasm,
-				bufferMnemonic.ptr, bufferMnemonic.sizeof, &op);
-			adbg_disasm_machine(&disasm,
-				bufferMachine.ptr, bufferMachine.sizeof, &op);
+		} else with (globals) {
+			adbg_disasm_format(&dism,
+				bufferMnemonic.ptr,
+				bufferMnemonic.sizeof, &op);
+			adbg_disasm_machine(&dism,
+				bufferMachine.ptr,
+				bufferMachine.sizeof, &op);
 			printf("> %p: (%s) %s\n",
 				e.fault.raw, bufferMachine.ptr, bufferMnemonic.ptr);
 		}
