@@ -210,19 +210,18 @@ size_t adbg_disasm_machine(adbg_disasm_t *disasm, char *buffer, size_t size, adb
 	import adbg.config : USE_CAPSTONE;
 	
 	static if (USE_CAPSTONE) {
-		if (buffer == null || size == 0) {
+		if (buffer == null)
+			return 0;
+		if (size == 0 || disasm == null || op == null) {
 			buffer = empty_string;
 			return 0;
 		}
-		
-		//import adbg.include.capstone;
-		import adbg.include.c.stdio : snprintf;
 		
 		adbg_string_t s = adbg_string_t(buffer, size);
 		
 		int opsize = op.size;
 		int e2 = opsize - 1;
-		ubyte *u8 = disasm.current.i8;
+		ubyte *u8 = disasm.last.i8;
 		
 		for (int i; i < opsize; ++i, ++u8) {
 			s.addx8(*u8, true);

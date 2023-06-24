@@ -747,6 +747,8 @@ int adbg_disasm(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op) {
 		return adbg_oops(AdbgError.uninitiated);
 	
 	static if (USE_CAPSTONE) {
+		disasm.last = disasm.current;
+		
 		//TODO: fix base address
 		ulong addr = disasm.base.sz;
 		if (cs_disasm_iter(disasm.cs_handle,
