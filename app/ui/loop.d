@@ -13,7 +13,7 @@ import adbg.dbg;
 import adbg.disassembler, adbg.error;
 import common, term;
 
-//TODO: loop option or new ui for just logging in faults
+//TODO: Consider moving this thing to "examples/"
 
 extern (C):
 
@@ -60,6 +60,7 @@ int loop_handler(exception_t *e) {
 	}
 	
 	// * Process input
+	//TODO: get rid of term dependency and use getchar() or something
 L_PROMPT:
 	printf("\nAction [S=Step,C=Continue,Q=Quit] ");
 	InputInfo input = void;

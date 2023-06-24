@@ -222,7 +222,7 @@ size_t adbg_disasm_machine(adbg_disasm_t *disasm, char *buffer, size_t size, adb
 		
 		int opsize = op.size;
 		int e2 = opsize - 1;
-		ubyte *u8 = disasm.base.i8;
+		ubyte *u8 = disasm.current.i8;
 		
 		for (int i; i < opsize; ++i, ++u8) {
 			s.addx8(*u8, true);
