@@ -32,11 +32,12 @@ version (Windows) {
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
 	import core.sys.posix.signal : kill, SIGKILL, siginfo_t, raise;
 	import core.sys.posix.sys.uio;
-	import core.sys.posix.fcntl : open;
+	import core.sys.posix.fcntl : open, O_RDONLY;
+	import core.sys.posix.unistd : read, close, execve;
 	import core.stdc.stdlib : exit, malloc, free;
 	import adbg.include.posix.mann;
 	import adbg.include.posix.ptrace;
-	import adbg.include.posix.unistd;
+	import adbg.include.posix.unistd : clone, CLONE_PTRACE;
 	import adbg.include.linux.user;
 	private enum __WALL = 0x40000000;
 }
@@ -145,25 +146,27 @@ struct __adbg_child_t {
 enum {
 	/// Pass args line to tracee.
 	/// Type: const(char) *args
-	ABDG_SPAWN_OPTION_ARGS = 1,
+	ABDG_SPAWN_OPT_ARGS = 1,
 	/// Pass argv lines to debugger.
 	/// Type: const(char) **argv
-	ABDG_SPAWN_OPTION_ARGV = 2,
+	ABDG_SPAWN_OPT_ARGV = 2,
 	/// Pass spawn directory to debugger.
 	/// Type: const(char) *args
-	ABDG_SPAWN_OPTION_DIR  = 3,
+	ABDG_SPAWN_OPT_DIR  = 3,
 	// Pass environment table to tracee.
 	// Type: const(char) **argv
-	//ABDG_OPT_SPAWN_ENVP    = 4,
+	//ABDG_SPAWN_OPT_ENVP    = 4,
 	// Tell debugger to continue tracee once spawned.
 	// Type: none
-	//ADBG_SPAWN_OPTION_CONTINUE = 5,
+	//ADBG_SPAWN_OPT_CONTINUE = 5,
 	// Tell debugger to use shell instead.
 	// Type: none
-	//ADBG_SPAWN_OPTION_USE_SHELL = 6,
+	//ADBG_SPAWN_OPT_USE_SHELL = 6,
 	// (Posix) Tell debugger to use clone(2) instead of fork(2).
 	// Type: none
-	//ADBG_SPAWN_OPTION_USE_CLONE = 7,
+	//ADBG_SPAWN_OPT_USE_CLONE = 7,
+	// Only accept these exceptions.
+	//ADBG_SPAWN_OPT_FILTER = 8,
 }
 
 private
@@ -193,13 +196,13 @@ int adbg_spawn_optionsv(adbg_options_spawn_t *opts, va_list list) {
 	
 L_OPTION:
 	switch (va_arg!int(list)) {
-	case ABDG_SPAWN_OPTION_ARGS:
+	case ABDG_SPAWN_OPT_ARGS:
 		opts.args = va_arg!(const(char)*)(list);
 		goto L_OPTION;
-	case ABDG_SPAWN_OPTION_ARGV:
+	case ABDG_SPAWN_OPT_ARGV:
 		opts.argv = va_arg!(const(char)**)(list);
 		goto L_OPTION;
-	case ABDG_SPAWN_OPTION_DIR:
+	case ABDG_SPAWN_OPT_DIR:
 		opts.dir = va_arg!(const(char)*)(list);
 		goto L_OPTION;
 	default:
@@ -327,10 +330,10 @@ int adbg_spawn3(adbg_tracee_t *tracee, const(char) *path, adbg_options_spawn_t *
 				return adbg_oops(AdbgError.os);
 
 			// Adjust argv
-			if (argv) {
+			if (opts.argv) {
 				size_t i0, i1 = 1;
-				while (argv[i0] && i1 < 15)
-					__argv[i1++] = argv[i0++];
+				while (opts.argv[i0] && i1 < 15)
+					__argv[i1++] = opts.argv[i0++];
 				__argv[i1] = null;
 			} else {
 				__argv[1] = null;
@@ -338,9 +341,10 @@ int adbg_spawn3(adbg_tracee_t *tracee, const(char) *path, adbg_options_spawn_t *
 			__argv[0] = path;
 
 			// Adjust envp
-			if (envp == null) {
-				envp = cast(const(char)**)&__envp;
-				envp[0] = null;
+			//TODO: Is this still valid?
+			if (opts.envp == null) {
+				opts.envp = cast(const(char)**)&__envp;
+				opts.envp[0] = null;
 			}
 
 			// Clone
@@ -359,10 +363,10 @@ int adbg_spawn3(adbg_tracee_t *tracee, const(char) *path, adbg_options_spawn_t *
 				return adbg_oops(AdbgError.os);
 			if (tracee.pid == 0) { // Child process
 				// Adjust argv
-				if (argv) {
+				if (opts.argv) {
 					size_t i0, i1 = 1;
-					while (argv[i0] && i1 < 15)
-						__argv[i1++] = argv[i0++];
+					while (opts.argv[i0] && i1 < 15)
+						__argv[i1++] = opts.argv[i0++];
 					__argv[i1] = null;
 				} else {
 					__argv[1] = null;
@@ -370,9 +374,9 @@ int adbg_spawn3(adbg_tracee_t *tracee, const(char) *path, adbg_options_spawn_t *
 				__argv[0] = path;
 				
 				// Adjust envp
-				if (envp == null) {
-					envp = cast(const(char)**)&__envp;
-					envp[0] = null;
+				if (opts.envp == null) {
+					opts.envp = cast(const(char)**)&__envp;
+					opts.envp[0] = null;
 				}
 				
 				// Trace me
@@ -411,11 +415,13 @@ enum {
 	/// Continue execution when attached.
 	/// Default: false
 	/// Type: none
-	ADBG_OPTION_ATTACH_CONTINUE = 1,
+	ADBG_ATTACH_OPT_CONTINUE = 1,
 	/// Kill tracee when debugger exits.
 	/// Default: false
 	/// Type: none
-	ADBG_OPTION_ATTACH_EXITKILL = 2,
+	ADBG_ATTACH_OPT_EXITKILL = 2,
+	// Only accept these exceptions.
+	//ADBG_ATTACH_OPT_FILTER = 3
 }
 
 /// Attach the debugger to a process ID.
@@ -444,10 +450,10 @@ int adbg_attach2(adbg_tracee_t *tracee, int pid, ...) {
 
 L_OPTION:
 	switch (va_arg!int(list)) {
-	case ADBG_OPTION_ATTACH_CONTINUE:
+	case ADBG_ATTACH_OPT_CONTINUE:
 		continue_ = true;
 		goto L_OPTION;
-	case ADBG_OPTION_ATTACH_EXITKILL:
+	case ADBG_ATTACH_OPT_EXITKILL:
 		exitkill = true;
 		goto L_OPTION;
 	default:
@@ -550,7 +556,8 @@ bool adbg_is_debugged() {
 	version (Windows) {
 		return IsDebuggerPresent() == TRUE;
 	} else version (linux) { // https://stackoverflow.com/a/24969863
-		char[4096] buf;
+		import core.stdc.string : strstr;
+		char[4096] buf = void;
 
 		const int status_fd = open("/proc/self/status", O_RDONLY);
 		if (status_fd == -1)
@@ -562,17 +569,23 @@ bool adbg_is_debugged() {
 		if (num_read <= 0)
 			return false;
 
-		buf[num_read] = '\0';
-		static immutable char *tracerPidString = "TracerPid:";
-		const auto tracer_pid_ptr = strstr(buf, tracerPidString);
-		if (!tracer_pid_ptr)
+		buf[num_read] = 0;
+		static immutable const(char) *tracerPidString = "TracerPid:";
+		const(char)* strptr = strstr(buf.ptr, tracerPidString);
+		if (strptr == null)
 			return false;
-
-		for (const char* c = tracer_pid_ptr + tracerPidString.sizeof - 1; c <= buf + num_read; ++c){
-			if (isspace(*c))
-				continue;
-			else
-				return isdigit(*c) != 0 && *c != '0';
+		
+		// "TracerPid:": 10 chars
+		// ulong.max (18446744073709551615): 20 chars
+		// spacing is either one tab or a few spaces: 1-8
+		// so 40 is a decent guess
+		for (size_t i = 10; i < 40; ++i) {
+			const char c = strptr[i];
+			switch (c) {
+			case '\n', '\r': return false; // EOL
+			case '0', '\t', ' ': continue; // space
+			default: return true; // digit
+			}
 		}
 
 		return false;
@@ -601,7 +614,7 @@ AdbgStatus adbg_status(adbg_tracee_t *tracee) { return tracee.status; }
  * Params: userfunc = User function callback
  * Returns: Zero on success; Otherwise an error occured
  */
-int adbg_run(adbg_tracee_t *tracee, int function(adbg_exception_t*) userfunc) {
+int adbg_start(adbg_tracee_t *tracee, int function(adbg_exception_t*) userfunc) {
 	if (userfunc == null)
 		return adbg_oops(AdbgError.nullAddress);
 	
@@ -731,27 +744,25 @@ L_DEBUG_LOOP:
 			siginfo_t sig = void;
 			if (ptrace(PTRACE_GETSIGINFO, tracee.pid, null, &sig) >= 0) {
 				version (CRuntime_Glibc)
-					e.fault.raw = sig._sifields._sigfault.si_addr;
+					exception.fault.raw = sig._sifields._sigfault.si_addr;
 				else version (CRuntime_Musl)
-					e.fault.raw = sig.__si_fields.__sigfault.si_addr;
+					exception.fault.raw = sig.__si_fields.__sigfault.si_addr;
 				else static assert(0, "hack me");
 			} else {
-				e.fault.raw = null;
+				exception.fault.raw = null;
 			}
 			break;
 //		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
 		default:
-			e.fault.raw = null;
+			exception.fault.raw = null;
 		}
 		
-		adbg_exception_translate(&exception, &tracee,pid, &chld_signo);
+		adbg_exception_translate(&exception, &tracee.pid, &chld_signo);
 		
-		with (AdbgAction)
-		switch (userfunc(&e)) {
+		switch (userfunc(&exception)) with (AdbgAction) {
 		case exit:
 			tracee.status = AdbgStatus.idle; // in either case
-			// Because PTRACE_KILL is deprecated
-			if (kill(tracee.pid, SIGKILL) == -1)
+			if (kill(tracee.pid, SIGKILL) == -1) // PT_KILL is deprecated
 				return adbg_oops(AdbgError.os);
 			return 0;
 		case step:

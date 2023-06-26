@@ -72,7 +72,7 @@ void adbg_context_start(adbg_thread_context_t *ctx, adbg_tracee_t *tracee) {
 			else
 				adbg_context_start_x86_64(ctx);
 		} else // Anything else 64-bit
-			adbg_context_start_x86_64(ctx, AdbgArchitecture.x86_32);
+			adbg_context_start_x86_64(ctx);
 	}
 }
 

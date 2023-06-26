@@ -23,7 +23,7 @@ extern (C):
 
 /// Starts loop UI
 int app_loop() {
-	if (adbg_status != AdbgStatus.ready) {
+	if (adbg_state != AdbgStatus.ready) {
 		puts("loop: No program loaded");
 		return 1;
 	}

@@ -48,7 +48,7 @@ version (Windows) {
 
 extern (C):
 
-public int adbg_seh_set(int function(adbg_exception_t*) func) {
+public int adbg_seh_enable(int function(adbg_exception_t*) func) {
 	if (func == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
@@ -67,11 +67,11 @@ public int adbg_seh_set(int function(adbg_exception_t*) func) {
 			sigemptyset(&sa.sa_mask);
 			sa.sa_flags = SA_SIGINFO;
 			sa.sa_sigaction = &adbg_seh_catch;
-			if (sigaction(SIGSEGV, &sa, NULL_SIGACTION) == -1 ||
-				sigaction(SIGTRAP, &sa, NULL_SIGACTION) == -1 ||
-				sigaction(SIGFPE, &sa, NULL_SIGACTION) == -1 ||
-				sigaction(SIGILL, &sa, NULL_SIGACTION) == -1 ||
-				sigaction(SIGBUS, &sa, NULL_SIGACTION) == -1) {
+			if (sigaction(SIGSEGV, &sa, NO_SIGACTION) == -1 ||
+				sigaction(SIGTRAP, &sa, NO_SIGACTION) == -1 ||
+				sigaction(SIGFPE, &sa, NO_SIGACTION) == -1 ||
+				sigaction(SIGILL, &sa, NO_SIGACTION) == -1 ||
+				sigaction(SIGBUS, &sa, NO_SIGACTION) == -1) {
 				return adbg_oops(AdbgError.os); // Well, crt, but you know
 			}
 			checkpoint.enabled = true;

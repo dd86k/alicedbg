@@ -357,7 +357,7 @@ enum {
  * 	flags = Reserved
  * Returns: OS error code on error
  */
-int adbg_attach(int pid, int flags = 0) {
+int adbg_attach_(int pid, int flags = 0) {
 	bool stop = (flags & ADBG_ATTACH_OPT_STOP) != 0;
 	bool exitkill = (flags & ADBG_ATTACH_OPT_EXITKILL) != 0;
 	version (Windows) {
@@ -437,7 +437,7 @@ int adbg_attach(int pid, int flags = 0) {
 }
 
 /// Detach debugger from current process.
-int adbg_detach() {
+int adbg_detach_() {
 	version (Windows) {
 		if (DebugActiveProcessStop(g_debuggee.pid) == FALSE)
 			return adbg_oops(AdbgError.os);
@@ -451,7 +451,7 @@ int adbg_detach() {
 /// Insert a debuggee break.
 //TODO: bool checkDebugger = false
 //      POSIX: https://stackoverflow.com/a/24969863
-void adbg_break() {
+void adbg_break_() {
 	version (Windows) {
 		DebugBreak();
 	} else version (Posix) {
@@ -463,7 +463,7 @@ void adbg_break() {
  * Get the debugger's current status.
  * Returns: AdbgStatus enum
  */
-AdbgStatus adbg_status() {
+AdbgStatus adbg_state() {
 	return g_debuggee.status;
 }
 

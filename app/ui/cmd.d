@@ -220,7 +220,7 @@ void cmd_h_load() {
 //
 
 int cmd_c_r(int argc, const(char) **argv) {
-	if (adbg_status == AdbgStatus.idle) {
+	if (adbg_state == AdbgStatus.idle) {
 		puts("No program loaded or not paused");
 		return AppError.pauseRequired;
 	}
@@ -310,7 +310,7 @@ int cmd_c_help(int argc, const(char) **argv) {
 //
 
 int cmd_c_run(int argc, const(char) **argv) {
-	if (adbg_status != AdbgStatus.ready) {
+	if (adbg_state != AdbgStatus.ready) {
 		puts("No programs loaded");
 		return AppError.alreadyLoaded;
 	}
@@ -322,7 +322,7 @@ int cmd_c_run(int argc, const(char) **argv) {
 //
 
 int cmd_c_maps(int argc, const(char) **argv) {
-	if (adbg_status() == AdbgStatus.idle) {
+	if (adbg_state() == AdbgStatus.idle) {
 		puts("error: Attach or spawn debuggee first");
 		return 1;
 	}

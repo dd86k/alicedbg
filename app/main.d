@@ -13,7 +13,7 @@ import adbg.include.c.stdlib : exit;
 import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
-import adbg.v1.debugger : adbg_attach, adbg_load;
+import adbg.v1.debugger : adbg_attach_, adbg_load;
 import adbg.v1.disassembler;
 import common, ui, dumper, analyzer;
 

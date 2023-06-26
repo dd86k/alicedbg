@@ -166,8 +166,7 @@ AdbgException adbg_exception_from_os(uint code, uint subcode = 0) {
 		default:	return Unknown;
 		}
 	} else {
-		with (ExceptionType)
-		switch (code) {
+		switch (code) with (AdbgException) {
 		case SIGILL:
 			/*
 			switch (subcode) {

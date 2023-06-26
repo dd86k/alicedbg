@@ -265,7 +265,7 @@ int adbg_mem_maps(adbg_tracee_t *tracee, adbg_mem_map **mmaps, size_t *mcount, .
 		
 		// Allocate map items
 		version (Trace) trace("allocating %zu items", itemcnt);
-		adbg_mm_map *map = *mmaps = cast(adbg_mm_map*)malloc(itemcnt * adbg_mm_map.sizeof);
+		adbg_mem_map *map = *mmaps = cast(adbg_mem_map*)malloc(itemcnt * adbg_mem_map.sizeof);
 		if (map == null) {
 			free(procbuf);
 			close(fd_maps);

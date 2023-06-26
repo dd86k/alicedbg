@@ -9,7 +9,7 @@ module adbg.v1.debugger.seh.posix;
 
 version (Posix):
 
-import adbg.dbg.exception;
+import adbg.v1.debugger.exception;
 import adbg.include.c.setjmp;
 import core.sys.posix.signal;
 import core.sys.posix.ucontext;
