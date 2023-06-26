@@ -277,6 +277,12 @@ struct adbg_address_t {
 	}
 }
 
+enum AdbgArchitecture {
+	x86_16,
+	x86_32,
+	x86_64,
+}
+
 //
 // ANCHOR Functions
 //

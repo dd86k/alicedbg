@@ -8,13 +8,13 @@
 module main;
 
 import adbg.platform;
-import adbg.dbg : adbg_attach, adbg_load;
-import adbg.disassembler;
 import adbg.utils.string : adbg_util_hex_array;
 import adbg.include.c.stdlib : exit;
 import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
+import adbg.v1.debugger : adbg_attach, adbg_load;
+import adbg.v1.disassembler;
 import common, ui, dumper, analyzer;
 
 private:

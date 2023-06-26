@@ -8,7 +8,7 @@
 module analyzer;
 
 import adbg.include.c.stdio;
-import adbg.disassembler;
+import adbg.v1.disassembler;
 import common;
 
 private immutable const(char)*[AdbgDisasmOperand.length] opType = [

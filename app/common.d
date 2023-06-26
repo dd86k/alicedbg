@@ -9,8 +9,8 @@
 module common;
 
 import adbg.config;
-import adbg.dbg.exception;
-import adbg.disassembler;
+import adbg.v1.debugger.exception;
+import adbg.v1.disassembler;
 import adbg.error;
 import core.stdc.stdio : FILE;
 

@@ -9,11 +9,14 @@ module ui.loop;
 
 import core.stdc.string : memcpy;
 import adbg.include.c.stdio;
-import adbg.dbg;
-import adbg.disassembler, adbg.error;
+import adbg.v1.debugger;
+import adbg.v1.disassembler;
+import adbg.error;
 import common, term;
 
 //TODO: Consider moving this thing to "examples/"
+//TODO: Remove term dependency
+//      Use getchar() or similar
 
 extern (C):
 

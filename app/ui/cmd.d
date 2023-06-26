@@ -9,11 +9,13 @@ module ui.cmd;
 
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib : exit, free;
-import adbg.error;
-import adbg.dbg.debugger, adbg.dbg.exception, adbg.dbg.context;
-import adbg.utils.string;
-import adbg.disassembler;
 import core.stdc.string;
+import adbg.error;
+import adbg.utils.string;
+import adbg.v1.debugger;
+import adbg.v1.debugger.exception;
+import adbg.v1.debugger.context;
+import adbg.v1.disassembler;
 import common, term;
 
 extern (C):

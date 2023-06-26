@@ -8,9 +8,9 @@
 module dump.mz;
 
 import core.stdc.stdio;
-import adbg.disassembler : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
-import adbg.server.v1.mz;
-import adbg.server.v1 : adbg_object_t;
+import adbg.v1.disassembler : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
+import adbg.v1.server.mz;
+import adbg.v1.server : adbg_object_t;
 import dumper;
 
 extern (C):
@@ -89,7 +89,7 @@ void dump_mz_relocs(adbg_object_t *obj) {
 void dump_mz_disasm(dump_t *dump) {
 	dump_h1("Disassembly");
 	
-	uint start = dump.obj.mz.hdr.e_cparh * 16;
+	uint start = dump.obj.mz.hdr.e_cparh << 4; // *16
 	if (start < mz_hdr.sizeof || start >= dump.obj.fsize) {
 		printf("dump_mz_disasm: Data start outside of exe (%u)", start);
 	}

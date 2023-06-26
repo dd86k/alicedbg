@@ -10,9 +10,9 @@ module dump.pe;
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE;
 import adbg.include.c.stdio;
 import adbg.utils.date : ctime32;
-import adbg.disassembler;
-import adbg.server.v1.pe;
-import adbg.server.v1 : adbg_object_t;
+import adbg.v1.disassembler;
+import adbg.v1.server.pe;
+import adbg.v1.server : adbg_object_t;
 import adbg.utils.uid, adbg.utils.bit;
 import common, dumper;
 
