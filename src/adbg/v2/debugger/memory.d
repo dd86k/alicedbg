@@ -1,4 +1,4 @@
-module adbg.debugger.v2.memory;
+module adbg.v2.debugger.memory;
 
 import adbg.v2.debugger.process : adbg_tracee_t;
 import adbg.include.c.stdlib : malloc, free;

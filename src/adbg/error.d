@@ -10,8 +10,6 @@
  */
 module adbg.error;
 
-import adbg.config;
-
 // NOTE: Every thing that could go wrong should have an error code.
 
 extern (C):
@@ -71,14 +69,14 @@ struct adbg_error_t {
 	void *res;	/// Resource
 }
 /// Last error in alicedbg.
-__gshared adbg_error_t error;
+private __gshared adbg_error_t error;
 
-private struct error_msg_t {
+private struct adbg_error_msg_t {
 	uint code;
 	const(char) *msg;
 }
 private immutable const(char) *defaultMsg = "Internal error.";
-private immutable error_msg_t[] errors_msg = [
+private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	// Generics
 	//
@@ -127,6 +125,12 @@ version (Windows) {
 	enum SYS_ERR_FMT = "%d"; /// Error code format
 }
 
+/// Get error state instance.
+/// Returns: Pointer to the only error instance.
+const(adbg_error_t)* adbg_error_current() {
+	return &error;
+}
+
 /// Get error message from the OS (or CRT) by providing the error code
 /// Params: code = Error code number from OS
 /// Returns: String
@@ -150,24 +154,12 @@ const(char) *adbg_sys_error(int code) {
 
 /// Get the last error code from the OS (or CRT)
 /// Returns: GetLastError from Windows, otherwise errno
-int adbg_sys_errno() {
+private
+int adbg_error_system() {
 	version (Windows)
 		return GetLastError;
 	else
 		return errno;
-}
-
-/// Print code and message to std ala perror
-/// Params:
-/// 	mod = module adbg.name
-/// 	code = Error code
-void adbg_sys_perror(string mod = null)(int code) {
-	import core.stdc.stdio : printf;
-	static if (mod)
-		enum fmt = mod~": ("~SYS_ERR_FMT~") %s\n";
-	else
-		enum fmt = "("~SYS_ERR_FMT~") %s\n";
-	printf(fmt, code, adbg_sys_error(code));
 }
 
 //
@@ -203,14 +195,12 @@ int adbg_errno() {
 
 int adbg_errno_extern() {
 	import core.stdc.errno : errno;
-	static if (USE_CAPSTONE) {
-		import adbg.include.capstone : cs_errno, csh;
-	}
+	import adbg.include.capstone : csh, cs_errno;
 	
 	with (AdbgError)
 	switch (error.code) {
 	case crt:	return errno;
-	case os:	return adbg_sys_errno;
+	case os:	return adbg_error_system;
 	case capstone:	return cs_errno(*cast(csh*)error.res);
 	default:	return error.code;
 	}
@@ -222,13 +212,13 @@ const(char)* adbg_error_msg(int code = error.code) {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
 	import bindbc.loader.sharedlib : errors;
-	static if (USE_CAPSTONE) import adbg.include.capstone : cs_strerror;
+	import adbg.include.capstone : csh, cs_errno, cs_strerror;
 	
 	with (AdbgError)
 	switch (error.code) {
 	case crt: return strerror(errno);
-	case os:  return adbg_sys_error(adbg_sys_errno);
-	case capstone:  return cs_strerror(adbg_sys_errno);
+	case os:  return adbg_sys_error(adbg_error_system);
+	case capstone:  return cs_strerror(cs_errno(*cast(csh*)error.res));
 	case loader:
 		if (errors.length)
 			return errors()[0].message;

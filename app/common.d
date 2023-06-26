@@ -103,7 +103,9 @@ __gshared settings_t globals;
 /// Print last library error information to stdout 
 int printerror(const(char)* func = cast(char*)__FUNCTION__) {
 	import adbg.include.c.stdio : printf, puts;
-	import adbg.error : error;
+	import adbg.error : adbg_error_current;
+	
+	const(adbg_error_t)* error = adbg_error_current;
 	
 	debug printf("[%s:%d] ", error.file, error.line);
 	printf("%s: E-%u ", func, adbg_errno);

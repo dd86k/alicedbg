@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © 2019-2022 dd86k <dd@dax.moe>
 /// License: BSD-3-Clause
-module adbg.debugger.v2.context;
+module adbg.v2.debugger.context;
 
 import adbg.platform : AdbgArchitecture;
 import adbg.v2.debugger.process : adbg_tracee_t;
@@ -62,7 +62,7 @@ struct adbg_thread_context_t {
 
 /// Initiate register fields with their names and sizes.
 /// This is usually done by the debugger itself.
-void adbg_context_start(adbg_tracee_t *tracee, adbg_thread_context_t *ctx) {
+void adbg_context_start(adbg_thread_context_t *ctx, adbg_tracee_t *tracee) {
 	version (X86) {
 		adbg_context_start_x86(ctx);
 	} else version (X86_64) {
@@ -76,7 +76,7 @@ void adbg_context_start(adbg_tracee_t *tracee, adbg_thread_context_t *ctx) {
 	}
 }
 
-void adbg_context_fill(adbg_tracee_t *tracee, adbg_thread_context_t *ctx) {
+void adbg_context_fill(adbg_thread_context_t *ctx, adbg_tracee_t *tracee) {
 	version (Windows) {
 		CONTEXT winctx = void;
 		version (Win64) {

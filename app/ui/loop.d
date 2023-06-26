@@ -15,6 +15,7 @@ import adbg.error;
 import common, term;
 
 //TODO: Consider moving this thing to "examples/"
+//      Sub-package :example
 //TODO: Remove term dependency
 //      Use getchar() or similar
 
