@@ -13,6 +13,8 @@
  */
 module adbg.include.c.stdio;
 
+import adbg.include.d.config : COMPILER_FEAT_PRAGMA_PRINTF, GDC_11;
+
 extern (C):
 @system:
 @nogc:
@@ -31,23 +33,32 @@ int getchar();
 //       from core.stdc.stdio._snprintf, so this is one of those copy-paste fix.
 
 version (Windows) {
-	///
-	pragma(printf)
-	int   _snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
-	alias _snprintf snprintf;
+	static if (COMPILER_FEAT_PRAGMA_PRINTF) {
+		///
+		pragma(printf)
+		int   _snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
+		alias _snprintf snprintf;
+	} else {
+		///
+		int   _snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
+		alias _snprintf snprintf;
+	}
 } else {
-	///
-	pragma(printf)
-	int   snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
+	static if (COMPILER_FEAT_PRAGMA_PRINTF) {
+		///
+		pragma(printf)
+		int   snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
+	} else {
+		///
+		int   snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
+	}
 }
 
 // NOTE: Wrong printf/scanf detection for GDC 11 and lower.
 //       scanf conditions were the same for printf
-//       GDC 11.3 is 2.076
-//       GDC 12 (being fine) is 2.100
 
 version (GNU) {
-	static if (__VERSION__ <= 2076) {
+	static if (__VERSION__ <= GDC_11) { // GDC 11.3
 		/// 
 		int __isoc99_sscanf(scope const char* s, scope const char* format, scope ...);
 		/// 

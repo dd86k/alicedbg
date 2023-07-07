@@ -1,11 +1,11 @@
-/**
- * Compile constants
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © 2019-2022 dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
+/// Compile constants
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © 2019-2022 dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module adbg.platform;
+
+import adbg.include.d.config : COMPILER_FEAT_TARGETINFO;
 
 //TODO: has feature xyz should be dynamic
 //      e.g., capstone may not be available, but could be after installing it
@@ -145,26 +145,6 @@ else version (PlayStation3)
 	enum TARGET_OS = "playstation3";	/// Ditto
 else
 	enum TARGET_OS = "unknown";	/// Ditto
-
-//
-// ANCHOR Compiler support enumerations
-//
-// __VERSION__ is the debugger front-end version
-// GDC 5.4:  Likely 2.068.1
-// GDC 8.4:  2.068.1
-// GDC 10.3: 2.076.1, but it's heavily modified
-// GDC 11.2: 2.076.1
-// GDC 12.0: 2.098.0-beta.1 (or 2.098.1 at release)
-//
-
-/// If set, the compiler supports the getTargetInfo trait.
-enum COMPILER_FEAT_TARGETINFO    = __VERSION__ >= 2083;
-/// If set, the compiler supports the printf and scanf pragmas.
-enum COMPILER_FEAT_PRAGMA_PRINTF = __VERSION__ >= 2092;
-/// Compiler supports DIP1034 (bottom type, includes noreturn).
-enum COMPILER_FEAT_NORETURN      = __VERSION__ >= 2096;
-/// Compiler has support for core.int128.
-enum COMPILER_FEAT_INT128        = __VERSION__ >= 2100;
 
 //
 // ANCHOR Additional target information
