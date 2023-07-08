@@ -584,13 +584,16 @@ bool adbg_is_debugged() {
 			switch (c) {
 			case '\n', '\r': return false; // EOL
 			case '0', '\t', ' ': continue; // space
-			default: return true; // digit
+			default: return true; // non-zero digit
 			}
 		}
 
 		return false;
 	} else static assert(0, "adbg_debug_me: Implement me");
 }
+
+//TODO: unittest for adbg_is_debugged that loads the executable
+//      Or in tests/
 
 /// Insert a debuggee break.
 void adbg_break() {
@@ -605,17 +608,18 @@ void adbg_break() {
 /// Returns: AdbgStatus enum
 AdbgStatus adbg_status(adbg_tracee_t *tracee) { return tracee.status; }
 
-/**
- * Enter the debugging loop. Continues execution of the process until a new
- * debug event occurs. When an exception occurs, the exception_t structure is
- * populated with debugging information.
- * (Windows) Uses WaitForDebugEvent, filters any but EXCEPTION_DEBUG_EVENT
- * (Posix) Uses ptrace(2) and waitpid(2), filters SIGCONT out
- * Params: userfunc = User function callback
- * Returns: Zero on success; Otherwise an error occured
- */
-int adbg_start(adbg_tracee_t *tracee, int function(adbg_exception_t*) userfunc) {
-	if (userfunc == null)
+/// Enter the debugging loop. Continues execution of the process until a new
+/// debug event occurs. When an exception occurs, the exception_t structure is
+/// populated with debugging information.
+/// (Windows) Uses WaitForDebugEvent, filters any but EXCEPTION_DEBUG_EVENT
+/// (Posix) Uses ptrace(2) and waitpid(2), filters SIGCONT out
+/// Params:
+/// 	tracee = Tracee instance
+/// 	userfunc = User function callback
+/// 	... = Options, pass 0 for no options and assume defaults
+/// Returns: Non-zero on error
+int adbg_start2(adbg_tracee_t *tracee, int function(adbg_exception_t*) userfunc, ...) {
+	if (tracee == null || userfunc == null)
 		return adbg_oops(AdbgError.nullAddress);
 	
 	adbg_exception_t exception = void;
@@ -699,6 +703,7 @@ L_DEBUG_LOOP:
 		tracee.status = AdbgStatus.running;
 		tracee.pid = waitpid(-1, &wstatus, 0);
 		
+		// Something bad happened
 		if (tracee.pid == -1) {
 			tracee.status = AdbgStatus.idle;
 			return adbg_oops(AdbgError.os);
@@ -706,6 +711,7 @@ L_DEBUG_LOOP:
 		
 		tracee.status = AdbgStatus.paused;
 		
+		//TODO: Check waitpid status for BSDs
 		// Bits  Description (Linux)
 		// 6:0   Signo that caused child to exit
 		//       0x7f if child stopped/continued
@@ -742,15 +748,15 @@ L_DEBUG_LOOP:
 		// - gdbserver and lldb never attempt to do such thing anyway
 		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 			siginfo_t sig = void;
-			if (ptrace(PTRACE_GETSIGINFO, tracee.pid, null, &sig) >= 0) {
-				version (CRuntime_Glibc)
-					exception.fault.raw = sig._sifields._sigfault.si_addr;
-				else version (CRuntime_Musl)
-					exception.fault.raw = sig.__si_fields.__sigfault.si_addr;
-				else static assert(0, "hack me");
-			} else {
+			if (ptrace(PTRACE_GETSIGINFO, tracee.pid, null, &sig) < 0) {
 				exception.fault.raw = null;
+				break;
 			}
+			version (CRuntime_Glibc)
+				exception.fault.raw = sig._sifields._sigfault.si_addr;
+			else version (CRuntime_Musl)
+				exception.fault.raw = sig.__si_fields.__sigfault.si_addr;
+			else static assert(0, "hack me");
 			break;
 //		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
 		default:
@@ -795,15 +801,15 @@ int adbg_breakpoint_get(adbg_tracee_t *tracee, breakpoint_t *bp, int index) {
 int adbg_breakpoint_present_at(adbg_tracee_t *tracee, breakpoint_t *bp, size_t addr) {
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_breakpoint_get_list(adbg_tracee_t *tracee, breakpoint_t **l, uint *n) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_breakpoint_rm_all(adbg_tracee_t *tracee) {
+int adbg_breakpoint_list(adbg_tracee_t *tracee, breakpoint_t **l, uint *n) {
 	return adbg_oops(AdbgError.notImplemented);
 }
 int adbg_breakpoint_rm(adbg_tracee_t *tracee, int index) {
 	return adbg_oops(AdbgError.notImplemented);
 }
 int adbg_breakpoint_rm_at(adbg_tracee_t *tracee, size_t addr) {
+	return adbg_oops(AdbgError.notImplemented);
+}
+int adbg_breakpoint_rm_all(adbg_tracee_t *tracee) {
 	return adbg_oops(AdbgError.notImplemented);
 }

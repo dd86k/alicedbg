@@ -10,6 +10,8 @@ import adbg.v2.debugger.process : adbg_tracee_t;
 import adbg.include.c.stdio : snprintf;
 import core.stdc.stdarg;
 
+//TODO: Support FP registers
+
 version (Windows) {
 	import adbg.include.windows.wow64;
 	import core.sys.windows.windows;
@@ -24,8 +26,13 @@ version (X86) {
 	private enum REG_COUNT = 10;	/// Number of registers for platform
 } else version (X86_64) {
 	version = X86_ANY;
-	private enum REG_COUNT = 18;	/// Number of registers for platform
-} else static assert(0, "REG_COUNT not defined");
+	private enum REG_COUNT = 18;	/// Ditto
+} else version (ARM) {
+	private enum REG_COUNT = 0;	/// Ditto
+} else version (AArch64) {
+	private enum REG_COUNT = 0;	/// Ditto
+} else
+	private enum REG_COUNT = 0;	/// Ditto
 
 extern (C):
 
@@ -73,10 +80,11 @@ void adbg_context_start(adbg_thread_context_t *ctx, adbg_tracee_t *tracee) {
 				adbg_context_start_x86_64(ctx);
 		} else // Anything else 64-bit
 			adbg_context_start_x86_64(ctx);
-	}
+	} else
+		e.count = 0;
 }
 
-void adbg_context_fill(adbg_thread_context_t *ctx, adbg_tracee_t *tracee) {
+void adbg_context_fill(adbg_tracee_t *tracee, adbg_thread_context_t *ctx) {
 	version (Windows) {
 		CONTEXT winctx = void;
 		version (Win64) {
@@ -106,14 +114,13 @@ void adbg_context_fill(adbg_thread_context_t *ctx, adbg_tracee_t *tracee) {
 		}
 	} else version (Posix) {
 		//TODO: PTRACE_GETFPREGS
-		user_regs_struct u = void;
+		user_regs u = void;
 		if (ptrace(PTRACE_GETREGS, tracee.pid, null, &u) < 0) {
 			ctx.count = 0;
 			return;
 		}
 		adbg_context_fill_linux(ctx, &u);
 	}
-	
 }
 
 /// Format a register depending on their type as a zero-padded number.
@@ -123,9 +130,9 @@ size_t adbg_context_reg_hex(char *buffer, size_t len, register_t *reg) {
 	switch (reg.type) with (AdbgRegisterSize) {
 	case u8:  len = snprintf(buffer, len, "%02x", reg.u8); break;
 	case u16: len = snprintf(buffer, len, "%04x", reg.u16); break;
-	case u32: len = snprintf(buffer, len, "%08x", reg.u32); break;
-	case u64: len = snprintf(buffer, len, "%016llx", reg.u64); break;
-	default:  assert(0); //TODO: Consider returning 0
+	case u32, f32: len = snprintf(buffer, len, "%08x", reg.u32); break;
+	case u64, f64: len = snprintf(buffer, len, "%016llx", reg.u64); break;
+	default:  assert(0); //TODO: Con sider returning 0
 	}
 	return len;
 }
@@ -250,18 +257,22 @@ version (Windows) {
 		}
 	}
 
-	version (Win64)
-	void adbg_context_fill_wow64(adbg_thread_context_t *ctx, WOW64_CONTEXT *winctx) {
-		ctx.items[0].u32 = winctx.Eip;
-		ctx.items[1].u32 = winctx.EFlags;
-		ctx.items[2].u32 = winctx.Eax;
-		ctx.items[3].u32 = winctx.Ebx;
-		ctx.items[4].u32 = winctx.Ecx;
-		ctx.items[5].u32 = winctx.Edx;
-		ctx.items[6].u32 = winctx.Esp;
-		ctx.items[7].u32 = winctx.Ebp;
-		ctx.items[8].u32 = winctx.Esi;
-		ctx.items[9].u32 = winctx.Edi;
+	version (Win64) {
+		version (X86_64)
+		void adbg_context_fill_wow64(adbg_thread_context_t *ctx, WOW64_CONTEXT *winctx) {
+			ctx.items[0].u32 = winctx.Eip;
+			ctx.items[1].u32 = winctx.EFlags;
+			ctx.items[2].u32 = winctx.Eax;
+			ctx.items[3].u32 = winctx.Ebx;
+			ctx.items[4].u32 = winctx.Ecx;
+			ctx.items[5].u32 = winctx.Edx;
+			ctx.items[6].u32 = winctx.Esp;
+			ctx.items[7].u32 = winctx.Ebp;
+			ctx.items[8].u32 = winctx.Esi;
+			ctx.items[9].u32 = winctx.Edi;
+		}
+		
+		//TODO: Windows WoW64 AArch64 filler
 	}
 } else version (linux) {
 	/// Populate exception_t.registers array from user_regs_struct

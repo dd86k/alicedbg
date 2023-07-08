@@ -283,7 +283,8 @@ const(char) *adbg_exception_name(AdbgException code) {
 	}
 }
 
-package // Used internally for debugger
+// Used internally for debugger
+package
 void adbg_exception_translate(adbg_exception_t *exception, void *os1, void *os2) {
 	version (Windows) {
 		DEBUG_EVENT *de = cast(DEBUG_EVENT*)os1;

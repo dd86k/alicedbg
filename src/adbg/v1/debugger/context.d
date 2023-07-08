@@ -30,9 +30,9 @@ extern (C):
 version (X86) {
 	enum EX_REG_COUNT = 10;	/// Number of registers for platform
 } else version (X86_64) {
-	enum EX_REG_COUNT = 18;	/// Number of registers for platform
+	enum EX_REG_COUNT = 18;	/// Ditto
 } else
-	static assert(0, "EX_REG_COUNT not defined");
+	enum EX_REG_COUNT = 0;	/// Ditto
 
 /// Register size
 enum AdbgRegisterSize {
@@ -80,7 +80,8 @@ void adbg_ctx_init(thread_context_t *e) {
 				adbg_ctx_init_x86_64(e);
 		} else
 			adbg_ctx_init_x86_64(e);
-	}
+	} else
+		e.count = 0;
 }
 
 /// (Internal) Get the thread context from debuggee
@@ -113,10 +114,8 @@ void adbg_ctx_get(thread_context_t *ctx) {
 			}
 			adbg_ctx_os(ctx, &winctx);
 		}
-	} else
-	version (Posix) {
-		//TODO: PTRACE_GETFPREGS
-		user_regs_struct u = void;
+	} else version (Posix) {
+		user_regs u = void;
 		if (ptrace(PTRACE_GETREGS, g_debuggee.pid, null, &u) < 0) {
 			ctx.count = 0;
 			return;
