@@ -106,7 +106,7 @@ int adbg_memory_write(adbg_tracee_t *tracee, size_t addr, void *data, uint size)
 }
 
 /// Memory permission access bits.
-enum AdbgMemAccess {
+enum AdbgMemPerm {
 	read	= 1,	/// Read permission
 	write	= 1 << 1,	/// Write permission
 	exec	= 1 << 3,	/// Execute permission
@@ -117,14 +117,6 @@ enum AdbgMemAccess {
 	readWrite	= read | write,	/// Read and write permissions
 	readExec	= read | exec,	/// Read and execution permissions
 	all	= read | write | exec,	/// Read, write, and execute permissions
-}
-
-deprecated enum {
-	ADBG_ACCESS_R = 1,
-	ADBG_ACCESS_W = 1 << 1,
-	ADBG_ACCESS_X = 1 << 2,
-	ADBG_ACCESS_P = 1 << 8,
-	ADBG_ACCESS_S = 1 << 9,
 }
 
 private enum MEM_MAP_NAME_LEN = 512;
@@ -143,12 +135,15 @@ struct adbg_memory_map {
 
 /// Memory options for adbg_memory_maps.
 enum AdbgMapOpt {
-	/// Only get the memory regions for this process.
-	/// Type: 
-	processOnly	= 1,
+	reserved_
+	// Only get the memory regions for this process.
+	// Type: None
+	//processOnly	= 1,
 	// With given Process ID instead
 	// Permission issues may be raised
 	//pid = 2,
+	// Override default list size.
+	//listSize	= 3,
 }
 
 /// Obtain the memory map for the current process.
@@ -214,23 +209,23 @@ int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mco
 			
 			// Needs a bit for Copy-on-Write?
 			if (mem.AllocationProtect & PAGE_EXECUTE_WRITECOPY)
-				map.access = ADBG_ACCESS_R | ADBG_ACCESS_X;
+				map.access = AdbgMemPerm.readExec;
 			else if (mem.AllocationProtect & PAGE_EXECUTE_READWRITE)
-				map.access = ADBG_ACCESS_R | ADBG_ACCESS_W | ADBG_ACCESS_X;
+				map.access = AdbgMemPerm.all;
 			else if (mem.AllocationProtect & PAGE_EXECUTE_READ)
-				map.access = ADBG_ACCESS_R | ADBG_ACCESS_X;
+				map.access = AdbgMemPerm.readExec;
 			else if (mem.AllocationProtect & PAGE_EXECUTE)
-				map.access = ADBG_ACCESS_X;
+				map.access = AdbgMemPerm.exec;
 			else if (mem.AllocationProtect & PAGE_READONLY)
-				map.access = ADBG_ACCESS_R;
+				map.access = AdbgMemPerm.read;
 			else if (mem.AllocationProtect & PAGE_READWRITE)
-				map.access = ADBG_ACCESS_R | ADBG_ACCESS_W;
+				map.access = AdbgMemPerm.readWrite;
 			else if (mem.AllocationProtect & PAGE_WRITECOPY)
-				map.access = ADBG_ACCESS_R;
+				map.access = AdbgMemPerm.read;
 			else
 				map.access = 0;
 			
-			map.access |= mem.Type == MEM_PRIVATE ? ADBG_ACCESS_P : ADBG_ACCESS_S;
+			map.access |= mem.Type == MEM_PRIVATE ? AdbgMemPerm.private_ : AdbgMemPerm.shared_;
 			
 			map.base = minfo.lpBaseOfDll;
 			map.size = minfo.SizeOfImage;
@@ -379,10 +374,10 @@ int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mco
 			map.base = cast(void*)range_start;
 			map.size = range_end - range_start;
 			
-			map.access = perms[3] == 'p' ? ADBG_ACCESS_P : ADBG_ACCESS_S;
-			if (perms[0] == 'r') map.access |= ADBG_ACCESS_R;
-			if (perms[1] == 'w') map.access |= ADBG_ACCESS_W;
-			if (perms[2] == 'x') map.access |= ADBG_ACCESS_X;
+			map.access = perms[3] == 'p' ? AdbgMemPerm.private_ : AdbgMemPerm.shared_;
+			if (perms[0] == 'r') map.access |= AdbgMemPerm.read;
+			if (perms[1] == 'w') map.access |= AdbgMemPerm.write;
+			if (perms[2] == 'x') map.access |= AdbgMemPerm.exec;
 			
 			++i; ++map;
 		}
@@ -439,21 +434,6 @@ private bool adbg_mem_scan_u64(void *v, void *c, size_t l) {
 private bool adbg_mem_scan_other(void *v, void *c, size_t l) {
 	import core.stdc.string : memcmp;
 	return memcmp(v, c, l) == 0;
-}
-
-enum {
-	/// 
-	ADBG_SCAN_OPT_UNALIGNED = 1,
-	// 
-	//ADBG_SCAN_OPT_PROGRESS_CB = 2,
-	// 
-	//ADBG_SCAN_OPT_PID = 3,
-	// Custom mmap list.
-	//ADBG_SCAN_OPT_MMAP_LIST = 4,
-	// Custom mmap list count.
-	//ADBG_SCAN_OPT_MMAP_COUNT = 5,
-	// Re-scan specificied list.
-	//ADBG_SCAN_OPT_RESCAN_LIST = 6,
 }
 
 /// Options for adbg_memory_scan.
@@ -557,7 +537,7 @@ int adbg_memory_scan(adbg_tracee_t *tracee,
 	size_t count_ = *count;
 	size_t list_i;
 	L_MODULE: for (size_t mi; mi < mcount; ++mi, ++mmaps) {
-		enum ACC = ADBG_ACCESS_R;
+		enum ACC = AdbgMemPerm.read;
 		if ((mmaps.access & ACC) != ACC)
 			continue; //TODO: trace
 		

@@ -144,7 +144,7 @@ int app_dump() {
 
 /// Disassemble data to stdout
 /// Params:
-/// 	dp = Disassembler parameters
+/// 	dasm = Disassembler parameters
 /// 	data = Data pointer
 /// 	size = Data size
 /// 	flags = Configuration flags

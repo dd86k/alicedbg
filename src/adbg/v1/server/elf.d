@@ -329,6 +329,91 @@ enum ELF_SHF_MASKOS	= 0x0ff00000;	/// OS-specific
 enum ELF_SHF_MASKPROC	= 0xf0000000;	/// Processor-specific
 
 //
+// ET_CORE
+// elf.h values off musl 1.20
+//
+
+enum ELF_NT_PRSTATUS	= 1;	/// 
+enum ELF_NT_PRFPREG	= 2;	/// 
+enum ELF_NT_FPREGSET	= 2;	/// 
+enum ELF_NT_PRPSINFO	= 3;	/// 
+enum ELF_NT_PRXREG	= 4;	/// 
+enum ELF_NT_TASKSTRUCT	= 4;	/// 
+enum ELF_NT_PLATFORM	= 5;	/// 
+enum ELF_NT_AUXV	= 6;	/// 
+enum ELF_NT_GWINDOWS	= 7;	/// 
+enum ELF_NT_ASRS	= 8;	/// 
+enum ELF_NT_PSTATUS	= 10;	/// 
+enum ELF_NT_PSINFO	= 13;	/// 
+enum ELF_NT_PRCRED	= 14;	/// 
+enum ELF_NT_UTSNAME	= 15;	/// 
+enum ELF_NT_LWPSTATUS	= 16;	/// 
+enum ELF_NT_LWPSINFO	= 17;	/// 
+enum ELF_NT_PRFPXREG	= 20;	/// 
+enum ELF_NT_SIGINFO	= 0x53494749;	/// 
+enum ELF_NT_FILE	= 0x46494c45;	/// 
+enum ELF_NT_PRXFPREG	= 0x46e62b7f;	/// 
+enum ELF_NT_PPC_VMX	= 0x100;	/// 
+enum ELF_NT_PPC_SPE	= 0x101;	/// 
+enum ELF_NT_PPC_VSX	= 0x102;	/// 
+enum ELF_NT_PPC_TAR	= 0x103;	/// 
+enum ELF_NT_PPC_PPR	= 0x104;	/// 
+enum ELF_NT_PPC_DSCR	= 0x105;	/// 
+enum ELF_NT_PPC_EBB	= 0x106;	/// 
+enum ELF_NT_PPC_PMU	= 0x107;	/// 
+enum ELF_NT_PPC_TM_CGPR	= 0x108;	/// 
+enum ELF_NT_PPC_TM_CFPR	= 0x109;	/// 
+enum ELF_NT_PPC_TM_CVMX	= 0x10a;	/// 
+enum ELF_NT_PPC_TM_CVSX	= 0x10b;	/// 
+enum ELF_NT_PPC_TM_SPR	= 0x10c;	/// 
+enum ELF_NT_PPC_TM_CTAR	= 0x10d;	/// 
+enum ELF_NT_PPC_TM_CPPR	= 0x10e;	/// 
+enum ELF_NT_PPC_TM_CDSCR	= 0x10f;	/// 
+enum ELF_NT_386_TLS	= 0x200;	/// 
+enum ELF_NT_386_IOPERM	= 0x201;	/// 
+enum ELF_NT_X86_XSTATE	= 0x202;	/// 
+enum ELF_NT_S390_HIGH_GPRS	= 0x300;	/// 
+enum ELF_NT_S390_TIMER	= 0x301;	/// 
+enum ELF_NT_S390_TODCMP	= 0x302;	/// 
+enum ELF_NT_S390_TODPREG	= 0x303;	/// 
+enum ELF_NT_S390_CTRS	= 0x304;	/// 
+enum ELF_NT_S390_PREFIX	= 0x305;	/// 
+enum ELF_NT_S390_LAST_BREAK	= 0x306;	/// 
+enum ELF_NT_S390_SYSTEM_CALL	= 0x307;	/// 
+enum ELF_NT_S390_TDB	= 0x308;	/// 
+enum ELF_NT_S390_VXRS_LOW	= 0x309;	/// 
+enum ELF_NT_S390_VXRS_HIGH	= 0x30a;	/// 
+enum ELF_NT_S390_GS_CB	= 0x30b;	/// 
+enum ELF_NT_S390_GS_BC	= 0x30c;	/// 
+enum ELF_NT_S390_RI_CB	= 0x30d;	/// 
+enum ELF_NT_ARM_VFP	= 0x400;	/// 
+enum ELF_NT_ARM_TLS	= 0x401;	/// 
+enum ELF_NT_ARM_HW_BREAK	= 0x402;	/// 
+enum ELF_NT_ARM_HW_WATCH	= 0x403;	/// 
+enum ELF_NT_ARM_SYSTEM_CALL	= 0x404;	/// 
+enum ELF_NT_ARM_SVE	= 0x405;	/// 
+enum ELF_NT_ARM_PAC_MASK	= 0x406;	/// 
+enum ELF_NT_ARM_PACA_KEYS	= 0x407;	/// 
+enum ELF_NT_ARM_PACG_KEYS	= 0x408;	/// 
+enum ELF_NT_METAG_CBUF	= 0x500;	/// 
+enum ELF_NT_METAG_RPIPE	= 0x501;	/// 
+enum ELF_NT_METAG_TLS	= 0x502;	/// 
+enum ELF_NT_ARC_V2	= 0x600;	/// 
+enum ELF_NT_VMCOREDD	= 0x700;	/// 
+enum ELF_NT_MIPS_DSP	= 0x800;	/// 
+enum ELF_NT_MIPS_FP_MODE	= 0x801;	/// 
+enum ELF_NT_MIPS_MSA	= 0x802;	/// 
+enum ELF_NT_VERSION	= 1;	/// 
+enum ELF_NT_LOONGARCH_CPUCFG	= 0xa00;	/// LoongArch CPU config registers
+enum ELF_NT_LOONGARCH_CSR	= 0xa01;	/// LoongArch control and status registers
+enum ELF_NT_LOONGARCH_LSX	= 0xa02;	/// LoongArch Loongson SIMD Extension registers
+enum ELF_NT_LOONGARCH_LASX	= 0xa03;	/// LoongArch Loongson Advanced SIMD Extension registers
+enum ELF_NT_LOONGARCH_LBT	= 0xa04;	/// LoongArch Loongson Binary Translation registers
+enum ELF_NT_LOONGARCH_HW_BREAK	= 0xa05;   /// LoongArch hardware breakpoint registers
+enum ELF_NT_LOONGARCH_HW_WATCH	= 0xa06;   /// LoongArch hardware watchpoint registers
+
+
+//
 // ELF32 meta
 //
 
