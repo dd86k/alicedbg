@@ -42,7 +42,7 @@ extern (C):
 //TODO: Add "preliminary" prefix system (stack then commit)
 
 /// Internal entry point for the x86 decoder.
-/// Params: p = adbg_disasm_t pointer.
+/// Params: disasm = adbg_disasm_t pointer.
 /// Returns: Error code.
 int adbg_disasm_x86(adbg_disasm_t *disasm) {
 	x86_state_t state;

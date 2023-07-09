@@ -200,7 +200,7 @@ void adbg_disasm_format_operands_left(adbg_disasm_t *disasm, ref adbg_string_t s
 
 /// Renders the machine opcode into a buffer.
 /// Params:
-/// 	p = Disassembler
+/// 	disasm = Disassembler
 /// 	buffer = Character buffer
 /// 	size = Buffer size
 /// 	op = Opcode information

@@ -84,6 +84,7 @@ void adbg_context_start(adbg_thread_context_t *ctx, adbg_tracee_t *tracee) {
 		e.count = 0;
 }
 
+private
 void adbg_context_fill(adbg_tracee_t *tracee, adbg_thread_context_t *ctx) {
 	version (Windows) {
 		CONTEXT winctx = void;
@@ -124,6 +125,13 @@ void adbg_context_fill(adbg_tracee_t *tracee, adbg_thread_context_t *ctx) {
 }
 
 /// Format a register depending on their type as a zero-padded number.
+/// 
+/// Params:
+/// 	buffer = Reference to text buffer.
+/// 	len = Size of buffer.
+/// 	reg = Register.
+///
+/// Returns: Number of characters written.
 size_t adbg_context_reg_hex(char *buffer, size_t len, register_t *reg) {
 	if (buffer == null || len == 0)
 		return 0;
@@ -138,6 +146,13 @@ size_t adbg_context_reg_hex(char *buffer, size_t len, register_t *reg) {
 }
 
 /// Format a register's context with their formatted value.
+/// 
+/// Params:
+/// 	buffer = Reference to text buffer.
+/// 	len = Size of buffer.
+/// 	reg = Register.
+///
+/// Returns: Number of characters written.
 size_t adbg_context_reg_val(char *buffer, size_t len, register_t *reg) {
 	if (buffer == null || len == 0)
 		return 0;

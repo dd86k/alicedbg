@@ -683,7 +683,7 @@ int adbg_disasm_opt(adbg_disasm_t *disasm, AdbgDisasmOpt opt, int val) {
 
 /// Start a disassembler region using a buffer.
 /// Params:
-/// 	p = Disassembler structure.
+/// 	disasm = Disassembler structure.
 /// 	mode = Disassembly mode.
 /// 	buffer = Buffer pointer.
 /// 	size = Buffer size.
@@ -702,7 +702,7 @@ int adbg_disasm_start_buffer(adbg_disasm_t *disasm, AdbgDisasmMode mode, void *b
 //TODO: Consider adding base parameter
 /// Start a disassembler region at the debuggee's location.
 /// Params:
-/// 	p = Disassembler structure.
+/// 	disasm = Disassembler structure.
 /// 	mode = Disassembly mode.
 /// 	addr = Debuggee address.
 /// Returns: Error code
@@ -735,7 +735,7 @@ int adbg_disasm_once_debuggee(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op, A
 /// structure.
 ///
 /// Params:
-/// 	p = Disassembler structure.
+/// 	disasm = Disassembler structure.
 /// 	op = Opcode information structure.
 /// Returns: Non-zero indicates an error has occured.
 int adbg_disasm(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op) {

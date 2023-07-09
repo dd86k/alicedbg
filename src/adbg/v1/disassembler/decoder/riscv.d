@@ -22,7 +22,8 @@ extern (C):
 
 /// Disassemble RISC-V
 /// Note: So far only does risc-v-32
-/// Params: p = Disassembler parameters
+/// Params: disasm = Disassembler parameters
+/// Returns: Error code.
 int adbg_disasm_riscv(adbg_disasm_t *disasm) {
 	riscv_internals_t state = void;
 	state.disasm = disasm;

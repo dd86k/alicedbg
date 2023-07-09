@@ -219,7 +219,7 @@ L_OPTION:
 /// 	tracee = Reference to tracee object.
 /// 	path = Command, path to executable.
 /// 	... = Options
-/// Returns: Error code on error
+/// Returns: Error code.
 int adbg_spawn(adbg_tracee_t *tracee, const(char) *path, ...) {
 	if (tracee == null || path == null)
 		return adbg_oops(AdbgError.invalidArgument);
@@ -419,8 +419,8 @@ enum {
 /// Attach the debugger to a process ID.
 ///
 /// Params:
-/// 	pid = Process ID
-/// 	flags = Reserved
+/// 	tracee = Tracee reference.
+/// 	pid = Process ID.
 /// 	... = Options. Pass 0 for none or to end list.
 ///
 /// Returns: Error code.
@@ -603,13 +603,15 @@ AdbgStatus adbg_status(adbg_tracee_t *tracee) pure { return tracee.status; }
 /// Enter the debugging loop. Continues execution of the process until a new
 /// debug event occurs. When an exception occurs, the exception_t structure is
 /// populated with debugging information.
-/// (Windows) Uses WaitForDebugEvent, filters any but EXCEPTION_DEBUG_EVENT
-/// (Posix) Uses ptrace(2) and waitpid(2), filters SIGCONT out
+///
+/// Windows: Uses WaitForDebugEvent, filters anything but EXCEPTION_DEBUG_EVENT.
+/// Posix: Uses ptrace(2) and waitpid(2), filters SIGCONT out.
+///
 /// Params:
-/// 	tracee = Tracee instance
-/// 	userfunc = User function callback
-/// 	... = Options, pass 0 for no options and assume defaults
-/// Returns: Non-zero on error
+/// 	tracee = Tracee instance.
+/// 	userfunc = User function callback.
+/// 	... = Options, pass 0 for no options and assume defaults.
+/// Returns: Error code.
 int adbg_start(adbg_tracee_t *tracee, int function(adbg_exception_t*) userfunc, ...) {
 	if (tracee == null || userfunc == null)
 		return adbg_oops(AdbgError.nullAddress);

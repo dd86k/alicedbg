@@ -1,12 +1,5 @@
 /// Exception structure and helpers.
 ///
-/// The ExceptionType enumeration has its own unique values because taking the
-/// native exception OS values would make transmitting the information outside
-/// of the debugger difficult for the client program (e.g. client would have
-/// to distinguish an exception type of Fault as EXCEPTION_ACCESS_VIOLATION
-/// (0xC00000005) AND SIGSEGV. That'd be hell!). So a "translater" (see function
-/// `codetype`) converts those codes to the enumeration.
-///
 /// Windows: um/minwinbase.h
 ///
 /// Linux: include/uapi/asm-generic/siginfo.h
@@ -43,30 +36,30 @@ extern (C):
 
 /// Unhandled exception type of process/program
 enum AdbgException {
-	Unknown,	/// Unknown type
-	Exit,	/// Program terminated (Windows) CTRL+C (linux) SIGINT, SIGTSTP, SIGQUIT
-	Breakpoint,	/// (x86) INT 3
-	Step,	/// Single step
-	Fault,	/// Access violations and segmentation faults
-	BoundExceeded,	/// Array bounds exceeded
-	Misalignment,	/// Data type misaligned
-	Illegal,	/// Illegal opcode
-	DivZero,	/// Integer divide by zero
-	PageError,	/// In-page error
-	IntOverflow,	/// Integer overflow
-	StackOverflow,	/// Stack overflow
-	PrivilegedOpcode,	/// Priviled instruction
+	Unknown,	/// Unknown exception type.
+	Exit,	/// Program was terminated, typically by the user.
+	Breakpoint,	/// A software breakpoint was hint.
+	Step,	/// Single step was performed.
+	Fault,	/// An access violations or segmentation fault occured.
+	BoundExceeded,	/// Array bounds exceeded.
+	Misalignment,	/// Data type misaligned.
+	Illegal,	/// Illegal opcode.
+	DivZero,	/// Integer divide by zero.
+	PageError,	/// In-page error.
+	IntOverflow,	/// Integer overflow.
+	StackOverflow,	/// Stack overflow.
+	PrivilegedOpcode,	/// Priviled instruction.
 	// FPU
-	FPUDenormal,	/// Denormal value too small to represent a FP, e.g. operand
-	FPUDivZero,	/// Floating/Decimal divide by zero
-	FPUInexact,	/// Inexact value/result is not exact in decimal
-	FPUIllegal,	/// Invalid operation
-	FPUOverflow,	/// Overflow in FPU operation
-	FPUUnderflow,	/// FPU's stack overflow
-	FPUStackOverflow,	/// FPU's stack overflowed
+	FPUDenormal,	/// Denormal value too small to represent a FP, e.g. operand.
+	FPUDivZero,	/// Floating/Decimal divide by zero.
+	FPUInexact,	/// Inexact value/result is not exact in decimal.
+	FPUIllegal,	/// Invalid operation.
+	FPUOverflow,	/// Overflow in FPU operation.
+	FPUUnderflow,	/// FPU's stack overflow.
+	FPUStackOverflow,	/// FPU's stack overflowed.
 	// OS specific-ish
-	Disposition,	/// OS reports invalid disposition to exception handler
-	NoContinue,	/// Debugger tried to continue on after non-continuable error
+	Disposition,	/// OS reports invalid disposition to exception handler. Internal error.
+	NoContinue,	/// Debugger tried to continue on after non-continuable error.
 }
 
 //TODO: Severity levels depending on exception type
@@ -89,24 +82,18 @@ struct adbg_exception_t {
 	adbg_address_t fault;	/// Memory address pointer for fault. Otherwise null.
 }
 
-// Windows: Mostly covered in winbase.h or winnt.h
-// - Include\shared\winnt.h (at least for x86, amd64)
-// - Include\shared\ntstatus.h (winnt: #ifndef WIN32_NO_STATUS || UMDF_USING_NTSTATUS)
-// - Include\shared\ksarm.h (ARM: ARMv6, ARMv7)
-// - Include\shared\ksarm64.h (ARM64: ARMv8)
-// Linux: see sigaction(2)
-
-/**
- * (Internal) Translate an oscode to an ExceptionType enum value.
- * Windows: `DEBUG_INFO.Exception.ExceptionRecord.ExceptionCode` and
- * `cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]` in certain
- * cases.
- * Posix: Signal number (`si_signo`) and its code `si_code` in certain cases.
- * Params:
- * 	code = OS code
- * 	subcode = OS sub-code
- * Returns: ExceptionType enum value
- */
+/// (Internal) Translate an oscode to an ExceptionType enum value.
+///
+/// Windows: `DEBUG_INFO.Exception.ExceptionRecord.ExceptionCode` and
+/// `cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]` in certain
+/// cases.
+/// Posix: Signal number (`si_signo`) and its code `si_code` in certain cases.
+///
+/// Params:
+/// 	code = OS code.
+/// 	subcode = OS sub-code.
+///
+/// Returns: Adjusted exception type.
 AdbgException adbg_exception_from_os(uint code, uint subcode = 0) {
 	version (Windows) {
 		// NOTE: Prefer STATUS over EXCEPTION names when possible
@@ -248,10 +235,12 @@ AdbgException adbg_exception_from_os(uint code, uint subcode = 0) {
 	}
 }
 
-/// Get a very short descriptive string for a ExceptionType value in all
-/// uppercase. UI or client may want to lowercase if they want, but I'm keeping
-/// the uppercase.
+/// Get a short descriptive string for an exception type value.
+///
+/// The names are uppercased.
+///
 /// Params: code = ExceptionType
+///
 /// Returns: String
 const(char) *adbg_exception_name(AdbgException code) {
 	switch (code) with (AdbgException) {

@@ -186,12 +186,3 @@ buildType "afl" {
 	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" platform="ldc"
 }
-
-#
-# ANCHOR Documentation
-#
-
-# Brings back ddox
-buildType "ddox" {
-	versions "__DDOX"
-}

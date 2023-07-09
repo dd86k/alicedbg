@@ -345,16 +345,16 @@ enum X86_FPU_FLAGS_TEST_C3 = 1UL << 19;
 /// Operand type for instruction's operands
 enum x86_op_type
 {
-    X86_OP_INVALID = 0, ///< = CS_OP_INVALID (Uninitialized).
-    X86_OP_REG = 1, ///< = CS_OP_REG (Register operand).
-    X86_OP_IMM = 2, ///< = CS_OP_IMM (Immediate operand).
-    X86_OP_MEM = 3 ///< = CS_OP_MEM (Memory operand).
+    X86_OP_INVALID = 0, /// = CS_OP_INVALID (Uninitialized).
+    X86_OP_REG = 1, /// = CS_OP_REG (Register operand).
+    X86_OP_IMM = 2, /// = CS_OP_IMM (Immediate operand).
+    X86_OP_MEM = 3 /// = CS_OP_MEM (Memory operand).
 }
 
 /// XOP Code Condition type
 enum x86_xop_cc
 {
-    X86_XOP_CC_INVALID = 0, ///< Uninitialized.
+    X86_XOP_CC_INVALID = 0, /// Uninitialized.
     X86_XOP_CC_LT = 1,
     X86_XOP_CC_LE = 2,
     X86_XOP_CC_GT = 3,
@@ -368,17 +368,17 @@ enum x86_xop_cc
 /// AVX broadcast type
 enum x86_avx_bcast
 {
-    X86_AVX_BCAST_INVALID = 0, ///< Uninitialized.
-    X86_AVX_BCAST_2 = 1, ///< AVX512 broadcast type {1to2}
-    X86_AVX_BCAST_4 = 2, ///< AVX512 broadcast type {1to4}
-    X86_AVX_BCAST_8 = 3, ///< AVX512 broadcast type {1to8}
-    X86_AVX_BCAST_16 = 4 ///< AVX512 broadcast type {1to16}
+    X86_AVX_BCAST_INVALID = 0, /// Uninitialized.
+    X86_AVX_BCAST_2 = 1, /// AVX512 broadcast type {1to2}
+    X86_AVX_BCAST_4 = 2, /// AVX512 broadcast type {1to4}
+    X86_AVX_BCAST_8 = 3, /// AVX512 broadcast type {1to8}
+    X86_AVX_BCAST_16 = 4 /// AVX512 broadcast type {1to16}
 }
 
 /// SSE Code Condition type
 enum x86_sse_cc
 {
-    X86_SSE_CC_INVALID = 0, ///< Uninitialized.
+    X86_SSE_CC_INVALID = 0, /// Uninitialized.
     X86_SSE_CC_EQ = 1,
     X86_SSE_CC_LT = 2,
     X86_SSE_CC_LE = 3,
@@ -392,7 +392,7 @@ enum x86_sse_cc
 /// AVX Code Condition type
 enum x86_avx_cc
 {
-    X86_AVX_CC_INVALID = 0, ///< Uninitialized.
+    X86_AVX_CC_INVALID = 0, /// Uninitialized.
     X86_AVX_CC_EQ = 1,
     X86_AVX_CC_LT = 2,
     X86_AVX_CC_LE = 3,
@@ -430,52 +430,52 @@ enum x86_avx_cc
 /// AVX static rounding mode type
 enum x86_avx_rm
 {
-    X86_AVX_RM_INVALID = 0, ///< Uninitialized.
-    X86_AVX_RM_RN = 1, ///< Round to nearest
-    X86_AVX_RM_RD = 2, ///< Round down
-    X86_AVX_RM_RU = 3, ///< Round up
-    X86_AVX_RM_RZ = 4 ///< Round toward zero
+    X86_AVX_RM_INVALID = 0, /// Uninitialized.
+    X86_AVX_RM_RN = 1, /// Round to nearest
+    X86_AVX_RM_RD = 2, /// Round down
+    X86_AVX_RM_RU = 3, /// Round up
+    X86_AVX_RM_RZ = 4 /// Round toward zero
 }
 
 /// Instruction prefixes - to be used in cs_x86.prefix[]
 enum x86_prefix
 {
-    X86_PREFIX_LOCK = 0xf0, ///< lock (cs_x86.prefix[0]
-    X86_PREFIX_REP = 0xf3, ///< rep (cs_x86.prefix[0]
-    X86_PREFIX_REPE = 0xf3, ///< repe/repz (cs_x86.prefix[0]
-    X86_PREFIX_REPNE = 0xf2, ///< repne/repnz (cs_x86.prefix[0]
+    X86_PREFIX_LOCK = 0xf0, /// lock (cs_x86.prefix[0])
+    X86_PREFIX_REP = 0xf3, /// rep (cs_x86.prefix[0])
+    X86_PREFIX_REPE = 0xf3, /// repe/repz (cs_x86.prefix[0])
+    X86_PREFIX_REPNE = 0xf2, /// repne/repnz (cs_x86.prefix[0])
 
-    X86_PREFIX_CS = 0x2e, ///< segment override CS (cs_x86.prefix[1]
-    X86_PREFIX_SS = 0x36, ///< segment override SS (cs_x86.prefix[1]
-    X86_PREFIX_DS = 0x3e, ///< segment override DS (cs_x86.prefix[1]
-    X86_PREFIX_ES = 0x26, ///< segment override ES (cs_x86.prefix[1]
-    X86_PREFIX_FS = 0x64, ///< segment override FS (cs_x86.prefix[1]
-    X86_PREFIX_GS = 0x65, ///< segment override GS (cs_x86.prefix[1]
+    X86_PREFIX_CS = 0x2e, /// segment override CS (cs_x86.prefix[1])
+    X86_PREFIX_SS = 0x36, /// segment override SS (cs_x86.prefix[1])
+    X86_PREFIX_DS = 0x3e, /// segment override DS (cs_x86.prefix[1])
+    X86_PREFIX_ES = 0x26, /// segment override ES (cs_x86.prefix[1])
+    X86_PREFIX_FS = 0x64, /// segment override FS (cs_x86.prefix[1])
+    X86_PREFIX_GS = 0x65, /// segment override GS (cs_x86.prefix[1])
 
-    X86_PREFIX_OPSIZE = 0x66, ///< operand-size override (cs_x86.prefix[2]
-    X86_PREFIX_ADDRSIZE = 0x67 ///< address-size override (cs_x86.prefix[3]
+    X86_PREFIX_OPSIZE = 0x66, /// operand-size override (cs_x86.prefix[2])
+    X86_PREFIX_ADDRSIZE = 0x67 /// address-size override (cs_x86.prefix[3])
 }
 
 /// Instruction's operand referring to memory
 /// This is associated with X86_OP_MEM operand type above
 struct x86_op_mem
 {
-    x86_reg segment; ///< segment register (or X86_REG_INVALID if irrelevant)
-    x86_reg base; ///< base register (or X86_REG_INVALID if irrelevant)
-    x86_reg index; ///< index register (or X86_REG_INVALID if irrelevant)
-    int scale; ///< scale for index register
-    long disp; ///< displacement value
+    x86_reg segment; /// segment register (or X86_REG_INVALID if irrelevant)
+    x86_reg base; /// base register (or X86_REG_INVALID if irrelevant)
+    x86_reg index; /// index register (or X86_REG_INVALID if irrelevant)
+    int scale; /// scale for index register
+    long disp; /// displacement value
 }
 
 /// Instruction operand
 struct cs_x86_op
 {
-    x86_op_type type; ///< operand type
+    x86_op_type type; /// operand type
     union
     {
-        x86_reg reg; ///< register value for REG operand
-        long imm; ///< immediate value for IMM operand
-        x86_op_mem mem; ///< base/index/scale/disp value for MEM operand
+        x86_reg reg; /// register value for REG operand
+        long imm; /// immediate value for IMM operand
+        x86_op_mem mem; /// base/index/scale/disp value for MEM operand
     }
 
     /// size of this operand (in bytes).
@@ -575,9 +575,9 @@ struct cs_x86
     /// or 0 when instruction has no operand.
     ubyte op_count;
 
-    cs_x86_op[8] operands; ///< operands for this instruction.
+    cs_x86_op[8] operands; /// operands for this instruction.
 
-    cs_x86_encoding encoding; ///< encoding information
+    cs_x86_encoding encoding; /// encoding information
 }
 
 /// X86 instructions
@@ -2102,26 +2102,26 @@ enum x86_insn
 /// Group of X86 instructions
 enum x86_insn_group
 {
-    X86_GRP_INVALID = 0, ///< = CS_GRP_INVALID
+    X86_GRP_INVALID = 0, /// = CS_GRP_INVALID
 
     // Generic groups
     // all jump instructions (conditional+direct+indirect jumps)
-    X86_GRP_JUMP = 1, ///< = CS_GRP_JUMP
+    X86_GRP_JUMP = 1, /// = CS_GRP_JUMP
     // all call instructions
-    X86_GRP_CALL = 2, ///< = CS_GRP_CALL
+    X86_GRP_CALL = 2, /// = CS_GRP_CALL
     // all return instructions
-    X86_GRP_RET = 3, ///< = CS_GRP_RET
+    X86_GRP_RET = 3, /// = CS_GRP_RET
     // all interrupt instructions (int+syscall)
-    X86_GRP_INT = 4, ///< = CS_GRP_INT
+    X86_GRP_INT = 4, /// = CS_GRP_INT
     // all interrupt return instructions
-    X86_GRP_IRET = 5, ///< = CS_GRP_IRET
+    X86_GRP_IRET = 5, /// = CS_GRP_IRET
     // all privileged instructions
-    X86_GRP_PRIVILEGE = 6, ///< = CS_GRP_PRIVILEGE
+    X86_GRP_PRIVILEGE = 6, /// = CS_GRP_PRIVILEGE
     // all relative branching instructions
-    X86_GRP_BRANCH_RELATIVE = 7, ///< = CS_GRP_BRANCH_RELATIVE
+    X86_GRP_BRANCH_RELATIVE = 7, /// = CS_GRP_BRANCH_RELATIVE
 
     // Architecture-specific groups
-    X86_GRP_VM = 128, ///< all virtualization instructions (VT-x + AMD-V)
+    X86_GRP_VM = 128, /// all virtualization instructions (VT-x + AMD-V)
     X86_GRP_3DNOW = 129,
     X86_GRP_AES = 130,
     X86_GRP_ADX = 131,

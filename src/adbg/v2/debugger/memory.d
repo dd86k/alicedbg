@@ -32,11 +32,12 @@ extern (C):
 /// Read memory from child tracee.
 ///
 /// Params:
-/// 	addr = Memory address (within the children address space)
-/// 	data = Pointer to data
-/// 	size = Size of data
+/// 	tracee = Reference to tracee instance.
+/// 	addr = Memory address (within the children address space).
+/// 	data = Pointer to data.
+/// 	size = Size of data.
 ///
-/// Returns: Non-zero on error
+/// Returns: Error code.
 int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
 	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
 	//      Linux 6.2 (include/uapi/linux/ptrace.h) still has no PTRACE_IO
@@ -71,11 +72,14 @@ int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) 
 }
 
 /// Write memory to debuggee child.
+///
 /// Params:
-/// 	addr = Memory address (within the children address space)
-/// 	data = Pointer to data
-/// 	size = Size of data
-/// Returns: Non-zero on error
+/// 	tracee = Reference to tracee instance.
+/// 	addr = Memory address (within the children address space).
+/// 	data = Pointer to data.
+/// 	size = Size of data.
+///
+/// Returns: Error code.
 int adbg_memory_write(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
 	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
 	version (Windows) {
@@ -322,7 +326,7 @@ int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mco
 		// 55adaf007000-55adaf009000 r--p 00000000 08:02 1311130    /usr/bin/cat
 		// Perms: r=read, w=write, x=execute, s=shared or p=private (CoW)
 		// Path: Path or [stack], [stack:%id] (3.4 to 4.4), [heap]
-		//       [vdso]: https://lwn.net/Articles/615809/
+		//       [vdso]: virtual dynamic shared object: https://lwn.net/Articles/615809/
 		//       [vvar]: Stores a "mirror" of kernel variables required by virt syscalls
 		//       [vsyscall]: Legacy user-kernel (jump?) tables for some syscalls
 		enum LINE_LEN = 256;

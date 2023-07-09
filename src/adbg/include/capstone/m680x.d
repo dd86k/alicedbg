@@ -58,36 +58,43 @@ enum m680x_op_type
 }
 
 // Supported bit values for mem.idx.offset_bits
-enum M680X_OFFSET_NONE = 0;
-enum M680X_OFFSET_BITS_5 = 5;
-enum M680X_OFFSET_BITS_8 = 8;
-enum M680X_OFFSET_BITS_9 = 9;
-enum M680X_OFFSET_BITS_16 = 16;
+enum M680X_OFFSET_NONE = 0; /// 
+enum M680X_OFFSET_BITS_5 = 5;   /// 
+enum M680X_OFFSET_BITS_8 = 8;   /// 
+enum M680X_OFFSET_BITS_9 = 9;   /// 
+enum M680X_OFFSET_BITS_16 = 16; /// 
 
 // Supported bit flags for mem.idx.flags
 // These flags can be combined
-enum M680X_IDX_INDIRECT = 1;
-enum M680X_IDX_NO_COMMA = 2;
-enum M680X_IDX_POST_INC_DEC = 4;
+enum M680X_IDX_INDIRECT = 1;    /// 
+enum M680X_IDX_NO_COMMA = 2;    /// 
+enum M680X_IDX_POST_INC_DEC = 4;    /// 
 
 /// Instruction's operand referring to indexed addressing
 struct m680x_op_idx
 {
-    m680x_reg base_reg; ///< base register (or M680X_REG_INVALID if
-    ///< irrelevant)
-    m680x_reg offset_reg; ///< offset register (or M680X_REG_INVALID if
-    ///< irrelevant)
-    short offset; ///< 5-,8- or 16-bit offset. See also offset_bits.
-    ushort offset_addr; ///< = offset addr. if base_reg == M680X_REG_PC.
-    ///< calculated as offset + PC
-    ubyte offset_bits; ///< offset width in bits for indexed addressing
-    byte inc_dec; ///< inc. or dec. value:
-    ///<    0: no inc-/decrement
-    ///<    1 .. 8: increment by 1 .. 8
-    ///<    -1 .. -8: decrement by 1 .. 8
-    ///< if flag M680X_IDX_POST_INC_DEC set it is post
-    ///< inc-/decrement otherwise pre inc-/decrement
-    ubyte flags; ///< 8-bit flags (see above)
+    /// base register (or M680X_REG_INVALID if
+    /// irrelevant)
+    m680x_reg base_reg;
+    /// offset register (or M680X_REG_INVALID if
+    /// irrelevant)
+    m680x_reg offset_reg;
+    /// 5-,8- or 16-bit offset. See also offset_bits.
+    short offset;
+    /// = offset addr. if base_reg == M680X_REG_PC.
+    /// calculated as offset + PC
+    ushort offset_addr;
+    /// offset width in bits for indexed addressing
+    ubyte offset_bits;
+    /// inc. or dec. value:
+    ///    0: no inc-/decrement
+    ///    1 .. 8: increment by 1 .. 8
+    ///    -1 .. -8: decrement by 1 .. 8
+    /// if flag M680X_IDX_POST_INC_DEC set it is post
+    /// inc-/decrement otherwise pre inc-/decrement
+    byte inc_dec;
+    /// 8-bit flags (see above)
+    ubyte flags;
 }
 
 /// Instruction's memory operand referring to relative addressing (Bcc/LBcc)
