@@ -10,10 +10,22 @@
  */
 module adbg.error;
 
+version (Windows) {
+	import core.sys.windows.windows;
+	deprecated enum SYS_ERR_FMT = "%08X"; /// Error code format
+	enum ADBG_OS_ERROR_FORMAT = "%08X"; /// Error code format
+} else {
+	import core.stdc.errno : errno;
+	import core.stdc.string : strerror;
+	deprecated enum SYS_ERR_FMT = "%d"; /// Error code format
+	enum ADBG_OS_ERROR_FORMAT = "%d"; /// Error code format
+}
+
 // NOTE: Every thing that could go wrong should have an error code.
 
 //TODO: Consider making all codes negative values.
-//      This allows positive values to be used as, for example, count.
+//      This allows positive values to be used and follows more
+//      the "C way" of doing things.
 
 extern (C):
 
@@ -25,9 +37,7 @@ enum AdbgError {
 	success	= 0,
 	invalidArgument	= 1,
 	nullArgument	= 2,
-	allocationFailed	= 3,
 	uninitiated	= 4,
-	notImplemented	= 5,
 	//
 	// 100-199: Debugger
 	//
@@ -62,6 +72,9 @@ enum AdbgError {
 	// 1000-1999: Misc
 	//
 	assertion	= 1000,	/// Soft assert
+	unimplemented	= 1001,	/// Not implemented
+	todo	= unimplemented,	/// Ditto
+	notImplemented	= unimplemented,	/// Old alias to unimplemented
 	//
 	// 2000-2999: External
 	//            Libraries have their own error facilities
@@ -93,14 +106,12 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	{ AdbgError.invalidArgument, "Invalid parameter value." },
 	{ AdbgError.nullArgument, "Parameter is null." },
-	{ AdbgError.allocationFailed, "Memory allocation failed, maybe the machine is out of memory." },
 	{ AdbgError.uninitiated, "Object or structure is uninitiated." },
-	{ AdbgError.notImplemented, "Unimplemented." },
-	{ AdbgError.assertion, "Soft assert." },
 	//
 	// Debugger
 	//
 	{ AdbgError.notAttached, "No processes are attached to debugger." },
+	{ AdbgError.notPaused, "Tracee is requied to be stopped for this feature." },
 	//
 	// Disassembler
 	//
@@ -123,18 +134,17 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.invalidObjType, "Invalid object type." },
 	{ AdbgError.invalidObjABI, "Invalid ABI value for object." },
 	//
+	// Memory subsystem
+	//
+	// Could be a warning?
+	{ AdbgError.scannerDataEmpty, "Size of data given to memory scanner is zero." },
+	//
 	// Misc.
 	//
+	{ AdbgError.unimplemented, "Feature is not implemented." },
+	{ AdbgError.assertion, "A soft assert was hit." },
 	{ AdbgError.success, "No errors occured." },
 ];
-version (Windows) {
-	import core.sys.windows.windows;
-	enum SYS_ERR_FMT = "%08X"; /// Error code format
-} else {
-	import core.stdc.errno : errno;
-	import core.stdc.string : strerror;
-	enum SYS_ERR_FMT = "%d"; /// Error code format
-}
 
 /// Get error state instance.
 /// Returns: Pointer to the only error instance.

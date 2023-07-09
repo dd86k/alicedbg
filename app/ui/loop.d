@@ -37,7 +37,7 @@ int loop_handler(exception_t *e) {
 	__gshared uint ex_num; /// Exception number
 	printf(
 	"\n----------------------------------------\n"~
-	"* EXCEPTION #%u: %s ("~SYS_ERR_FMT~")\n"~
+	"* EXCEPTION #%u: %s ("~ADBG_OS_ERROR_FORMAT~")\n"~
 	"* PID=%u TID=%u\n",
 	ex_num++, adbg_exception_string(e.type), e.oscode,
 	e.pid, e.tid,

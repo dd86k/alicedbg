@@ -532,7 +532,7 @@ adbg_disasm_t *adbg_disasm_alloc(AdbgPlatform m) {
 	
 	adbg_disasm_t *s = cast(adbg_disasm_t*)calloc(1, adbg_disasm_t.sizeof);
 	if (s == null) {
-		adbg_oops(AdbgError.allocationFailed);
+		adbg_oops(AdbgError.os);
 		return null;
 	}
 	

@@ -361,7 +361,7 @@ int cmd_c_quit(int argc, const(char) **argv) {
 int cmd_handler(exception_t *ex) {
 	memcpy(&globals.last_exception, ex, exception_t.sizeof);
 	
-	printf("*	Thread %d stopped for: %s ("~SYS_ERR_FMT~")\n",
+	printf("*	Thread %d stopped for: %s ("~ADBG_OS_ERROR_FORMAT~")\n",
 		ex.tid, adbg_exception_string(ex.type), ex.oscode);
 	
 	int length = void;

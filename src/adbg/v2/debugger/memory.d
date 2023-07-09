@@ -29,33 +29,43 @@ version (Windows) {
 
 extern (C):
 
-/// Read memory from debuggee child.
+/// Read memory from child tracee.
+///
 /// Params:
 /// 	addr = Memory address (within the children address space)
 /// 	data = Pointer to data
 /// 	size = Size of data
+///
 /// Returns: Non-zero on error
 int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
-	//TODO: FreeBSD/NetBSD/OpenBSD have PT_IO interestingly
-	//      Checked Linux 6.2 (include/uapi/linux/ptrace.h), no PTRACE_IO
+	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
+	//      Linux 6.2 (include/uapi/linux/ptrace.h) still has no PTRACE_IO
 	version (Windows) {
 		if (ReadProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
 			return adbg_oops(AdbgError.os);
-	} else { // Based on https://www.linuxjournal.com/article/6100
+		return 0;
+	} else version (linux) { // Based on https://www.linuxjournal.com/article/6100
 		c_long *dest = cast(c_long*)data;	/// target
 		int r = size / c_long.sizeof;	/// number of "long"s to read
 		
-		for (; r > 0; --r, ++dest, addr += c_long.sizeof)
+		for (; r > 0; --r, ++dest, addr += c_long.sizeof) {
+			errno = 0; // As manpage wants
 			*dest = ptrace(PTRACE_PEEKDATA, tracee.pid, addr, null);
+			if (errno)
+				return adbg_oops(AdbgError.os);
+		}
 		
 		r = size % c_long.sizeof;
 		if (r) {
+			errno = 0;
 			c_long l = ptrace(PTRACE_PEEKDATA, tracee.pid, addr, null);
+			if (errno)
+				return adbg_oops(AdbgError.os);
 			ubyte* dest8 = cast(ubyte*)dest, src8 = cast(ubyte*)&l;
 			for (; r; --r) *dest8++ = *src8++; // inlined memcpy
 		}
-	}
-	return 0;
+		return 0;
+	} else return adbg_oops(AdbgError.unimplemented);
 }
 
 /// Write memory to debuggee child.
@@ -65,24 +75,30 @@ int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) 
 /// 	size = Size of data
 /// Returns: Non-zero on error
 int adbg_memory_write(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
+	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
 	version (Windows) {
 		if (WriteProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
 			return adbg_oops(AdbgError.os);
-	} else { // Mostly taken from https://www.linuxjournal.com/article/6100
+		return 0;
+	} else version (linux) { // Based on https://www.linuxjournal.com/article/6100
 		c_long *user = cast(c_long*)data;	/// user data pointer
 		int i;	/// offset index
 		int j = size / c_long.sizeof;	/// number of "blocks" to process
 		
-		for (; i < j; ++i, ++user)
-			ptrace(PTRACE_POKEDATA, tracee.pid,
-				addr + (i * c_long.sizeof), user);
+		for (; i < j; ++i, ++user) {
+			if (ptrace(PTRACE_POKEDATA, tracee.pid,
+				addr + (i * c_long.sizeof), user) < 0)
+				return adbg_oops(AdbgError.os);
+		}
 		
 		j = size % c_long.sizeof;
-		if (j)
-			ptrace(PTRACE_POKEDATA, tracee.pid,
-				addr + (i * c_long.sizeof), user);
-	}
-	return 0;
+		if (j) {
+			if (ptrace(PTRACE_POKEDATA, tracee.pid,
+				addr + (i * c_long.sizeof), user) < 0)
+				return adbg_oops(AdbgError.os);
+		}
+		return 0;
+	} else return adbg_oops(AdbgError.unimplemented);
 }
 
 private enum MEM_MAP_NAME_LEN = 512;
