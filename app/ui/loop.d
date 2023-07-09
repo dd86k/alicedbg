@@ -12,12 +12,10 @@ import adbg.include.c.stdio;
 import adbg.v1.debugger;
 import adbg.v1.disassembler;
 import adbg.error;
-import common, term;
+import common;
 
 //TODO: Consider moving this thing to "examples/"
 //      Sub-package :example
-//TODO: Remove term dependency
-//      Use getchar() or similar
 
 extern (C):
 
@@ -27,7 +25,6 @@ int app_loop() {
 		puts("loop: No program loaded");
 		return 1;
 	}
-	if (term_init) return 1;
 	return adbg_run(&loop_handler);
 }
 
@@ -43,7 +40,7 @@ int loop_handler(exception_t *e) {
 	e.pid, e.tid,
 	);
 	
-	// * Print disassembly, if available
+	// Print disassembly if available
 	if (e.fault) {
 		adbg_disasm_opcode_t op = void;
 		if (adbg_disasm_once_debuggee(&globals.dism,
@@ -63,20 +60,13 @@ int loop_handler(exception_t *e) {
 		}
 	}
 	
-	// * Process input
-	//TODO: get rid of term dependency and use getchar() or something
+	// Process input
 L_PROMPT:
 	printf("\nAction [S=Step,C=Continue,Q=Quit] ");
-	InputInfo input = void;
-L_INPUT:
-	term_read(&input);
-	if (input.type != InputType.Key)
-		goto L_INPUT;
-	with (AdbgAction)
-	switch (input.key.keyCode) {
-	case Key.S: puts("Stepping...");	return step;
-	case Key.C: puts("Continuing...");	return proceed;
-	case Key.Q: puts("Quitting...");	return exit;
+	switch (getchar()) with (AdbgAction) {
+	case 's', 'S': puts("Stepping...");	return step;
+	case 'c', 'C': puts("Continuing...");	return proceed;
+	case 'q', 'Q': puts("Quitting...");	return exit;
 	default: goto L_PROMPT;
 	}
 }
