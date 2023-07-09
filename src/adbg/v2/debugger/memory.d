@@ -35,7 +35,7 @@ extern (C):
 /// 	data = Pointer to data
 /// 	size = Size of data
 /// Returns: Non-zero on error
-int adbg_mem_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
+int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
 	//TODO: FreeBSD/NetBSD/OpenBSD have PT_IO interestingly
 	//      Checked Linux 6.2 (include/uapi/linux/ptrace.h), no PTRACE_IO
 	version (Windows) {
@@ -64,7 +64,7 @@ int adbg_mem_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
 /// 	data = Pointer to data
 /// 	size = Size of data
 /// Returns: Non-zero on error
-int adbg_mem_write(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
+int adbg_memory_write(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
 	version (Windows) {
 		if (WriteProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
 			return adbg_oops(AdbgError.os);
@@ -96,7 +96,7 @@ enum {
 }
 
 /// Represents a mapped memory region
-struct adbg_mem_map {
+struct adbg_memory_map {
 	/// Base memory region address.
 	void *base;
 	/// Size of region.
@@ -117,8 +117,20 @@ enum {
 	//ADBG_MEM_OPT_PID = 2,
 }
 
-/// Obtain the memory maps for the current process
-int adbg_mem_maps(adbg_tracee_t *tracee, adbg_mem_map **mmaps, size_t *mcount, ...) {
+/// Obtain the memory map for the current process.
+///
+/// This function allocates the list of results.
+/// Memory allocated by this function can be freed using free(3).
+/// This behavior may change in the future.
+///
+/// Params:
+/// 	tracee = Tracee, in the ready or paused state.
+/// 	mmaps = Reference to map list.
+/// 	mcount = Reference to map count.
+/// 	... = Options.
+///
+/// Returns: Error code.
+int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mcount, ...) {
 	version (Windows) {
 		import core.sys.windows.psapi :
 			GetModuleInformation,
@@ -142,7 +154,7 @@ int adbg_mem_maps(adbg_tracee_t *tracee, adbg_mem_map **mmaps, size_t *mcount, .
 		
 		DWORD modcount = needed / HMODULE.sizeof;
 		
-		adbg_mem_map *map = *mmaps = cast(adbg_mem_map*)malloc(modcount * adbg_mem_map.sizeof);
+		adbg_memory_map *map = *mmaps = cast(adbg_memory_map*)malloc(modcount * adbg_memory_map.sizeof);
 		
 		size_t i; /// (user) map index
 		for (DWORD mod_i; mod_i < modcount; ++mod_i) {
@@ -265,7 +277,7 @@ int adbg_mem_maps(adbg_tracee_t *tracee, adbg_mem_map **mmaps, size_t *mcount, .
 		
 		// Allocate map items
 		version (Trace) trace("allocating %zu items", itemcnt);
-		adbg_mem_map *map = *mmaps = cast(adbg_mem_map*)malloc(itemcnt * adbg_mem_map.sizeof);
+		adbg_memory_map *map = *mmaps = cast(adbg_memory_map*)malloc(itemcnt * adbg_memory_map.sizeof);
 		if (map == null) {
 			free(procbuf);
 			close(fd_maps);
@@ -356,10 +368,16 @@ int adbg_mem_maps(adbg_tracee_t *tracee, adbg_mem_map **mmaps, size_t *mcount, .
 enum {
 	/// 
 	ADBG_SCAN_OPT_UNALIGNED = 1,
-	/// 
+	// 
 	//ADBG_SCAN_OPT_PROGRESS_CB = 2,
-	/// 
+	// 
 	//ADBG_SCAN_OPT_PID = 3,
+	// Custom mmap list.
+	//ADBG_SCAN_OPT_MMAP_LIST = 4,
+	// Custom mmap list count.
+	//ADBG_SCAN_OPT_MMAP_COUNT = 5,
+	// Re-scan specificied list.
+	//ADBG_SCAN_OPT_RESCAN_LIST = 6,
 }
 
 private bool adbg_mem_scan_u8(void *v, void *c, size_t l) {
@@ -400,13 +418,119 @@ private bool adbg_mem_scan_other(void *v, void *c, size_t l) {
 	return memcmp(v, c, l) == 0;
 }
 
-/// Scan debuggee process for a specific value
-int adbg_mem_scan(adbg_tracee_t *tracee,
-	ulong **smap, size_t *scount,
-	adbg_mem_map *mmaps, size_t mcount,
+/// Scan debuggee process memory for a specific value.
+///
+/// This function allocates the list to contain a list of 2000 items.
+/// Memory allocated by this function can be freed using free(3).
+/// This behavior may change in the future.
+///
+/// Example:
+/// ---
+/// // Assume tracee is paused.
+///
+/// ulong *results = void; size_t count = void;
+/// int data = 42;
+/// if (adbg_memory_scan(tracee, &results, &count, &data, int.sizeof, 0)) {
+///     return; // Error
+/// }
+///
+/// for (size_t i; i < count; ++i) {
+///     printf("0x%llx", results[i]);
+/// }
+/// 
+/// free(results);
+/// ---
+///
+/// Params:
+/// 	tracee = Tracee, in the ready or paused state.
+/// 	list = Reference to result list.
+/// 	count = Reference to result list item count;
+/// 	data = Reference to user data.
+/// 	size = Reference to user data size.
+/// 	... = Options.
+///
+/// Returns: Error code.
+int adbg_memory_scan(adbg_tracee_t *tracee,
+	ulong **list, size_t *count,
 	void* data, size_t size, ...) {
+	import adbg.v2.debugger.process : AdbgStatus;
 	
+	if (tracee == null || data == null ||
+		list == null || count == null)
+		return adbg_oops(AdbgError.nullArgument);
+	if (size == 0)
+		return adbg_oops(AdbgError.scannerDataEmpty);
 	
+	switch (tracee.status) with (AdbgStatus) {
+	case ready, paused: break;
+	default:
+		*count = 0;
+		return adbg_oops(AdbgError.notPaused);
+	}
 	
-	return adbg_oops(AdbgError.notImplemented); // done scanning
+	adbg_memory_map *mmaps = void; size_t mcount = void;
+	int e = adbg_memory_maps(tracee, &mmaps, &mcount, 0);
+	if (e) return e;
+	
+	extern (C)
+	bool function(void*, void*, size_t) scan = void;
+	
+	// get optimized scan func
+	switch (size) {
+	case ulong.sizeof:	scan = &adbg_mem_scan_u64; break;
+	case uint.sizeof:	scan = &adbg_mem_scan_u32; break;
+	case ushort.sizeof:	scan = &adbg_mem_scan_u16; break;
+	case ubyte.sizeof:	scan = &adbg_mem_scan_u8; break;
+	default:		scan = &adbg_mem_scan_other;
+	}
+	
+	ubyte *buffer = cast(ubyte*)malloc(size);
+	if (buffer == null) {
+		free(mmaps);
+		return adbg_oops(AdbgError.os);
+	}
+	
+	// temporary thing until we get something similar to vector<T>
+	enum TEMP_BUFITEMS = 2000;
+	
+	ulong *list_ = *list;
+	list_ = cast(ulong*)malloc(ulong.sizeof * TEMP_BUFITEMS);
+	if (list_ == null) {
+		free(mmaps);
+		free(buffer);
+		return adbg_oops(AdbgError.os);
+	}
+	
+	size_t count_ = *count;
+	size_t list_i;
+	L_MODULE: for (size_t mi; mi < mcount; ++mi, ++mmaps) {
+		enum ACC = ADBG_ACCESS_R;
+		if ((mmaps.access & ACC) != ACC)
+			continue; //TODO: trace
+		
+		void* start = mmaps.base;
+		void* end   = start + mmaps.size;
+		
+		for (; start + size < end; start += size) {
+			// Read into buffer
+			if (adbg_memory_read(tracee, cast(size_t)start, buffer, cast(uint)size)) {
+				//TODO: trace()
+				continue;
+			}
+			// Found a hit
+			if (scan(buffer, data, size)) {
+				//TODO: trace()
+				list_[list_i++] = cast(ulong)start;
+				// No more entries
+				if (list_i >= TEMP_BUFITEMS)
+					break L_MODULE;
+			}
+		}
+	}
+	
+	*count = count_;
+	free(mmaps);
+	free(buffer);
+	
+	return 0;
 }

@@ -12,34 +12,29 @@ module adbg.error;
 
 // NOTE: Every thing that could go wrong should have an error code.
 
+//TODO: Consider making all codes negative values.
+//      This allows positive values to be used as, for example, count.
+
 extern (C):
 
-/// Self eror codes
+/// Error codes
 enum AdbgError {
-	/// Success!
-	none	= 0,
 	//
-	// Generic
+	// 0-99: Generic
 	//
+	success	= 0,
 	invalidArgument	= 1,
 	nullArgument	= 2,
 	allocationFailed	= 3,
 	uninitiated	= 4,
 	notImplemented	= 5,
-	assertion	= 80,	/// Soft assert
 	//
-	// External
-	//
-	crt	= 90,
-	os	= 91,
-	loader	= 92,
-	capstone	= 93,
-	//
-	// Debugger
+	// 100-199: Debugger
 	//
 	notAttached = 100,
+	notPaused = 101,
 	//
-	// Disasembler
+	// 200-299: Disasembler
 	//
 	nullAddress	= 201,
 	unsupportedPlatform	= 202,
@@ -49,7 +44,7 @@ enum AdbgError {
 	outOfData	= 221,
 	opcodeLimit	= 222,
 	//
-	// Object server
+	// 300-399: Object server
 	//
 	unknownObjFormat	= 301,
 	unsupportedObjFormat	= 302,
@@ -59,6 +54,22 @@ enum AdbgError {
 	invalidObjEndian	= 313,
 	invalidObjType	= 314,
 	invalidObjABI	= 315,
+	//
+	// 400-499: Debugger memory operations
+	//
+	scannerDataEmpty	= 400,
+	//
+	// 1000-1999: Misc
+	//
+	assertion	= 1000,	/// Soft assert
+	//
+	// 2000-2999: External
+	//            Libraries have their own error facilities
+	//
+	crt	= 2001,
+	os	= 2002,
+	loader	= 2003,
+	capstone	= 2004,
 }
 
 /// Represents an error in alicedbg.
@@ -114,7 +125,7 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	// Misc.
 	//
-	{ AdbgError.none, "No errors occured." },
+	{ AdbgError.success, "No errors occured." },
 ];
 version (Windows) {
 	import core.sys.windows.windows;

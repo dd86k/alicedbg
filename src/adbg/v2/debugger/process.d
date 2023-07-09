@@ -84,10 +84,10 @@ enum AdbgAction {
 /// Debugger status
 public
 enum AdbgStatus {
-	idle,	/// Waiting for input
-	ready,	/// Program loaded, waiting to run
-	running,	/// Executing debuggee
-	paused,	/// Exception occured
+	idle,	/// No tracee is loaded, or has been unloaded.
+	ready,	/// Tracee is loaded and waiting to run.
+	running,	/// Tracee is running.
+	paused,	/// Tracee is paused due to an exception.
 }
 
 /// Debugger event

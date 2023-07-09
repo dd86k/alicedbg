@@ -152,7 +152,6 @@ int app_dump() {
 int dump_disasm(adbg_disasm_t *dasm, void* data, size_t size, int flags) {
 	adbg_disasm_opcode_t op = void;
 	
-	//TODO: Dedicated function
 	if (flags & DumpOpt.disasm_stats) {
 		uint iavg;	/// instruction average size
 		uint imin;	/// smallest instruction size
@@ -163,7 +162,7 @@ int dump_disasm(adbg_disasm_t *dasm, void* data, size_t size, int flags) {
 L_DISASM_1:
 		with (AdbgError)
 		switch (adbg_disasm(dasm, &op)) {
-		case none:
+		case success:
 			iavg += op.size;
 			++icnt;
 			if (op.size > imax)
@@ -205,7 +204,7 @@ L_DISASM_1:
 	
 	L_DISASM_2:
 		switch (adbg_disasm(dasm, &op)) with (AdbgError) {
-		case none: break;
+		case success: break;
 		case outOfData: return 0;
 		default: return printerror();
 		}
