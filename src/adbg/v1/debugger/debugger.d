@@ -31,13 +31,13 @@ version (Windows) {
 } else version (Posix) {
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
-	import core.sys.posix.signal : kill, SIGKILL, siginfo_t, raise;
 	import core.sys.posix.sys.uio;
 	import core.sys.posix.fcntl : open;
 	import core.stdc.stdlib : exit, malloc, free;
 	import adbg.include.posix.mann;
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
+	import adbg.include.posix.signal;
 	import adbg.include.linux.user;
 	private enum __WALL = 0x40000000;
 }
