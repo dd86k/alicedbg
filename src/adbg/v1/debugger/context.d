@@ -287,7 +287,7 @@ version (Windows) {
 	//
 
 	/// Populate exception_t.registers array from user_regs_struct
-	package void adbg_ctx_os(thread_context_t *ctx, user_regs_struct *u) {
+	package void adbg_ctx_os(thread_context_t *ctx, user_regs *u) {
 		version (X86) {
 			ctx.items[0].u32 = u.eip;
 			ctx.items[1].u32 = u.eflags;

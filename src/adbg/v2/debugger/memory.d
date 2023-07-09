@@ -45,6 +45,8 @@ int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) 
 			return adbg_oops(AdbgError.os);
 		return 0;
 	} else version (linux) { // Based on https://www.linuxjournal.com/article/6100
+		import core.stdc.errno : errno;
+		
 		c_long *dest = cast(c_long*)data;	/// target
 		int r = size / c_long.sizeof;	/// number of "long"s to read
 		
@@ -81,6 +83,8 @@ int adbg_memory_write(adbg_tracee_t *tracee, size_t addr, void *data, uint size)
 			return adbg_oops(AdbgError.os);
 		return 0;
 	} else version (linux) { // Based on https://www.linuxjournal.com/article/6100
+		import core.stdc.errno : errno;
+		
 		c_long *user = cast(c_long*)data;	/// user data pointer
 		int i;	/// offset index
 		int j = size / c_long.sizeof;	/// number of "blocks" to process
@@ -101,9 +105,21 @@ int adbg_memory_write(adbg_tracee_t *tracee, size_t addr, void *data, uint size)
 	} else return adbg_oops(AdbgError.unimplemented);
 }
 
-private enum MEM_MAP_NAME_LEN = 512;
+/// Memory permission access bits.
+enum AdbgMemAccess {
+	read	= 1,	/// Read permission
+	write	= 1 << 1,	/// Write permission
+	exec	= 1 << 3,	/// Execute permission
+	private_	= 1 << 8,	/// Process memory is private
+	shared_	= 1 << 9,	/// Process memory is shared
+	
+	// Common access patterns
+	readWrite	= read | write,	/// Read and write permissions
+	readExec	= read | exec,	/// Read and execution permissions
+	all	= read | write | exec,	/// Read, write, and execute permissions
+}
 
-enum {
+deprecated enum {
 	ADBG_ACCESS_R = 1,
 	ADBG_ACCESS_W = 1 << 1,
 	ADBG_ACCESS_X = 1 << 2,
@@ -111,6 +127,7 @@ enum {
 	ADBG_ACCESS_S = 1 << 9,
 }
 
+private enum MEM_MAP_NAME_LEN = 512;
 /// Represents a mapped memory region
 struct adbg_memory_map {
 	/// Base memory region address.
@@ -124,13 +141,14 @@ struct adbg_memory_map {
 	char[MEM_MAP_NAME_LEN] name;
 }
 
-// adbg_mm_maps options
-enum {
-	/// Only get the memory regions for this process
-	ADBG_MEM_OPT_PROCESS_ONLY = 1,
+/// Memory options for adbg_memory_maps.
+enum AdbgMapOpt {
+	/// Only get the memory regions for this process.
+	/// Type: 
+	processOnly	= 1,
 	// With given Process ID instead
 	// Permission issues may be raised
-	//ADBG_MEM_OPT_PID = 2,
+	//pid = 2,
 }
 
 /// Obtain the memory map for the current process.
@@ -171,6 +189,10 @@ int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mco
 		DWORD modcount = needed / HMODULE.sizeof;
 		
 		adbg_memory_map *map = *mmaps = cast(adbg_memory_map*)malloc(modcount * adbg_memory_map.sizeof);
+		if (map == null) {
+			free(mods);
+			return adbg_oops(AdbgError.os);
+		}
 		
 		size_t i; /// (user) map index
 		for (DWORD mod_i; mod_i < modcount; ++mod_i) {
@@ -381,21 +403,6 @@ int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mco
 		return adbg_oops(AdbgError.notImplemented);
 }
 
-enum {
-	/// 
-	ADBG_SCAN_OPT_UNALIGNED = 1,
-	// 
-	//ADBG_SCAN_OPT_PROGRESS_CB = 2,
-	// 
-	//ADBG_SCAN_OPT_PID = 3,
-	// Custom mmap list.
-	//ADBG_SCAN_OPT_MMAP_LIST = 4,
-	// Custom mmap list count.
-	//ADBG_SCAN_OPT_MMAP_COUNT = 5,
-	// Re-scan specificied list.
-	//ADBG_SCAN_OPT_RESCAN_LIST = 6,
-}
-
 private bool adbg_mem_scan_u8(void *v, void *c, size_t l) {
 	return *cast(ubyte*)v == *cast(ubyte*)c;
 }
@@ -432,6 +439,36 @@ private bool adbg_mem_scan_u64(void *v, void *c, size_t l) {
 private bool adbg_mem_scan_other(void *v, void *c, size_t l) {
 	import core.stdc.string : memcmp;
 	return memcmp(v, c, l) == 0;
+}
+
+enum {
+	/// 
+	ADBG_SCAN_OPT_UNALIGNED = 1,
+	// 
+	//ADBG_SCAN_OPT_PROGRESS_CB = 2,
+	// 
+	//ADBG_SCAN_OPT_PID = 3,
+	// Custom mmap list.
+	//ADBG_SCAN_OPT_MMAP_LIST = 4,
+	// Custom mmap list count.
+	//ADBG_SCAN_OPT_MMAP_COUNT = 5,
+	// Re-scan specificied list.
+	//ADBG_SCAN_OPT_RESCAN_LIST = 6,
+}
+
+/// Options for adbg_memory_scan.
+enum AdbgScanOpt {
+	/// 
+	unaligned	= 1,
+	// Report progress to callback.
+	//progress_cb
+	// Rescan this list instead. Don't forget to pass rescanListCount too.
+	// Type: Internal
+	//rescanList
+	// Use this mmap list instead. Don't forget to pass customMMapCount too.
+	//customMMap
+	// To be used with customMMap.
+	//customMMapCount
 }
 
 /// Scan debuggee process memory for a specific value.

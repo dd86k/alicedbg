@@ -276,7 +276,7 @@ version (Windows) {
 	}
 } else version (linux) {
 	/// Populate exception_t.registers array from user_regs_struct
-	void adbg_context_fill_linux(adbg_thread_context_t *ctx, user_regs_struct *u) {
+	void adbg_context_fill_linux(adbg_thread_context_t *ctx, user_regs *u) {
 		version (X86) {
 			ctx.items[0].u32 = u.eip;
 			ctx.items[1].u32 = u.eflags;
