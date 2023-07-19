@@ -151,6 +151,7 @@ buildType "syntax" {
 buildType "setjmp" {
 	buildOptions "unittests"
 	sourceFiles "tests/setjmp.d"
+	importPaths "src"
 }
 # terminal: readkey
 buildType "readkey" {

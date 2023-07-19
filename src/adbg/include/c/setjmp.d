@@ -36,9 +36,9 @@ version (Windows) {
 		// - dmd-x86_omf
 		// - dmd-x86_mscoff
 		// - ldc-x86
+		// - ldc-x86_64 with setjmpex
 		// Crashes on:
 		// - dmd-x86_64
-		// - ldc-x86_64
 		private enum _JBLEN = 16;
 		private alias _SETJMP_FLOAT128 _JBTYPE;
 
@@ -163,7 +163,13 @@ version (Windows) {
 	alias __jmp_buf_tag jmp_buf;
 } else static assert(0, "Missing setjmp definitions");
 
+version (Win64) {
+	alias setjmp = _setjmpex;
+	/// 
+	int _setjmpex(ref jmp_buf);
+} else {
+	/// 
+	int setjmp(ref jmp_buf);
+}
 /// 
-int setjmp(ref jmp_buf);
-/// 
-void longjmp(ref jmp_buf, int);
+noreturn longjmp(ref jmp_buf, int);

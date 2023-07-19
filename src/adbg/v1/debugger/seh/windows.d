@@ -20,7 +20,7 @@ struct checkpoint_t {
 }
 
 extern (C)
-public checkpoint_t* adbg_seh_enable() {
+public checkpoint_t* adbg_seh_enable_() {
 	import core.stdc.string : memcpy;
 	if (sehinit == false) {
 		if (SetThreadErrorMode(SEM, null) == 0)
