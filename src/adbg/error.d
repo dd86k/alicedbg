@@ -81,8 +81,8 @@ enum AdbgError {
 	//
 	crt	= 2001,
 	os	= 2002,
-	loader	= 2003,
-	capstone	= 2004,
+	libLoader	= 2003,
+	libCapstone	= 2004,
 }
 
 /// Represents an error in alicedbg.
@@ -218,11 +218,10 @@ int adbg_errno_extern() {
 	import core.stdc.errno : errno;
 	import adbg.include.capstone : csh, cs_errno;
 	
-	with (AdbgError)
-	switch (error.code) {
+	switch (error.code) with (AdbgError) {
 	case crt:	return errno;
 	case os:	return adbg_error_system;
-	case capstone:	return cs_errno(*cast(csh*)error.res);
+	case libCapstone:	return cs_errno(*cast(csh*)error.res);
 	default:	return error.code;
 	}
 }
@@ -235,12 +234,11 @@ const(char)* adbg_error_msg(int code = error.code) {
 	import bindbc.loader.sharedlib : errors;
 	import adbg.include.capstone : csh, cs_errno, cs_strerror;
 	
-	with (AdbgError)
-	switch (error.code) {
+	switch (error.code) with (AdbgError) {
 	case crt: return strerror(errno);
 	case os:  return adbg_sys_error(adbg_error_system);
-	case capstone:  return cs_strerror(cs_errno(*cast(csh*)error.res));
-	case loader:
+	case libCapstone:  return cs_strerror(cs_errno(*cast(csh*)error.res));
+	case libLoader:
 		if (errors.length)
 			return errors()[0].message;
 		return defaultMsg;

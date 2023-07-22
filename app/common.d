@@ -112,7 +112,7 @@ int printerror(const(char)* func = cast(char*)__FUNCTION__) {
 	switch (error.code) with (AdbgError) {
 	case crt: printf("(CRT:%d) ", adbg_errno_extern); break;
 	case os: printf("(OS:"~ADBG_OS_ERROR_FORMAT~") ", adbg_errno_extern); break;
-	case capstone: printf("(CS:%d) ", adbg_errno_extern); break;
+	case libCapstone: printf("(CS:%d) ", adbg_errno_extern); break;
 	default:
 	}
 	puts(adbg_error_msg);

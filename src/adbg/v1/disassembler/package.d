@@ -424,7 +424,7 @@ int adbg_disasm_init(adbg_disasm_t *disasm) {
 						trace("%s", e.message);
 					}
 				}
-				adbg_oops(AdbgError.loader);
+				adbg_oops(AdbgError.libLoader);
 			}
 			lib_cs_loaded = true;
 			version (Trace) trace("capstone loaded");
@@ -489,14 +489,14 @@ int adbg_disasm_platform(adbg_disasm_t *disasm, AdbgPlatform m) {
 	static if (USE_CAPSTONE) {
 		version (Trace) trace("cs_open=%p", cs_open);
 		if (cs_open(cs_arch, cs_mode, &disasm.cs_handle))
-			return adbg_oops(AdbgError.capstone, &disasm.cs_handle);
+			return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
 		
 		disasm.cs_inst = cs_malloc(disasm.cs_handle);
 		if (disasm.cs_inst == null)
-			return adbg_oops(AdbgError.capstone, &disasm.cs_handle);
+			return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
 		
 		//if (cs_option(disasm.cs_handle, CS_OPT_DETAIL, CS_OPT_ON))
-		//	return adbg_oops(AdbgError.capstone, &disasm.cs_handle);
+		//	return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
 	}
 	
 	// Defaults
@@ -522,7 +522,7 @@ adbg_disasm_t *adbg_disasm_alloc(AdbgPlatform m) {
 						trace("%s", e.message);
 					}
 				}
-				adbg_oops(AdbgError.loader);
+				adbg_oops(AdbgError.libLoader);
 				return null;
 			}
 			lib_cs_loaded = true;
@@ -558,7 +558,7 @@ int adbg_disasm_configure(adbg_disasm_t *disasm, AdbgPlatform m) {
 						trace("%s", e.message);
 					}
 				}
-				return adbg_oops(AdbgError.loader);
+				return adbg_oops(AdbgError.libLoader);
 			}
 			lib_cs_loaded = true;
 			version (Trace) trace("capstone loaded");
@@ -613,7 +613,7 @@ int adbg_disasm_configure(adbg_disasm_t *disasm, AdbgPlatform m) {
 	
 	static if (USE_CAPSTONE) {
 		if (cs_open(cs_arch, cs_mode, &disasm.cs_handle))
-			return adbg_oops(AdbgError.capstone, &disasm.cs_handle);
+			return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
 	}
 	
 	return 0;
@@ -633,7 +633,7 @@ int adbg_disasm_syntax(adbg_disasm_t *disasm, int syntax) {
 		default:     return adbg_oops(AdbgError.invalidOptionValue);
 		}
 		if (cs_option(disasm.cs_handle, CS_OPT_SYNTAX, syntax))
-			return adbg_oops(AdbgError.capstone, &disasm.cs_handle);
+			return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
 	} else {
 		disasm.syntax = cast(AdbgSyntax)val; //TODO: To deprecate (??)
 		switch (disasm.syntax) with (AdbgSyntax) {
@@ -759,7 +759,7 @@ int adbg_disasm(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op) {
 			if (cs_errno(disasm.cs_handle) == CS_ERR_OK)
 				return adbg_oops(AdbgError.outOfData);
 			
-			return adbg_oops(AdbgError.capstone, &disasm.cs_handle);
+			return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
 		}
 		
 		//TODO: disasm modes
