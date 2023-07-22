@@ -22,7 +22,8 @@ nothrow:
 
 // NOTE: Wrong extern.
 //       Should be C, but they're defined as D.
-//       This is wrong for symbol mangling (e.g., _putchar vs. _D4core4stdc5stdio7putcharFiZi).
+//       This is wrong for symbol mangling, affecting linking.
+//       (e.g., _putchar vs. _D4core4stdc5stdio7putcharFiZi)
 
 /// 
 int putchar(int);

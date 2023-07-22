@@ -445,6 +445,8 @@ enum AdbgScanOpt {
 	/// 
 	unaligned	= 1,
 	// Report progress to callback.
+	//
+	// Callback will report: stage name and a percentage on modules scanned.
 	//progress_cb
 	// Rescan this list instead. Don't forget to pass rescanListCount too.
 	// Type: Internal

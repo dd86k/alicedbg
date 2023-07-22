@@ -97,7 +97,7 @@ size_t adbg_util_getline(char *bf, size_t bfsz, size_t *lnsz, const(char) *src, 
 	for (; src[s] && i < bfsz; ++i) {
 		int c = src[s++]; // unconditionally prep next pos
 		
-		//TODO: Include tab as accepted
+		//TODO: Include tab as accepted character
 		if (isprint(c) == false)
 			break;
 		
@@ -124,6 +124,8 @@ unittest {
 		}
 	}
 }
+
+//TODO: adbg_util_getline2: version without copying line to buffer, but modifies it
 
 /// Convert a hex string into a byte array.
 /// Params:
