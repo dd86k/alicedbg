@@ -63,7 +63,7 @@ int loop_handler(exception_t *e) {
 	// Process input
 L_PROMPT:
 	printf("\nAction [S=Step,C=Continue,Q=Quit] ");
-	switch (getchar()) {
+	switch (getchar()) with (AdbgAction) {
 	case 's', 'S': puts("Stepping...");	return step;
 	case 'c', 'C': puts("Continuing...");	return proceed;
 	case 'q', 'Q': puts("Quitting...");	return exit;
