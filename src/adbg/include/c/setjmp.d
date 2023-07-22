@@ -1,4 +1,4 @@
-/// (WIP) setjmp.h wrapper binding to the C runtime.
+/// setjmp.h binding.
 ///
 /// While there are bindings for posix (core.sys.posix.setjmp), there are none
 /// for Windows.
@@ -9,6 +9,7 @@
 module adbg.include.c.setjmp;
 
 import adbg.include.c.config : c_long, c_ulong, c_longint, c_ulongint;
+import adbg.include.d.config : COMPILER_FEAT_NORETURN;
 
 extern (C):
 @system:
@@ -90,8 +91,7 @@ version (Windows) {
 		static assert (_JUMP_BUFFER.sizeof == _JBTYPE.sizeof * _JBLEN);
 	} else static assert(0, "Missing setjmp definitions (Windows)");
 
-	//public alias _JBTYPE[_JBLEN] jmp_buf; // typedef _JBTYPE jmp_buf[_JBLEN];
-	public alias _JUMP_BUFFER jmp_buf;
+	public alias _JUMP_BUFFER jmp_buf; // typedef _JBTYPE jmp_buf[_JBLEN];
 } else version (CRuntime_Glibc) { // 2.25
 	version (X86) { // sysdeps/x86/bits/setjmp.h
 		struct __jmp_buf {
@@ -163,13 +163,23 @@ version (Windows) {
 	alias __jmp_buf_tag jmp_buf;
 } else static assert(0, "Missing setjmp definitions");
 
-version (Win64) {
-	alias setjmp = _setjmpex;
+version (Win32) { // Required by DMD, works with LDC
+	/// 
+	int _setjmp(ref jmp_buf);
+	alias setjmp = _setjmp;
+} else version (Win64) { // Required by LDC, doesn't work with DMD
 	/// 
 	int _setjmpex(ref jmp_buf);
+	alias setjmp = _setjmpex;
 } else {
 	/// 
 	int setjmp(ref jmp_buf);
 }
-/// 
-noreturn longjmp(ref jmp_buf, int);
+
+static if (COMPILER_FEAT_NORETURN) {
+	/// 
+	noreturn longjmp(ref jmp_buf, int);
+} else {
+	/// 
+	void longjmp(ref jmp_buf, int);
+}
