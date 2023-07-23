@@ -12,7 +12,7 @@ module adbg.include.d.config;
 /// GDC 5.x
 enum GDC_5  = 2_067; // 2.067.x: 5.4 (Ubuntu 16.04)
 /// GDC 8.x
-enum GDC_8  = 2_068; // 2.068.1: 8.4 (Ubuntu 18.04)
+enum GDC_8  = 2_068; // 2.068.1: 8.4 (Ubuntu 18.04), 8.3 (Debian 10.7)
 /// GDC 9.x
 enum GDC_9  = 2_076; // 2.076.1: 9.5 (Ubuntu 22.04:gdc-9)
 /// GDC 10.x
@@ -22,6 +22,60 @@ enum GDC_11 = 2_076; // 2.076.1: 11.2 (Ubuntu 22.04)
 /// GDC 12.x
 //enum GDC_12 = 2_098; // Tested on 12.1, 2.098.0-beta.1 (or 2.098.1 at release)
 enum GDC_12 = 2_100; // 2.100.x: 12.1 (Ubuntu 22.04), 12.2 (Debian 12)
+/// GDC 13.x
+enum GDC_13 = 2_103; // 2.103.x: 13.1.1 (OpenSUSE Tumbleweed 202307178)
+
+// gcc/d/d-builtins.cc::d_init_versions emits nothing interesting.
+
+//TODO: enum GDC_VERSION = 0;
+
+//
+// ANCHOR LDC LLVM versioning
+//
+
+version (LDC) {
+	// NOTE: LDC doesn't seem to fill in for minor versions
+	//       Last tested with ldc 1.32.2 (dmdfe 2.102.2, llvm 15.0.7)
+	// See driver/main.cpp::registerPredefinedVersions.
+	// No traits to get LDC/LLVM versions.
+	// LDC started in 2009, supporting LLVM 2.0.
+	version (LDC_LLVM_1700) {
+		enum LLVM_VERSION = 17;
+	} else version (LDC_LLVM_1600) {
+		enum LLVM_VERSION = 16;
+	} else version (LDC_LLVM_1500) {
+		enum LLVM_VERSION = 15;
+	} else version (LDC_LLVM_1400) {
+		enum LLVM_VERSION = 14;
+	} else version (LDC_LLVM_1300) {
+		enum LLVM_VERSION = 13;
+	} else version (LDC_LLVM_1200) {
+		enum LLVM_VERSION = 12;
+	} else version (LDC_LLVM_1100) {
+		enum LLVM_VERSION = 11;
+	} else version (LDC_LLVM_1000) {
+		enum LLVM_VERSION = 10;
+	} else version (LDC_LLVM_900) {
+		enum LLVM_VERSION = 9;
+	} else version (LDC_LLVM_800) {
+		enum LLVM_VERSION = 8;
+	} else version (LDC_LLVM_700) {
+		enum LLVM_VERSION = 7;
+	} else version (LDC_LLVM_600) {
+		enum LLVM_VERSION = 6;
+	} else version (LDC_LLVM_500) {
+		enum LLVM_VERSION = 5;
+	} else version (LDC_LLVM_400) {
+		enum LLVM_VERSION = 4;
+	} else version (LDC_LLVM_300) {
+		enum LLVM_VERSION = 3;
+	} else version (LDC_LLVM_200) {
+		enum LLVM_VERSION = 2;
+	} else
+		enum LLVM_VERSION = 0;
+} else {
+	enum LLVM_VERSION = 0;
+}
 
 //
 // ANCHOR Compiler support enumerations

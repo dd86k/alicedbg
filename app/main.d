@@ -373,8 +373,11 @@ template DSTRVER(uint ver) {
 }
 
 int cli_version() {
+	import adbg.include.d.config : LLVM_VERSION;
 	import adbg.config : CONFIG_DISASM, AdbgConfigDisasm;
 	puts(page_version);
+	static if (LLVM_VERSION)
+		printf("LLVM: %d\n", LLVM_VERSION);
 	static if (CONFIG_DISASM == AdbgConfigDisasm.capstone) {
 		import adbg.include.capstone : capstone_dyn_init, cs_version;
 		if (capstone_dyn_init() == false) {
