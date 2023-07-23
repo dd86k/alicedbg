@@ -37,7 +37,10 @@ enum AdbgError {
 	success	= 0,
 	invalidArgument	= 1,
 	nullArgument	= 2,
-	uninitiated	= 4,
+	uninitiated	= 4,	// Only when user value is important like for fopen
+	invalidOption	= 5,
+	invalidOptionValue	= 6,
+	//TODO: Prefix all errors with corresponding section (e.g., debuggerNotAttached)
 	//
 	// 100-199: Debugger
 	//
@@ -48,8 +51,6 @@ enum AdbgError {
 	//
 	nullAddress	= 201,
 	unsupportedPlatform	= 202,
-	invalidOption	= 203,
-	invalidOptionValue	= 204,
 	illegalInstruction	= 220,
 	outOfData	= 221,
 	opcodeLimit	= 222,
