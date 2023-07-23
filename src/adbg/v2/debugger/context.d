@@ -5,7 +5,6 @@
 /// License: BSD-3-Clause
 module adbg.v2.debugger.context;
 
-import adbg.platform : AdbgArchitecture;
 import adbg.v2.debugger.process : adbg_tracee_t;
 import adbg.include.c.stdio : snprintf;
 import core.stdc.stdarg;

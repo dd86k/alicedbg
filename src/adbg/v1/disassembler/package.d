@@ -16,10 +16,6 @@ private import adbg.platform : adbg_address_t;
 private import adbg.v1.disassembler.decoders;
 public import adbg.v1.disassembler.formatter;
 
-static if (USE_CAPSTONE) {
-	import adbg.include.capstone;
-}
-
 //TODO: Invalid results could be rendered differently
 //      e.g., .byte 0xd6,0xd6 instead of (bad)
 //      Option 1. Add lasterror in adbg_disasm_t
@@ -388,10 +384,6 @@ struct adbg_disasm_t { align(1):
 			bool userUnpackMachine;
 		}
 	}
-	static if (USE_CAPSTONE) {
-		csh cs_handle;
-		cs_insn *cs_inst;
-	}
 }
 
 package
@@ -415,22 +407,6 @@ private __gshared bool lib_cs_loaded = false;
 int adbg_disasm_init(adbg_disasm_t *disasm) {
 	version (Trace) trace("disasm=%p", disasm);
 	
-	static if (USE_CAPSTONE) {
-		if (lib_cs_loaded == false) {
-			if (capstone_dyn_init()) {
-				version (Trace) {
-					import bindbc.loader.sharedlib : errors;
-					foreach (e; errors) {
-						trace("%s", e.message);
-					}
-				}
-				adbg_oops(AdbgError.libLoader);
-			}
-			lib_cs_loaded = true;
-			version (Trace) trace("capstone loaded");
-		}
-	}
-	
 	return adbg_disasm_platform(disasm, AdbgPlatform.native);
 }
 
@@ -440,42 +416,23 @@ int adbg_disasm_platform(adbg_disasm_t *disasm, AdbgPlatform m) {
 	if (disasm == null)
 		return adbg_oops(AdbgError.uninitiated);
 	
-	static if (USE_CAPSTONE) {
-		int cs_arch, cs_mode;
-	}
-	
 	with (AdbgPlatform)
 	switch (m) {
 	case native: // equals 0
 		m = DEFAULT_PLATFORM;
 		goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
-		static if (USE_CAPSTONE) {
-			cs_arch = CS_ARCH_X86;
-			switch (m) with (AdbgPlatform) {
-			case x86_16: cs_mode = CS_MODE_16; break;
-			case x86_32: cs_mode = CS_MODE_32; break;
-			case x86_64: cs_mode = CS_MODE_64; break;
-			default:
-			}
-		} else {
-			disasm.limit = ADBG_MAX_X86;
-			disasm.fdecode = &adbg_disasm_x86;
-			disasm.syntax = AdbgSyntax.intel;
-			disasm.foperand = &adbg_disasm_operand_intel;
-		}
-	
+		disasm.limit = ADBG_MAX_X86;
+		disasm.fdecode = &adbg_disasm_x86;
+		disasm.syntax = AdbgSyntax.intel;
+		disasm.foperand = &adbg_disasm_operand_intel;
 		break;
 	case riscv32:
-		static if (USE_CAPSTONE) { // v5 has support but not v4
-			return adbg_oops(AdbgError.unsupportedPlatform);
-		} else {
-			disasm.limit = ADBG_MAX_RV32;
-			disasm.fdecode = &adbg_disasm_riscv;
-			disasm.syntax = AdbgSyntax.riscv;
-			disasm.foperand = &adbg_disasm_operand_riscv;
-			break;
-		}
+		disasm.limit = ADBG_MAX_RV32;
+		disasm.fdecode = &adbg_disasm_riscv;
+		disasm.syntax = AdbgSyntax.riscv;
+		disasm.foperand = &adbg_disasm_operand_riscv;
+		break;
 	/*case riscv64:
 		disasm.limit = ADBG_MAX_RV64;
 		disasm.fdecode = &adbg_disasm_riscv;
@@ -484,19 +441,6 @@ int adbg_disasm_platform(adbg_disasm_t *disasm, AdbgPlatform m) {
 		break;*/
 	default:
 		return adbg_oops(AdbgError.unsupportedPlatform);
-	}
-	
-	static if (USE_CAPSTONE) {
-		version (Trace) trace("cs_open=%p", cs_open);
-		if (cs_open(cs_arch, cs_mode, &disasm.cs_handle))
-			return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
-		
-		disasm.cs_inst = cs_malloc(disasm.cs_handle);
-		if (disasm.cs_inst == null)
-			return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
-		
-		//if (cs_option(disasm.cs_handle, CS_OPT_DETAIL, CS_OPT_ON))
-		//	return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
 	}
 	
 	// Defaults
@@ -512,23 +456,6 @@ adbg_disasm_t *adbg_disasm_alloc(AdbgPlatform m) {
 	import core.stdc.stdlib : calloc, free;
 	
 	version (Trace) trace("platform=%u", m);
-	
-	static if (USE_CAPSTONE) {
-		if (lib_cs_loaded == false) {
-			if (capstone_dyn_init()) {
-				version (Trace) {
-					import bindbc.loader.sharedlib : errors;
-					foreach (e; errors) {
-						trace("%s", e.message);
-					}
-				}
-				adbg_oops(AdbgError.libLoader);
-				return null;
-			}
-			lib_cs_loaded = true;
-			version (Trace) trace("capstone loaded");
-		}
-	}
 	
 	adbg_disasm_t *s = cast(adbg_disasm_t*)calloc(1, adbg_disasm_t.sizeof);
 	if (s == null) {
@@ -549,47 +476,16 @@ deprecated("use adbg_disasm_platform")
 int adbg_disasm_configure(adbg_disasm_t *disasm, AdbgPlatform m) {
 	version (Trace) trace("platform=%u", m);
 	
-	static if (USE_CAPSTONE) {
-		if (lib_cs_loaded == false) {
-			if (capstone_dyn_init()) {
-				version (Trace) {
-					import bindbc.loader.sharedlib : errors;
-					foreach (e; errors) {
-						trace("%s", e.message);
-					}
-				}
-				return adbg_oops(AdbgError.libLoader);
-			}
-			lib_cs_loaded = true;
-			version (Trace) trace("capstone loaded");
-		}
-	}
-	
-	static if (USE_CAPSTONE) {
-		int cs_arch, cs_mode;
-	}
-	
 	with (AdbgPlatform)
 	switch (m) {
 	case native: // equals 0
 		m = DEFAULT_PLATFORM;
 		goto case DEFAULT_PLATFORM;
 	case x86_16, x86_32, x86_64:
-		static if (USE_CAPSTONE) {
-			cs_arch = CS_ARCH_X86;
-			switch (m) with (AdbgPlatform) {
-			case x86_16: cs_mode = CS_MODE_16; break;
-			case x86_32: cs_mode = CS_MODE_32; break;
-			case x86_64: cs_mode = CS_MODE_64; break;
-			default:
-			}
-		} else {
-			disasm.limit = ADBG_MAX_X86;
-			disasm.fdecode = &adbg_disasm_x86;
-			disasm.syntax = AdbgSyntax.intel;
-			disasm.foperand = &adbg_disasm_operand_intel;
-		}
-	
+		disasm.limit = ADBG_MAX_X86;
+		disasm.fdecode = &adbg_disasm_x86;
+		disasm.syntax = AdbgSyntax.intel;
+		disasm.foperand = &adbg_disasm_operand_intel;
 		break;
 	case riscv32:
 		static if (USE_CAPSTONE) { // v5 has support but not v4
@@ -611,41 +507,22 @@ int adbg_disasm_configure(adbg_disasm_t *disasm, AdbgPlatform m) {
 		return adbg_oops(AdbgError.unsupportedPlatform);
 	}
 	
-	static if (USE_CAPSTONE) {
-		if (cs_open(cs_arch, cs_mode, &disasm.cs_handle))
-			return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
-	}
-	
 	return 0;
 }
 
 int adbg_disasm_syntax(adbg_disasm_t *disasm, int syntax) {
 	version (Trace) trace("syntax=%d", syntax);
 	
-	static if (USE_CAPSTONE) {
-		//TODO: CS_OPT_SYNTAX_MASM
-		//      What difference is there with Intel's?
-		//TODO: CS_OPT_SYNTAX_NOREGNAME
-		switch (syntax) with (AdbgSyntax) {
-		case platform: return 0;
-		case intel:  syntax = CS_OPT_SYNTAX_INTEL; break;
-		case att:    syntax = CS_OPT_SYNTAX_ATT; break;
-		default:     return adbg_oops(AdbgError.invalidOptionValue);
-		}
-		if (cs_option(disasm.cs_handle, CS_OPT_SYNTAX, syntax))
-			return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
-	} else {
-		disasm.syntax = cast(AdbgSyntax)val; //TODO: To deprecate (??)
-		switch (disasm.syntax) with (AdbgSyntax) {
-		case intel:  disasm.foperand = &adbg_disasm_operand_intel; break;
-		case nasm:   disasm.foperand = &adbg_disasm_operand_nasm; break;
-		case att:    disasm.foperand = &adbg_disasm_operand_att; break;
-		case ideal:  disasm.foperand = &adbg_disasm_operand_ideal; break;
-		case hyde:   disasm.foperand = &adbg_disasm_operand_hyde; break;
-		case riscv:  disasm.foperand = &adbg_disasm_operand_riscv; break;
-		default:     return adbg_oops(AdbgError.invalidOptionValue);
-		}
+	switch (syntax) with (AdbgSyntax) {
+	case intel:  disasm.foperand = &adbg_disasm_operand_intel; break;
+	case nasm:   disasm.foperand = &adbg_disasm_operand_nasm; break;
+	case att:    disasm.foperand = &adbg_disasm_operand_att; break;
+	case ideal:  disasm.foperand = &adbg_disasm_operand_ideal; break;
+	case hyde:   disasm.foperand = &adbg_disasm_operand_hyde; break;
+	case riscv:  disasm.foperand = &adbg_disasm_operand_riscv; break;
+	default:     return adbg_oops(AdbgError.invalidOptionValue);
 	}
+	disasm.syntax = cast(AdbgSyntax)syntax; //TODO: To deprecate (??)
 	return 0;
 }
 
@@ -746,55 +623,27 @@ int adbg_disasm(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op) {
 	if (lib_cs_loaded == false)
 		return adbg_oops(AdbgError.uninitiated);
 	
-	static if (USE_CAPSTONE) {
-		disasm.last = disasm.current;
-		
-		//TODO: fix base address
-		ulong addr = disasm.base.sz;
-		if (cs_disasm_iter(disasm.cs_handle,
-			&disasm.current.i8,
-			&disasm.left,
-			&addr,
-			disasm.cs_inst) == false) {
-			if (cs_errno(disasm.cs_handle) == CS_ERR_OK)
-				return adbg_oops(AdbgError.outOfData);
-			
-			return adbg_oops(AdbgError.libCapstone, &disasm.cs_handle);
-		}
-		
-		//TODO: disasm modes
-		op.size = disasm.cs_inst.size;
-		op.mnemonic = cs_insn_name(disasm.cs_handle, disasm.cs_inst.id);
-		op.operand_list = disasm.cs_inst.op_str.ptr;
-		return 0;
-	} else {
-		with (op) { // reset opcode
-			mnemonic = segment = null;
-			size = machineCount = prefixCount = operandCount = 0;
-		}
-		with (disasm) { // reset disasm
-			decoderAll = 0;
-		}
-		
-		extern (C)
-		int function(adbg_disasm_t*) decode = disasm.fdecode;
-		
-		if (decode == null)
-			return adbg_oops(AdbgError.uninitiated);
-		
-		disasm.opcode = op;
-		disasm.last = disasm.current;	// Save address
-		return decode(disasm);	// Decode
+	with (op) { // reset opcode
+		mnemonic = segment = null;
+		size = machineCount = prefixCount = operandCount = 0;
 	}
+	with (disasm) { // reset disasm
+		decoderAll = 0;
+	}
+	
+	extern (C)
+	int function(adbg_disasm_t*) decode = disasm.fdecode;
+	
+	if (decode == null)
+		return adbg_oops(AdbgError.uninitiated);
+	
+	disasm.opcode = op;
+	disasm.last = disasm.current;	// Save address
+	return decode(disasm);	// Decode
 }
 
 void adbg_disasm_free(adbg_disasm_t *disasm) {
 	import core.stdc.stdlib : free;
-	
-	static if (USE_CAPSTONE) {
-		if (lib_cs_loaded)
-			cs_close(&disasm.cs_handle);
-	}
 	
 	free(disasm);
 }

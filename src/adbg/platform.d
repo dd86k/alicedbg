@@ -1,4 +1,4 @@
-/// Compile constants
+/// Informational compile constants.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -73,9 +73,9 @@ version (LittleEndian) {
 	enum PLATFORM_MSB = 0;	/// Set if target big-endian
 	enum TARGET_ENDIAN = "lsb";	/// Target endian name
 } else {
-	enum PLATFORM_LSB = 0;	/// Set if target little-endian
-	enum PLATFORM_MSB = 1;	/// Set if target big-endian
-	enum TARGET_ENDIAN = "msb";	/// Target endian name
+	enum PLATFORM_LSB = 0;	/// Ditto
+	enum PLATFORM_MSB = 1;	/// Ditto
+	enum TARGET_ENDIAN = "msb";	/// Ditto
 }
 
 //
@@ -257,28 +257,22 @@ struct adbg_address_t {
 	}
 }
 
-enum AdbgArchitecture {
-	x86_16,
-	x86_32,
-	x86_64,
-}
-
 //
 // ANCHOR Functions
 //
 
 /// Target information structure
 struct adbg_info_t {
-	const(char) *adbgver = ADBG_VERSION;	/// Library/app version
-	const(char) *build   = __BUILDTYPE__;	/// "debug" or "release"
-	const(char) *arch    = TARGET_PLATFORM;	/// ISA
-	const(char) *os      = TARGET_OS;	/// Operating system
-	const(char) *crt     = TARGET_CRT;	/// C runtime
-	const(char) *cpprt   = TARGET_CPPRT;	/// C++ runtime
-	const(char) *env     = TARGET_ENV;	/// Target environment
-	const(char) *objfmt  = TARGET_OBJFMT;	/// Object format (e.g., coff)
-	const(char) *fltabi  = TARGET_FLTABI;	/// Float ABI (hard or soft)
-	const(char) *dflags  = D_FEATURES;	/// Float ABI (hard or soft)
+	const(char) *adbgver = ADBG_VERSION;	/// Library version.
+	const(char) *build   = __BUILDTYPE__;	/// "debug" or "release".
+	const(char) *arch    = TARGET_PLATFORM;	/// Architecture.
+	const(char) *os      = TARGET_OS;	/// Operating system.
+	const(char) *crt     = TARGET_CRT;	/// C runtime.
+	const(char) *cpprt   = TARGET_CPPRT;	/// C++ runtime.
+	const(char) *env     = TARGET_ENV;	/// Target environment.
+	const(char) *objfmt  = TARGET_OBJFMT;	/// Object format (e.g., coff).
+	const(char) *fltabi  = TARGET_FLTABI;	/// Float ABI (hard or soft).
+	const(char) *dflags  = D_FEATURES;	/// D compile features.
 }
 
 /**
