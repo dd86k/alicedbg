@@ -23,7 +23,7 @@ enum GDC_11 = 2_076; // 2.076.1: 11.2 (Ubuntu 22.04)
 //enum GDC_12 = 2_098; // Tested on 12.1, 2.098.0-beta.1 (or 2.098.1 at release)
 enum GDC_12 = 2_100; // 2.100.x: 12.1 (Ubuntu 22.04), 12.2 (Debian 12)
 /// GDC 13.x
-enum GDC_13 = 2_103; // 2.103.x: 13.1.1 (OpenSUSE Tumbleweed 202307178)
+enum GDC_13 = 2_103; // 2.103.x: 13.1.1 (OpenSUSE Tumbleweed 202307178, Artix Linux 20230711)
 
 // gcc/d/d-builtins.cc::d_init_versions emits nothing interesting.
 
@@ -40,41 +40,41 @@ version (LDC) {
 	// No traits to get LDC/LLVM versions.
 	// LDC started in 2009, supporting LLVM 2.0.
 	version (LDC_LLVM_1700) {
-		enum LLVM_VERSION = 17;
+		enum LLVM_VERSION = 17;	/// LLVM version from compiler used.
 	} else version (LDC_LLVM_1600) {
-		enum LLVM_VERSION = 16;
+		enum LLVM_VERSION = 16;	/// Ditto
 	} else version (LDC_LLVM_1500) {
-		enum LLVM_VERSION = 15;
+		enum LLVM_VERSION = 15;	/// Ditto
 	} else version (LDC_LLVM_1400) {
-		enum LLVM_VERSION = 14;
+		enum LLVM_VERSION = 14;	/// Ditto
 	} else version (LDC_LLVM_1300) {
-		enum LLVM_VERSION = 13;
+		enum LLVM_VERSION = 13;	/// Ditto
 	} else version (LDC_LLVM_1200) {
-		enum LLVM_VERSION = 12;
+		enum LLVM_VERSION = 12;	/// Ditto
 	} else version (LDC_LLVM_1100) {
-		enum LLVM_VERSION = 11;
+		enum LLVM_VERSION = 11;	/// Ditto
 	} else version (LDC_LLVM_1000) {
-		enum LLVM_VERSION = 10;
+		enum LLVM_VERSION = 10;	/// Ditto
 	} else version (LDC_LLVM_900) {
-		enum LLVM_VERSION = 9;
+		enum LLVM_VERSION = 9;	/// Ditto
 	} else version (LDC_LLVM_800) {
-		enum LLVM_VERSION = 8;
+		enum LLVM_VERSION = 8;	/// Ditto
 	} else version (LDC_LLVM_700) {
-		enum LLVM_VERSION = 7;
+		enum LLVM_VERSION = 7;	/// Ditto
 	} else version (LDC_LLVM_600) {
-		enum LLVM_VERSION = 6;
+		enum LLVM_VERSION = 6;	/// Ditto
 	} else version (LDC_LLVM_500) {
-		enum LLVM_VERSION = 5;
+		enum LLVM_VERSION = 5;	/// Ditto
 	} else version (LDC_LLVM_400) {
-		enum LLVM_VERSION = 4;
+		enum LLVM_VERSION = 4;	/// Ditto
 	} else version (LDC_LLVM_300) {
-		enum LLVM_VERSION = 3;
+		enum LLVM_VERSION = 3;	/// Ditto
 	} else version (LDC_LLVM_200) {
-		enum LLVM_VERSION = 2;
+		enum LLVM_VERSION = 2;	/// Ditto
 	} else
-		enum LLVM_VERSION = 0;
+		enum LLVM_VERSION = 0;	/// Ditto
 } else {
-	enum LLVM_VERSION = 0;
+	enum LLVM_VERSION = 0;	/// Ditto
 }
 
 //

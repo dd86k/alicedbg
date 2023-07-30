@@ -380,12 +380,13 @@ int cli_version() {
 		printf("LLVM: %d\n", LLVM_VERSION);
 	static if (CONFIG_DISASM == AdbgConfigDisasm.capstone) {
 		import adbg.include.capstone : capstone_dyn_init, cs_version;
+		printf("Capstone: ");
 		if (capstone_dyn_init() == false) {
 			int major = void, minor = void;
 			cs_version(&major, &minor);
-			printf("Capstone: %d.%d\n", major, minor);
+			printf("%d.%d\n", major, minor);
 		} else {
-			puts("Capstone: error");
+			puts("error");
 		}
 	}
 	exit(0);
