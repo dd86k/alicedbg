@@ -9,6 +9,8 @@ module adbg.include.d.config;
 // ANCHOR GDC versioning from DMD-FE
 //
 
+/// GDC 4.x
+enum GDC_4  = 2_055; // 2.055.x: 4.6 (Debian 7)
 /// GDC 5.x
 enum GDC_5  = 2_067; // 2.067.x: 5.4 (Ubuntu 16.04)
 /// GDC 8.x
@@ -80,6 +82,7 @@ version (LDC) {
 //
 // ANCHOR Compiler support enumerations
 //
+
 /// If set, the compiler supports the getTargetInfo trait.
 enum COMPILER_FEAT_TARGETINFO    = __VERSION__ >= 2_083;
 /// If set, the compiler supports the printf and scanf pragmas.
