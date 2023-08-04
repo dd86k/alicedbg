@@ -1,31 +1,31 @@
-/**
- * Bit manipulation utility module.
- *
- * This includes bit swapping functions, and some extras (such as the
- * BIT template to help selecting bits).
- *
- * Most useful being the fswap variants, which depending on the requested
- * endian (compared to the target's), return a function for bulk processing.
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
+/// Bit manipulation utility module.
+///
+/// This includes bit swapping functions, and some extras (such as the
+/// BIT template to help selecting bits).
+///
+/// Most useful being the fswap variants, which depending on the requested
+/// endian (compared to the target's), return a function for bulk processing.
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module adbg.utils.bit;
 
 import adbg.platform;
 
 extern (C):
 
+//TODO: INT16/INT32/INT64 templates (auto swap)
+
 /// Create a 1-bit bitmask with a bit position (0-based, 1 << a).
 /// Params: n = Bit position (0-based)
 template BIT(int n) if (n < 32) { enum { BIT = 1 << n } }
-
-/// Convert bits to bytes.
-/// Params: n = Number of bits
-template BITS(int n) if (n % 8 == 0) { enum { BITS = n << 3 } }
-
-//TODO: TCHAR16, TCHAR16LE, TCHAR16BE, and etc. to .utils.string
+@system unittest {
+	assert(BIT!0 == 1);
+	assert(BIT!1 == 0b10);
+	assert(BIT!2 == 0b100);
+	assert(BIT!4 == 0b1_0000);
+}
 
 /// Turn a 2-character string into a 2-byte number
 /// Params: s = 2-character string
@@ -37,7 +37,8 @@ template CHAR16(char[2] s) {
 }
 /// 
 @system unittest {
-	assert(CHAR16!"MZ" == 0x5a4d);
+	version (LittleEndian) assert(CHAR16!"MZ" == 0x5a4d);
+	version (BigEndian)    assert(CHAR16!"MZ" == 0x4d5a);
 }
 
 /// Turn a 4-character string into a 4-byte number
@@ -48,6 +49,36 @@ template CHAR32(char[4] s) {
 	else
 		enum uint CHAR32 = (s[3] << 24) | (s[2] << 16) | (s[1] << 8) | s[0];
 }
+/// 
+@system unittest {
+	version (LittleEndian) assert(CHAR32!"ABCD" == 0x44434241);
+	version (BigEndian)    assert(CHAR32!"ABCD" == 0x41424344);
+}
+
+/// Ensure endianness on 16-bit number.
+/// Params:
+///   v = Value.
+///   little = Little-endianness desired.
+/// Returns: Potentially swapped value.
+ushort adbg_util_ensure16(ushort v, bool little) pure {
+	return little == PLATFORM_LSB ? v : adbg_util_bswap16(v);
+}
+/// Ensure endianness on 32-bit number.
+/// Params:
+///   v = Value.
+///   little = Little-endianness desired.
+/// Returns: Potentially swapped value.
+uint adbg_util_ensure32(uint v, bool little) pure {
+	return little == PLATFORM_LSB ? v : adbg_util_bswap32(v);
+}
+/// Ensure endianness on 64-bit number.
+/// Params:
+///   v = Value.
+///   little = Little-endianness desired.
+/// Returns: Potentially swapped value.
+ulong adbg_util_ensure64(ulong v, bool little) pure {
+	return little == PLATFORM_LSB ? v : adbg_util_bswap64(v);
+}
 
 struct adbg_swapper_t {
 	swapfunc16 swap16;
@@ -55,9 +86,9 @@ struct adbg_swapper_t {
 	swapfunc64 swap64;
 }
 
-adbg_swapper_t adbg_config_swapper(bool wantsLSB) {
+adbg_swapper_t adbg_util_swapper(bool little) {
 	adbg_swapper_t swapper = void;
-	if (wantsLSB == PLATFORM_LSB) {
+	if (little == PLATFORM_LSB) {
 		swapper.swap16 = &adbg_util_nop16;
 		swapper.swap32 = &adbg_util_nop32;
 		swapper.swap64 = &adbg_util_nop64;
@@ -69,67 +100,6 @@ adbg_swapper_t adbg_config_swapper(bool wantsLSB) {
 	return swapper;
 }
 
-/// Force a 16-bit number to be in little-endian in memory.
-/// Params: n = 16-bit number 
-deprecated("Unused")
-template LSB16(int n) {
-	version (BigEndian)
-		enum { LSB16 = adbg_util_bswap16(n) }
-	else
-		enum { LSB16 = n }
-}
-/// Force a 32-bit number to be in little-endian in memory.
-/// Params: n = 32-bit number 
-deprecated("Unused")
-template LSB32(int n) {
-	version (BigEndian)
-		enum { LSB32 = adbg_util_bswap32(n) }
-	else
-		enum { LSB32 = n }
-}
-/// Force a 64-bit number to be in little-endian in memory.
-/// Params: n = 64-bit number 
-deprecated("Unused")
-template LSB64(int n) {
-	version (BigEndian)
-		enum { LSB64 = adbg_util_bswap64(n) }
-	else
-		enum { LSB64 = n }
-}
-
-/// Force a 16-bit number to be in big-endian in memory.
-/// Params: n = 16-bit number 
-deprecated("Unused")
-template MSB16(int n) {
-	version (LittleEndian)
-		enum { MSB16 = adbg_util_bswap16(n) }
-	else
-		enum { MSB16 = n }
-}
-/// Force a 32-bit number to be in big-endian in memory.
-/// Params: n = 32-bit number 
-deprecated("Unused")
-template MSB32(int n) {
-	version (LittleEndian)
-		enum { MSB32 = adbg_util_bswap32(n) }
-	else
-		enum { MSB32 = n }
-}
-/// Force a 64-bit number to be in big-endian in memory.
-/// Params: n = 64-bit number 
-deprecated("Unused")
-template MSB64(int n) {
-	version (LittleEndian)
-		enum { MSB64 = adbg_util_bswap64(n) }
-	else
-		enum { MSB64 = n }
-}
-
-version (LittleEndian)
-	private enum TE = 0; /// Target Endian
-else
-	private enum TE = 1; /// Target Endian
-
 alias swapfunc16 = ushort function(ushort);
 alias swapfunc32 = uint function(uint);
 alias swapfunc64 = ulong function(ulong);
@@ -139,10 +109,11 @@ alias swapfunc64 = ulong function(ulong);
 /// returns the same value. If it does not match, this function returns
 /// a function that effectively byte swaps the value. This is useful for bulk
 /// operations, such as parsing header data or processing disassembly.
-/// Params: e = Endian (0=Little, 1=Big)
+/// Params: little = Endian is little
 /// Returns: fswap16 function pointer
-ushort function(ushort) adbg_util_fswap16(int e) {
-	return e == TE ? &adbg_util_nop16 : &adbg_util_bswap16;
+deprecated("Use adbg_util_ensure16")
+ushort function(ushort) adbg_util_fswap16(bool little) {
+	return little == PLATFORM_LSB ? &adbg_util_nop16 : &adbg_util_bswap16;
 }
 
 /// Return a function pointer depending if requested endian matches target
@@ -150,10 +121,11 @@ ushort function(ushort) adbg_util_fswap16(int e) {
 /// returns the same value. If it does not match, this function returns
 /// a function that effectively byte swaps the value. This is useful for bulk
 /// operations, such as parsing header data or processing disassembly.
-/// Params: e = Endian (0=Little, 1=Big)
+/// Params: little = Endian is little
 /// Returns: fswap32 function pointer
-uint function(uint) adbg_util_fswap32(int e) {
-	return e == TE ? &adbg_util_nop32 : &adbg_util_bswap32;
+deprecated("Use adbg_util_ensure32")
+uint function(uint) adbg_util_fswap32(bool little) {
+	return little == PLATFORM_LSB ? &adbg_util_nop32 : &adbg_util_bswap32;
 }
 
 /// Return a function pointer depending if requested endian matches target
@@ -161,10 +133,11 @@ uint function(uint) adbg_util_fswap32(int e) {
 /// returns the same value. If it does not match, this function returns
 /// a function that effectively byte swaps the value. This is useful for bulk
 /// operations, such as parsing header data or processing disassembly.
-/// Params: e = Endian (0=Little, 1=Big)
+/// Params: little = Endian is little
 /// Returns: fswap64 function pointer
-ulong function(ulong) adbg_util_fswap64(int e) {
-	return e == TE ? &adbg_util_nop64 : &adbg_util_bswap64;
+deprecated("Use adbg_util_ensure64")
+ulong function(ulong) adbg_util_fswap64(bool little) {
+	return little == PLATFORM_LSB ? &adbg_util_nop64 : &adbg_util_bswap64;
 }
 
 private ushort adbg_util_nop16(ushort v) pure { return v; }
@@ -174,17 +147,17 @@ private ulong adbg_util_nop64(ulong v) pure { return v; }
 /// Byte-swap an 16-bit value.
 /// Params: v = 16-bit value
 /// Returns: Byte-swapped value
-ushort adbg_util_bswap16(ushort v) pure nothrow @nogc {
+ushort adbg_util_bswap16(ushort v) pure {
 	return cast(ushort)(v >> 8 | v << 8);
 }
 
 /// Byte-swap an 32-bit value.
 /// Params: v = 32-bit value
 /// Returns: Byte-swapped value
-uint adbg_util_bswap32(uint v) pure nothrow @nogc {
+uint adbg_util_bswap32(uint v) pure {
 	//TODO: Determine when bswap was introduced (at least works for dmd 2.078)
 	import core.bitop : bswap;
-	return bswap(v); // Better intrinsics
+	return bswap(v); // Intrinsic
 	// Source: https://stackoverflow.com/a/19560621
 	//v = (v >> 16) | (v << 16);
 	//return ((v & 0xFF00FF00) >> 8) | ((v & 0x00FF00FF) << 8);
@@ -193,11 +166,15 @@ uint adbg_util_bswap32(uint v) pure nothrow @nogc {
 /// Byte-swap an 64-bit value.
 /// Params: v = 64-bit value
 /// Returns: Byte-swapped value
-ulong adbg_util_bswap64(ulong v) pure nothrow @nogc {
+ulong adbg_util_bswap64(ulong v) pure {
+	// NOTE: Only recent versions of DMD inlines the intrinsic
+	//TODO: Determine when bswap was introduced (at least works for dmd 2.078)
+	import core.bitop : bswap;
+	return bswap(v); // Intrinsic
 	// Source: https://stackoverflow.com/a/19560621
-	v = (v >> 32) | (v << 32);
-	v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
-	return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
+	//v = (v >> 32) | (v << 32);
+	//v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
+	//return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
 }
 
 /// 
@@ -209,36 +186,4 @@ unittest {
 	assert(adbg_util_bswap16(N16) == R16, "bswap16");
 	assert(adbg_util_bswap32(N32) == R32, "bswap32");
 	assert(adbg_util_bswap64(N64) == R64, "bswap64");
-	
-	version (LittleEndian) {
-		swapfunc16 l16 = adbg_util_fswap16(0);
-		swapfunc32 l32 = adbg_util_fswap32(0);
-		swapfunc64 l64 = adbg_util_fswap64(0);
-		swapfunc16 m16 = adbg_util_fswap16(1);
-		swapfunc32 m32 = adbg_util_fswap32(1);
-		swapfunc64 m64 = adbg_util_fswap64(1);
-		// LSB matches, no swapping occurs
-		assert(l16(N16) == N16, "fswap16-lsb");
-		assert(l32(N32) == N32, "fswap32-lsb");
-		assert(l64(N64) == N64, "fswap64-lsb");
-		// MSB does not match
-		assert(m16(N16) == R16, "fswap16-msb");
-		assert(m32(N32) == R32, "fswap32-msb");
-		assert(m64(N64) == R64, "fswap64-msb");
-	} else {
-		swapfunc16 l16 = adbg_util_fswap16(0);
-		swapfunc32 l32 = adbg_util_fswap32(0);
-		swapfunc64 l64 = adbg_util_fswap64(0);
-		swapfunc16 m16 = adbg_util_fswap16(1);
-		swapfunc32 m32 = adbg_util_fswap32(1);
-		swapfunc64 m64 = adbg_util_fswap64(1);
-		// LSB does not match
-		assert(l16(N16) == R16, "fswap16-lsb");
-		assert(l32(N32) == R32, "fswap32-lsb");
-		assert(l64(N64) == R64, "fswap64-lsb");
-		// MSB matches, no swapping occurs
-		assert(m16(N16) == N16, "fswap16-msb");
-		assert(m32(N32) == N32, "fswap32-msb");
-		assert(m64(N64) == N64, "fswap64-msb");
-	}
 }
