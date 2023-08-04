@@ -1,0 +1,896 @@
+/// ELF format.
+///
+/// Sources:
+/// - http://www.sco.com/developers/gabi/latest/ch4.eheader.html
+/// - linux/include/uapi/linux/elf.h
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
+module adbg.v2.object.format.elf;
+
+import adbg.v2.object.server : adbg_object_t, AdbgObject;
+import adbg.error;
+import adbg.utils.bit : CHAR32;
+
+// NOTE: The string table section is typically named .shstrtab
+
+/// Signature magic for ELF.
+enum MAGIC_ELF = CHAR32!"\x7FELF";
+
+// ELF32
+private alias uint	Elf32_Addr;
+private alias ushort	Elf32_Half;
+private alias uint	Elf32_Off;
+private alias int	Elf32_Sword;
+private alias uint	Elf32_Word;
+
+// ELF64
+private alias ulong	Elf64_Addr;
+private alias ushort	Elf64_Half;
+private alias short	Elf64_SHalf;
+private alias ulong	Elf64_Off;
+private alias int	Elf64_Sword;
+private alias uint	Elf64_Word;
+private alias ulong	Elf64_Xword;
+private alias long	Elf64_Sxword;
+
+extern (C):
+
+// Constants
+
+enum ELF_EI_NIDENT	= 16;	/// Size of the initial pad (e_ident[])
+
+// ELF Indexes
+
+// 0..3 is "ELF\0" magic
+enum ELF_EI_CLASS	= 4;	/// Class index
+enum ELF_EI_DATA	= 5;	/// Data index
+enum ELF_EI_VERSION	= 6;	/// File version index
+enum ELF_EI_OSABI	= 7;	/// OS/ABI type index
+enum ELF_EI_ABIVERSION	= 8;	/// ABI version index
+
+// ELF Class identifiers
+
+enum ELF_CLASS_NONE	= 0;	/// No class
+enum ELF_CLASS_32	= 1;	/// 32-bit ELF
+enum ELF_CLASS_64	= 2;	/// 64-bit ELF
+
+// ELF Data identifiers
+
+enum ELF_DATA_NONE	= 0;	/// Invalid value
+enum ELF_DATA_LSB	= 1;	/// Little-endian
+enum ELF_DATA_MSB	= 2;	/// Big-endian
+
+// ELF Version identifiers
+
+enum ELF_EV_NONE	= 0;	/// No ELF version
+enum ELF_EV_CURRENT	= 1;	/// ELF Version 1
+
+// ELF OSABI identifiers
+
+enum ELF_OSABI_NONE	= 0;	/// System V
+enum ELF_OSABI_HPUX	= 1;	/// HP-UX
+enum ELF_OSABI_NETBSD	= 2;	/// NetBSD
+enum ELF_OSABI_GNU	= 3;	/// GNU
+enum ELF_OSABI_LINUX	= ELF_OSABI_GNU;	/// Linux
+enum ELF_OSABI_SOLARIS	= 6;	/// Solaris
+enum ELF_OSABI_AIX	= 7;	/// AIX
+enum ELF_OSABI_IRIX	= 8;	/// IRIX
+enum ELF_OSABI_FREEBSD	= 9;	/// FreeBSD
+enum ELF_OSABI_TRU64	= 10;	/// Compaq TRU64 UNIX
+enum ELF_OSABI_MODESTO	= 11;	/// Novell Modesto
+enum ELF_OSABI_OPENBSD	= 12;	/// OpenBSD
+enum ELF_OSABI_OPENVMS	= 13;	/// OpenVMS
+enum ELF_OSABI_NSK	= 14;	/// Hewlett-Packard Non-Stop Kernel
+enum ELF_OSABI_AROS	= 15;	/// Amiga Research OS
+enum ELF_OSABI_FENIXOS	= 16;	/// FenixOS
+enum ELF_OSABI_CLOUDABI	= 17;	/// Nuxi CloudABI
+enum ELF_OSABI_OPENVOS	= 18;	/// Stratus Technologies OpenVOS
+
+// ELF Type values
+
+enum ELF_ET_NONE	= 0;	/// No file type
+enum ELF_ET_REL	= 1;	/// Relocatable file
+enum ELF_ET_EXEC	= 2;	/// Executable file
+enum ELF_ET_DYN	= 3;	/// Shared object file
+enum ELF_ET_CORE	= 4;	/// Core file
+enum ELF_ET_LOOS	= 0xFE00;	/// OS-specific
+enum ELF_ET_HIOS	= 0xFEFF;	/// OS-specific
+enum ELF_ET_LOPROC	= 0xFF00;	/// Processor-specific
+enum ELF_ET_HIPROC	= 0xFFFF;	/// Processor-specific
+
+// ELF Machine values
+// FatELF also uses this
+
+enum ELF_EM_NONE	= 0;	/// No machine
+enum ELF_EM_M32	= 1;	/// AT&T WE 32100
+enum ELF_EM_SPARC	= 2;	/// SPARC
+enum ELF_EM_386	= 3;	/// Intel x86
+enum ELF_EM_68K	= 4;	/// Motorola 68000
+enum ELF_EM_88K	= 5;	/// Motorola 88000
+enum ELF_EM_MCU	= 6;	/// Intel MCU
+enum ELF_EM_860	= 7;	/// Intel 80860
+enum ELF_EM_MIPS	= 8;	/// MIPS I (RS3000)
+enum ELF_EM_S370	= 9;	/// IBM System/370
+enum ELF_EM_MIPS_RS3_LE	= 10;	/// MIPS RS3000 Little-Endian
+enum ELF_EM_PARISC	= 15;	/// Hewlett-Packard PA-RISC
+enum ELF_EM_VPP500	= 17;	/// Fujitsu VPP500
+enum ELF_EM_SPARC32PLUS	= 18;	/// Enhanced SPARC
+enum ELF_EM_960	= 19;	/// Intel 80960
+enum ELF_EM_PPC	= 20;	/// PowerPC
+enum ELF_EM_PPC64	= 21;	/// 64-bit PowerPC
+enum ELF_EM_S390	= 22;	/// IBM System/390
+enum ELF_EM_SPU	= 23;	/// IBM SPU/SPC
+enum ELF_EM_V800	= 36;	/// NEC V800
+enum ELF_EM_FR20	= 37;	/// Fujitsu FR20
+enum ELF_EM_RH32	= 38;	/// TRW
+enum ELF_EM_RCE	= 39;	/// Motorola RCE
+enum ELF_EM_ARM	= 40;	/// ARM 32-bit
+enum ELF_EM_ALPHA	= 41;	/// DEC Alpha
+enum ELF_EM_SH	= 42;	/// Hitachi SuperH
+enum ELF_EM_SPARCV9	= 43;	/// SPARC Version 9
+enum ELF_EM_TRICORE	= 44;	/// Siemens TriCore embedded
+enum ELF_EM_ARC	= 45;	/// Argonaut RISC Core
+enum ELF_EM_H8_300	= 46;	/// Hitachi H8/300
+enum ELF_EM_H8_300H	= 47;	/// Hitachi H8/300H
+enum ELF_EM_H8S	= 48;	/// Hitachi H8S
+enum ELF_EM_H8_500	= 49;	/// Hitachi H8/500
+enum ELF_EM_IA_64	= 50;	/// Intel Itanium Architecture 64
+enum ELF_EM_MIPS_X	= 51;	/// Stanford MIPS-X
+enum ELF_EM_COLDFIRE	= 52;	/// Motorola ColdFire
+enum ELF_EM_68HC12	= 53;	/// Motorola M68HC12
+enum ELF_EM_MMA	= 54;	/// Fujitsu MMA Multimedia Accelerator
+enum ELF_EM_PCP = 55;	/// Siemens PCP
+enum ELF_EM_NCPU	= 56;	/// Sony nCPU embedded RISC
+enum ELF_EM_NDR1	= 57;	/// Denso NDR1
+enum ELF_EM_STARCODE	= 58;	/// Motorola Star*Core
+enum ELF_EM_ME16	= 59;	/// Toyota ME16
+enum ELF_EM_ST100	= 60;	/// STMicroelectronics ST100
+enum ELF_EM_TINYJ	= 61;	/// Advanced Logic Corp. TinyJ
+enum ELF_EM_X86_64	= 62;	/// AMD x86-64
+enum ELF_EM_PDSP	= 63;	/// Sony DSP
+enum ELF_EM_PDP10	= 64;	/// DEC PDP-10
+enum ELF_EM_PDP11	= 65;	/// DEC PDP-11
+enum ELF_EM_FX66	= 66;	/// Siemens FX66
+enum ELF_EM_ST9PLUS	= 67;	/// STMicroelectronics ST9+ (8/16-bit)
+enum ELF_EM_ST7	= 68;	/// STMicroelectronics ST7 (8-bit)
+enum ELF_EM_68HC16	= 69;	/// Motorola 68HC16
+enum ELF_EM_68HC11	= 70;	/// Motorola 68HC11
+enum ELF_EM_68HC08	= 71;	/// Motorola 68HC08
+enum ELF_EM_68HC05	= 72;	/// Motorola 68HC05
+enum ELF_EM_SVX	= 73;	/// Silicon Graphics SVx
+enum ELF_EM_ST19	= 74;	/// STMicroelectronics ST19 (8-bit)
+enum ELF_EM_VAX	= 75;	/// DEC VAX
+enum ELF_EM_CRIS	= 76;	/// Axis Communications (32-bit)
+enum ELF_EM_JAVELIN	= 77;	/// Infineon Technologies (32-bit)
+enum ELF_EM_FIREPATH	= 78;	/// Element 14 DSP (64-bit)
+enum ELF_EM_ZSP	= 79;	/// LSI Logic DSP (16-bit)
+enum ELF_EM_MMIX	= 80;	/// Donald Knuth's educational processor (64-bit)
+enum ELF_EM_HUANY	= 81;	/// Harvard University machine-independent object files
+enum ELF_EM_PRISM	= 82;	/// SiTera Prism
+enum ELF_EM_AVR	= 83;	/// Atmel AVR (8-bit)
+enum ELF_EM_FR30	= 84;	/// Fujitsu FR30
+enum ELF_EM_D10V	= 85;	/// Mitsubishi D10V
+enum ELF_EM_D30V	= 86;	/// Mitsubishi D30V
+enum ELF_EM_V850	= 87;	/// NEC V850
+enum ELF_EM_M32R	= 88;	/// Mitsubishi M32R
+enum ELF_EM_MN10300	= 89;	/// Mitsubishi MN10300
+enum ELF_EM_MN10200	= 90;	/// Mitsubishi MN10200
+enum ELF_EM_PJ	= 91;	/// picoJava
+enum ELF_EM_OPENRISC	= 92;	/// OpenRISC (32-bit)
+enum ELF_EM_ARC_COMPACT	= 93;	/// ARC International ARCompact
+enum ELF_EM_XTENSA	= 94;	/// Tensilica Xtensa Architecture
+enum ELF_EM_VIDEOCORE	= 95;	/// Alphamosaic VideoCore
+enum ELF_EM_TMM_GPP	= 96;	/// Thompson Multimedia General Purpose
+enum ELF_EM_NS32K	= 97;	/// National Semiconductor 32000
+enum ELF_EM_TPC	= 98;	/// Tenor Network TPC
+enum ELF_EM_SNP1K	= 99;	/// Trebia SNP 1000
+enum ELF_EM_ST200	= 100;	/// STMicroelectronics ST200
+enum ELF_EM_IP2K	= 101;	/// Ubicom IP2xxx
+enum ELF_EM_MAX	= 102;	/// MAX
+enum ELF_EM_CR	= 103;	/// National Semiconductor CompactRISC
+enum ELF_EM_F2MC16	= 104;	/// Fujitsu F2MC16
+enum ELF_EM_MSP430	= 105;	/// Texas Instruments MSP430
+enum ELF_EM_BLACKFIN	= 106;	/// Analog Devices Blackfin DSP
+enum ELF_EM_SE_C33	= 107;	/// Seiko Epson S1C33
+enum ELF_EM_SEP	= 108;	/// Sharp
+enum ELF_EM_ARCA	= 109;	/// Arca RISC
+enum ELF_EM_UNICORE	= 110;	/// PKU-Unity/Pekin Unicore
+enum ELF_EM_EXCESS	= 111;	/// eXcess (16/32/64-bit)
+enum ELF_EM_DXP	= 112;	/// Icera Semiconductor Inc. Deep Execution
+enum ELF_EM_ALTERA_NIOS2	= 113;	/// Altera Nios II soft-core
+enum ELF_EM_CRX	= 114;	/// national Semiconductor CompactRISC CRX
+enum ELF_EM_XGATE	= 115;	/// Motorola XGATE
+enum ELF_EM_C116	= 116;	/// Infineon C16x/XC16x
+enum ELF_EM_M16C	= 117;	/// Renesas M32C
+enum ELF_EM_DSPIC30F	= 118;	/// Microchip Technology DSPIC30F
+enum ELF_EM_CE	= 119;	/// Freescale Communication Engine RISC
+enum ELF_EM_M32C	= 120;	/// Renesas M32C
+enum ELF_EM_TSK3000	= 131;	/// Altium TSK3000
+enum ELF_EM_RS08	= 132;	/// Freescale RS08
+enum ELF_EM_SHARC	= 133;	/// SHARC (32-bit)
+enum ELF_EM_ECOG2	= 134;	/// Cyan Technology eCOG2
+enum ELF_EM_SCORE7	= 135;	/// Sunplus S+core7 RISC
+enum ELF_EM_DSP24	= 136;	/// New Japan Radio (NJR) DSP (24-bit)
+enum ELF_EM_VIDEOCORE3	= 137;	/// Broadcom VideoCore III
+enum ELF_EM_LATTICEMICO32	= 138;	/// Lattice FPGA
+enum ELF_EM_SE_C17	= 139;	/// Seiko Epson C17
+enum ELF_EM_TI_C6000	= 140;	/// Texas Instruments TMS320C6000
+enum ELF_EM_TI_C2000	= 141;	/// Texas Instruments TMS320C2000
+enum ELF_EM_TI_C5500	= 142;	/// Texas Instruments TMS320C55xx
+enum ELF_EM_TI_ARP32	= 143;	/// Texas Instruments Application Specific RISC (32-bit)
+enum ELF_EM_TI_PRU	= 144;	/// Texas Instruments Programmable Realtime Unit
+enum ELF_EM_MMDSP_PLUS	= 160;	/// STMicroelectronics VLIW DSP (64-bit)
+enum ELF_EM_CYPRESS_M8C	= 161;	/// Cypress M8C
+enum ELF_EM_R32C	= 162;	/// Renesas R32C
+enum ELF_EM_TRIMEDIA	= 163;	/// NXP Semiconductors TriMedia
+enum ELF_EM_QDSP6	= 164;	/// QUALCOMM DSP6
+enum ELF_EM_8051	= 165;	/// Intel 8051
+enum ELF_EM_STXP7X	= 166;	/// STMicroelectronics STxP7x
+enum ELF_EM_NDS32	= 167;	/// Andes Technology RISC
+enum ELF_EM_ECOG1X	= 168;	/// Cyan Technology eCOG1X
+enum ELF_EM_MAXQ30	= 169;	/// Dallas Semiconductor MAXQ30
+enum ELF_EM_XIMO16	= 170;	/// New Japan Radio (NJR) DSP (16-bit)
+enum ELF_EM_MANIK	= 171;	/// M2000 Reconfigurable RISC
+enum ELF_EM_CRAYNV2	= 172;	/// Cray Inc. NV2
+enum ELF_EM_RX	= 173;	/// Renesas RX
+enum ELF_EM_METAG	= 174;	/// Imagination Technologies META
+enum ELF_EM_MCST_ELBRUS	= 175;	/// MCST Elbrus general purpose hardware
+enum ELF_EM_ECOG16	= 176;	/// Cyan Technology eCOG16
+enum ELF_EM_CR16	= 177;	/// National Semiconductor CompactRISC CR16 (16-bit)
+enum ELF_EM_ETPU	= 178;	/// Freescale Extended Time Processing Unit
+enum ELF_EM_SLE9X	= 179;	/// Infineon Technologies SLE9X
+enum ELF_EM_L10M	= 180;	/// Intel L10M
+enum ELF_EM_K10M	= 181;	/// Intel K10M
+enum ELF_EM_AARCH64	= 183;	/// ARM (64-bit)
+enum ELF_EM_AVR32	= 185;	/// Atmel Corporation (32-bit)
+enum ELF_EM_STM8	= 186;	/// STMicroeletronics STM8 (8-bit)
+enum ELF_EM_TILE64	= 187;	/// Tilera TILE64
+enum ELF_EM_TILEPRO	= 188;	/// Tilera TILEPro
+enum ELF_EM_MICROBLAZE	= 189;	/// Xilinx MicroBlaze RISC soft core (32-bit)
+enum ELF_EM_CUDA	= 190;	/// NVIDIA CUDA
+enum ELF_EM_TILEGX	= 191;	/// Tilera TILE-Gx
+enum ELF_EM_CLOUDSHIELD	= 192;	/// CloudShield
+enum ELF_EM_COREA_1ST	= 193;	/// KIPO-KAIST Core-A 1st generation
+enum ELF_EM_COREA_2ND	= 194;	/// KIPO-KAIST Core-A 2nd generation
+enum ELF_EM_ARC_COMPACT2	= 195;	/// Synopsys ARCompact V2
+enum ELF_EM_OPEN8	= 196;	/// Open8 RISC soft core (8-bit)
+enum ELF_EM_RL78	= 197;	/// Renesas RL78
+enum ELF_EM_VIDEOCORE5	= 198;	/// Broadcom VideoCore V
+enum ELF_EM_78KOR	= 199;	/// Renesas 78KOR
+enum ELF_EM_56800EX	= 200;	/// Freescale 56800EX DSC
+enum ELF_EM_BA1	= 201;	/// Beyond BA1
+enum ELF_EM_BA2	= 202;	/// Beyond BA2
+enum ELF_EM_XCORE	= 203;	/// XMOS xCORE
+enum ELF_EM_MCHP_PIC	= 204;	/// Microchip PIC(r) (8-bit)
+enum ELF_EM_INTEL205	= 205;	/// Reserved by Intel
+enum ELF_EM_INTEL206	= 206;	/// Reserved by Intel
+enum ELF_EM_INTEL207	= 207;	/// Reserved by Intel
+enum ELF_EM_INTEL208	= 208;	/// Reserved by Intel
+enum ELF_EM_INTEL209	= 209;	/// Reserved by Intel
+enum ELF_EM_KM32	= 210;	/// KM211 KM32 (32-bit)
+enum ELF_EM_KMX32	= 211;	/// KM211 KMX32 (32-bit)
+enum ELF_EM_KMX16	= 212;	/// KM211 KMX16 (16-bit)
+enum ELF_EM_KMX8	= 213;	/// KM211 KMX8 (8-bit)
+enum ELF_EM_KVARC	= 214;	/// KM211 KVARC
+enum ELF_EM_CDP	= 215;	/// Paneve CDP
+enum ELF_EM_COGE	= 216;	/// Cognitive Smart Memory
+enum ELF_EM_COOL	= 217;	/// Bluechip Systems
+enum ELF_EM_NORC	= 218;	/// Nanoradio Optimized RISC
+enum ELF_EM_CSR_KALIMBA	= 219;	/// CSR Kalimba
+enum ELF_EM_Z80	= 220;	/// Zilog Z80
+enum ELF_EM_VISIUM	= 221;	/// VISIUMcore
+enum ELF_EM_FT32	= 222;	/// FTDI Chip FT32 RISC (32-bit)
+enum ELF_EM_MOXIE	= 223;	/// Moxie
+enum ELF_EM_AMDGPU	= 224;	/// AMD GPU
+enum ELF_EM_RISCV	= 225;	/// RISC-V
+
+// Section type values
+
+enum ELF_SHT_NULL	= 0;	/// Inactive
+enum ELF_SHT_PROGBITS	= 1;	/// Program bits
+enum ELF_SHT_SYMTAB	= 2;	/// Symbol table
+enum ELF_SHT_STRTAB	= 3;	/// String table
+enum ELF_SHT_RELA	= 4;	/// Relocation entries (with addends)
+enum ELF_SHT_HASH	= 5;	/// Symbol hash table
+enum ELF_SHT_DYNAMIC	= 6;	/// Dynamic linking information
+enum ELF_SHT_NOTE	= 7;	/// File information
+enum ELF_SHT_NOBITS	= 8;	/// Empty section
+enum ELF_SHT_REL	= 9;	/// Relocation entries (without addends)
+enum ELF_SHT_SHLIB	= 10;	/// Reserved
+enum ELF_SHT_DYNSYM	= 11;	/// Dynamic symbol table
+enum ELF_SHT_INIT_ARRAY	= 12;	/// Array of pointers to initialization functions
+enum ELF_SHT_FINI_ARRAY	= 13;	/// Array of pointers to termination functions
+enum ELF_SHT_PREINIT_ARRAY	= 14;	/// Array of pointers to pre-initialization functions
+enum ELF_SHT_GROUP	= 15;	/// Section group
+enum ELF_SHT_SYNTAB_SHNDX	= 16;	/// Symbol table pointed by e_shstrndx
+enum ELF_SHT_LOOS	= 0x60000000;	/// Operating system specific
+enum ELF_SHT_HIOS	= 0x6fffffff;	/// Operating system specific
+enum ELF_SHT_LOPROC	= 0x70000000;	/// Processor specific
+enum ELF_SHT_HIPROC	= 0x7fffffff;	/// Processor specific
+enum ELF_SHT_LOUSER	= 0x80000000;	/// Application specific
+enum ELF_SHT_HIUSER	= 0xffffffff;	/// Application specific
+
+// Section flags
+
+enum ELF_SHF_WRITE	= 0x1;	/// Section should be writable
+enum ELF_SHF_ALLOC	= 0x2;	/// Section occupies memory during executing
+enum ELF_SHF_EXECINSTR	= 0x4;	/// Section contains executable machine instructions
+enum ELF_SHF_MERGE	= 0x10;	/// Section may be merged to eleminate duplication
+enum ELF_SHF_STRINGS	= 0x20;	/// Section is string table
+enum ELF_SHF_INFO_LINK	= 0x40;	/// sh_info field in this section holds a section header table value
+enum ELF_SHF_LINK_ORDER	= 0x80;	/// Adds special ordering for link editors
+enum ELF_SHF_OS_NONCONFORMING	= 0x100;	/// OS-specific
+enum ELF_SHF_GROUP	= 0x200;	/// Section is part of a group
+enum ELF_SHF_TLS	= 0x400;	/// Section contains Thread Local Storage data
+enum ELF_SHF_COMPRESSED	= 0x800;	/// Section is compressed
+enum ELF_SHF_MASKOS	= 0x0ff00000;	/// OS-specific
+enum ELF_SHF_MASKPROC	= 0xf0000000;	/// Processor-specific
+
+//
+// ET_CORE
+// elf.h values off musl 1.20
+//
+
+enum ELF_NT_PRSTATUS	= 1;	/// 
+enum ELF_NT_PRFPREG	= 2;	/// 
+enum ELF_NT_FPREGSET	= 2;	/// 
+enum ELF_NT_PRPSINFO	= 3;	/// 
+enum ELF_NT_PRXREG	= 4;	/// 
+enum ELF_NT_TASKSTRUCT	= 4;	/// 
+enum ELF_NT_PLATFORM	= 5;	/// 
+enum ELF_NT_AUXV	= 6;	/// 
+enum ELF_NT_GWINDOWS	= 7;	/// 
+enum ELF_NT_ASRS	= 8;	/// 
+enum ELF_NT_PSTATUS	= 10;	/// 
+enum ELF_NT_PSINFO	= 13;	/// 
+enum ELF_NT_PRCRED	= 14;	/// 
+enum ELF_NT_UTSNAME	= 15;	/// 
+enum ELF_NT_LWPSTATUS	= 16;	/// 
+enum ELF_NT_LWPSINFO	= 17;	/// 
+enum ELF_NT_PRFPXREG	= 20;	/// 
+enum ELF_NT_SIGINFO	= 0x53494749;	/// 
+enum ELF_NT_FILE	= 0x46494c45;	/// 
+enum ELF_NT_PRXFPREG	= 0x46e62b7f;	/// 
+enum ELF_NT_PPC_VMX	= 0x100;	/// 
+enum ELF_NT_PPC_SPE	= 0x101;	/// 
+enum ELF_NT_PPC_VSX	= 0x102;	/// 
+enum ELF_NT_PPC_TAR	= 0x103;	/// 
+enum ELF_NT_PPC_PPR	= 0x104;	/// 
+enum ELF_NT_PPC_DSCR	= 0x105;	/// 
+enum ELF_NT_PPC_EBB	= 0x106;	/// 
+enum ELF_NT_PPC_PMU	= 0x107;	/// 
+enum ELF_NT_PPC_TM_CGPR	= 0x108;	/// 
+enum ELF_NT_PPC_TM_CFPR	= 0x109;	/// 
+enum ELF_NT_PPC_TM_CVMX	= 0x10a;	/// 
+enum ELF_NT_PPC_TM_CVSX	= 0x10b;	/// 
+enum ELF_NT_PPC_TM_SPR	= 0x10c;	/// 
+enum ELF_NT_PPC_TM_CTAR	= 0x10d;	/// 
+enum ELF_NT_PPC_TM_CPPR	= 0x10e;	/// 
+enum ELF_NT_PPC_TM_CDSCR	= 0x10f;	/// 
+enum ELF_NT_386_TLS	= 0x200;	/// 
+enum ELF_NT_386_IOPERM	= 0x201;	/// 
+enum ELF_NT_X86_XSTATE	= 0x202;	/// 
+enum ELF_NT_S390_HIGH_GPRS	= 0x300;	/// 
+enum ELF_NT_S390_TIMER	= 0x301;	/// 
+enum ELF_NT_S390_TODCMP	= 0x302;	/// 
+enum ELF_NT_S390_TODPREG	= 0x303;	/// 
+enum ELF_NT_S390_CTRS	= 0x304;	/// 
+enum ELF_NT_S390_PREFIX	= 0x305;	/// 
+enum ELF_NT_S390_LAST_BREAK	= 0x306;	/// 
+enum ELF_NT_S390_SYSTEM_CALL	= 0x307;	/// 
+enum ELF_NT_S390_TDB	= 0x308;	/// 
+enum ELF_NT_S390_VXRS_LOW	= 0x309;	/// 
+enum ELF_NT_S390_VXRS_HIGH	= 0x30a;	/// 
+enum ELF_NT_S390_GS_CB	= 0x30b;	/// 
+enum ELF_NT_S390_GS_BC	= 0x30c;	/// 
+enum ELF_NT_S390_RI_CB	= 0x30d;	/// 
+enum ELF_NT_ARM_VFP	= 0x400;	/// 
+enum ELF_NT_ARM_TLS	= 0x401;	/// 
+enum ELF_NT_ARM_HW_BREAK	= 0x402;	/// 
+enum ELF_NT_ARM_HW_WATCH	= 0x403;	/// 
+enum ELF_NT_ARM_SYSTEM_CALL	= 0x404;	/// 
+enum ELF_NT_ARM_SVE	= 0x405;	/// 
+enum ELF_NT_ARM_PAC_MASK	= 0x406;	/// 
+enum ELF_NT_ARM_PACA_KEYS	= 0x407;	/// 
+enum ELF_NT_ARM_PACG_KEYS	= 0x408;	/// 
+enum ELF_NT_METAG_CBUF	= 0x500;	/// 
+enum ELF_NT_METAG_RPIPE	= 0x501;	/// 
+enum ELF_NT_METAG_TLS	= 0x502;	/// 
+enum ELF_NT_ARC_V2	= 0x600;	/// 
+enum ELF_NT_VMCOREDD	= 0x700;	/// 
+enum ELF_NT_MIPS_DSP	= 0x800;	/// 
+enum ELF_NT_MIPS_FP_MODE	= 0x801;	/// 
+enum ELF_NT_MIPS_MSA	= 0x802;	/// 
+enum ELF_NT_VERSION	= 1;	/// 
+enum ELF_NT_LOONGARCH_CPUCFG	= 0xa00;	/// LoongArch CPU config registers
+enum ELF_NT_LOONGARCH_CSR	= 0xa01;	/// LoongArch control and status registers
+enum ELF_NT_LOONGARCH_LSX	= 0xa02;	/// LoongArch Loongson SIMD Extension registers
+enum ELF_NT_LOONGARCH_LASX	= 0xa03;	/// LoongArch Loongson Advanced SIMD Extension registers
+enum ELF_NT_LOONGARCH_LBT	= 0xa04;	/// LoongArch Loongson Binary Translation registers
+enum ELF_NT_LOONGARCH_HW_BREAK	= 0xa05;   /// LoongArch hardware breakpoint registers
+enum ELF_NT_LOONGARCH_HW_WATCH	= 0xa06;   /// LoongArch hardware watchpoint registers
+
+
+//
+// ELF32 meta
+//
+
+/// ELF32 header structure
+struct Elf32_Ehdr {
+	ubyte[ELF_EI_NIDENT] e_ident;	/// Identification bytes
+	Elf32_Half e_type;	/// Object file type
+	Elf32_Half e_machine;	/// Object file machine
+	Elf32_Word e_version;	/// Object version
+	Elf32_Addr e_entry;	/// Object entry address
+	Elf32_Off  e_phoff;	/// Program header offset
+	Elf32_Off  e_shoff;	/// Section header offset
+	Elf32_Word e_flags;	/// Architecture flags
+	Elf32_Half e_ehsize;	/// Header size in bytes
+	Elf32_Half e_phentsize;	/// Program header size
+	Elf32_Half e_phnum;	/// Number of entries in the program header table
+	Elf32_Half e_shentsize;	/// Section header size
+	Elf32_Half e_shnum;	/// Number of entries in the section header table
+	Elf32_Half e_shstrndx;	/// Index of the section header table entry that has section names
+}
+
+/// Program 32-bit header
+struct Elf32_Phdr {
+	Elf32_Word p_type;	/// Segment type
+	Elf32_Off  p_offset;	/// Segment file offset
+	Elf32_Addr p_vaddr;	/// Segment virtual address
+	Elf32_Addr p_paddr;	/// Segment physical address
+	Elf32_Word p_filesz;	/// Segment size in file
+	Elf32_Word p_memsz;	/// Segment size in memory
+	Elf32_Word p_flags;	
+	Elf32_Word p_align;	/// Segment alignment, file & memory
+}
+
+/// Section 32-bit header
+struct Elf32_Shdr {
+	Elf32_Word sh_name;	/// Section name, index in string table
+	Elf32_Word sh_type;	/// Type of section
+	Elf32_Word sh_flags;	/// Miscellaneous section attributes
+	Elf32_Addr sh_addr;	/// Section virtual addr at execution
+	Elf32_Off  sh_offset;	/// Section file offset
+	Elf32_Word sh_size;	/// Size of section in bytes
+	Elf32_Word sh_link;	/// Index of another section
+	Elf32_Word sh_info;	/// Additional section information
+	Elf32_Word sh_addralign;	/// Section alignment
+	Elf32_Word sh_entsize;	/// Entry size if section holds table
+}
+
+/// Note 32-bit header
+struct Elf32_Nhdr {
+	Elf32_Word n_namesz;	/// Name size
+	Elf32_Word n_descsz;	/// Content size
+	Elf32_Word n_type;	/// Content type
+}
+
+struct Elf32_Dyn {
+	Elf32_Sword d_tag;
+	union {
+		Elf32_Sword d_val;
+		Elf32_Addr  d_ptr;
+	}
+}
+
+struct Elf32_Rel {
+	Elf32_Addr r_offset;
+	Elf32_Word r_info;
+}
+
+struct Elf32_Rela {
+	Elf32_Addr  r_offset;
+	Elf32_Word  r_info;
+	Elf32_Sword r_addend;
+}
+
+struct Elf32_Sym {
+	Elf32_Word st_name;
+	Elf32_Addr st_value;
+	Elf32_Word st_size;
+	ubyte      st_info;
+	ubyte      st_other;
+	Elf32_Half st_shndx;
+}
+
+/// ELF32 Compressed header
+struct Elf32_Chdr {
+	Elf32_Word ch_type;	/// Compression algorithm
+	Elf32_Word ch_size;	/// Uncompressed data size
+	Elf32_Word ch_addralign;	/// Uncompressed data alignment
+}
+
+//
+// ELF64 meta
+//
+
+/// ELF64 header structure
+struct Elf64_Ehdr {
+	ubyte[ELF_EI_NIDENT] e_ident;	/// Identification bytes
+	Elf64_Half e_type;	/// Object file type
+	Elf64_Half e_machine;	/// Object file machine
+	Elf64_Word e_version;	/// Object version
+	Elf64_Addr e_entry;	/// Object entry address
+	Elf64_Off  e_phoff;	/// Program header offset
+	Elf64_Off  e_shoff;	/// Section header offset
+	Elf64_Word e_flags;	/// Architecture flags
+	Elf64_Half e_ehsize;	/// Header size in bytes
+	Elf64_Half e_phentsize;	/// Program header size
+	Elf64_Half e_phnum;	/// Number of entries in the program header table
+	Elf64_Half e_shentsize;	/// Section header size
+	Elf64_Half e_shnum;	/// Number of entries in the section header table
+	Elf64_Half e_shstrndx;	/// Index of the section header table entry that has section names
+}
+
+/// Program 64-bit header
+struct Elf64_Phdr {
+	Elf64_Word  p_type;	/// Segment type
+	Elf64_Word  p_flags;	/// Segment flags
+	Elf64_Off   p_offset;	/// Segment file offset
+	Elf64_Addr  p_vaddr;	/// Segment virtual address
+	Elf64_Addr  p_paddr;	/// Segment physical address
+	Elf64_Xword p_filesz;	/// Segment size in file
+	Elf64_Xword p_memsz;	/// Segment size in memory
+	Elf64_Xword p_align;	/// Segment alignment, file & memory
+}
+
+/// Section 64-bit header
+struct Elf64_Shdr {
+	Elf64_Word  sh_name;	/// Section name, index in string table
+	Elf64_Word  sh_type;	/// Type of section
+	Elf64_Xword sh_flags;	/// Miscellaneous section attributes
+	Elf64_Addr  sh_addr;	/// Section virtual addr at execution
+	Elf64_Off   sh_offset;	/// Section file offset
+	Elf64_Xword sh_size;	/// Size of section in bytes
+	Elf64_Word  sh_link;	/// Index of another section
+	Elf64_Word  sh_info;	/// Additional section information
+	Elf64_Xword sh_addralign;	/// Section alignment
+	Elf64_Xword sh_entsize;	/// Entry size if section holds table
+}
+
+/// Note 64-bit header
+struct Elf64_Nhdr {
+	Elf64_Word n_namesz;	/// Name size
+	Elf64_Word n_descsz;	/// Content size
+	Elf64_Word n_type;	/// Content type
+}
+
+struct Elf64_Dyn {
+	Elf64_Sxword d_tag;
+	union {
+		Elf64_Xword d_val;
+		Elf64_Addr  d_ptr;
+	}
+}
+
+struct Elf64_Rel {
+	Elf64_Addr  r_offset;	/// Location at which to apply the action
+	Elf64_Xword r_info;	/// Index and type of relocation
+}
+
+struct Elf64_Rela {
+	Elf32_Addr  offset;
+	Elf32_Word  info;
+	Elf32_Sword addend;
+}
+
+/// ELF64 Compressed header
+struct Elf64_Chdr {
+	Elf64_Word  ch_type;	/// Compression algorithm
+	Elf64_Word  ch_reserved;	/// Reserved, obviously
+	Elf64_Xword ch_size;	/// Uncompressed size
+	Elf64_Xword ch_addralign;	/// Uncompressed alignment
+}
+
+//
+// Functions
+//
+
+int adbg_object_elf_load(adbg_object_t *obj) {
+	obj.type = AdbgObject.elf;
+	obj.i.elf32.e_header = cast(Elf32_Ehdr*)obj.buffer;
+	
+	switch (obj.i.elf32.e_header.e_ident[ELF_EI_CLASS]) {
+	case ELF_CLASS_32:
+		with (obj.i.elf32) {
+			if (e_header.e_phoff >= obj.file_size ||
+			    e_header.e_shoff >= obj.file_size)
+			{
+				return adbg_oops(AdbgError.assertion);
+			}
+			p_header = cast(Elf32_Phdr*)(obj.buffer + e_header.e_phoff);
+			s_header = cast(Elf32_Shdr*)(obj.buffer + e_header.e_shoff);
+		}
+		break;
+	case ELF_CLASS_64:
+		with (obj.i.elf64) {
+			if (e_header.e_phoff >= obj.file_size ||
+			    e_header.e_shoff >= obj.file_size)
+			{
+				return adbg_oops(AdbgError.assertion);
+			}
+			Elf64_Ehdr* hdr64 = cast(Elf64_Ehdr*)obj.buffer;
+			p_header = cast(Elf64_Phdr*)(obj.buffer + hdr64.e_phoff);
+			s_header = cast(Elf64_Shdr*)(obj.buffer + hdr64.e_shoff);
+		}
+		break;
+	default:
+		return adbg_oops(AdbgError.invalidObjClass);
+	}
+	
+	return 0;
+}
+
+const(char) *adbg_object_elf_class_string(ubyte class_) {
+	switch (class_) {
+	case ELF_CLASS_32:	return "ELF32";
+	case ELF_CLASS_64:	return "ELF64";
+	default:	return null;
+	}
+}
+
+const(char) *adbg_object_elf_data_string(ubyte data) {
+	switch (data) {
+	case ELF_DATA_LSB:	return "LSB";
+	case ELF_DATA_MSB:	return "MSB";
+	default:	return null;
+	}
+}
+
+const(char) *adbg_object_elf_abi_string(ubyte object_) {
+	switch (object_) {
+	case ELF_OSABI_NONE:	return "NONE";
+	case ELF_OSABI_HPUX:	return "HPUX";
+	case ELF_OSABI_NETBSD:	return "NETBSD";
+	case ELF_OSABI_GNU:	return "GNU";
+	case ELF_OSABI_SOLARIS:	return "SOLARIS";
+	case ELF_OSABI_AIX:	return "AIX";
+	case ELF_OSABI_IRIX:	return "IRIX";
+	case ELF_OSABI_FREEBSD:	return "FREEBSD";
+	case ELF_OSABI_TRU64:	return "TRU64";
+	case ELF_OSABI_MODESTO:	return "MODESTO";
+	case ELF_OSABI_OPENBSD:	return "OPENBSD";
+	case ELF_OSABI_OPENVMS:	return "OPENVMS";
+	case ELF_OSABI_NSK:	return "NSK";
+	case ELF_OSABI_AROS:	return "AROS";
+	case ELF_OSABI_FENIXOS:	return "FENIXOS";
+	case ELF_OSABI_CLOUDABI:	return "CLOUDABI";
+	case ELF_OSABI_OPENVOS:	return "OPENVOS";
+	default:	return null;
+	}
+}
+
+const(char) *adbg_object_elf_et_string(ushort type) {
+	switch (type) {
+	case ELF_ET_NONE:	return "NONE";
+	case ELF_ET_REL:	return "REL";
+	case ELF_ET_EXEC:	return "EXEC";
+	case ELF_ET_DYN:	return "DYN";
+	case ELF_ET_CORE:	return "CORE";
+	case ELF_ET_LOOS:	return "LOOS";
+	case ELF_ET_HIOS:	return "HIOS";
+	case ELF_ET_LOPROC:	return "LOPROC";
+	case ELF_ET_HIPROC:	return "HIPROC";
+	default:	return null;
+	}
+}
+
+const(char) *adbg_object_elf_em_string(ushort machine) {
+	switch (machine) {
+	case ELF_EM_NONE:	return "No machine";
+	case ELF_EM_M32:	return "AT&T WE 32100";
+	case ELF_EM_SPARC:	return "SPARC";
+	case ELF_EM_386:	return "Intel x86";
+	case ELF_EM_68K:	return "Motorola 68000";
+	case ELF_EM_88K:	return "Motorola 88000";
+	case ELF_EM_MCU:	return "Intel MCU";
+	case ELF_EM_860:	return "Intel 80860";
+	case ELF_EM_MIPS:	return "MIPS I (RS3000)";
+	case ELF_EM_S370:	return "IBM System/370";
+	case ELF_EM_MIPS_RS3_LE:	return "MIPS RS3000 Little-Endian";
+	case ELF_EM_PARISC:	return "Hewlett-Packard PA-RISC";
+	case ELF_EM_VPP500:	return "Fujitsu VPP500";
+	case ELF_EM_SPARC32PLUS:	return "Enhanced SPARC";
+	case ELF_EM_960:	return "Intel 80960";
+	case ELF_EM_PPC:	return "IBM PowerPC";
+	case ELF_EM_PPC64:	return "IBM PowerPC64";
+	case ELF_EM_S390:	return "IBM System/390";
+	case ELF_EM_SPU:	return "IBM SPU/SPC";
+	case ELF_EM_V800:	return "NEC V800";
+	case ELF_EM_FR20:	return "Fujitsu FR20";
+	case ELF_EM_RH32:	return "TRW RH-32";
+	case ELF_EM_RCE:	return "Motorola RCE";
+	case ELF_EM_ARM:	return "ARM 32-bit";
+	case ELF_EM_ALPHA:	return "DEC Alpha";
+	case ELF_EM_SH:	return "Hitachi SuperH";
+	case ELF_EM_SPARCV9:	return "SPARC Version 9";
+	case ELF_EM_TRICORE:	return "Siemens TriCore embedded";
+	case ELF_EM_ARC:	return "Argonaut RISC Core";
+	case ELF_EM_H8_300:	return "Hitachi H8/300";
+	case ELF_EM_H8_300H:	return "Hitachi H8/300H";
+	case ELF_EM_H8S:	return "Hitachi H8S";
+	case ELF_EM_H8_500:	return "Hitachi H8/500";
+	case ELF_EM_IA_64:	return "Intel Itanium";
+	case ELF_EM_MIPS_X:	return "Stanford MIPS-X";
+	case ELF_EM_COLDFIRE:	return "Motorola ColdFire";
+	case ELF_EM_68HC12:	return "Motorola M68HC12";
+	case ELF_EM_MMA:	return "Fujitsu MMA Multimedia Accelerator";
+	case ELF_EM_PCP:	return "Siemens PCP";
+	case ELF_EM_NCPU:	return "Sony nCPU embedded RISC";
+	case ELF_EM_NDR1:	return "Denso NDR1";
+	case ELF_EM_STARCODE:	return "Motorola Star*Core";
+	case ELF_EM_ME16:	return "Toyota ME16";
+	case ELF_EM_ST100:	return "STMicroelectronics ST100";
+	case ELF_EM_TINYJ:	return "Advanced Logic Corp. TinyJ";
+	case ELF_EM_X86_64:	return "AMD x86-64";
+	case ELF_EM_PDSP:	return "Sony DSP";
+	case ELF_EM_PDP10:	return "DEC PDP-10";
+	case ELF_EM_PDP11:	return "DEC PDP-11";
+	case ELF_EM_FX66:	return "Siemens FX66";
+	case ELF_EM_ST9PLUS:	return "STMicroelectronics ST9+ (8/16-bit)";
+	case ELF_EM_ST7:	return "STMicroelectronics ST7 (8-bit)";
+	case ELF_EM_68HC16:	return "Motorola 68HC16";
+	case ELF_EM_68HC11:	return "Motorola 68HC11";
+	case ELF_EM_68HC08:	return "Motorola 68HC08";
+	case ELF_EM_68HC05:	return "Motorola 68HC05";
+	case ELF_EM_SVX:	return "Silicon Graphics SVx";
+	case ELF_EM_ST19:	return "STMicroelectronics ST19 (8-bit)";
+	case ELF_EM_VAX:	return "DEC VAX";
+	case ELF_EM_CRIS:	return "Axis Communications (32-bit)";
+	case ELF_EM_JAVELIN:	return "Infineon Technologies (32-bit)";
+	case ELF_EM_FIREPATH:	return "Element 14 DSP (64-bit)";
+	case ELF_EM_ZSP:	return "LSI Logic DSP (16-bit)";
+	case ELF_EM_MMIX:	return "Donald Knuth's educational processor (64-bit)";
+	case ELF_EM_HUANY:	return "Harvard University machine-independent object files";
+	case ELF_EM_PRISM:	return "SiTera Prism";
+	case ELF_EM_AVR:	return "Atmel AVR (8-bit)";
+	case ELF_EM_FR30:	return "Fujitsu FR30";
+	case ELF_EM_D10V:	return "Mitsubishi D10V";
+	case ELF_EM_D30V:	return "Mitsubishi D30V";
+	case ELF_EM_V850:	return "NEC V850";
+	case ELF_EM_M32R:	return "Mitsubishi M32R";
+	case ELF_EM_MN10300:	return "Mitsubishi MN10300";
+	case ELF_EM_MN10200:	return "Mitsubishi MN10200";
+	case ELF_EM_PJ:	return "picoJava";
+	case ELF_EM_OPENRISC:	return "OpenRISC (32-bit)";
+	case ELF_EM_ARC_COMPACT:	return "ARC International ARCompact";
+	case ELF_EM_XTENSA:	return "Tensilica Xtensa Architecture";
+	case ELF_EM_VIDEOCORE:	return "Alphamosaic VideoCore";
+	case ELF_EM_TMM_GPP:	return "Thompson Multimedia General Purpose";
+	case ELF_EM_NS32K:	return "National Semiconductor 32000";
+	case ELF_EM_TPC:	return "Tenor Network TPC";
+	case ELF_EM_SNP1K:	return "Trebia SNP 1000";
+	case ELF_EM_ST200:	return "STMicroelectronics ST200";
+	case ELF_EM_IP2K:	return "Ubicom IP2xxx";
+	case ELF_EM_MAX:	return "MAX";
+	case ELF_EM_CR:	return "National Semiconductor CompactRISC";
+	case ELF_EM_F2MC16:	return "Fujitsu F2MC16";
+	case ELF_EM_MSP430:	return "Texas Instruments MSP430";
+	case ELF_EM_BLACKFIN:	return "Analog Devices Blackfin DSP";
+	case ELF_EM_SE_C33:	return "Seiko Epson S1C33";
+	case ELF_EM_SEP:	return "Sharp";
+	case ELF_EM_ARCA:	return "Arca RISC";
+	case ELF_EM_UNICORE:	return "PKU-Unity/Pekin Unicore";
+	case ELF_EM_EXCESS:	return "eXcess (16/32/64-bit)";
+	case ELF_EM_DXP:	return "Icera Semiconductor Inc. Deep Execution";
+	case ELF_EM_ALTERA_NIOS2:	return "Altera Nios II soft-core";
+	case ELF_EM_CRX:	return "national Semiconductor CompactRISC CRX";
+	case ELF_EM_XGATE:	return "Motorola XGATE";
+	case ELF_EM_C116:	return "Infineon C16x/XC16x";
+	case ELF_EM_M16C:	return "Renesas M32C";
+	case ELF_EM_DSPIC30F:	return "Microchip Technology DSPIC30F";
+	case ELF_EM_CE:	return "Freescale Communication Engine RISC";
+	case ELF_EM_M32C:	return "Renesas M32C";
+	case ELF_EM_TSK3000:	return "Altium TSK3000";
+	case ELF_EM_RS08:	return "Freescale RS08";
+	case ELF_EM_SHARC:	return "SHARC (32-bit)";
+	case ELF_EM_ECOG2:	return "Cyan Technology eCOG2";
+	case ELF_EM_SCORE7:	return "Sunplus S+core7 RISC";
+	case ELF_EM_DSP24:	return "New Japan Radio (NJR) DSP (24-bit)";
+	case ELF_EM_VIDEOCORE3:	return "Broadcom VideoCore III";
+	case ELF_EM_LATTICEMICO32:	return "Lattice FPGA";
+	case ELF_EM_SE_C17:	return "Seiko Epson C17";
+	case ELF_EM_TI_C6000:	return "Texas Instruments TMS320C6000";
+	case ELF_EM_TI_C2000:	return "Texas Instruments TMS320C2000";
+	case ELF_EM_TI_C5500:	return "Texas Instruments TMS320C55xx";
+	case ELF_EM_TI_ARP32:	return "Texas Instruments Application Specific RISC (32-bit)";
+	case ELF_EM_TI_PRU:	return "Texas Instruments Programmable Realtime Unit";
+	case ELF_EM_MMDSP_PLUS:	return "STMicroelectronics VLIW DSP (64-bit)";
+	case ELF_EM_CYPRESS_M8C:	return "Cypress M8C";
+	case ELF_EM_R32C:	return "Renesas R32C";
+	case ELF_EM_TRIMEDIA:	return "NXP Semiconductors TriMedia";
+	case ELF_EM_QDSP6:	return "QUALCOMM DSP6";
+	case ELF_EM_8051:	return "Intel 8051";
+	case ELF_EM_STXP7X:	return "STMicroelectronics STxP7x";
+	case ELF_EM_NDS32:	return "Andes Technology RISC";
+	case ELF_EM_ECOG1X:	return "Cyan Technology eCOG1X";
+	case ELF_EM_MAXQ30:	return "Dallas Semiconductor MAXQ30";
+	case ELF_EM_XIMO16:	return "New Japan Radio (NJR) DSP (16-bit)";
+	case ELF_EM_MANIK:	return "M2000 Reconfigurable RISC";
+	case ELF_EM_CRAYNV2:	return "Cray Inc. NV2";
+	case ELF_EM_RX:	return "Renesas RX";
+	case ELF_EM_METAG:	return "Imagination Technologies META";
+	case ELF_EM_MCST_ELBRUS:	return "MCST Elbrus general purpose hardware";
+	case ELF_EM_ECOG16:	return "Cyan Technology eCOG16";
+	case ELF_EM_CR16:	return "National Semiconductor CompactRISC CR16 (16-bit)";
+	case ELF_EM_ETPU:	return "Freescale Extended Time Processing Unit";
+	case ELF_EM_SLE9X:	return "Infineon Technologies SLE9X";
+	case ELF_EM_L10M:	return "Intel L10M";
+	case ELF_EM_K10M:	return "Intel K10M";
+	case ELF_EM_AARCH64:	return "ARM (64-bit)";
+	case ELF_EM_AVR32:	return "Atmel Corporation (32-bit)";
+	case ELF_EM_STM8:	return "STMicroeletronics STM8 (8-bit)";
+	case ELF_EM_TILE64:	return "Tilera TILE64";
+	case ELF_EM_TILEPRO:	return "Tilera TILEPro";
+	case ELF_EM_MICROBLAZE:	return "Xilinx MicroBlaze RISC soft core (32-bit)";
+	case ELF_EM_CUDA:	return "NVIDIA CUDA";
+	case ELF_EM_TILEGX:	return "Tilera TILE-Gx";
+	case ELF_EM_CLOUDSHIELD:	return "CloudShield";
+	case ELF_EM_COREA_1ST:	return "KIPO-KAIST Core-A 1st generation";
+	case ELF_EM_COREA_2ND:	return "KIPO-KAIST Core-A 2nd generation";
+	case ELF_EM_ARC_COMPACT2:	return "Synopsys ARCompact V2";
+	case ELF_EM_OPEN8:	return "Open8 RISC soft core (8-bit)";
+	case ELF_EM_RL78:	return "Renesas RL78";
+	case ELF_EM_VIDEOCORE5:	return "Broadcom VideoCore V";
+	case ELF_EM_78KOR:	return "Renesas 78KOR";
+	case ELF_EM_56800EX:	return "Freescale 56800EX DSC";
+	case ELF_EM_BA1:	return "Beyond BA1";
+	case ELF_EM_BA2:	return "Beyond BA2";
+	case ELF_EM_XCORE:	return "XMOS xCORE";
+	case ELF_EM_MCHP_PIC:	return "Microchip PIC(r) (8-bit)";
+	case ELF_EM_INTEL205:	return "Reserved by Intel";
+	case ELF_EM_INTEL206:	return "Reserved by Intel";
+	case ELF_EM_INTEL207:	return "Reserved by Intel";
+	case ELF_EM_INTEL208:	return "Reserved by Intel";
+	case ELF_EM_INTEL209:	return "Reserved by Intel";
+	case ELF_EM_KM32:	return "KM211 KM32 (32-bit)";
+	case ELF_EM_KMX32:	return "KM211 KMX32 (32-bit)";
+	case ELF_EM_KMX16:	return "KM211 KMX16 (16-bit)";
+	case ELF_EM_KMX8:	return "KM211 KMX8 (8-bit)";
+	case ELF_EM_KVARC:	return "KM211 KVARC";
+	case ELF_EM_CDP:	return "Paneve CDP";
+	case ELF_EM_COGE:	return "Cognitive Smart Memory";
+	case ELF_EM_COOL:	return "Bluechip Systems";
+	case ELF_EM_NORC:	return "Nanoradio Optimized RISC";
+	case ELF_EM_CSR_KALIMBA:	return "CSR Kalimba";
+	case ELF_EM_Z80:	return "Zilog Z80";
+	case ELF_EM_VISIUM:	return "VISIUMcore";
+	case ELF_EM_FT32:	return "FTDI Chip FT32 RISC (32-bit)";
+	case ELF_EM_MOXIE:	return "Moxie";
+	case ELF_EM_AMDGPU:	return "AMD GPU";
+	case ELF_EM_RISCV:	return "RISC-V";
+	default:	return null;
+	}
+}
+
+const(char) *adbg_object_elf_sht_string(int section) {
+	switch (section) {
+	case ELF_SHT_NULL:	return "NULL";
+	case ELF_SHT_PROGBITS:	return "PROGBITS";
+	case ELF_SHT_SYMTAB:	return "SYMTAB";
+	case ELF_SHT_STRTAB:	return "STRTAB";
+	case ELF_SHT_RELA:	return "RELA";
+	case ELF_SHT_HASH:	return "HASH";
+	case ELF_SHT_DYNAMIC:	return "DYNAMIC";
+	case ELF_SHT_NOTE:	return "NOTE";
+	case ELF_SHT_NOBITS:	return "NOBITS";
+	case ELF_SHT_REL:	return "REL";
+	case ELF_SHT_SHLIB:	return "SHLIB";
+	case ELF_SHT_DYNSYM:	return "DYNSYM";
+	case ELF_SHT_INIT_ARRAY:	return "INIT_ARRAY";
+	case ELF_SHT_FINI_ARRAY:	return "FINI_ARRAY";
+	case ELF_SHT_PREINIT_ARRAY:	return "PREINIT_ARRAY";
+	case ELF_SHT_GROUP:	return "GROUP";
+	case ELF_SHT_SYNTAB_SHNDX:	return "SYNTAB_SHNDX";
+	case ELF_SHT_LOOS:	return "LOOS";
+	case ELF_SHT_HIOS:	return "HIOS";
+	case ELF_SHT_LOPROC:	return "LOPROC";
+	case ELF_SHT_HIPROC:	return "HIPROC";
+	case ELF_SHT_LOUSER:	return "LOUSER";
+	case ELF_SHT_HIUSER:	return "HIUSER";
+	default:	return null;
+	}
+}

@@ -104,7 +104,8 @@ enum AdbgDasmPlatform {
 
 /// Assembler syntax.
 enum AdbgDasmSyntax {
-	native,	/// Default option for platform.
+	/// Default option for platform.
+	native,
 	/// Intel syntax
 	/// Year: 1978
 	/// Destination: Left
