@@ -20,6 +20,7 @@ import adbg.error;
 import adbg.utils.bit;
 import adbg.v2.object.formats;
 import adbg.v2.disassembler.core : AdbgDasmPlatform;
+import adbg.v2.object.machines : AdbgMachine;
 
 extern (C):
 
@@ -254,10 +255,9 @@ L_ARG:
 }
 
 //TODO: adbg_object_load_continue if partial was used
-//TODO: Switch to object server's machine definition when done
-//      AdbgMachine adbg_object_machine(adbg_object_t *obj)
+//      set new buffer_size, partial=false
 
-/// Get machine type for disassembler from object.
+/// Get machine type from object.
 ///
 /// Useful for dumping object disassembly.
 /// Params: obj = Object.
@@ -293,4 +293,37 @@ AdbgDasmPlatform adbg_object_platform(adbg_object_t *obj) {
 	}
 	
 	return AdbgDasmPlatform.native;
+}
+
+AdbgMachine adbg_object_machine(adbg_object_t *obj) {
+	if (obj == null)
+		return AdbgMachine.native;
+	
+	switch (obj.type) with (AdbgObject) {
+	case mz:	return AdbgMachine.x86_16;
+	//case pe:	return adbg_object_pe_machine(obj.i.pe.header.Machine);
+	// NOTE: Both fat and header matches the header structure
+	//case macho:	return adbg_object_macho_machine(obj.i.macho.header.cputype);
+	case elf:	return adbg_object_elf_machine(obj.i.elf32.e_header.e_machine);
+	default:	return AdbgMachine.unknown;
+	}
+}
+
+/// Get the name of the loaded object format.
+/// Params: obj = Loaded object reference.
+/// Returns: Object format name.
+const(char)* adbg_object_name(adbg_object_t *obj) {
+	if (obj == null)
+		goto L_UNKNOWN;
+	switch (obj.type) with (AdbgObject) {
+	case mz:	return "Mark Zbikowski object format";
+	case ne:	return "New Executable object format";
+	case le:	return "Linked Executable object format";
+	case pe:	return "Portable Executable object format";
+	case macho:	return "Mach-O object format";
+	case elf:	return "Executable and Linkable Format object format";
+	default:
+	}
+L_UNKNOWN:
+	return "Unknown object format";
 }

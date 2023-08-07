@@ -10,6 +10,7 @@
 module adbg.v2.object.format.elf;
 
 import adbg.v2.object.server : adbg_object_t, AdbgObject;
+import adbg.v2.object.machines : AdbgMachine;
 import adbg.error;
 import adbg.utils.bit : CHAR32;
 
@@ -144,7 +145,7 @@ enum ELF_EM_MMA	= 54;	/// Fujitsu MMA Multimedia Accelerator
 enum ELF_EM_PCP = 55;	/// Siemens PCP
 enum ELF_EM_NCPU	= 56;	/// Sony nCPU embedded RISC
 enum ELF_EM_NDR1	= 57;	/// Denso NDR1
-enum ELF_EM_STARCODE	= 58;	/// Motorola Star*Core
+enum ELF_EM_STARCORE	= 58;	/// Motorola Star*Core
 enum ELF_EM_ME16	= 59;	/// Toyota ME16
 enum ELF_EM_ST100	= 60;	/// STMicroelectronics ST100
 enum ELF_EM_TINYJ	= 61;	/// Advanced Logic Corp. TinyJ
@@ -203,7 +204,7 @@ enum ELF_EM_ALTERA_NIOS2	= 113;	/// Altera Nios II soft-core
 enum ELF_EM_CRX	= 114;	/// national Semiconductor CompactRISC CRX
 enum ELF_EM_XGATE	= 115;	/// Motorola XGATE
 enum ELF_EM_C116	= 116;	/// Infineon C16x/XC16x
-enum ELF_EM_M16C	= 117;	/// Renesas M32C
+enum ELF_EM_M16C	= 117;	/// Renesas M16C
 enum ELF_EM_DSPIC30F	= 118;	/// Microchip Technology DSPIC30F
 enum ELF_EM_CE	= 119;	/// Freescale Communication Engine RISC
 enum ELF_EM_M32C	= 120;	/// Renesas M32C
@@ -593,6 +594,9 @@ int adbg_object_elf_load(adbg_object_t *obj) {
 	obj.type = AdbgObject.elf;
 	obj.i.elf32.e_header = cast(Elf32_Ehdr*)obj.buffer;
 	
+	if (obj.i.elf32.e_header.e_version != ELF_EV_CURRENT)
+		return adbg_oops(AdbgError.assertion);
+	
 	switch (obj.i.elf32.e_header.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:
 		with (obj.i.elf32) {
@@ -622,6 +626,189 @@ int adbg_object_elf_load(adbg_object_t *obj) {
 	}
 	
 	return 0;
+}
+
+AdbgMachine adbg_object_elf_machine(ushort machine) {
+	// NOTE: Intel reserved values are excluded
+	switch (machine) {
+	case ELF_EM_M32:	return AdbgMachine.we32100;
+	case ELF_EM_SPARC:	return AdbgMachine.sparc;
+	case ELF_EM_386:	return AdbgMachine.x86_32;
+	case ELF_EM_68K:	return AdbgMachine.m68k;
+	case ELF_EM_88K:	return AdbgMachine.m88k;
+	case ELF_EM_MCU:	return AdbgMachine.mcu;
+	case ELF_EM_860:	return AdbgMachine.i860;
+	case ELF_EM_MIPS:	return AdbgMachine.mips;
+	case ELF_EM_S370:	return AdbgMachine.s370;
+	case ELF_EM_MIPS_RS3_LE:	return AdbgMachine.mipsle;
+	case ELF_EM_PARISC:	return AdbgMachine.parisc;
+	case ELF_EM_VPP500:	return AdbgMachine.vpp500;
+	case ELF_EM_SPARC32PLUS:	return AdbgMachine.sparc8p;
+	case ELF_EM_960:	return AdbgMachine.i960;
+	case ELF_EM_PPC:	return AdbgMachine.ppc;
+	case ELF_EM_PPC64:	return AdbgMachine.ppc64;
+	case ELF_EM_S390:	return AdbgMachine.s390;
+	case ELF_EM_SPU:	return AdbgMachine.spu;
+	case ELF_EM_V800:	return AdbgMachine.v800;
+	case ELF_EM_FR20:	return AdbgMachine.fr20;
+	case ELF_EM_RH32:	return AdbgMachine.rh32;
+	case ELF_EM_RCE:	return AdbgMachine.rce;
+	case ELF_EM_ARM:	return AdbgMachine.arm;
+	case ELF_EM_ALPHA:	return AdbgMachine.alpha;
+	case ELF_EM_SH:	return AdbgMachine.sh;
+	case ELF_EM_SPARCV9:	return AdbgMachine.sparc9;
+	case ELF_EM_TRICORE:	return AdbgMachine.tricore;
+	case ELF_EM_ARC:	return AdbgMachine.arc;
+	case ELF_EM_H8_300:	return AdbgMachine.h8300;
+	case ELF_EM_H8_300H:	return AdbgMachine.h8300h;
+	case ELF_EM_H8S:	return AdbgMachine.h8s;
+	case ELF_EM_H8_500:	return AdbgMachine.h8500;
+	case ELF_EM_IA_64:	return AdbgMachine.ia64;
+	case ELF_EM_MIPS_X:	return AdbgMachine.mipsx;
+	case ELF_EM_COLDFIRE:	return AdbgMachine.coldfire;
+	case ELF_EM_68HC12:	return AdbgMachine.m68hc12;
+	case ELF_EM_MMA:	return AdbgMachine.mma;
+	case ELF_EM_PCP:	return AdbgMachine.pcp;
+	case ELF_EM_NCPU:	return AdbgMachine.ncpu;
+	case ELF_EM_NDR1:	return AdbgMachine.ndr1;
+	case ELF_EM_STARCORE:	return AdbgMachine.starcore;
+	case ELF_EM_ME16:	return AdbgMachine.me16;
+	case ELF_EM_ST100:	return AdbgMachine.st100;
+	case ELF_EM_TINYJ:	return AdbgMachine.tinyj;
+	case ELF_EM_X86_64:	return AdbgMachine.x86_64;
+	case ELF_EM_PDSP:	return AdbgMachine.sonydsp;
+	case ELF_EM_PDP10:	return AdbgMachine.pdp10;
+	case ELF_EM_PDP11:	return AdbgMachine.pdp11;
+	case ELF_EM_FX66:	return AdbgMachine.fx66;
+	case ELF_EM_ST9PLUS:	return AdbgMachine.st9;
+	case ELF_EM_ST7:	return AdbgMachine.st7;
+	case ELF_EM_68HC16:	return AdbgMachine.m68hc16;
+	case ELF_EM_68HC11:	return AdbgMachine.m68hc11;
+	case ELF_EM_68HC08:	return AdbgMachine.m68hc08;
+	case ELF_EM_68HC05:	return AdbgMachine.m68hc05;
+	case ELF_EM_SVX:	return AdbgMachine.svx;
+	case ELF_EM_ST19:	return AdbgMachine.st19;
+	case ELF_EM_VAX:	return AdbgMachine.vax;
+	case ELF_EM_CRIS:	return AdbgMachine.axis;
+	case ELF_EM_JAVELIN:	return AdbgMachine.sle9x;
+	case ELF_EM_FIREPATH:	return AdbgMachine.firepath;
+	case ELF_EM_ZSP:	return AdbgMachine.zsp;
+	case ELF_EM_MMIX:	return AdbgMachine.mmix;
+	case ELF_EM_HUANY:	return AdbgMachine.harvard;
+	case ELF_EM_PRISM:	return AdbgMachine.prism;
+	case ELF_EM_AVR:	return AdbgMachine.avr;
+	case ELF_EM_FR30:	return AdbgMachine.fr30;
+	case ELF_EM_D10V:	return AdbgMachine.d10v;
+	case ELF_EM_D30V:	return AdbgMachine.d30v;
+	case ELF_EM_V850:	return AdbgMachine.v850;
+	case ELF_EM_M32R:	return AdbgMachine.m32r;
+	case ELF_EM_MN10300:	return AdbgMachine.mn10300;
+	case ELF_EM_MN10200:	return AdbgMachine.mn10200;
+	case ELF_EM_PJ:	return AdbgMachine.pj;
+	case ELF_EM_OPENRISC:	return AdbgMachine.openrisc;
+	case ELF_EM_ARC_COMPACT:	return AdbgMachine.arc;
+	case ELF_EM_XTENSA:	return AdbgMachine.xtensa;
+	case ELF_EM_VIDEOCORE:	return AdbgMachine.videocore;
+	case ELF_EM_TMM_GPP:	return AdbgMachine.tmm;
+	case ELF_EM_NS32K:	return AdbgMachine.ns32k;
+	case ELF_EM_TPC:	return AdbgMachine.tpc;
+	case ELF_EM_SNP1K:	return AdbgMachine.snp1k;
+	case ELF_EM_ST200:	return AdbgMachine.st200;
+	case ELF_EM_IP2K:	return AdbgMachine.ip2k;
+	case ELF_EM_MAX:	return AdbgMachine.max;
+	case ELF_EM_CR:	return AdbgMachine.cr;
+	case ELF_EM_F2MC16:	return AdbgMachine.f2mc16;
+	case ELF_EM_MSP430:	return AdbgMachine.msp430;
+	case ELF_EM_BLACKFIN:	return AdbgMachine.blackfin;
+	case ELF_EM_SE_C33:	return AdbgMachine.s1c33;
+	case ELF_EM_SEP:	return AdbgMachine.sep;
+	case ELF_EM_ARCA:	return AdbgMachine.arca;
+	case ELF_EM_UNICORE:	return AdbgMachine.unicore;
+	case ELF_EM_EXCESS:	return AdbgMachine.excess;
+	case ELF_EM_DXP:	return AdbgMachine.dxp;
+	case ELF_EM_ALTERA_NIOS2:	return AdbgMachine.nios2;
+	case ELF_EM_CRX:	return AdbgMachine.crx;
+	case ELF_EM_XGATE:	return AdbgMachine.xgate;
+	case ELF_EM_C116:	return AdbgMachine.c166;
+	case ELF_EM_M16C:	return AdbgMachine.m16c;
+	case ELF_EM_DSPIC30F:	return AdbgMachine.dspic30f;
+	case ELF_EM_CE:	return AdbgMachine.ce;
+	case ELF_EM_M32C:	return AdbgMachine.m32c;
+	case ELF_EM_TSK3000:	return AdbgMachine.tsk3000;
+	case ELF_EM_RS08:	return AdbgMachine.rs08;
+	case ELF_EM_SHARC:	return AdbgMachine.sharc;
+	case ELF_EM_ECOG2:	return AdbgMachine.ecog2;
+	case ELF_EM_SCORE7:	return AdbgMachine.score7;
+	case ELF_EM_DSP24:	return AdbgMachine.dsp24;
+	case ELF_EM_VIDEOCORE3:	return AdbgMachine.videocore3;
+	case ELF_EM_LATTICEMICO32:	return AdbgMachine.mico32;
+	case ELF_EM_SE_C17:	return AdbgMachine.c17;
+	case ELF_EM_TI_C6000:	return AdbgMachine.tic6000;
+	case ELF_EM_TI_C2000:	return AdbgMachine.tic2000;
+	case ELF_EM_TI_C5500:	return AdbgMachine.tic55xx;
+	case ELF_EM_TI_ARP32:	return AdbgMachine.asrisc;
+	case ELF_EM_TI_PRU:	return AdbgMachine.pru;
+	case ELF_EM_MMDSP_PLUS:	return AdbgMachine.vdsp;
+	case ELF_EM_CYPRESS_M8C:	return AdbgMachine.m8c;
+	case ELF_EM_R32C:	return AdbgMachine.r32c;
+	case ELF_EM_TRIMEDIA:	return AdbgMachine.trimedia;
+	case ELF_EM_QDSP6:	return AdbgMachine.dsp6;
+	case ELF_EM_8051:	return AdbgMachine.i8051;
+	case ELF_EM_STXP7X:	return AdbgMachine.stxp7x;
+	case ELF_EM_NDS32:	return AdbgMachine.nds32;
+	case ELF_EM_ECOG1X:	return AdbgMachine.ecog1x;
+	case ELF_EM_MAXQ30:	return AdbgMachine.maxq30;
+	case ELF_EM_XIMO16:	return AdbgMachine.dsp16;
+	case ELF_EM_MANIK:	return AdbgMachine.m2000;
+	case ELF_EM_CRAYNV2:	return AdbgMachine.nv2;
+	case ELF_EM_RX:	return AdbgMachine.rx;
+	case ELF_EM_METAG:	return AdbgMachine.meta;
+	case ELF_EM_MCST_ELBRUS:	return AdbgMachine.elbrus;
+	case ELF_EM_ECOG16:	return AdbgMachine.ecog16;
+	case ELF_EM_CR16:	return AdbgMachine.cr16;
+	case ELF_EM_ETPU:	return AdbgMachine.etpu;
+	case ELF_EM_SLE9X:	return AdbgMachine.sle9x; // javelin?
+	case ELF_EM_L10M:	return AdbgMachine.l10m;
+	case ELF_EM_K10M:	return AdbgMachine.k10m;
+	case ELF_EM_AARCH64:	return AdbgMachine.aarch64;
+	case ELF_EM_AVR32:	return AdbgMachine.avr32;
+	case ELF_EM_STM8:	return AdbgMachine.stm8;
+	case ELF_EM_TILE64:	return AdbgMachine.tile64;
+	case ELF_EM_TILEPRO:	return AdbgMachine.tilepro;
+	case ELF_EM_MICROBLAZE:	return AdbgMachine.microblaze;
+	case ELF_EM_CUDA:	return AdbgMachine.cuda;
+	case ELF_EM_TILEGX:	return AdbgMachine.tilegx;
+	case ELF_EM_CLOUDSHIELD:	return AdbgMachine.cloudshield;
+	case ELF_EM_COREA_1ST:	return AdbgMachine.corea1;
+	case ELF_EM_COREA_2ND:	return AdbgMachine.corea2;
+	case ELF_EM_ARC_COMPACT2:	return AdbgMachine.arcc2;
+	case ELF_EM_OPEN8:	return AdbgMachine.open8;
+	case ELF_EM_RL78:	return AdbgMachine.rl78;
+	case ELF_EM_VIDEOCORE5:	return AdbgMachine.videocore5;
+	case ELF_EM_78KOR:	return AdbgMachine.r78kor;
+	case ELF_EM_56800EX:	return AdbgMachine.dsc;
+	case ELF_EM_BA1:	return AdbgMachine.ba1;
+	case ELF_EM_BA2:	return AdbgMachine.ba2;
+	case ELF_EM_XCORE:	return AdbgMachine.xcore;
+	case ELF_EM_MCHP_PIC:	return AdbgMachine.picr8;
+	case ELF_EM_KM32:	return AdbgMachine.km32;
+	case ELF_EM_KMX32:	return AdbgMachine.kmx32;
+	case ELF_EM_KMX16:	return AdbgMachine.kmx16;
+	case ELF_EM_KMX8:	return AdbgMachine.kmx8;
+	case ELF_EM_KVARC:	return AdbgMachine.kvarc;
+	case ELF_EM_CDP:	return AdbgMachine.cdp;
+	case ELF_EM_COGE:	return AdbgMachine.csm;
+	case ELF_EM_COOL:	return AdbgMachine.bluechip;
+	case ELF_EM_NORC:	return AdbgMachine.nano;
+	case ELF_EM_CSR_KALIMBA:	return AdbgMachine.csr;
+	case ELF_EM_Z80:	return AdbgMachine.z80;
+	case ELF_EM_VISIUM:	return AdbgMachine.visium;
+	case ELF_EM_FT32:	return AdbgMachine.ftdi;
+	case ELF_EM_MOXIE:	return AdbgMachine.moxie;
+	case ELF_EM_AMDGPU:	return AdbgMachine.amdgpu;
+	case ELF_EM_RISCV:	return AdbgMachine.riscv;
+	default:	return AdbgMachine.unknown;
+	}
 }
 
 const(char) *adbg_object_elf_class_string(ubyte class_) {
@@ -721,7 +908,7 @@ const(char) *adbg_object_elf_em_string(ushort machine) {
 	case ELF_EM_PCP:	return "Siemens PCP";
 	case ELF_EM_NCPU:	return "Sony nCPU embedded RISC";
 	case ELF_EM_NDR1:	return "Denso NDR1";
-	case ELF_EM_STARCODE:	return "Motorola Star*Core";
+	case ELF_EM_STARCORE:	return "Motorola Star*Core";
 	case ELF_EM_ME16:	return "Toyota ME16";
 	case ELF_EM_ST100:	return "STMicroelectronics ST100";
 	case ELF_EM_TINYJ:	return "Advanced Logic Corp. TinyJ";

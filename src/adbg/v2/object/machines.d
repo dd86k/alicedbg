@@ -67,6 +67,8 @@ enum AdbgMachine {
 	/// SPARC Version 9
 	sparc9,
 	
+	/// RISC-V (any)
+	riscv,
 	/// RISC-V RV32
 	riscv32,
 	/// RISC-V RV64
@@ -105,9 +107,9 @@ enum AdbgMachine {
 	alpha64,
 	
 	/// Motorola 68000
-	m68000,
+	m68k,
 	/// Motorola 88000
-	m88000,
+	m88k,
 	/// Motorola 68HC05
 	m68hc05,
 	/// Motorola 68HC08
@@ -124,6 +126,8 @@ enum AdbgMachine {
 	coldfire,
 	/// Motorola Star*Core
 	starcore,
+	/// Motorola XGATE
+	xgate,
 	
 	/// Atmel AVR
 	avr,
@@ -159,12 +163,16 @@ enum AdbgMachine {
 	am33,
 	/// Mitsubishi MN10200
 	mn10200,
+	/// Mitsubishi MN10300
+	mn10300,
 	
 	/// ARC
 	arc,
 	/// XTensa
 	xtensa,
 	
+	/// Renesas M16C
+	m16c,
 	/// Renesas M32C
 	m32c,
 	/// Renesas R32C
@@ -218,9 +226,9 @@ enum AdbgMachine {
 	f2mc16,
 	
 	/// National Semiconductor 32000
-	ns32000,
+	ns32k,
 	/// National Semiconductor CompactRISC
-	crisc,
+	cr,
 	/// National Semiconductor CompactRISC CRX
 	crx,
 	/// National Semiconductor CompactRISC CR16 (16-bit)
@@ -452,8 +460,8 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.x86_32, "x86_32", "x86", "Intel x86" },
 	{ AdbgMachine.x86_64, "x86_64", "amd64", "Intel x86 (64-bit)" },
 	{ AdbgMachine.mcu,    "mcu", null, "Intel MCU" },
-	{ AdbgMachine.i860,   "i860", null, "Intel 80860" },
-	{ AdbgMachine.i960,   "i960", null, "Intel 80960" },
+	{ AdbgMachine.i860,   "i860", null, "Intel i860" },
+	{ AdbgMachine.i960,   "i960", null, "Intel i960" },
 	{ AdbgMachine.i8051,  "8051", null, "Intel 8051" },
 	{ AdbgMachine.l10m,   "l10m", null, "Intel L10M" },
 	{ AdbgMachine.k10m,   "k10m", null, "Intel K10M" },
@@ -462,8 +470,8 @@ immutable adbg_machine_t[] machines = [
 	// Arm
 	{ AdbgMachine.thumb,   "thumb", "t16", "ARM Thumb" },
 	{ AdbgMachine.thumb32, "thumb32", "t32", "ARM Thumb-2 (32-bit)" },
-	{ AdbgMachine.arm,     "arm32", "arm", "ARM (32-bit)" },
-	{ AdbgMachine.aarch64, "arm64", "aarch64", "ARM (64-bit)" },
+	{ AdbgMachine.arm,     "arm", "arm32", "ARM (32-bit)" },
+	{ AdbgMachine.aarch64, "aarch64", "arm64", "ARM (64-bit)" },
 	
 	// IBM
 	{ AdbgMachine.romp,   "romp", null, "IBM ROMP" },
@@ -480,6 +488,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.sparc9,  "sparc9", null, "SPARC Version 9" },
 	
 	// RISC-V
+	{ AdbgMachine.riscv,    "riscv", null, "RISC-V" },
 	{ AdbgMachine.riscv32,  "riscv32", null, "RISC-V (32-bit)" },
 	{ AdbgMachine.riscv64,  "riscv64", null, "RISC-V (64-bit)" },
 	{ AdbgMachine.riscv128, "riscv128", null, "RISC-V (128-bit)" },
@@ -503,16 +512,17 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.alpha64, "alpha64", null, "DEC Alpha (64-bit)" },
 	
 	// Motorola
-	{ AdbgMachine.m68000,   "m68000", null, "Motorola 68000" },
-	{ AdbgMachine.m88000,   "m88000", null, "Motorola 88000" },
+	{ AdbgMachine.m68k,     "m68k", "m68000", "Motorola 68000" },
+	{ AdbgMachine.m88k,     "m88k", "m88000", "Motorola 88000" },
 	{ AdbgMachine.m68hc05,  "m68hc05", null, "Motorola 68HC05" },
 	{ AdbgMachine.m68hc08,  "m68hc08", null, "Motorola 68HC08" },
 	{ AdbgMachine.m68hc11,  "m68hc11", null, "Motorola 68HC11" },
-	{ AdbgMachine.m68hc12,  "m68hc12", "xgate", "Motorola M68HC12" },
+	{ AdbgMachine.m68hc12,  "m68hc12", null, "Motorola M68HC12" },
 	{ AdbgMachine.m68hc16,  "m68hc16", null, "Motorola 68HC16" },
 	{ AdbgMachine.rce,      "rce", null, "Motorola RCE" },
 	{ AdbgMachine.coldfire, "coldfire", null, "Motorola ColdFire" },
 	{ AdbgMachine.starcore, "starcore", null, "Motorola Star*Core" },
+	{ AdbgMachine.xgate,    "xgate", null, "Motorola XGATE" },
 	
 	// Atmel
 	{ AdbgMachine.avr,   "avr", null, "Atmel AVR (8-bit)" },
@@ -535,6 +545,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.m32r,    "m32r", null, "Mitsubishi M32R" },
 	{ AdbgMachine.am33,    "am33", null, "Mitsubishi MN10300 (AM33)" },
 	{ AdbgMachine.mn10200, "mn10200", null, "Mitsubishi MN10200" },
+	{ AdbgMachine.mn10300, "mn10300", null, "Mitsubishi MN10300" },
 	
 	// ARC
 	{ AdbgMachine.arc, "arc", null, "ARC International ARCompact" },
@@ -543,6 +554,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.xtensa, "xtensa", null, "Tensilica Xtensa" },
 	
 	// Renesas
+	{ AdbgMachine.m16c,   "m16c", null, "Renesas M16C" },
 	{ AdbgMachine.m32c,   "m32c", null, "Renesas M32C" },
 	{ AdbgMachine.r32c,   "r32c", null, "Renesas R32C" },
 	{ AdbgMachine.rx,     "rx", null, "Renesas RX" },
@@ -575,10 +587,10 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.f2mc16, "f2mc16", null, "Fujitsu F2MC16" },
 	
 	// National Semiconductor
-	{ AdbgMachine.ns32000, "ns32000", null, "National Semiconductor 32000" },
-	{ AdbgMachine.crisc,   "crisc", null, "National Semiconductor CompactRISC" },
-	{ AdbgMachine.crx,     "crx", null, "National Semiconductor CompactRISC CRX" },
-	{ AdbgMachine.cr16,    "cr16", null, "National Semiconductor CompactRISC CR16 (16-bit)" },
+	{ AdbgMachine.ns32k, "ns32k", null, "National Semiconductor 32000" },
+	{ AdbgMachine.cr,    "cr", null, "National Semiconductor CompactRISC" },
+	{ AdbgMachine.crx,   "crx", null, "National Semiconductor CompactRISC CRX" },
+	{ AdbgMachine.cr16,  "cr16", null, "National Semiconductor CompactRISC CR16 (16-bit)" },
 	
 	// Freescale
 	{ AdbgMachine.ce,   "ce", null, "Freescale Communication Engine RISC" },
