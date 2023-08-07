@@ -114,7 +114,7 @@ void adbg_context_fill(adbg_tracee_t *tracee, adbg_thread_context_t *ctx) {
 		}
 	} else version (Posix) {
 		//TODO: PTRACE_GETFPREGS
-		user_regs u = void;
+		user_regs_struct u = void;
 		if (ptrace(PTRACE_GETREGS, tracee.pid, null, &u) < 0) {
 			ctx.count = 0;
 			return;
@@ -290,7 +290,7 @@ version (Windows) {
 	}
 } else version (linux) {
 	/// Populate exception_t.registers array from user_regs_struct
-	void adbg_context_fill_linux(adbg_thread_context_t *ctx, user_regs *u) {
+	void adbg_context_fill_linux(adbg_thread_context_t *ctx, user_regs_struct *u) {
 		version (X86) {
 			ctx.items[0].u32 = u.eip;
 			ctx.items[1].u32 = u.eflags;

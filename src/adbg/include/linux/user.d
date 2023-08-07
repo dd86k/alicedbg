@@ -14,6 +14,11 @@
 /// License: BSD-3-Clause
 module adbg.include.linux.user;
 
+// NOTE: User and ptrace contexts
+//       user and pt_regs structures may differ.
+//       PTRACE_GETREGS typically requires pt_regs.
+//       The definition can be found in arch/*/include/asm/ptrace.h
+
 version (linux):
 
 import adbg.include.c.config;
@@ -60,29 +65,29 @@ version (X86) {
 		int [56]padding;
 	}
 	/// 
-	struct user_regs {
-		int ebx;	/// 
-		int ecx;	/// 
-		int edx;	/// 
-		int esi;	/// 
-		int edi;	/// 
-		int ebp;	/// 
-		int eax;	/// 
-		int xds;	/// 
-		int xes;	/// 
-		int xfs;	/// 
-		int xgs;	/// 
-		int orig_eax;	/// 
-		int eip;	/// 
-		int xcs;	/// 
-		int eflags;	/// 
-		int esp;	/// 
-		int xss;	/// 
+	struct user_regs_struct {
+		uint ebx;	/// 
+		uint ecx;	/// 
+		uint edx;	/// 
+		uint esi;	/// 
+		uint edi;	/// 
+		uint ebp;	/// 
+		uint eax;	/// 
+		uint xds;	/// 
+		uint xes;	/// 
+		uint xfs;	/// 
+		uint xgs;	/// 
+		uint orig_eax;	/// 
+		uint eip;	/// 
+		uint xcs;	/// 
+		uint eflags;	/// 
+		uint esp;	/// 
+		uint xss;	/// 
 	}
 	/// 
 	struct user {
 		/// 
-		user_regs regs;
+		user_regs_struct regs;
 		/// 
 		int u_fpvalid;
 		/// 
@@ -130,7 +135,7 @@ version (X86) {
 		uint[32] padding;	/// 
 	}
 	/// 
-	struct user_regs {
+	struct user_regs_struct {
 		ulong r15;	/// 
 		ulong r14;	/// 
 		ulong r13;	/// 
@@ -162,7 +167,7 @@ version (X86) {
 	/// 
 	struct user {
 		/// 
-		user_regs regs;
+		user_regs_struct regs;
 		/// 
 		int u_fpvalid;
 		/// 
@@ -202,11 +207,50 @@ version (X86) {
 	// sysdeps/unix/sysv/linux/arm/sys/user.h
 	// sysdeps/unix/sysv/linux/arm/sys/ucontext.h
 	
-	// typedef greg_t gregset_t[NGREG]; // #define NGREG	18
-	struct user_regs {
-		int r0, r1, r2, r3, r4, r5, r6, r7, r8,
-			r9, r10, r11, r12, r13, r14, r15;
+	enum NGREG = 18;
+	
+	
+	/*#define ARM_cpsr	uregs[16]
+	#define ARM_pc		uregs[15]
+	#define ARM_lr		uregs[14]
+	#define ARM_sp		uregs[13]
+	#define ARM_ip		uregs[12]
+	#define ARM_fp		uregs[11]
+	#define ARM_r10		uregs[10]
+	#define ARM_r9		uregs[9]
+	#define ARM_r8		uregs[8]
+	#define ARM_r7		uregs[7]
+	#define ARM_r6		uregs[6]
+	#define ARM_r5		uregs[5]
+	#define ARM_r4		uregs[4]
+	#define ARM_r3		uregs[3]
+	#define ARM_r2		uregs[2]
+	#define ARM_r1		uregs[1]
+	#define ARM_r0		uregs[0]
+	#define ARM_ORIG_r0	uregs[17]*/
+	struct user_regs_struct {
+		c_ulongint r0;
+		c_ulongint r1;
+		c_ulongint r2;
+		c_ulongint r3;
+		c_ulongint r4;
+		c_ulongint r5;
+		c_ulongint r6;
+		c_ulongint r7;
+		c_ulongint r8;
+		c_ulongint r9;
+		c_ulongint r10;
+		c_ulongint fp;
+		c_ulongint ip;
+		c_ulongint sp;
+		c_ulongint lr;
+		c_ulongint pc;
+		c_ulongint orig_r0;
 	}
+	struct user_regs_struct {
+		c_ulongint[NGREG] uregs;	/// 
+	}
+	
 	struct fpregset_t {
 		struct fpregs_t { /*
 			unsigned int sign1:1;
@@ -236,12 +280,8 @@ version (X86) {
 		align(8) c_ulong[128] uc_regspace;
 	}
 	
-	struct user_regs {
-		c_ulongint[18] uregs;	/// 
-	}
-	
 	struct user {
-		user_regs regs;	/// 
+		user_regs_struct regs;	/// 
 		int u_fpvalid;	/// 
 		
 		c_ulongint u_tsize;	/// 
@@ -264,6 +304,8 @@ version (X86) {
 } else version (AArch64) {
 	// sysdeps/unix/sysv/linux/aarch64/sys/user.h
 	// sysdeps/unix/sysv/linux/aarch64/sys/ucontext.h
+	// arch/arm64/include/asm/ptrace.h
+	
 	public import core.sys.posix.ucontext : mcontext_t;
 	public import core.sys.posix.signal : sigset_t;
 	
@@ -272,39 +314,23 @@ version (X86) {
 		ulong[2] parts;
 	}
 	
-	struct user_regs {
-		ulong[31] regs;
-		ulong sp;
-		ulong pc;
-		ulong pstate;
-	}
-	
 	struct user_fpsimd {
 		__uint128_t[32] vregs;
 		uint fpsr;
 		uint fpcr;
 	}
 	
-	/+struct sigstack_t {
-		void *ss_sp;
-		int ss_flags;
-		size_t ss_size;
+	// user_pt_regs
+	struct user_regs_struct {
+		ulong[31] regs;
+		ulong sp;
+		ulong pc;
+		ulong pstate;
 	}
 	
-	// linux:include/uapi/linux/signal.h
-	private enum _NSIG	= 64;
-	private enum _NSIG_BPW	= c_long.sizeof * 8; // __BITS_PER_LONG, c
-	private enum _NSIG_WORDS	= _NSIG / _NSIG_BPW;
-	
-	struct ucontext {
-		c_ulong	uc_flags;
-		ucontext*	uc_link;
-		sigstack_t	uc_stack;
-		sigset_t	uc_sigmask;
-		mcontext_t	uc_mcontext;
-	}+/
+	/// User structure
 	struct user {
-		user_regs regs;	/// General registers
+		user_regs_struct regs;	/// General registers
 		int u_fpvalid;	/// True if math co-processor being used.
 
 		c_ulongint u_tsize;	/// Text segment size (pages).
@@ -320,8 +346,49 @@ version (X86) {
 
 		c_ulong magic;		/// uniquely identify a core file
 		ubyte[32] u_comm;		/// User command that was responsible
-		int[8] u_debugreg;
+		int[8] u_debugreg;	/// No longer used
 		user_fpregs u_fp;	/// Floating point registers
 		user_fpregs *u_fp0;	/// help gdb to find the FP registers.
+	}
+} else version (RISCV64) {
+	/*
+	 * User-mode register state for core dumps, ptrace, sigcontext
+	 *
+	 * This decouples struct pt_regs from the userspace ABI.
+	 * struct user_regs_struct must form a prefix of struct pt_regs.
+	 */
+	struct user_regs_struct {
+		c_ulong pc;
+		c_ulong ra;
+		c_ulong sp;
+		c_ulong gp;
+		c_ulong tp;
+		c_ulong t0;
+		c_ulong t1;
+		c_ulong t2;
+		c_ulong s0;
+		c_ulong s1;
+		c_ulong a0;
+		c_ulong a1;
+		c_ulong a2;
+		c_ulong a3;
+		c_ulong a4;
+		c_ulong a5;
+		c_ulong a6;
+		c_ulong a7;
+		c_ulong s2;
+		c_ulong s3;
+		c_ulong s4;
+		c_ulong s5;
+		c_ulong s6;
+		c_ulong s7;
+		c_ulong s8;
+		c_ulong s9;
+		c_ulong s10;
+		c_ulong s11;
+		c_ulong t3;
+		c_ulong t4;
+		c_ulong t5;
+		c_ulong t6;
 	}
 }
