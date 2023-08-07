@@ -806,14 +806,14 @@ void dump_pe_debug(adbg_object_t *obj) {
 			case CHAR32!"RSDS":
 				PE_DEBUG_DATA_CODEVIEW_PDB70* pdb =
 					cast(PE_DEBUG_DATA_CODEVIEW_PDB70*)rawdata;
-				UID_TEXT uidt = void;
-				uid_str(pdb.PDB_GUID, uidt, UID_GUID);
+				char[UID_TEXTLEN] guid = void;
+				uid_text(pdb.PDB_GUID, guid, UID_GUID);
 				printf(
 				"Type              PDB 7.0 File (RSDS)\n"~
-				"GUID              %s\n"~
+				"GUID              %.*s\n"~
 				"Age               %d\n"~
 				"Path              %s\n",
-				cast(char*)uidt, pdb.Age, pdb.Path.ptr);
+				UID_TEXTLEN, guid.ptr, pdb.Age, pdb.Path.ptr);
 				break;
 			case CHAR32!"NB09":
 				printf("Type              PDB 2.0+ File (CodeView 4.10)\n");
