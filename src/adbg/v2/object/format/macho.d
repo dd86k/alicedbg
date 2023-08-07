@@ -7,14 +7,15 @@ module adbg.v2.object.format.macho;
 
 import adbg.error : adbg_oops, AdbgError;
 import adbg.v2.object.server : adbg_object_t, AdbgObject;
+import adbg.v2.object.machines : AdbgMachine;
 import adbg.utils.bit;
 
-enum MACHO_MAGIC    = 0xFEEDFACEu;    /// Mach-O BE magic
-enum MACHO_MAGIC_64 = 0xFEEDFACFu;    /// Mach-O BE x64 magic
-enum MACHO_CIGAM    = 0xCEFAEDFEu;    /// Mach-O LE magic
-enum MACHO_CIGAM_64 = 0xCFFAEDFEu;    /// Mach-O LE x64 magic
-enum MACHO_FAT_MAGIC   = 0xCAFEBABEu; /// Mach-O FAT BE magic
-enum MACHO_FAT_CIGAM   = 0xBEBAFECAu; /// Mach-O FAT LE magic
+enum MACHO_MAGIC	= 0xFEEDFACEu;    /// Mach-O BE magic
+enum MACHO_MAGIC_64	= 0xFEEDFACFu;    /// Mach-O BE x64 magic
+enum MACHO_CIGAM	= 0xCEFAEDFEu;    /// Mach-O LE magic
+enum MACHO_CIGAM_64	= 0xCFFAEDFEu;    /// Mach-O LE x64 magic
+enum MACHO_FAT_MAGIC	= 0xCAFEBABEu; /// Mach-O FAT BE magic
+enum MACHO_FAT_CIGAM	= 0xBEBAFECAu; /// Mach-O FAT LE magic
 
 struct macho_header {
 	// 64-bit version just adds a reserved field at the end.
@@ -29,7 +30,7 @@ struct macho_header {
 
 struct macho_fatmach_header {
 	uint magic;     /// Magic
-	uint nfat_arch; /// FAT arch version?
+	uint nfat_arch; /// Number of architectures (structs) in binary
 }
 
 struct macho_fat_arch {
@@ -317,21 +318,21 @@ int adbg_object_macho_load(adbg_object_t *obj) {
 			obj.buffer + macho_fatmach_header.sizeof);
 	}
 	
-	if (obj.i.macho.reversed) {
-		if (obj.i.macho.fat) {
-			obj.i.macho.fat_header.nfat_arch = adbg_util_bswap32(obj.i.macho.fat_header.nfat_arch);
-			obj.i.macho.fat_arch.cputype = adbg_util_bswap32(obj.i.macho.fat_arch.cputype);
-			obj.i.macho.fat_arch.subtype = adbg_util_bswap32(obj.i.macho.fat_arch.subtype);
-			obj.i.macho.fat_arch.offset = adbg_util_bswap32(obj.i.macho.fat_arch.offset);
-			obj.i.macho.fat_arch.size = adbg_util_bswap32(obj.i.macho.fat_arch.size);
-			obj.i.macho.fat_arch.alignment = adbg_util_bswap32(obj.i.macho.fat_arch.alignment);
+	if (obj.i.macho.reversed) with (obj.i) {
+		if (macho.fat) {
+			macho.fat_header.nfat_arch = adbg_util_bswap32(macho.fat_header.nfat_arch);
+			macho.fat_arch.cputype = adbg_util_bswap32(macho.fat_arch.cputype);
+			macho.fat_arch.subtype = adbg_util_bswap32(macho.fat_arch.subtype);
+			macho.fat_arch.offset = adbg_util_bswap32(macho.fat_arch.offset);
+			macho.fat_arch.size = adbg_util_bswap32(macho.fat_arch.size);
+			macho.fat_arch.alignment = adbg_util_bswap32(macho.fat_arch.alignment);
 		} else {
-			obj.i.macho.header.cputype = adbg_util_bswap32(obj.i.macho.header.cputype);
-			obj.i.macho.header.subtype = adbg_util_bswap32(obj.i.macho.header.subtype);
-			obj.i.macho.header.filetype = adbg_util_bswap32(obj.i.macho.header.filetype);
-			obj.i.macho.header.ncmds = adbg_util_bswap32(obj.i.macho.header.ncmds);
-			obj.i.macho.header.sizeofcmds = adbg_util_bswap32(obj.i.macho.header.sizeofcmds);
-			obj.i.macho.header.flags = adbg_util_bswap32(obj.i.macho.header.flags);
+			macho.header.cputype = adbg_util_bswap32(macho.header.cputype);
+			macho.header.subtype = adbg_util_bswap32(macho.header.subtype);
+			macho.header.filetype = adbg_util_bswap32(macho.header.filetype);
+			macho.header.ncmds = adbg_util_bswap32(macho.header.ncmds);
+			macho.header.sizeofcmds = adbg_util_bswap32(macho.header.sizeofcmds);
+			macho.header.flags = adbg_util_bswap32(macho.header.flags);
 		}
 	}
 	
@@ -346,25 +347,51 @@ const(char) *adbg_object_macho_magic_string(uint signature) {
 	case MACHO_CIGAM_64:	return "MACHO_CIGAM_64";
 	case MACHO_FAT_MAGIC:	return "MACHO_FAT_MAGIC";
 	case MACHO_FAT_CIGAM:	return "MACHO_FAT_CIGAM";
-	default: return null;
+	default:	return null;
 	}
 }
 
 const(char) *adbg_object_macho_filetype_string(uint type) {
+	// NOTE: FAT files have no filetypes
 	switch (type) {
-	case MACHO_FILETYPE_OBJECT:      return "Object";
-	case MACHO_FILETYPE_EXECUTE:     return "Executable";
-	case MACHO_FILETYPE_FVMLIB:      return "Fixed VM Library";
-	case MACHO_FILETYPE_CORE:        return "Core";
-	case MACHO_FILETYPE_PRELOAD:     return "Preload";
-	case MACHO_FILETYPE_DYLIB:       return "Dynamic library";
-	case MACHO_FILETYPE_DYLINKER:    return "Dynamic linker";
-	case MACHO_FILETYPE_BUNDLE:      return "Bundle";
-	case MACHO_FILETYPE_DYLIB_STUB:  return "Dynamic library stub";
-	case MACHO_FILETYPE_DSYM:        return "Companion file (debug)";
-	case MACHO_FILETYPE_KEXT_BUNDLE: return "Kext bundle";
-	// Fat files have no "filetypes", thus why handled earlier
-	default:             return "?";
+	case MACHO_FILETYPE_OBJECT:	return "Object";
+	case MACHO_FILETYPE_EXECUTE:	return "Executable";
+	case MACHO_FILETYPE_FVMLIB:	return "Fixed VM Library";
+	case MACHO_FILETYPE_CORE:	return "Core";
+	case MACHO_FILETYPE_PRELOAD:	return "Preload";
+	case MACHO_FILETYPE_DYLIB:	return "Dynamic library";
+	case MACHO_FILETYPE_DYLINKER:	return "Dynamic linker";
+	case MACHO_FILETYPE_BUNDLE:	return "Bundle";
+	case MACHO_FILETYPE_DYLIB_STUB:	return "Dynamic library stub";
+	case MACHO_FILETYPE_DSYM:	return "Companion file (debug)";
+	case MACHO_FILETYPE_KEXT_BUNDLE:	return "Kext bundle";
+	default:	return "?";
+	}
+}
+
+AdbgMachine adbg_object_macho_machine(uint type) {
+	switch (type) {
+	case MACHO_CPUTYPE_VAX:	return AdbgMachine.vax;
+	case MACHO_CPUTYPE_ROMP:	return AdbgMachine.romp;
+	case MACHO_CPUTYPE_NS32032:
+	case MACHO_CPUTYPE_NS32332:
+	case MACHO_CPUTYPE_NS32532:	return AdbgMachine.ns32k;
+	case MACHO_CPUTYPE_I386:	return AdbgMachine.x86;
+	case MACHO_CPUTYPE_X86_64:	return AdbgMachine.x86_64;
+	case MACHO_CPUTYPE_MIPS:	return AdbgMachine.mips;
+	case MACHO_CPUTYPE_MC680x0:	return AdbgMachine.m68k;
+	case MACHO_CPUTYPE_HPPA:	return AdbgMachine.parisc;
+	case MACHO_CPUTYPE_ARM:	return AdbgMachine.arm;
+	case MACHO_CPUTYPE_MC88000:	return AdbgMachine.m88k;
+	case MACHO_CPUTYPE_MC98000:	return AdbgMachine.m98k;
+	case MACHO_CPUTYPE_SPARC:	return AdbgMachine.sparc;
+	case MACHO_CPUTYPE_I860_LITTLE:
+	case MACHO_CPUTYPE_I860:	return AdbgMachine.i860;
+	case MACHO_CPUTYPE_RS6000:	return AdbgMachine.rs6000;
+	case MACHO_CPUTYPE_POWERPC64:	return AdbgMachine.ppc64;
+	case MACHO_CPUTYPE_POWERPC:	return AdbgMachine.ppc;
+	case MACHO_CPUTYPE_VEO:	return AdbgMachine.veo;
+	default:	return AdbgMachine.unknown;
 	}
 }
 
@@ -384,7 +411,7 @@ const(char) *adbg_object_macho_cputype_string(uint type) {
 	case MACHO_CPUTYPE_MC88000:	return "MC88000";
 	case MACHO_CPUTYPE_MC98000:	return "MC98000";
 	case MACHO_CPUTYPE_I860, MACHO_CPUTYPE_I860_LITTLE:	return "i860";
-	case MACHO_CPUTYPE_RS6000: return "RS6000";
+	case MACHO_CPUTYPE_RS6000:	return "RS6000";
 	case MACHO_CPUTYPE_POWERPC64:	return "PowerPC64";
 	case MACHO_CPUTYPE_POWERPC:	return "PowerPC";
 	case MACHO_CPUTYPE_VEO:	return "VEO";
@@ -420,13 +447,6 @@ const(char) *adbg_obj_macho_subtype_string(uint type, uint subtype) {
 	case MACHO_CPUTYPE_NS32032:	return "NS32032";
 	case MACHO_CPUTYPE_NS32332:	return "NS32332";
 	case MACHO_CPUTYPE_NS32532:	return "NS32532";
-		/*switch (cpu_subtype) { aaaand don't feel like it
-MMAX_DPC
-SQT
-MMAX_APC_FPU
-MMAX_APC_FPA
-MMAX_XPC
-		}*/
 	case MACHO_CPUTYPE_I386:
 		switch (subtype) {
 		case MACHO_SUBTYPE_i386:	return "i386";

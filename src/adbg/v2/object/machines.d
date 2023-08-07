@@ -16,9 +16,9 @@ enum AdbgMachine {
 	native = unknown,
 	
 	/// Intel x86 16-bit (8086)
-	x86_16,
+	i8086,
 	/// Intel x86 32-bit (i386)
-	x86_32,
+	x86,
 	/// Intel x86 64-bit (amd64)
 	x86_64,
 	/// Intel MCU
@@ -59,6 +59,8 @@ enum AdbgMachine {
 	s390,
 	/// IBM SPU/SPC
 	spu,
+	/// IBM RS/6000
+	rs6000,
 	
 	/// SPARC
 	sparc,
@@ -110,6 +112,8 @@ enum AdbgMachine {
 	m68k,
 	/// Motorola 88000
 	m88k,
+	/// Motorola 98000
+	m98k,
 	/// Motorola 68HC05
 	m68hc05,
 	/// Motorola 68HC08
@@ -436,6 +440,8 @@ enum AdbgMachine {
 	visium,
 	/// FTDI Chip FT32 RISC (32-bit)
 	ftdi,
+	/// VEO
+	veo,
 }
 
 /// Machine name.
@@ -456,8 +462,8 @@ struct adbg_machine_t {
 /// List of known machines.
 immutable adbg_machine_t[] machines = [
 	// Intel
-	{ AdbgMachine.x86_16, "x86_16", "8086", "Intel 8086" },
-	{ AdbgMachine.x86_32, "x86_32", "x86", "Intel x86" },
+	{ AdbgMachine.i8086,  "x86_16", "8086", "Intel 8086" },
+	{ AdbgMachine.x86,    "x86_32", "x86", "Intel x86" },
 	{ AdbgMachine.x86_64, "x86_64", "amd64", "Intel x86 (64-bit)" },
 	{ AdbgMachine.mcu,    "mcu", null, "Intel MCU" },
 	{ AdbgMachine.i860,   "i860", null, "Intel i860" },
@@ -481,6 +487,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.s370,   "s370", null, "IBM System/370" },
 	{ AdbgMachine.s390,   "s390", null, "IBM System/390" },
 	{ AdbgMachine.spu,    "spu", null, "IBM SPU/SPC" },
+	{ AdbgMachine.rs6000, "rs6000", null, "IBM RS/6000" },
 	
 	// Sun Microsystems
 	{ AdbgMachine.sparc,   "sparc", null, "SPARC" },
@@ -512,8 +519,9 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.alpha64, "alpha64", null, "DEC Alpha (64-bit)" },
 	
 	// Motorola
-	{ AdbgMachine.m68k,     "m68k", "m68000", "Motorola 68000" },
-	{ AdbgMachine.m88k,     "m88k", "m88000", "Motorola 88000" },
+	{ AdbgMachine.m68k,     "m68k", "mc68000", "Motorola 68000" },
+	{ AdbgMachine.m88k,     "m88k", "mc88000", "Motorola 88000" },
+	{ AdbgMachine.m98k,     "m98k", "mc98000", "Motorola 98000" },
 	{ AdbgMachine.m68hc05,  "m68hc05", null, "Motorola 68HC05" },
 	{ AdbgMachine.m68hc08,  "m68hc08", null, "Motorola 68HC08" },
 	{ AdbgMachine.m68hc11,  "m68hc11", null, "Motorola 68HC11" },
@@ -709,6 +717,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.z80,	"z80", null, "Zilog Z80" },
 	{ AdbgMachine.visium,	"visium", null, "VISIUMcore" },
 	{ AdbgMachine.ftdi,	"ftdi", null, "FTDI Chip FT32 RISC (32-bit)" },
+	{ AdbgMachine.veo,	"veo", null, "VEO" },
 ];
 
 /// Get the number of registered machine platforms.

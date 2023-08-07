@@ -300,10 +300,10 @@ AdbgMachine adbg_object_machine(adbg_object_t *obj) {
 		return AdbgMachine.native;
 	
 	switch (obj.type) with (AdbgObject) {
-	case mz:	return AdbgMachine.x86_16;
+	case mz:	return AdbgMachine.i8086;
 	//case pe:	return adbg_object_pe_machine(obj.i.pe.header.Machine);
 	// NOTE: Both fat and header matches the header structure
-	//case macho:	return adbg_object_macho_machine(obj.i.macho.header.cputype);
+	case macho:	return adbg_object_macho_machine(obj.i.macho.header.cputype);
 	case elf:	return adbg_object_elf_machine(obj.i.elf32.e_header.e_machine);
 	default:	return AdbgMachine.unknown;
 	}
@@ -316,14 +316,14 @@ const(char)* adbg_object_name(adbg_object_t *obj) {
 	if (obj == null)
 		goto L_UNKNOWN;
 	switch (obj.type) with (AdbgObject) {
-	case mz:	return "Mark Zbikowski object format";
-	case ne:	return "New Executable object format";
-	case le:	return "Linked Executable object format";
-	case pe:	return "Portable Executable object format";
-	case macho:	return "Mach-O object format";
-	case elf:	return "Executable and Linkable Format object format";
+	case mz:	return "Mark Zbikowski";
+	case ne:	return "New Executable";
+	case le:	return "Linked Executable";
+	case pe:	return "Portable Executable";
+	case macho:	return "Mach-O";
+	case elf:	return "Executable and Linkable Format";
 	default:
 	}
 L_UNKNOWN:
-	return "Unknown object format";
+	return "Unknown";
 }
