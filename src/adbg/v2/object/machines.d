@@ -772,5 +772,5 @@ immutable(adbg_machine_t)* adbg_object_machine_select(const(char) *alias_) {
 }
 @system unittest {
 	assert(adbg_object_machine_select("I do not exist") == null);
-	assert(adbg_object_machine_select("x86").machine == AdbgMachine.x86_32);
+	assert(adbg_object_machine_select("x86").machine == AdbgMachine.x86);
 }
