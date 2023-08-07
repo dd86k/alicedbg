@@ -17,6 +17,7 @@ module adbg.v2.object.format.pe;
 import core.stdc.inttypes;
 import adbg.error;
 import adbg.v2.object.server : AdbgObject, adbg_object_t;
+import adbg.v2.object.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit : CHAR32;
 
@@ -587,6 +588,41 @@ int adbg_object_pe_load(adbg_object_t *obj) {
 	}
 	
 	return 0;
+}
+
+AdbgMachine adbg_object_pe_machine(ushort machine) {
+	switch (machine) {
+	case PE_MACHINE_I386:	return AdbgMachine.x86;
+	case PE_MACHINE_AMD64:	return AdbgMachine.amd64;
+	case PE_MACHINE_ALPHAOLD, PE_MACHINE_ALPHA:	return AdbgMachine.alpha;
+	case PE_MACHINE_ALPHA64:	return AdbgMachine.alpha64;
+	case PE_MACHINE_AM33:	return AdbgMachine.am33;
+	case PE_MACHINE_ARM:
+	case PE_MACHINE_ARMNT:	return AdbgMachine.arm;
+	case PE_MACHINE_ARM64:	return AdbgMachine.aarch64;
+	case PE_MACHINE_EBC:	return AdbgMachine.ebc;
+	case PE_MACHINE_IA64:	return AdbgMachine.ia64;
+	case PE_MACHINE_M32R:	return AdbgMachine.m32r;
+	case PE_MACHINE_MIPS16:	return AdbgMachine.mips16;
+	case PE_MACHINE_MIPSFPU:	return AdbgMachine.mipsfpu;
+	case PE_MACHINE_MIPSFPU16:	return AdbgMachine.mips16fpu;
+	case PE_MACHINE_POWERPC:	return AdbgMachine.ppc;
+	case PE_MACHINE_POWERPCFP:	return AdbgMachine.ppcfpu;
+	case PE_MACHINE_R3000:	return AdbgMachine.mips;
+	case PE_MACHINE_R4000:	return AdbgMachine.mipsii;
+	case PE_MACHINE_R10000:	return AdbgMachine.mipsiv;
+	case PE_MACHINE_RISCV32:	return AdbgMachine.riscv32;
+	case PE_MACHINE_RISCV64:	return AdbgMachine.riscv64;
+	case PE_MACHINE_RISCV128:	return AdbgMachine.riscv128;
+	case PE_MACHINE_SH3:	return AdbgMachine.sh3;
+	case PE_MACHINE_SH3DSP:	return AdbgMachine.sh3dsp;
+	case PE_MACHINE_SH4:	return AdbgMachine.sh4;
+	case PE_MACHINE_SH5:	return AdbgMachine.sh5;
+	case PE_MACHINE_THUMB:	return AdbgMachine.thumb;
+	case PE_MACHINE_WCEMIPSV2:	return AdbgMachine.mipswcele;
+	case PE_MACHINE_CLR:	return AdbgMachine.clr;
+	default:	return AdbgMachine.unknown;
+	}
 }
 
 const(char) *adbg_object_pe_machine_string(ushort machine) {

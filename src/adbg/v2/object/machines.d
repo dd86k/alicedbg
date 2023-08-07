@@ -20,7 +20,7 @@ enum AdbgMachine {
 	/// Intel x86 32-bit (i386)
 	x86,
 	/// Intel x86 64-bit (amd64)
-	x86_64,
+	amd64,
 	/// Intel MCU
 	mcu,
 	/// Intel i860
@@ -80,16 +80,18 @@ enum AdbgMachine {
 	
 	/// Stanford MIPS-X
 	mipsx,
-	/// MIPS I (RS3000)
+	/// MIPS I (R3000)
 	mips,
-	/// MIPS I (RS3000) with FPU
+	/// MIPS I (R3000) with FPU
 	mipsfpu,
-	/// MIPS I (RS3000) Little-Endian
+	/// MIPS I (R3000) Little-Endian
 	mipsle,
 	/// MIPS16
 	mips16,
 	/// MIPS16 with FPU
 	mips16fpu,
+	/// MIPS II (R4000)
+	mipsii,
 	/// MIPS III (R4000)
 	mipsiii,
 	/// MIPS IV (R10000)
@@ -462,9 +464,9 @@ struct adbg_machine_t {
 /// List of known machines.
 immutable adbg_machine_t[] machines = [
 	// Intel
-	{ AdbgMachine.i8086,  "x86_16", "8086", "Intel 8086" },
-	{ AdbgMachine.x86,    "x86_32", "x86", "Intel x86" },
-	{ AdbgMachine.x86_64, "x86_64", "amd64", "Intel x86 (64-bit)" },
+	{ AdbgMachine.i8086,  "8086", "x86_16", "Intel 8086" },
+	{ AdbgMachine.x86,    "x86", "x86_32", "Intel x86" },
+	{ AdbgMachine.amd64, "amd64", "x86_64", "Intel x86 (64-bit)" },
 	{ AdbgMachine.mcu,    "mcu", null, "Intel MCU" },
 	{ AdbgMachine.i860,   "i860", null, "Intel i860" },
 	{ AdbgMachine.i960,   "i960", null, "Intel i960" },
@@ -507,6 +509,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.mipsle,    "mipsle", null, "MIPS I (RS3000) Little-Endian" },
 	{ AdbgMachine.mips16,    "mips16", null, "MIPS16" },
 	{ AdbgMachine.mips16fpu, "mips16fpu", null, "MIPS16 with FPU" },
+	{ AdbgMachine.mipsii,    "mipsii", null, "MIPS II (R3000)" },
 	{ AdbgMachine.mipsiii,   "mipsiii", null, "MIPS III (R4000)" },
 	{ AdbgMachine.mipsiv,    "mipsiv", null, "MIPS IV (R10000)" },
 	{ AdbgMachine.mipswcele, "mipswcele", null, "MIPS little-endian WCE v2" },

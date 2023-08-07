@@ -377,7 +377,7 @@ AdbgMachine adbg_object_macho_machine(uint type) {
 	case MACHO_CPUTYPE_NS32332:
 	case MACHO_CPUTYPE_NS32532:	return AdbgMachine.ns32k;
 	case MACHO_CPUTYPE_I386:	return AdbgMachine.x86;
-	case MACHO_CPUTYPE_X86_64:	return AdbgMachine.x86_64;
+	case MACHO_CPUTYPE_X86_64:	return AdbgMachine.amd64;
 	case MACHO_CPUTYPE_MIPS:	return AdbgMachine.mips;
 	case MACHO_CPUTYPE_MC680x0:	return AdbgMachine.m68k;
 	case MACHO_CPUTYPE_HPPA:	return AdbgMachine.parisc;

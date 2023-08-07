@@ -633,7 +633,7 @@ AdbgMachine adbg_object_elf_machine(ushort machine) {
 	switch (machine) {
 	case ELF_EM_M32:	return AdbgMachine.we32100;
 	case ELF_EM_SPARC:	return AdbgMachine.sparc;
-	case ELF_EM_386:	return AdbgMachine.x86_32;
+	case ELF_EM_386:	return AdbgMachine.x86;
 	case ELF_EM_68K:	return AdbgMachine.m68k;
 	case ELF_EM_88K:	return AdbgMachine.m88k;
 	case ELF_EM_MCU:	return AdbgMachine.mcu;
@@ -675,7 +675,7 @@ AdbgMachine adbg_object_elf_machine(ushort machine) {
 	case ELF_EM_ME16:	return AdbgMachine.me16;
 	case ELF_EM_ST100:	return AdbgMachine.st100;
 	case ELF_EM_TINYJ:	return AdbgMachine.tinyj;
-	case ELF_EM_X86_64:	return AdbgMachine.x86_64;
+	case ELF_EM_X86_64:	return AdbgMachine.amd64;
 	case ELF_EM_PDSP:	return AdbgMachine.sonydsp;
 	case ELF_EM_PDP10:	return AdbgMachine.pdp10;
 	case ELF_EM_PDP11:	return AdbgMachine.pdp11;

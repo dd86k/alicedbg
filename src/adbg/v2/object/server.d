@@ -301,7 +301,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *obj) {
 	
 	switch (obj.type) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
-	//case pe:	return adbg_object_pe_machine(obj.i.pe.header.Machine);
+	case pe:	return adbg_object_pe_machine(obj.i.pe.header.Machine);
 	// NOTE: Both fat and header matches the header structure
 	case macho:	return adbg_object_macho_machine(obj.i.macho.header.cputype);
 	case elf:	return adbg_object_elf_machine(obj.i.elf32.e_header.e_machine);
