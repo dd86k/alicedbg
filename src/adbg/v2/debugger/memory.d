@@ -40,7 +40,7 @@ extern (C):
 /// Returns: Error code.
 int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
 	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
-	//      Linux 6.2 (include/uapi/linux/ptrace.h) still has no PTRACE_IO
+	//      Linux 6.2 (include/uapi/linux/ptrace.h) still has no PT_IO
 	version (Windows) {
 		if (ReadProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
 			return adbg_oops(AdbgError.os);
@@ -53,7 +53,7 @@ int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) 
 		
 		for (; r > 0; --r, ++dest, addr += c_long.sizeof) {
 			errno = 0; // As manpage wants
-			*dest = ptrace(PTRACE_PEEKDATA, tracee.pid, addr, null);
+			*dest = ptrace(PT_PEEKDATA, tracee.pid, addr, null);
 			if (errno)
 				return adbg_oops(AdbgError.os);
 		}
@@ -61,7 +61,7 @@ int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) 
 		r = size % c_long.sizeof;
 		if (r) {
 			errno = 0;
-			c_long l = ptrace(PTRACE_PEEKDATA, tracee.pid, addr, null);
+			c_long l = ptrace(PT_PEEKDATA, tracee.pid, addr, null);
 			if (errno)
 				return adbg_oops(AdbgError.os);
 			ubyte* dest8 = cast(ubyte*)dest, src8 = cast(ubyte*)&l;
@@ -94,14 +94,14 @@ int adbg_memory_write(adbg_tracee_t *tracee, size_t addr, void *data, uint size)
 		int j = size / c_long.sizeof;	/// number of "blocks" to process
 		
 		for (; i < j; ++i, ++user) {
-			if (ptrace(PTRACE_POKEDATA, tracee.pid,
+			if (ptrace(PT_POKEDATA, tracee.pid,
 				addr + (i * c_long.sizeof), user) < 0)
 				return adbg_oops(AdbgError.os);
 		}
 		
 		j = size % c_long.sizeof;
 		if (j) {
-			if (ptrace(PTRACE_POKEDATA, tracee.pid,
+			if (ptrace(PT_POKEDATA, tracee.pid,
 				addr + (i * c_long.sizeof), user) < 0)
 				return adbg_oops(AdbgError.os);
 		}

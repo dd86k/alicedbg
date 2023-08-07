@@ -214,7 +214,7 @@ L_OPTION:
 /// This does not start the process, nor the debugger.
 /// On Posix systems, stat(2) is used to check if the file exists.
 /// Windows: CreateProcessA (DEBUG_PROCESS).
-/// Posix: stat(2), fork(2) or clone(2), ptrace(2) (PTRACE_TRACEME), and execve(2).
+/// Posix: stat(2), fork(2) or clone(2), ptrace(2) (PT_TRACEME), and execve(2).
 /// Params:
 /// 	tracee = Reference to tracee object.
 /// 	path = Command, path to executable.
@@ -373,7 +373,7 @@ int adbg_spawn2(adbg_tracee_t *tracee, const(char) *path, adbg_options_spawn_t *
 				}
 				
 				// Trace me
-				if (ptrace(PTRACE_TRACEME, 0, 0, 0))
+				if (ptrace(PT_TRACEME, 0, 0, 0))
 					return adbg_error_system;
 				version (CRuntime_Musl) {
 					if (raise(SIGTRAP))
@@ -397,7 +397,7 @@ int adbg_spawn2(adbg_tracee_t *tracee, const(char) *path, adbg_options_spawn_t *
 version (USE_CLONE)
 private int adbg_linux_child(void* arg) {
 	__adbg_child_t *c = cast(__adbg_child_t*)arg;
-	if (ptrace(PTRACE_TRACEME, 0, 0, 0))
+	if (ptrace(PT_TRACEME, 0, 0, 0))
 		return adbg_oops(AdbgError.os);
 	execve(c.argv[0], c.argv, c.envp);
 	return adbg_oops(AdbgError.os);
@@ -508,12 +508,12 @@ L_OPTION:
 			} while (Thread32Next(h_thread_snapshot, &te32));*/
 		}
 	} else version (Posix) {
-		if (ptrace(continue_ ? PTRACE_SEIZE : PTRACE_ATTACH, pid, null, null) < 0)
+		if (ptrace(continue_ ? PT_SEIZE : PT_ATTACH, pid, null, null) < 0)
 			return adbg_oops(AdbgError.os);
 		
 		tracee.pid = cast(pid_t)pid;
 		
-		if (exitkill && ptrace(PTRACE_SETOPTIONS, pid, null, PTRACE_O_EXITKILL) < 0)
+		if (exitkill && ptrace(PT_SETOPTIONS, pid, null, PT_O_EXITKILL) < 0)
 			return adbg_oops(AdbgError.os);
 	}
 	
@@ -532,7 +532,7 @@ int adbg_detach(adbg_tracee_t *tracee) {
 		if (DebugActiveProcessStop(tracee.pid) == FALSE)
 			return adbg_oops(AdbgError.os);
 	} else version (Posix) {
-		if (ptrace(PTRACE_DETACH, tracee.pid, null, null) == -1)
+		if (ptrace(PT_DETACH, tracee.pid, null, null) == -1)
 			return adbg_oops(AdbgError.os);
 	}
 	tracee.attached = false;
@@ -592,7 +592,7 @@ void adbg_break() {
 	version (Windows) {
 		DebugBreak();
 	} else version (Posix) {
-		ptrace(PTRACE_TRACEME, 0, null, null);
+		ptrace(PT_TRACEME, 0, null, null);
 	} else static assert(0, "adbg_debug_me: Implement me");
 }
 
@@ -742,7 +742,7 @@ L_DEBUG_LOOP:
 		// - gdbserver and lldb never attempt to do such thing anyway
 		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 			siginfo_t sig = void;
-			if (ptrace(PTRACE_GETSIGINFO, tracee.pid, null, &sig) < 0) {
+			if (ptrace(PT_GETSIGINFO, tracee.pid, null, &sig) < 0) {
 				exception.fault.raw = null;
 				break;
 			}
@@ -766,13 +766,13 @@ L_DEBUG_LOOP:
 				return adbg_oops(AdbgError.os);
 			return 0;
 		case step:
-			if (ptrace(PTRACE_SINGLESTEP, tracee.pid, null, null) == -1) {
+			if (ptrace(PT_SINGLESTEP, tracee.pid, null, null) == -1) {
 				tracee.status = AdbgStatus.idle;
 				return adbg_oops(AdbgError.os);
 			}
 			goto L_DEBUG_LOOP;
 		case proceed:
-			if (ptrace(PTRACE_CONT, tracee.pid, null, null) == -1) {
+			if (ptrace(PT_CONT, tracee.pid, null, null) == -1) {
 				tracee.status = AdbgStatus.idle;
 				return adbg_oops(AdbgError.os);
 			}

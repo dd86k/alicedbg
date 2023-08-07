@@ -116,7 +116,7 @@ void adbg_ctx_get(thread_context_t *ctx) {
 		}
 	} else version (Posix) {
 		user_regs_struct u = void;
-		if (ptrace(PTRACE_GETREGS, g_debuggee.pid, null, &u) < 0) {
+		if (ptrace(PT_GETREGS, g_debuggee.pid, null, &u) < 0) {
 			ctx.count = 0;
 			return;
 		}

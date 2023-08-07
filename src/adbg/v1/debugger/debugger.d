@@ -170,7 +170,7 @@ private __gshared int g_options;	/// Debugger options
  * This does not start the process, nor the debugger.
  * On Posix systems, stat(2) is used to check if the file exists.
  * Windows: CreateProcessA (DEBUG_PROCESS).
- * Posix: stat(2), fork(2) or clone(2), ptrace(2) (PTRACE_TRACEME), and execve(2).
+ * Posix: stat(2), fork(2) or clone(2), ptrace(2) (PT_TRACEME), and execve(2).
  * Params:
  * 	 path = Command, path to executable
  * 	 argv = Argument vector, null-terminated, can be null
@@ -310,7 +310,7 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 				}
 				
 				// Trace me
-				if (ptrace(PTRACE_TRACEME, 0, 0, 0))
+				if (ptrace(PT_TRACEME, 0, 0, 0))
 					return adbg_error_system;
 				version (CRuntime_Musl) {
 					if (raise(SIGTRAP))
@@ -335,7 +335,7 @@ version (Posix)
 version (USE_CLONE)
 private int __adbg_chld(void* arg) {
 	__adbg_child_t *c = cast(__adbg_child_t*)arg;
-	if (ptrace(PTRACE_TRACEME, 0, 0, 0))
+	if (ptrace(PT_TRACEME, 0, 0, 0))
 		return adbg_oops(AdbgError.os);
 	execve(c.argv[0], c.argv, c.envp);
 	return adbg_oops(AdbgError.os);
@@ -351,7 +351,7 @@ enum {
 /**
  * Attach the debugger to a process ID.
  * Windows: Uses DebugActiveProcess
- * Posix: Uses ptrace(PTRACE_SEIZE)
+ * Posix: Uses ptrace(PT_SEIZE)
  * Params:
  * 	pid = Process ID
  * 	flags = Reserved
@@ -421,13 +421,13 @@ int adbg_attach_(int pid, int flags = 0) {
 			} while (Thread32Next(h_thread_snapshot, &te32));*/
 		}
 	} else version (Posix) {
-		if (ptrace(stop ? PTRACE_ATTACH : PTRACE_SEIZE, pid, null, null) == -1)
+		if (ptrace(stop ? PT_ATTACH : PT_SEIZE, pid, null, null) == -1)
 			return adbg_oops(AdbgError.os);
 		
 		g_debuggee.pid = cast(pid_t)pid;
 		
 		if (exitkill)
-			if (ptrace(PTRACE_SETOPTIONS, pid, null, PTRACE_O_EXITKILL) == -1)
+			if (ptrace(PT_SETOPTIONS, pid, null, PT_O_EXITKILL) == -1)
 				return adbg_oops(AdbgError.os);
 	}
 	
@@ -442,7 +442,7 @@ int adbg_detach_() {
 		if (DebugActiveProcessStop(g_debuggee.pid) == FALSE)
 			return adbg_oops(AdbgError.os);
 	} else version (Posix) {
-		if (ptrace(PTRACE_DETACH, g_debuggee.pid, null, null) == -1)
+		if (ptrace(PT_DETACH, g_debuggee.pid, null, null) == -1)
 			return adbg_oops(AdbgError.os);
 	}
 	return 0;
@@ -455,7 +455,7 @@ void adbg_break_() {
 	version (Windows) {
 		DebugBreak();
 	} else version (Posix) {
-		ptrace(PTRACE_TRACEME, 0, null, null);
+		ptrace(PT_TRACEME, 0, null, null);
 	}
 }
 
@@ -604,7 +604,7 @@ L_DEBUG_LOOP:
 		// - gdbserver and lldb never attempt to do such thing anyway
 		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 			siginfo_t sig = void;
-			if (ptrace(PTRACE_GETSIGINFO, g_debuggee.pid, null, &sig) >= 0) {
+			if (ptrace(PT_GETSIGINFO, g_debuggee.pid, null, &sig) >= 0) {
 				version (CRuntime_Glibc)
 					e.fault.raw = sig._sifields._sigfault.si_addr;
 				else version (CRuntime_Musl)
@@ -625,18 +625,18 @@ L_DEBUG_LOOP:
 		switch (userfunc(&e)) {
 		case exit:
 			g_debuggee.status = AdbgStatus.idle; // in either case
-			// Because PTRACE_KILL is deprecated
+			// Because PT_KILL is deprecated
 			if (kill(g_debuggee.pid, SIGKILL) == -1)
 				return adbg_oops(AdbgError.os);
 			return 0;
 		case step:
-			if (ptrace(PTRACE_SINGLESTEP, g_debuggee.pid, null, null) == -1) {
+			if (ptrace(PT_SINGLESTEP, g_debuggee.pid, null, null) == -1) {
 				g_debuggee.status = AdbgStatus.idle;
 				return adbg_oops(AdbgError.os);
 			}
 			goto L_DEBUG_LOOP;
 		case proceed:
-			if (ptrace(PTRACE_CONT, g_debuggee.pid, null, null) == -1) {
+			if (ptrace(PT_CONT, g_debuggee.pid, null, null) == -1) {
 				g_debuggee.status = AdbgStatus.idle;
 				return adbg_oops(AdbgError.os);
 			}
@@ -689,11 +689,11 @@ int adbg_mm_read(size_t addr, void *data, uint size) {
 		int r = size / c_long.sizeof;	/// number of "long"s to read
 		
 		for (; r > 0; --r, ++d, addr += c_long.sizeof)
-			*d = ptrace(PTRACE_PEEKDATA, g_debuggee.pid, addr, null);
+			*d = ptrace(PT_PEEKDATA, g_debuggee.pid, addr, null);
 		
 		r = size % c_long.sizeof;
 		if (r) {
-			c_long c = ptrace(PTRACE_PEEKDATA, g_debuggee.pid, addr, null);
+			c_long c = ptrace(PT_PEEKDATA, g_debuggee.pid, addr, null);
 			ubyte* dest8 = cast(ubyte*)d, src8 = cast(ubyte*)&c;
 			for (; r; --r) *dest8++ = *src8++; // inlined memcpy
 		}
@@ -717,12 +717,12 @@ int adbg_mm_write(size_t addr, void *data, uint size) {
 		int j = size / c_long.sizeof;	/// number of "blocks" to process
 		
 		for (; i < j; ++i, ++user)
-			ptrace(PTRACE_POKEDATA, g_debuggee.pid,
+			ptrace(PT_POKEDATA, g_debuggee.pid,
 				addr + (i * c_long.sizeof), user);
 		
 		j = size % c_long.sizeof;
 		if (j)
-			ptrace(PTRACE_POKEDATA, g_debuggee.pid,
+			ptrace(PT_POKEDATA, g_debuggee.pid,
 				addr + (i * c_long.sizeof), user);
 	}
 	return 0;

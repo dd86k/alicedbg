@@ -115,7 +115,7 @@ void adbg_context_fill(adbg_tracee_t *tracee, adbg_thread_context_t *ctx) {
 	} else version (Posix) {
 		//TODO: PTRACE_GETFPREGS
 		user_regs_struct u = void;
-		if (ptrace(PTRACE_GETREGS, tracee.pid, null, &u) < 0) {
+		if (ptrace(PT_GETREGS, tracee.pid, null, &u) < 0) {
 			ctx.count = 0;
 			return;
 		}
