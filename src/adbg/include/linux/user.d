@@ -187,7 +187,7 @@ version (X86) {
 		/// 
 		int reserved;
 		union {
-			user_regs *u_ar0;	/// 
+			user_regs_struct *u_ar0;	/// 
 			ulong __u_ar0_word;	/// 
 		}
 		union {
