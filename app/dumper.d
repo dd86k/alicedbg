@@ -240,7 +240,7 @@ void dprint_entry32(const(char) *section, uint u1, uint u2) {
 
 // name + rvalue (stops when name is null)
 void dprint_flags16(const(char) *section, ushort flags, ...) {
-	printf(FORMAT_FIELD~"0x%04x (", section, flags);
+	printf(FORMAT_FIELD~"0x%04x\t(", section, flags);
 	
 	va_list args = void;
 	va_start(args, flags);
@@ -259,7 +259,7 @@ L_START:
 }
 // name + rvalue (stops when name is null)
 void dprint_flags32(const(char) *section, uint flags, ...) {
-	printf(FORMAT_FIELD~"0x%08x (", section, flags);
+	printf(FORMAT_FIELD~"0x%08x\t(", section, flags);
 	
 	va_list args = void;
 	va_start(args, flags);
@@ -279,7 +279,7 @@ L_START:
 // name + rvalue (stops when name is null)
 //TODO: Could make it a template?
 void dprint_flags64(const(char) *section, ulong flags, ...) {
-	printf(FORMAT_FIELD~"0x%016llx (", section, flags);
+	printf(FORMAT_FIELD~"0x%016llx\t(", section, flags);
 	
 	va_list args = void;
 	va_start(args, flags);
