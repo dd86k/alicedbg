@@ -7,12 +7,9 @@ import core.stdc.config : c_long;
 import adbg.error;
 
 version (Windows) {
-	pragma(lib, "Psapi.lib"); // for core.sys.windows.psapi
-	
 	import core.sys.windows.windows;
 	import adbg.include.windows.wow64;
-	import core.sys.windows.psapi : GetProcessImageFileNameA,
-		GetMappedFileNameA, GetModuleBaseNameA;
+	import adbg.include.windows.psapi_dyn;
 } else version (Posix) {
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
@@ -165,10 +162,8 @@ enum AdbgMapOpt {
 /// Returns: Error code.
 int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mcount, ...) {
 	version (Windows) {
-		import core.sys.windows.psapi :
-			GetModuleInformation,
-			EnumProcessModules,
-			MODULEINFO;
+		if (__dynlib_psapi_load())
+			return adbg_oops(AdbgError.libLoader);
 		
 		if (tracee.pid == 0) {
 			return adbg_oops(AdbgError.notAttached);

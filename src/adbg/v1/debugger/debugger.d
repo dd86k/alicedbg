@@ -22,12 +22,9 @@ import adbg.utils.string : adbg_util_argv_flatten;
 public import adbg.v1.debugger.exception;
 
 version (Windows) {
-	pragma(lib, "Psapi.lib"); // for core.sys.windows.psapi
-	
 	import core.sys.windows.windows;
 	import adbg.include.windows.wow64;
-	import core.sys.windows.psapi : GetProcessImageFileNameA,
-		GetMappedFileNameA, GetModuleBaseNameA;
+	import adbg.include.windows.psapi_dyn;
 } else version (Posix) {
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
@@ -763,10 +760,8 @@ struct adbg_mm_map {
 /// Obtain the memory maps for the current process
 int adbg_mm_maps(adbg_mm_map **mmaps, size_t *mcount, ...) {
 	version (Windows) {
-		import core.sys.windows.psapi :
-			GetModuleInformation,
-			EnumProcessModules,
-			MODULEINFO;
+		if (__dynlib_psapi_load())
+			return adbg_oops(AdbgError.libLoader);
 		
 		if (g_debuggee.pid == 0) {
 			return adbg_oops(AdbgError.notAttached);

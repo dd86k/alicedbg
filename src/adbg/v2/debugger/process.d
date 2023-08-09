@@ -21,12 +21,8 @@ import adbg.utils.string : adbg_util_argv_flatten;
 import adbg.v2.debugger.exception;
 
 version (Windows) {
-	pragma(lib, "Psapi.lib"); // for core.sys.windows.psapi
-	
 	import core.sys.windows.windows;
 	import adbg.include.windows.wow64;
-	import core.sys.windows.psapi : GetProcessImageFileNameA,
-		GetMappedFileNameA, GetModuleBaseNameA;
 } else version (Posix) {
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
@@ -121,7 +117,6 @@ struct adbg_tracee_t {
 		HANDLE htid;	/// Thread handle
 		int pid;	/// Process identificiation number
 		int tid;	/// Thread identification number
-		char[MAX_PATH] execpath;	/// 
 		version (Win64) int wow64; /// If running under WoW64
 	}
 	version (Posix) {
@@ -298,10 +293,6 @@ int adbg_spawn2(adbg_tracee_t *tracee, const(char) *path, adbg_options_spawn_t *
 		//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 		version (Win64)
 		if (IsWow64Process(tracee.hpid, &tracee.wow64) == FALSE)
-			return adbg_oops(AdbgError.os);
-		
-		//TODO: Is this required?
-		if (GetProcessImageFileNameA(tracee.hpid, tracee.execpath.ptr, MAX_PATH) == FALSE)
 			return adbg_oops(AdbgError.os);
 	} else version (Posix) {
 		// Verify if file exists and we has access to it
