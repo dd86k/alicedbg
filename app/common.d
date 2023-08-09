@@ -83,7 +83,7 @@ struct settings_t {
 	const(char) **env;	/// Debuggee: environement vector
 	const(char) *dir;	/// Debuggee: directory
 	uint pid;	/// Debuggee: PID
-	uint flags;	/// Flags to pass to callee
+	uint flags;	/// Flags to pass to sub-app
 	AdbgSyntax syntax;	/// 
 	AdbgPlatform platform;	/// 
 	/// App settings
@@ -100,7 +100,43 @@ struct settings_t {
 /// Global variables. Helps keeping track of app variables.
 __gshared settings_t globals;
 
+// Potentially dangerous since some errors require an additional component
+void panic(AdbgError code = AdbgError.success, void *add = null) {
+	import core.stdc.stdlib : exit;
+	if (code) adbg_oops(code);
+	exit(oops());
+}
+
+
+int oops(const(char)* func = cast(char*)__FUNCTION__,
+	const(char)* mod = cast(char*)__MODULE__,
+	const(char)* file = cast(char*)__FILE__,
+	int line = __LINE__) {
+	import adbg.include.c.stdio : printf, puts;
+	import adbg.error : adbg_error_current;
+	
+	const(adbg_error_t)* error = adbg_error_current;
+	
+	printf("%s: E-%u ", mod, adbg_errno);
+	switch (error.code) with (AdbgError) {
+	case crt:	printf("(CRT:%d) ", adbg_errno_extern); break;
+	case os:	printf("(OS:"~ADBG_OS_ERROR_FORMAT~") ", adbg_errno_extern); break;
+	case libCapstone:	printf("(CS:%d) ", adbg_errno_extern); break;
+	default:
+	}
+	puts(adbg_error_msg);
+	
+	debug {
+		printf("%s\n", func);
+		printf("\t%s:%d\n", file, line);
+		printf("\t%s:%d\n", error.file, error.line);
+	}
+	
+	return error.code;
+}
+
 /// Print last library error information to stdout 
+deprecated("Use oops")
 int printerror(const(char)* func = cast(char*)__FUNCTION__) {
 	import adbg.include.c.stdio : printf, puts;
 	import adbg.error : adbg_error_current;

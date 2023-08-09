@@ -1,16 +1,13 @@
-/**
- * MS-DOS MZ file dumper
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
+/// MS-DOS MZ file dumper
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module dump.mz;
 
-import core.stdc.stdio;
-import adbg.v1.disassembler : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
-import adbg.v1.server.mz;
-import adbg.v1.server : adbg_object_t;
+import adbg.v2.disassembler.core;
+import adbg.v2.object.server;
+import adbg.v2.object.format.mz;
 import dumper;
 
 extern (C):
@@ -19,91 +16,80 @@ extern (C):
 /// calling this function.
 /// Params: dump = Dump structure
 /// Returns: Non-zero on error
-int dump_mz(dump_t *dump) {
-	dump_title("MS-DOS MZ");
+int dump_mz(adbg_object_t *o, uint flags) {
+	if (flags & DumpOpt.header)
+		dump_mz_hdr(o);
 	
-	if (dump.flags & DumpOpt.header)
-		dump_mz_hdr(dump.obj);
+	if (flags & DumpOpt.relocs)
+		dump_mz_relocs(o);
 	
-	if (dump.flags & DumpOpt.relocs)
-		dump_mz_relocs(dump.obj);
-	
-	if (dump.flags & DumpOpt.disasm)
-		dump_mz_disasm(dump);
+	if (flags & DumpOpt.disasm)
+		dump_mz_disasm(o, flags);
 	
 	return 0;
 }
 
 private:
 
-void dump_mz_hdr(adbg_object_t *obj) {
-	dump_h1("Header");
-	printf(
-	"e_cblp      %04Xh\t(%u)\n"~
-	"e_cp        %04Xh\t(%u)\n"~
-	"e_crlc      %04Xh\t(%u)\n"~
-	"e_cparh     %04Xh\n"~
-	"e_minalloc  %04Xh\n"~
-	"e_maxalloc  %04Xh\n"~
-	"e_ss        %04Xh\n"~
-	"e_sp        %04Xh\n"~
-	"e_csum      %04Xh\n"~
-	"e_ip        %04Xh\n"~
-	"e_cs        %04Xh\n"~
-	"e_lfarlc    %04Xh\n"~
-	"e_ovno      %04Xh\t(%u)\n"~
-	"e_lfanew    %08Xh\n",
-	obj.mz.hdr.e_cblp, obj.mz.hdr.e_cblp,
-	obj.mz.hdr.e_cp, obj.mz.hdr.e_cp,
-	obj.mz.hdr.e_crlc, obj.mz.hdr.e_crlc,
-	obj.mz.hdr.e_cparh,
-	obj.mz.hdr.e_minalloc,
-	obj.mz.hdr.e_maxalloc,
-	obj.mz.hdr.e_ss,
-	obj.mz.hdr.e_sp,
-	obj.mz.hdr.e_csum,
-	obj.mz.hdr.e_ip,
-	obj.mz.hdr.e_cs,
-	obj.mz.hdr.e_lfarlc,
-	obj.mz.hdr.e_ovno, obj.mz.hdr.e_ovno,
-	obj.mz.hdr.e_lfanew
-	);
+void dump_mz_hdr(adbg_object_t *o) {
+	dprint_header("MZ Header");
+	
+	with (o.i.mz.header) {
+	dprint_u16("e_cblp", e_cblp);
+	dprint_u16("e_cp", e_cp);
+	dprint_u16("e_crlc", e_crlc);
+	dprint_u16("e_cparh", e_cparh);
+	dprint_u16("e_minalloc", e_minalloc);
+	dprint_u16("e_maxalloc", e_maxalloc);
+	dprint_x16("e_ss", e_ss);
+	dprint_x16("e_sp", e_sp);
+	dprint_x16("e_csum", e_csum);
+	dprint_x16("e_ip", e_ip);
+	dprint_x16("e_cs", e_cs);
+	dprint_x16("e_lfarlc", e_lfarlc);
+	dprint_u16("e_ovno", e_ovno);
+	dprint_x32("e_lfanew", e_lfanew);
+	}
 }
 
-void dump_mz_relocs(adbg_object_t *obj) {
-	dump_h1("Relocations");
+void dump_mz_relocs(adbg_object_t *o) {
+	import core.stdc.stdio : printf;
 	
-	ushort relocs = obj.mz.hdr.e_crlc;
-	mz_reloc *reloc = obj.mz.relocs;
+	dprint_header("Relocations");
 	
-	if (relocs == 0 || reloc == null) {
-		puts("No relocations");
+	ushort count = o.i.mz.header.e_crlc;
+	mz_reloc *reloc = o.i.mz.relocs;
+	
+	if (count == 0 || reloc == null)
 		return;
-	}
 	
-	for (ushort i; i < relocs; ++i)
+	for (ushort i; i < count; ++i)
 		printf("%u. segment=%04X offset=%04X\n",
 			i, reloc[i].segment, reloc[i].offset);
 }
 
-void dump_mz_disasm(dump_t *dump) {
-	dump_h1("Disassembly");
+void dump_mz_disasm(adbg_object_t *o, uint flags) {
+	dprint_header("Disassembly");
 	
-	uint start = dump.obj.mz.hdr.e_cparh << 4; // *16
-	if (start < mz_hdr.sizeof || start >= dump.obj.fsize) {
-		printf("dump_mz_disasm: Data start outside of exe (%u)", start);
+	uint start = o.i.mz.header.e_cparh << 4; // *16
+	if (start < mz_hdr.sizeof || start >= o.file_size) {
+		dprint_warn("Data start outside of exe");
+		return;
 	}
 	
 	uint blks = void;
 	uint len  = void;
-	with (dump.obj.mz.hdr) {
-		blks = e_cblp ? e_cp - 1 : e_cp;
-		len  = (blks * 16) + e_cblp;
+	with (o.i.mz.header) {
+	blks = e_cblp ? e_cp - 1 : e_cp;
+	len  = (blks * 16) + e_cblp;
 	}
-	if (len > dump.obj.fsize) {
-		printf("dump_mz_disasm: Data length cannot be bigger than file (%u)", len);
+	if (len == 0)
+		return;
+	if (len > o.file_size) {
+		dprint_warn("Data length cannot be bigger than file");
 		return;
 	}
 	
-	dump_disasm(dump.dopts, dump.obj.buf + start, len, dump.flags);
+	//TODO: AdbgMachine
+	dprint_disassembly(null, 0, o.buffer + start, len, AdbgDasmPlatform.x86_16, flags);
 }

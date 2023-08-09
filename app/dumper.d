@@ -7,59 +7,62 @@
  */
 module dumper;
 
-import core.stdc.stdio;
-import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc;
+import adbg.include.c.stdio;
+import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc;
+import adbg.include.c.stdarg;
 import adbg.error;
-import adbg.v1.disassembler;
-import adbg.v1.server;
+import adbg.v2.object.server;
+import adbg.v2.disassembler.core;
 import adbg.utils.bit : BIT;
 import adbg.utils.file;
-import common, dump;
+import common, dump.mz, dump.pe, dump.macho, dump.elf;
 
 extern (C):
 
-private enum MODULE = __MODULE__.ptr;
+deprecated private enum MODULE = __MODULE__.ptr;
 
+//TODO: Consider a "Summary" ala objdump -f
+//      Could be default over "all headers"
 /// Bitfield. Selects which information to display.
 enum DumpOpt {
 	/// 'h' - Dump header
-	header	= BIT!(0),
+	header	= BIT!0,
 	/// 'd' - Dump directories (PE32)
-	dirs	= BIT!(1),
+	dirs	= BIT!1,
 	/// 'e' - Exports
-	exports	= BIT!(2),
+	exports	= BIT!2,
 	/// 'i' - Imports
-	imports	= BIT!(3),
+	imports	= BIT!3,
 	/// 'c' - Images, certificates, etc.
-	resources	= BIT!(4),
+	resources	= BIT!4,
 	/// 't' - Structured Exception Handler
-	seh	= BIT!(5),
+	seh	= BIT!5,
 	/// 't' - Symbol table(s)
-	symbols	= BIT!(6),
+	symbols	= BIT!6,
 	/// 'T' - Dynamic symbol table
-	dynsymbols	= BIT!(7),
+	dynsymbols	= BIT!7,
 	/// 'g' - Debugging material
-	debug_	= BIT!(8),
+	debug_	= BIT!8,
 	/// 'o' - Thread Local Storage
-	tls	= BIT!(9),
+	tls	= BIT!9,
 	/// 'l' - Load configuration
-	loadcfg	= BIT!(10),
+	loadcfg	= BIT!10,
 	/// 's' - Sections
-	sections	= BIT!(11),
+	sections	= BIT!11,
 	/// 'r' - Relocations
-	relocs	= BIT!(12),
+	relocs	= BIT!12,
 	/// 'R' - Dynamic relocations
-	dynrelocs	= BIT!(13),
+	dynrelocs	= BIT!13,
 	
 	/// Disassemble executable sections
-	disasm_code	= BIT!(22),
+	disasm_code	= BIT!22,
 	/// Disassembly statistics
-	disasm_stats	= BIT!(23),
+	disasm_stats	= BIT!23,
 	/// Disassemble all sections
-	disasm_all	= BIT!(24),
+	disasm_all	= BIT!24,
 	
 	/// File is raw, do not auto-detect
-	raw	= BIT!(31),
+	raw	= BIT!31,
 	
 	/// Display all metadata except disassembly
 	everything = header | dirs | resources | seh |
@@ -71,21 +74,24 @@ enum DumpOpt {
 }
 
 /// dump structure
+deprecated
 struct dump_t {
 	adbg_object_t *obj; /// object
-	adbg_disasm_t *dopts; /// disasm options
-	//TODO: Do bools instead
+	adbg_disassembler_t *dasm;	/// disassembler
+	//TODO: Do bools instead?
 	int flags; /// display settings
 }
 
 /// Output a dump title.
 /// Params: title = Title
+deprecated("Use dprint_name")
 void dump_title(const(char) *title) {
 	printf("%s format\n", title);
 }
 
 /// Output a dump chapter.
 /// Params: title = Chapter name
+deprecated("Use dprint_section")
 void dump_h1(const(char) *title) {
 	printf("\n# %s\n\n", title);
 }
@@ -94,29 +100,28 @@ void dump_h1(const(char) *title) {
 /// Returns: Error code if non-zero
 int app_dump() {
 	if (globals.flags & DumpOpt.raw) {
-		size_t size;
+		size_t size = void;
 		ubyte *buffer = adbg_util_readall(&size, globals.file);
 		
 		if (buffer == null) {
-			perror(MODULE);
-			return EXIT_FAILURE;
+			panic(AdbgError.crt);
 		}
 		
-		//TODO: dump_disasm should take directly from globals
-		with (globals)
-		return dump_disasm(&dism, buffer, size, flags);
+		if (size == 0)
+			return 0;
+		
+		//TODO: AdbgMachine
+		return dprint_disassembly(null, 0, buffer, size,
+			AdbgDasmPlatform.native, globals.flags);
 	}
 	
-	FILE *f = fopen(globals.file, "rb"); // Handles null file pointers
-	if (f == null) {
-		perror(MODULE);
-		return EXIT_FAILURE;
-	}
+	adbg_object_t *o = cast(adbg_object_t*)malloc(adbg_object_t.sizeof);
+	if (o == null)
+		panic(AdbgError.crt);
 	
-	adbg_object_t obj = void;
-	
+	//TODO: If only headers, use partial option
 	// Load object into memory
-	if (adbg_obj_open_file(&obj, f)) {
+	if (adbg_object_open(o, globals.file, 0)) {
 		printerror;
 		return 1;
 	}
@@ -126,57 +131,221 @@ int app_dump() {
 	if ((globals.flags & 0xFF_FFFF) == 0)
 		globals.flags |= DumpOpt.header;
 	
-	dump_t dump = void;
-	dump.obj = &obj;
-	dump.dopts = &globals.dism;	//TODO: Why not make subfunctions take from global directly?
-	dump.flags = globals.flags;
+	// NOTE: adbg_object_name safely returns "Unknown" in case of unknown.
+	printf("%s object format\n", adbg_object_name(o));
 	
-	switch (dump.obj.format) with (AdbgObjFormat) {
-	case MZ:	return dump_mz(&dump);
-	case PE:	return dump_pe(&dump);
-	case ELF:	return dump_elf(&dump);
-	case MachO:	return dump_macho(&dump);
+	switch (o.type) with (AdbgObject) {
+	case mz:	return dump_mz(o, globals.flags);
+	case pe:	return dump_pe(o, globals.flags);
+	case elf:	return dump_elf(o, globals.flags);
+	case macho:	return dump_macho(o, globals.flags);
 	default:
-		puts("dumper: format not supported");
-		return EXIT_FAILURE;
 	}
+	
+	puts("\ndumper: format not supported or unknown.");
+	return EXIT_FAILURE;
 }
 
-/// Disassemble data to stdout
-/// Params:
-/// 	dasm = Disassembler parameters
-/// 	data = Data pointer
-/// 	size = Data size
-/// 	flags = Configuration flags
-/// Returns: Status code
-int dump_disasm(adbg_disasm_t *dasm, void* data, size_t size, int flags) {
-	adbg_disasm_opcode_t op = void;
+//TODO: Rename as dprint_xxx ?
+
+private enum FORMAT_FIELD = "  %-30s:  ";
+
+//TODO: Make this vararg and the defautl
+//      Then removed print_columns
+void dprint_header(const(char) *header) {
+	printf("\n# %s\n", header);
+}
+void dprint_columns(const(char) *header, const(char) *s1, const(char) *s2) {
+	printf("\n# %-30s   %-10s  %s\n", header, s1, s2);
+}
+void dprint_warn(const(char) *message) {
+	printf("warning: %s\n", message);
+}
+
+void dprint_section(uint count, const(char) *section, uint max) {
+	printf("\n%u. %.*s:\n", count, max, section);
+}
+
+void dprint_string(const(char) *name, const(char) *val) {
+	printf(FORMAT_FIELD~"%s", name, val);
+}
+void dprint_stringl(const(char) *name, const(char) *val, uint len) {
+	printf(FORMAT_FIELD~"%.*s", name, len, val);
+}
+void dprint_x8(const(char) *name, ubyte val,
+	const(char) *meaning = null, const(char) *alias_ = null) {
+	printf(FORMAT_FIELD~"0x%02x", name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+void dprint_u8(const(char) *name, ubyte val,
+	const(char) *meaning = null, const(char) *alias_ = null) {
+	printf(FORMAT_FIELD~"%u", name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+void dprint_x16(const(char) *name, ushort val,
+	const(char) *meaning = null, const(char) *alias_ = null) {
+	printf(FORMAT_FIELD~"0x%04x", name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+void dprint_u16(const(char) *name, ushort val,
+	const(char) *meaning = null, const(char) *alias_ = null) {
+	printf(FORMAT_FIELD~"%u", name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+// temp for pe32 import
+void dprint_x16__i(uint rva, ushort hint, const(char) *s) {
+	printf("%20x  0x%04x  %.256s\n", rva, hint, s);
+}
+
+void dprint_x32(const(char) *name, uint val,
+	const(char) *meaning = null, const(char) *alias_ = null) {
+	printf(FORMAT_FIELD~"0x%08x", name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+// temp for pe32 stuff
+void dprint_x32s(const(char) *name, uint val,
+	const(char) *meaning = null, uint max = 0) {
+	printf(FORMAT_FIELD~"0x%08x", name, val);
+	if (meaning) printf("\t(%.*s)", max, meaning);
+	putchar('\n');
+}
+void dprint_u32(const(char) *name, uint val,
+	const(char) *meaning = null, const(char) *alias_ = null) {
+	printf(FORMAT_FIELD~"%u", name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+void dprint_x64(const(char) *name, ulong val,
+	const(char) *meaning = null, const(char) *alias_ = null) {
+	printf(FORMAT_FIELD~"0x%016llx", name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+void dprint_u64(const(char) *name, ulong val,
+	const(char) *meaning = null, const(char) *alias_ = null) {
+	printf(FORMAT_FIELD~"%llu", name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+
+// temp for pe32 dir entry
+void dprint_entry32(const(char) *section, uint u1, uint u2) {
+	printf(FORMAT_FIELD~"0x%08x  %u\n", section, u1, u2);
+}
+
+// name + rvalue (stops when name is null)
+void dprint_flags16(const(char) *section, ushort flags, ...) {
+	printf(FORMAT_FIELD~"0x%04x (", section, flags);
 	
+	va_list args = void;
+	va_start(args, flags);
+	ushort count;
+L_START:
+	const(char) *name = va_arg!(const(char)*)(args);
+	if (name == null) {
+		puts(")");
+		return;
+	}
+	
+	if ((flags & va_arg!ushort(args)) == 0) goto L_START; // condition
+	if (count++) putchar(',');
+	printf("%s", name);
+	goto L_START;
+}
+// name + rvalue (stops when name is null)
+void dprint_flags32(const(char) *section, uint flags, ...) {
+	printf(FORMAT_FIELD~"0x%08x (", section, flags);
+	
+	va_list args = void;
+	va_start(args, flags);
+	ushort count;
+L_START:
+	const(char) *name = va_arg!(const(char)*)(args);
+	if (name == null) {
+		puts(")");
+		return;
+	}
+	
+	if ((flags & va_arg!int(args)) == 0) goto L_START; // condition
+	if (count++) putchar(',');
+	printf("%s", name);
+	goto L_START;
+}
+// name + rvalue (stops when name is null)
+//TODO: Could make it a template?
+void dprint_flags64(const(char) *section, ulong flags, ...) {
+	printf(FORMAT_FIELD~"0x%016llx (", section, flags);
+	
+	va_list args = void;
+	va_start(args, flags);
+	ushort count;
+L_START:
+	const(char) *name = va_arg!(const(char)*)(args);
+	if (name == null) {
+		puts(")");
+		return;
+	}
+	
+	if ((flags & va_arg!long(args)) == 0) goto L_START; // condition
+	if (count++) putchar(',');
+	printf("%s", name);
+	goto L_START;
+}
+
+// hexdump
+void dprint_raw(const(char) *name, uint namemax,
+	ulong filebase, void *data, size_t size) {
+	//TODO: print "raw:<size>" or something and dump it
+	//TODO: need to think of a "raw dump" setting
+}
+
+// name is typically section name or filename if raw
+int dprint_disassembly(const(char) *name, uint namemax,
+	void* data, ulong size,
+	AdbgDasmPlatform platform, uint flags) {
+	if (name && namemax) printf("<%.*s>:\n", namemax, name);
+	if (data == null || size == 0) return 0;
+	//TODO: Check data+size against object type (file_size)
+	
+	adbg_disassembler_t *dasm = cast(adbg_disassembler_t*)malloc(adbg_disassembler_t.sizeof);
+	if (dasm == null)
+		panic(AdbgError.crt);
+	
+	if (adbg_dasm_open(dasm, platform))
+		panic();
+	
+	adbg_opcode_t op = void;
+	adbg_dasm_start(dasm, data, cast(size_t)size);
+	
+	// stats mode
 	if (flags & DumpOpt.disasm_stats) {
-		uint iavg;	/// instruction average size
-		uint imin;	/// smallest instruction size
-		uint imax;	/// longest instruction size
-		uint icnt;	/// instruction count
-		uint ills;	/// Number of illegal instructions
-		adbg_disasm_start_buffer(dasm, AdbgDisasmMode.size, data, size);
-L_DISASM_1:
-		with (AdbgError)
-		switch (adbg_disasm(dasm, &op)) {
+		uint s_avg;	/// instruction average size
+		uint s_min;	/// smallest instruction size
+		uint s_max;	/// longest instruction size
+		uint s_cnt;	/// instruction count
+		uint s_ill;	/// Number of illegal instructions
+L_STAT:
+		switch (adbg_dasm(dasm, &op)) with (AdbgError) {
 		case success:
-			iavg += op.size;
-			++icnt;
-			if (op.size > imax)
-				imax = op.size;
-			if (op.size < imin)
-				imin = op.size;
-			goto L_DISASM_1;
+			s_avg += op.size;
+			++s_cnt;
+			if (op.size > s_max)
+				s_max = op.size;
+			if (op.size < s_min)
+				s_min = op.size;
+			goto L_STAT;
 		case illegalInstruction:
-			iavg += op.size;
-			++icnt;
-			++ills;
-			goto L_DISASM_1;
+			s_avg += op.size;
+			++s_cnt;
+			++s_ill;
+			goto L_DISASM;
 		case outOfData: break;
-		default: return printerror();
+		default: panic();
 		}
 		printf(
 		"Opcode statistics\n"~
@@ -185,64 +354,23 @@ L_DISASM_1:
 		"biggest size : %u\n"~
 		"illegal      : %u\n"~
 		"total        : %u\n",
-		cast(float)iavg / icnt, imin, imax, ills, icnt
+		cast(float)s_avg / s_cnt, s_min, s_max, s_ill, s_cnt
 		);
 		return 0;
 	}
 	
-	uint i;
-	
-	import adbg.config : USE_CAPSTONE;
-	
-	static if (USE_CAPSTONE) {
-		char[120] str_machine = "test";
-		char[120] str_mnemonic = void;
-		
-		version(Trace) trace("size=%u", size);
-		
-		adbg_disasm_start_buffer(dasm, AdbgDisasmMode.file, data, size);
-	
-	L_DISASM_2:
-		switch (adbg_disasm(dasm, &op)) with (AdbgError) {
-		case success: break;
-		case outOfData: return 0;
-		default: return printerror();
-		}
-		adbg_disasm_machine(dasm, str_machine.ptr, 120, &op);
-		adbg_disasm_format(dasm, str_mnemonic.ptr, 120, &op);
-		printf("%8x  %-22s  %s\n", i, str_machine.ptr, str_mnemonic.ptr);
-		i += op.size;
-		goto L_DISASM_2;
-	} else {
-		char[40] machine = void, prefix = void, mnemonic = void, operands = void;
-		const(char)* maptr = void, prptr = void, mnptr = void, opptr = void;
-		adbg_disasm_start_buffer(dasm, AdbgDisasmMode.file, data, size);
-	
-	L_DISASM_2:
-		switch (adbg_disasm(dasm, &op)) with (AdbgError) {
-		case none:
-			adbg_disasm_machine(dasm, machine.ptr, 40, &op);
-			adbg_disasm_format_prefixes(dasm, prefix.ptr, 40, &op);
-			adbg_disasm_format_mnemonic(dasm, mnemonic.ptr, 40, &op);
-			adbg_disasm_format_operands(dasm, operands.ptr, 40, &op);
-			maptr = machine.ptr;
-			prptr = prefix.ptr;
-			mnptr = mnemonic.ptr;
-			opptr = operands.ptr;
-			break;
-		//TODO: Illegal should be moved with none and disasm takes care of buffer
-		case illegalInstruction:
-			adbg_disasm_machine(dasm, machine.ptr, 40, &op);
-			maptr = machine.ptr;
-			prptr = "";
-			mnptr = "(bad)";
-			opptr = "";
-			break;
-		case outOfData: return 0;
-		default: return printerror();
-		}
-		printf("%8x  %-22s  %s%-12s%s\n", i, maptr, prptr, mnptr, opptr);
-		i += op.size;
-		goto L_DISASM_2;
+	// normal disasm mode
+L_DISASM:
+	switch (adbg_dasm(dasm, &op)) with (AdbgError) {
+	case success:
+		//TODO: print base as 08x if small enough
+		printf("%016llx  %s\t%s\n", op.base, op.mnemonic, op.operands);
+		goto L_DISASM;
+	case illegalInstruction:
+		printf("%016llx  illegal (%d bytes)\n", op.base, op.size);
+		goto L_DISASM;
+	case outOfData: break;
+	default: panic();
 	}
+	return 0;
 }

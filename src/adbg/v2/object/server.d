@@ -65,6 +65,9 @@ struct adbg_object_t {
 	
 	union {
 		void   *buffer;	/// Buffer to file object.
+		char   *bufferc;	/// Ditto
+		wchar  *bufferw;	/// Ditto
+		dchar  *bufferd;	/// Ditto
 		ubyte  *buffer8;	/// Ditto
 		ushort *buffer16;	/// Ditto
 		uint   *buffer32;	/// Ditto
@@ -80,6 +83,7 @@ struct adbg_object_t {
 	
 	/// Loaded object type.
 	AdbgObject type;
+	
 
 	package
 	union adbg_object_internals_t {
@@ -87,15 +91,19 @@ struct adbg_object_t {
 		void *header;
 		
 		struct mz_t {
-			mz_header *header;
-			mz_relocation *relocs;
+			mz_hdr *header;
+			mz_reloc *relocs;
 		}
 		mz_t mz;
 		
 		struct pe_t {
 			// Headers
 			PE_HEADER *header;
-			PE_OPTIONAL_HEADER *opt_header;
+			union {
+				PE_OPTIONAL_HEADER *opt_header;
+				PE_OPTIONAL_HEADER64 *opt_header64;
+				PE_OPTIONAL_HEADERROM *opt_headerrom;
+			}
 			// Directories
 			PE_IMAGE_DATA_DIRECTORY *directory;
 			// Data
@@ -124,16 +132,16 @@ struct adbg_object_t {
 		macho_t macho;
 		
 		struct elf32_t {
-			Elf32_Ehdr *e_header;
-			Elf32_Phdr *p_header;
-			Elf32_Shdr *s_header;
+			Elf32_Ehdr *ehdr;
+			Elf32_Phdr *phdr;
+			Elf32_Shdr *shdr;
 		}
 		elf32_t elf32;
 		
 		struct elf64_t {
-			Elf64_Ehdr *e_header;
-			Elf64_Phdr *p_header;
-			Elf64_Shdr *s_header;
+			Elf64_Ehdr *ehdr;
+			Elf64_Phdr *phdr;
+			Elf64_Shdr *shdr;
 		}
 		elf64_t elf64;
 	}
@@ -202,7 +210,7 @@ L_ARG:
 		return adbg_oops(AdbgError.crt);
 	
 	// Read
-	if (fread(obj.buffer, obj.file_size, 1, obj.handle) == 0)
+	if (fread(obj.buffer, cast(size_t)obj.file_size, 1, obj.handle) == 0)
 		return adbg_oops(AdbgError.crt);
 	
 	// zero internal stuff
@@ -226,9 +234,10 @@ L_ARG:
 	default:
 	}
 	
+	//TODO: Support compressed MZ files?
 	switch (*obj.buffer16) {
 	case MAGIC_MZ:
-		if (obj.file_size < mz_header.sizeof)
+		if (obj.file_size < mz_hdr.sizeof)
 			return adbg_oops(AdbgError.unknownObjFormat);
 		
 		uint offset = obj.i.mz.header.e_lfanew;
@@ -283,7 +292,7 @@ AdbgDasmPlatform adbg_object_platform(adbg_object_t *obj) {
 		}
 		break;
 	case elf:
-		switch (obj.i.elf32.e_header.e_machine) {
+		switch (obj.i.elf32.ehdr.e_machine) {
 		case ELF_EM_X86_64:	return AdbgDasmPlatform.x86_64;
 		case ELF_EM_386:	return AdbgDasmPlatform.x86_32;
 		default:
@@ -304,9 +313,28 @@ AdbgMachine adbg_object_machine(adbg_object_t *obj) {
 	case pe:	return adbg_object_pe_machine(obj.i.pe.header.Machine);
 	// NOTE: Both fat and header matches the header structure
 	case macho:	return adbg_object_macho_machine(obj.i.macho.header.cputype);
-	case elf:	return adbg_object_elf_machine(obj.i.elf32.e_header.e_machine);
+	case elf:	return adbg_object_elf_machine(obj.i.elf32.ehdr.e_machine);
 	default:	return AdbgMachine.unknown;
 	}
+}
+
+/// Get the short name of the loaded object format.
+/// Params: obj = Loaded object reference.
+/// Returns: Object format name.
+const(char)* adbg_object_short_name(adbg_object_t *obj) {
+	if (obj == null)
+		goto L_UNKNOWN;
+	switch (obj.type) with (AdbgObject) {
+	case mz:	return "mz";
+	case ne:	return "ne";
+	case le:	return "le";
+	case pe:	return "pe32";
+	case macho:	return "macho";
+	case elf:	return "elf";
+	default:
+	}
+L_UNKNOWN:
+	return "Unknown";
 }
 
 /// Get the name of the loaded object format.

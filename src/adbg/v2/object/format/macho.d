@@ -419,7 +419,7 @@ const(char) *adbg_object_macho_cputype_string(uint type) {
 	}
 }
 
-const(char) *adbg_obj_macho_subtype_string(uint type, uint subtype) {
+const(char) *adbg_object_macho_subtype_string(uint type, uint subtype) {
 	switch (type) {
 	case MACHO_CPUTYPE_VAX:
 		switch (subtype) {

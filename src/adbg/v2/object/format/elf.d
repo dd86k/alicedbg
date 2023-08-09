@@ -101,6 +101,25 @@ enum ELF_ET_HIOS	= 0xFEFF;	/// OS-specific
 enum ELF_ET_LOPROC	= 0xFF00;	/// Processor-specific
 enum ELF_ET_HIPROC	= 0xFFFF;	/// Processor-specific
 
+// Program segment header values
+
+enum ELF_PT_NULL	= 0;
+enum ELF_PT_LOAD	= 1;
+enum ELF_PT_DYNAMIC	= 2;
+enum ELF_PT_INTERP	= 3;
+enum ELF_PT_NOTE	= 4;
+enum ELF_PT_SHLIB	= 5;
+enum ELF_PT_PHDR	= 6;
+enum ELF_PT_TLS	= 7;	/// Thread local storage segment
+enum ELF_PT_LOOS	= 0x60000000;	/// OS-specific
+enum ELF_PT_HIOS	= 0x6fffffff;	/// OS-specific
+enum ELF_PT_LOPROC	= 0x70000000;
+enum ELF_PT_HIPROC	= 0x7fffffff;
+enum ELF_PT_GNU_EH_FRAME	= (ELF_PT_LOOS + 0x474e550);
+enum ELF_PT_GNU_STACK	= (ELF_PT_LOOS + 0x474e551);
+enum ELF_PT_GNU_RELRO	= (ELF_PT_LOOS + 0x474e552);
+enum ELF_PT_GNU_PROPERTY	= (ELF_PT_LOOS + 0x474e553);
+
 // ELF Machine values
 // FatELF also uses this
 
@@ -286,6 +305,46 @@ enum ELF_EM_FT32	= 222;	/// FTDI Chip FT32 RISC (32-bit)
 enum ELF_EM_MOXIE	= 223;	/// Moxie
 enum ELF_EM_AMDGPU	= 224;	/// AMD GPU
 enum ELF_EM_RISCV	= 225;	/// RISC-V
+
+//
+// ehdr e_flags
+//
+
+// ARM
+enum ELF_EF_ARM_RELEXEC	= 0x01; /// 
+enum ELF_EF_ARM_HASENTRY	= 0x02; /// 
+enum ELF_EF_ARM_INTERWORK	= 0x04; /// 
+enum ELF_EF_ARM_APCS_26	= 0x08; /// 
+enum ELF_EF_ARM_APCS_FLOAT	= 0x10; /// 
+enum ELF_EF_ARM_PIC	= 0x20; /// 
+enum ELF_EF_ARM_ALIGN8	= 0x40; /// 8-bit structure alignment is in use
+enum ELF_EF_ARM_NEW_ABI	= 0x80; /// 
+enum ELF_EF_ARM_OLD_ABI	= 0x100; /// 
+enum ELF_EF_ARM_SOFT_FLOAT	= 0x200; /// 
+enum ELF_EF_ARM_VFP_FLOAT	= 0x400; /// 
+enum ELF_EF_ARM_MAVERICK_FLOAT	= 0x800; /// 
+
+// MIPS
+enum ELF_EF_MIPS_NOREORDER	= 1;	/// A .noreorder directive was used
+enum ELF_EF_MIPS_PIC	= 2;	/// Contains PIC code
+enum ELF_EF_MIPS_CPIC	= 4;	/// Uses PIC calling sequence
+enum ELF_EF_MIPS_XGOT	= 8;	/// 
+enum ELF_EF_MIPS_64BIT_WHIRL	= 16;	/// 
+enum ELF_EF_MIPS_ABI2	= 32;	/// 
+enum ELF_EF_MIPS_ABI_ON32	= 64;	/// 
+enum ELF_EF_MIPS_ARCH	= 0xf0000000;	/// MIPS architecture level
+
+// SPARC
+// https://docs.oracle.com/cd/E19120-01/open.solaris/819-0690/chapter6-43405/index.html
+enum ELF_EF_SPARC_EXT_MARK	= 0xffff00;	/// Vendor Extension mask
+enum ELF_EF_SPARC_32PLUS	= 0x000100;	/// Generic V8+ features
+enum ELF_EF_SPARC_SUN_US1	= 0x000200;	/// Sun UltraSPARC 1 Extensions 
+enum ELF_EF_SPARC_HAL_R1	= 0x000400;	/// HAL R1 Extensions 
+enum ELF_EF_SPARC_SUN_US3	= 0x000800;	/// Sun UltraSPARC 3 Extensions 
+enum ELF_EF_SPARCV9_MM	= 0x3;	/// Mask for Memory Model 
+enum ELF_EF_SPARCV9_TSO	= 0x0;	/// Total Store Ordering 
+enum ELF_EF_SPARCV9_PSO	= 0x1;	/// Partial Store Ordering 
+enum ELF_EF_SPARCV9_RMO	= 0x2;	/// Relaxed Memory Ordering 
 
 // Section type values
 
@@ -592,33 +651,33 @@ struct Elf64_Chdr {
 
 int adbg_object_elf_load(adbg_object_t *obj) {
 	obj.type = AdbgObject.elf;
-	obj.i.elf32.e_header = cast(Elf32_Ehdr*)obj.buffer;
+	obj.i.elf32.ehdr = cast(Elf32_Ehdr*)obj.buffer;
 	
-	if (obj.i.elf32.e_header.e_version != ELF_EV_CURRENT)
+	if (obj.i.elf32.ehdr.e_version != ELF_EV_CURRENT)
 		return adbg_oops(AdbgError.assertion);
 	
-	switch (obj.i.elf32.e_header.e_ident[ELF_EI_CLASS]) {
+	switch (obj.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:
 		with (obj.i.elf32) {
-			if (e_header.e_phoff >= obj.file_size ||
-			    e_header.e_shoff >= obj.file_size)
+			if (ehdr.e_phoff >= obj.file_size ||
+			    ehdr.e_shoff >= obj.file_size)
 			{
 				return adbg_oops(AdbgError.assertion);
 			}
-			p_header = cast(Elf32_Phdr*)(obj.buffer + e_header.e_phoff);
-			s_header = cast(Elf32_Shdr*)(obj.buffer + e_header.e_shoff);
+			phdr = cast(Elf32_Phdr*)(obj.buffer + ehdr.e_phoff);
+			shdr = cast(Elf32_Shdr*)(obj.buffer + ehdr.e_shoff);
 		}
 		break;
 	case ELF_CLASS_64:
 		with (obj.i.elf64) {
-			if (e_header.e_phoff >= obj.file_size ||
-			    e_header.e_shoff >= obj.file_size)
+			if (ehdr.e_phoff >= obj.file_size ||
+			    ehdr.e_shoff >= obj.file_size)
 			{
 				return adbg_oops(AdbgError.assertion);
 			}
 			Elf64_Ehdr* hdr64 = cast(Elf64_Ehdr*)obj.buffer;
-			p_header = cast(Elf64_Phdr*)(obj.buffer + hdr64.e_phoff);
-			s_header = cast(Elf64_Shdr*)(obj.buffer + hdr64.e_shoff);
+			phdr = cast(Elf64_Phdr*)(obj.buffer + hdr64.e_phoff);
+			shdr = cast(Elf64_Shdr*)(obj.buffer + hdr64.e_shoff);
 		}
 		break;
 	default:
@@ -861,6 +920,28 @@ const(char) *adbg_object_elf_et_string(ushort type) {
 	case ELF_ET_HIOS:	return "HIOS";
 	case ELF_ET_LOPROC:	return "LOPROC";
 	case ELF_ET_HIPROC:	return "HIPROC";
+	default:	return null;
+	}
+}
+
+const(char) *adbg_object_elf_pt_string(uint type) {
+	switch (type) {
+	case ELF_PT_NULL:	return "NULL";
+	case ELF_PT_LOAD:	return "LOAD";
+	case ELF_PT_DYNAMIC:	return "DYNAMIC";
+	case ELF_PT_INTERP:	return "INTERP";
+	case ELF_PT_NOTE:	return "NOTE";
+	case ELF_PT_SHLIB:	return "SHLIB";
+	case ELF_PT_PHDR:	return "PHDR";
+	case ELF_PT_TLS:	return "TLS";
+	case ELF_PT_LOOS:	return "LOOS";
+	case ELF_PT_HIOS:	return "HIOS";
+	case ELF_PT_LOPROC:	return "LOPROC";
+	case ELF_PT_HIPROC:	return "HIPROC";
+	case ELF_PT_GNU_EH_FRAME:	return "GNU_EH_FRAME";
+	case ELF_PT_GNU_STACK:	return "GNU_STACK";
+	case ELF_PT_GNU_RELRO:	return "GNU_RELRO";
+	case ELF_PT_GNU_PROPERTY:	return "GNU_PROPERTY";
 	default:	return null;
 	}
 }

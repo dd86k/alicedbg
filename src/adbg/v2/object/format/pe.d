@@ -21,6 +21,9 @@ import adbg.v2.object.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit : CHAR32;
 
+//TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
+//TODO: Function to check RVA bounds (within file_size)
+
 extern (C):
 
 /// Magic number for PE32 object files.
@@ -553,11 +556,13 @@ int adbg_object_pe_load(adbg_object_t *obj) {
 		obj.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR64);
 		obj.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR64);
 		break;
+	// NOTE: ROM have no directories
 	case PE_FMT_ROM:
-		obj.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDRROM);
+		//obj.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDRROM);
 		obj.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDRROM);
-		break;
-	default: return adbg_oops(AdbgError.unsupportedObjFormat);
+		return 0;
+	default:
+		return adbg_oops(AdbgError.unsupportedObjFormat);
 	}
 	
 	// Map sections to corresponding directory

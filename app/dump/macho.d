@@ -1,90 +1,82 @@
+/// Mach-O object dumper.
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module dump.macho;
 
-import core.stdc.stdio;
-import adbg.v1.disassembler : adbg_disasm_t, adbg_disasm, AdbgDisasmMode;
-import adbg.v1.server.macho;
-import adbg.v1.server : adbg_object_t;
+import adbg.v2.disassembler.core;
+import adbg.v2.object.server;
+import adbg.v2.object.format.macho;
 import dumper;
 
-int dump_macho(dump_t *dump) {
-	dump_title("Apple Mach-O executable");
-	
-	if (dump.flags & DumpOpt.header)
-		dump_macho_hdr(dump.obj);
+int dump_macho(adbg_object_t *o, uint flags) {
+	if (flags & DumpOpt.header)
+		dump_macho_hdr(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_macho_hdr(adbg_object_t *obj) {
-	if (obj.macho.fat) {
-		dump_h1("FAT Header");
-		with (obj.macho.fathdr) printf(
-		"magic        %08x\t(%s)\n"~
-		"nfat_arch    %u\n",
-		magic, adbg_obj_macho_magic(magic),
-		nfat_arch
-		);
-		dump_h1("FAT Arch Header");
-		with (obj.macho.fatarch) printf(
-		"cputype      %u\t(%s)\n"~
-		"subtype      %u\t(%s)\n"~
-		"offset       %u\n"~
-		"size         %u\n"~
-		"alignment    %u\n",
-		cputype, adbg_obj_macho_cputype(cputype),
-		subtype, adbg_obj_macho_subtype(cputype, subtype),
-		offset,
-		size,
-		alignment
-		);
-	} else {
-		dump_h1("Header");
-		with (obj.macho.hdr) printf(
-		"magic        %08x\t(%s)\n"~
-		"cputype      %u\t(%s)\n"~
-		"subtype      %u\t(%s)\n"~
-		"filetype     %u\t(%s)\n"~
-		"ncmds        %u\n"~
-		"sizeofcmds   %u\n"~
-		"flags        %08x\t(",
-		magic, adbg_obj_macho_magic(magic),
-		cputype, adbg_obj_macho_cputype(cputype),
-		subtype, adbg_obj_macho_subtype(cputype, subtype),
-		filetype, adbg_obj_macho_filetype(filetype),
-		ncmds,
-		sizeofcmds,
-		flags
-		);
-		with (obj.macho.hdr) {
-			if (flags & MACHO_FLAG_NOUNDEFS) printf("NOUNDEFS,");
-			if (flags & MACHO_FLAG_INCRLINK) printf("INCRLINK,");
-			if (flags & MACHO_FLAG_DYLDLINK) printf("DYLDLINK,");
-			if (flags & MACHO_FLAG_BINDATLOAD) printf("BINDATLOAD,");
-			if (flags & MACHO_FLAG_PREBOUND) printf("PREBOUND,");
-			if (flags & MACHO_FLAG_SPLIT_SEGS) printf("SPLIT_SEGS,");
-			if (flags & MACHO_FLAG_LAZY_INIT) printf("LAZY_INIT,");
-			if (flags & MACHO_FLAG_TWOLEVEL) printf("TWOLEVEL,");
-			if (flags & MACHO_FLAG_FORCE_FLAT) printf("FORCE_FLAT,");
-			if (flags & MACHO_FLAG_NOMULTIDEFS) printf("NOMULTIDEFS,");
-			if (flags & MACHO_FLAG_NOFIXPREBINDING) printf("NOFIXPREBINDING,");
-			if (flags & MACHO_FLAG_PREBINDABLE) printf("PREBINDABLE,");
-			if (flags & MACHO_FLAG_ALLMODSBOUND) printf("ALLMODSBOUND,");
-			if (flags & MACHO_FLAG_SUBSECTIONS_VIA_SYMBOLS) printf("SUBSECTIONS_VIA_SYMBOLS,");
-			if (flags & MACHO_FLAG_CANONICAL) printf("CANONICAL,");
-			if (flags & MACHO_FLAG_WEAK_DEFINES) printf("WEAK_DEFINES,");
-			if (flags & MACHO_FLAG_BINDS_TO_WEAK) printf("BINDS_TO_WEAK,");
-			if (flags & MACHO_FLAG_ALLOW_STACK_EXECUTION) printf("ALLOW_STACK_EXECUTION,");
-			if (flags & MACHO_FLAG_ROOT_SAFE) printf("ROOT_SAFE,");
-			if (flags & MACHO_FLAG_SETUID_SAFE) printf("SETUID_SAFE,");
-			if (flags & MACHO_FLAG_NO_REEXPORTED_DYLIBS) printf("NO_REEXPORTED_DYLIBS,");
-			if (flags & MACHO_FLAG_PIE) printf("PIE,");
-			if (flags & MACHO_FLAG_DEAD_STRIPPABLE_DYLIB) printf("DEAD_STRIPPABLE_DYLIB,");
-			if (flags & MACHO_FLAG_HAS_TLV_DESCRIPTORS) printf("HAS_TLV_DESCRIPTORS,");
-			if (flags & MACHO_FLAG_NO_HEAP_EXECUTION) printf("NO_HEAP_EXECUTION,");
-			if (flags & MACHO_FLAG_APP_EXTENSION_SAFE) printf("APP_EXTENSION_SAFE,");
+void dump_macho_hdr(adbg_object_t *o) {
+	if (o.i.macho.fat) {
+		dprint_header("FAT Header");
+		
+		with (o.i.macho.fat_header) {
+		dprint_x32("magic", magic, adbg_object_macho_magic_string(magic));
+		dprint_u32("nfat_arch", nfat_arch);
 		}
-		puts(")");
+		
+		dprint_header("FAT Arch Header");
+		
+		//TODO: multiple nfat_arch
+		with (o.i.macho.fat_arch) {
+		dprint_x32("cputype", cputype, adbg_object_macho_cputype_string(cputype));
+		dprint_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
+		dprint_x32("offset", offset);
+		dprint_x32("size", size);
+		dprint_x32("alignment", alignment);
+		}
+	} else {
+		dprint_header("Header");
+		
+		with (o.i.macho.header) {
+		dprint_x32("magic", magic, adbg_object_macho_magic_string(magic));
+		dprint_x32("cputype", cputype, adbg_object_macho_cputype_string(cputype));
+		dprint_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
+		dprint_x32("filetype", subtype, adbg_object_macho_filetype_string(filetype));
+		dprint_u32("ncmds", ncmds);
+		dprint_u32("sizeofcmds", sizeofcmds);
+		dprint_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
+		dprint_flags32("flags", flags,
+			"NOUNDEFS".ptr,	MACHO_FLAG_NOUNDEFS,
+			"INCRLINK".ptr,	MACHO_FLAG_INCRLINK,
+			"DYLDLINK".ptr,	MACHO_FLAG_DYLDLINK,
+			"BINDATLOAD".ptr,	MACHO_FLAG_BINDATLOAD,
+			"PREBOUND".ptr,	MACHO_FLAG_PREBOUND,
+			"SPLIT_SEGS".ptr,	MACHO_FLAG_SPLIT_SEGS,
+			"LAZY_INIT".ptr,	MACHO_FLAG_LAZY_INIT,
+			"TWOLEVEL".ptr,	MACHO_FLAG_TWOLEVEL,
+			"FORCE_FLAT".ptr,	MACHO_FLAG_FORCE_FLAT,
+			"NOMULTIDEFS".ptr,	MACHO_FLAG_NOMULTIDEFS,
+			"NOFIXPREBINDING".ptr,	MACHO_FLAG_NOFIXPREBINDING,
+			"PREBINDABLE".ptr,	MACHO_FLAG_PREBINDABLE,
+			"ALLMODSBOUND".ptr,	MACHO_FLAG_ALLMODSBOUND,
+			"SUBSECTIONS_VIA_SYMBOLS".ptr,	MACHO_FLAG_SUBSECTIONS_VIA_SYMBOLS,
+			"CANONICAL".ptr,	MACHO_FLAG_CANONICAL,
+			"WEAK_DEFINES".ptr,	MACHO_FLAG_WEAK_DEFINES,
+			"BINDS_TO_WEAK".ptr,	MACHO_FLAG_BINDS_TO_WEAK,
+			"ALLOW_STACK_EXECUTION".ptr,	MACHO_FLAG_ALLOW_STACK_EXECUTION,
+			"ROOT_SAFE".ptr,	MACHO_FLAG_ROOT_SAFE,
+			"SETUID_SAFE".ptr,	MACHO_FLAG_SETUID_SAFE,
+			"NO_REEXPORTED_DYLIBS".ptr,	MACHO_FLAG_NO_REEXPORTED_DYLIBS,
+			"PIE".ptr,	MACHO_FLAG_PIE,
+			"DEAD_STRIPPABLE_DYLIB".ptr,	MACHO_FLAG_DEAD_STRIPPABLE_DYLIB,
+			"HAS_TLV_DESCRIPTORS".ptr,	MACHO_FLAG_HAS_TLV_DESCRIPTORS,
+			"NO_HEAP_EXECUTION".ptr,	MACHO_FLAG_NO_HEAP_EXECUTION,
+			"APP_EXTENSION_SAFE".ptr,	MACHO_FLAG_APP_EXTENSION_SAFE,
+			null);
+		}
 	}
 }
