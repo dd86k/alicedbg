@@ -45,10 +45,9 @@ void dump_macho_hdr(adbg_object_t *o) {
 		dprint_x32("magic", magic, adbg_object_macho_magic_string(magic));
 		dprint_x32("cputype", cputype, adbg_object_macho_cputype_string(cputype));
 		dprint_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
-		dprint_x32("filetype", subtype, adbg_object_macho_filetype_string(filetype));
+		dprint_x32("filetype", filetype, adbg_object_macho_filetype_string(filetype));
 		dprint_u32("ncmds", ncmds);
 		dprint_u32("sizeofcmds", sizeofcmds);
-		dprint_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
 		dprint_flags32("flags", flags,
 			"NOUNDEFS".ptr,	MACHO_FLAG_NOUNDEFS,
 			"INCRLINK".ptr,	MACHO_FLAG_INCRLINK,
