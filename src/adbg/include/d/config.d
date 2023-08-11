@@ -83,6 +83,11 @@ version (LDC) {
 // ANCHOR Compiler support enumerations
 //
 
+/// core.bitop.bswap supports ulong.
+// Added in druntime/d07e682f21b0043354fc4b9ca6d5d2b176a63539
+// git describe --contains says v2.071.0-b1
+// but successfully compiled on GDC 6.3 (DMD-2.068)
+enum COMPILER_FEAT_BSWAP64       = __VERSION__ >= 2_068;
 /// If set, the compiler supports the getTargetInfo trait.
 enum COMPILER_FEAT_TARGETINFO    = __VERSION__ >= 2_083;
 /// If set, the compiler supports the printf and scanf pragmas.
