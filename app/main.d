@@ -15,7 +15,7 @@ import core.stdc.string : strcmp;
 import core.stdc.stdio;
 import adbg.v1.debugger : adbg_attach_, adbg_load;
 import adbg.v1.disassembler;
-import common, ui, dumper, analyzer;
+import common, ui, dumper;
 
 private:
 extern (C):
@@ -512,39 +512,9 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
-	if (adbg_disasm_init(&globals.dism))
-		return printerror();
-	if (globals.syntax && adbg_disasm_syntax(&globals.dism, globals.syntax))
-		return printerror();
-	
 	switch (globals.mode) {
-	case SettingMode.analyze:
-		puts("Not currently available. It will probably be implemented again later.");
-		return 1;
-		/*if (globals.file == null) {
-			puts("main: base16 input required");
-			return EXIT_FAILURE;
-		}
-		
-		//TODO: Should be allocated instead
-		with (globals) adbg_util_hex_array(
-			cast(ubyte*)inputHex, 32, file, inputHexSize);
-		
-		return analyze();*/
 	case SettingMode.dump: return app_dump();
 	case SettingMode.debugger:
-		// Pre-load target if specified.
-		// Necessary for loop UI, but optional for others
-		with (globals)
-		if (file) {
-			if (adbg_load(file, args)) {
-				printerror;
-				return EXIT_FAILURE;
-			}
-			
-			printf("File '%s' loaded\n", globals.file);
-		}
-		
 		switch (globals.ui) {
 		case SettingUI.loop:	return app_loop();
 		case SettingUI.cmd:	return app_cmd();

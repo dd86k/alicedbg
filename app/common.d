@@ -9,10 +9,11 @@
 module common;
 
 import adbg.config;
-import adbg.v1.debugger.exception;
-import adbg.v1.disassembler;
 import adbg.error;
+import adbg.v2.disassembler;
+import adbg.v2.debugger.exception;
 import core.stdc.stdio : FILE;
+import core.stdc.stdlib : malloc;
 
 public:
 extern (C):
@@ -20,48 +21,37 @@ extern (C):
 /// Application error
 enum AppError {
 	none,
-	invalidParameter,
-	invalidCommand, // or action or sub-command
-	unavailable,
-	loadFailed,
-	pauseRequired,
-	alreadyLoaded,
+	invalidParameter	= -1,
+	invalidCommand	= -2, // or action or sub-command
+	unavailable	= -3,
+	loadFailed	= -4,
+	pauseRequired	= -5,
+	alreadyLoaded	= -6,
+	alicedbg	= -10,
 }
 
 // Platforms
 
 struct setting_platform_t {
-	AdbgPlatform val;
+	AdbgDasmPlatform val;
 	const(char)* opt, alt, desc;
 }
 immutable setting_platform_t[] platforms = [
-	{ AdbgPlatform.x86_16,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
-	{ AdbgPlatform.x86_32,	"x86",     "i386",  "x86 32-bit (extended mode)" },
-	{ AdbgPlatform.x86_64,	"x86_64",  "amd64", "x86 64-bit (long mode)" },
-	{ AdbgPlatform.riscv32,	"riscv32", "rv32",  "RISC-V 32-bit"},
+	{ AdbgDasmPlatform.x86_16,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
+	{ AdbgDasmPlatform.x86_32,	"x86",     "i386",  "x86 32-bit (extended mode)" },
+	{ AdbgDasmPlatform.x86_64,	"x86_64",  "amd64", "x86 64-bit (long mode)" },
 ];
 
 // Syntaxes
 
 struct setting_syntax_t {
-	AdbgSyntax val;
+	AdbgDasmSyntax val;
 	const(char)* opt, desc;
 }
-static if (USE_CAPSTONE) {
-	immutable setting_syntax_t[] syntaxes = [
-		{ AdbgSyntax.att,   "att",   "AT&T syntax" },
-		{ AdbgSyntax.intel, "intel", "Intel syntax" },
-	];
-} else {
-	immutable setting_syntax_t[] syntaxes = [
-		{ AdbgSyntax.att,   "att",   "AT&T syntax" },
-		{ AdbgSyntax.intel, "intel", "Intel syntax" },
-		{ AdbgSyntax.nasm,  "nasm",  "Netwide Assembler syntax" },
-		{ AdbgSyntax.ideal, "ideal", "Borland Ideal Turbo Assembly Enhanced syntax" },
-		{ AdbgSyntax.hyde,  "hyde",  "Randall Hyde High Level Assembly Language syntax" },
-		{ AdbgSyntax.riscv, "riscv", "RISC-V native syntax" },
-	];
-}
+immutable setting_syntax_t[] syntaxes = [
+	{ AdbgDasmSyntax.att,   "att",   "AT&T syntax" },
+	{ AdbgDasmSyntax.intel, "intel", "Intel syntax" },
+];
 
 //
 // Settings
@@ -84,11 +74,10 @@ struct settings_t {
 	const(char) *dir;	/// Debuggee: directory
 	uint pid;	/// Debuggee: PID
 	uint flags;	/// Flags to pass to sub-app
-	AdbgSyntax syntax;	/// 
-	AdbgPlatform platform;	/// 
+	AdbgDasmSyntax syntax;	/// 
+	AdbgDasmPlatform platform;	/// 
 	/// App settings
-	adbg_disasm_t dism;	/// Disassembler
-	exception_t last_exception;	/// Last exception
+	adbg_exception_t last_exception;	/// Last exception
 	FILE *inputFile;	/// 
 	//TODO: Should be allocated
 	ubyte[32] inputHex;	/// 
@@ -99,6 +88,12 @@ struct settings_t {
 
 /// Global variables. Helps keeping track of app variables.
 __gshared settings_t globals;
+
+T* alloc(T)() {
+	T* t = cast(T*)malloc(T.sizeof);
+	if (t == null) panic(AdbgError.crt);
+	return t;
+}
 
 // Potentially dangerous since some errors require an additional component
 void panic(AdbgError code = AdbgError.success, void *add = null) {
