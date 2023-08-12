@@ -1,33 +1,73 @@
-/**
- * Command interpreter.
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
+/// Command interpreter.
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module ui.cmd;
 
 import adbg.include.c.stdio;
-import adbg.include.c.stdlib : exit, free;
+import adbg.include.c.stdlib;
 import core.stdc.string;
 import adbg.error;
 import adbg.utils.string;
-import adbg.v1.debugger;
-import adbg.v1.debugger.exception;
-import adbg.v1.debugger.context;
-import adbg.v1.disassembler;
+import adbg.v2.debugger;
+import adbg.v2.disassembler;
 import common, term;
+
+//TODO: cmd_file -- read (commands) from file
+//TODO: cmd_strace [on|off]
+//TODO: Command re-structure
+//      show r|registers
+//      show b|breakpoints
 
 extern (C):
 
 /// Enter the command-line loop
 /// Returns: Error code
 int app_cmd() {
+	tracee = alloc!adbg_process_t();
+	disasm = alloc!adbg_disassembler_t();
+	context = alloc!adbg_thread_context_t();
+	
+	// If file specified, load it
+	if (globals.file) {
+		if (adbg_spawn(tracee, globals.file, 0))
+			return oops;
+	}
+	
+	disasm_available = adbg_dasm_open(disasm) == AdbgError.success;
+	if (disasm_available == false) {
+		printf("warning: Disassembler not available (%s)\n",
+			adbg_error_msg());
+	}
+	
 	term_init;
-	return cmd_loop;
+	
+	user_continue = true;
+	
+	return prompt();
 }
 
-//TODO: cmd_file -- read (commands) from file
+private:
+
+int prompt() {
+	char* line = void;
+	int argc = void;
+	int error;
+	while (user_continue) {
+		cmd_prompt(error); // print prompt
+		line = term_readline(&argc); // read line
+		
+		//TODO: remove once term gets key events
+		if (line == null) {
+			printf("^D");
+			return 0;
+		}
+		
+		error = cmd_execl(line, argc); // execute line
+	}
+	return error;
+}
 
 /// Execute a line of command
 /// Returns: Error code
@@ -42,50 +82,25 @@ int cmd_execl(char *command, size_t len) {
 	return cmd_execv(argc, cast(const(char)**)argv);
 }
 
-private:
-
 //
 // Private globals
 //
 
-__gshared immutable const(char) *cmd_fmt   = " %-10s                      %s\n";
-__gshared immutable const(char) *cmd_fmta  = " %-10s %-20s %s\n";
-__gshared bool continue_; /// if user wants to continue
-__gshared bool paused;	/// if debuggee is paused
-__gshared int lasterror;	/// last command error
+immutable const(char) *cmd_fmt   = " %-10s                      %s\n";
+immutable const(char) *cmd_fmta  = " %-10s %-20s %s\n";
+__gshared adbg_process_t *tracee;
+__gshared adbg_disassembler_t *disasm;
+__gshared adbg_thread_context_t *context;
+__gshared bool user_continue;	/// if user wants to continue
 
-//
-// loop
-//
-
-int cmd_loop() {
-	char* line = void;
-	int argc = void;
-	continue_ = true;
-	
-	while (continue_) {
-		cmd_prompt(lasterror); // print prompt
-		line = term_readline(&argc); // read line
-		
-		//TODO: remove once term gets key events
-		if (line == null) {
-			printf("^D");
-			return 0;
-		}
-		
-		lasterror = cmd_execl(line, argc); // execute line
-	}
-	
-	return lasterror;
-}
+__gshared bool disasm_available;
 
 //
 // prompt
 //
 
 void cmd_prompt(int err) {
-	enum fmt = "[%d adbg%c] ";
-	printf(fmt, err, paused ? '*' : ' ');
+	printf("[%3d adbg%c] ", err, adbg_status(tracee) == AdbgStatus.paused ? '*' : ' ');
 }
 
 void cmd_help_chapter(const(char) *name) {
@@ -199,12 +214,11 @@ int cmd_c_load(int argc, const(char) **argv) {
 		return AppError.invalidParameter;
 	}
 	
-	if (adbg_load(argv[1], argc > 2 ? argv + 2: null)) {
-		printerror;
+	if (adbg_spawn(tracee, argv[1], argc > 2 ? argv + 2: null, 0)) {
+		oops();
 		return AppError.loadFailed;
 	}
 	
-	printf("Program '%s' loaded\n", argv[1]);
 	return 0;
 }
 void cmd_h_load() {
@@ -220,45 +234,35 @@ void cmd_h_load() {
 //
 
 int cmd_c_r(int argc, const(char) **argv) {
-	if (adbg_state == AdbgStatus.idle) {
-		puts("No program loaded or not paused");
+	if (adbg_status(tracee) == AdbgStatus.idle) {
+		puts("No program loaded or not debugger_paused");
 		return AppError.pauseRequired;
 	}
 	
-	thread_context_t ctx = void;
-	adbg_ctx_init(&ctx);
-	adbg_ctx_get(&ctx);
+	adbg_context_start(context, tracee);
+	adbg_context_fill(tracee, context);
 	
-	if (ctx.count == 0) {
+	if (context.count == 0) {
 		puts("No registers available");
 		return AppError.unavailable;
 	}
 	
-	int m = ctx.count;
-	register_t *r = ctx.items.ptr;
-	const(char) *reg = argv[1];
-	
-	// searching for reg
-	//TODO: reg=value when setting context is available
-	if (reg) {
-		for (size_t i; i < m; ++i, ++r) {
-			if (strcmp(reg, r.name))
-				continue;
-			printf("%-8s  0x%8s  %s\n",
-				r.name,
-				adbg_ctx_reg_hex(r),
-				adbg_ctx_reg_val(r));
-			return 0;
-		}
+	adbg_register_t *regs = context.items.ptr;
+	const(char) *rselect = argc >= 1 ? argv[1] : null;
+	bool found;
+	for (size_t i; i < context.count; ++i) {
+		adbg_register_t *reg = &context.items[i];
+		char[12] hex = void;
+		char[12] val = void;
+		adbg_context_reg_hex(hex.ptr, 12, reg);
+		adbg_context_reg_val(val.ptr, 12, reg);
+		printf("%-8s  0x%8s  %s\n", regs[i].name, hex.ptr, val.ptr);
+		if (rselect && strcmp(rselect, regs[i].name) == 0) break;
+	}
+	if (rselect && found == false) {
 		puts("Register not found");
 		return AppError.invalidParameter;
 	}
-	
-	for (size_t i; i < m; ++i, ++r)
-		printf("%-8s  0x%8s  %s\n",
-			r.name,
-			adbg_ctx_reg_hex(r),
-			adbg_ctx_reg_val(r));
 	return 0;
 }
 
@@ -298,7 +302,7 @@ int cmd_c_help(int argc, const(char) **argv) {
 	}
 	
 	// Action list
-	puts("\nWhen debuggee is paused:");
+	puts("\nWhen debuggee is debugger_paused:");
 	foreach (action; actions)
 		printf(cmd_fmt, action.str, action.desc);
 	
@@ -310,11 +314,11 @@ int cmd_c_help(int argc, const(char) **argv) {
 //
 
 int cmd_c_run(int argc, const(char) **argv) {
-	if (adbg_state != AdbgStatus.ready) {
+	if (adbg_status(tracee) != AdbgStatus.ready) {
 		puts("No programs loaded");
 		return AppError.alreadyLoaded;
 	}
-	return adbg_run(&cmd_handler);
+	return adbg_start(tracee, &cmd_handler);
 }
 
 //
@@ -322,24 +326,22 @@ int cmd_c_run(int argc, const(char) **argv) {
 //
 
 int cmd_c_maps(int argc, const(char) **argv) {
-	if (adbg_state() == AdbgStatus.idle) {
+	if (adbg_status(tracee) == AdbgStatus.idle) {
 		puts("error: Attach or spawn debuggee first");
 		return 1;
 	}
 	
-	adbg_mm_map *maps = void;
-	size_t mlen = void;
-	if (adbg_mm_maps(&maps, &mlen))
-	{
-		printf("error: %s\n", adbg_error_msg());
-		return adbg_errno();
+	adbg_memory_map_t *mmaps = void;
+	size_t mcount = void;
+	scope(exit) if (mcount) free(mmaps);
+	
+	if (adbg_memory_maps(tracee, &mmaps, &mcount, 0)) {
+		return AppError.alicedbg;
 	}
-	for (size_t i; i < mlen; ++i)
-	{
-		adbg_mm_map *map = &maps[i];
-		printf("%16llx %8llx %s\n", cast(size_t)map.base, map.size, map.name.ptr);
+	for (size_t i; i < mcount; ++i) {
+		adbg_memory_map_t *map = &mmaps[i];
+		with (map) printf("%8zx %8llx %s\n", cast(size_t)base, size, name.ptr);
 	}
-	if (mlen) free(maps);
 	
 	return 0;
 }
@@ -358,51 +360,33 @@ int cmd_c_quit(int argc, const(char) **argv) {
 // exception handler
 //
 
-int cmd_handler(exception_t *ex) {
-	memcpy(&globals.last_exception, ex, exception_t.sizeof);
+int cmd_handler(adbg_exception_t *ex) {
+	printf("*	Process %d thread %d stopped\n"
+		~"	Due to %s ("~ADBG_OS_ERROR_FORMAT~")\n",
+		ex.pid, ex.tid,
+		adbg_exception_name(ex), ex.oscode);
 	
-	printf("*	Thread %d stopped for: %s ("~ADBG_OS_ERROR_FORMAT~")\n",
-		ex.tid, adbg_exception_string(ex.type), ex.oscode);
-	
-	int length = void;
-	int argc = void;
-	paused = true;
-	
-	if (ex.fault) {
-		printf("	Fault address: %zx\n", ex.fault.sz);
-		adbg_disasm_opcode_t op = void;
-		if (adbg_disasm_once_debuggee(&globals.dism,
-			&op,
-			AdbgDisasmMode.file,
-			ex.fault.sz)) {
-			printf("	Faulting instruction: (error:%s)\n", adbg_error_msg);
-		} else with (globals) {
-			adbg_disasm_format(&dism,
-				bufferMnemonic.ptr,
-				bufferMnemonic.sizeof, &op);
-			adbg_disasm_machine(&dism,
-				bufferMachine.ptr,
-				bufferMachine.sizeof, &op);
-			printf("	Faulting instruction: [%s] %s\n",
-				bufferMachine.ptr, bufferMnemonic.ptr);
+	if (disasm_available && ex.fault) {
+		// BUG: There should be something detecting VS2013 and earlier MSVCRT
+		version (Windows)
+			enum fmt = "	Fault address: %Ix\n";
+		else
+			enum fmt = "	Fault address: %zx\n";
+		printf(fmt, ex.fault.sz);
+		ubyte[16] data = void;
+		adbg_opcode_t op = void;
+		if (adbg_memory_read(tracee, ex.fault.sz, data.ptr, 16)) {
+			oops;
+			goto L_SKIP;
 		}
+		printf("	Faulting instruction: ");
+		if (adbg_dasm_once(disasm, &op, data.ptr, 16))
+			printf("(error:%s)\n", adbg_error_msg);
+		else
+			printf(" %llx %s %s\n",
+				ex.fault.i64, op.mnemonic, op.operands);
 	}
 	
-L_INPUT:
-	cmd_prompt(lasterror);
-	char* line = term_readline(&length);
-	if (line == null) {
-		continue_ = false;
-		return AdbgAction.exit;
-	}
-	const(char)** argv = cast(const(char)**)adbg_util_expand(line, &argc);
-	
-	int a = cmd_action(argv[0]);
-	if (a > 0) {
-		paused = false;
-		return a;
-	}
-	
-	lasterror = cmd_execv(argc, argv);
-	goto L_INPUT;
+L_SKIP:
+	return prompt;
 }

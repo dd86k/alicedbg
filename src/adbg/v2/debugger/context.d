@@ -5,7 +5,7 @@
 /// License: BSD-3-Clause
 module adbg.v2.debugger.context;
 
-import adbg.v2.debugger.process : adbg_tracee_t;
+import adbg.v2.debugger.process : adbg_process_t;
 import adbg.include.c.stdio : snprintf;
 import core.stdc.stdarg;
 
@@ -42,7 +42,7 @@ enum AdbgRegisterSize {
 }
 
 /// Register structure, designs a single register for UI ends to understand
-struct register_t {
+struct adbg_register_t {
 	AdbgRegisterSize type;	/// Register type (size)
 	union {
 		ulong  u64;	/// Register data: ulong (u64)
@@ -63,12 +63,12 @@ struct adbg_thread_context_t {
 	/// Register count in registers field.
 	ushort count;
 	/// Register population, this may depends by platform.
-	register_t[REG_COUNT] items;
+	adbg_register_t[REG_COUNT] items;
 }
 
 /// Initiate register fields with their names and sizes.
 /// This is usually done by the debugger itself.
-void adbg_context_start(adbg_thread_context_t *ctx, adbg_tracee_t *tracee) {
+void adbg_context_start(adbg_thread_context_t *ctx, adbg_process_t *tracee) {
 	version (X86) {
 		adbg_context_start_x86(ctx);
 	} else version (X86_64) {
@@ -83,8 +83,7 @@ void adbg_context_start(adbg_thread_context_t *ctx, adbg_tracee_t *tracee) {
 		e.count = 0;
 }
 
-private
-void adbg_context_fill(adbg_tracee_t *tracee, adbg_thread_context_t *ctx) {
+void adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {
 	version (Windows) {
 		CONTEXT winctx = void;
 		version (Win64) {
@@ -131,7 +130,7 @@ void adbg_context_fill(adbg_tracee_t *tracee, adbg_thread_context_t *ctx) {
 /// 	reg = Register.
 ///
 /// Returns: Number of characters written.
-size_t adbg_context_reg_hex(char *buffer, size_t len, register_t *reg) {
+size_t adbg_context_reg_hex(char *buffer, size_t len, adbg_register_t *reg) {
 	if (buffer == null || len == 0)
 		return 0;
 	switch (reg.type) with (AdbgRegisterSize) {
@@ -152,7 +151,7 @@ size_t adbg_context_reg_hex(char *buffer, size_t len, register_t *reg) {
 /// 	reg = Register.
 ///
 /// Returns: Number of characters written.
-size_t adbg_context_reg_val(char *buffer, size_t len, register_t *reg) {
+size_t adbg_context_reg_val(char *buffer, size_t len, adbg_register_t *reg) {
 	if (buffer == null || len == 0)
 		return 0;
 	switch (reg.type) with (AdbgRegisterSize) {

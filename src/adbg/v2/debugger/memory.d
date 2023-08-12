@@ -1,6 +1,6 @@
 module adbg.v2.debugger.memory;
 
-import adbg.v2.debugger.process : adbg_tracee_t;
+import adbg.v2.debugger.process : adbg_process_t;
 import adbg.include.c.stdlib : malloc, free;
 import adbg.include.c.stdio;
 import core.stdc.config : c_long;
@@ -35,7 +35,11 @@ extern (C):
 /// 	size = Size of data.
 ///
 /// Returns: Error code.
-int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
+int adbg_memory_read(adbg_process_t *tracee, size_t addr, void *data, uint size) {
+	if (tracee == null || data == null) {
+		return adbg_oops(AdbgError.nullArgument);
+	}
+	
 	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
 	//      Linux 6.2 (include/uapi/linux/ptrace.h) still has no PT_IO
 	version (Windows) {
@@ -77,7 +81,11 @@ int adbg_memory_read(adbg_tracee_t *tracee, size_t addr, void *data, uint size) 
 /// 	size = Size of data.
 ///
 /// Returns: Error code.
-int adbg_memory_write(adbg_tracee_t *tracee, size_t addr, void *data, uint size) {
+int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size) {
+	if (tracee == null || data == null) {
+		return adbg_oops(AdbgError.nullArgument);
+	}
+	
 	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
 	version (Windows) {
 		if (WriteProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
@@ -122,7 +130,7 @@ enum AdbgMemPerm {
 
 private enum MEM_MAP_NAME_LEN = 512;
 /// Represents a mapped memory region
-struct adbg_memory_map {
+struct adbg_memory_map_t {
 	/// Base memory region address.
 	void *base;
 	/// Size of region.
@@ -143,8 +151,8 @@ enum AdbgMapOpt {
 	// With given Process ID instead
 	// Permission issues may be raised
 	//pid = 2,
-	// Override default list size.
-	//listSize	= 3,
+	// Get this maximum amount of maps.
+	//count	= 3,
 }
 
 /// Obtain the memory map for the current process.
@@ -160,17 +168,21 @@ enum AdbgMapOpt {
 /// 	... = Options.
 ///
 /// Returns: Error code.
-int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mcount, ...) {
+int adbg_memory_maps(adbg_process_t *tracee, adbg_memory_map_t **mmaps, size_t *mcount, ...) {
+	if (tracee == null || mmaps == null || mcount == null) {
+		return adbg_oops(AdbgError.nullArgument);
+	}
+	
+	// Failsafe
+	*mcount = 0;
+	
+	if (tracee.pid == 0) {
+		return adbg_oops(AdbgError.notAttached);
+	}
+	
 	version (Windows) {
 		if (__dynlib_psapi_load())
 			return adbg_oops(AdbgError.libLoader);
-		
-		if (tracee.pid == 0) {
-			return adbg_oops(AdbgError.notAttached);
-		}
-		if (mmaps == null || mcount == null) {
-			return adbg_oops(AdbgError.nullArgument);
-		}
 		
 		enum SIZE = 512 * HMODULE.sizeof;
 		HMODULE *mods = cast(HMODULE*)malloc(SIZE);
@@ -182,7 +194,7 @@ int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mco
 		
 		DWORD modcount = needed / HMODULE.sizeof;
 		
-		adbg_memory_map *map = *mmaps = cast(adbg_memory_map*)malloc(modcount * adbg_memory_map.sizeof);
+		adbg_memory_map_t *map = *mmaps = cast(adbg_memory_map_t*)malloc(modcount * adbg_memory_map_t.sizeof);
 		if (map == null) {
 			free(mods);
 			return adbg_oops(AdbgError.os);
@@ -238,19 +250,12 @@ int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mco
 	} else version (linux) {
 		// Inspired by libscanmem
 		// https://github.com/scanmem/scanmem/blob/main/maps.c
-		import core.stdc.config : c_long;
+		
 		import core.stdc.stdlib : malloc, free;
 		import core.sys.linux.unistd : readlink;
 		import adbg.utils.string : adbg_util_getline, adbg_util_getlinef;
 		import core.sys.linux.unistd : read, close;
 		import core.sys.linux.fcntl : open, O_RDONLY;
-		
-		if (tracee.pid == 0) {
-			return adbg_oops(AdbgError.notAttached);
-		}
-		if (mmaps == null || mcount == null) {
-			return adbg_oops(AdbgError.nullArgument);
-		}
 		
 		*mcount = 0;
 		
@@ -265,26 +270,27 @@ int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mco
 		if (fd_maps == -1)
 			return adbg_oops(AdbgError.os);
 		
-		// Formulate proc exe path
+		/*
+		// Get proc exe path (e.g., /usr/bin/cat)
 		enum PROC_EXE_LEN = 32;
 		char[PROC_EXE_LEN] proc_exe = void;
 		snprintf(proc_exe.ptr, PROC_EXE_LEN, "/proc/%u/exe", tracee.pid);
 		
-		// Read link from proc exe for process path (e.g., /usr/bin/cat)
+		// Read link from proc exe for process path
 		enum EXE_PATH_LEN = 256;
 		char[EXE_PATH_LEN] exe_path = void;
 		version (Trace) trace("exe: %s", proc_exe.ptr);
 		ssize_t linksz = readlink(proc_exe.ptr, exe_path.ptr, EXE_PATH_LEN);
 		if (linksz > 0) {
 			exe_path[linksz] = 0;
-		} else { // Fail or empty
+		} else { // Failed or empty
 			exe_path[0] = 0;
-		}
+		}*/
 		
-		// Allocate 4 MiB for input maps buffer
+		// Allocate 2 MiB for input maps buffer
 		// WebKit has about 164K worth of maps, for example
-		// And then read as much as possible (not possible with fread)
-		enum READSZ = 4 * 1024 * 1024;
+		// And then read as much as possible (not possible with fread!)
+		enum READSZ = 2 * 1024 * 1024;
 		//TODO: Consider mmap(2)
 		char *procbuf = cast(char*)malloc(READSZ);
 		if (procbuf == null) {
@@ -309,7 +315,8 @@ int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mco
 		
 		// Allocate map items
 		version (Trace) trace("allocating %zu items", itemcnt);
-		adbg_memory_map *map = *mmaps = cast(adbg_memory_map*)malloc(itemcnt * adbg_memory_map.sizeof);
+		adbg_memory_map_t *map = *mmaps =
+			cast(adbg_memory_map_t*)malloc(itemcnt * adbg_memory_map_t.sizeof);
 		if (map == null) {
 			free(procbuf);
 			close(fd_maps);
@@ -329,6 +336,7 @@ int adbg_memory_maps(adbg_tracee_t *tracee, adbg_memory_map **mmaps, size_t *mco
 		size_t linesz = void; /// line size
 		size_t srcidx; /// maps source buffer index
 		size_t i; /// maps index
+		//TODO: use a variant with mutable string and actively cuts lines
 		while (adbg_util_getline(line.ptr, LINE_LEN, &linesz, procbuf, &srcidx)) {
 			size_t range_start = void;
 			size_t range_end   = void;
@@ -484,7 +492,7 @@ enum AdbgScanOpt {
 /// 	... = Options.
 ///
 /// Returns: Error code.
-int adbg_memory_scan(adbg_tracee_t *tracee,
+int adbg_memory_scan(adbg_process_t *tracee,
 	ulong **list, size_t *count,
 	void* data, size_t size, ...) {
 	import adbg.v2.debugger.process : AdbgStatus;
@@ -502,7 +510,7 @@ int adbg_memory_scan(adbg_tracee_t *tracee,
 		return adbg_oops(AdbgError.notPaused);
 	}
 	
-	adbg_memory_map *mmaps = void; size_t mcount = void;
+	adbg_memory_map_t *mmaps = void; size_t mcount = void;
 	int e = adbg_memory_maps(tracee, &mmaps, &mcount, 0);
 	if (e) return e;
 	

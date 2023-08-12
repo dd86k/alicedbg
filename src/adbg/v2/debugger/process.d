@@ -20,6 +20,8 @@ import adbg.platform, adbg.error;
 import adbg.utils.string : adbg_util_argv_flatten;
 import adbg.v2.debugger.exception;
 
+//TODO: alloc process function?
+
 version (Windows) {
 	import core.sys.windows.windows;
 	import adbg.include.windows.wow64;
@@ -105,24 +107,35 @@ struct adbg_debugger_event_t {
 	}
 }+/
 
-struct adbg_tracee_t {
-	AdbgStatus status;
-	breakpoint_t[ADBG_MAX_BREAKPOINTS] breakpoints;
-	size_t bpindex;	/// breakpoint index
-	/// Set when debuggee was attached to rather than created.
-	/// This is used in the debugger loop.
-	bool attached;
+enum AdbgCreation {
+	unloaded,
+	attached,
+	spawned,
+}
+
+struct adbg_process_t {
 	version (Windows) {
-		HANDLE hpid;	/// Process handle
-		HANDLE htid;	/// Thread handle
 		int pid;	/// Process identificiation number
 		int tid;	/// Thread identification number
+		HANDLE hpid;	/// Process handle
+		HANDLE htid;	/// Thread handle
 		version (Win64) int wow64; /// If running under WoW64
 	}
 	version (Posix) {
 		pid_t pid;	/// Process ID // @suppress(dscanner.suspicious.label_var_same_name)
 		int mhandle;	/// Memory file handle
 	}
+	/// Current process status.
+	AdbgStatus status;
+	/// List of breakpoints.
+	breakpoint_t[ADBG_MAX_BREAKPOINTS] bp_list;
+	/// Breakpoint index.
+	size_t bp_index;
+	/// Set when debuggee was attached to rather than created.
+	/// This is used in the debugger loop.
+	deprecated bool attached;
+	/// 
+	AdbgCreation creation;
 }
 
 private
@@ -215,17 +228,18 @@ L_OPTION:
 /// 	path = Command, path to executable.
 /// 	... = Options
 /// Returns: Error code.
-int adbg_spawn(adbg_tracee_t *tracee, const(char) *path, ...) {
+int adbg_spawn(adbg_process_t *tracee, const(char) *path, ...) {
 	if (tracee == null || path == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
+	version (Trace) trace("path=%s", path);
 	va_list list = void;
 	va_start(list, path);
 	
 	return adbg_spawnv(tracee, path, list);
 }
 private
-int adbg_spawnv(adbg_tracee_t *tracee, const(char) *path, va_list list) {
+int adbg_spawnv(adbg_process_t *tracee, const(char) *path, va_list list) {
 	if (tracee == null || path == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
@@ -236,7 +250,7 @@ int adbg_spawnv(adbg_tracee_t *tracee, const(char) *path, va_list list) {
 	return adbg_spawn2(tracee, path, &opts);
 }
 private
-int adbg_spawn2(adbg_tracee_t *tracee, const(char) *path, adbg_options_spawn_t *opts) {
+int adbg_spawn2(adbg_process_t *tracee, const(char) *path, adbg_options_spawn_t *opts) {
 	if (tracee == null || path == null || opts == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
@@ -415,7 +429,7 @@ enum {
 /// 	... = Options. Pass 0 for none or to end list.
 ///
 /// Returns: Error code.
-int adbg_attach(adbg_tracee_t *tracee, int pid, ...) {
+int adbg_attach(adbg_process_t *tracee, int pid, ...) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
@@ -514,7 +528,7 @@ L_OPTION:
 }
 
 /// Detach debugger from current process.
-int adbg_detach(adbg_tracee_t *tracee) {
+int adbg_detach(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
@@ -589,7 +603,7 @@ void adbg_break() {
 
 /// Get the debugger's current state.
 /// Returns: Debugger status.
-AdbgStatus adbg_status(adbg_tracee_t *tracee) pure { return tracee.status; }
+AdbgStatus adbg_status(adbg_process_t *tracee) pure { return tracee.status; }
 
 /// Enter the debugging loop. Continues execution of the process until a new
 /// debug event occurs. When an exception occurs, the exception_t structure is
@@ -603,7 +617,7 @@ AdbgStatus adbg_status(adbg_tracee_t *tracee) pure { return tracee.status; }
 /// 	userfunc = User function callback.
 /// 	... = Options, pass 0 for no options and assume defaults.
 /// Returns: Error code.
-int adbg_start(adbg_tracee_t *tracee, int function(adbg_exception_t*) userfunc, ...) {
+int adbg_start(adbg_process_t *tracee, int function(adbg_exception_t*) userfunc, ...) {
 	if (tracee == null || userfunc == null)
 		return adbg_oops(AdbgError.nullAddress);
 	
@@ -777,24 +791,24 @@ L_DEBUG_LOOP:
 // Breakpoint handling
 //
 
-int adbg_breakpoint_add(adbg_tracee_t *tracee, size_t addr) {
+int adbg_breakpoint_add(adbg_process_t *tracee, size_t addr) {
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_breakpoint_get(adbg_tracee_t *tracee, breakpoint_t *bp, int index) {
+int adbg_breakpoint_get(adbg_process_t *tracee, breakpoint_t *bp, int index) {
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_breakpoint_present_at(adbg_tracee_t *tracee, breakpoint_t *bp, size_t addr) {
+int adbg_breakpoint_present_at(adbg_process_t *tracee, breakpoint_t *bp, size_t addr) {
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_breakpoint_list(adbg_tracee_t *tracee, breakpoint_t **l, uint *n) {
+int adbg_breakpoint_list(adbg_process_t *tracee, breakpoint_t **l, uint *n) {
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_breakpoint_rm(adbg_tracee_t *tracee, int index) {
+int adbg_breakpoint_rm(adbg_process_t *tracee, int index) {
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_breakpoint_rm_at(adbg_tracee_t *tracee, size_t addr) {
+int adbg_breakpoint_rm_at(adbg_process_t *tracee, size_t addr) {
 	return adbg_oops(AdbgError.notImplemented);
 }
-int adbg_breakpoint_rm_all(adbg_tracee_t *tracee) {
+int adbg_breakpoint_rm_all(adbg_process_t *tracee) {
 	return adbg_oops(AdbgError.notImplemented);
 }

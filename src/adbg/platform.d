@@ -242,6 +242,7 @@ enum D_FEATURES = PIC~PIE~SIMD~AVX~AVX2~NoBoundsCheck;
 //
 
 /// 
+deprecated
 public
 struct adbg_address_t {
 	alias raw this;

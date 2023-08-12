@@ -13,6 +13,7 @@ private import core.stdc.stdlib;
 /// Read entire file into memory.
 /// To release buffer, call free(3).
 /// Returns: Buffer pointer. Null on error.
+//TODO: Consider setting internal error
 ubyte *adbg_util_readall(size_t *size, const(char) *path) {
 	//TODO: Check filesize before continuing for 2GiB limitation
 	FILE *f = fopen(path, "rb");

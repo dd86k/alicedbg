@@ -25,10 +25,17 @@ int app_loop() {
 		puts("loop: No program loaded");
 		return 1;
 	}
+	if (adbg_disasm_init(&dism))
+		return printerror();
+	if (globals.syntax && adbg_disasm_syntax(&dism, globals.syntax))
+		return printerror();
+	
 	return adbg_run(&loop_handler);
 }
 
 private:
+
+__gshared adbg_disasm_t dism;
 
 int loop_handler(exception_t *e) {
 	__gshared uint ex_num; /// Exception number
@@ -43,7 +50,7 @@ int loop_handler(exception_t *e) {
 	// Print disassembly if available
 	if (e.fault) {
 		adbg_disasm_opcode_t op = void;
-		if (adbg_disasm_once_debuggee(&globals.dism,
+		if (adbg_disasm_once_debuggee(&dism,
 			&op,
 			AdbgDisasmMode.file,
 			e.fault.sz)) {

@@ -79,7 +79,16 @@ struct adbg_exception_t {
 	int pid;
 	/// Thread ID, if available; Otherwise zero.
 	int tid;
-	adbg_address_t fault;	/// Memory address pointer for fault. Otherwise null.
+	deprecated adbg_address_t fault;	/// Memory address pointer for fault. Otherwise null.
+	union {
+		/// Faulting address, if available; Otherwise zero.
+		ulong fault_address;
+		/// 32-bit Faulting address, if available; Otherwise zero.
+		/// Useful for LP32 environments.
+		uint fault_address32;
+		/// Used internally.
+		size_t faultz;
+	}
 }
 
 /// (Internal) Translate an oscode to an ExceptionType enum value.
@@ -242,8 +251,9 @@ AdbgException adbg_exception_from_os(uint code, uint subcode = 0) {
 /// Params: code = ExceptionType
 ///
 /// Returns: String
-const(char) *adbg_exception_name(AdbgException code) {
-	switch (code) with (AdbgException) {
+const(char) *adbg_exception_name(adbg_exception_t *ex) {
+	if (ex == null) return null;
+	switch (ex.type) with (AdbgException) {
 	case Unknown:	return "UNKNOWN";
 	case Exit:	return "TERMINATED";
 	case Breakpoint:	return "BREAKPOINT";
@@ -280,7 +290,7 @@ void adbg_exception_translate(adbg_exception_t *exception, void *os1, void *os2)
 		
 		exception.pid = de.dwProcessId;
 		exception.tid = de.dwThreadId;
-		exception.fault.raw = de.Exception.ExceptionRecord.ExceptionAddress;
+		exception.faultz = cast(size_t)de.Exception.ExceptionRecord.ExceptionAddress;
 		exception.oscode = de.Exception.ExceptionRecord.ExceptionCode;
 		
 		switch (exception.oscode) {

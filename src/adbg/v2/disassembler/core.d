@@ -9,10 +9,10 @@
 /// License: BSD-3-Clause
 module adbg.v2.disassembler.core;
 
-import adbg.error;
-import adbg.platform;
 import adbg.include.capstone;
 import adbg.include.c.stdarg;
+import adbg.error;
+import adbg.platform;
 
 version (X86) { // CS_OPT_SYNTAX_DEFAULT
 	private enum {
@@ -324,10 +324,6 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	
 	dasm.address_last = dasm.address_current;
 	
-	//TODO: Confirm if CS modifies:
-	// - buffer pointer
-	// - buffer_size
-	// - and base address fields
 	if (cs_disasm_iter(dasm.cs_handle,
 		cast(const(ubyte*)*)&dasm.buffer,
 		&dasm.buffer_size,
@@ -346,4 +342,9 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	opcode.operands = dasm.cs_inst.op_str.ptr;
 	
 	return 0;
+}
+
+int adbg_dasm_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, void *data, size_t size) {
+	int e = adbg_dasm_start(dasm, data, size);
+	return e ? e : adbg_dasm(dasm, opcode);
 }
