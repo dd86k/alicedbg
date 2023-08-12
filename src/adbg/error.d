@@ -253,7 +253,7 @@ const(char)* adbg_error_msg(int code = error.code) {
 
 version (Trace) {
 	import core.stdc.stdio, core.stdc.stdarg;
-	private import adbg.platform : COMPILER_FEAT_PRAGMA_PRINTF;
+	private import adbg.include.d.config : COMPILER_FEAT_PRAGMA_PRINTF;
 	
 	private extern (C) int putchar(int);
 	
