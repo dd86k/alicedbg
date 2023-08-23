@@ -26,6 +26,7 @@ version (Windows) {
 //TODO: Consider making all codes negative values.
 //      This allows positive values to be used and follows more
 //      the "C way" of doing things.
+//TODO: Consider prefixing errors with corresponding section (e.g., debuggerNotAttached)
 
 extern (C):
 
@@ -36,16 +37,17 @@ enum AdbgError {
 	//
 	success	= 0,
 	invalidArgument	= 1,
-	nullArgument	= 2,
+	missingArgument	= 2,
+	nullArgument	= missingArgument,	// Old alias
 	uninitiated	= 4,	// Only when user value is important like for fopen
 	invalidOption	= 5,
 	invalidOptionValue	= 6,
-	//TODO: Prefix all errors with corresponding section (e.g., debuggerNotAttached)
 	//
 	// 100-199: Debugger
 	//
 	notAttached = 100,
 	notPaused = 101,
+	invalidAction = 102,
 	//
 	// 200-299: Disasembler
 	//
@@ -88,7 +90,7 @@ enum AdbgError {
 
 /// Represents an error in alicedbg.
 struct adbg_error_t {
-	const(char)* file;	/// File source
+	const(char)* mod;	/// Source module
 	int line;	/// Line source
 	int code;	/// Error code
 	void *res;	/// Resource
@@ -201,7 +203,7 @@ int adbg_error_system() {
 /// Returns: Error code
 int adbg_oops(AdbgError e, void *res = null, string m = __MODULE__, int l = __LINE__) {
 	version (Trace) trace("code=%d res=%p", e, res);
-	error.file = m.ptr;
+	error.mod = m.ptr;
 	error.line = l;
 	error.res = res;
 	return error.code = e;

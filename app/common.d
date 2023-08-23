@@ -103,9 +103,9 @@ void panic(AdbgError code = AdbgError.success, void *add = null) {
 }
 
 
-int oops(const(char)* func = cast(char*)__FUNCTION__,
+int oops(
+	const(char)* func = cast(char*)__FUNCTION__,
 	const(char)* mod = cast(char*)__MODULE__,
-	const(char)* file = cast(char*)__FILE__,
 	int line = __LINE__) {
 	import adbg.include.c.stdio : printf, puts;
 	import adbg.error : adbg_error_current;
@@ -122,9 +122,9 @@ int oops(const(char)* func = cast(char*)__FUNCTION__,
 	puts(adbg_error_msg);
 	
 	debug {
-		printf("%s\n", func);
-		printf("\t%s:%d\n", file, line);
-		printf("\t%s:%d\n", error.file, error.line);
+		printf("in %s\n", func);
+		printf("  %s:%d\n", mod, line);
+		printf("  %s:%d\n", error.mod, error.line);
 	}
 	
 	return error.code;
@@ -138,7 +138,7 @@ int printerror(const(char)* func = cast(char*)__FUNCTION__) {
 	
 	const(adbg_error_t)* error = adbg_error_current;
 	
-	debug printf("[%s:%d] ", error.file, error.line);
+	debug printf("[%s:%d] ", error.mod, error.line);
 	printf("%s: E-%u ", func, adbg_errno);
 	switch (error.code) with (AdbgError) {
 	case crt: printf("(CRT:%d) ", adbg_errno_extern); break;
