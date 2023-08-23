@@ -19,7 +19,6 @@
 module adbg.v1.debugger.exception;
 
 public import adbg.v1.debugger.context;
-import adbg.platform : adbg_address_t;
 
 version (Windows) {
 	import core.sys.windows.windows;
@@ -73,6 +72,21 @@ enum ExceptionType {
 	NoContinue,	/// Debugger tried to continue on after non-continuable error
 }
 
+public
+struct adbg_address_t {
+	alias raw this;
+	union {
+		size_t  sz;	/// Used internally
+		void   *raw;	/// Ditto
+		ubyte  *i8;	/// Ditto
+		ushort *i16;	/// Ditto
+		uint   *i32;	/// Ditto
+		ulong  *i64;	/// Ditto
+		float  *f32;	/// Ditto
+		double *f64;	/// Ditto
+	}
+}
+
 //TODO: Severity levels depending on exception type
 //      Essentially it'll be for a "can or cannot continue"
 //      This would also allow the removal of Disposition/NoContinue
@@ -91,12 +105,6 @@ struct exception_t {
 	/// Thread ID, if available; Otherwise zero.
 	int tid;
 	adbg_address_t fault;	/// Memory address pointer for fault. Otherwise null.
-	union {
-		/// Memory address pointer for fault. Otherwise null.
-		deprecated void *faultaddr;
-		/// Memory address value for fault. Otherwise null.
-		deprecated size_t faultaddrv;
-	}
 }
 
 // Windows: Mostly covered in winbase.h or winnt.h

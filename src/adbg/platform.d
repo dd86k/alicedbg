@@ -238,27 +238,6 @@ else                       private enum NoBoundsCheck = "";
 enum D_FEATURES = PIC~PIE~SIMD~AVX~AVX2~NoBoundsCheck;
 
 //
-// Core structures
-//
-
-/// 
-deprecated
-public
-struct adbg_address_t {
-	alias raw this;
-	union {
-		size_t  sz;	/// Used internally
-		void   *raw;	/// Ditto
-		ubyte  *i8;	/// Ditto
-		ushort *i16;	/// Ditto
-		uint   *i32;	/// Ditto
-		ulong  *i64;	/// Ditto
-		float  *f32;	/// Ditto
-		double *f64;	/// Ditto
-	}
-}
-
-//
 // ANCHOR Functions
 //
 

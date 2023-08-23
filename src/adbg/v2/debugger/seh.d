@@ -102,7 +102,7 @@ uint adbg_seh_catch(_EXCEPTION_POINTERS *e) {
 		EXCEPTION_IN_PAGE_ERROR, EXCEPTION_ACCESS_VIOLATION;
 	
 	checkpoint.exception.oscode = e.ExceptionRecord.ExceptionCode;
-	checkpoint.exception.fault.raw = e.ExceptionRecord.ExceptionAddress;
+	checkpoint.exception.faultz = cast(size_t)e.ExceptionRecord.ExceptionAddress;
 	checkpoint.exception.pid = checkpoint.exception.tid = 0;
 	
 	switch (checkpoint.exception.oscode) {

@@ -24,6 +24,12 @@ import adbg.v2.object.machines : AdbgMachine;
 
 extern (C):
 
+//TODO: Object type and format enums
+//      Either:
+//      - extent formats to include everyting else, have functions to say type (_is_dump)
+//      - keep format and add a "type/purpose" enum (exec/dump/symbols/etc.)
+//      - do type as first-class and format second
+
 /// Executable or object format.
 enum AdbgObject {
 	/// Raw binary file, or unknown object format.

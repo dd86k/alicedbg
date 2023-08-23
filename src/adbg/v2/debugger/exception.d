@@ -9,8 +9,6 @@
 /// License: BSD-3-Clause
 module adbg.v2.debugger.exception;
 
-import adbg.platform : adbg_address_t;
-
 version (Windows) {
 	import core.sys.windows.winbase;
 	private enum {	// missing values for WoW64 (NTSTATUS, winbase.h)
@@ -79,7 +77,6 @@ struct adbg_exception_t {
 	int pid;
 	/// Thread ID, if available; Otherwise zero.
 	int tid;
-	deprecated adbg_address_t fault;	/// Memory address pointer for fault. Otherwise null.
 	union {
 		/// Faulting address, if available; Otherwise zero.
 		ulong fault_address;

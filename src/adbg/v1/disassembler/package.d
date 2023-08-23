@@ -12,7 +12,7 @@ module adbg.v1.disassembler;
 import adbg.error;
 import adbg.config;
 private import adbg.utils.string;
-private import adbg.platform : adbg_address_t;
+private import adbg.v1.debugger.exception : adbg_address_t;
 private import adbg.v1.disassembler.decoders;
 public import adbg.v1.disassembler.formatter;
 
