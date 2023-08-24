@@ -173,6 +173,8 @@ int adbg_memory_maps(adbg_process_t *tracee, adbg_memory_map_t **mmaps, size_t *
 		return adbg_oops(AdbgError.nullArgument);
 	}
 	
+	version (Trace) trace("tracee=%p mmaps=%p mcount=%p", tracee, mmaps, mcount);
+	
 	// Failsafe
 	*mcount = 0;
 	
@@ -208,11 +210,11 @@ int adbg_memory_maps(adbg_process_t *tracee, adbg_memory_map_t **mmaps, size_t *
 				continue;
 			}
 			// \Device\HarddiskVolume5\xyz.dll
-			if (GetMappedFileNameA(tracee.hpid, minfo.lpBaseOfDll, map.name.ptr, MEM_MAP_NAME_LEN) == FALSE) {
+			if (GetMappedFileNameA(tracee.hpid, minfo.lpBaseOfDll, map.name.ptr, MEM_MAP_NAME_LEN)) {
 				// xyz.dll
-				if (GetModuleBaseNameA(tracee.hpid, mod, map.name.ptr, MEM_MAP_NAME_LEN) == FALSE) {
-					map.name[0] = 0;
-				}
+				map.name[GetModuleBaseNameA(tracee.hpid, mod, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
+			} else {
+				map.name[0] = 0;
 			}
 			
 			MEMORY_BASIC_INFORMATION mem = void;

@@ -82,8 +82,11 @@ enum AdbgAction {
 /// Debugger status
 public
 enum AdbgStatus {
-	idle,	/// No tracee is loaded, or has been unloaded.
-	ready,	/// Tracee is loaded and waiting to run.
+	unloaded,	/// No No tracee is loaded.
+	idle = unloaded,	/// Old v1 alias for unloaded.
+	unknown = unloaded,	/// Alias for idle
+	standby,	/// Tracee is loaded and waiting to run.
+	ready = standby,	/// Old v1 alias for standby.
 	running,	/// Tracee is running.
 	paused,	/// Tracee is paused due to an exception.
 }
@@ -394,8 +397,8 @@ int adbg_spawn2(adbg_process_t *tracee, const(char) *path, adbg_options_spawn_t 
 		} // USE_CLONE
 	}
 	
-	tracee.attached = false;
-	tracee.status = AdbgStatus.ready;
+	tracee.status = AdbgStatus.standby;
+	tracee.creation = AdbgCreation.spawned;
 	return 0;
 }
 
@@ -603,7 +606,10 @@ void adbg_break() {
 
 /// Get the debugger's current state.
 /// Returns: Debugger status.
-AdbgStatus adbg_status(adbg_process_t *tracee) pure { return tracee.status; }
+AdbgStatus adbg_status(adbg_process_t *tracee) pure {
+	if (tracee == null) return AdbgStatus.unknown;
+	return tracee.status;
+}
 
 /// Enter the debugging loop. Continues execution of the process until a new
 /// debug event occurs. When an exception occurs, the exception_t structure is
@@ -653,9 +659,9 @@ L_DEBUG_LOOP:
 		
 		tracee.status = AdbgStatus.paused;
 		with (AdbgAction)
-		final switch (userfunc(&exception)) {
+		switch (userfunc(&exception)) {
 		case exit:
-			if (tracee.attached)
+			if (tracee.creation == AdbgCreation.attached)
 				return adbg_detach(tracee);
 			
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
@@ -695,6 +701,8 @@ L_DEBUG_LOOP:
 				return adbg_oops(AdbgError.os);
 			}
 			goto L_DEBUG_LOOP;
+		default:
+			return adbg_oops(AdbgError.invalidAction);
 		}
 	} else version (Posix) {
 		int wstatus = void;
@@ -782,7 +790,8 @@ L_DEBUG_LOOP:
 				return adbg_oops(AdbgError.os);
 			}
 			goto L_DEBUG_LOOP;
-		default: assert(0);
+		default:
+			return adbg_oops(AdbgError.invalidAction);
 		}
 	}
 }

@@ -353,6 +353,8 @@ L_END:
 	}
 }
 
+//TODO: Consider redoing with getchar+fwrite(stdin)
+
 //TODO: term_readline_event(Key, void function(Key))
 //      or just term_event_ctrld (etc.)
 //TODO: damage-based display (putchar)

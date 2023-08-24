@@ -19,6 +19,13 @@ import common, term;
 //TODO: Command re-structure
 //      show r|registers
 //      show b|breakpoints
+//      show s|stack
+//      show state
+//      add breakpoint
+//TODO: Move commands to its own module? rename ui as shell?
+//      "tcp" ui might re-use commands
+//TODO: int cmd_error(const(char)*);
+//TODO: Improve help system by avoiding help functions
 
 extern (C):
 
@@ -27,7 +34,6 @@ extern (C):
 int app_cmd() {
 	tracee = alloc!adbg_process_t();
 	disasm = alloc!adbg_disassembler_t();
-	context = alloc!adbg_thread_context_t();
 	
 	// If file specified, load it
 	if (globals.file) {
@@ -35,8 +41,8 @@ int app_cmd() {
 			return oops;
 	}
 	
-	disasm_available = adbg_dasm_open(disasm) == AdbgError.success;
-	if (disasm_available == false) {
+	if (adbg_dasm_open(disasm)) {
+		disasm_available = false;
 		printf("warning: Disassembler not available (%s)\n",
 			adbg_error_msg());
 	}
@@ -90,10 +96,9 @@ immutable const(char) *cmd_fmt   = " %-10s                      %s\n";
 immutable const(char) *cmd_fmta  = " %-10s %-20s %s\n";
 __gshared adbg_process_t *tracee;
 __gshared adbg_disassembler_t *disasm;
-__gshared adbg_thread_context_t *context;
-__gshared bool user_continue;	/// if user wants to continue
-
 __gshared bool disasm_available;
+__gshared bool user_continue;	/// if user wants to continue
+__gshared AdbgAction user_action;
 
 //
 // prompt
@@ -131,6 +136,11 @@ immutable command_t[] commands = [
 		"load", "<file> [<arg>...]",
 		"Load executable file into the debugger",
 		&cmd_c_load, &cmd_h_load
+	},
+	{ // temporary
+		"d", "action",
+		"Debugger action",
+		&cmd_action
 	},
 //	{ "core",   null, "Load core debugging object into debugger", &cmd_c_load },
 //	{ "attach", null, "Attach the debugger to pid", &cmd_c_pid },
@@ -196,11 +206,16 @@ immutable action_t[] actions = [
 	{ "si",       "Instruction step", AdbgAction.step },
 ];
 
-int cmd_action(const(char) *a) {
+int cmd_action(int argc, const(char) **argv) {
+	if (argc < 1)
+		return 0;
+	
+	const(char) *a = argv[1];
 	foreach (action; actions)
 		if (strcmp(a, action.str) == 0)
-			return action.val;
+			user_action = action.val; 
 	
+	puts("Debugger action not found");
 	return -1;
 }
 
@@ -234,30 +249,34 @@ void cmd_h_load() {
 //
 
 int cmd_c_r(int argc, const(char) **argv) {
-	if (adbg_status(tracee) == AdbgStatus.idle) {
+	if (adbg_status(tracee) == AdbgStatus.unloaded) {
 		puts("No program loaded or not debugger_paused");
 		return AppError.pauseRequired;
 	}
 	
-	adbg_context_start(context, tracee);
-	adbg_context_fill(tracee, context);
+	adbg_thread_context_t *context = adbg_context_easy(tracee);
 	
+	if (context == null) {
+		oops;
+		return AppError.alicedbg;
+	}
 	if (context.count == 0) {
 		puts("No registers available");
 		return AppError.unavailable;
 	}
 	
 	adbg_register_t *regs = context.items.ptr;
-	const(char) *rselect = argc >= 1 ? argv[1] : null;
+	const(char) *rselect = argc >= 2 ? argv[1] : null;
 	bool found;
 	for (size_t i; i < context.count; ++i) {
 		adbg_register_t *reg = &context.items[i];
-		char[12] hex = void;
-		char[12] val = void;
-		adbg_context_reg_hex(hex.ptr, 12, reg);
-		adbg_context_reg_val(val.ptr, 12, reg);
-		printf("%-8s  0x%8s  %s\n", regs[i].name, hex.ptr, val.ptr);
-		if (rselect && strcmp(rselect, regs[i].name) == 0) break;
+		bool show = rselect == null || strcmp(rselect, regs[i].name) == 0;
+		if (show == false) continue;
+		char[20] normal = void, hexdec = void;
+		adbg_context_format(normal.ptr, 20, reg, FORMAT_NORMAL);
+		adbg_context_format(hexdec.ptr, 20, reg, FORMAT_HEXPADDED);
+		printf("%-8s  0x%8s  %s\n", regs[i].name, hexdec.ptr, normal.ptr);
+		found = true;
 	}
 	if (rselect && found == false) {
 		puts("Register not found");
@@ -271,10 +290,10 @@ int cmd_c_r(int argc, const(char) **argv) {
 //
 
 int cmd_c_help(int argc, const(char) **argv) {
-	const(char) *arg = argv[1];
-	
 	// Help on command
-	if (arg) {
+	if (argc >= 2) {
+		const(char) *arg = argv[1];
+		
 		foreach (comm; commands) {
 			if (strcmp(arg, comm.str))
 				continue;
@@ -288,6 +307,7 @@ int cmd_c_help(int argc, const(char) **argv) {
 			comm.help();
 			return 0;
 		}
+		
 		printf("No help article found for '%s'\n", arg);
 		return AppError.invalidCommand;
 	}
@@ -314,7 +334,7 @@ int cmd_c_help(int argc, const(char) **argv) {
 //
 
 int cmd_c_run(int argc, const(char) **argv) {
-	if (adbg_status(tracee) != AdbgStatus.ready) {
+	if (adbg_status(tracee) == AdbgStatus.unloaded) {
 		puts("No programs loaded");
 		return AppError.alreadyLoaded;
 	}
@@ -325,23 +345,24 @@ int cmd_c_run(int argc, const(char) **argv) {
 // maps command
 //
 
+//TODO: optional arg: filter module by name (contains string)
 int cmd_c_maps(int argc, const(char) **argv) {
-	if (adbg_status(tracee) == AdbgStatus.idle) {
-		puts("error: Attach or spawn debuggee first");
+	if (adbg_status(tracee) == AdbgStatus.unloaded) {
+		puts("error: Attach or spawn program first");
 		return 1;
 	}
 	
 	adbg_memory_map_t *mmaps = void;
 	size_t mcount = void;
-	scope(exit) if (mcount) free(mmaps);
 	
 	if (adbg_memory_maps(tracee, &mmaps, &mcount, 0)) {
 		return AppError.alicedbg;
 	}
 	for (size_t i; i < mcount; ++i) {
 		adbg_memory_map_t *map = &mmaps[i];
-		with (map) printf("%8zx %8llx %s\n", cast(size_t)base, size, name.ptr);
+		with (map) printf("%8p %10lld %s\n", base, size, name.ptr);
 	}
+	if (mcount) free(mmaps);
 	
 	return 0;
 }
@@ -366,16 +387,13 @@ int cmd_handler(adbg_exception_t *ex) {
 		ex.pid, ex.tid,
 		adbg_exception_name(ex), ex.oscode);
 	
-	if (disasm_available && ex.fault) {
-		// BUG: There should be something detecting VS2013 and earlier MSVCRT
-		version (Windows)
-			enum fmt = "	Fault address: %Ix\n";
-		else
-			enum fmt = "	Fault address: %zx\n";
-		printf(fmt, ex.fault.sz);
+	if (disasm_available && ex.faultz) {
+		// NOTE: size_t stuff on Windows works with %Ix,
+		//       so for now, print full.
+		printf("	Fault address: %llx\n", ex.faultz);
 		ubyte[16] data = void;
 		adbg_opcode_t op = void;
-		if (adbg_memory_read(tracee, ex.fault.sz, data.ptr, 16)) {
+		if (adbg_memory_read(tracee, ex.faultz, data.ptr, 16)) {
 			oops;
 			goto L_SKIP;
 		}
@@ -383,8 +401,13 @@ int cmd_handler(adbg_exception_t *ex) {
 		if (adbg_dasm_once(disasm, &op, data.ptr, 16))
 			printf("(error:%s)\n", adbg_error_msg);
 		else
-			printf(" %llx %s %s\n",
-				ex.fault.i64, op.mnemonic, op.operands);
+			printf("%s %s\n", op.mnemonic, op.operands);
+	}
+	
+	if (user_action < 0) {
+		int a = user_action;
+		user_action = cast(AdbgAction)-1;
+		return a;
 	}
 	
 L_SKIP:
