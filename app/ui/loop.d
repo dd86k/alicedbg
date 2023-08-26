@@ -25,10 +25,14 @@ int app_loop() {
 		puts("loop: No program loaded");
 		return 1;
 	}
-	if (adbg_disasm_init(&dism))
-		return printerror();
-	if (globals.syntax && adbg_disasm_syntax(&dism, globals.syntax))
-		return printerror();
+	if (adbg_disasm_init(&dism)) {
+		printf("error: %s\n", adbg_error_msg);
+		return adbg_errno;
+	}
+	if (globals.syntax && adbg_disasm_syntax(&dism, globals.syntax)) {
+		printf("error: %s\n", adbg_error_msg);
+		return adbg_errno;
+	}
 	
 	return adbg_run(&loop_handler);
 }

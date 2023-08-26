@@ -122,8 +122,7 @@ int app_dump() {
 	//TODO: If only headers, use partial option
 	// Load object into memory
 	if (adbg_object_open(o, globals.file, 0)) {
-		printerror;
-		return 1;
+		return oops;
 	}
 	
 	// When nothing is set, the default is to show headers

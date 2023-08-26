@@ -92,8 +92,6 @@ int cmd_execl(char *command, size_t len) {
 // Private globals
 //
 
-immutable const(char) *cmd_fmt   = " %-10s                      %s\n";
-immutable const(char) *cmd_fmta  = " %-10s %-20s %s\n";
 __gshared adbg_process_t *tracee;
 __gshared adbg_disassembler_t *disasm;
 __gshared bool disasm_available;
@@ -165,6 +163,11 @@ immutable command_t[] commands = [
 		"maps", null,
 		"Show memory maps",
 		&cmd_c_maps
+	},
+	{
+		"scan", null,
+		"Scan memory for value",
+		&cmd_c_scan
 	},
 	{
 		"quit", null,
@@ -312,19 +315,16 @@ int cmd_c_help(int argc, const(char) **argv) {
 		return AppError.invalidCommand;
 	}
 	
+	static immutable const(char) *cmd_fmt   = " %-10s                      %s\n";
+	static immutable const(char) *cmd_fmta  = " %-10s %-20s %s\n";
+	
 	// Command list
-	puts("Debugger commands:");
 	foreach (comm; commands) {
 		if (comm.synop)
 			printf(cmd_fmta, comm.str, comm.synop, comm.desc);
 		else
 			printf(cmd_fmt, comm.str, comm.desc);
 	}
-	
-	// Action list
-	puts("\nWhen debuggee is debugger_paused:");
-	foreach (action; actions)
-		printf(cmd_fmt, action.str, action.desc);
 	
 	return 0;
 }
@@ -368,6 +368,20 @@ int cmd_c_maps(int argc, const(char) **argv) {
 }
 
 //
+// scan command
+//
+
+int cmd_c_scan(int argc, const(char) **argv) {
+	// Sub command
+	if (argc > 1) {
+	}
+	
+	// Otherwise, new list
+	
+	return 0;
+}
+
+//
 // quit command
 //
 
@@ -382,15 +396,15 @@ int cmd_c_quit(int argc, const(char) **argv) {
 //
 
 int cmd_handler(adbg_exception_t *ex) {
-	printf("*	Process %d thread %d stopped\n"
-		~"	Due to %s ("~ADBG_OS_ERROR_FORMAT~")\n",
+	printf("*	Process %d thread %d stopped\n"~
+		"	Due to %s ("~ADBG_OS_ERROR_FORMAT~")\n",
 		ex.pid, ex.tid,
 		adbg_exception_name(ex), ex.oscode);
 	
 	if (disasm_available && ex.faultz) {
 		// NOTE: size_t stuff on Windows works with %Ix,
 		//       so for now, print full.
-		printf("	Fault address: %llx\n", ex.faultz);
+		printf("	Fault address: %llx\n", ex.fault_address);
 		ubyte[16] data = void;
 		adbg_opcode_t op = void;
 		if (adbg_memory_read(tracee, ex.faultz, data.ptr, 16)) {

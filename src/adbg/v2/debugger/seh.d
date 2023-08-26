@@ -134,9 +134,9 @@ void adbg_seh_catch(int sig, siginfo_t *si, void *p) {
 	checkpoint.exception.oscode = sig;
 	// HACK: Missing ref'd D bindings to Musl
 	version (CRuntime_Glibc)
-		checkpoint.exception.fault.raw = si._sifields._sigfault.si_addr;
+		checkpoint.exception.fault_address = cast(ulong)si._sifields._sigfault.si_addr;
 	else version (CRuntime_Musl)
-		checkpoint.exception.fault.raw = si.__si_fields.__sigfault.si_addr;
+		checkpoint.exception.fault_address = cast(ulong)si.__si_fields.__sigfault.si_addr;
 	else static assert(0, "hack me");
 
 	/+mexception.pid = mexception.tid = 0;

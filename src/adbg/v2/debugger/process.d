@@ -21,6 +21,7 @@ import adbg.utils.string : adbg_util_argv_flatten;
 import adbg.v2.debugger.exception;
 
 //TODO: alloc process function?
+//      or "adbg_process_t* adbg_process_singleton();" ?
 
 version (Windows) {
 	import core.sys.windows.windows;
@@ -81,7 +82,7 @@ enum AdbgAction {
 
 /// Debugger status
 public
-enum AdbgStatus {
+enum AdbgStatus : ubyte {
 	unloaded,	/// No No tracee is loaded.
 	idle = unloaded,	/// Old v1 alias for unloaded.
 	unknown = unloaded,	/// Alias for idle
@@ -110,7 +111,7 @@ struct adbg_debugger_event_t {
 	}
 }+/
 
-enum AdbgCreation {
+enum AdbgCreation : ubyte {
 	unloaded,
 	attached,
 	spawned,
@@ -130,6 +131,8 @@ struct adbg_process_t {
 	}
 	/// Current process status.
 	AdbgStatus status;
+	/// 
+	AdbgCreation creation;
 	/// List of breakpoints.
 	breakpoint_t[ADBG_MAX_BREAKPOINTS] bp_list;
 	/// Breakpoint index.
@@ -137,8 +140,6 @@ struct adbg_process_t {
 	/// Set when debuggee was attached to rather than created.
 	/// This is used in the debugger loop.
 	deprecated bool attached;
-	/// 
-	AdbgCreation creation;
 }
 
 private
@@ -453,7 +454,7 @@ L_OPTION:
 	default:
 	}
 	
-	tracee.attached = false;
+	tracee.creation = AdbgCreation.attached;
 	
 	version (Windows) {
 		// Creates events:
@@ -525,7 +526,7 @@ L_OPTION:
 			return adbg_oops(AdbgError.os);
 	}
 	
-	tracee.attached = true;
+	tracee.creation = AdbgCreation.attached;
 	tracee.status = continue_ ? AdbgStatus.running : AdbgStatus.paused;
 	return 0;
 }
@@ -535,6 +536,7 @@ int adbg_detach(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
+	tracee.creation = AdbgCreation.unloaded;
 	tracee.status = AdbgStatus.idle;
 	version (Windows) {
 		if (DebugActiveProcessStop(tracee.pid) == FALSE)
@@ -543,7 +545,7 @@ int adbg_detach(adbg_process_t *tracee) {
 		if (ptrace(PT_DETACH, tracee.pid, null, null) == -1)
 			return adbg_oops(AdbgError.os);
 	}
-	tracee.attached = false;
+	
 	return 0;
 }
 
@@ -661,11 +663,12 @@ L_DEBUG_LOOP:
 		with (AdbgAction)
 		switch (userfunc(&exception)) {
 		case exit:
+			tracee.status = AdbgStatus.idle;
+			tracee.creation = AdbgCreation.unloaded;
 			if (tracee.creation == AdbgCreation.attached)
 				return adbg_detach(tracee);
 			
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
-			tracee.status = AdbgStatus.idle;
 			return 0;
 		case step:
 			// Enable single-stepping via Trap flag
@@ -756,18 +759,18 @@ L_DEBUG_LOOP:
 		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 			siginfo_t sig = void;
 			if (ptrace(PT_GETSIGINFO, tracee.pid, null, &sig) < 0) {
-				exception.fault.raw = null;
+				exception.fault_address = 0;
 				break;
 			}
 			version (CRuntime_Glibc)
-				exception.fault.raw = sig._sifields._sigfault.si_addr;
+				exception.fault_address = cast(ulong)sig._sifields._sigfault.si_addr;
 			else version (CRuntime_Musl)
-				exception.fault.raw = sig.__si_fields.__sigfault.si_addr;
+				exception.fault_address = cast(ulong)sig.__si_fields.__sigfault.si_addr;
 			else static assert(0, "hack me");
 			break;
 //		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
 		default:
-			exception.fault.raw = null;
+			exception.fault_address = 0;
 		}
 		
 		adbg_exception_translate(&exception, &tracee.pid, &chld_signo);

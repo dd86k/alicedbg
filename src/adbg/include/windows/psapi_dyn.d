@@ -1,4 +1,4 @@
-/// Dynamic definitions.
+/// Dynamic definitions for psapi.
 ///
 /// Copied from core.sys.windows.psapi.
 module adbg.include.windows.psapi_dyn;
@@ -173,7 +173,7 @@ bool __dynlib_psapi_load() {
     
     SharedLib lib = load("psapi.dll");
     if (lib == invalidHandle)
-            return true;
+        return true;
     
     bindSymbol(lib, cast(void**)&EnumProcesses, "EnumProcesses");
     bindSymbol(lib, cast(void**)&GetProcessImageFileNameA, "GetProcessImageFileNameA");
