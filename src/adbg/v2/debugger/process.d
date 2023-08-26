@@ -137,9 +137,6 @@ struct adbg_process_t {
 	breakpoint_t[ADBG_MAX_BREAKPOINTS] bp_list;
 	/// Breakpoint index.
 	size_t bp_index;
-	/// Set when debuggee was attached to rather than created.
-	/// This is used in the debugger loop.
-	deprecated bool attached;
 }
 
 private

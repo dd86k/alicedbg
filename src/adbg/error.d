@@ -12,12 +12,10 @@ module adbg.error;
 
 version (Windows) {
 	import core.sys.windows.windows;
-	deprecated enum SYS_ERR_FMT = "%08X"; /// Error code format
 	enum ADBG_OS_ERROR_FORMAT = "%08X"; /// Error code format
 } else {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
-	deprecated enum SYS_ERR_FMT = "%d"; /// Error code format
 	enum ADBG_OS_ERROR_FORMAT = "%d"; /// Error code format
 }
 

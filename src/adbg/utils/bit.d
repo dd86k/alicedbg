@@ -104,42 +104,6 @@ alias swapfunc16 = ushort function(ushort);
 alias swapfunc32 = uint function(uint);
 alias swapfunc64 = ulong function(ulong);
 
-/// Return a function pointer depending if requested endian matches target
-/// endian. If it matches identical, this function returns a function that
-/// returns the same value. If it does not match, this function returns
-/// a function that effectively byte swaps the value. This is useful for bulk
-/// operations, such as parsing header data or processing disassembly.
-/// Params: little = Endian is little
-/// Returns: fswap16 function pointer
-deprecated("Use adbg_util_ensure16")
-ushort function(ushort) adbg_util_fswap16(bool little) {
-	return little == PLATFORM_LSB ? &adbg_util_nop16 : &adbg_util_bswap16;
-}
-
-/// Return a function pointer depending if requested endian matches target
-/// endian. If it matches identical, this function returns a function that
-/// returns the same value. If it does not match, this function returns
-/// a function that effectively byte swaps the value. This is useful for bulk
-/// operations, such as parsing header data or processing disassembly.
-/// Params: little = Endian is little
-/// Returns: fswap32 function pointer
-deprecated("Use adbg_util_ensure32")
-uint function(uint) adbg_util_fswap32(bool little) {
-	return little == PLATFORM_LSB ? &adbg_util_nop32 : &adbg_util_bswap32;
-}
-
-/// Return a function pointer depending if requested endian matches target
-/// endian. If it matches identical, this function returns a function that
-/// returns the same value. If it does not match, this function returns
-/// a function that effectively byte swaps the value. This is useful for bulk
-/// operations, such as parsing header data or processing disassembly.
-/// Params: little = Endian is little
-/// Returns: fswap64 function pointer
-deprecated("Use adbg_util_ensure64")
-ulong function(ulong) adbg_util_fswap64(bool little) {
-	return little == PLATFORM_LSB ? &adbg_util_nop64 : &adbg_util_bswap64;
-}
-
 private ushort adbg_util_nop16(ushort v) pure { return v; }
 private uint adbg_util_nop32(uint v) pure { return v; }
 private ulong adbg_util_nop64(ulong v) pure { return v; }

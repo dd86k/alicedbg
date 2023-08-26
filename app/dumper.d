@@ -19,8 +19,6 @@ import common, dump.mz, dump.pe, dump.macho, dump.elf;
 
 extern (C):
 
-deprecated private enum MODULE = __MODULE__.ptr;
-
 //TODO: Consider a "Summary" ala objdump -f
 //      Could be default over "all headers"
 /// Bitfield. Selects which information to display.
@@ -71,29 +69,6 @@ enum DumpOpt {
 	
 	/// Wants to disassemble at least something
 	disasm = disasm_code | disasm_stats | disasm_all,
-}
-
-/// dump structure
-deprecated
-struct dump_t {
-	adbg_object_t *obj; /// object
-	adbg_disassembler_t *dasm;	/// disassembler
-	//TODO: Do bools instead?
-	int flags; /// display settings
-}
-
-/// Output a dump title.
-/// Params: title = Title
-deprecated("Use dprint_name")
-void dump_title(const(char) *title) {
-	printf("%s format\n", title);
-}
-
-/// Output a dump chapter.
-/// Params: title = Chapter name
-deprecated("Use dprint_section")
-void dump_h1(const(char) *title) {
-	printf("\n# %s\n\n", title);
 }
 
 /// Dump given file to stdout.
