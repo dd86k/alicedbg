@@ -112,7 +112,7 @@ int oops(
 	
 	const(adbg_error_t)* error = adbg_error_current;
 	
-	printf("%s: E-%u ", mod, adbg_errno);
+	printf("ERROR-%u: ", adbg_errno);
 	switch (error.code) with (AdbgError) {
 	case crt:	printf("(CRT:%d) ", adbg_errno_extern); break;
 	case os:	printf("(OS:"~ADBG_OS_ERROR_FORMAT~") ", adbg_errno_extern); break;
