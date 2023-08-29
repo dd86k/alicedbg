@@ -655,11 +655,10 @@ void dump_pe_disasm(adbg_object_t *o, uint flags) {
 	for (ushort si; si < count; ++si) {
 		PE_SECTION_ENTRY *entry = &o.i.pe.sections[si];
 		
-		//TODO: Check machine
 		if (all || entry.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE) {
-			dprint_disassembly(entry.Name.ptr, 8,
+			dprint_disassemble_object(o, entry.Name.ptr, 8,
 				o.buffer + entry.PointerToRawData, entry.SizeOfRawData,
-				AdbgMachine.native, flags);
+				flags);
 		}
 	}
 }

@@ -91,6 +91,5 @@ void dump_mz_disasm(adbg_object_t *o, uint flags) {
 		return;
 	}
 	
-	//TODO: AdbgMachine
-	dprint_disassembly(null, 0, o.buffer + start, len, AdbgMachine.i8086, flags);
+	dprint_disassemble_object(o, null, 0, o.buffer + start, len, flags);
 }

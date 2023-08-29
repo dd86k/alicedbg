@@ -19,7 +19,6 @@ import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.utils.bit;
 import adbg.v2.object.formats;
-import adbg.v2.disassembler.core : AdbgDasmPlatform;
 import adbg.v2.object.machines : AdbgMachine;
 
 extern (C):
@@ -272,44 +271,6 @@ L_ARG:
 //TODO: adbg_object_load_continue if partial was used
 //      set new buffer_size, partial=false
 
-/// Get machine type from object.
-///
-/// Useful for dumping object disassembly.
-/// Params: obj = Object.
-/// Returns: Machine type.
-AdbgDasmPlatform adbg_object_platform(adbg_object_t *obj) {
-	if (obj == null || obj.handle == null)
-		return AdbgDasmPlatform.native;
-	
-	switch (obj.type) with (AdbgObject) {
-	case pe:
-		switch (obj.i.pe.header.Machine) {
-		case PE_MACHINE_AMD64:	return AdbgDasmPlatform.x86_64;
-		case PE_MACHINE_I386:	return AdbgDasmPlatform.x86_32;
-		default:
-		}
-		break;
-	case macho:
-		// NOTE: both fat and header matches
-		switch (obj.i.macho.header.cputype) {
-		case MACHO_CPUTYPE_X86_64:	return AdbgDasmPlatform.x86_64;
-		case MACHO_CPUTYPE_I386:	return AdbgDasmPlatform.x86_32;
-		default:
-		}
-		break;
-	case elf:
-		switch (obj.i.elf32.ehdr.e_machine) {
-		case ELF_EM_X86_64:	return AdbgDasmPlatform.x86_64;
-		case ELF_EM_386:	return AdbgDasmPlatform.x86_32;
-		default:
-		}
-		break;
-	default:
-	}
-	
-	return AdbgDasmPlatform.native;
-}
-
 AdbgMachine adbg_object_machine(adbg_object_t *obj) {
 	if (obj == null)
 		return AdbgMachine.native;
@@ -340,7 +301,7 @@ const(char)* adbg_object_short_name(adbg_object_t *obj) {
 	default:
 	}
 L_UNKNOWN:
-	return "Unknown";
+	return "unknown";
 }
 
 /// Get the name of the loaded object format.

@@ -133,7 +133,7 @@ int cli_march(const(char) *val) {
 	}
 	foreach (setting_platform_t p; platforms) {
 		if (strcmp(val, p.opt) == 0 || strcmp(val, p.alt) == 0) {
-			globals.platform = p.val;
+			globals.machine = p.val;
 			return EXIT_SUCCESS;
 		}
 	}

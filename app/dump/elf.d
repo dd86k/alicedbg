@@ -313,12 +313,10 @@ void dump_elf_disasm(adbg_object_t *o, uint flags) {
 		char *table = o.bufferc + offset; // string table
 		while (shdr++ < max) with (shdr) {
 			if (all || sh_flags & ELF_SHF_EXECINSTR)
-				//TODO: check sh_offset
-				//TODO: AdbgMachine
-				dprint_disassembly(
+				dprint_disassemble_object(o,
 					table + sh_name, 32,
 					o.buffer8 + sh_offset, sh_size,
-					AdbgMachine.native, flags);
+					flags);
 		}
 		break;
 	case ELF_CLASS_64:
@@ -345,12 +343,10 @@ void dump_elf_disasm(adbg_object_t *o, uint flags) {
 		char *table = o.bufferc + offset; // string table
 		while (shdr++ < max) with (shdr) {
 			if (all || sh_flags & ELF_SHF_EXECINSTR)
-				//TODO: check sh_offset
-				//TODO: AdbgMachine
-				dprint_disassembly(
+				dprint_disassemble_object(o,
 					table + sh_name, 32,
 					o.buffer8 + sh_offset, sh_size,
-					AdbgMachine.native, flags);
+					flags);
 		}
 		break;
 	default:

@@ -86,9 +86,8 @@ int app_dump() {
 		if (size == 0)
 			return 0;
 		
-		//TODO: AdbgMachine
-		return dprint_disassembly(null, 0, buffer, size,
-			AdbgMachine.native, globals.flags);
+		return dprint_disassemble(AdbgMachine.native,
+			null, 0, buffer, size, globals.flags);
 	}
 	
 	adbg_object_t *o = cast(adbg_object_t*)malloc(adbg_object_t.sizeof);
@@ -135,6 +134,10 @@ void dprint_columns(const(char) *header, const(char) *s1, const(char) *s2) {
 }
 void dprint_warn(const(char) *message) {
 	printf("warning: %s\n", message);
+}
+void dprint_error(const(char) *message) {
+	printf("error: %s\n", message);
+	panic();
 }
 
 void dprint_section(uint count, const(char) *section, uint max) {
@@ -280,9 +283,25 @@ void dprint_raw(const(char) *name, uint namemax,
 }
 
 // name is typically section name or filename if raw
-int dprint_disassembly(const(char) *name, uint namemax,
+int dprint_disassemble_object(adbg_object_t *o,
+	const(char) *name, uint namemax,
 	void* data, ulong size,
-	AdbgMachine machine, uint flags) {
+	uint flags) {
+	
+	if (size >= o.buffer_size ||
+		data < o.buffer ||
+		data + size >= o.buffer) {
+		dprint_error("Buffer outside file");
+	}
+	
+	return dprint_disassemble(
+		adbg_object_machine(o), name, namemax, data, size, flags);
+}
+int dprint_disassemble(AdbgMachine machine,
+	const(char) *name, uint namemax,
+	void* data, ulong size,
+	uint flags) {
+	
 	if (name && namemax) printf("<%.*s>:\n", namemax, name);
 	if (data == null || size == 0) return 0;
 	//TODO: Check data+size against object type (file_size)
@@ -335,6 +354,7 @@ L_STAT:
 	}
 	
 	// normal disasm mode
+	//TODO: Could do better with a while (!= EOF) and is_opcode_illegal()
 L_DISASM:
 	switch (adbg_dasm(dasm, &op)) with (AdbgError) {
 	case success:

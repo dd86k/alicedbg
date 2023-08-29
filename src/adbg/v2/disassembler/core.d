@@ -97,14 +97,6 @@ struct adbg_opcode_t {
 	const(char) *operands;	/// Instruction operands.
 }
 
-/// Architecture platform.
-enum AdbgDasmPlatform {
-	native,	/// Default native platform.
-	x86_16,	/// 16-bit x86: 8086
-	x86_32,	/// 32-bit x86: i386
-	x86_64,	/// 64-bit x86: amd64
-}
-
 /// Assembler syntax.
 enum AdbgDasmSyntax {
 	/// Default option for platform.

@@ -12,6 +12,7 @@ import adbg.config;
 import adbg.error;
 import adbg.v2.disassembler;
 import adbg.v2.debugger.exception;
+import adbg.v2.object.machines : AdbgMachine;
 import core.stdc.stdio : FILE;
 import core.stdc.stdlib : malloc;
 
@@ -32,14 +33,15 @@ enum AppError {
 
 // Platforms
 
+// temporary
 struct setting_platform_t {
-	AdbgDasmPlatform val;
+	AdbgMachine val;
 	const(char)* opt, alt, desc;
 }
 immutable setting_platform_t[] platforms = [
-	{ AdbgDasmPlatform.x86_16,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
-	{ AdbgDasmPlatform.x86_32,	"x86",     "i386",  "x86 32-bit (extended mode)" },
-	{ AdbgDasmPlatform.x86_64,	"x86_64",  "amd64", "x86 64-bit (long mode)" },
+	{ AdbgMachine.i8086,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
+	{ AdbgMachine.x86,	"x86",     "i386",  "x86 32-bit (extended mode)" },
+	{ AdbgMachine.amd64,	"x86_64",  "amd64", "x86 64-bit (long mode)" },
 ];
 
 // Syntaxes
@@ -75,7 +77,7 @@ struct settings_t {
 	uint pid;	/// Debuggee: PID
 	uint flags;	/// Flags to pass to sub-app
 	AdbgDasmSyntax syntax;	/// 
-	AdbgDasmPlatform platform;	/// 
+	AdbgMachine machine;	/// For disassembler
 	/// App settings
 	adbg_exception_t last_exception;	/// Last exception
 	FILE *inputFile;	/// 
