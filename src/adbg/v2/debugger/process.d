@@ -560,7 +560,7 @@ bool adbg_is_debugged() {
 		// Linux 5.10 example status for cat(1) is 1392 Bytes
 		enum BUFFERSZ = 4096;
 		
-		char *buffer = malloc(BUFFERSZ);
+		char *buffer = cast(char*)malloc(BUFFERSZ);
 		if (buffer == null)
 			return false;
 
