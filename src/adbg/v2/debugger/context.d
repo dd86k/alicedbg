@@ -210,7 +210,7 @@ private:
 version (X86_ANY)
 void adbg_context_start_x86(adbg_thread_context_t *ctx) {
 	version (Trace) trace("ctx=%p", ctx);
-	ctx.count = REG_COUNT;
+	ctx.count = 10;
 	ctx.items[0].name = "eip";
 	ctx.items[0].type = AdbgRegisterSize.u32;
 	ctx.items[1].name = "eflags";
@@ -236,7 +236,7 @@ void adbg_context_start_x86(adbg_thread_context_t *ctx) {
 version (X86_64)
 void adbg_context_start_x86_64(adbg_thread_context_t *ctx) {
 	version (Trace) trace("ctx=%p", ctx);
-	ctx.count = REG_COUNT;
+	ctx.count = 18;
 	ctx.items[0].name  = "rip";
 	ctx.items[0].type  = AdbgRegisterSize.u64;
 	ctx.items[1].name  = "rflags";

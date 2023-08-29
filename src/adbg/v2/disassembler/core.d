@@ -13,6 +13,8 @@ import adbg.include.capstone;
 import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.platform;
+import adbg.v2.debugger.process : adbg_process_t;
+import adbg.v2.object.machines : AdbgMachine;
 
 version (X86) { // CS_OPT_SYNTAX_DEFAULT
 	private enum {
@@ -148,21 +150,21 @@ private __gshared bool loaded_cs;
 
 // Platform to CS' ARCH and MODE types
 private
-int adbg_dasm_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgDasmPlatform platform) {
-	switch (platform) with (AdbgDasmPlatform) {
+int adbg_dasm_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
+	switch (platform) with (AdbgMachine) {
 	case native: // equals 0
 		cs_arch = CS_DEFAULT_PLATFORM;
 		cs_mode = CS_DEFAULT_MODE;
 		break;
-	case x86_16:
+	case i8086:
 		cs_arch = CS_ARCH_X86;
 		cs_mode = CS_MODE_16;
 		break;
-	case x86_32:
+	case x86:
 		cs_arch = CS_ARCH_X86;
 		cs_mode = CS_MODE_32;
 		break;
-	case x86_64:
+	case amd64:
 		cs_arch = CS_ARCH_X86;
 		cs_mode = CS_MODE_64;
 		break;
@@ -170,6 +172,18 @@ int adbg_dasm_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgDasmPlatform platfo
 		return adbg_oops(AdbgError.unsupportedPlatform);
 	}
 	return 0;
+}
+
+int adbg_dasm_openproc(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
+	AdbgMachine mach;
+	
+	version (Win64) { // Windows + x86-64
+		version (X86_64) {
+			mach = tracee.wow64 ? AdbgMachine.x86 : AdbgMachine.amd64;
+		}
+	}
+	
+	return adbg_dasm_open(dasm, mach);
 }
 
 /* May offer this as an option later
@@ -182,10 +196,10 @@ void adbg_dasm_free(adbg_disassembler_t* dasm) {
 /// Open a disassembler instance.
 /// Params:
 ///   dasm = Reference to disassembler instance.
-///   platform = Architecture platform.
+///   machine = Machine architecture.
 /// Returns: Error code.
 int adbg_dasm_open(adbg_disassembler_t *dasm,
-	AdbgDasmPlatform platform = AdbgDasmPlatform.native) {
+	AdbgMachine machine = AdbgMachine.native) {
 	//TODO: static if (CAPSTONE_DYNAMIC)
 	if (loaded_cs == false) {
 		if (capstone_dyn_init()) {
@@ -202,7 +216,7 @@ int adbg_dasm_open(adbg_disassembler_t *dasm,
 	}
 	
 	int cs_arch = void, cs_mode = void;
-	if (adbg_dasm_lib_a2cs(cs_arch, cs_mode, platform))
+	if (adbg_dasm_lib_a2cs(cs_arch, cs_mode, machine))
 		return adbg_errno;
 	
 	if (cs_open(cs_arch, cs_mode, &dasm.cs_handle))
@@ -219,13 +233,13 @@ int adbg_dasm_open(adbg_disassembler_t *dasm,
 /// Re-open a disassembler instance by closing it and opening it again.
 /// Params:
 ///   dasm = Reference to disassembler instance.
-///   platform = Architecture platform.
+///   machine = Machine architecture.
 /// Returns: Error code.
-int adbg_dasm_reopen(adbg_disassembler_t *dasm, AdbgDasmPlatform platform) {
+int adbg_dasm_reopen(adbg_disassembler_t *dasm, AdbgMachine machine) {
 	if (dasm == null)
 		return adbg_oops(AdbgError.nullArgument);
 	adbg_dasm_close(dasm);
-	return adbg_dasm_open(dasm, platform);
+	return adbg_dasm_open(dasm, machine);
 }
 
 /// Closes a disassembler instance.

@@ -12,6 +12,7 @@ import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc;
 import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.v2.object.server;
+import adbg.v2.object.machines : AdbgMachine;
 import adbg.v2.disassembler.core;
 import adbg.utils.bit : BIT;
 import adbg.utils.file;
@@ -87,7 +88,7 @@ int app_dump() {
 		
 		//TODO: AdbgMachine
 		return dprint_disassembly(null, 0, buffer, size,
-			AdbgDasmPlatform.native, globals.flags);
+			AdbgMachine.native, globals.flags);
 	}
 	
 	adbg_object_t *o = cast(adbg_object_t*)malloc(adbg_object_t.sizeof);
@@ -281,7 +282,7 @@ void dprint_raw(const(char) *name, uint namemax,
 // name is typically section name or filename if raw
 int dprint_disassembly(const(char) *name, uint namemax,
 	void* data, ulong size,
-	AdbgDasmPlatform platform, uint flags) {
+	AdbgMachine machine, uint flags) {
 	if (name && namemax) printf("<%.*s>:\n", namemax, name);
 	if (data == null || size == 0) return 0;
 	//TODO: Check data+size against object type (file_size)
@@ -290,7 +291,7 @@ int dprint_disassembly(const(char) *name, uint namemax,
 	if (dasm == null)
 		panic(AdbgError.crt);
 	
-	if (adbg_dasm_open(dasm, platform))
+	if (adbg_dasm_open(dasm, machine))
 		panic();
 	
 	adbg_opcode_t op = void;

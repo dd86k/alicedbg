@@ -7,6 +7,7 @@ module dump.mz;
 
 import adbg.v2.disassembler.core;
 import adbg.v2.object.server;
+import adbg.v2.object.machines : AdbgMachine;
 import adbg.v2.object.format.mz;
 import dumper;
 
@@ -91,5 +92,5 @@ void dump_mz_disasm(adbg_object_t *o, uint flags) {
 	}
 	
 	//TODO: AdbgMachine
-	dprint_disassembly(null, 0, o.buffer + start, len, AdbgDasmPlatform.x86_16, flags);
+	dprint_disassembly(null, 0, o.buffer + start, len, AdbgMachine.i8086, flags);
 }

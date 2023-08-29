@@ -318,7 +318,7 @@ void dump_elf_disasm(adbg_object_t *o, uint flags) {
 				dprint_disassembly(
 					table + sh_name, 32,
 					o.buffer8 + sh_offset, sh_size,
-					AdbgDasmPlatform.native, flags);
+					AdbgMachine.native, flags);
 		}
 		break;
 	case ELF_CLASS_64:
@@ -350,7 +350,7 @@ void dump_elf_disasm(adbg_object_t *o, uint flags) {
 				dprint_disassembly(
 					table + sh_name, 32,
 					o.buffer8 + sh_offset, sh_size,
-					AdbgDasmPlatform.native, flags);
+					AdbgMachine.native, flags);
 		}
 		break;
 	default:

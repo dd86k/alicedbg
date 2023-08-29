@@ -25,6 +25,7 @@ import common, term;
 //TODO: Move commands to its own module? rename ui as shell?
 //      "tcp" ui might re-use commands
 //TODO: int cmd_error(const(char)*);
+//      or just cmd_log() with "debugger: " prepended
 //TODO: Improve help system by avoiding help functions
 
 extern (C):
@@ -41,12 +42,12 @@ int app_cmd() {
 		if (adbg_spawn(tracee, globals.file, 0))
 			return oops;
 		puts("Process created.");
-	}
 	
-	if (adbg_dasm_open(disasm)) {
-		disasm_available = false;
-		printf("warning: Disassembler not available (%s)\n",
-			adbg_error_msg());
+		if (adbg_dasm_openproc(disasm, tracee)) {
+			disasm_available = false;
+			printf("warning: Disassembler not available (%s)\n",
+				adbg_error_msg());
+		} else disasm_available = true;
 	}
 	
 	term_init;
@@ -306,8 +307,11 @@ int cmd_c_help(int argc, const(char) **argv) {
 int cmd_c_go(int argc, const(char) **argv) {
 	if (adbg_continue(tracee))
 		return AppError.alicedbg;
-	if (adbg_wait(tracee, &cmd_handler))
+	if (adbg_wait(tracee, &cmd_exception_handler))
 		return AppError.alicedbg;
+	// Temporary: Cheap hack for process exit
+	if (adbg_status(tracee) == AdbgStatus.unloaded)
+		printf("*\tProcess %d exited\n", tracee.pid);
 	return 0;
 }
 
@@ -318,7 +322,7 @@ int cmd_c_go(int argc, const(char) **argv) {
 int cmd_c_stepi(int argc, const(char) **argv) {
 	if (adbg_stepi(tracee))
 		return AppError.alicedbg;
-	if (adbg_wait(tracee, &cmd_handler))
+	if (adbg_wait(tracee, &cmd_exception_handler))
 		return AppError.alicedbg;
 	return 0;
 }
@@ -364,6 +368,7 @@ int cmd_c_scan(int argc, const(char) **argv) {
 
 int cmd_c_quit(int argc, const(char) **argv) {
 	//TODO: Quit confirmation if debuggee is alive
+	//      could do with optional "forced yes" type of optional
 	exit(0);
 	return 0;
 }
@@ -372,35 +377,35 @@ int cmd_c_quit(int argc, const(char) **argv) {
 // exception handler
 //
 
-int cmd_handler(adbg_exception_t *ex) {
+void cmd_exception_handler(adbg_exception_t *ex) {
 	printf("*	Process %d thread %d stopped\n"~
-		"	Due to %s ("~ADBG_OS_ERROR_FORMAT~")\n",
+		"	Reason: %s ("~ADBG_OS_ERROR_FORMAT~")\n",
 		ex.pid, ex.tid,
 		adbg_exception_name(ex), ex.oscode);
 	
-	if (disasm_available && ex.faultz) {
+	if (ex.faultz) {
 		// NOTE: size_t stuff on Windows works with %Ix,
 		//       so for now, print full.
 		printf("	Fault address: %llx\n", ex.fault_address);
-		ubyte[16] data = void;
-		adbg_opcode_t op = void;
-		if (adbg_memory_read(tracee, ex.faultz, data.ptr, 16)) {
-			oops;
-			goto L_SKIP;
-		}
 		printf("	Faulting instruction: ");
+		cmd_disasm(ex.faultz);
+	}
+}
+
+void cmd_disasm(size_t address, int count = 1) {
+	if (disasm_available == false)
+		return;
+	
+	for (int i; i < count; ++i) {
+		ubyte[16] data = void;
+		if (adbg_memory_read(tracee, address, data.ptr, 16)) {
+			oops;
+			return;
+		}
+		adbg_opcode_t op = void;
 		if (adbg_dasm_once(disasm, &op, data.ptr, 16))
 			printf("(error:%s)\n", adbg_error_msg);
 		else
 			printf("%s %s\n", op.mnemonic, op.operands);
 	}
-	
-L_SKIP:
-	if (user_action < 0) {
-		int a = user_action;
-		user_action = cast(AdbgAction)-1;
-		return a;
-	}
-	
-	return prompt;
 }

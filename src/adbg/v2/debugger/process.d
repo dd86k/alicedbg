@@ -558,21 +558,26 @@ bool adbg_is_debugged() {
 		import core.stdc.string : strstr;
 		
 		// Linux 5.10 example status for cat(1) is 1392 Bytes
-		char[4096] buf = void;
+		enum BUFFERSZ = 4096;
+		
+		char *buffer = malloc(BUFFERSZ);
+		if (buffer == null)
+			return false;
+
+		scope(exit) free(buffer);
 
 		const int status_fd = open("/proc/self/status", O_RDONLY);
 		if (status_fd == -1)
 			return false;
 
-		const ssize_t num_read = read(status_fd, buf.ptr, buf.sizeof - 1);
+		const ssize_t num_read = read(status_fd, buffer, BUFFERSZ - 1);
 		close(status_fd);
 
 		if (num_read <= 0)
 			return false;
 
-		buf[num_read] = 0;
-		static immutable const(char) *tracerPidString = "TracerPid:";
-		const(char)* strptr = strstr(buf.ptr, tracerPidString);
+		buffer[num_read] = 0;
+		const(char)* strptr = strstr(buffer, "TracerPid:");
 		if (strptr == null)
 			return false;
 		
@@ -625,7 +630,7 @@ AdbgStatus adbg_status(adbg_process_t *tracee) pure {
 /// 	userfunc = User function callback.
 /// 	... = Options, pass 0 for no options and assume defaults.
 /// Returns: Error code.
-int adbg_wait(adbg_process_t *tracee, int function(adbg_exception_t*) userfunc, ...) {
+int adbg_wait(adbg_process_t *tracee, void function(adbg_exception_t*) userfunc, ...) {
 	if (tracee == null || userfunc == null)
 		return adbg_oops(AdbgError.nullArgument);
 	if (tracee.creation == AdbgCreation.unloaded)

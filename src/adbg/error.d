@@ -235,6 +235,8 @@ int adbg_errno() {
 	return error.code;
 }
 
+//TODO: adbg_errno_extern_string ?
+
 int adbg_errno_extern() {
 	import core.stdc.errno : errno;
 	import adbg.include.capstone : csh, cs_errno;
