@@ -103,9 +103,14 @@ void adbg_context_start(adbg_thread_context_t *ctx, adbg_process_t *tracee) {
 }
 
 int adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {
+	import adbg.v2.debugger.process : AdbgCreation;
+	
 	version (Trace) trace("tracee=%p ctx=%p", ctx, tracee);
+	
 	if (tracee == null || ctx == null)
 		return adbg_oops(AdbgError.nullArgument);
+	if (tracee.creation == AdbgCreation.unloaded)
+		return adbg_oops(AdbgError.debuggerUnattached);
 	
 	version (Windows) {
 		CONTEXT winctx = void;
