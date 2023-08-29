@@ -28,43 +28,63 @@ version (Windows) {
 
 extern (C):
 
-/// Error codes
+/// Error codes.
+///
+/// These aren't really meant to be used directly.
 enum AdbgError {
 	//
 	// 0-99: Generic
 	//
 	success	= 0,
 	invalidArgument	= 1,
-	missingArgument	= 2,
-	nullArgument	= missingArgument,	// Old alias
+	nullArgument	= invalidArgument,	// Old alias for invalidArgument
 	uninitiated	= 4,	// Only when user value is important like for fopen
 	invalidOption	= 5,
 	invalidOptionValue	= 6,
 	//
 	// 100-199: Debugger
 	//
-	notAttached = 100,
-	notPaused = 101,
-	invalidAction = 102,
+	debuggerUnattached = 100,
+	debuggerUnpaused = 101,
+	debuggerInvalidAction = 102,	/// Wrong action from creation method.
+	// Old meanings
+	notAttached = debuggerUnattached,	/// Old value for debuggerUnattached
+	notPaused = debuggerUnpaused,	/// Old value for debuggerUnpaused
+	invalidAction = debuggerInvalidAction,	/// 
 	//
 	// 200-299: Disasembler
 	//
-	nullAddress	= 201,
-	unsupportedPlatform	= 202,
-	illegalInstruction	= 220,
-	outOfData	= 221,
-	opcodeLimit	= 222,
+	disasmInvalidAddress = 201,
+	disasmUnsupportedMachine = 202,
+	disasmIllegalInstruction = 220,
+	disasmEndOfData = 221,
+	disasmOpcodeLimit = 221,
+	// Old meanings
+	nullAddress	= disasmInvalidAddress,
+	unsupportedPlatform	= disasmUnsupportedMachine,
+	illegalInstruction	= disasmIllegalInstruction,
+	outOfData	= disasmEndOfData,
+	opcodeLimit	= disasmOpcodeLimit,
 	//
 	// 300-399: Object server
 	//
-	unknownObjFormat	= 301,
-	unsupportedObjFormat	= 302,
-	invalidObjVersion	= 310,
-	invalidObjMachine	= 311,
-	invalidObjClass	= 312,
-	invalidObjEndian	= 313,
-	invalidObjType	= 314,
-	invalidObjABI	= 315,
+	objectUnknownFormat	= 301,
+	objectUnsupportedFormat	= 302,
+	objectInvalidVersion	= 310,
+	objectInvalidMachine	= 310,
+	objectInvalidClass	= 310,
+	objectInvalidEndian	= 310,
+	objectInvalidType	= 310,
+	objectInvalidABI	= 310,
+	// Old meanings
+	unknownObjFormat	= objectUnknownFormat,
+	unsupportedObjFormat	= objectUnsupportedFormat,
+	invalidObjVersion	= objectInvalidVersion,
+	invalidObjMachine	= objectInvalidMachine,
+	invalidObjClass	= objectInvalidClass,
+	invalidObjEndian	= objectInvalidEndian,
+	invalidObjType	= objectInvalidType,
+	invalidObjABI	= objectInvalidABI,
 	//
 	// 400-499: Debugger memory operations
 	//
