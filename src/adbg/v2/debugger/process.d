@@ -532,14 +532,17 @@ L_OPTION:
 int adbg_detach(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.nullArgument);
+	if (tracee.creation != AdbgCreation.attached)
+		return adbg_oops(AdbgError.debuggerInvalidAction);
 	
 	tracee.creation = AdbgCreation.unloaded;
 	tracee.status = AdbgStatus.idle;
+	
 	version (Windows) {
 		if (DebugActiveProcessStop(tracee.pid) == FALSE)
 			return adbg_oops(AdbgError.os);
 	} else version (Posix) {
-		if (ptrace(PT_DETACH, tracee.pid, null, null) == -1)
+		if (ptrace(PT_DETACH, tracee.pid, null, null) < 0)
 			return adbg_oops(AdbgError.os);
 	}
 	
@@ -622,19 +625,23 @@ AdbgStatus adbg_status(adbg_process_t *tracee) pure {
 /// 	userfunc = User function callback.
 /// 	... = Options, pass 0 for no options and assume defaults.
 /// Returns: Error code.
-int adbg_start(adbg_process_t *tracee, int function(adbg_exception_t*) userfunc, ...) {
+int adbg_wait(adbg_process_t *tracee, int function(adbg_exception_t*) userfunc, ...) {
 	if (tracee == null || userfunc == null)
-		return adbg_oops(AdbgError.nullAddress);
+		return adbg_oops(AdbgError.nullArgument);
+	if (tracee.creation == AdbgCreation.unloaded)
+		return adbg_oops(AdbgError.debuggerUnattached);
 	
 	adbg_exception_t exception = void;
 	
 	version (Windows) {
 		DEBUG_EVENT de = void;
 L_DEBUG_LOOP:
-		tracee.status = AdbgStatus.running;
-		if (WaitForDebugEvent(&de, INFINITE) == FALSE)
+		// Something bad happened
+		if (WaitForDebugEvent(&de, INFINITE) == FALSE) {
+			tracee.status = AdbgStatus.unloaded;
+			tracee.creation = AdbgCreation.unloaded;
 			return adbg_oops(AdbgError.os);
-		tracee.status = AdbgStatus.paused;
+		}
 		
 		// Filter events
 		switch (de.dwDebugEventCode) {
@@ -648,75 +655,26 @@ L_DEBUG_LOOP:
 		case OUTPUT_DEBUG_STRING_EVENT:
 		case RIP_EVENT:
 			goto default;*/
-		case EXIT_PROCESS_DEBUG_EVENT: return 0;
+		case EXIT_PROCESS_DEBUG_EVENT:
+			goto L_UNLOADED;
 		default:
 			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
 			goto L_DEBUG_LOOP;
 		}
 		
-		adbg_exception_translate(&exception, &de, null);
-		
 		tracee.status = AdbgStatus.paused;
-		with (AdbgAction)
-		switch (userfunc(&exception)) {
-		case exit:
-			tracee.status = AdbgStatus.idle;
-			tracee.creation = AdbgCreation.unloaded;
-			if (tracee.creation == AdbgCreation.attached)
-				return adbg_detach(tracee);
-			
-			ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_TERMINATE_PROCESS);
-			return 0;
-		case step:
-			// Enable single-stepping via Trap flag
-			version (Win64) {
-				if (tracee.wow64) {
-					WOW64_CONTEXT winctxwow64 = void;
-					winctxwow64.ContextFlags = CONTEXT_CONTROL;
-					Wow64GetThreadContext(tracee.htid, &winctxwow64);
-					FlushInstructionCache(tracee.hpid, null, 0);
-					winctxwow64.EFlags |= 0x100;
-					Wow64SetThreadContext(tracee.htid, &winctxwow64);
-				} else {
-					CONTEXT winctx = void;
-					winctx.ContextFlags = CONTEXT_CONTROL;
-					GetThreadContext(tracee.htid, &winctx);
-					FlushInstructionCache(tracee.hpid, null, 0);
-					winctx.EFlags |= 0x100;
-					SetThreadContext(tracee.htid, &winctx);
-				}
-			} else {
-				CONTEXT winctx = void;
-				winctx.ContextFlags = CONTEXT_ALL;
-				GetThreadContext(tracee.htid, &winctx);
-				FlushInstructionCache(tracee.hpid, null, 0);
-				winctx.EFlags |= 0x100;
-				SetThreadContext(tracee.htid, &winctx);
-			}
-			goto case;
-		case proceed:
-			if (ContinueDebugEvent(
-				de.dwProcessId, de.dwThreadId, DBG_CONTINUE) == FALSE) {
-				tracee.status = AdbgStatus.idle;
-				return adbg_oops(AdbgError.os);
-			}
-			goto L_DEBUG_LOOP;
-		default:
-			return adbg_oops(AdbgError.invalidAction);
-		}
+		adbg_exception_translate(&exception, &de, null);
 	} else version (Posix) {
 		int wstatus = void;
 L_DEBUG_LOOP:
-		tracee.status = AdbgStatus.running;
 		tracee.pid = waitpid(-1, &wstatus, 0);
 		
 		// Something bad happened
-		if (tracee.pid == -1) {
-			tracee.status = AdbgStatus.idle;
-			return adbg_oops(AdbgError.os);
+		if (tracee.pid < 0) {
+			tracee.status = AdbgStatus.unloaded;
+			tracee.creation = AdbgCreation.unloaded;
+			return adbg_oops(AdbgError.crt);
 		}
-		
-		tracee.status = AdbgStatus.paused;
 		
 		//TODO: Check waitpid status for BSDs
 		// Bits  Description (Linux)
@@ -730,11 +688,8 @@ L_DEBUG_LOOP:
 		
 		// Only interested if child is continuing or stopped; Otherwise
 		// it exited and there's nothing more we can do about it.
-		// So return its status code
-		if ((wstatus & 0x7F) != 0x7F) {
-			tracee.status = AdbgStatus.idle;
-			return chld_signo;
-		}
+		if ((wstatus & 0x7F) != 0x7F)
+			goto L_UNLOADED;
 		
 		// Signal filtering
 		switch (chld_signo) {
@@ -765,34 +720,117 @@ L_DEBUG_LOOP:
 				exception.fault_address = cast(ulong)sig.__si_fields.__sigfault.si_addr;
 			else static assert(0, "hack me");
 			break;
-//		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
+//		case SIGINT, SIGTERM, SIGABRT: //TODO: Killed?
 		default:
 			exception.fault_address = 0;
 		}
 		
+		tracee.status = AdbgStatus.paused;
 		adbg_exception_translate(&exception, &tracee.pid, &chld_signo);
-		
-		switch (userfunc(&exception)) with (AdbgAction) {
-		case exit:
-			tracee.status = AdbgStatus.idle; // in either case
-			if (kill(tracee.pid, SIGKILL) == -1) // PT_KILL is deprecated
-				return adbg_oops(AdbgError.os);
-			return 0;
-		case step:
-			if (ptrace(PT_SINGLESTEP, tracee.pid, null, null) == -1) {
-				tracee.status = AdbgStatus.idle;
-				return adbg_oops(AdbgError.os);
-			}
-			goto L_DEBUG_LOOP;
-		case proceed:
-			if (ptrace(PT_CONT, tracee.pid, null, null) == -1) {
-				tracee.status = AdbgStatus.idle;
-				return adbg_oops(AdbgError.os);
-			}
-			goto L_DEBUG_LOOP;
-		default:
-			return adbg_oops(AdbgError.invalidAction);
+	}
+	
+	userfunc(&exception);
+	return 0;
+
+L_UNLOADED:
+	tracee.status = AdbgStatus.unloaded;
+	tracee.creation = AdbgCreation.unloaded;
+	return 0;
+}
+int adbg_end(adbg_process_t *tracee) {
+	if (tracee == null)
+		return adbg_oops(AdbgError.nullArgument);
+	if (tracee.creation == AdbgCreation.unloaded)
+		return adbg_oops(AdbgError.debuggerUnattached);
+	
+	return tracee.creation == AdbgCreation.attached ?
+		adbg_detach(tracee) : adbg_terminate(tracee);
+}
+int adbg_terminate(adbg_process_t *tracee) {
+	if (tracee == null)
+		return adbg_oops(AdbgError.nullArgument);
+	if (tracee.creation == AdbgCreation.unloaded)
+		return adbg_oops(AdbgError.debuggerUnattached);
+	
+	tracee.status = AdbgStatus.unloaded; // exited in any case
+	tracee.creation = AdbgCreation.unloaded;
+	
+	version (Windows) {
+		if (ContinueDebugEvent(tracee.pid, tracee.tid, DBG_TERMINATE_PROCESS) == FALSE)
+			return adbg_oops(AdbgError.os);
+	} else {
+		if (kill(tracee.pid, SIGKILL) < 0) // PT_KILL is deprecated
+			return adbg_oops(AdbgError.os);
+	}
+	return 0;
+}
+int adbg_continue(adbg_process_t *tracee) {
+	if (tracee == null)
+		return adbg_oops(AdbgError.nullArgument);
+	if (tracee.creation == AdbgCreation.unloaded)
+		return adbg_oops(AdbgError.debuggerUnattached);
+	if (tracee.status != AdbgStatus.paused)
+		return 0;
+	
+	tracee.status = AdbgStatus.running;
+	
+	version (Windows) {
+		if (ContinueDebugEvent(tracee.pid, tracee.tid, DBG_CONTINUE) == FALSE) {
+			tracee.status = AdbgStatus.idle;
+			return adbg_oops(AdbgError.os);
 		}
+	} else {
+		if (ptrace(PT_CONT, tracee.pid, null, null) < 0) {
+			tracee.status = AdbgStatus.idle;
+			return adbg_oops(AdbgError.os);
+		}
+	}
+	
+	return 0;
+}
+int adbg_stepi(adbg_process_t *tracee) {
+	if (tracee == null)
+		return adbg_oops(AdbgError.nullArgument);
+	if (tracee.creation == AdbgCreation.unloaded)
+		return adbg_oops(AdbgError.debuggerUnattached);
+	
+	enum EFLAGS_TF = 0x100;
+	
+	version (Windows) {
+		// Enable single-stepping via Trap flag
+		version (Win64) {
+			if (tracee.wow64) {
+				WOW64_CONTEXT winctxwow64 = void;
+				winctxwow64.ContextFlags = CONTEXT_CONTROL;
+				Wow64GetThreadContext(tracee.htid, &winctxwow64);
+				winctxwow64.EFlags |= EFLAGS_TF;
+				Wow64SetThreadContext(tracee.htid, &winctxwow64);
+				FlushInstructionCache(tracee.hpid, null, 0);
+			} else {
+				CONTEXT winctx = void;
+				winctx.ContextFlags = CONTEXT_CONTROL;
+				GetThreadContext(tracee.htid, &winctx);
+				winctx.EFlags |= EFLAGS_TF;
+				SetThreadContext(tracee.htid, &winctx);
+				FlushInstructionCache(tracee.hpid, null, 0);
+			}
+		} else {
+			CONTEXT winctx = void;
+			winctx.ContextFlags = CONTEXT_ALL;
+			GetThreadContext(tracee.htid, &winctx);
+			winctx.EFlags |= EFLAGS_TF;
+			SetThreadContext(tracee.htid, &winctx);
+			FlushInstructionCache(tracee.hpid, null, 0);
+		}
+		
+		return adbg_continue(tracee);
+	} else {
+		if (ptrace(PT_SINGLESTEP, tracee.pid, null, null) < 0) {
+			tracee.status = AdbgStatus.idle;
+			return adbg_oops(AdbgError.os);
+		}
+		
+		return 0;
 	}
 }
 

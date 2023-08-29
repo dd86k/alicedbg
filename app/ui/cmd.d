@@ -35,10 +35,12 @@ int app_cmd() {
 	tracee = alloc!adbg_process_t();
 	disasm = alloc!adbg_disassembler_t();
 	
+	//TODO: check for pid option too
 	// If file specified, load it
 	if (globals.file) {
 		if (adbg_spawn(tracee, globals.file, 0))
 			return oops;
+		puts("Process created.");
 	}
 	
 	if (adbg_dasm_open(disasm)) {
@@ -61,7 +63,7 @@ int prompt() {
 	int argc = void;
 	int error;
 	while (user_continue) {
-		cmd_prompt(error); // print prompt
+		cmd_prompt(); // print prompt
 		line = term_readline(&argc); // read line
 		
 		//TODO: remove once term gets key events
@@ -71,6 +73,8 @@ int prompt() {
 		}
 		
 		error = cmd_execl(line, argc); // execute line
+		if (error == AppError.alicedbg)
+			oops;
 	}
 	return error;
 }
@@ -102,8 +106,8 @@ __gshared AdbgAction user_action;
 // prompt
 //
 
-void cmd_prompt(int err) {
-	printf("[%3d adbg%c] ", err, adbg_status(tracee) == AdbgStatus.paused ? '*' : ' ');
+void cmd_prompt() {
+	printf("(adbg) ");
 }
 
 void cmd_help_chapter(const(char) *name) {
@@ -135,48 +139,50 @@ immutable command_t[] commands = [
 		"Load executable file into the debugger",
 		&cmd_c_load, &cmd_h_load
 	},
-	{ // temporary
-		"d", "action",
-		"Debugger action",
-		&cmd_action
-	},
 //	{ "core",   null, "Load core debugging object into debugger", &cmd_c_load },
 //	{ "attach", null, "Attach the debugger to pid", &cmd_c_pid },
 //	{ "b",      "<action>", "Breakpoint management", & },
 //	{ "d",      "<addr>", "Disassemble address", & },
 	{
-		"run", null,
-		"Run debugger after loading an executable",
-		&cmd_c_run
+		"go", null,
+		"Continue or start debugging.",
+		&cmd_c_go
 	},
+	//TODO: restart
 	{
-		"r", null,
-		"Register management",
-		&cmd_c_r
+		"stepi", null,
+		"Perform an instruction step.",
+		&cmd_c_stepi
+	},
+	//TODO: status
+	{
+		"reg", null,
+		"Register management.",
+		&cmd_c_reg
 	},
 	{
 		"help", "<command>",
-		"Show this help screen",
+		"Show this help screen.",
 		&cmd_c_help
 	},
 	{
 		"maps", null,
-		"Show memory maps",
+		"Show memory maps.",
 		&cmd_c_maps
 	},
 	{
 		"scan", null,
-		"Scan memory for value",
+		"Scan memory for value.",
 		&cmd_c_scan
 	},
 	{
 		"quit", null,
-		"Quit",
+		"Quit debugger.",
 		&cmd_c_quit
 	},
 	{
 		"q", null,
-		"Alias to quit",
+		"Alias to quit.",
 		&cmd_c_quit
 	},
 ];
@@ -191,35 +197,6 @@ int cmd_execv(int argc, const(char) **argv) {
 	
 	printf("unknown command: '%s'\n", argv[0]);
 	return AppError.invalidCommand;
-}
-
-//
-// Action handling
-//
-
-struct action_t {
-	immutable(char) *str;	/// long strion
-	immutable(char) *desc;	/// help description
-	AdbgAction val;	/// action value
-}
-immutable action_t[] actions = [
-	{ "continue", "Resume debuggee", AdbgAction.proceed },
-	{ "c",        "Alias to continue", AdbgAction.proceed },
-	{ "close",    "Close debuggee process", AdbgAction.exit },
-	{ "si",       "Instruction step", AdbgAction.step },
-];
-
-int cmd_action(int argc, const(char) **argv) {
-	if (argc < 1)
-		return 0;
-	
-	const(char) *a = argv[1];
-	foreach (action; actions)
-		if (strcmp(a, action.str) == 0)
-			user_action = action.val; 
-	
-	puts("Debugger action not found");
-	return -1;
 }
 
 //
@@ -248,21 +225,14 @@ void cmd_h_load() {
 }
 
 //
-// r command
+// reg command
 //
 
-int cmd_c_r(int argc, const(char) **argv) {
-	if (adbg_status(tracee) == AdbgStatus.unloaded) {
-		puts("No program loaded or not debugger_paused");
-		return AppError.pauseRequired;
-	}
-	
+int cmd_c_reg(int argc, const(char) **argv) {
 	adbg_thread_context_t *context = adbg_context_easy(tracee);
 	
-	if (context == null) {
-		oops;
+	if (context == null)
 		return AppError.alicedbg;
-	}
 	if (context.count == 0) {
 		puts("No registers available");
 		return AppError.unavailable;
@@ -330,15 +300,27 @@ int cmd_c_help(int argc, const(char) **argv) {
 }
 
 //
-// run command
+// go command
 //
 
-int cmd_c_run(int argc, const(char) **argv) {
-	if (adbg_status(tracee) == AdbgStatus.unloaded) {
-		puts("No programs loaded");
-		return AppError.alreadyLoaded;
-	}
-	return adbg_start(tracee, &cmd_handler);
+int cmd_c_go(int argc, const(char) **argv) {
+	if (adbg_continue(tracee))
+		return AppError.alicedbg;
+	if (adbg_wait(tracee, &cmd_handler))
+		return AppError.alicedbg;
+	return 0;
+}
+
+//
+// stepi command
+//
+
+int cmd_c_stepi(int argc, const(char) **argv) {
+	if (adbg_stepi(tracee))
+		return AppError.alicedbg;
+	if (adbg_wait(tracee, &cmd_handler))
+		return AppError.alicedbg;
+	return 0;
 }
 
 //
@@ -347,11 +329,6 @@ int cmd_c_run(int argc, const(char) **argv) {
 
 //TODO: optional arg: filter module by name (contains string)
 int cmd_c_maps(int argc, const(char) **argv) {
-	if (adbg_status(tracee) == AdbgStatus.unloaded) {
-		puts("error: Attach or spawn program first");
-		return 1;
-	}
-	
 	adbg_memory_map_t *mmaps = void;
 	size_t mcount = void;
 	
@@ -418,12 +395,12 @@ int cmd_handler(adbg_exception_t *ex) {
 			printf("%s %s\n", op.mnemonic, op.operands);
 	}
 	
+L_SKIP:
 	if (user_action < 0) {
 		int a = user_action;
 		user_action = cast(AdbgAction)-1;
 		return a;
 	}
 	
-L_SKIP:
 	return prompt;
 }
