@@ -134,14 +134,17 @@ void dump_elf_e_flags(ushort e_machine, uint e_flags) {
 void dump_elf_phdr(adbg_object_t *o) {
 	dprint_header("Program segment headers");
 	
+	//TODO: Warn and set an upper number limit (e.g. 1000)
+	
 	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:
-		if (o.i.elf32.ehdr.e_phnum == 0)
+		if (o.i.elf32.phdr == null ||
+			o.i.elf32.ehdr.e_phnum == 0)
 			return;
 		
 		Elf32_Phdr *phdr = o.i.elf32.phdr;
 		Elf32_Phdr *max = phdr + o.i.elf32.ehdr.e_phnum;
-		while (phdr++ < max) with (phdr) {
+		for (; phdr < max; ++phdr) with (phdr) {
 			dprint_u32("p_type", p_type, adbg_object_elf_pt_string(p_type));
 			dprint_x32("p_flags", p_flags);
 			dprint_x32("p_offset", p_offset);
@@ -153,12 +156,13 @@ void dump_elf_phdr(adbg_object_t *o) {
 		}
 		break;
 	case ELF_CLASS_64:
-		if (o.i.elf64.ehdr.e_phnum == 0)
+		if (o.i.elf64.phdr == null ||
+			o.i.elf64.ehdr.e_phnum == 0)
 			return;
 		
 		Elf64_Phdr *phdr = o.i.elf64.phdr;
 		Elf64_Phdr *max = phdr + o.i.elf64.ehdr.e_phnum;
-		while (phdr++ < max) with (phdr) {
+		for (; phdr < max; ++phdr) with (phdr) {
 			dprint_u32("p_type", p_type, adbg_object_elf_pt_string(p_type));
 			dprint_x32("p_flags", p_flags);
 			dprint_x64("p_offset", p_offset);
@@ -180,6 +184,9 @@ void dump_elf_sections(adbg_object_t *o) {
 	
 	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:
+		if (o.i.elf32.ehdr == null)
+			return;
+		
 		ushort section_count = o.i.elf32.ehdr.e_shnum;
 		
 		if (section_count == 0)
@@ -202,7 +209,7 @@ void dump_elf_sections(adbg_object_t *o) {
 		Elf32_Shdr *max = shdr + section_count;
 		char *table = o.bufferc + offset; // string table
 		uint count;
-		while (shdr++ < max) with (shdr) {
+		for (; shdr < max; ++shdr) with (shdr) {
 			dprint_section(++count, table + sh_name, 32);
 			dprint_x32("sh_name", sh_name);
 			dprint_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
@@ -230,6 +237,9 @@ void dump_elf_sections(adbg_object_t *o) {
 		}
 		break;
 	case ELF_CLASS_64:
+		if (o.i.elf64.ehdr == null)
+			return;
+		
 		ushort section_count = o.i.elf64.ehdr.e_shnum;
 		
 		if (section_count == 0)
@@ -252,7 +262,7 @@ void dump_elf_sections(adbg_object_t *o) {
 		Elf64_Shdr *max = shdr + section_count;
 		char *table = o.bufferc + offset; // string table
 		uint count;
-		while (shdr++ < max) with (shdr) {
+		for (; shdr < max; ++shdr) with (shdr) {
 			dprint_section(++count, table + sh_name, 32);
 			dprint_x32("sh_name", sh_name);
 			dprint_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
