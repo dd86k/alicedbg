@@ -115,7 +115,7 @@ int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size
 }
 
 /// Memory permission access bits.
-enum AdbgMemPerm {
+enum AdbgMemPerm : ushort {
 	read	= 1,	/// Read permission
 	write	= 1 << 1,	/// Write permission
 	exec	= 1 << 3,	/// Execute permission
@@ -326,7 +326,7 @@ int adbg_memory_maps(adbg_process_t *tracee, adbg_memory_map_t **mmaps, size_t *
 		}
 		
 		// Go through each entry, which may look like this (without header):
-		// Address                   Perm Offset   Dev   inode      Path
+		// Address range             Perm Offset   Dev   inode      Path
 		// 55adaf007000-55adaf009000 r--p 00000000 08:02 1311130    /usr/bin/cat
 		// Perms: r=read, w=write, x=execute, s=shared or p=private (CoW)
 		// Path: Path or [stack], [stack:%id] (3.4 to 4.4), [heap]
@@ -351,7 +351,9 @@ int adbg_memory_maps(adbg_process_t *tracee, adbg_memory_map_t **mmaps, size_t *
 			
 			if (sscanf(line.ptr, "%zx-%zx %4s %x %x:%x %u %512s",
 				&range_start, &range_end,
-				perms.ptr, &offset, &dev_major, &dev_minor, &inode, map.name.ptr) < 8) {
+				perms.ptr, &offset,
+				&dev_major, &dev_minor,
+				&inode, map.name.ptr) < 8) {
 				continue;
 			}
 			
@@ -395,28 +397,29 @@ int adbg_memory_maps(adbg_process_t *tracee, adbg_memory_map_t **mmaps, size_t *
 		free(procbuf);
 		return 0;
 	} else
-		// FreeBSD: procstat(1)
+		// FreeBSD: procstat(1) / pmap(9)
 		// - https://man.freebsd.org/cgi/man.cgi?query=vm_map
 		// - https://github.com/freebsd/freebsd-src/blob/main/lib/libutil/kinfo_getvmmap.c
 		// - args[0] = CTL_KERN
 		// - args[1] = KERN_PROC
 		// - args[2] = KERN_PROC_VMMAP
 		// - args[3] = pid
-		// NetBSD: pmap(1)
+		// NetBSD: pmap(1) / uvm_map(9)
 		// OpenBSD: procmap(1)
+		// - kvm_open + kvm_getprocs + KERN_PROC_PID
 		return adbg_oops(AdbgError.notImplemented);
 }
 
-private bool adbg_mem_scan_u8(void *v, void *c, size_t l) {
+private bool adbg_mem_cmp_u8(void *v, void *c, size_t l) pure {
 	return *cast(ubyte*)v == *cast(ubyte*)c;
 }
-private bool adbg_mem_scan_u16(void *v, void *c, size_t l) {
+private bool adbg_mem_cmp_u16(void *v, void *c, size_t l) pure {
 	return *cast(ushort*)v == *cast(ushort*)c;
 }
-private bool adbg_mem_scan_u32(void *v, void *c, size_t l) {
+private bool adbg_mem_cmp_u32(void *v, void *c, size_t l) pure {
 	return *cast(uint*)v == *cast(uint*)c;
 }
-private bool adbg_mem_scan_u64(void *v, void *c, size_t l) {
+private bool adbg_mem_cmp_u64(void *v, void *c, size_t l) pure {
 	return *cast(ulong*)v == *cast(ulong*)c;
 }
 /*private bool adbg_mm_scan_u128(void *v, void *c, size_t l) {
@@ -440,7 +443,7 @@ private bool adbg_mem_scan_u64(void *v, void *c, size_t l) {
 		return memcmp(v, c, l) == 0;
 	}
 }*/
-private bool adbg_mem_scan_other(void *v, void *c, size_t l) {
+private bool adbg_mem_cmp_other(void *v, void *c, size_t l) pure {
 	import core.stdc.string : memcmp;
 	return memcmp(v, c, l) == 0;
 }
@@ -449,6 +452,8 @@ private bool adbg_mem_scan_other(void *v, void *c, size_t l) {
 enum AdbgScanOpt {
 	/// 
 	unaligned	= 1,
+	/// Rescan results only.
+	rescan	= 2,
 	// Report progress to callback.
 	//
 	// Callback will report: stage name and a percentage on modules scanned.
@@ -461,6 +466,17 @@ enum AdbgScanOpt {
 	// To be used with customMMap.
 	//customMMapCount
 }
+
+struct adbg_scan_t {
+	
+}
+struct adbg_scan_result_t {
+	ulong address;
+	
+	adbg_memory_map_t *map;
+}
+
+private enum DEFAULT_BUFFER_SIZE = 2000;
 
 /// Scan debuggee process memory for a specific value.
 ///
@@ -506,26 +522,27 @@ int adbg_memory_scan(adbg_process_t *tracee,
 		return adbg_oops(AdbgError.scannerDataEmpty);
 	
 	switch (tracee.status) with (AdbgStatus) {
-	case ready, paused: break;
-	default:
+	case standby, paused, running: break;
+	default: // Can't if unloaded
 		*count = 0;
 		return adbg_oops(AdbgError.notPaused);
 	}
 	
-	adbg_memory_map_t *mmaps = void; size_t mcount = void;
+	adbg_memory_map_t *mmaps = void;
+	size_t mcount = void;
 	int e = adbg_memory_maps(tracee, &mmaps, &mcount, 0);
 	if (e) return e;
 	
 	extern (C)
-	bool function(void*, void*, size_t) scan = void;
+	bool function(void*, void*, size_t) cmp = void;
 	
-	// get optimized scan func
+	// get optimized compare func
 	switch (size) {
-	case ulong.sizeof:	scan = &adbg_mem_scan_u64; break;
-	case uint.sizeof:	scan = &adbg_mem_scan_u32; break;
-	case ushort.sizeof:	scan = &adbg_mem_scan_u16; break;
-	case ubyte.sizeof:	scan = &adbg_mem_scan_u8; break;
-	default:		scan = &adbg_mem_scan_other;
+	case ulong.sizeof:	cmp = &adbg_mem_cmp_u64; break;
+	case uint.sizeof:	cmp = &adbg_mem_cmp_u32; break;
+	case ushort.sizeof:	cmp = &adbg_mem_cmp_u16; break;
+	case ubyte.sizeof:	cmp = &adbg_mem_cmp_u8; break;
+	default:		cmp = &adbg_mem_cmp_other;
 	}
 	
 	ubyte *buffer = cast(ubyte*)malloc(size);
@@ -534,11 +551,8 @@ int adbg_memory_scan(adbg_process_t *tracee,
 		return adbg_oops(AdbgError.os);
 	}
 	
-	// temporary thing until we get something similar to vector<T>
-	enum TEMP_BUFITEMS = 2000;
-	
 	ulong *list_ = *list;
-	list_ = cast(ulong*)malloc(ulong.sizeof * TEMP_BUFITEMS);
+	list_ = cast(ulong*)malloc(ulong.sizeof * DEFAULT_BUFFER_SIZE);
 	if (list_ == null) {
 		free(mmaps);
 		free(buffer);
@@ -548,25 +562,27 @@ int adbg_memory_scan(adbg_process_t *tracee,
 	size_t count_ = *count;
 	size_t list_i;
 	L_MODULE: for (size_t mi; mi < mcount; ++mi, ++mmaps) {
-		enum ACC = AdbgMemPerm.read;
-		if ((mmaps.access & ACC) != ACC)
+		// Or can we regardless?
+		enum MIN_ACCESS = AdbgMemPerm.read;
+		if ((mmaps.access & MIN_ACCESS) != MIN_ACCESS)
 			continue; //TODO: trace
 		
 		void* start = mmaps.base;
 		void* end   = start + mmaps.size;
 		
+		// Aligned, for now
 		for (; start + size < end; start += size) {
 			// Read into buffer
 			if (adbg_memory_read(tracee, cast(size_t)start, buffer, cast(uint)size)) {
 				//TODO: trace()
-				continue;
+				continue L_MODULE;
 			}
 			// Found a hit
-			if (scan(buffer, data, size)) {
+			if (cmp(buffer, data, size)) {
 				//TODO: trace()
 				list_[list_i++] = cast(ulong)start;
-				// No more entries
-				if (list_i >= TEMP_BUFITEMS)
+				// No more entries can be put
+				if (list_i >= DEFAULT_BUFFER_SIZE)
 					break L_MODULE;
 			}
 		}
