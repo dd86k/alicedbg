@@ -111,14 +111,17 @@ private ulong adbg_util_nop64(ulong v) pure { return v; }
 /// Byte-swap an 16-bit value.
 /// Params: v = 16-bit value
 /// Returns: Byte-swapped value
-ushort adbg_util_bswap16(ushort v) pure {
+ushort adbg_bswap16(ushort v) pure {
 	return cast(ushort)(v >> 8 | v << 8);
 }
+
+// Old name
+public alias adbg_util_bswap16 = adbg_bswap16;
 
 /// Byte-swap an 32-bit value.
 /// Params: v = 32-bit value
 /// Returns: Byte-swapped value
-uint adbg_util_bswap32(uint v) pure {
+uint adbg_bswap32(uint v) pure {
 	//TODO: Determine when bswap was introduced (at least works for dmd 2.078)
 	import core.bitop : bswap;
 	return bswap(v); // Intrinsic
@@ -130,7 +133,7 @@ uint adbg_util_bswap32(uint v) pure {
 /// Byte-swap an 64-bit value.
 /// Params: v = 64-bit value
 /// Returns: Byte-swapped value
-ulong adbg_util_bswap64(ulong v) pure {
+ulong adbg_bswap64(ulong v) pure {
 	// NOTE: Only recent versions of DMD inlines the intrinsic
 	//TODO: Determine when bswap was introduced (at least works for dmd 2.078)
 	import core.bitop : bswap;
@@ -141,13 +144,18 @@ ulong adbg_util_bswap64(ulong v) pure {
 	//return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
 }
 
+// Old names
+public alias adbg_util_bswap16 = adbg_bswap16;
+public alias adbg_util_bswap32 = adbg_bswap32;
+public alias adbg_util_bswap64 = adbg_bswap64;
+
 /// 
 unittest {
 	enum N16 = 0xAABB; enum R16 = 0xBBAA;
 	enum N32 = 0xAABBCCDD; enum R32 = 0xDDCCBBAA;
 	enum N64 = 0xAABBCCDD_11223344; enum R64 = 0x44332211_DDCCBBAA;
 	
-	assert(adbg_util_bswap16(N16) == R16, "bswap16");
-	assert(adbg_util_bswap32(N32) == R32, "bswap32");
-	assert(adbg_util_bswap64(N64) == R64, "bswap64");
+	assert(adbg_bswap16(N16) == R16, "bswap16");
+	assert(adbg_bswap32(N32) == R32, "bswap32");
+	assert(adbg_bswap64(N64) == R64, "bswap64");
 }

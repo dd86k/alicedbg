@@ -540,7 +540,7 @@ struct PE_SECTION_ENTRY { align(1):
 /// Params: obj = Object
 /// Returns: Status code
 int adbg_object_pe_load(adbg_object_t *obj) {
-	obj.type = AdbgObject.pe;
+	obj.format = AdbgObject.pe;
 	
 	void *base = obj.buffer + obj.i.mz.header.e_lfanew;
 	
@@ -558,7 +558,7 @@ int adbg_object_pe_load(adbg_object_t *obj) {
 		break;
 	// NOTE: ROM have no directories
 	case PE_FMT_ROM:
-		//obj.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDRROM);
+		obj.i.pe.directory = null;
 		obj.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDRROM);
 		return 0;
 	default:

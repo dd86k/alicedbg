@@ -281,7 +281,7 @@ enum { //flag_t
 }
 
 int adbg_object_macho_load(adbg_object_t *obj) {
-	obj.type = AdbgObject.macho;
+	obj.format = AdbgObject.macho;
 	
 	obj.i.macho.header = cast(macho_header*)obj.buffer;
 	

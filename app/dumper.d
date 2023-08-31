@@ -108,7 +108,7 @@ int app_dump() {
 	// NOTE: adbg_object_name safely returns "Unknown" in case of unknown.
 	printf("%s object format\n", adbg_object_name(o));
 	
-	switch (o.type) with (AdbgObject) {
+	switch (o.format) with (AdbgObject) {
 	case mz:	return dump_mz(o, globals.flags);
 	case pe:	return dump_pe(o, globals.flags);
 	case elf:	return dump_elf(o, globals.flags);

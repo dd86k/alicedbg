@@ -166,6 +166,7 @@ int adbg_dasm_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 	return 0;
 }
 
+// NOTE: Could have done adbg_process_machine but safer to do this.
 int adbg_dasm_openproc(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
 	AdbgMachine mach;
 	

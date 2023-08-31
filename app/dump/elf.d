@@ -142,9 +142,10 @@ void dump_elf_phdr(adbg_object_t *o) {
 			o.i.elf32.ehdr.e_phnum == 0)
 			return;
 		
-		Elf32_Phdr *phdr = o.i.elf32.phdr;
-		Elf32_Phdr *max = phdr + o.i.elf32.ehdr.e_phnum;
-		for (; phdr < max; ++phdr) with (phdr) {
+		//TODO: adbg_object_elf32_phnum function?
+		for (uint i; i < o.i.elf32.ehdr.e_phnum; ++i) {
+			Elf32_Phdr *phdr = adbg_object_elf_phdr32(o, i);
+			with (phdr) {
 			dprint_u32("p_type", p_type, adbg_object_elf_pt_string(p_type));
 			dprint_x32("p_flags", p_flags);
 			dprint_x32("p_offset", p_offset);
@@ -153,6 +154,11 @@ void dump_elf_phdr(adbg_object_t *o) {
 			dprint_x32("p_filesz", p_filesz);
 			dprint_x32("p_memsz", p_memsz);
 			dprint_x32("p_align", p_align);
+			}
+			
+			//TODO: coredump
+			// if (p_type == ELF_PT_NOTE)
+			// Elf32_Nhdr (like NT_X86_XSTATE)
 		}
 		break;
 	case ELF_CLASS_64:
@@ -160,9 +166,9 @@ void dump_elf_phdr(adbg_object_t *o) {
 			o.i.elf64.ehdr.e_phnum == 0)
 			return;
 		
-		Elf64_Phdr *phdr = o.i.elf64.phdr;
-		Elf64_Phdr *max = phdr + o.i.elf64.ehdr.e_phnum;
-		for (; phdr < max; ++phdr) with (phdr) {
+		for (uint i; i < o.i.elf64.ehdr.e_phnum; ++i) {
+			Elf64_Phdr *phdr = adbg_object_elf_phdr64(o, i);
+			with (phdr) {
 			dprint_u32("p_type", p_type, adbg_object_elf_pt_string(p_type));
 			dprint_x32("p_flags", p_flags);
 			dprint_x64("p_offset", p_offset);
@@ -171,6 +177,11 @@ void dump_elf_phdr(adbg_object_t *o) {
 			dprint_x64("p_filesz", p_filesz);
 			dprint_x64("p_memsz", p_memsz);
 			dprint_x64("p_align", p_align);
+			}
+			
+			//TODO: coredump
+			// if (p_type == ELF_PT_NOTE)
+			// Elf32_Nhdr (like NT_X86_XSTATE)
 		}
 		break;
 	default:
@@ -188,7 +199,6 @@ void dump_elf_sections(adbg_object_t *o) {
 			return;
 		
 		ushort section_count = o.i.elf32.ehdr.e_shnum;
-		
 		if (section_count == 0)
 			return;
 		
@@ -199,17 +209,17 @@ void dump_elf_sections(adbg_object_t *o) {
 			return;
 		}
 		
-		Elf32_Shdr *shdr = o.i.elf32.shdr;
-		uint offset = shdr[id].sh_offset;
+		uint offset = o.i.elf32.shdr[id].sh_offset;
 		if (offset < Elf32_Ehdr.sizeof || offset > o.file_size) {
 			dprint_warn("String table offset out of bounds");
 			return;
 		}
 		
-		Elf32_Shdr *max = shdr + section_count;
 		char *table = o.bufferc + offset; // string table
 		uint count;
-		for (; shdr < max; ++shdr) with (shdr) {
+		for (uint i; i < section_count; ++i) {
+			Elf32_Shdr *shdr = adbg_object_elf_shdr32(o, i);
+			with (shdr) {
 			dprint_section(++count, table + sh_name, 32);
 			dprint_x32("sh_name", sh_name);
 			dprint_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
@@ -234,6 +244,7 @@ void dump_elf_sections(adbg_object_t *o) {
 			dprint_x32("sh_info", sh_info);
 			dprint_x32("sh_addralign", sh_addralign);
 			dprint_x32("sh_entsize", sh_entsize);
+			}
 		}
 		break;
 	case ELF_CLASS_64:
@@ -241,7 +252,6 @@ void dump_elf_sections(adbg_object_t *o) {
 			return;
 		
 		ushort section_count = o.i.elf64.ehdr.e_shnum;
-		
 		if (section_count == 0)
 			return;
 		
@@ -252,17 +262,17 @@ void dump_elf_sections(adbg_object_t *o) {
 			return;
 		}
 		
-		Elf64_Shdr *shdr = o.i.elf64.shdr;
-		ulong offset = shdr[id].sh_offset;
+		ulong offset = o.i.elf64.shdr[id].sh_offset;
 		if (offset < Elf64_Ehdr.sizeof || offset > o.file_size) {
 			dprint_warn("String table offset out of bounds");
 			return;
 		}
 		
-		Elf64_Shdr *max = shdr + section_count;
 		char *table = o.bufferc + offset; // string table
 		uint count;
-		for (; shdr < max; ++shdr) with (shdr) {
+		for (uint i; i < section_count; ++i) {
+			Elf64_Shdr *shdr = adbg_object_elf_shdr64(o, i);
+			with (shdr) {
 			dprint_section(++count, table + sh_name, 32);
 			dprint_x32("sh_name", sh_name);
 			dprint_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
@@ -286,6 +296,7 @@ void dump_elf_sections(adbg_object_t *o) {
 			dprint_x32("sh_info", sh_info);
 			dprint_x64("sh_addralign", sh_addralign);
 			dprint_x64("sh_entsize", sh_entsize);
+			}
 		}
 		break;
 	default:

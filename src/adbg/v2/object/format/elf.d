@@ -12,7 +12,8 @@ module adbg.v2.object.format.elf;
 import adbg.v2.object.server : adbg_object_t, AdbgObject;
 import adbg.v2.object.machines : AdbgMachine;
 import adbg.error;
-import adbg.utils.bit : CHAR32;
+import adbg.utils.bit;
+import adbg.include.c.stdlib : calloc, free;
 
 // NOTE: The string table section is typically named .shstrtab
 
@@ -649,35 +650,111 @@ struct Elf64_Chdr {
 // Functions
 //
 
+version (BigEndian)
+	private enum PLATFORM_DATA = ELF_DATA_MSB;
+else
+	private enum PLATFORM_DATA = ELF_DATA_LSB;
+
 int adbg_object_elf_load(adbg_object_t *obj) {
-	obj.type = AdbgObject.elf;
+	obj.format = AdbgObject.elf;
 	obj.i.elf32.ehdr = cast(Elf32_Ehdr*)obj.buffer;
 	
-	if (obj.i.elf32.ehdr.e_version != ELF_EV_CURRENT)
-		return adbg_oops(AdbgError.assertion);
+	obj.reversed = obj.i.elf32.ehdr.e_ident[ELF_EI_DATA] != PLATFORM_DATA;
+	version (Trace) trace("reversed=%d", obj.reversed);
 	
 	switch (obj.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:
 		with (obj.i.elf32) {
-			if (ehdr.e_phoff >= obj.file_size ||
-			    ehdr.e_shoff >= obj.file_size)
-			{
-				return adbg_oops(AdbgError.assertion);
+			if (obj.reversed) {
+				ehdr.e_type	= adbg_bswap16(ehdr.e_type);
+				ehdr.e_machine	= adbg_bswap16(ehdr.e_machine);
+				ehdr.e_version	= adbg_bswap32(ehdr.e_version);
+				ehdr.e_entry	= adbg_bswap32(ehdr.e_entry);
+				ehdr.e_phoff	= adbg_bswap32(ehdr.e_phoff);
+				ehdr.e_shoff	= adbg_bswap32(ehdr.e_shoff);
+				ehdr.e_flags	= adbg_bswap32(ehdr.e_flags);
+				ehdr.e_ehsize	= adbg_bswap16(ehdr.e_ehsize);
+				ehdr.e_phentsize	= adbg_bswap16(ehdr.e_phentsize);
+				ehdr.e_phnum	= adbg_bswap16(ehdr.e_phnum);
+				ehdr.e_shentsize	= adbg_bswap16(ehdr.e_shentsize);
+				ehdr.e_shnum	= adbg_bswap16(ehdr.e_shnum);
+				ehdr.e_shstrndx	= adbg_bswap16(ehdr.e_shstrndx);
 			}
-			phdr = cast(Elf32_Phdr*)(obj.buffer + ehdr.e_phoff);
-			shdr = cast(Elf32_Shdr*)(obj.buffer + ehdr.e_shoff);
+			
+			if (ehdr.e_version != ELF_EV_CURRENT)
+				return adbg_oops(AdbgError.assertion);
+			
+			if (ehdr.e_phoff && ehdr.e_phnum) {
+				if (ehdr.e_phoff >= obj.file_size) {
+					return adbg_oops(AdbgError.assertion);
+				}
+				phdr = cast(Elf32_Phdr*)(obj.buffer + ehdr.e_phoff);
+				reserved_phdr = cast(bool*)calloc(ehdr.e_phnum, bool.sizeof);
+				if (reserved_phdr == null)
+					return adbg_oops(AdbgError.crt);
+			} else {
+				reserved_phdr = null;
+				phdr = null;
+			}
+			if (ehdr.e_shoff && ehdr.e_shnum) {
+				if (ehdr.e_shoff >= obj.file_size) {
+					return adbg_oops(AdbgError.assertion);
+				}
+				shdr = cast(Elf32_Shdr*)(obj.buffer + ehdr.e_shoff);
+				reserved_shdr = cast(bool*)calloc(ehdr.e_shnum, bool.sizeof);
+				if (reserved_shdr == null)
+					return adbg_oops(AdbgError.crt);
+			} else {
+				reserved_shdr = null;
+				shdr = null;
+			}
 		}
 		break;
 	case ELF_CLASS_64:
 		with (obj.i.elf64) {
-			if (ehdr.e_phoff >= obj.file_size ||
-			    ehdr.e_shoff >= obj.file_size)
-			{
-				return adbg_oops(AdbgError.assertion);
+			if (obj.reversed) {
+				ehdr.e_type	= adbg_bswap16(ehdr.e_type);
+				ehdr.e_machine	= adbg_bswap16(ehdr.e_machine);
+				ehdr.e_version	= adbg_bswap32(ehdr.e_version);
+				ehdr.e_entry	= adbg_bswap64(ehdr.e_entry);
+				ehdr.e_phoff	= adbg_bswap64(ehdr.e_phoff);
+				ehdr.e_shoff	= adbg_bswap64(ehdr.e_shoff);
+				ehdr.e_flags	= adbg_bswap32(ehdr.e_flags);
+				ehdr.e_ehsize	= adbg_bswap16(ehdr.e_ehsize);
+				ehdr.e_phentsize	= adbg_bswap16(ehdr.e_phentsize);
+				ehdr.e_phnum	= adbg_bswap16(ehdr.e_phnum);
+				ehdr.e_shentsize	= adbg_bswap16(ehdr.e_shentsize);
+				ehdr.e_shnum	= adbg_bswap16(ehdr.e_shnum);
+				ehdr.e_shstrndx	= adbg_bswap16(ehdr.e_shstrndx);
 			}
-			Elf64_Ehdr* hdr64 = cast(Elf64_Ehdr*)obj.buffer;
-			phdr = cast(Elf64_Phdr*)(obj.buffer + hdr64.e_phoff);
-			shdr = cast(Elf64_Shdr*)(obj.buffer + hdr64.e_shoff);
+			
+			if (ehdr.e_version != ELF_EV_CURRENT)
+				return adbg_oops(AdbgError.assertion);
+			
+			if (ehdr.e_phoff && ehdr.e_phnum) {
+				if (ehdr.e_phoff >= obj.file_size) {
+					return adbg_oops(AdbgError.assertion);
+				}
+				phdr = cast(Elf64_Phdr*)(obj.buffer + ehdr.e_phoff);
+				reserved_phdr = cast(bool*)calloc(ehdr.e_phnum, bool.sizeof);
+				if (reserved_phdr == null)
+					return adbg_oops(AdbgError.crt);
+			} else {
+				reserved_phdr = null;
+				phdr = null;
+			}
+			if (ehdr.e_shoff && ehdr.e_shnum) {
+				if (ehdr.e_shoff >= obj.file_size) {
+					return adbg_oops(AdbgError.assertion);
+				}
+				shdr = cast(Elf64_Shdr*)(obj.buffer + ehdr.e_shoff);
+				reserved_shdr = cast(bool*)calloc(ehdr.e_shnum, bool.sizeof);
+				if (reserved_shdr == null)
+					return adbg_oops(AdbgError.crt);
+			} else {
+				reserved_shdr = null;
+				shdr = null;
+			}
 		}
 		break;
 	default:
@@ -685,6 +762,98 @@ int adbg_object_elf_load(adbg_object_t *obj) {
 	}
 	
 	return 0;
+}
+
+Elf32_Ehdr* adbg_object_elf_ehdr32(adbg_object_t *o) {
+	if (o == null) return null;
+	// Return as-is, already swapped
+	return o.i.elf32.ehdr;
+}
+
+Elf32_Phdr* adbg_object_elf_phdr32(adbg_object_t *o, size_t index) {
+	if (o == null) return null;
+	if (o.i.elf32.phdr == null) return null;
+	if (index >= o.i.elf32.ehdr.e_phnum) return null;
+	Elf32_Phdr *phdr = &o.i.elf32.phdr[index];
+	if (o.reversed && o.i.elf32.reserved_phdr[index] == false) {
+		phdr.p_type	= adbg_bswap32(phdr.p_type);
+		phdr.p_offset	= adbg_bswap32(phdr.p_offset);
+		phdr.p_vaddr	= adbg_bswap32(phdr.p_vaddr);
+		phdr.p_paddr	= adbg_bswap32(phdr.p_paddr);
+		phdr.p_filesz	= adbg_bswap32(phdr.p_filesz);
+		phdr.p_memsz	= adbg_bswap32(phdr.p_memsz);
+		phdr.p_flags	= adbg_bswap32(phdr.p_flags);
+		phdr.p_align	= adbg_bswap32(phdr.p_align);
+		o.i.elf32.reserved_phdr[index] = true;
+	}
+	return phdr;
+}
+
+Elf32_Shdr* adbg_object_elf_shdr32(adbg_object_t *o, size_t index) {
+	if (o == null) return null;
+	if (o.i.elf32.shdr == null) return null;
+	if (index >= o.i.elf32.ehdr.e_shnum) return null;
+	Elf32_Shdr *shdr = &o.i.elf32.shdr[index];
+	if (o.reversed && o.i.elf32.reserved_phdr[index] == false) {
+		shdr.sh_name	= adbg_bswap32(shdr.sh_name);
+		shdr.sh_type	= adbg_bswap32(shdr.sh_type);
+		shdr.sh_flags	= adbg_bswap32(shdr.sh_flags);
+		shdr.sh_addr	= adbg_bswap32(shdr.sh_addr);
+		shdr.sh_offset	= adbg_bswap32(shdr.sh_offset);
+		shdr.sh_size	= adbg_bswap32(shdr.sh_size);
+		shdr.sh_link	= adbg_bswap32(shdr.sh_link);
+		shdr.sh_info	= adbg_bswap32(shdr.sh_info);
+		shdr.sh_addralign	= adbg_bswap32(shdr.sh_addralign);
+		shdr.sh_entsize	= adbg_bswap32(shdr.sh_entsize);
+		o.i.elf32.reserved_shdr[index] = true;
+	}
+	return shdr;
+}
+
+Elf64_Ehdr* adbg_object_elf_ehdr64(adbg_object_t *o) {
+	if (o == null) return null;
+	// Return as-is, already swapped
+	return o.i.elf64.ehdr;
+}
+
+Elf64_Phdr* adbg_object_elf_phdr64(adbg_object_t *o, size_t index) {
+	if (o == null) return null;
+	if (o.i.elf64.phdr == null) return null;
+	if (index >= o.i.elf64.ehdr.e_phnum) return null;
+	Elf64_Phdr *phdr = &o.i.elf64.phdr[index];
+	if (o.reversed && o.i.elf64.reserved_phdr[index] == false) {
+		phdr.p_type	= adbg_bswap32(phdr.p_type);
+		phdr.p_offset	= adbg_bswap64(phdr.p_offset);
+		phdr.p_vaddr	= adbg_bswap64(phdr.p_vaddr);
+		phdr.p_paddr	= adbg_bswap64(phdr.p_paddr);
+		phdr.p_filesz	= adbg_bswap64(phdr.p_filesz);
+		phdr.p_memsz	= adbg_bswap64(phdr.p_memsz);
+		phdr.p_flags	= adbg_bswap32(phdr.p_flags);
+		phdr.p_align	= adbg_bswap64(phdr.p_align);
+		o.i.elf32.reserved_phdr[index] = true;
+	}
+	return phdr;
+}
+
+Elf64_Shdr* adbg_object_elf_shdr64(adbg_object_t *o, size_t index) {
+	if (o == null) return null;
+	if (o.i.elf64.shdr == null) return null;
+	if (index >= o.i.elf64.ehdr.e_shnum) return null;
+	Elf64_Shdr *shdr = &o.i.elf64.shdr[index];
+	if (o.reversed && o.i.elf64.reserved_phdr[index] == false) {
+		shdr.sh_name	= adbg_bswap32(shdr.sh_name);
+		shdr.sh_type	= adbg_bswap32(shdr.sh_type);
+		shdr.sh_flags	= adbg_bswap64(shdr.sh_flags);
+		shdr.sh_addr	= adbg_bswap64(shdr.sh_addr);
+		shdr.sh_offset	= adbg_bswap64(shdr.sh_offset);
+		shdr.sh_size	= adbg_bswap64(shdr.sh_size);
+		shdr.sh_link	= adbg_bswap32(shdr.sh_link);
+		shdr.sh_info	= adbg_bswap32(shdr.sh_info);
+		shdr.sh_addralign	= adbg_bswap64(shdr.sh_addralign);
+		shdr.sh_entsize	= adbg_bswap64(shdr.sh_entsize);
+		o.i.elf32.reserved_shdr[index] = true;
+	}
+	return shdr;
 }
 
 AdbgMachine adbg_object_elf_machine(ushort machine) {

@@ -42,7 +42,7 @@ struct mz_reloc {
 }
 
 int adbg_object_mz_load(adbg_object_t *obj) {
-	obj.type = AdbgObject.mz;
+	obj.format = AdbgObject.mz;
 	obj.i.mz.header = cast(mz_hdr*)obj.buffer;
 	with (obj.i.mz) if (header.e_lfarlc && header.e_crlc && header.e_lfarlc < obj.file_size)
 		relocs = cast(mz_reloc*)(obj.buffer + header.e_lfarlc);

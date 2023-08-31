@@ -80,16 +80,25 @@ struct adbg_object_t {
 	}
 	/// Allocated buffer size.
 	size_t buffer_size;
+	
 	/// Option: Partial loading.
 	/// Warning: Rest of object must be loaded automatically before using other services.
 	bool partial;
-	/// 
-	bool reserved;
 	
-	/// Loaded object type.
-	AdbgObject type;
+	/// Target endianness is reversed and therefore fields needs
+	/// to be byte-swapped.
+	bool reversed;
 	
-
+	// Target object machine definition is supported by the target
+	// running this server, depends on architectural features.
+	// This is used for checking if source debugging is available.
+	// Examples: x86 on x86-64 or Arm A32 on Arm A64 via WoW64
+	//TODO: bool debug_supported;
+	
+	/// Loaded object format.
+	AdbgObject format;
+	
+	// Pointers to machine-dependant structures
 	package
 	union adbg_object_internals_t {
 		// Main header. All object files have some form of header.
@@ -140,6 +149,10 @@ struct adbg_object_t {
 			Elf32_Ehdr *ehdr;
 			Elf32_Phdr *phdr;
 			Elf32_Shdr *shdr;
+			
+			bool reserved_ehdr;
+			bool *reserved_phdr;
+			bool *reserved_shdr;
 		}
 		elf32_t elf32;
 		
@@ -147,6 +160,10 @@ struct adbg_object_t {
 			Elf64_Ehdr *ehdr;
 			Elf64_Phdr *phdr;
 			Elf64_Shdr *shdr;
+			
+			bool reserved_ehdr;
+			bool *reserved_phdr;
+			bool *reserved_shdr;
 		}
 		elf64_t elf64;
 	}
@@ -275,7 +292,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *obj) {
 	if (obj == null)
 		return AdbgMachine.native;
 	
-	switch (obj.type) with (AdbgObject) {
+	switch (obj.format) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
 	case pe:	return adbg_object_pe_machine(obj.i.pe.header.Machine);
 	// NOTE: Both fat and header matches the header structure
@@ -291,7 +308,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *obj) {
 const(char)* adbg_object_short_name(adbg_object_t *obj) {
 	if (obj == null)
 		goto L_UNKNOWN;
-	switch (obj.type) with (AdbgObject) {
+	switch (obj.format) with (AdbgObject) {
 	case mz:	return "mz";
 	case ne:	return "ne";
 	case le:	return "le";
@@ -310,7 +327,7 @@ L_UNKNOWN:
 const(char)* adbg_object_name(adbg_object_t *obj) {
 	if (obj == null)
 		goto L_UNKNOWN;
-	switch (obj.type) with (AdbgObject) {
+	switch (obj.format) with (AdbgObject) {
 	case mz:	return "Mark Zbikowski";
 	case ne:	return "New Executable";
 	case le:	return "Linked Executable";
