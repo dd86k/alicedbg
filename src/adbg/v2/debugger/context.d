@@ -99,7 +99,7 @@ void adbg_context_start(adbg_thread_context_t *ctx, adbg_process_t *tracee) {
 		} else // Anything else 64-bit
 			adbg_context_start_x86_64(ctx);
 	} else
-		e.count = 0;
+		ctx.count = 0;
 }
 
 int adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {

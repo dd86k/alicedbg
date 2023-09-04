@@ -319,6 +319,7 @@ version (X86) {
 		uint fpsr;
 		uint fpcr;
 	}
+	alias user_fpsimd user_fpregs;
 	
 	// user_pt_regs
 	struct user_regs_struct {
@@ -342,7 +343,7 @@ version (X86) {
 
 		c_longint signal;	/// Signal that caused the core dump.
 		int reserved;	/// No longer used
-		user_regs *u_ar0;	/// help gdb to find the general registers.
+		user_regs_struct *u_ar0;	/// help gdb to find the general registers.
 
 		c_ulong magic;		/// uniquely identify a core file
 		ubyte[32] u_comm;		/// User command that was responsible

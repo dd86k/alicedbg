@@ -439,6 +439,7 @@ int adbg_disasm_platform(adbg_disasm_t *disasm, AdbgPlatform m) {
 		disasm.syntax = AdbgSyntax.riscv;
 		disasm.foperand = &adbg_disasm_operand_riscv;
 		break;*/
+	case arm_a32, arm_a64:
 	default:
 		return adbg_oops(AdbgError.unsupportedPlatform);
 	}
@@ -503,6 +504,7 @@ int adbg_disasm_configure(adbg_disasm_t *disasm, AdbgPlatform m) {
 		disasm.syntax = AdbgSyntax.riscv;
 		disasm.foperand = &adbg_disasm_operand_riscv;
 		break;*/
+	case arm_a32, arm_a64:
 	default:
 		return adbg_oops(AdbgError.unsupportedPlatform);
 	}
