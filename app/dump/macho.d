@@ -30,13 +30,14 @@ void dump_macho_hdr(adbg_object_t *o) {
 		
 		dprint_header("FAT Arch Header");
 		
-		//TODO: multiple nfat_arch
-		with (o.i.macho.fat_arch) {
-		dprint_x32("cputype", cputype, adbg_object_macho_cputype_string(cputype));
-		dprint_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
-		dprint_x32("offset", offset);
-		dprint_x32("size", size);
-		dprint_x32("alignment", alignment);
+		size_t i;
+		macho_fat_arch *fa = void;
+		while ((fa = adbg_object_macho_fat_arch(o, i++)) != null) with (fa) {
+			dprint_x32("cputype", cputype, adbg_object_macho_cputype_string(cputype));
+			dprint_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
+			dprint_x32("offset", offset);
+			dprint_x32("size", size);
+			dprint_x32("alignment", alignment);
 		}
 	} else {
 		dprint_header("Header");
@@ -76,6 +77,15 @@ void dump_macho_hdr(adbg_object_t *o) {
 			"NO_HEAP_EXECUTION".ptr,	MACHO_FLAG_NO_HEAP_EXECUTION,
 			"APP_EXTENSION_SAFE".ptr,	MACHO_FLAG_APP_EXTENSION_SAFE,
 			null);
+		}
+		
+		dprint_header("Load commands");
+		
+		size_t i;
+		macho_load_command *command = void;
+		while ((command = adbg_object_macho_load_command(o, i++)) != null) with (command) {
+			dprint_x32("cmd", cmd, adbg_object_macho_command_string(cmd));
+			dprint_x32("cmdsize", cmdsize);
 		}
 	}
 }

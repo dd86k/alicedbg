@@ -64,7 +64,7 @@ enum AdbgObjectLoadOption {
 /// All fields are used internally and should not be used directly.
 struct adbg_object_t {
 	/// File handle to object.
-	FILE *handle;
+	FILE *file_handle;
 	/// File size.
 	ulong file_size;
 	
@@ -81,24 +81,31 @@ struct adbg_object_t {
 	/// Allocated buffer size.
 	size_t buffer_size;
 	
-	/// Option: Partial loading.
-	/// Warning: Rest of object must be loaded automatically before using other services.
-	bool partial;
-	
-	/// Target endianness is reversed and therefore fields needs
-	/// to be byte-swapped.
-	bool reversed;
-	
-	// Target object machine definition is supported by the target
-	// running this server, depends on architectural features.
-	// This is used for checking if source debugging is available.
-	// Examples: x86 on x86-64 or Arm A32 on Arm A64 via WoW64
-	//TODO: bool debug_supported;
-	
 	/// Loaded object format.
 	AdbgObject format;
 	
+	package
+	struct adbg_object_properties_t {
+		/// Target endianness is reversed and therefore fields needs
+		/// to be byte-swapped.
+		bool reversed;
+		// Target object has code that can be run on this platform.
+		// Examples: x86 on x86-64 or Arm A32 on Arm A64 via WoW64
+		//TODO: bool platform_native;
+	}
+	adbg_object_properties_t p;
+	
+	package
+	struct adbg_object_options_t {
+		/// Option: Partial loading.
+		/// Warning: Rest of object must be loaded automatically before
+		/// using other services.
+		bool partial;
+	}
+	adbg_object_options_t o;
+	
 	// Pointers to machine-dependant structures
+	//TODO: Move stuff like "reversed_"/"is64"/etc. fields into properties
 	package
 	union adbg_object_internals_t {
 		// Main header. All object files have some form of header.
@@ -138,10 +145,12 @@ struct adbg_object_t {
 				macho_fatmach_header *fat_header;
 			}
 			macho_fat_arch *fat_arch;
+			macho_load_command *commands;
 			bool is64;
 			bool fat;
-			bool reversed;
-			bool reserved;
+			
+			bool *reversed_fat_arch;
+			bool *reversed_commands;
 		}
 		macho_t macho;
 		
@@ -150,9 +159,9 @@ struct adbg_object_t {
 			Elf32_Phdr *phdr;
 			Elf32_Shdr *shdr;
 			
-			bool reserved_ehdr;
-			bool *reserved_phdr;
-			bool *reserved_shdr;
+			bool reversed_ehdr;
+			bool *reversed_phdr;
+			bool *reversed_shdr;
 		}
 		elf32_t elf32;
 		
@@ -161,9 +170,9 @@ struct adbg_object_t {
 			Elf64_Phdr *phdr;
 			Elf64_Shdr *shdr;
 			
-			bool reserved_ehdr;
-			bool *reserved_phdr;
-			bool *reserved_shdr;
+			bool reversed_ehdr;
+			bool *reversed_phdr;
+			bool *reversed_shdr;
 		}
 		elf64_t elf64;
 	}
@@ -171,114 +180,127 @@ struct adbg_object_t {
 	adbg_object_internals_t i;
 }
 
-int adbg_object_open(adbg_object_t *obj, const(char) *path, ...) {
-	if (obj == null)
+int adbg_object_open(adbg_object_t *o, const(char) *path, ...) {
+	if (o == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
-	obj.handle = fopen(path, "rb");
-	if (obj.handle == null)
+	o.file_handle = fopen(path, "rb");
+	if (o.file_handle == null)
 		return adbg_oops(AdbgError.crt);
 	
 	va_list list = void;
 	va_start(list, path);
 	
-	return adbg_object_loadv(obj, list);
+	return adbg_object_loadv(o, list);
 }
 
-void adbg_object_close(adbg_object_t *obj) {
-	if (obj == null)
+void adbg_object_close(adbg_object_t *o) {
+	if (o == null)
 		return;
-	if (obj.handle)
-		fclose(obj.handle);
-	if (obj.buffer && obj.buffer_size)
-		free(obj.buffer);
+	switch (o.format) with (AdbgObject) {
+	//case pe:
+	case macho:
+		with (o.i.macho) {
+		if (reversed_fat_arch) free(reversed_fat_arch);
+		if (reversed_commands) free(reversed_commands);
+		}
+		break;
+	case elf:
+		break;
+	default:
+	}
+	if (o.file_handle)
+		fclose(o.file_handle);
+	if (o.buffer && o.buffer_size)
+		free(o.buffer);
 }
 
 private
-int adbg_object_loadv(adbg_object_t *obj, va_list args) {
+int adbg_object_loadv(adbg_object_t *o, va_list args) {
 	import core.stdc.string : memset;
 	
-	if (obj == null || obj.handle == null)
+	if (o == null || o.file_handle == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
+	memset(&o.o, 0, o.o.sizeof); // Init options
+	memset(&o.p, 0, o.p.sizeof); // Init object properties
+	memset(&o.i, 0, o.i.sizeof); // Init object internal structures
+	
 	// options
-	obj.partial = false;
 L_ARG:
 	switch (va_arg!int(args)) {
 	case 0: break;
 	case AdbgObjectLoadOption.partial:
-		obj.partial = true;
+		o.o.partial = true;
 		goto L_ARG;
 	default:
 		return adbg_oops(AdbgError.invalidOption);
 	}
 	
 	// Get file size
-	if (fseek(obj.handle, 0, SEEK_END))
+	if (fseek(o.file_handle, 0, SEEK_END))
 		return adbg_oops(AdbgError.crt);
 	
-	obj.file_size = ftell(obj.handle);
+	o.file_size = ftell(o.file_handle);
 	
-	if (obj.file_size < 0) // -1
+	if (o.file_size < 0) // -1
 		return adbg_oops(AdbgError.crt);
-	if (fseek(obj.handle, 0, SEEK_SET))
+	if (fseek(o.file_handle, 0, SEEK_SET))
 		return adbg_oops(AdbgError.crt);
 	
 	// Allocate
 	enum PARTIAL_SIZE = 4096;
-	obj.buffer_size = obj.partial ? PARTIAL_SIZE : cast(size_t)obj.file_size;
-	obj.buffer = malloc(obj.buffer_size);
-	if (obj.buffer == null)
+	o.buffer_size = o.o.partial ? PARTIAL_SIZE : cast(size_t)o.file_size;
+	o.buffer = malloc(o.buffer_size);
+	if (o.buffer == null)
 		return adbg_oops(AdbgError.crt);
 	
 	// Read
-	if (fread(obj.buffer, cast(size_t)obj.file_size, 1, obj.handle) == 0)
+	if (fread(o.buffer, cast(size_t)o.file_size, 1, o.file_handle) == 0)
 		return adbg_oops(AdbgError.crt);
 	
-	// zero internal stuff
-	obj.i = obj.i.init;
 	// Set first header
 	// Also used in auto-detection
-	obj.i.header = obj.buffer;
+	o.i.header = o.buffer;
 	
 	// Auto-detection
 	//TODO: Consider moving auto-detection as separate function?
-	switch (*obj.buffer32) {
+	switch (*o.buffer32) {
 	case MAGIC_ELF:
-		return adbg_object_elf_load(obj);
+		return adbg_object_elf_load(o);
 	case MACHO_MAGIC:	// 32-bit LE
 	case MACHO_MAGIC_64:	// 64-bit LE
 	case MACHO_CIGAM:	// 32-bit BE
 	case MACHO_CIGAM_64:	// 64-bit BE
 	case MACHO_FAT_MAGIC:	// Fat LE
 	case MACHO_FAT_CIGAM:	// Fat BE
-		return adbg_object_macho_load(obj);
+		return adbg_object_macho_load(o);
 	default:
 	}
 	
 	//TODO: Support compressed MZ files?
-	switch (*obj.buffer16) {
+	switch (*o.buffer16) {
 	case MAGIC_MZ:
-		if (obj.file_size < mz_hdr.sizeof)
+		if (o.file_size < mz_hdr.sizeof)
 			return adbg_oops(AdbgError.unknownObjFormat);
 		
-		uint offset = obj.i.mz.header.e_lfanew;
+		uint offset = o.i.mz.header.e_lfanew;
 		
 		if (offset == 0)
-			return adbg_object_mz_load(obj);
-		if (offset >= obj.file_size - PE_HEADER.sizeof)
+			return adbg_object_mz_load(o);
+		if (offset >= o.file_size - PE_HEADER.sizeof)
 			return adbg_oops(AdbgError.assertion);
 		
-		uint sig = *cast(uint*)(obj.buffer + offset);
+		uint sig = *cast(uint*)(o.buffer + offset);
 		
 		if (sig == MAGIC_PE32)
-			return adbg_object_pe_load(obj);
+			return adbg_object_pe_load(o);
 		
 		switch (cast(ushort)sig) {
 		case CHAR16!"LE", CHAR16!"LX", CHAR16!"NE":
 			return adbg_oops(AdbgError.unsupportedObjFormat);
 		default: // Assume MZ?
-			return adbg_object_mz_load(obj);
+			return adbg_object_mz_load(o);
 		}
 	default:
 		return adbg_oops(AdbgError.unknownObjFormat);
@@ -288,16 +310,16 @@ L_ARG:
 //TODO: adbg_object_load_continue if partial was used
 //      set new buffer_size, partial=false
 
-AdbgMachine adbg_object_machine(adbg_object_t *obj) {
-	if (obj == null)
+AdbgMachine adbg_object_machine(adbg_object_t *o) {
+	if (o == null)
 		return AdbgMachine.native;
 	
-	switch (obj.format) with (AdbgObject) {
+	switch (o.format) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
-	case pe:	return adbg_object_pe_machine(obj.i.pe.header.Machine);
+	case pe:	return adbg_object_pe_machine(o.i.pe.header.Machine);
 	// NOTE: Both fat and header matches the header structure
-	case macho:	return adbg_object_macho_machine(obj.i.macho.header.cputype);
-	case elf:	return adbg_object_elf_machine(obj.i.elf32.ehdr.e_machine);
+	case macho:	return adbg_object_macho_machine(o.i.macho.header.cputype);
+	case elf:	return adbg_object_elf_machine(o.i.elf32.ehdr.e_machine);
 	default:	return AdbgMachine.unknown;
 	}
 }
@@ -305,10 +327,10 @@ AdbgMachine adbg_object_machine(adbg_object_t *obj) {
 /// Get the short name of the loaded object format.
 /// Params: obj = Loaded object reference.
 /// Returns: Object format name.
-const(char)* adbg_object_short_name(adbg_object_t *obj) {
-	if (obj == null)
+const(char)* adbg_object_short_name(adbg_object_t *o) {
+	if (o == null)
 		goto L_UNKNOWN;
-	switch (obj.format) with (AdbgObject) {
+	switch (o.format) with (AdbgObject) {
 	case mz:	return "mz";
 	case ne:	return "ne";
 	case le:	return "le";
@@ -324,10 +346,10 @@ L_UNKNOWN:
 /// Get the name of the loaded object format.
 /// Params: obj = Loaded object reference.
 /// Returns: Object format name.
-const(char)* adbg_object_name(adbg_object_t *obj) {
-	if (obj == null)
+const(char)* adbg_object_name(adbg_object_t *o) {
+	if (o == null)
 		goto L_UNKNOWN;
-	switch (obj.format) with (AdbgObject) {
+	switch (o.format) with (AdbgObject) {
 	case mz:	return "Mark Zbikowski";
 	case ne:	return "New Executable";
 	case le:	return "Linked Executable";

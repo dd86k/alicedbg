@@ -5,20 +5,30 @@
 /// License: BSD-3-Clause
 module adbg.v2.object.format.macho;
 
-import adbg.error : adbg_oops, AdbgError;
+import adbg.error;
 import adbg.v2.object.server : adbg_object_t, AdbgObject;
 import adbg.v2.object.machines : AdbgMachine;
 import adbg.utils.bit;
+import core.stdc.stdlib : calloc;
 
-enum MACHO_MAGIC	= 0xFEEDFACEu;    /// Mach-O BE magic
-enum MACHO_MAGIC_64	= 0xFEEDFACFu;    /// Mach-O BE x64 magic
-enum MACHO_CIGAM	= 0xCEFAEDFEu;    /// Mach-O LE magic
-enum MACHO_CIGAM_64	= 0xCFFAEDFEu;    /// Mach-O LE x64 magic
+// Sources:
+// - https://github.com/opensource-apple/cctools/blob/master/include/mach/machine.h
+// - https://github.com/opensource-apple/cctools/blob/master/include/mach-o/loader.h
+
+// Self-imposed limits
+//TODO: Apply limits (with logging?)
+private enum LIMIT_FAT_ARCH = 200;
+private enum LIMIT_COMMANDS = 2000;
+
+enum MACHO_MAGIC	= 0xFEEDFACEu; /// Mach-O BE magic
+enum MACHO_MAGIC_64	= 0xFEEDFACFu; /// Mach-O BE x64 magic
+enum MACHO_CIGAM	= 0xCEFAEDFEu; /// Mach-O LE magic
+enum MACHO_CIGAM_64	= 0xCFFAEDFEu; /// Mach-O LE x64 magic
 enum MACHO_FAT_MAGIC	= 0xCAFEBABEu; /// Mach-O FAT BE magic
 enum MACHO_FAT_CIGAM	= 0xBEBAFECAu; /// Mach-O FAT LE magic
 
+// 64-bit version just adds a 32-bit reserved field at the end.
 struct macho_header {
-	// 64-bit version just adds a reserved field at the end.
 	uint magic;      /// Mach magic number identifier
 	uint cputype;    /// Cpu specifier
 	uint subtype;    /// Machine specifier
@@ -36,33 +46,71 @@ struct macho_fatmach_header {
 struct macho_fat_arch {
 	uint cputype;    /// 
 	uint subtype;    /// 
-	uint offset;     /// Offset to first segment?
+	uint offset;     /// File offset to first segment or command?
 	uint size;       /// Segments size?
 	uint alignment;  /// Page alignment?
 }
 
+struct macho_load_command {
+	uint cmd;	/// type of load command
+	uint cmdsize;	/// total size of command in bytes
+}
+
+alias int vm_prot_t;
+
+struct macho_segment_command { /* for 32-bit architectures */
+	uint	cmd;	/// LC_SEGMENT
+	uint	cmdsize;	/// includes sizeof section structs
+	char[16]	segname;	/// segment name
+	uint	vmaddr;	/// memory address of this segment
+	uint	vmsize;	/// memory size of this segment
+	uint	fileoff;	/// file offset of this segment
+	uint	filesize;	/// amount to map from the file
+	vm_prot_t	maxprot;	/// maximum VM protection
+	vm_prot_t	initprot;	/// initial VM protection
+	uint	nsects;	/// number of sections in segment
+	uint	flags;	/// flags
+}
+
+struct macho_segment_command_64 { /* for 64-bit architectures */
+	uint	cmd;	/// LC_SEGMENT_64
+	uint	cmdsize;	/// includes sizeof section_64 structs
+	char[16]	segname;	/// segment name
+	ulong	vmaddr;	/// memory address of this segment
+	ulong	vmsize;	/// memory size of this segment
+	ulong	fileoff;	/// file offset of this segment
+	ulong	filesize;	/// amount to map from the file
+	vm_prot_t	maxprot;	/// maximum VM protection
+	vm_prot_t	initprot;	/// initial VM protection
+	uint	nsects;	/// number of sections in segment
+	uint	flags;	/// flags
+}
+
 alias cpu_type_t = int;
 enum {
+	MACHO_CPUTYPE_ANY = -1,
+	/// Used as a bitmask to mark cputype as 64-bit
+	MACHO_CPUTYPE_ABI64 = 0x1000000,
 	MACHO_CPUTYPE_VAX = 1,
 	MACHO_CPUTYPE_ROMP = 2,
 	MACHO_CPUTYPE_NS32032 = 4,
 	MACHO_CPUTYPE_NS32332 = 5,
 	MACHO_CPUTYPE_MC680x0 = 6,
 	MACHO_CPUTYPE_I386 = 7,
+	MACHO_CPUTYPE_X86_64 = MACHO_CPUTYPE_I386 | MACHO_CPUTYPE_ABI64,
 	MACHO_CPUTYPE_MIPS = 8,
 	MACHO_CPUTYPE_NS32532 = 9,
-	MACHO_CPUTYPE_X86_64 = 0x1000007,
 	MACHO_CPUTYPE_HPPA = 11,
 	MACHO_CPUTYPE_ARM = 12,
+	MACHO_CPUTYPE_ARM64 = MACHO_CPUTYPE_ARM | MACHO_CPUTYPE_ABI64,
 	MACHO_CPUTYPE_MC88000 = 13,
 	MACHO_CPUTYPE_SPARC = 14,
-	MACHO_CPUTYPE_I860 = 15, // MSB
-	MACHO_CPUTYPE_I860_LITTLE = 16, // LSB
+	MACHO_CPUTYPE_I860 = 15, // big-endian
+	MACHO_CPUTYPE_I860_LITTLE = 16, // little-endian
 	MACHO_CPUTYPE_RS6000 = 17,
 	MACHO_CPUTYPE_MC98000 = 18,
-	MACHO_CPUTYPE_POWERPC = 19,
-	MACHO_CPUTYPE_ABI64 = 0x1000000,
-	MACHO_CPUTYPE_POWERPC64 = 1000013,
+	MACHO_CPUTYPE_POWERPC = 18,
+	MACHO_CPUTYPE_POWERPC64 = MACHO_CPUTYPE_POWERPC | MACHO_CPUTYPE_ABI64,
 	MACHO_CPUTYPE_VEO = 255
 }
 
@@ -105,9 +153,10 @@ enum { // SUBTYPE_32032
 	MACHO_SUBTYPE_MMAX_XPC = 5, /* 532 CPU */
 }
 
-/*uint32_t SUBTYPE_INTEL(short f, short m) {
-	return f + (m << 4);
-}*/
+private
+template SUBTYPE_INTEL(short f, short m) {
+	enum SUBTYPE_INTEL = f + (m << 4);
+}
 
 // x86 subtypes
 enum { // SUBTYPE_I386
@@ -116,11 +165,12 @@ enum { // SUBTYPE_I386
 	MACHO_SUBTYPE_i386 = 3,
 	MACHO_SUBTYPE_i486 = 4,
 	MACHO_SUBTYPE_i486SX = 132, // "4 + 128"
-	MACHO_SUBTYPE_i586 = 5, // same as PENT, SUBTYPE_INTEL(5, 0)
-	MACHO_SUBTYPE_PENPRO = 22, // SUBTYPE_INTEL(6, 1)
-	MACHO_SUBTYPE_PENTII_M3 = 54, // SUBTYPE_INTEL(6, 3)
-	MACHO_SUBTYPE_PENTII_M5 = 86, // SUBTYPE_INTEL(6, 5)
-	MACHO_SUBTYPE_PENTIUM_4 = 10, // SUBTYPE_INTEL(10, 0)
+	MACHO_SUBTYPE_i586 = 5,
+	MACHO_SUBTYPE_PENT = SUBTYPE_INTEL!(5, 0),
+	MACHO_SUBTYPE_PENPRO = SUBTYPE_INTEL!(6, 1),
+	MACHO_SUBTYPE_PENTII_M3 = SUBTYPE_INTEL!(6, 3),
+	MACHO_SUBTYPE_PENTII_M5 = SUBTYPE_INTEL!(6, 5),
+	MACHO_SUBTYPE_PENTIUM_4 = SUBTYPE_INTEL!(10, 0),
 }
 
 // MIPS subty
@@ -159,6 +209,7 @@ enum { // SUBTYPE_ARM
 	MACHO_SUBTYPE_V5TEJ = 7,
 	MACHO_SUBTYPE_XSCALE = 8,
 	MACHO_SUBTYPE_V7 = 9,
+	MACHO_SUBTYPE_V8 = 13,
 }
 
 // MC88000 subtypes
@@ -250,8 +301,9 @@ enum {
 	MACHO_FILETYPE_KEXT_BUNDLE = 0xB,
 }
 
+// Flags
 alias macho_flag_t = int;
-enum { //flag_t
+enum {
 	MACHO_FLAG_NOUNDEFS                = 0x00000001,
 	MACHO_FLAG_INCRLINK                = 0x00000002,
 	MACHO_FLAG_DYLDLINK                = 0x00000004,
@@ -280,45 +332,92 @@ enum { //flag_t
 	MACHO_FLAG_APP_EXTENSION_SAFE      = 0x02000000
 }
 
-int adbg_object_macho_load(adbg_object_t *obj) {
-	obj.format = AdbgObject.macho;
+// Commands
+enum {
+	MACHO_LC_REQ_DYLD	= 0x80000000,	/// Requires dynamic linker
+	MACHO_LC_SEGMENT	= 0x1,	/// Segment of this file to be mapped
+	MACHO_LC_SYMTAB	= 0x2,	/// Link-edit stab symbol table info
+	MACHO_LC_SYMSEG	= 0x3,	/// Link-edit gdb symbol table info (obsolete)
+	MACHO_LC_THREAD	= 0x4,	/// Thread
+	MACHO_LC_UNIXTHREAD	= 0x5,	/// Unix thread (includes a stack)
+	MACHO_LC_LOADFVMLIB	= 0x6,	/// Load a specified fixed VM shared library
+	MACHO_LC_IDFVMLIB	= 0x7,	/// Fixed VM shared library identification
+	MACHO_LC_IDENT	= 0x8,	/// Object identification info (obsolete)
+	MACHO_LC_FVMFILE	= 0x9,	/// Fixed VM file inclusion (internal use)
+	MACHO_LC_PREPAGE	= 0xa,	/// Prepage command (internal use)
+	MACHO_LC_DYSYMTAB	= 0xb,	/// Dynamic link-edit symbol table info
+	MACHO_LC_LOAD_DYLIB	= 0xc,	/// Load a dynamically linked shared library
+	MACHO_LC_ID_DYLIB	= 0xd,	/// Dynamically linked shared lib ident
+	MACHO_LC_LOAD_DYLINKER	= 0xe,	/// Load a dynamic linker
+	MACHO_LC_ID_DYLINKER	= 0xf,	/// Dynamic linker identification
+	MACHO_LC_PREBOUND_DYLIB = 0x10,	/// Modules prebound for a dynamically linked shared library
+	MACHO_LC_ROUTINES	= 0x11,	/// Image routines
+	MACHO_LC_SUB_FRAMEWORK = 0x12,	/// Sub framework
+	MACHO_LC_SUB_UMBRELLA	= 0x13,	/// Sub umbrella
+	MACHO_LC_SUB_CLIENT	= 0x14,	/// Sub client
+	MACHO_LC_SUB_LIBRARY	= 0x15,	/// Sub library
+	MACHO_LC_TWOLEVEL_HINTS	= 0x16,	/// Two-level namespace lookup hints
+	MACHO_LC_PREBIND_CKSUM	= 0x17,	/// Prebind checksum
+	MACHO_LC_SEGMENT_64	= 0x19,	/// 64-bit segment of this file to be mapped
+	MACHO_LC_ROUTINES_64	= 0x1a,	/// 64-bit image routines
+	MACHO_LC_UUID	= 0x1b,	/// The uuid
+	MACHO_LC_RPATH	= 0x1c | MACHO_LC_REQ_DYLD,	/// Runpath additions
+	MACHO_LC_CODE_SIGNATURE	= 0x1d,	/// Local of code signature
+	MACHO_LC_SEGMENT_SPLIT_INFO	= 0x1e,	/// Local of info to split segments
+	MACHO_LC_REEXPORT_DYLIB	= 0x1f | MACHO_LC_REQ_DYLD,	/// Load and re-export dylib
+	MACHO_LC_LAZY_LOAD_DYLIB	= 0x20,	/// Delay load of dylib until first use
+	MACHO_LC_ENCRYPTION_INFO	= 0x21,	/// Encrypted segment information
+	MACHO_LC_DYLD_INFO	= 0x22,	/// Compressed dyld information
+	MACHO_LC_DYLD_INFO_ONLY	= 0x22 | MACHO_LC_REQ_DYLD,	/// Compressed dyld information only
+	MACHO_LC_LOAD_UPWARD_DYLIB	= 0x23 | MACHO_LC_REQ_DYLD, /// Load upward dylib
+	MACHO_LC_VERSION_MIN_MACOSX	= 0x24,	/// Build for MacOSX min OS version
+	MACHO_LC_VERSION_MIN_IPHONEOS	= 0x25,	/// Build for iPhoneOS min OS version
+	MACHO_LC_FUNCTION_STARTS	= 0x26,	/// Compressed table of function start addresses
+	MACHO_LC_DYLD_ENVIRONMENT	= 0x27,	/// String for dyld to treat like environment variable
+	MACHO_LC_MAIN	= 0x28 | MACHO_LC_REQ_DYLD,	/// Replacement for LC_UNIXTHREAD
+	MACHO_LC_DATA_IN_CODE	= 0x29,	/// Table of non-instructions in __text
+	MACHO_LC_SOURCE_VERSION	= 0x2a,	/// Source version used to build binary
+	MACHO_LC_DYLIB_CODE_SIGN_DRS	= 0x2b,	/// Code signing DRs copied from linked dylibs
+	MACHO_LC_ENCRYPTION_INFO_64	= 0x2c,	/// 64-bit encrypted segment information
+	MACHO_LC_LINKER_OPTION	= 0x2D,	/// linker options in MH_OBJECT files
+	MACHO_LC_LINKER_OPTIMIZATION_HINT	= 0x2e,	/// Optimization hints in MH_OBJECT files
+	MACHO_LC_VERSION_MIN_WATCHOS	= 0x30,	/// Build for Watch min OS version
+}
+
+int adbg_object_macho_load(adbg_object_t *o) {
+	o.format = AdbgObject.macho;
 	
-	obj.i.macho.header = cast(macho_header*)obj.buffer;
+	o.i.macho.header = cast(macho_header*)o.buffer;
 	
-	//TODO: Test signature byte-wise for features
-	//      Low priority
 	// NOTE: Internals are set to zero.
 	//       Unless I change that, and this snippet leads to a crash.
-	switch (obj.i.macho.header.magic) {
+	with (o.i) switch (macho.header.magic) {
 	case MACHO_MAGIC:	// 32-bit LE
 		break;
 	case MACHO_MAGIC_64:	// 64-bit LE
-		obj.i.macho.is64 = true;
+		macho.is64 = true;
 		break;
 	case MACHO_CIGAM:	// 32-bit BE
-		obj.i.macho.reversed = true;
+		o.p.reversed = true;
 		break;
 	case MACHO_CIGAM_64:	// 64-bit BE
-		obj.i.macho.reversed = true;
-		obj.i.macho.is64 = true;
+		o.p.reversed = true;
+		macho.is64 = true;
 		break;
 	case MACHO_FAT_MAGIC:	// Fat LE
-		obj.i.macho.fat = true;
+		macho.fat = true;
 		break;
 	case MACHO_FAT_CIGAM:	// Fat BE
-		obj.i.macho.fat = true;
-		obj.i.macho.reversed = true;
+		macho.fat = true;
+		o.p.reversed = true;
 		break;
 	default:
 		return adbg_oops(AdbgError.assertion);
 	}
 	
-	if (obj.i.macho.fat) {
-		obj.i.macho.fat_arch = cast(macho_fat_arch*)(
-			obj.buffer + macho_fatmach_header.sizeof);
-	}
+	version (Trace) trace("64=%d reversed=%d fat=%d", o.i.macho.is64, o.p.reversed, o.i.macho.fat);
 	
-	if (obj.i.macho.reversed) with (obj.i) {
+	with (o.i) if (o.p.reversed) {
 		if (macho.fat) {
 			macho.fat_header.nfat_arch = adbg_util_bswap32(macho.fat_header.nfat_arch);
 			macho.fat_arch.cputype = adbg_util_bswap32(macho.fat_arch.cputype);
@@ -336,7 +435,76 @@ int adbg_object_macho_load(adbg_object_t *obj) {
 		}
 	}
 	
+	with (o.i) if (macho.fat) {
+		macho.fat_arch = cast(macho_fat_arch*)(o.buffer + macho_fatmach_header.sizeof);
+		macho.reversed_fat_arch = cast(bool*)calloc(macho.fat_header.nfat_arch, bool.sizeof);
+	} else if (macho.header.ncmds) {
+		macho.reversed_commands = cast(bool*)calloc(macho.header.ncmds, bool.sizeof);
+		size_t cl = macho.is64 ? macho_header.sizeof + uint.sizeof : macho_header.sizeof;
+		version (Trace) trace("cl=%p 64=%d", cl, macho.is64);
+		macho.commands = cast(macho_load_command*)(o.buffer + cl);
+	}
+	
 	return 0;
+}
+
+//TODO: Consider adbg_object_macho_isfat
+
+macho_header* adbg_object_macho_header(adbg_object_t *o) {
+	if (o == null) return null;
+	// NOTE: pre-swapped
+	return o.i.macho.header;
+}
+
+macho_fatmach_header* adbg_object_macho_header_fat(adbg_object_t *o) {
+	if (o == null) return null;
+	// NOTE: pre-swapped
+	return o.i.macho.fat_header;
+}
+
+macho_fat_arch* adbg_object_macho_fat_arch(adbg_object_t *o, size_t index) {
+	if (o == null) return null;
+	if (o.i.macho.fat_header == null) return null; // not loaded
+	if (o.i.macho.fat == false) return null;
+	if (index >= o.i.macho.fat_header.nfat_arch) return null;
+	
+	macho_fat_arch* fat_arch = &o.i.macho.fat_arch[index];
+	if (o.p.reversed && o.i.macho.reversed_fat_arch[index] == false) {
+		fat_arch.cputype	= adbg_util_bswap32(fat_arch.cputype);
+		fat_arch.subtype	= adbg_util_bswap32(fat_arch.subtype);
+		fat_arch.offset	= adbg_util_bswap32(fat_arch.offset);
+		fat_arch.size	= adbg_util_bswap32(fat_arch.size);
+		fat_arch.alignment	= adbg_util_bswap32(fat_arch.alignment);
+		o.i.macho.reversed_fat_arch[index] = true;
+	}
+	return fat_arch;
+}
+
+// Load commands have a type and size.
+// Size includes type (4 bytes), size (4 bytes), and anything that follows it
+// until next command.
+macho_load_command* adbg_object_macho_load_command(adbg_object_t *o, size_t index) {
+	if (o == null) return null;
+	if (o.i.macho.header == null) return null; // not loaded
+	if (o.i.macho.fat) return null;
+	if (index >= o.i.macho.header.ncmds) return null;
+	
+	macho_load_command* command = void;
+	size_t next;
+	for (size_t i; i <= index; ++i) {
+		command = cast(macho_load_command*)(cast(void*)o.i.macho.commands + next);
+		if (o.p.reversed && o.i.macho.reversed_commands[i] == false) {
+			version (Trace) trace("Reversing %u", cast(uint)i);
+			command.cmd = adbg_util_bswap32(command.cmd);
+			command.cmdsize = adbg_util_bswap32(command.cmdsize);
+			o.i.macho.reversed_commands[i] = true;
+		}
+		version (Trace) trace("command cmd=%x size=0x%x", command.cmd, command.cmdsize);
+		next += command.cmdsize;
+		if (next >= o.file_size)
+			return null;
+	}
+	return command;
 }
 
 const(char) *adbg_object_macho_magic_string(uint signature) {
@@ -379,11 +547,11 @@ AdbgMachine adbg_object_macho_machine(uint type) {
 	case MACHO_CPUTYPE_I386:	return AdbgMachine.x86;
 	case MACHO_CPUTYPE_X86_64:	return AdbgMachine.amd64;
 	case MACHO_CPUTYPE_MIPS:	return AdbgMachine.mips;
-	case MACHO_CPUTYPE_MC680x0:	return AdbgMachine.m68k;
 	case MACHO_CPUTYPE_HPPA:	return AdbgMachine.parisc;
-	case MACHO_CPUTYPE_ARM:	return AdbgMachine.arm;
+	case MACHO_CPUTYPE_MC680x0:	return AdbgMachine.m68k;
 	case MACHO_CPUTYPE_MC88000:	return AdbgMachine.m88k;
-	case MACHO_CPUTYPE_MC98000:	return AdbgMachine.m98k;
+	case MACHO_CPUTYPE_ARM:	return AdbgMachine.arm;
+	case MACHO_CPUTYPE_ARM64:	return AdbgMachine.aarch64;
 	case MACHO_CPUTYPE_SPARC:	return AdbgMachine.sparc;
 	case MACHO_CPUTYPE_I860_LITTLE:
 	case MACHO_CPUTYPE_I860:	return AdbgMachine.i860;
@@ -408,8 +576,8 @@ const(char) *adbg_object_macho_cputype_string(uint type) {
 	case MACHO_CPUTYPE_MC680x0:	return "MC68000";
 	case MACHO_CPUTYPE_HPPA:	return "HPPA";
 	case MACHO_CPUTYPE_ARM:	return "ARM";
+	case MACHO_CPUTYPE_ARM64:	return "ARM64";
 	case MACHO_CPUTYPE_MC88000:	return "MC88000";
-	case MACHO_CPUTYPE_MC98000:	return "MC98000";
 	case MACHO_CPUTYPE_I860, MACHO_CPUTYPE_I860_LITTLE:	return "i860";
 	case MACHO_CPUTYPE_RS6000:	return "RS6000";
 	case MACHO_CPUTYPE_POWERPC64:	return "PowerPC64";
@@ -452,7 +620,7 @@ const(char) *adbg_object_macho_subtype_string(uint type, uint subtype) {
 		case MACHO_SUBTYPE_i386:	return "i386";
 		case MACHO_SUBTYPE_i486:	return "i486";
 		case MACHO_SUBTYPE_i486SX:	return "i486SX";
-		case MACHO_SUBTYPE_i586:	return "i586";
+		case MACHO_SUBTYPE_PENT:	return "Pentium";
 		case MACHO_SUBTYPE_PENPRO:	return "Pentium Pro";
 		case MACHO_SUBTYPE_PENTII_M3:	return "Pentium III (M3)";
 		case MACHO_SUBTYPE_PENTII_M5:	return "Pentium III (M5)";
@@ -491,17 +659,18 @@ const(char) *adbg_object_macho_subtype_string(uint type, uint subtype) {
 		case MACHO_SUBTYPE_V5TEJ:	return "ARM V5TEJ";
 		case MACHO_SUBTYPE_XSCALE:	return "ARM XSCALE";
 		case MACHO_SUBTYPE_V7:	return "ARM V7";
+		case MACHO_SUBTYPE_V8:	return "ARM V8";
 		default:	return "ARM";
 		}
+	case MACHO_CPUTYPE_ARM64:	return "ARM64 V8";
 	case MACHO_CPUTYPE_MC88000:
 		switch (subtype) {
 		case MACHO_SUBTYPE_MC88100:	return "MC88100";
 		case MACHO_SUBTYPE_MC88110:	return "MC88110";
 		default:	return "MC88000";
 		}
-	case MACHO_CPUTYPE_MC98000:	return subtype ? "MC98601" : "MC98000";
-	case MACHO_CPUTYPE_I860:	return "i860 (MSB)";
-	case MACHO_CPUTYPE_I860_LITTLE:	return "i860 (LSB)";
+	case MACHO_CPUTYPE_I860:	return "i860";
+	case MACHO_CPUTYPE_I860_LITTLE:	return "i860 (little-endian)";
 	case MACHO_CPUTYPE_RS6000:	return "RS6000";
 	case MACHO_CPUTYPE_POWERPC64:
 		switch (subtype) {
@@ -536,6 +705,60 @@ const(char) *adbg_object_macho_subtype_string(uint type, uint subtype) {
 		default:	return "PowerPC";
 		}
 	case MACHO_CPUTYPE_VEO:	return "VEO";
+	default:	return "?";
+	}
+}
+
+const(char)* adbg_object_macho_command_string(uint command) {
+	switch (command) {
+	case MACHO_LC_REQ_DYLD:	return "LC_REQ_DYLD";
+	case MACHO_LC_SEGMENT:	return "LC_SEGMENT";
+	case MACHO_LC_SYMTAB:	return "LC_SYMTAB";
+	case MACHO_LC_SYMSEG:	return "LC_SYMSEG";
+	case MACHO_LC_THREAD:	return "LC_THREAD";
+	case MACHO_LC_UNIXTHREAD:	return "LC_UNIXTHREAD";
+	case MACHO_LC_LOADFVMLIB:	return "LC_LOADFVMLIB";
+	case MACHO_LC_IDFVMLIB:	return "LC_IDFVMLIB";
+	case MACHO_LC_IDENT:	return "LC_IDENT";
+	case MACHO_LC_FVMFILE:	return "LC_FVMFILE";
+	case MACHO_LC_PREPAGE:	return "LC_PREPAGE";
+	case MACHO_LC_DYSYMTAB:	return "LC_DYSYMTAB";
+	case MACHO_LC_LOAD_DYLIB:	return "LC_LOAD_DYLIB";
+	case MACHO_LC_ID_DYLIB:	return "LC_ID_DYLIB";
+	case MACHO_LC_LOAD_DYLINKER:	return "LC_LOAD_DYLINKER";
+	case MACHO_LC_ID_DYLINKER:	return "LC_ID_DYLINKER";
+	case MACHO_LC_PREBOUND_DYLIB:	return "LC_PREBOUND_DYLIB";
+	case MACHO_LC_ROUTINES:	return "LC_ROUTINES";
+	case MACHO_LC_SUB_FRAMEWORK:	return "LC_SUB_FRAMEWORK";
+	case MACHO_LC_SUB_UMBRELLA:	return "LC_SUB_UMBRELLA";
+	case MACHO_LC_SUB_CLIENT:	return "LC_SUB_CLIENT";
+	case MACHO_LC_SUB_LIBRARY:	return "LC_SUB_LIBRARY";
+	case MACHO_LC_TWOLEVEL_HINTS:	return "LC_TWOLEVEL_HINTS";
+	case MACHO_LC_PREBIND_CKSUM:	return "LC_PREBIND_CKSUM";
+	case MACHO_LC_SEGMENT_64:	return "LC_SEGMENT_64";
+	case MACHO_LC_ROUTINES_64:	return "LC_ROUTINES_64";
+	case MACHO_LC_UUID:	return "LC_UUID";
+	case MACHO_LC_RPATH:	return "LC_RPATH";
+	case MACHO_LC_CODE_SIGNATURE:	return "LC_CODE_SIGNATURE";
+	case MACHO_LC_SEGMENT_SPLIT_INFO:	return "LC_SEGMENT_SPLIT_INFO";
+	case MACHO_LC_REEXPORT_DYLIB:	return "LC_REEXPORT_DYLIB";
+	case MACHO_LC_LAZY_LOAD_DYLIB:	return "LC_LAZY_LOAD_DYLIB";
+	case MACHO_LC_ENCRYPTION_INFO:	return "LC_ENCRYPTION_INFO";
+	case MACHO_LC_DYLD_INFO:	return "LC_DYLD_INFO";
+	case MACHO_LC_DYLD_INFO_ONLY:	return "LC_DYLD_INFO_ONLY";
+	case MACHO_LC_LOAD_UPWARD_DYLIB:	return "LC_LOAD_UPWARD_DYLIB";
+	case MACHO_LC_VERSION_MIN_MACOSX:	return "LC_VERSION_MIN_MACOSX";
+	case MACHO_LC_VERSION_MIN_IPHONEOS:	return "LC_VERSION_MIN_IPHONEOS";
+	case MACHO_LC_FUNCTION_STARTS:	return "LC_FUNCTION_STARTS";
+	case MACHO_LC_DYLD_ENVIRONMENT:	return "LC_DYLD_ENVIRONMENT";
+	case MACHO_LC_MAIN:	return "LC_MAIN";
+	case MACHO_LC_DATA_IN_CODE:	return "LC_DATA_IN_CODE";
+	case MACHO_LC_SOURCE_VERSION:	return "LC_SOURCE_VERSION";
+	case MACHO_LC_DYLIB_CODE_SIGN_DRS:	return "LC_DYLIB_CODE_SIGN_DRS";
+	case MACHO_LC_ENCRYPTION_INFO_64:	return "LC_ENCRYPTION_INFO_64";
+	case MACHO_LC_LINKER_OPTION:	return "LC_LINKER_OPTION";
+	case MACHO_LC_LINKER_OPTIMIZATION_HINT:	return "LC_LINKER_OPTIMIZATION_HINT";
+	case MACHO_LC_VERSION_MIN_WATCHOS:	return "LC_VERSION_MIN_WATCHOS";
 	default:	return "?";
 	}
 }
