@@ -19,17 +19,19 @@ enum MAP_SHARED_VALIDATE = 0x03;	/// share + validate extension flags
 enum MAP_TYPE	= 0x0f;		/// Mask for type of mapping
 enum MAP_FIXED	= 0x10;		/// Interpret addr exactly
 enum MAP_ANONYMOUS	= 0x20;		/// don't use a file
-// Linux specifics
-enum MAP_GROWSDOWN	= 0x01000;		/// stack-like segment
-enum MAP_DENYWRITE	= 0x02000;		/// ETXTBSY
-enum MAP_EXECUTABLE	= 0x04000;		/// mark it as an executable
-enum MAP_LOCKED	= 0x08000;		/// lock the mapping
-enum MAP_NORESERVE	= 0x10000;		/// don't check for reservations
-enum MAP_POPULATE	= 0x20000;		/// populate (prefault) pagetables
-enum MAP_NONBLOCK	= 0x40000;		/// do not block on IO
-enum MAP_STACK	= 0x80000;		/// give out an address that is best suited for process/thread stacks
-enum MAP_HUGETLB	= 0x100000;	/// create a huge page mapping
-enum MAP_FIXED_NOREPLACE	= 0x200000;	/// MAP_FIXED which doesn't unmap underlying mapping
+
+version (linux) {
+	enum MAP_GROWSDOWN	= 0x01000;		/// stack-like segment
+	enum MAP_DENYWRITE	= 0x02000;		/// ETXTBSY
+	enum MAP_EXECUTABLE	= 0x04000;		/// mark it as an executable
+	enum MAP_LOCKED	= 0x08000;		/// lock the mapping
+	enum MAP_NORESERVE	= 0x10000;		/// don't check for reservations
+	enum MAP_POPULATE	= 0x20000;		/// populate (prefault) pagetables
+	enum MAP_NONBLOCK	= 0x40000;		/// do not block on IO
+	enum MAP_STACK	= 0x80000;		/// give out an address that is best suited for process/thread stacks
+	enum MAP_HUGETLB	= 0x100000;	/// create a huge page mapping
+	enum MAP_FIXED_NOREPLACE	= 0x200000;	/// MAP_FIXED which doesn't unmap underlying mapping
+}
 
 enum MAP_FAILED = cast(void*)-1;	/// mmap returns MAP_FAILED when it failed to allocate
 
