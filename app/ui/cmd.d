@@ -352,6 +352,14 @@ int cmd_c_maps(int argc, const(char) **argv) {
 // scan command
 //
 
+// v1: can only handle one scan at a time
+// v2: multiple scans
+// Examples:
+// - scan int -2 (new or continue scan)
+//   print "123 hits"
+//   or "123 hits, job 2 created"
+// - scan reset (reset scan)
+// - v2: scan list (list scans)
 int cmd_c_scan(int argc, const(char) **argv) {
 	// Sub command
 	if (argc > 1) {

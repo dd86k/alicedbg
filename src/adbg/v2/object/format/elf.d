@@ -774,6 +774,7 @@ Elf32_Phdr* adbg_object_elf_phdr32(adbg_object_t *o, size_t index) {
 	if (o == null) return null;
 	if (o.i.elf32.phdr == null) return null;
 	if (index >= o.i.elf32.ehdr.e_phnum) return null;
+	
 	Elf32_Phdr *phdr = &o.i.elf32.phdr[index];
 	if (o.p.reversed && o.i.elf32.reversed_phdr[index] == false) {
 		phdr.p_type	= adbg_bswap32(phdr.p_type);
@@ -793,6 +794,7 @@ Elf32_Shdr* adbg_object_elf_shdr32(adbg_object_t *o, size_t index) {
 	if (o == null) return null;
 	if (o.i.elf32.shdr == null) return null;
 	if (index >= o.i.elf32.ehdr.e_shnum) return null;
+	
 	Elf32_Shdr *shdr = &o.i.elf32.shdr[index];
 	if (o.p.reversed && o.i.elf32.reversed_phdr[index] == false) {
 		shdr.sh_name	= adbg_bswap32(shdr.sh_name);

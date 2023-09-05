@@ -628,9 +628,8 @@ AdbgStatus adbg_status(adbg_process_t *tracee) pure {
 /// Params:
 /// 	tracee = Tracee instance.
 /// 	userfunc = User function callback.
-/// 	... = Options, pass 0 for no options and assume defaults.
 /// Returns: Error code.
-int adbg_wait(adbg_process_t *tracee, void function(adbg_exception_t*) userfunc, ...) {
+int adbg_wait(adbg_process_t *tracee, void function(adbg_exception_t*) userfunc) {
 	if (tracee == null || userfunc == null)
 		return adbg_oops(AdbgError.nullArgument);
 	if (tracee.creation == AdbgCreation.unloaded)
