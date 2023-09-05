@@ -1,5 +1,8 @@
 /// Object name definitions.
 ///
+/// This is expressed as instruction sets, typically ones that are
+/// incompatible with the rest of the list.
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause
@@ -114,8 +117,7 @@ enum AdbgMachine {
 	m68k,
 	/// Motorola 88000
 	m88k,
-	/// Motorola 98000
-	m98k,
+	// NOTE: MC98000 *is* PowerPC
 	/// Motorola 68HC05
 	m68hc05,
 	/// Motorola 68HC08
@@ -461,12 +463,15 @@ struct adbg_machine_t {
 	const(char) *name;
 }
 
+// NOTE: Full name consistency.
+//     - Proper names (like an English name or title).
+//     - Avoid parentheses when possible (makes titles a little less clean).
 /// List of known machines.
 immutable adbg_machine_t[] machines = [
 	// Intel
 	{ AdbgMachine.i8086,  "8086", "x86_16", "Intel 8086" },
 	{ AdbgMachine.x86,    "x86", "x86_32", "Intel x86" },
-	{ AdbgMachine.amd64, "amd64", "x86_64", "Intel x86 (64-bit)" },
+	{ AdbgMachine.amd64,  "amd64", "x86_64", "AMD x86-64" },
 	{ AdbgMachine.mcu,    "mcu", null, "Intel MCU" },
 	{ AdbgMachine.i860,   "i860", null, "Intel i860" },
 	{ AdbgMachine.i960,   "i960", null, "Intel i960" },
@@ -477,15 +482,15 @@ immutable adbg_machine_t[] machines = [
 	
 	// Arm
 	{ AdbgMachine.thumb,   "thumb", "t16", "ARM Thumb" },
-	{ AdbgMachine.thumb32, "thumb32", "t32", "ARM Thumb-2 (32-bit)" },
-	{ AdbgMachine.arm,     "arm", "arm32", "ARM (32-bit)" },
-	{ AdbgMachine.aarch64, "aarch64", "arm64", "ARM (64-bit)" },
+	{ AdbgMachine.thumb32, "thumb32", "t32", "ARM Thumb-2 32-bit" },
+	{ AdbgMachine.arm,     "arm", "arm32", "ARM 32-bit" },
+	{ AdbgMachine.aarch64, "aarch64", "arm64", "ARM 64-bit" },
 	
 	// IBM
 	{ AdbgMachine.romp,   "romp", null, "IBM ROMP" },
 	{ AdbgMachine.ppc,    "ppc", null, "IBM PowerPC" },
 	{ AdbgMachine.ppcfpu, "ppcfpu", null, "IBM PowerPC with FPU" },
-	{ AdbgMachine.ppc64,  "ppc64", null, "IBM PowerPC (64-bit)" },
+	{ AdbgMachine.ppc64,  "ppc64", null, "IBM PowerPC 64-bit" },
 	{ AdbgMachine.s370,   "s370", null, "IBM System/370" },
 	{ AdbgMachine.s390,   "s390", null, "IBM System/390" },
 	{ AdbgMachine.spu,    "spu", null, "IBM SPU/SPC" },
@@ -498,33 +503,32 @@ immutable adbg_machine_t[] machines = [
 	
 	// RISC-V
 	{ AdbgMachine.riscv,    "riscv", null, "RISC-V" },
-	{ AdbgMachine.riscv32,  "riscv32", null, "RISC-V (32-bit)" },
-	{ AdbgMachine.riscv64,  "riscv64", null, "RISC-V (64-bit)" },
-	{ AdbgMachine.riscv128, "riscv128", null, "RISC-V (128-bit)" },
+	{ AdbgMachine.riscv32,  "riscv32", null, "RISC-V 32-bit" },
+	{ AdbgMachine.riscv64,  "riscv64", null, "RISC-V 64-bit" },
+	{ AdbgMachine.riscv128, "riscv128", null, "RISC-V 128-bit" },
 	
 	// MIPS
 	{ AdbgMachine.mipsx,     "mipsx", null, "Stanford MIPS-X" },
-	{ AdbgMachine.mips,      "mips", null, "MIPS I (RS3000)" },
-	{ AdbgMachine.mipsfpu,   "mipsfpu", null, "MIPS I (RS3000) with FPU" },
-	{ AdbgMachine.mipsle,    "mipsle", null, "MIPS I (RS3000) Little-Endian" },
+	{ AdbgMachine.mips,      "mips", "rs3000", "MIPS I (RS3000)" },
+	{ AdbgMachine.mipsfpu,   "mipsfpu", "rs3000", "MIPS I (RS3000) with FPU" },
+	{ AdbgMachine.mipsle,    "mipsle", "rs3000", "MIPS I (RS3000) Little-Endian" },
 	{ AdbgMachine.mips16,    "mips16", null, "MIPS16" },
 	{ AdbgMachine.mips16fpu, "mips16fpu", null, "MIPS16 with FPU" },
-	{ AdbgMachine.mipsii,    "mipsii", null, "MIPS II (R3000)" },
-	{ AdbgMachine.mipsiii,   "mipsiii", null, "MIPS III (R4000)" },
-	{ AdbgMachine.mipsiv,    "mipsiv", null, "MIPS IV (R10000)" },
-	{ AdbgMachine.mipswcele, "mipswcele", null, "MIPS little-endian WCE v2" },
+	{ AdbgMachine.mipsii,    "mipsii", "r3000", "MIPS II (R3000)" },
+	{ AdbgMachine.mipsiii,   "mipsiii", "r4000", "MIPS III (R4000)" },
+	{ AdbgMachine.mipsiv,    "mipsiv", "r10000", "MIPS IV (R10000)" },
+	{ AdbgMachine.mipswcele, "mipswcele", "wcev2le", "MIPS WCE v2 Little-Endian" },
 	
 	// DEC
 	{ AdbgMachine.pdp10,   "pdp10", null, "DEC PDP-10" },
 	{ AdbgMachine.pdp11,   "pdp11", null, "DEC PDP-11" },
 	{ AdbgMachine.vax,     "vax", null, "DEC VAX" },
 	{ AdbgMachine.alpha,   "alpha", null, "DEC Alpha" },
-	{ AdbgMachine.alpha64, "alpha64", null, "DEC Alpha (64-bit)" },
+	{ AdbgMachine.alpha64, "alpha64", null, "DEC Alpha 64-bit" },
 	
 	// Motorola
-	{ AdbgMachine.m68k,     "m68k", "mc68000", "Motorola 68000" },
-	{ AdbgMachine.m88k,     "m88k", "mc88000", "Motorola 88000" },
-	{ AdbgMachine.m98k,     "m98k", "mc98000", "Motorola 98000" },
+	{ AdbgMachine.m68k,     "m68k", "m68000", "Motorola 68000" },
+	{ AdbgMachine.m88k,     "m88k", "m88000", "Motorola 88000" },
 	{ AdbgMachine.m68hc05,  "m68hc05", null, "Motorola 68HC05" },
 	{ AdbgMachine.m68hc08,  "m68hc08", null, "Motorola 68HC08" },
 	{ AdbgMachine.m68hc11,  "m68hc11", null, "Motorola 68HC11" },
@@ -577,17 +581,17 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.tic2000, "tic2000", null, "Texas Instruments TMS320C2000" },
 	{ AdbgMachine.tic55xx, "tic55xx", null, "Texas Instruments TMS320C55xx" },
 	{ AdbgMachine.tic6000, "tic6000", null, "Texas Instruments TMS320C6000" },
-	{ AdbgMachine.asrisc,  "asrisc", null, "Texas Instruments Application Specific RISC (32-bit)" },
+	{ AdbgMachine.asrisc,  "asrisc", null, "Texas Instruments Application Specific RISC 32-bit" },
 	{ AdbgMachine.pru,     "pru", null, "Texas Instruments Programmable Realtime Unit" },
 	
 	// STMicroelectronics
-	{ AdbgMachine.st7,    "st7", null, "STMicroelectronics ST7 (8-bit)" },
-	{ AdbgMachine.stm8,   "stm8", null, "STMicroelectronics STM8 (8-bit)" },
-	{ AdbgMachine.st9,    "st9", null, "STMicroelectronics ST9+ (8/16-bit)" },
-	{ AdbgMachine.st19,   "st19", null, "STMicroelectronics ST19 (8-bit)" },
+	{ AdbgMachine.st7,    "st7", null, "STMicroelectronics ST7 8-bit" },
+	{ AdbgMachine.stm8,   "stm8", null, "STMicroelectronics STM8 8-bit" },
+	{ AdbgMachine.st9,    "st9", null, "STMicroelectronics ST9+ 8/16-bit" },
+	{ AdbgMachine.st19,   "st19", null, "STMicroelectronics ST19 8-bit" },
 	{ AdbgMachine.st100,  "st100", null, "STMicroelectronics ST100" },
 	{ AdbgMachine.st200,  "st200", null, "STMicroelectronics ST200" },
-	{ AdbgMachine.vdsp,   "vdsp", null, "STMicroelectronics VLIW DSP (64-bit)" },
+	{ AdbgMachine.vdsp,   "vdsp", null, "STMicroelectronics VLIW DSP 64-bit" },
 	{ AdbgMachine.stxp7x, "stxp7x", null, "STMicroelectronics STxP7x" },
 	
 	// Fujistu
@@ -601,7 +605,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.ns32k, "ns32k", null, "National Semiconductor 32000" },
 	{ AdbgMachine.cr,    "cr", null, "National Semiconductor CompactRISC" },
 	{ AdbgMachine.crx,   "crx", null, "National Semiconductor CompactRISC CRX" },
-	{ AdbgMachine.cr16,  "cr16", null, "National Semiconductor CompactRISC CR16 (16-bit)" },
+	{ AdbgMachine.cr16,  "cr16", null, "National Semiconductor CompactRISC CR16 16-bit" },
 	
 	// Freescale
 	{ AdbgMachine.ce,   "ce", null, "Freescale Communication Engine RISC" },
@@ -615,10 +619,10 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.fx66,    "fx66", null, "Siemens FX66" },
 	
 	// KM211
-	{ AdbgMachine.kmx8,  "kmx8", null, "KM211 KMX8 (8-bit)" },
-	{ AdbgMachine.kmx16, "kmx16", null, "KM211 KMX16 (16-bit)" },
-	{ AdbgMachine.km32,  "km32", null, "KM211 KM32 (32-bit)" },
-	{ AdbgMachine.kmx32, "kmx32", null, "KM211 KMX32 (32-bit)" },
+	{ AdbgMachine.kmx8,  "kmx8", null, "KM211 KMX8 8-bit" },
+	{ AdbgMachine.kmx16, "kmx16", null, "KM211 KMX16 16-bit" },
+	{ AdbgMachine.km32,  "km32", null, "KM211 KM32 32-bit" },
+	{ AdbgMachine.kmx32, "kmx32", null, "KM211 KMX32 32-bit" },
 	{ AdbgMachine.kvarc, "kvarc", null, "KM211 KVARC" },
 	
 	// MCST
@@ -629,13 +633,13 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.v850, "v850", null, "NEC V850" },
 	
 	// Analog Devices
-	{ AdbgMachine.sharc, "sharc", null, "SHARC (32-bit)" },
+	{ AdbgMachine.sharc, "sharc", null, "SHARC 32-bit" },
 	
 	// Soft processor group
 	{ AdbgMachine.moxie, "moxie", null, "Moxie" },
 	
 	// Educational group
-	{ AdbgMachine.mmix,    "mmix", null, "Donald Knuth's educational processor (64-bit)" },
+	{ AdbgMachine.mmix,    "mmix", null, "Donald Knuth's educational processor 64-bit" },
 	{ AdbgMachine.harvard, "harvard", null, "Harvard University machine-independent object" },
 	
 	// GPU group
@@ -650,7 +654,7 @@ immutable adbg_machine_t[] machines = [
 	// Etc.
 	{ AdbgMachine.we32100,	"we32100", null, "AT&T WE 32100" },
 	{ AdbgMachine.parisc,	"parisc", null, "Hewlett-Packard PA-RISC" },
-	{ AdbgMachine.rh32,	"rh32", null, "TRW (RH32)" },
+	{ AdbgMachine.rh32,	"rh32", null, "TRW RH32" },
 	{ AdbgMachine.arisc,	"arisc", null, "Argonaut RISC Core" },
 	{ AdbgMachine.ncpu,	"ncpu", null, "Sony nCPU embedded RISC" },
 	{ AdbgMachine.ndr1,	"ndr1", null, "Denso NDR1" },
@@ -658,11 +662,11 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.tinyj,	"tinyj", null, "Advanced Logic Corp. TinyJ" },
 	{ AdbgMachine.sonydsp,	"sonydsp", null, "Sony DSP" },
 	{ AdbgMachine.svx,	"svx", null, "Silicon Graphics SVx" },
-	{ AdbgMachine.axis,	"axis", null, "Axis Communications (32-bit)" },
-	{ AdbgMachine.firepath,	"firepath", null, "Element Firepath 14 DSP (64-bit)" },
-	{ AdbgMachine.zsp,	"zsp", null, "LSI Logic ZSP DSP (16-bit)" },
+	{ AdbgMachine.axis,	"axis", null, "Axis Communications 32-bit" },
+	{ AdbgMachine.firepath,	"firepath", null, "Element Firepath 14 DSP 64-bit" },
+	{ AdbgMachine.zsp,	"zsp", null, "LSI Logic ZSP DSP 16-bit" },
 	{ AdbgMachine.prism,	"prism", null, "SiTera Prism" },
-	{ AdbgMachine.openrisc,	"openrisc", null, "OpenRISC (32-bit)" },
+	{ AdbgMachine.openrisc,	"openrisc", null, "OpenRISC 32-bit" },
 	{ AdbgMachine.videocore,	"videocore", null, "Alphamosaic VideoCore" },
 	{ AdbgMachine.tmm,	"tmm", null, "Thompson Multimedia General Purpose" },
 	{ AdbgMachine.tpc,	"tpc", null, "Tenor Network TPC" },
@@ -689,8 +693,8 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.dsp6,	"dsp6", null, "Qualcomm DSP6" },
 	{ AdbgMachine.nds32,	"nds32", null, "Andes Technology RISC" },
 	{ AdbgMachine.maxq30,	"maxq30", null, "Dallas Semiconductor MAXQ30" },
-	{ AdbgMachine.dsp16,	"dsp16", null, "New Japan Radio (NJR) DSP (16-bit)" },
-	{ AdbgMachine.dsp24,	"dsp24", null, "New Japan Radio (NJR) DSP (24-bit)" },
+	{ AdbgMachine.dsp16,	"dsp16", null, "New Japan Radio DSP 16-bit" },
+	{ AdbgMachine.dsp24,	"dsp24", null, "New Japan Radio DSP 24-bit" },
 	{ AdbgMachine.m2000,	"m2000", null, "M2000 Reconfigurable RISC" },
 	{ AdbgMachine.nv2,	"nv2", null, "Cray Inc. NV2" },
 	{ AdbgMachine.meta,	"meta", null, "Imagination Technologies META" },
@@ -702,16 +706,16 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.tile64,	"tile64", null, "Tilera TILE64" },
 	{ AdbgMachine.tilepro,	"tilepro", null, "Tilera TILEPro" },
 	{ AdbgMachine.tilegx,	"tilegx", null, "Tilera TILE-Gx" },
-	{ AdbgMachine.microblaze,	"microblaze", null, "Xilinx MicroBlaze RISC soft core (32-bit)" },
+	{ AdbgMachine.microblaze,	"microblaze", null, "Xilinx MicroBlaze RISC soft core 32-bit" },
 	{ AdbgMachine.cloudshield,	"cloudshield", null, "CloudShield" },
 	{ AdbgMachine.corea1,	"corea1", null, "KIPO-KAIST Core-A 1st generation" },
 	{ AdbgMachine.corea2,	"corea2", null, "KIPO-KAIST Core-A 2nd generation" },
 	{ AdbgMachine.arcc2,	"arcc2", null, "Synopsys ARCompact V2" },
-	{ AdbgMachine.open8,	"open8", null, "Open8 RISC soft core (8-bit)" },
+	{ AdbgMachine.open8,	"open8", null, "Open8 RISC soft core 8-bit" },
 	{ AdbgMachine.ba1,	"ba1", null, "Beyond BA1" },
 	{ AdbgMachine.ba2,	"ba2", null, "Beyond BA2" },
 	{ AdbgMachine.xcore,	"xcore", null, "XMOS xCORE" },
-	{ AdbgMachine.picr8,	"picr8", null, "Microchip PIC(r) (8-bit)" },
+	{ AdbgMachine.picr8,	"picr8", null, "Microchip PIC(r) 8-bit" },
 	{ AdbgMachine.cdp,	"cdp", null, "Paneve CDP" },
 	{ AdbgMachine.csm,	"csm", null, "Cognitive Smart Memory" },
 	{ AdbgMachine.bluechip,	"bluechip", null, "Bluechip Systems" },
@@ -719,7 +723,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.csr,	"csr", null, "CSR Kalimba" },
 	{ AdbgMachine.z80,	"z80", null, "Zilog Z80" },
 	{ AdbgMachine.visium,	"visium", null, "VISIUMcore" },
-	{ AdbgMachine.ftdi,	"ftdi", null, "FTDI Chip FT32 RISC (32-bit)" },
+	{ AdbgMachine.ftdi,	"ftdi", null, "FTDI Chip FT32 RISC 32-bit" },
 	{ AdbgMachine.veo,	"veo", null, "VEO" },
 ];
 
@@ -738,10 +742,9 @@ immutable(adbg_machine_t)* adbg_object_machine_name(AdbgMachine mach) {
 	return &machines[--mach];
 }
 @system unittest {
-	size_t count = machines.length;
 	assert(adbg_object_machine_name(cast(AdbgMachine)-1) == null);
 	assert(adbg_object_machine_name(cast(AdbgMachine)0)  == null);
-	for (size_t i = 1; i < count; ++i) {
+	for (size_t i = 1; i < machines.length; ++i) {
 		immutable(adbg_machine_t)* m =
 			adbg_object_machine_name(cast(AdbgMachine)i);
 		assert(m);
@@ -754,10 +757,9 @@ immutable(adbg_machine_t)* adbg_object_machine_name(AdbgMachine mach) {
 /// Returns: Machine pointer or null.
 immutable(adbg_machine_t)* adbg_object_machine_select(const(char) *alias_) {
 	import core.stdc.string : strcmp;
-	size_t count = machines.length;
 	// NOTE: strcmp is unlikely to check for null pointers.
 	//       Checked under musl 1.20.
-	for (size_t i; i < count; ++i) {
+	for (size_t i = 1; i < machines.length; ++i) {
 		immutable(adbg_machine_t)* machine = &machines[i];
 		
 		if (machine.alias1 == null) continue;
