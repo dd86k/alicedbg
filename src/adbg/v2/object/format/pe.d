@@ -29,6 +29,10 @@ extern (C):
 /// Magic number for PE32 object files.
 enum MAGIC_PE32 = CHAR32!"PE\0\0";
 
+/// Minimum file size for PE32.
+// https://stackoverflow.com/a/47311684
+private enum MINIMUM_SIZE = 97;
+
 enum : ushort { // PE_HEADER.Machine, likely all little-endian
 	PE_MACHINE_UNKNOWN	= 0,	/// Any machine
 	PE_MACHINE_ALPHAOLD	= 0x183,	/// Alpha (old value), unused
@@ -540,6 +544,9 @@ struct PE_SECTION_ENTRY { align(1):
 /// Params: obj = Object
 /// Returns: Status code
 int adbg_object_pe_load(adbg_object_t *obj) {
+	if (obj.file_size < MINIMUM_SIZE)
+		return adbg_oops(AdbgError.objectTooSmall);
+	
 	obj.format = AdbgObject.pe;
 	
 	void *base = obj.buffer + obj.i.mz.header.e_lfanew;

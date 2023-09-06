@@ -114,6 +114,8 @@ struct adbg_object_t {
 		struct mz_t {
 			mz_hdr *header;
 			mz_reloc *relocs;
+			
+			bool *reversed_relocs;
 		}
 		mz_t mz;
 		
@@ -198,6 +200,9 @@ void adbg_object_close(adbg_object_t *o) {
 	if (o == null)
 		return;
 	switch (o.format) with (AdbgObject) {
+	case mz:
+		with (o.i.mz) if (reversed_relocs) free(reversed_relocs);
+		break;
 	//case pe:
 	case macho:
 		with (o.i.macho) {
@@ -206,6 +211,23 @@ void adbg_object_close(adbg_object_t *o) {
 		}
 		break;
 	case elf:
+		import adbg.v2.object.format.elf :
+			ELF_EI_CLASS, ELF_CLASS_32, ELF_CLASS_64;
+		switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
+		case ELF_CLASS_32:
+			with (o.i.elf32) {
+				if (reversed_phdr) free(reversed_phdr);
+				if (reversed_shdr) free(reversed_shdr);
+			}
+			break;
+		case ELF_CLASS_64:
+			with (o.i.elf64) {
+				if (reversed_phdr) free(reversed_phdr);
+				if (reversed_shdr) free(reversed_shdr);
+			}
+			break;
+		default:
+		}
 		break;
 	default:
 	}
@@ -265,35 +287,33 @@ L_ARG:
 	
 	// Auto-detection
 	//TODO: Consider moving auto-detection as separate function?
+	//      Especially if debugger can return process' base address for image headers
 	switch (*o.buffer32) {
-	case MAGIC_ELF:
+	case MAGIC_ELF:	// "\x7fELF" is text and MAGIC is automatically swapped on target
 		return adbg_object_elf_load(o);
-	case MACHO_MAGIC:	// 32-bit LE
-	case MACHO_MAGIC_64:	// 64-bit LE
-	case MACHO_CIGAM:	// 32-bit BE
-	case MACHO_CIGAM_64:	// 64-bit BE
-	case MACHO_FAT_MAGIC:	// Fat LE
-	case MACHO_FAT_CIGAM:	// Fat BE
+	case MACHO_MAGIC:	// 32-bit
+	case MACHO_MAGIC_64:	// 64-bit
+	case MACHO_CIGAM:	// 32-bit reversed
+	case MACHO_CIGAM_64:	// 64-bit reversed
+	case MACHO_FAT_MAGIC:	// Fat
+	case MACHO_FAT_CIGAM:	// Fat reversed
 		return adbg_object_macho_load(o);
 	default:
 	}
 	
-	//TODO: Support compressed MZ files?
 	switch (*o.buffer16) {
 	case MAGIC_MZ:
 		if (o.file_size < mz_hdr.sizeof)
 			return adbg_oops(AdbgError.unknownObjFormat);
 		
 		uint offset = o.i.mz.header.e_lfanew;
-		
 		if (offset == 0)
 			return adbg_object_mz_load(o);
 		if (offset >= o.file_size - PE_HEADER.sizeof)
 			return adbg_oops(AdbgError.assertion);
 		
 		uint sig = *cast(uint*)(o.buffer + offset);
-		
-		if (sig == MAGIC_PE32)
+		if (sig == MAGIC_PE32) // text
 			return adbg_object_pe_load(o);
 		
 		switch (cast(ushort)sig) {
@@ -302,6 +322,13 @@ L_ARG:
 		default: // Assume MZ?
 			return adbg_object_mz_load(o);
 		}
+	case MAGIC_ZM:
+		if (o.file_size < mz_hdr.sizeof)
+			return adbg_oops(AdbgError.unknownObjFormat);
+		
+		o.p.reversed = true;
+		with (o.i.mz.header) e_lfanew = adbg_bswap32(e_lfanew);
+		goto case MAGIC_MZ;
 	default:
 		return adbg_oops(AdbgError.unknownObjFormat);
 	}

@@ -5,14 +5,27 @@
 /// License: BSD-3-Clause
 module adbg.v2.object.format.mz;
 
+import adbg.error;
 import adbg.v2.object.server : adbg_object_t, AdbgObject;
-import adbg.utils.bit : CHAR16;
+import adbg.utils.bit;
+
+//TODO: Support compressed MZ files?
+
+/// Minimum file size for an MZ EXE.
+// NOTE: Borland EXE about 6K (includes a CRT?).
+private enum MINIMUM_SIZE = mz_hdr.sizeof + 0x200;
 
 /// Magic number for MZ objects.
 enum MAGIC_MZ = CHAR16!"MZ";
+/// Swappged magic for MZ objects.
+enum MAGIC_ZM = CHAR16!"ZM";
 
-private enum ERESWDS = 16;
-private enum PAGE = 512;
+/// Number of reserved words for e_res.
+enum ERESWDS = 16;
+/// Size of a MZ paragraph.
+enum PARAGRAPH = 16;
+/// Size of a MZ page.
+enum PAGE = 512;
 
 /// MZ header structure
 struct mz_hdr {
@@ -31,7 +44,7 @@ struct mz_hdr {
 	ushort e_lfarlc;	/// File address of relocation table
 	ushort e_ovno;	/// Overlay number
 	ushort[ERESWDS] e_res;	/// Reserved words
-	uint   e_lfanew;	/// File address of new exe header (usually at 3Ch)
+	uint   e_lfanew;	/// File address of new exe header
 }
 static assert(mz_hdr.e_lfanew.offsetof == 0x3c);
 
@@ -41,10 +54,55 @@ struct mz_reloc {
 	ushort segment;
 }
 
-int adbg_object_mz_load(adbg_object_t *obj) {
-	obj.format = AdbgObject.mz;
-	obj.i.mz.header = cast(mz_hdr*)obj.buffer;
-	with (obj.i.mz) if (header.e_lfarlc && header.e_crlc && header.e_lfarlc < obj.file_size)
-		relocs = cast(mz_reloc*)(obj.buffer + header.e_lfarlc);
+int adbg_object_mz_load(adbg_object_t *o) {
+	import core.stdc.stdlib : calloc;
+	
+	if (o.file_size < MINIMUM_SIZE)
+		return adbg_oops(AdbgError.objectTooSmall);
+	
+	if (o.p.reversed) with (o.i.mz.header) {
+		e_magic	= adbg_bswap16(e_magic);
+		e_cblp	= adbg_bswap16(e_cblp);
+		e_cp	= adbg_bswap16(e_cp);
+		e_crlc	= adbg_bswap16(e_crlc);
+		e_cparh	= adbg_bswap16(e_cparh);
+		e_minalloc	= adbg_bswap16(e_minalloc);
+		e_maxalloc	= adbg_bswap16(e_maxalloc);
+		e_ss	= adbg_bswap16(e_ss);
+		e_sp	= adbg_bswap16(e_sp);
+		e_csum	= adbg_bswap16(e_csum);
+		e_ip	= adbg_bswap16(e_ip);
+		e_cs	= adbg_bswap16(e_cs);
+		e_lfarlc	= adbg_bswap16(e_lfarlc);
+		e_ovno	= adbg_bswap16(e_ovno);
+		for (size_t i; i < ERESWDS; ++i)
+			e_res[i] = adbg_bswap16(e_res[i]);
+	}
+	
+	o.format = AdbgObject.mz;
+	with (o.i.mz) if (header.e_lfarlc && header.e_crlc && header.e_lfarlc < o.file_size) {
+		relocs = cast(mz_reloc*)(o.buffer + header.e_lfarlc);
+		if (o.p.reversed)
+			o.i.mz.reversed_relocs = cast(bool*)calloc(header.e_crlc, bool.sizeof);
+	}
 	return 0;
+}
+
+mz_hdr* adbg_object_mz_header(adbg_object_t *o) {
+	if (o == null) return null;
+	return o.i.mz.header;
+}
+
+mz_reloc* adbg_object_mz_reloc(adbg_object_t *o, size_t index) {
+	if (o == null) return null;
+	if (o.i.mz.relocs == null) return null; // no relocations available
+	if (index >= o.i.mz.header.e_crlc) return null;
+	
+	mz_reloc *reloc = &o.i.mz.relocs[index];
+	if (o.p.reversed && o.i.mz.reversed_relocs[index] == false) {
+		reloc.offset = adbg_bswap16(reloc.offset);
+		reloc.segment = adbg_bswap16(reloc.segment);
+		o.i.mz.reversed_relocs[index] = true;
+	}
+	return reloc;
 }

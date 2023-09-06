@@ -16,6 +16,10 @@ import core.stdc.stdlib : calloc;
 // - https://github.com/opensource-apple/cctools/blob/master/include/mach-o/loader.h
 
 // Self-imposed limits
+
+/// Smallest Mach-O size.
+// https://codegolf.stackexchange.com/a/154685
+private enum MINIMUM_SIZE = 0x1000; // Due to paging
 //TODO: Apply limits (with logging?)
 private enum LIMIT_FAT_ARCH = 200;
 private enum LIMIT_COMMANDS = 2000;
@@ -385,6 +389,9 @@ enum {
 }
 
 int adbg_object_macho_load(adbg_object_t *o) {
+	if (o.file_size < MINIMUM_SIZE)
+		return adbg_oops(AdbgError.objectTooSmall);
+	
 	o.format = AdbgObject.macho;
 	
 	o.i.macho.header = cast(macho_header*)o.buffer;

@@ -49,6 +49,22 @@ void dump_mz_hdr(adbg_object_t *o) {
 	dprint_x16("e_cs", e_cs);
 	dprint_x16("e_lfarlc", e_lfarlc);
 	dprint_u16("e_ovno", e_ovno);
+	dprint_x16("e_res[0]", e_res[0]); // lazy
+	dprint_x16("e_res[1]", e_res[1]); // lazy
+	dprint_x16("e_res[2]", e_res[2]); // lazy
+	dprint_x16("e_res[3]", e_res[3]); // lazy
+	dprint_x16("e_res[4]", e_res[4]); // lazy
+	dprint_x16("e_res[5]", e_res[5]); // lazy
+	dprint_x16("e_res[6]", e_res[6]); // lazy
+	dprint_x16("e_res[7]", e_res[7]); // lazy
+	dprint_x16("e_res[8]", e_res[8]); // lazy
+	dprint_x16("e_res[9]", e_res[9]); // lazy
+	dprint_x16("e_res[10]", e_res[10]); // lazy
+	dprint_x16("e_res[11]", e_res[11]); // lazy
+	dprint_x16("e_res[12]", e_res[12]); // lazy
+	dprint_x16("e_res[13]", e_res[13]); // lazy
+	dprint_x16("e_res[14]", e_res[14]); // lazy
+	dprint_x16("e_res[15]", e_res[15]); // lazy
 	dprint_x32("e_lfanew", e_lfanew);
 	}
 }
@@ -58,15 +74,10 @@ void dump_mz_relocs(adbg_object_t *o) {
 	
 	dprint_header("Relocations");
 	
-	ushort count = o.i.mz.header.e_crlc;
-	mz_reloc *reloc = o.i.mz.relocs;
-	
-	if (count == 0 || reloc == null)
-		return;
-	
-	for (ushort i; i < count; ++i)
-		printf("%u. segment=%04X offset=%04X\n",
-			i, reloc[i].segment, reloc[i].offset);
+	mz_reloc *reloc = void;
+	size_t i;
+	while ((reloc = adbg_object_mz_reloc(o, i++)) != null) with (reloc)
+		printf("%u. segment=%04X offset=%04X\n", cast(uint)i, segment, offset);
 }
 
 void dump_mz_disasm(adbg_object_t *o, uint flags) {
@@ -82,7 +93,7 @@ void dump_mz_disasm(adbg_object_t *o, uint flags) {
 	uint len  = void;
 	with (o.i.mz.header) {
 	blks = e_cblp ? e_cp - 1 : e_cp;
-	len  = (blks * 16) + e_cblp;
+	len  = (blks * PARAGRAPH) + e_cblp;
 	}
 	if (len == 0)
 		return;

@@ -70,12 +70,13 @@ enum AdbgError {
 	//
 	objectUnknownFormat	= 301,
 	objectUnsupportedFormat	= 302,
+	objectTooSmall	= 303,
 	objectInvalidVersion	= 310,
-	objectInvalidMachine	= 310,
-	objectInvalidClass	= 310,
-	objectInvalidEndian	= 310,
-	objectInvalidType	= 310,
-	objectInvalidABI	= 310,
+	objectInvalidMachine	= 311,
+	objectInvalidClass	= 312,
+	objectInvalidEndian	= 313,
+	objectInvalidType	= 314,
+	objectInvalidABI	= 315,
 	// Old meanings
 	unknownObjFormat	= objectUnknownFormat,
 	unsupportedObjFormat	= objectUnsupportedFormat,

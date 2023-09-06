@@ -20,6 +20,10 @@ import adbg.include.c.stdlib : calloc, free;
 /// Signature magic for ELF.
 enum MAGIC_ELF = CHAR32!"\x7FELF";
 
+/// Minimum file size for ELF.
+// https://stackoverflow.com/a/53383541
+private enum MINIMUM_SIZE = 130;
+
 // ELF32
 private alias uint	Elf32_Addr;
 private alias ushort	Elf32_Half;
@@ -656,8 +660,10 @@ else
 	private enum PLATFORM_DATA = ELF_DATA_LSB;
 
 int adbg_object_elf_load(adbg_object_t *o) {
+	if (o.file_size < MINIMUM_SIZE)
+		return adbg_oops(AdbgError.objectTooSmall);
+	
 	o.format = AdbgObject.elf;
-	o.i.elf32.ehdr = cast(Elf32_Ehdr*)o.buffer;
 	
 	o.p.reversed = o.i.elf32.ehdr.e_ident[ELF_EI_DATA] != PLATFORM_DATA;
 	version (Trace) trace("reversed=%d", o.p.reversed);

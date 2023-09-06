@@ -115,9 +115,6 @@ ushort adbg_bswap16(ushort v) pure {
 	return cast(ushort)(v >> 8 | v << 8);
 }
 
-// Old name
-public alias adbg_util_bswap16 = adbg_bswap16;
-
 /// Byte-swap an 32-bit value.
 /// Params: v = 32-bit value
 /// Returns: Byte-swapped value
