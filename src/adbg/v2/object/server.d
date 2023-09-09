@@ -129,15 +129,20 @@ struct adbg_object_t {
 			}
 			// Directories
 			PE_IMAGE_DATA_DIRECTORY *directory;
-			// Data
-			PE_SECTION_ENTRY *sections;
-			PE_EXPORT_DESCRIPTOR *exports;
-			PE_IMPORT_DESCRIPTOR *imports;
-			PE_DEBUG_DIRECTORY *debug_directory;
+			PE_EXPORT_DESCRIPTOR *directory_exports;
+			PE_IMPORT_DESCRIPTOR *directory_imports;
+			PE_DEBUG_DIRECTORY *directory_debug;
 			union {
 				PE_LOAD_CONFIG_DIR32 *load_config32;
 				PE_LOAD_CONFIG_DIR64 *load_config64;
 			}
+			// Data
+			PE_SECTION_ENTRY *sections;
+			
+			bool *reversed_sections;
+			bool *reversed_dir_exports;
+			bool *reversed_dir_imports;
+			bool *reversed_dir_debug;
 		}
 		pe_t pe;
 		

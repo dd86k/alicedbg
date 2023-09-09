@@ -304,7 +304,7 @@ immutable setting_show_t[] showflags = [
 	{ 'h', "Show header metadata (default)", DumpOpt.header },
 	{ 's', "Show sections metadata", DumpOpt.sections },
 	{ 'i', "Show imports", DumpOpt.imports },
-//	{ 'e', "Show exports", DUMPER_SHOW_EXPORTS },
+	{ 'e', "Show exports", DumpOpt.exports },
 	{ 'c', "Show load configuration", DumpOpt.loadcfg },
 	{ 'r', "Show load configuration", DumpOpt.relocs },
 	{ 'p', "Show debug information", DumpOpt.debug_ },
@@ -467,7 +467,7 @@ int main(int argc, const(char)** argv) {
 				}
 				val = argv[argi];
 				if (opt.fa(val)) {
-					printf("main: '%s' is an invalid value for --%s", val, argLong);
+					printf("main: '%s' is an invalid value for --%s\n", val, argLong);
 					return EXIT_FAILURE;
 				}
 				continue CLI;
@@ -498,7 +498,7 @@ int main(int argc, const(char)** argv) {
 				}
 				val = argv[argi];
 				if (opt.fa(val)) {
-					printf("main: '%s' is an invalid value for -%c", val, argShort);
+					printf("main: '%s' is an invalid value for -%c\n", val, argShort);
 					return EXIT_FAILURE;
 				}
 				continue CLI;

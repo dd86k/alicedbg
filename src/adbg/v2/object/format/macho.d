@@ -445,8 +445,12 @@ int adbg_object_macho_load(adbg_object_t *o) {
 	with (o.i) if (macho.fat) {
 		macho.fat_arch = cast(macho_fat_arch*)(o.buffer + macho_fatmach_header.sizeof);
 		macho.reversed_fat_arch = cast(bool*)calloc(macho.fat_header.nfat_arch, bool.sizeof);
+		if (macho.reversed_fat_arch == null)
+			return adbg_oops(AdbgError.crt);
 	} else if (macho.header.ncmds) {
 		macho.reversed_commands = cast(bool*)calloc(macho.header.ncmds, bool.sizeof);
+		if (macho.reversed_commands == null)
+			return adbg_oops(AdbgError.crt);
 		size_t cl = macho.is64 ? macho_header.sizeof + uint.sizeof : macho_header.sizeof;
 		version (Trace) trace("cl=%p 64=%d", cl, macho.is64);
 		macho.commands = cast(macho_load_command*)(o.buffer + cl);

@@ -176,7 +176,7 @@ void dprint_u16(const(char) *name, ushort val,
 }
 // temp for pe32 import
 void dprint_x16__i(uint rva, ushort hint, const(char) *s) {
-	printf("%20x  0x%04x  %.256s\n", rva, hint, s);
+	printf("  %-31x  %-10x  %.256s\n", rva, hint, s);
 }
 
 void dprint_x32(const(char) *name, uint val,

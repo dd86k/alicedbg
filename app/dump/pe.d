@@ -221,11 +221,10 @@ void dump_pe_dirs(adbg_object_t *o) {
 void dump_pe_sections(adbg_object_t *o) {
 	dprint_header("Sections");
 	
-	for (ushort si; si < o.i.pe.header.NumberOfSections; ++si) {
-		PE_SECTION_ENTRY *section = &o.i.pe.sections[si];
-		
-		with (section) {
-		dprint_section(si + 1, Name.ptr, 8);
+	PE_SECTION_ENTRY *section = void;
+	size_t i;
+	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
+		dprint_section(cast(uint)i + 1, Name.ptr, 8);
 		dprint_x32("VirtualAddress", VirtualAddress);
 		dprint_x32("VirtualSize", VirtualSize);
 		dprint_x32("PointerToRawData", PointerToRawData);
@@ -264,7 +263,6 @@ void dump_pe_sections(adbg_object_t *o) {
 			"MEM_READ".ptr,	PE_SECTION_CHARACTERISTIC_MEM_READ,
 			"MEM_WRITE".ptr,	PE_SECTION_CHARACTERISTIC_MEM_WRITE,
 			null);
-		}
 	}
 }
 
@@ -510,58 +508,50 @@ void dump_pe_sections(adbg_object_t *o) {
 
 // NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
 void dump_pe_imports(adbg_object_t *o) {
-	dprint_header("Imports");
-	
-	if (o.i.pe.imports == null)
-		return;
-	
-	char* basename = cast(char*)o.i.pe.imports - o.i.pe.directory.ImportTable.rva;
-	
-	size_t count = o.i.pe.directory.ImportTable.size / PE_IMPORT_DESCRIPTOR.sizeof;
-	for (size_t i; i < count; ++i) {
-		PE_IMPORT_DESCRIPTOR *id = &o.i.pe.imports[i];
-		
-		if (id.Characteristics == 0)
-			break;
-		
-		dprint_x32("Characteristics", id.Characteristics);
-		dprint_x32("TimeDateStamp", id.TimeDateStamp);
-		dprint_x32("ForwarderChain", id.ForwarderChain);
+	PE_IMPORT_DESCRIPTOR *import_ = void;
+	size_t i;
+	while ((import_ = adbg_object_pe_import(o, i++)) != null) with (import_) {
+		dprint_header("Import");
+		dprint_x32("Characteristics", Characteristics);
+		dprint_x32("TimeDateStamp", TimeDateStamp);
+		dprint_x32("ForwarderChain", ForwarderChain);
 		// NOTE: 256 is a temporary maximum
 		//       I think these are 0-terminated, but just in case
-		dprint_x32s("Name", id.Name, basename + id.Name, 256);
-		dprint_x32("FirstThunk", id.FirstThunk);
+		dprint_x32s("Name", Name, adbg_object_pe_import_name(o, import_), 256);
+		dprint_x32("FirstThunk", FirstThunk);
 		
-		dprint_columns("RVA", "Hint", "String");
+		//TODO: Function to get import name+hint from lte directly
 		
-		union lte_t {
-			void *raw;
-			PE_IMPORT_LTE32 *e32;
-			PE_IMPORT_LTE64 *e64;
-		}
-		lte_t lte = void; lte.raw = basename + id.Characteristics;
-		
+		size_t il;
 		switch (o.i.pe.opt_header.Magic) {
 		case PE_FMT_32:
-			for (; lte.e32.val; ++lte.e32) {
-				if (lte.e32.val >= 0x8000_0000) { // Ordinal
-					dprint_x16("", lte.e32.num);
+			PE_IMPORT_LTE32 *t32 = adbg_object_pe_import_lte32(o, import_, il);
+			if (t32 == null) continue;
+			dprint_columns("RVA", "Hint", "String");
+			do with (t32) {
+				if (val >= 0x8000_0000) { // Ordinal
+					dprint_x16("", num);
 				} else { // RVA
-					ushort *hint = cast(ushort*)(basename + lte.e32.rva);
-					dprint_x16__i(lte.e32.rva, *hint, cast(char*)hint + 2);
+					ushort *hint =
+						adbg_object_pe_import_lte32_hint(o, import_, t32);
+					dprint_x16__i(rva, *hint, cast(char*)hint + ushort.sizeof);
 				}
-			}
-			break;
+			} while ((t32 = adbg_object_pe_import_lte32(o, import_, ++il)) != null);
+			continue;
 		case PE_FMT_64:
-			for (; lte.e64.val; ++lte.e64) {
-				if (lte.e64.val >= 0x8000_0000_0000_0000) { // Ordinal
-					dprint_x16("", lte.e32.num);
+			PE_IMPORT_LTE64 *t64 = adbg_object_pe_import_lte64(o, import_, il);
+			if (t64 == null) continue;
+			dprint_columns("RVA", "Hint", "String");
+			do with (t64) {
+				if (val >= 0x8000_0000_0000_0000) { // Ordinal
+					dprint_x16("", num);
 				} else { // RVA
-					ushort *hint = cast(ushort*)(basename + lte.e64.rva);
-					dprint_x16__i(lte.e64.rva, *hint, cast(char*)hint + 2);
+					ushort *hint =
+						adbg_object_pe_import_lte64_hint(o, import_, t64);
+					dprint_x16__i(rva, *hint, cast(char*)hint + ushort.sizeof);
 				}
-			}
-			break;
+			} while ((t64 = adbg_object_pe_import_lte64(o, import_, ++il)) != null);
+			continue;
 		default:
 		}
 	}
@@ -570,29 +560,25 @@ void dump_pe_imports(adbg_object_t *o) {
 void dump_pe_debug(adbg_object_t *o) {
 	dprint_header("Debug");
 	
-	if (o.i.pe.debug_directory == null)
-		return;
-	
-	size_t count = o.i.pe.directory.DebugDirectory.size / PE_DEBUG_DIRECTORY.sizeof;
-	for (size_t i; i < count; ++i) {
-		PE_DEBUG_DIRECTORY *id = &o.i.pe.debug_directory[i];
+	PE_DEBUG_DIRECTORY *debug_ = void;
+	size_t i;
+	while ((debug_ = adbg_object_pe_debug_directory(o, i++)) != null) with (debug_) {
+		dprint_x32("Characteristics", Characteristics);
+		dprint_x32("TimeDateStamp", TimeDateStamp);
+		dprint_u16("MajorVersion", MajorVersion);
+		dprint_u16("MinorVersion", MinorVersion);
+		dprint_u32("Type", Type, adbg_object_pe_debug_type_string(Type));
+		dprint_u32("SizeOfData", SizeOfData);
+		dprint_x32("AddressOfRawData", AddressOfRawData);
+		dprint_x32("PointerToRawData", PointerToRawData);
 		
-		dprint_x32("Characteristics", id.Characteristics);
-		dprint_x32("TimeDateStamp", id.TimeDateStamp);
-		dprint_u16("MajorVersion", id.MajorVersion);
-		dprint_u16("MinorVersion", id.MinorVersion);
-		dprint_u32("Type", id.Type, adbg_object_pe_debug_type_string(id.Type));
-		dprint_u32("SizeOfData", id.SizeOfData);
-		dprint_x32("AddressOfRawData", id.AddressOfRawData);
-		dprint_x32("PointerToRawData", id.PointerToRawData);
-		
-		void *rawdata = o.buffer + id.PointerToRawData;
+		void *rawdata = o.buffer + PointerToRawData;
 		if (rawdata >= o.buffer + o.file_size) {
 			dprint_warn("PointerToRawData out of bounds");
 			return;
 		}
 		
-		switch (id.Type) {
+		switch (Type) {
 		case PE_IMAGE_DEBUG_TYPE_CODEVIEW:
 			//TODO: Check MajorVersion/MinorVersion
 			//      For example, a modern D program use 0.0
@@ -600,13 +586,13 @@ void dump_pe_debug(adbg_object_t *o) {
 			
 			uint sig = *cast(uint*)rawdata;
 			switch (sig) {
-			case CHAR32!"NB09": // PDB 2.0+ / CodeView 4.10
+			case PE_IMAGE_DEBUG_CODEVIEW_CV410: // PDB 2.0+ / CodeView 4.10
 				dprint_x32("Signature", sig, "PDB 2.0+ / CodeView 4.10");
 				goto L_DEBUG_PDB20;
-			case CHAR32!"NB10": // PDB 2.0+
+			case PE_IMAGE_DEBUG_CODEVIEW_PDB20PLUS: // PDB 2.0+
 				dprint_x32("Signature", sig, "PDB 2.0+ / NB10");
 				goto L_DEBUG_PDB20;
-			case CHAR32!"NB11": // PDB 2.0+ / CodeView 5.0
+			case PE_IMAGE_DEBUG_CODEVIEW_CV500: // PDB 2.0+ / CodeView 5.0
 				dprint_x32("Signature", sig, "PDB 2.0+ / CodeView 5.0");
 L_DEBUG_PDB20:
 				PE_DEBUG_DATA_CODEVIEW_PDB20* pdb =
@@ -617,11 +603,11 @@ L_DEBUG_PDB20:
 				//TODO: Consider limiting to MAX_PATH or similar
 				dprint_string("Path", pdb.Path.ptr);
 				break;
-			case CHAR32!"RSDS": // PDB 7.0 / CodeView 7.0
+			case PE_IMAGE_DEBUG_CODEVIEW_CV700: // PDB 7.0 / CodeView 7.0
 				PE_DEBUG_DATA_CODEVIEW_PDB70* pdb =
 					cast(PE_DEBUG_DATA_CODEVIEW_PDB70*)rawdata;
 				char[UID_TEXTLEN] guid = void;
-				uid_text(pdb.PDB_GUID, guid, UID_GUID);
+				uid_text(pdb.Guid, guid, UID_GUID);
 				dprint_x32("Signature", sig, "PDB 7.0 / CodeView 7.0");
 				dprint_stringl("GUID", guid.ptr, UID_TEXTLEN);
 				dprint_u32("Age", pdb.Age); // ctime32?
