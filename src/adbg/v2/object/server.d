@@ -23,6 +23,8 @@ import adbg.v2.object.machines : AdbgMachine;
 
 extern (C):
 
+//TODO: Function to check and/or fetch stuff from object
+//      Check bounds at minimum
 //TODO: Object type and format enums
 //      Either:
 //      - extent formats to include everyting else, have functions to say type (_is_dump)

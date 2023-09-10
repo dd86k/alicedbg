@@ -16,6 +16,9 @@ import adbg.platform;
 import adbg.v2.debugger.process : adbg_process_t;
 import adbg.v2.object.machines : AdbgMachine;
 
+//TODO: Capstone CS_MODE_BIG_ENDIAN
+//      Depending on target endianness, Capstone may need this bit
+
 version (X86) { // CS_OPT_SYNTAX_DEFAULT
 	private enum {
 		CS_DEFAULT_PLATFORM = CS_ARCH_X86,	/// Platform default platform

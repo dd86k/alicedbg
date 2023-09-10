@@ -28,6 +28,9 @@ enum AppError {
 	loadFailed	= -4,
 	pauseRequired	= -5,
 	alreadyLoaded	= -6,
+	missingOption	= -7,
+	unformat	= -8,
+	crt	= -9,
 	alicedbg	= -10,
 }
 

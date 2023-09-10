@@ -12,7 +12,7 @@ import adbg.error;
 import adbg.utils.string;
 import adbg.v2.debugger;
 import adbg.v2.disassembler;
-import common, term;
+import common, term, utils;
 
 //TODO: cmd_file -- read (commands) from file
 //TODO: cmd_strace [on|off]
@@ -24,8 +24,9 @@ import common, term;
 //      add breakpoint
 //TODO: Move commands to its own module? rename ui as shell?
 //      "tcp" ui might re-use commands
-//TODO: int cmd_error(const(char)*);
-//      or just cmd_log() with "debugger: " prepended
+//      Commands interface common objects, UI takes I/O differently
+//      - shell: human
+//      - tcpserver: machine (json)
 //TODO: Improve help system by avoiding help functions
 
 extern (C):
@@ -59,6 +60,40 @@ int app_cmd() {
 
 private:
 
+void print_error(int code) {
+	const(char) *msg = void;
+	switch (code) with (AppError) {
+	case 0: return;
+	case invalidParameter:
+		msg = "Invalid command parameter.";
+		break;
+	case invalidCommand:
+		msg = "Invalid command.";
+		break;
+	case unavailable:
+		msg = "Debugger unavailable.";
+		break;
+	case loadFailed:
+		msg = "Failed to load file.";
+		break;
+	case pauseRequired:
+		msg = "Debugger needs to be paused for this action.";
+		break;
+	case alreadyLoaded:
+		msg = "File already loaded.";
+		break;
+	case missingOption:
+		msg = "Missing option for command.";
+		break;
+	case alicedbg:
+		msg = adbg_error_msg;
+		break;
+	default:
+		msg = "Unknown error.";
+	}
+	puts(msg);
+}
+
 int prompt() {
 	char* line = void;
 	int argc = void;
@@ -74,8 +109,7 @@ int prompt() {
 		}
 		
 		error = cmd_execl(line, argc); // execute line
-		if (error == AppError.alicedbg)
-			oops;
+		print_error(error);
 	}
 	return error;
 }
@@ -155,7 +189,11 @@ immutable command_t[] commands = [
 		"Perform an instruction step.",
 		&cmd_c_stepi
 	},
-	//TODO: status
+	{
+		"status", null,
+		"Get debugger state.",
+		&cmd_c_status
+	},
 	{
 		"reg", null,
 		"Register management.",
@@ -170,6 +208,11 @@ immutable command_t[] commands = [
 		"maps", null,
 		"Show memory maps.",
 		&cmd_c_maps
+	},
+	{
+		"m", "[address] [length]",
+		"View memory",
+		&cmd_c_m
 	},
 	{
 		"scan", null,
@@ -223,6 +266,24 @@ void cmd_h_load() {
 	`Load an executable file into the debugger. Any arguments after the `~
 	`file are arguments passed into the debugger.`
 	);
+}
+
+//
+// status
+//
+
+int cmd_c_status(int argc, const(char) **argv) {
+	AdbgStatus state = adbg_status(tracee);
+	const(char) *m = void;
+	switch (state) with (AdbgStatus) {
+	case unloaded:	m = "unloaded"; break;
+	case standby:	m = "standby"; break;
+	case running:	m = "running"; break;
+	case paused:	m = "paused"; break;
+	default:	m = "(unknown)";
+	}
+	puts(m);
+	return 0;
 }
 
 //
@@ -332,6 +393,7 @@ int cmd_c_stepi(int argc, const(char) **argv) {
 //
 
 //TODO: optional arg: filter module by name (contains string)
+//TODO: max count to show or option to filter modules out
 int cmd_c_maps(int argc, const(char) **argv) {
 	adbg_memory_map_t *mmaps = void;
 	size_t mcount = void;
@@ -344,6 +406,55 @@ int cmd_c_maps(int argc, const(char) **argv) {
 		with (map) printf("%8p %10lld %s\n", base, size, name.ptr);
 	}
 	if (mcount) free(mmaps);
+	
+	return 0;
+}
+
+//
+// memory (view) command
+//
+
+int cmd_c_m(int argc, const(char) **argv) {
+	if (argc < 2) {
+		return AppError.missingOption;
+	}
+	
+	long uaddress = void;
+	if (unformat64(&uaddress, argv[1]))
+		return AppError.unformat;
+	
+	int ulength = 64;
+	if (argc >= 3) {
+		if (unformat(&ulength, argv[2]))
+			return AppError.unformat;
+		if (ulength <= 0)
+			return 0;
+	}
+	
+	ubyte *data = cast(ubyte*)malloc(ulength);
+	if (data == null)
+		return AppError.crt;
+	
+	if (adbg_memory_read(tracee, cast(size_t)uaddress, data, ulength))
+		return AppError.alicedbg;
+	
+	// Print column header
+	enum COLS = 16;
+	size_t count = ulength / COLS;
+	printf("                  ");
+	for (size_t c; c < COLS; ++c) {
+		printf("%2x ", cast(uint)c);
+	}
+	putchar('\n');
+	
+	// Print rows
+	for (size_t c; c < count; ++c, uaddress += COLS) {
+		printf("%16llx  ", uaddress);
+		for (size_t i; i < COLS && c * i < ulength; ++i) {
+			printf("%02x ", data[(c * COLS) + i]);
+		}
+		putchar('\n');
+	}
 	
 	return 0;
 }
