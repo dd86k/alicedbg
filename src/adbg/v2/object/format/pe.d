@@ -22,6 +22,8 @@ import adbg.v2.object.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit;
 
+// NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
+
 //TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
 //TODO: Function to check RVA bounds (within file_size)
 
@@ -827,7 +829,7 @@ PE_SECTION_ENTRY* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 // - [ ] DelayImport
 // - [ ] CLRHeader
 
-PE_EXPORT_DESCRIPTOR* adbg_object_pe_export_table(adbg_object_t *o, size_t index) {
+PE_EXPORT_DESCRIPTOR* adbg_object_pe_export(adbg_object_t *o, size_t index) {
 	if (o == null) return null;
 	if (o.i.pe.directory == null) return null;
 	size_t count = o.i.pe.directory.ExportTable.size / PE_EXPORT_DESCRIPTOR.sizeof;
@@ -842,6 +844,9 @@ PE_EXPORT_DESCRIPTOR* adbg_object_pe_export_table(adbg_object_t *o, size_t index
 	}
 	
 	PE_EXPORT_DESCRIPTOR* export_ = o.i.pe.directory_exports + index;
+	// Double check, count is sometimes misleading
+	if (export_.Name == 0) return null;
+	
 	if (o.p.reversed && o.i.pe.reversed_dir_exports[index] == false) with (export_) {
 		ExportFlags	= adbg_bswap32(ExportFlags);
 		Timestamp	= adbg_bswap32(Timestamp);
@@ -857,6 +862,35 @@ PE_EXPORT_DESCRIPTOR* adbg_object_pe_export_table(adbg_object_t *o, size_t index
 		o.i.pe.reversed_dir_exports[index] = true;
 	}
 	return export_;
+}
+
+char* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_) {
+	if (o == null) return null;
+	if (o.i.pe.directory == null) return null;
+	if (o.i.pe.directory_exports == null) return null;
+	
+	char *s = cast(char*)o.i.pe.directory_exports - o.i.pe.directory.ExportTable.rva + export_.Name;
+	
+	if (s >= o.buffer + o.file_size)
+		return null;
+	
+	return s;
+}
+
+char* adbg_object_pe_export_string_hint(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, size_t index) {
+	if (o == null) return null;
+	if (o.i.pe.directory == null) return null;
+	if (o.i.pe.directory_exports == null) return null;
+	if (index >= export_.NumberOfNamePointers) return null;
+	
+	//TODO: Check bounds
+	// If the address specified is not within the export section (as defined
+	// by the address and length that are indicated in the optional header).
+	void *base = cast(void*)o.i.pe.directory_exports -
+		o.i.pe.directory.ExportTable.rva;
+	//void *table = base + export_.ExportAddressTable;
+	void *name = base + *cast(uint*)(base + export_.NamePointer);
+	return cast(char*)name;
 }
 
 PE_IMPORT_DESCRIPTOR* adbg_object_pe_import(adbg_object_t *o, size_t index) {
@@ -890,7 +924,12 @@ char* adbg_object_pe_import_name(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_
 	if (o == null || import_ == null) return null;
 	if (o.i.pe.directory == null) return null;
 	
-	return cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva + import_.Name;
+	char *s = cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva + import_.Name;
+	
+	if (s >= o.buffer + o.file_size)
+		return null;
+	
+	return s;
 }
 
 //NOTE: LTEs aren't swapped just yet.

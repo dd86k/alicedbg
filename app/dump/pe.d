@@ -34,6 +34,9 @@ int dump_pe(adbg_object_t *o, uint flags) {
 	if (flags & DumpOpt.sections)
 		dump_pe_sections(o);
 	
+	if (flags & DumpOpt.exports)
+		dump_pe_exports(o);
+	
 	if (flags & DumpOpt.imports)
 		dump_pe_imports(o);
 	
@@ -506,7 +509,32 @@ void dump_pe_sections(adbg_object_t *o) {
 	}
 }*/
 
-// NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
+void dump_pe_exports(adbg_object_t *o) {
+	PE_EXPORT_DESCRIPTOR *export_ = void;
+	size_t i;
+	while ((export_ = adbg_object_pe_export(o, i++)) != null) with (export_) {
+		dprint_header("Export");
+		dprint_x32("ExportFlags", ExportFlags);
+		dprint_x32("Timestamp", Timestamp);
+		dprint_x16("MajorVersion", MajorVersion);
+		dprint_x16("MinorVersion", MinorVersion);
+		dprint_x32("Name", Name, adbg_object_pe_export_name(o, export_));
+		dprint_x32("OrdinalBase", OrdinalBase);
+		dprint_x32("AddressTableEntries", AddressTableEntries);
+		dprint_x32("NumberOfNamePointers", NumberOfNamePointers);
+		dprint_x32("ExportAddressTable", ExportAddressTable);
+		dprint_x32("NamePointer", NamePointer);
+		dprint_x32("OrdinalTable", OrdinalTable);
+		
+		char* hint = void;
+		size_t ie;
+		while ((hint = adbg_object_pe_export_string_hint(o, export_, ie++)) != null) {
+			import core.stdc.stdio : printf;
+			printf("  - %s\n", hint);
+		}
+	}
+}
+
 void dump_pe_imports(adbg_object_t *o) {
 	PE_IMPORT_DESCRIPTOR *import_ = void;
 	size_t i;
