@@ -18,6 +18,27 @@ enum {
 
 /// UUID/GUID structure
 union UID {
+	this (ubyte p0, ubyte p1, ubyte p2, ubyte p3,
+		ubyte p4, ubyte p5, ubyte p6, ubyte p7,
+		ubyte p8, ubyte p9, ubyte p10, ubyte p11,
+		ubyte p12, ubyte p13, ubyte p14, ubyte p15) {
+		data[0] = p0;
+		data[1] = p1;
+		data[2] = p2;
+		data[3] = p3;
+		data[4] = p4;
+		data[5] = p5;
+		data[6] = p6;
+		data[7] = p7;
+		data[8] = p8;
+		data[9] = p9;
+		data[10] = p10;
+		data[11] = p11;
+		data[12] = p12;
+		data[13] = p13;
+		data[14] = p14;
+		data[15] = p15;
+	}
 	ubyte[16] data;
 	ushort[8] u16;
 	uint[4]   u32;

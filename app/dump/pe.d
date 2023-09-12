@@ -195,11 +195,11 @@ void dump_pe_opthdr_dllcharacteristics(ushort DllCharacteristics) {
 }
 
 void dump_pe_dirs(adbg_object_t *o) {
-	dprint_columns("Directory", "RVA", "Size");
-	
 	// ROM
 	if (o.i.pe.directory == null)
 		return;
+	
+	dprint_columns("Directory", "RVA", "Size");
 	
 	with (o.i.pe.directory) {
 	dprint_entry32("ExportTable", ExportTable.rva, ExportTable.size);
@@ -614,13 +614,13 @@ void dump_pe_debug(adbg_object_t *o) {
 			
 			uint sig = *cast(uint*)rawdata;
 			switch (sig) {
-			case PE_IMAGE_DEBUG_CODEVIEW_CV410: // PDB 2.0+ / CodeView 4.10
+			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV410: // PDB 2.0+ / CodeView 4.10
 				dprint_x32("Signature", sig, "PDB 2.0+ / CodeView 4.10");
 				goto L_DEBUG_PDB20;
-			case PE_IMAGE_DEBUG_CODEVIEW_PDB20PLUS: // PDB 2.0+
+			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_PDB20PLUS: // PDB 2.0+
 				dprint_x32("Signature", sig, "PDB 2.0+ / NB10");
 				goto L_DEBUG_PDB20;
-			case PE_IMAGE_DEBUG_CODEVIEW_CV500: // PDB 2.0+ / CodeView 5.0
+			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV500: // PDB 2.0+ / CodeView 5.0
 				dprint_x32("Signature", sig, "PDB 2.0+ / CodeView 5.0");
 L_DEBUG_PDB20:
 				PE_DEBUG_DATA_CODEVIEW_PDB20* pdb =
@@ -631,7 +631,7 @@ L_DEBUG_PDB20:
 				//TODO: Consider limiting to MAX_PATH or similar
 				dprint_string("Path", pdb.Path.ptr);
 				break;
-			case PE_IMAGE_DEBUG_CODEVIEW_CV700: // PDB 7.0 / CodeView 7.0
+			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV700: // PDB 7.0 / CodeView 7.0
 				PE_DEBUG_DATA_CODEVIEW_PDB70* pdb =
 					cast(PE_DEBUG_DATA_CODEVIEW_PDB70*)rawdata;
 				char[UID_TEXTLEN] guid = void;
@@ -641,6 +641,10 @@ L_DEBUG_PDB20:
 				dprint_u32("Age", pdb.Age); // ctime32?
 				//TODO: Consider limiting to MAX_PATH or similar
 				dprint_string("Path", pdb.Path.ptr);
+				break;
+			case PE_IMAGE_DEBUG_MAGIC_EMBEDDED_PPDB: // Portable PDB
+				//NOTE: major_version >= 0x100 && minor_version == 0x100
+				dprint_x32("Signature", sig, "Portable PDB");
 				break;
 			default:
 				dprint_x32("Signature", sig, "Unknown");
@@ -665,13 +669,12 @@ void dump_pe_disasm(adbg_object_t *o, uint flags) {
 	dprint_header("Disassembly");
 	
 	bool all = (flags & DumpOpt.disasm_all) != 0;
-	ushort count = o.i.pe.header.NumberOfSections;
-	for (ushort si; si < count; ++si) {
-		PE_SECTION_ENTRY *entry = &o.i.pe.sections[si];
-		
-		if (all || entry.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE) {
-			dprint_disassemble_object(o, entry.Name.ptr, 8,
-				o.buffer + entry.PointerToRawData, entry.SizeOfRawData,
+	PE_SECTION_ENTRY *section = void;
+	size_t i;
+	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
+		if (all || Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE) {
+			dprint_disassemble_object(o, Name.ptr, 8,
+				o.buffer + PointerToRawData, SizeOfRawData,
 				flags);
 		}
 	}
