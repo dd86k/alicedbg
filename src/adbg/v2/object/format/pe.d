@@ -17,7 +17,7 @@ module adbg.v2.object.format.pe;
 import core.stdc.inttypes;
 import core.stdc.stdlib;
 import adbg.error;
-import adbg.v2.object.server : AdbgObject, adbg_object_t;
+import adbg.v2.object.server : AdbgObject, adbg_object_t, adbg_object_isoutside;
 import adbg.v2.object.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit;
@@ -867,7 +867,7 @@ PE_EXPORT_DESCRIPTOR* adbg_object_pe_export(adbg_object_t *o, size_t index) {
 }
 
 char* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_) {
-	if (o == null) return null;
+	if (o == null || export_ == null) return null;
 	if (o.i.pe.directory == null) return null;
 	if (o.i.pe.directory_exports == null) return null;
 	
@@ -880,18 +880,26 @@ char* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_
 }
 
 char* adbg_object_pe_export_string_hint(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, size_t index) {
-	if (o == null) return null;
+	if (o == null || export_ == null) return null;
 	if (o.i.pe.directory == null) return null;
 	if (o.i.pe.directory_exports == null) return null;
 	if (index >= export_.NumberOfNamePointers) return null;
 	
-	//TODO: Check bounds
+	// NOTE: Export Table bounds
 	// If the address specified is not within the export section (as defined
-	// by the address and length that are indicated in the optional header).
+	// by the address and length that are indicated in the optional header),
+	// 
 	void *base = cast(void*)o.i.pe.directory_exports -
 		o.i.pe.directory.ExportTable.rva;
+	if (adbg_object_isoutside(o, base)) return null;
+	
 	//void *table = base + export_.ExportAddressTable;
-	void *name = base + *cast(uint*)(base + export_.NamePointer);
+	uint *hint = cast(uint*)(base + export_.NamePointer) + index;
+	if (adbg_object_isoutside(o, hint)) return null;
+	
+	void *name = base + *hint;
+	if (adbg_object_isoutside(o, name)) return null;
+	
 	return cast(char*)name;
 }
 

@@ -189,6 +189,12 @@ struct adbg_object_t {
 	adbg_object_internals_t i;
 }
 
+//TODO: Round of implementations for this
+package
+bool adbg_object_isoutside(adbg_object_t *o, void *ptr) {
+	return ptr >= o.buffer + o.file_size;
+}
+
 int adbg_object_open(adbg_object_t *o, const(char) *path, ...) {
 	if (o == null)
 		return adbg_oops(AdbgError.nullArgument);
