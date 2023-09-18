@@ -445,7 +445,7 @@ L_READKEY:
 			buffer[slen] = '\n';
 			buffer[++slen] = 0;
 		}
-		*length = slen;
+		if (length) *length = slen;
 		return buffer.ptr;
 	case Tab: //TODO: auto-complete callback
 	

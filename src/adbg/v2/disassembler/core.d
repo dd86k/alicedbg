@@ -16,6 +16,10 @@ import adbg.platform;
 import adbg.v2.debugger.process : adbg_process_t;
 import adbg.v2.object.machines : AdbgMachine;
 
+version (Win64)
+	version (X86_64)
+		version = Win64_X86_64;
+
 //TODO: Capstone CS_MODE_BIG_ENDIAN
 //      Depending on target endianness, Capstone may need this bit
 
@@ -173,21 +177,11 @@ int adbg_dasm_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 int adbg_dasm_openproc(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
 	AdbgMachine mach;
 	
-	version (Win64) { // Windows + x86-64
-		version (X86_64) {
-			mach = tracee.wow64 ? AdbgMachine.x86 : AdbgMachine.amd64;
-		}
-	}
+	version (Win64_X86_64) // Windows + x86-64
+		mach = tracee.wow64 ? AdbgMachine.x86 : AdbgMachine.amd64;
 	
 	return adbg_dasm_open(dasm, mach);
 }
-
-/* May offer this as an option later
-adbg_disassembler_t* adbg_dasm_allocate() {
-	
-}
-void adbg_dasm_free(adbg_disassembler_t* dasm) {
-}*/
 
 /// Open a disassembler instance.
 /// Params:
@@ -215,6 +209,7 @@ int adbg_dasm_open(adbg_disassembler_t *dasm,
 	if (adbg_dasm_lib_a2cs(cs_arch, cs_mode, machine))
 		return adbg_errno;
 	
+	//TODO: If already opened, close
 	if (cs_open(cs_arch, cs_mode, &dasm.cs_handle))
 		return adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
 	

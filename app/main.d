@@ -10,12 +10,11 @@ module main;
 import adbg.platform;
 import adbg.utils.string : adbg_util_hex_array;
 import adbg.include.c.stdlib : exit;
-import core.stdc.stdlib : malloc, strtol, EXIT_SUCCESS, EXIT_FAILURE;
+import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
-import adbg.v1.debugger : adbg_attach_, adbg_load;
-import adbg.v1.disassembler;
 import common, ui, dumper;
+import shell;
 
 private:
 extern (C):
@@ -93,6 +92,7 @@ struct option_t {
 //TODO: --seh/--no-seh: Enable/disable internal SEH
 //TODO: -B/--disasm-base: base address (useful for COM files / org 0x100)
 //TODO: -e/--dump-skip: skip N bytes (or do +N)
+//TODO: rename --pid to --attach
 immutable option_t[] options = [
 	// general
 	{ 'a', "arch",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
@@ -343,7 +343,9 @@ int cli_help() {
 	"alicedbg - Aiming to be a simple debugger\n"~
 	"\n"~
 	"USAGE\n"~
-	" alicedbg {--pid ID|[--file] FILE|--dump FILE|--analyze HEX} [OPTIONS...]\n"~
+	" alicedbg FILE [OPTIONS...]\n"~
+	" alicedbg --pid ID [OPTIONS...]\n"~
+	" alicedbg --dump FILE [OPTIONS...]\n"~
 	" alicedbg {-h|--help|--version|--license}\n"~
 	"\n"~
 	"OPTIONS"
@@ -517,11 +519,11 @@ int main(int argc, const(char)** argv) {
 	case SettingMode.debugger:
 		switch (globals.ui) {
 		case SettingUI.loop:	return app_loop();
-		case SettingUI.cmd:	return app_cmd();
 		case SettingUI.tcpserver:
 			puts("main: tcp-server not yet supported");
 			return EXIT_FAILURE;
-		default: assert(0);
+		default:
+			return shell_loop;
 		}
 	default: assert(0, "Implement SettingMode");
 	}

@@ -44,44 +44,37 @@ version (Windows) {
 version (linux)
 	version = USE_CLONE;
 
-version (X86)
+version (X86) {
 	private enum opcode_t BREAKPOINT = 0xCC; // INT3
-else version (X86_64)
+	private enum BREAKPOINT_SIZE = 1;
+} else version (X86_64) {
 	private enum opcode_t BREAKPOINT = 0xCC; // INT3
-else version (ARM_Thumb)
+	private enum BREAKPOINT_SIZE = 1;
+} else version (ARM_Thumb) {
 	version (LittleEndian)
 		private enum opcode_t BREAKPOINT = 0xDDBE; // BKPT #221 (0xdd)
 	else
 		private enum opcode_t BREAKPOINT = 0xBEDD; // BKPT #221 (0xdd)
-else version (ARM) {
+	private enum BREAKPOINT_SIZE = 2;
+} else version (ARM) {
 	version (LittleEndian)
 		private enum opcode_t BREAKPOINT = 0x7D0D20E1; // BKPT #221 (0xdd)
 	else
 		private enum opcode_t BREAKPOINT = 0xE1200D7D; // BKPT #221 (0xdd)
+	private enum BREAKPOINT_SIZE = 4;
 } else version (AArch64) {
 	// NOTE: Checked under ODA, endianness seems to be moot
 	version (LittleEndian)
 		private enum opcode_t BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
 	else
 		private enum opcode_t BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
+	private enum BREAKPOINT_SIZE = 4;
 } else
 	static assert(0, "Missing BREAKPOINT value for target platform");
 
 extern (C):
 
-/// Actions that a user function handler may return
-public
-enum AdbgAction {
-	exit,	/// Close the process and stop debugging
-//	close,	/// Close process or detach
-//	stop,	/// Stop debugging
-//	pause,	/// Pause debugging
-	proceed,	/// Continue debugging
-	step,	/// Proceed with a single step
-}
-
 /// Debugger status
-public
 enum AdbgStatus : ubyte {
 	unloaded,	/// No No tracee is loaded.
 	idle = unloaded,	/// Old v1 alias for unloaded.
@@ -550,7 +543,7 @@ int adbg_detach(adbg_process_t *tracee) {
 }
 
 /// Is this process being debugged?
-/// Returns: true if a debugger is attached.
+/// Returns: True if a debugger is attached to this process.
 bool adbg_is_debugged() {
 	version (Windows) {
 		return IsDebuggerPresent() == TRUE;
@@ -836,6 +829,11 @@ int adbg_stepi(adbg_process_t *tracee) {
 		
 		return 0;
 	}
+}
+
+int adbg_process_pid(adbg_process_t *tracee) {
+	if (tracee == null) return 0;
+	return tracee.pid;
 }
 
 //
