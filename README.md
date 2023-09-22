@@ -1,30 +1,54 @@
 # Alice Debugger Project
 
-⚠️ **Early development!** ⚠️
+Aiming to be a simple cross-platform debugger, binary dumper, and memory
+scanner.
 
-⚠️ Currently not accepting Pull Requests ⚠️
+Fully written in D's BetterC mode, and available as a DUB package.
 
-The alicedbg project aims to be a simple debugger, object dumper, and system
-tracer fully compatible in BetterC (-betterC/-fno-druntime).
-
-It is available as an application and as a DUB library.
-
-The current aimed platforms are Windows (msvcrt) and Linux (Glibc, musl).
-
-Application features:
-- Debugging (default mode): Loop and command-line (default) interfaces
-- Dumping (`-D|--dump`): PE32, Mach-O, ELF, and raw blobs.
+Library features:
+- Debugger
+- Disassembler (using Capstone)
+- Object server
 
 Written from scratch for educational purposes.
 
-# Documentation
+## Warnings
 
-The wiki contains user manuals and development notes.
+**This is still lacking most features any debuggers should have.**
 
-| Home | Wiki |
-|---|---|
-| [Gitbucket](https://git.dd86k.space/dd86k/alicedbg) | [URL](https://git.dd86k.space/dd86k/alicedbg/wiki)
-| [Github](https://github.com/dd86k/alicedbg) | [URL](https://github.com/dd86k/alicedbg/wiki)
-| [Gitlab](https://gitlab.com/dd86k/alicedbg) | [URL](https://gitlab.com/dd86k/alicedbg/-/wikis/home)
+Long-term wishlist:
+- Source debugging
+- Windows kernel debugging
+- Linux kernel debugging
+- Embedded debugging
 
-Technical manual: TBA
+There are currently no stable APIs. Every releases to the 0.x series can change
+the API at any given time.
+
+None of the functions are thread-safe.
+
+## Application Usage
+
+The application is split across a few modes.
+
+### Debugger
+
+The debugger is the default operating mode.
+
+In this mode, the default option is to spawn a process with a file path.
+
+To attach to a live process, use the `--pid PID` option, where PID is a
+Process ID.
+
+### Dumper
+
+To invoke the object dumper, use `--dump PATH`, where PATH is a file path to a
+binary image.
+
+## Documentation
+
+See the repository's Wiki for further information.
+
+## License
+
+This project is licensed under the BSD 3-Clause license.
