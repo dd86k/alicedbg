@@ -362,28 +362,35 @@ immutable(command_t)* shell_findcommand(const(char) *ucommand) {
 	return null;
 }
 
-void shell_disasm(size_t address, int count = 1) {
-	enum BUFSIZE = 16;
-	
+void shell_event_disassemble(size_t address, int count = 1) {
 	if (dasm_available == false)
 		return;
 	
 	for (int i; i < count; ++i) {
+		enum BUFSIZE = 16;
 		ubyte[BUFSIZE] data = void;
 		if (adbg_memory_read(&process, address, data.ptr, BUFSIZE)) {
 			oops;
 			return;
 		}
 		adbg_opcode_t op = void;
-		if (adbg_dasm_once(&dasm, &op, data.ptr, BUFSIZE))
-			printf("(error:%s)\n", adbg_error_msg);
-		else
-			printf("%s %s\n", op.mnemonic, op.operands);
+		if (adbg_dasm_once(&dasm, &op, data.ptr, BUFSIZE)) {
+			printf("%8llx (error:%s)\n", cast(ulong)address, adbg_error_msg);
+			return;
+		}
+		
+		printf("%8llx %s", cast(ulong)address, op.mnemonic);
+		
+		if (op.operands)
+			printf(" %s", op.operands);
+		
+		putchar('\n');
+		
 		address += op.size;
 	}
 }
 
-void shell_exception(adbg_exception_t *ex) {
+void shell_event_exception(adbg_exception_t *ex) {
 	printf("*	Process %d thread %d stopped\n"~
 		"	Reason: %s ("~ADBG_OS_ERROR_FORMAT~")\n",
 		ex.pid, ex.tid,
@@ -394,11 +401,11 @@ void shell_exception(adbg_exception_t *ex) {
 		//       so for now, print full.
 		printf("	Fault address: %llx\n", ex.fault_address);
 		printf("	Faulting instruction: ");
-		shell_disasm(ex.faultz);
+		shell_event_disassemble(ex.faultz);
 	}
 }
 
-void shell_help(immutable(command_t) *command) {
+void shell_event_help(immutable(command_t) *command) {
 	with (command.help)
 		printf("%s - %s: %s\n", module_.ptr, category.ptr, command.name.ptr);
 	
@@ -412,6 +419,8 @@ void shell_help(immutable(command_t) *command) {
 		}
 	}
 	
+	//TODO: per-word cut-off (spaces)
+	//      work with section.text.length
 	enum COL = 72;
 	foreach (section; command.help.sections) {
 		printf("\n%s\n", section.name.ptr);
@@ -448,20 +457,17 @@ int command_help(int argc, const(char) **argv) {
 			return ShellError.invalidCommand;
 		}
 		
-		shell_help(command);
+		shell_event_help(command);
 		return 0;
 	}
 	
 	foreach (cmd; commands_list) {
 		if (cmd.alias_)
-			printf("%c, %s", cmd.alias_, cmd.name.ptr);
+			printf(" %c, %-12s", cmd.alias_, cmd.name.ptr);
 		else
-			printf("   %s", cmd.name.ptr);
+			printf("    %-12s", cmd.name.ptr);
 		
-		if (cmd.synopsis.length)
-			printf("%s", cmd.synopsis[0].ptr);
-		
-		putchar('\n');
+		printf(" -- %s\n", cmd.help.description.ptr);
 	}
 	
 	return 0;
