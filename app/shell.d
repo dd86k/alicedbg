@@ -578,7 +578,7 @@ int command_restart(int argc, const(char) **argv) {
 int command_go(int argc, const(char) **argv) {
 	if (adbg_continue(&process))
 		return ShellError.alicedbg;
-	if (adbg_wait(&process, &shell_exception))
+	if (adbg_wait(&process, &shell_event_exception))
 		return ShellError.alicedbg;
 	// Temporary: Cheap hack for process exit
 	if (adbg_status(&process) == AdbgStatus.unloaded)
@@ -595,7 +595,7 @@ int command_kill(int argc, const(char) **argv) {
 int command_stepi(int argc, const(char) **argv) {
 	if (adbg_stepi(&process))
 		return ShellError.alicedbg;
-	if (adbg_wait(&process, &shell_exception))
+	if (adbg_wait(&process, &shell_event_exception))
 		return ShellError.alicedbg;
 	return 0;
 }
@@ -716,7 +716,7 @@ int command_disassemble(int argc, const(char) **argv) {
 		return ShellError.invalidCount;
 	}
 	
-	shell_disasm(cast(size_t)uaddress, ucount);
+	shell_event_disassemble(cast(size_t)uaddress, ucount);
 	return 0;
 }
 

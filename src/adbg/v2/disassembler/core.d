@@ -186,10 +186,11 @@ int adbg_dasm_openproc(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
 }
 import adbg.v2.debugger.exception : adbg_exception_t;
 int adbg_dasm_process_exception(adbg_disassembler_t *dasm, adbg_process_t *tracee, adbg_exception_t *ex, adbg_opcode_t *op) {
+	import adbg.v2.debugger.memory : adbg_memory_read;
 	ubyte[16] data = void;
 	if (adbg_memory_read(tracee, ex.fault_address, data.ptr, 16))
 		return adbg_errno;
-	if (adbg_dasm_once(tracee, op, data.ptr, 16))
+	if (adbg_dasm_once(dasm, op, data.ptr, 16))
 		return adbg_errno;
 	return 0;
 }

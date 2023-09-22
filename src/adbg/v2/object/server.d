@@ -30,6 +30,7 @@ extern (C):
 //      - extent formats to include everyting else, have functions to say type (_is_dump)
 //      - keep format and add a "type/purpose" enum (exec/dump/symbols/etc.)
 //      - do type as first-class and format second
+//TODO: Consider loading only 4K for detection
 
 /// Executable or object format.
 enum AdbgObject {
