@@ -20,7 +20,11 @@ Long-term wishlist:
 - Source debugging
 - Windows kernel debugging
 - Linux kernel debugging
-- Embedded debugging
+- Support embedded platforms
+- Just-In-Time debugging
+
+Under consideration:
+- TUI option
 
 There are currently no stable APIs. Every releases to the 0.x series can change
 the API at any given time.
@@ -40,14 +44,24 @@ In this mode, the default option is to spawn a process with a file path.
 To attach to a live process, use the `--pid PID` option, where PID is a
 Process ID.
 
+Examples:
+- Spawn process
+  - Windows: `alicedbg test.exe`
+  - Posix: `alicedbg ./test`
+- Attach to process: `alicedbg --pid 3428`
+
 ### Dumper
 
 To invoke the object dumper, use `--dump PATH`, where PATH is a file path to a
 binary image.
 
+Examples:
+- Dump headers: `alicedbg --dump alicedbg.exe`
+
 ## Documentation
 
-See the repository's Wiki for further information.
+For information about compilation, internal structures, support,
+see the repository's Wiki for further information.
 
 ## License
 
