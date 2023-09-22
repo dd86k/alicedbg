@@ -50,13 +50,8 @@ void loop_handler(adbg_exception_t *ex) {
 	
 	// Print disassembly if available
 	if (feature_disasm && ex.faultz) {
-		ubyte[16] data = void;
-		if (adbg_memory_read(&process, ex.fault_address, data.ptr, 16)) {
-			printf(" (error:%s)\n", adbg_error_msg);
-			goto L_PROMPT;
-		}
 		adbg_opcode_t op = void;
-		if (adbg_dasm_once(&dasm, &op, data.ptr, 16)) {
+		if (adbg_dasm_process_exception(&dasm, &process, ex, &op)) {
 			printf(" (error:%s)\n", adbg_error_msg);
 			goto L_PROMPT;
 		}

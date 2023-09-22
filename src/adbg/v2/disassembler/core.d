@@ -22,6 +22,7 @@ version (Win64)
 
 //TODO: Capstone CS_MODE_BIG_ENDIAN
 //      Depending on target endianness, Capstone may need this bit
+//TODO: Consider user buffer to opcode struct for multi-buffer support?
 
 version (X86) { // CS_OPT_SYNTAX_DEFAULT
 	private enum {
@@ -174,6 +175,7 @@ int adbg_dasm_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 }
 
 // NOTE: Could have done adbg_process_machine but safer to do this.
+//       would "adbg_process_disassembler" be a better name? (and in process module)
 int adbg_dasm_openproc(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
 	AdbgMachine mach;
 	
@@ -182,6 +184,19 @@ int adbg_dasm_openproc(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
 	
 	return adbg_dasm_open(dasm, mach);
 }
+import adbg.v2.debugger.exception : adbg_exception_t;
+int adbg_dasm_process_exception(adbg_disassembler_t *dasm, adbg_process_t *tracee, adbg_exception_t *ex, adbg_opcode_t *op) {
+	ubyte[16] data = void;
+	if (adbg_memory_read(tracee, ex.fault_address, data.ptr, 16))
+		return adbg_errno;
+	if (adbg_dasm_once(tracee, op, data.ptr, 16))
+		return adbg_errno;
+	return 0;
+}
+
+//TODO: bool adbg_dasm_available()
+//      Try to unconditionally load capstone
+//      or bool adbg_available(FEATURE)
 
 /// Open a disassembler instance.
 /// Params:
@@ -298,8 +313,6 @@ L_ARG:
 	return 0;
 }
 
-//TODO: Consider user buffer to opcode struct for multi-buffer support?
-
 /// Start a disassembler session from user data.
 ///
 /// This is typically used before entering a loop.
@@ -330,7 +343,7 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	dasm.address_last = dasm.address_current;
 	
 	if (cs_disasm_iter(dasm.cs_handle,
-		cast(const(ubyte*)*)&dasm.buffer,
+		cast(const(ubyte*)*)&dasm.buffer, // CS adjusts this
 		&dasm.buffer_size,
 		&dasm.address_base,
 		dasm.cs_inst) == false) {
