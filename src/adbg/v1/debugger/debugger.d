@@ -234,9 +234,6 @@ int adbg_load(const(char) *path, const(char) **argv = null,
 		version (Win64)
 		if (IsWow64Process(g_debuggee.hpid, &g_debuggee.wow64) == FALSE)
 			return adbg_oops(AdbgError.os);
-		
-		if (GetProcessImageFileNameA(g_debuggee.hpid, g_debuggee.execpath.ptr, MAX_PATH) == FALSE)
-			return adbg_oops(AdbgError.os);
 	} else version (Posix) {
 		// Verify if file exists and we has access to it
 		stat_t st = void;

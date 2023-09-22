@@ -5,4 +5,4 @@
 /// License: BSD-3-Clause
 module adbg.v2;
 
-public import adbg.v2.debugger, adbg.v2.disassembler, adbg.v2.object;
+public import adbg.v2.debugger, adbg.v2.disassembler, adbg.v2.object, adbg.error;
