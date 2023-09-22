@@ -3,9 +3,8 @@
 .dub/
 dub*.s
 __dummy.html
-bin/
-docs/
-examples/
+/bin/
+/docs/
 /alicedbg
 alicedbg-test-*
 *.pdb
@@ -21,13 +20,14 @@ alicedbg-test-*
 *.json
 *.log
 
-# C headers, not ready
+# C headers
 /include/
 
-# Personal stuff (e.g., notes)
-/perso/
+# Personal stuff
+/notes/
+/o/
 
-# Commit message (git commit -t)
+# Temporary commit message (git commit -t)
 MSG
 
 # AFL stuff

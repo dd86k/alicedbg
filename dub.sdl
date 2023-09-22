@@ -187,3 +187,29 @@ buildType "afl" {
 	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" platform="ldc"
 }
+
+#
+# ANCHOR Examples
+#
+
+subPackage {
+	name "example-simple-v1"
+	targetType "executable"
+	targetName "simple-v1"
+	sourcePaths "src"
+	importPaths "src"
+	mainSourceFile "examples/simple-v1.d"
+	dependency "bindbc-loader" version="~>1.0.3"
+	subConfiguration "bindbc-loader" "yesBC"
+}
+
+subPackage {
+	name "example-simple-v2"
+	targetType "executable"
+	targetName "simple-v2"
+	sourcePaths "src"
+	importPaths "src"
+	mainSourceFile "examples/simple-v2.d"
+	dependency "bindbc-loader" version="~>1.0.3"
+	subConfiguration "bindbc-loader" "yesBC"
+}

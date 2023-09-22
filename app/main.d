@@ -13,7 +13,7 @@ import adbg.include.c.stdlib : exit;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
-import common, ui, dumper;
+import common, dumper;
 import shell;
 
 private:
@@ -395,7 +395,7 @@ int cli_version() {
 	return 0;
 }
 int cli_ver() {
-	puts(ADBG_VERSION);
+	puts(FULL_VERSION);
 	exit(0);
 	return 0;
 }
@@ -518,7 +518,6 @@ int main(int argc, const(char)** argv) {
 	case SettingMode.dump: return app_dump();
 	case SettingMode.debugger:
 		switch (globals.ui) {
-		case SettingUI.loop:	return app_loop();
 		case SettingUI.tcpserver:
 			puts("main: tcp-server not yet supported");
 			return EXIT_FAILURE;
