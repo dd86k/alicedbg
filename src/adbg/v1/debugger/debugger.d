@@ -42,29 +42,6 @@ version (Windows) {
 version (linux)
 	version = USE_CLONE;
 
-version (X86)
-	private enum opcode_t BREAKPOINT = 0xCC; // INT3
-else version (X86_64)
-	private enum opcode_t BREAKPOINT = 0xCC; // INT3
-else version (ARM_Thumb)
-	version (LittleEndian)
-		private enum opcode_t BREAKPOINT = 0xDDBE; // BKPT #221 (0xdd)
-	else
-		private enum opcode_t BREAKPOINT = 0xBEDD; // BKPT #221 (0xdd)
-else version (ARM) {
-	version (LittleEndian)
-		private enum opcode_t BREAKPOINT = 0x7D0D20E1; // BKPT #221 (0xdd)
-	else
-		private enum opcode_t BREAKPOINT = 0xE1200D7D; // BKPT #221 (0xdd)
-} else version (AArch64) {
-	// NOTE: Checked under ODA, endianness seems to be moot
-	version (LittleEndian)
-		private enum opcode_t BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
-	else
-		private enum opcode_t BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
-} else
-	static assert(0, "Missing BREAKPOINT value for target platform");
-
 extern (C):
 
 /// Actions that a user function handler may return
@@ -109,7 +86,6 @@ struct adbg_debugger_event_t {
 package
 struct debuggee_t {
 	AdbgStatus status;
-	breakpoint_t[ADBG_MAX_BREAKPOINTS] breakpoints;
 	size_t bpindex;	/// breakpoint index
 	/// Set when debuggee was attached to rather than created.
 	/// This is used in the debugger loop.
@@ -126,12 +102,6 @@ struct debuggee_t {
 		pid_t pid;	/// Process ID // @suppress(dscanner.suspicious.label_var_same_name)
 		int mhandle;	/// Memory file handle
 	}
-}
-
-private
-struct breakpoint_t {
-	size_t address;
-	align(4) opcode_t opcode;
 }
 
 version(USE_CLONE)
@@ -638,33 +608,6 @@ L_DEBUG_LOOP:
 		default: assert(0);
 		}
 	}
-}
-
-//
-// Breakpoint handling
-//
-
-int adbg_bp_add(size_t addr) {
-	return adbg_oops(AdbgError.notImplemented);
-	/*if (g_debuggee.bpindex >= ADBG_MAX_BREAKPOINTS - 1)
-		return 2;
-	breakpoint_t *bp = &g_debuggee.breakpoints[g_debuggee.bpindex];
-	assert(0);*/
-}
-breakpoint_t* adbg_bp_index(int index) {
-	return null;
-}
-breakpoint_t* adbg_bp_addr(size_t addr) {
-	return null;
-}
-int adbg_bp_list(breakpoint_t [ADBG_MAX_BREAKPOINTS]*l, uint *n) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_bp_rm_index(int index) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_bp_rm_addr(size_t addr) {
-	return adbg_oops(AdbgError.notImplemented);
 }
 
 

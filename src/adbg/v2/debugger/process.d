@@ -12,16 +12,18 @@
 module adbg.v2.debugger.process;
 
 import adbg.include.c.stdlib : malloc, free;
-import adbg.include.c.stdio;
+import adbg.include.c.stdio : snprintf;
 import adbg.include.c.stdarg;
 import core.stdc.config : c_long;
 import core.stdc.string : memset;
 import adbg.platform, adbg.error;
 import adbg.utils.string : adbg_util_argv_flatten;
-import adbg.v2.debugger.exception;
+import adbg.v2.debugger.exception : adbg_exception_t, adbg_exception_translate;
+import adbg.v2.debugger.breakpoint : adbg_breakpoint_t;
 
-//TODO: alloc process function?
-//      or "adbg_process_t* adbg_process_singleton();" ?
+//TODO: Pause/Resume
+//      Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
+//TODO: List threads
 
 version (Windows) {
 	import core.sys.windows.windows;
@@ -44,36 +46,10 @@ version (Windows) {
 version (linux)
 	version = USE_CLONE;
 
-version (X86) {
-	private enum opcode_t BREAKPOINT = 0xCC; // INT3
-	private enum BREAKPOINT_SIZE = 1;
-} else version (X86_64) {
-	private enum opcode_t BREAKPOINT = 0xCC; // INT3
-	private enum BREAKPOINT_SIZE = 1;
-} else version (ARM_Thumb) {
-	version (LittleEndian)
-		private enum opcode_t BREAKPOINT = 0xDDBE; // BKPT #221 (0xdd)
-	else
-		private enum opcode_t BREAKPOINT = 0xBEDD; // BKPT #221 (0xdd)
-	private enum BREAKPOINT_SIZE = 2;
-} else version (ARM) {
-	version (LittleEndian)
-		private enum opcode_t BREAKPOINT = 0x7D0D20E1; // BKPT #221 (0xdd)
-	else
-		private enum opcode_t BREAKPOINT = 0xE1200D7D; // BKPT #221 (0xdd)
-	private enum BREAKPOINT_SIZE = 4;
-} else version (AArch64) {
-	// NOTE: Checked under ODA, endianness seems to be moot
-	version (LittleEndian)
-		private enum opcode_t BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
-	else
-		private enum opcode_t BREAKPOINT = 0xA01B20D4; // BKPT #221 (0xdd)
-	private enum BREAKPOINT_SIZE = 4;
-} else
-	static assert(0, "Missing BREAKPOINT value for target platform");
-
 extern (C):
 
+//TODO: Deprecate debugger status and replace with process status
+//      In a way, it's already the case, but it's not being presented as such
 /// Debugger status
 enum AdbgStatus : ubyte {
 	unloaded,	/// No No tracee is loaded.
@@ -127,15 +103,9 @@ struct adbg_process_t {
 	/// 
 	AdbgCreation creation;
 	/// List of breakpoints.
-	breakpoint_t[ADBG_MAX_BREAKPOINTS] bp_list;
+	adbg_breakpoint_t *breakpoints;
 	/// Breakpoint index.
-	size_t bp_index;
-}
-
-private
-struct breakpoint_t {
-	size_t address;
-	align(4) opcode_t opcode;
+	size_t breakpoint_index;
 }
 
 version(USE_CLONE)
@@ -544,7 +514,7 @@ int adbg_detach(adbg_process_t *tracee) {
 
 /// Is this process being debugged?
 /// Returns: True if a debugger is attached to this process.
-bool adbg_is_debugged() {
+bool adbg_self_is_debugged() {
 	version (Windows) {
 		return IsDebuggerPresent() == TRUE;
 	} else version (linux) { // https://stackoverflow.com/a/24969863
@@ -596,7 +566,7 @@ bool adbg_is_debugged() {
 //      Or in tests/
 
 /// Insert a tracee break.
-void adbg_break() {
+void adbg_self_break() {
 	version (Windows) {
 		DebugBreak();
 	} else version (Posix) {
@@ -611,9 +581,13 @@ AdbgStatus adbg_status(adbg_process_t *tracee) pure {
 	return tracee.status;
 }
 
-/// Enter the debugging loop. Continues execution of the process until a new
+/// Enter the debugging loop.
+///
+/// Continues execution of the process until a new
 /// debug event occurs. When an exception occurs, the exception_t structure is
 /// populated with debugging information.
+///
+/// This call is blocking.
 ///
 /// Windows: Uses WaitForDebugEvent, filters anything but EXCEPTION_DEBUG_EVENT.
 /// Posix: Uses ptrace(2) and waitpid(2), filters SIGCONT out.
@@ -734,6 +708,8 @@ L_UNLOADED:
 	tracee.creation = AdbgCreation.unloaded;
 	return 0;
 }
+
+
 int adbg_end(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.nullArgument);
@@ -743,6 +719,8 @@ int adbg_end(adbg_process_t *tracee) {
 	return tracee.creation == AdbgCreation.attached ?
 		adbg_detach(tracee) : adbg_terminate(tracee);
 }
+
+
 int adbg_terminate(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.nullArgument);
@@ -761,6 +739,8 @@ int adbg_terminate(adbg_process_t *tracee) {
 	}
 	return 0;
 }
+
+
 int adbg_continue(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.nullArgument);
@@ -785,6 +765,8 @@ int adbg_continue(adbg_process_t *tracee) {
 	
 	return 0;
 }
+
+
 int adbg_stepi(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.nullArgument);
@@ -831,33 +813,8 @@ int adbg_stepi(adbg_process_t *tracee) {
 	}
 }
 
+
 int adbg_process_pid(adbg_process_t *tracee) {
 	if (tracee == null) return 0;
 	return tracee.pid;
-}
-
-//
-// Breakpoint handling
-//
-
-int adbg_breakpoint_add(adbg_process_t *tracee, size_t addr) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_breakpoint_get(adbg_process_t *tracee, breakpoint_t *bp, int index) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_breakpoint_present_at(adbg_process_t *tracee, breakpoint_t *bp, size_t addr) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_breakpoint_list(adbg_process_t *tracee, breakpoint_t **l, uint *n) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_breakpoint_rm(adbg_process_t *tracee, int index) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_breakpoint_rm_at(adbg_process_t *tracee, size_t addr) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_breakpoint_rm_all(adbg_process_t *tracee) {
-	return adbg_oops(AdbgError.notImplemented);
 }

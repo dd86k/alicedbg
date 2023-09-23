@@ -47,19 +47,14 @@ else  enum __BUILDTYPE__ = "release";	/// Ditto
 
 version (X86) {
 	enum TARGET_PLATFORM = "x86";	/// Platform ABI string
-	public alias opcode_t = ubyte;
 } else version (X86_64) {
 	enum TARGET_PLATFORM = "x86_64";	/// Ditto
-	public alias opcode_t = ubyte;
 } else version (ARM_Thumb) {
 	enum TARGET_PLATFORM = "arm_t32";	/// Ditto
-	public alias opcode_t = ushort;
 } else version (ARM) {
 	enum TARGET_PLATFORM = "arm_a32";	/// Ditto
-	public alias opcode_t = uint;
 } else version (AArch64) {
 	enum TARGET_PLATFORM = "arm_a64";	/// Ditto
-	public alias opcode_t = uint;
 }
 else
 	static assert(0, "Platform not supported.");
