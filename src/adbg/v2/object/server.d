@@ -190,9 +190,9 @@ struct adbg_object_t {
 	adbg_object_internals_t i;
 }
 
-//TODO: Round of implementations for this
+// Internal: Check if pointer is outside of file
 package
-bool adbg_object_isoutside(adbg_object_t *o, void *ptr) {
+bool adbg_object_poutside(adbg_object_t *o, void *ptr) {
 	return ptr >= o.buffer + o.file_size;
 }
 
@@ -217,7 +217,14 @@ void adbg_object_close(adbg_object_t *o) {
 	case mz:
 		with (o.i.mz) if (reversed_relocs) free(reversed_relocs);
 		break;
-	//case pe:
+	case pe:
+		with (o.i.pe) {
+			if (reversed_sections) free(reversed_sections);
+			if (reversed_dir_exports) free(reversed_dir_exports);
+			if (reversed_dir_imports) free(reversed_dir_imports);
+			if (reversed_dir_debug) free(reversed_dir_debug);
+		}
+		break;
 	case macho:
 		with (o.i.macho) {
 		if (reversed_fat_arch) free(reversed_fat_arch);
