@@ -9,7 +9,7 @@
 /// License: BSD-3-Clause
 module adbg.v2.object.format.elf;
 
-import adbg.v2.object.server : adbg_object_t, AdbgObject;
+import adbg.v2.object.server;
 import adbg.v2.object.machines : AdbgMachine;
 import adbg.error;
 import adbg.utils.bit;
@@ -48,8 +48,8 @@ extern (C):
 enum ELF_EI_NIDENT	= 16;	/// Size of the initial pad (e_ident[])
 
 // ELF Indexes
-
 // 0..3 is "ELF\0" magic
+
 enum ELF_EI_CLASS	= 4;	/// Class index
 enum ELF_EI_DATA	= 5;	/// Data index
 enum ELF_EI_VERSION	= 6;	/// File version index
@@ -695,6 +695,8 @@ int adbg_object_elf_load(adbg_object_t *o) {
 					return adbg_oops(AdbgError.assertion);
 				}
 				phdr = cast(Elf32_Phdr*)(o.buffer + ehdr.e_phoff);
+				if (adbg_object_poutside(o, phdr))
+					return adbg_oops(AdbgError.assertion);
 				reversed_phdr = cast(bool*)calloc(ehdr.e_phnum, bool.sizeof);
 				if (reversed_phdr == null)
 					return adbg_oops(AdbgError.crt);
@@ -707,6 +709,8 @@ int adbg_object_elf_load(adbg_object_t *o) {
 					return adbg_oops(AdbgError.assertion);
 				}
 				shdr = cast(Elf32_Shdr*)(o.buffer + ehdr.e_shoff);
+				if (adbg_object_poutside(o, shdr))
+					return adbg_oops(AdbgError.assertion);
 				reversed_shdr = cast(bool*)calloc(ehdr.e_shnum, bool.sizeof);
 				if (reversed_shdr == null)
 					return adbg_oops(AdbgError.crt);
@@ -742,6 +746,8 @@ int adbg_object_elf_load(adbg_object_t *o) {
 					return adbg_oops(AdbgError.assertion);
 				}
 				phdr = cast(Elf64_Phdr*)(o.buffer + ehdr.e_phoff);
+				if (adbg_object_poutside(o, phdr))
+					return adbg_oops(AdbgError.assertion);
 				reversed_phdr = cast(bool*)calloc(ehdr.e_phnum, bool.sizeof);
 				if (reversed_phdr == null)
 					return adbg_oops(AdbgError.crt);
@@ -754,6 +760,8 @@ int adbg_object_elf_load(adbg_object_t *o) {
 					return adbg_oops(AdbgError.assertion);
 				}
 				shdr = cast(Elf64_Shdr*)(o.buffer + ehdr.e_shoff);
+				if (adbg_object_poutside(o, shdr))
+					return adbg_oops(AdbgError.assertion);
 				reversed_shdr = cast(bool*)calloc(ehdr.e_shnum, bool.sizeof);
 				if (reversed_shdr == null)
 					return adbg_oops(AdbgError.crt);
@@ -828,6 +836,7 @@ Elf64_Phdr* adbg_object_elf_phdr64(adbg_object_t *o, size_t index) {
 	if (o == null) return null;
 	if (o.i.elf64.phdr == null) return null;
 	if (index >= o.i.elf64.ehdr.e_phnum) return null;
+	
 	Elf64_Phdr *phdr = &o.i.elf64.phdr[index];
 	if (o.p.reversed && o.i.elf64.reversed_phdr[index] == false) {
 		phdr.p_type	= adbg_bswap32(phdr.p_type);
@@ -847,6 +856,7 @@ Elf64_Shdr* adbg_object_elf_shdr64(adbg_object_t *o, size_t index) {
 	if (o == null) return null;
 	if (o.i.elf64.shdr == null) return null;
 	if (index >= o.i.elf64.ehdr.e_shnum) return null;
+	
 	Elf64_Shdr *shdr = &o.i.elf64.shdr[index];
 	if (o.p.reversed && o.i.elf64.reversed_phdr[index] == false) {
 		shdr.sh_name	= adbg_bswap32(shdr.sh_name);
