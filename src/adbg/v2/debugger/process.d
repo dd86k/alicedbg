@@ -372,17 +372,16 @@ private int adbg_linux_child(void* arg) {
 	return adbg_oops(AdbgError.os);
 }
 
-enum {
+enum AdbgAttachOpt {
 	/// Continue execution when attached.
 	/// Type: none
 	/// Default: false
-	ADBG_ATTACH_OPT_CONTINUE = 1,
+	continue_ = 1,
 	/// Kill tracee when debugger exits.
 	/// Type: none
 	/// Default: false
-	ADBG_ATTACH_OPT_EXITKILL = 2,
-	// Only accept these exceptions.
-	//ADBG_ATTACH_OPT_FILTER = 3
+	exitkill = 2,
+	//filter = 3,
 }
 
 /// Attach the debugger to a process ID.
@@ -401,14 +400,14 @@ int adbg_attach(adbg_process_t *tracee, int pid, ...) {
 	bool exitkill;	// kill child if debugger quits
 	
 	va_list list = void;
-	va_arg(list, pid);
+	va_start(list, pid);
 	
 L_OPTION:
 	switch (va_arg!int(list)) {
-	case ADBG_ATTACH_OPT_CONTINUE:
+	case AdbgAttachOpt.continue_:
 		continue_ = true;
 		goto L_OPTION;
-	case ADBG_ATTACH_OPT_EXITKILL:
+	case AdbgAttachOpt.exitkill:
 		exitkill = true;
 		goto L_OPTION;
 	default:
