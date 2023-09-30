@@ -27,6 +27,13 @@ enum ShellError {
 	missingOption	= -7,
 	unformat	= -8,
 	invalidCount	= -9,
+	
+	scanMissingType	= -20,
+	scanMissingValue	= -21,
+	scanInputOutOfRange	= -22,
+	scanNoScan	= -23,
+	scanInvalidSubCommand	= -24,
+	
 	crt	= -1000,
 	alicedbg	= -1001,
 }
@@ -53,6 +60,18 @@ const(char) *errorstring(ShellError code) {
 		return "Input is not a number.";
 	case invalidCount:
 		return "Count must be 1 or higher.";
+	
+	case scanMissingType:
+		return "Missing type parameter.";
+	case scanMissingValue:
+		return "Missing value parameter.";
+	case scanInputOutOfRange:
+		return "Value out of range.";
+	case scanNoScan:
+		return "No prior scan were initiated.";
+	case scanInvalidSubCommand:
+		return "Invalid type or subcommand.";
+	
 	case none:
 		return "No error occured.";
 	default:
@@ -311,7 +330,7 @@ immutable command_t[] commands_list = [
 		},
 		&command_disassemble,
 	},
-	/*{
+	{
 		0, "scan", [
 			"TYPE VALUE"
 		],
@@ -320,7 +339,7 @@ immutable command_t[] commands_list = [
 			"Scan for value in memory."
 		},
 		&command_scan,
-	},*/
+	},
 	//
 	// Shell
 	//
@@ -717,6 +736,145 @@ int command_disassemble(int argc, const(char) **argv) {
 	}
 	
 	shell_event_disassemble(cast(size_t)uaddress, ucount);
+	return 0;
+}
+
+__gshared size_t last_scan_size;
+__gshared ulong last_scan_data;
+__gshared adbg_scan_t *last_scan;
+
+void shell_event_list_scan_results() {
+	// super lazy hack
+	long mask = void;
+	switch (last_scan_size) {
+	case 8: mask = 0; break;
+	case 7: mask = 0xff_ffff_ffff_ffff; break;
+	case 6: mask = 0xffff_ffff_ffff; break;
+	case 5: mask = 0xff_ffff_ffff; break;
+	case 4: mask = 0xffff_ffff; break;
+	case 3: mask = 0xff_ffff; break;
+	case 2: mask = 0xffff; break;
+	case 1: mask = 0xff; break;
+	default:
+		puts("mask fail");
+		return;
+	}
+	//    ffffffffffffffff  ffffffffffffffff  ffffffffffffffff
+	puts("Address           Previous          Current");
+	adbg_scan_result_t *result = last_scan.results;
+	for (size_t i; i < last_scan.result_count; ++i, ++result) {
+		printf("%-16llx  %-16llu  ", result.address, result.value_u64 & mask);
+		ulong udata = void;
+		if (adbg_memory_read(&process, cast(size_t)result.address, &udata, cast(uint)last_scan_size))
+			puts("???");
+		else
+			printf("%llu\n", udata & mask);
+	}
+}
+
+int command_scan(int argc, const(char) **argv) {
+	if (argc < 2)
+		return ShellError.scanMissingType;
+	
+	const(char) *usub = argv[1];
+	
+	if (strcmp(usub, "list") == 0) {
+		if (last_scan == null)
+			return ShellError.scanNoScan;
+		
+		shell_event_list_scan_results;
+		return 0;
+	} else if (strcmp(usub, "clear") == 0) {
+		if (last_scan == null)
+			return 0;
+		
+		adbg_memory_scan_close(last_scan);
+		last_scan = null;
+		return 0;
+	}
+	
+	if (argc < 3)
+		return ShellError.scanMissingValue;
+	
+	const(char) *uin = argv[2];
+	
+	union u {
+		long data64;
+		int data;
+	}
+	u user;
+	if (strcmp(usub, "byte") == 0) {
+		last_scan_size = ubyte.sizeof;
+		unformat(&user.data, uin);
+		if (user.data > ubyte.max)
+			return ShellError.scanInputOutOfRange;
+	} else if (strcmp(usub, "short") == 0) {
+		last_scan_size = short.sizeof;
+		unformat(&user.data, uin);
+		if (user.data > short.max)
+			return ShellError.scanInputOutOfRange;
+	} else if (strcmp(usub, "int") == 0) {
+		last_scan_size = int.sizeof;
+		unformat(&user.data, uin);
+	} else if (strcmp(usub, "long") == 0) {
+		last_scan_size = long.sizeof;
+		unformat64(&user.data64, uin);
+	} else
+		return ShellError.scanInvalidSubCommand;
+	
+	if (last_scan)
+		adbg_memory_scan_close(last_scan);
+	
+	last_scan_data = user.data64;
+	
+	if ((last_scan = adbg_memory_scan(&process, &user, last_scan_size,
+		AdbgScanOpt.capacity, 100,
+		0)) == null)
+		return ShellError.alicedbg;
+	
+	printf("Scan completed with %u results.\n", cast(uint)last_scan.result_count);
+	return 0;
+}
+
+int command_rescan(int argc, const(char) **argv) {
+	if (argc < 2)
+		return ShellError.scanMissingType;
+	if (argc < 3)
+		return ShellError.scanMissingValue;
+	
+	const(char) *usub = argv[1];
+	const(char) *uin = argv[2];
+	
+	union u {
+		long data64;
+		int data;
+	}
+	u user;
+	if (strcmp(usub, "byte") == 0) {
+		last_scan_size = ubyte.sizeof;
+		unformat(&user.data, uin);
+		if (user.data > ubyte.max)
+			return ShellError.scanInputOutOfRange;
+	} else if (strcmp(usub, "short") == 0) {
+		last_scan_size = short.sizeof;
+		unformat(&user.data, uin);
+		if (user.data > short.max)
+			return ShellError.scanInputOutOfRange;
+	} else if (strcmp(usub, "int") == 0) {
+		last_scan_size = int.sizeof;
+		unformat(&user.data, uin);
+	} else if (strcmp(usub, "long") == 0) {
+		last_scan_size = long.sizeof;
+		unformat64(&user.data64, uin);
+	} else
+		return ShellError.scanInvalidSubCommand;
+	
+	if (adbg_memory_rescan(last_scan, &user, last_scan_size))
+		return ShellError.alicedbg;
+	
+	last_scan_data = user.data64;
+	
+	printf("Scan completed with %u results.\n", cast(uint)last_scan.result_count);
 	return 0;
 }
 

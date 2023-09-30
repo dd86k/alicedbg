@@ -465,12 +465,19 @@ private bool adbg_mem_cmp_other(void *v, void *c, size_t l) pure {
 
 /// Options for adbg_memory_scan.
 enum AdbgScanOpt {
-	/// 
+	/// Unaligned memory scans take a lot more time
+	/// Type: bool
+	/// Default: false
 	unaligned	= 1,
-	/// Rescan results only.
-	rescan	= 2,
+	/// Set the initial capacity for results, other than the default.
+	///
+	/// Currently, the capacity does not increase dynamically.
+	///
+	/// Note: Currently, one entry is 24 Bytes.
+	/// Type: int
+	/// Default: 20_000
+	capacity	= 3,
 	// Report progress to callback.
-	//
 	// Callback will report: stage name and a percentage on modules scanned.
 	//progress_cb
 	// Rescan this list instead. Don't forget to pass rescanListCount too.
@@ -483,11 +490,12 @@ enum AdbgScanOpt {
 }
 
 struct adbg_scan_t {
-	uint magic;
-	adbg_memory_map_t *maps;
-	size_t map_count;
+	adbg_process_t *process;
 	adbg_scan_result_t *results;
 	size_t result_count;
+	
+	adbg_memory_map_t *maps;
+	size_t map_count;
 }
 struct adbg_scan_result_t {
 	ulong address;
@@ -499,8 +507,6 @@ struct adbg_scan_result_t {
 		ubyte value__u8;
 	}
 }
-/// Default amount of items to allocate.
-private enum DEFAULT_BUFFER_SIZE = 20_000;
 
 /// Scan debuggee process memory for a specific value.
 ///
@@ -526,52 +532,66 @@ private enum DEFAULT_BUFFER_SIZE = 20_000;
 ///
 /// Params:
 /// 	tracee = Tracee, in the ready or paused state.
-///	scan = Scanner status.
 /// 	data = Reference to user data.
 /// 	size = Reference to user data size.
 /// 	... = Options.
 ///
-/// Returns: Error code.
-int adbg_memory_scan(adbg_process_t *tracee, adbg_scan_t *scan,
-	void* data, size_t size, ...) {
+/// Returns: An instance of the scanner or null on error.
+adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t size, ...) {
 	import adbg.v2.debugger.process : AdbgStatus;
 	
-	// Check
-	if (tracee == null || scan == null || data == null)
-		return adbg_oops(AdbgError.nullArgument);
-	if (size == 0)
-		return adbg_oops(AdbgError.scannerDataEmpty);
-	if (size > 8)
-		return adbg_oops(AdbgError.scannerDataLimit);
+	// Initial check and setup
+	if (tracee == null || data == null) {
+		adbg_oops(AdbgError.nullArgument);
+		return null;
+	}
+	if (size == 0) {
+		adbg_oops(AdbgError.scannerDataEmpty);
+		return null;
+	}
+	if (size > 8) {
+		adbg_oops(AdbgError.scannerDataLimit);
+		return null;
+	}
 	
 	// Check debugger status
 	switch (tracee.status) with (AdbgStatus) {
 	case standby, paused, running: break;
 	default:
-		return adbg_oops(AdbgError.notPaused);
+		adbg_oops(AdbgError.notPaused);
+		return null;
 	}
 	
-	// Get options
+	// Set options
 	va_list list = void;
 	va_start(list, size);
-	bool rescan;
+	int capacity = 20_000; /// Default amount of items to allocate.
 L_OPT:
 	switch (va_arg!int(list)) {
 	case 0: break;
-	case AdbgScanOpt.rescan:
-		rescan = va_arg!bool(list);
+	case AdbgScanOpt.capacity:
+		capacity = va_arg!int(list);
 		goto L_OPT;
 	default:
-		return adbg_oops(AdbgError.invalidOption);
+		adbg_oops(AdbgError.invalidOption);
+		return null;
 	}
 	
-	// Get maps
-	int e = adbg_memory_maps(tracee, &scan.maps, &scan.map_count, 0);
-	if (e) return e;
+	// Initial setup
+	adbg_scan_t *scanner = cast(adbg_scan_t*)malloc(adbg_scan_t.sizeof);
+	if (scanner == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	scanner.process = tracee;
+	
+	// Get memory maps
+	if (adbg_memory_maps(tracee, &scanner.maps, &scanner.map_count, 0))
+		return null;
 	
 	// Get optimized compare func if able
-	extern (C)
-	bool function(void*, void*, size_t) cmp = void;
+	//TODO: Comparer struct
+	extern (C) bool function(void*, void*, size_t) cmp = void;
 	switch (size) {
 	case ulong.sizeof:	cmp = &adbg_mem_cmp_u64; break;
 	case uint.sizeof:	cmp = &adbg_mem_cmp_u32; break;
@@ -581,65 +601,139 @@ L_OPT:
 	}
 	
 	// Make result list
-	scan.results = cast(adbg_scan_result_t*)calloc(DEFAULT_BUFFER_SIZE, adbg_scan_result_t.sizeof);
-	if (scan.results == null) {
-		free(scan.maps);
-		return adbg_oops(AdbgError.os);
+	scanner.results = cast(adbg_scan_result_t*)calloc(capacity, adbg_scan_result_t.sizeof);
+	if (scanner.results == null) {
+		adbg_memory_scan_close(scanner);
+		adbg_oops(AdbgError.crt);
+		return null;
 	}
 	
 	// Make read buffer
-	ubyte *buffer = cast(ubyte*)malloc(size); /// Read buffer
-	if (buffer == null) {
-		free(scan.maps);
-		return adbg_oops(AdbgError.os);
+	ubyte *read_buffer = cast(ubyte*)malloc(size);
+	if (read_buffer == null) {
+		adbg_memory_scan_close(scanner);
+		adbg_oops(AdbgError.crt);
+		return null;
 	}
 	
-	// New scan: Scan per memory regions
-	size_t i;
+	version (Trace) trace("modules=%u", cast(uint)scanner.map_count);
+	
+	// New scan: Scan per memory region
 	enum PERMS = AdbgMemPerm.readWrite; /// Minimum permission access
-	scan.result_count = 0;
-	L_MODULE: for (size_t mi; mi < scan.map_count; ++mi) {
-		adbg_memory_map_t *map = &scan.maps[mi];
+	uint read_size = cast(uint)size;
+	size_t i;
+	scanner.result_count = 0;
+	L_MODULE: for (size_t mi; mi < scanner.map_count; ++mi) {
+		adbg_memory_map_t *map = &scanner.maps[mi];
 		
-		if ((map.access & PERMS) != PERMS)
-			continue; //TODO: trace
+		version (Trace) trace("perms=%x", map.access);
+		
+		//if ((map.access & PERMS) != PERMS)
+		//	continue; //TODO: trace
 		
 		//TODO: Module detection
+		//      Scan through read+write non-exec sections
 		
 		void* start = map.base;
 		void* end   = start + map.size;
 		
-		// Aligned, for now
+		version (Trace) trace("start=%p end=%p", start, end);
+		
+		// Aligned reads for now
 		for (; start + size < end; start += size) {
 			// Read into buffer
-			if (adbg_memory_read(tracee, cast(size_t)start, buffer, cast(uint)size)) {
-				//TODO: trace()
+			if (adbg_memory_read(tracee, cast(size_t)start, read_buffer, read_size)) {
+				version (Trace)
+					trace("read failed for %.512s", map.name.ptr);
 				continue L_MODULE;
 			}
 			
 			// Different data
-			if (cmp(buffer, data, size))
-				//TODO: trace()?
+			if (cmp(read_buffer, data, size)) {
 				continue;
+			}
 			
-			adbg_scan_result_t *result = &scan.results[i++];
+			adbg_scan_result_t *result = &scanner.results[i++];
 			result.address = cast(ulong)start;
 			result.map = map;
-			memcpy(&result.value_u64, buffer, size);
+			memcpy(&result.value_u64, read_buffer, size);
 			
 			// No more entries can be inserted
-			if (i >= DEFAULT_BUFFER_SIZE)
+			if (i >= capacity)
 				break L_MODULE;
 		}
 	}
+	scanner.result_count = i;
 	
-	free(buffer); // Clear read buffer
-	return 0;
+	version (Trace) trace("results=%u", cast(uint)i);
+	
+	free(read_buffer); // Clear read buffer
+	return scanner;
 }
 
-void adbg_memory_scan_close(adbg_scan_t *scan) {
-	if (scan == null) return;
-	if (scan.maps) free(scan.maps);
-	if (scan.results) free(scan.results);
-	scan.result_count = 0;
+int adbg_memory_rescan(adbg_scan_t *scanner, void* data, size_t size) {
+	// Initial check and setup
+	if (scanner == null || data == null)
+		return adbg_oops(AdbgError.nullArgument);
+	if (size == 0)
+		return adbg_oops(AdbgError.scannerDataEmpty);
+	if (size > 8)
+		return adbg_oops(AdbgError.scannerDataLimit);
+	if (scanner.result_count == 0)
+		return 0;
+	// No prior scan performed
+	if (scanner.process == null || scanner.map_count == 0) {
+		scanner.result_count = 0;
+		return 0;
+	}
+	
+	// Make read buffer
+	ubyte *read_buffer = cast(ubyte*)malloc(size);
+	if (read_buffer == null)
+		return adbg_oops(AdbgError.crt);
+	
+	// Get optimized compare func if able
+	extern (C) bool function(void*, void*, size_t) cmp = void;
+	switch (size) {
+	case ulong.sizeof:	cmp = &adbg_mem_cmp_u64; break;
+	case uint.sizeof:	cmp = &adbg_mem_cmp_u32; break;
+	case ushort.sizeof:	cmp = &adbg_mem_cmp_u16; break;
+	case ubyte.sizeof:	cmp = &adbg_mem_cmp_u8; break;
+	default:		cmp = &adbg_mem_cmp_other;
+	}
+	
+	uint read_size = cast(uint)size;
+	// Strategy is to move items if we find a different value
+	for (size_t i; i < scanner.result_count; ++i) {
+		adbg_scan_result_t *result = &scanner.results[i];
+		
+		// Read into buffer
+		// On fail: Could be that module was unloaded
+		if (adbg_memory_read(scanner.process, cast(size_t)result.address, read_buffer, read_size)) {
+			//TODO: trace()
+			goto L_MOVE;
+		}
+		
+		// Same data?
+		if (cmp(read_buffer, &result.value_u64, size) == 0) {
+			//TODO: trace()?
+			continue;
+		}
+		
+		// If data couldn't be read, or is different, then move results
+	L_MOVE:
+		size_t c = --scanner.result_count;
+		for (size_t ri = i; ri < c; ++ri) {
+			memcpy(result, result + 1, adbg_scan_result_t.sizeof);
+		}
+	}
+	
+	return adbg_oops(AdbgError.unimplemented);
+}
+
+void adbg_memory_scan_close(adbg_scan_t *scanner) {
+	if (scanner == null) return;
+	if (scanner.maps) free(scanner.maps);
+	if (scanner.results) free(scanner.results);
+	free(scanner);
 }
