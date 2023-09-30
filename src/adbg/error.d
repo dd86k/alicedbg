@@ -90,6 +90,7 @@ enum AdbgError {
 	// 400-499: Debugger memory operations
 	//
 	scannerDataEmpty	= 400,
+	scannerDataLimit	= 401,
 	//
 	// 1000-1999: Misc
 	//
@@ -101,8 +102,8 @@ enum AdbgError {
 	// 2000-2999: External
 	//            Libraries have their own error facilities
 	//
-	crt	= 2001,
-	os	= 2002,
+	os	= 2001,
+	crt	= 2002,
 	libLoader	= 2003,
 	libCapstone	= 2004,
 }
@@ -158,8 +159,8 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	// Memory subsystem
 	//
-	// Could be a warning?
-	{ AdbgError.scannerDataEmpty, "Size of data given to memory scanner is zero." },
+	{ AdbgError.scannerDataEmpty, "Size of data given to memory scanner is empty." },
+	{ AdbgError.scannerDataLimit, "Size of data given to memory scanner is too high." },
 	//
 	// Misc.
 	//
