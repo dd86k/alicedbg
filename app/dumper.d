@@ -120,7 +120,8 @@ int app_dump() {
 	return EXIT_FAILURE;
 }
 
-//TODO: Rename as dprint_xxx ?
+//TODO: dprint_group_start(name)/dprint_group_end
+//TODO: Consider struct DumperPrinter or similar
 
 private enum FORMAT_FIELD = "  %-30s:  ";
 

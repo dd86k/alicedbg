@@ -25,6 +25,7 @@ Long-term wishlist:
 
 Under consideration:
 - TUI option
+- Addon system (either Lua, Squirrel, DMDScript, or AngelScript)
 
 There are currently no stable APIs. Every releases to the 0.x series can change
 the API at any given time.
