@@ -98,6 +98,9 @@ int shell_loop() {
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
 		} else dasm_available = true;
+		
+		if (globals.syntax && dasm_available)
+			adbg_dasm_options(&dasm, AdbgDasmOption.syntax, globals.syntax, 0);
 	}
 	
 	term_init;
@@ -151,6 +154,7 @@ __gshared const(char) **last_spawn_argv;
 
 __gshared void function(const(char)* sev, const(char)* msg) userlog;
 
+//TODO: Shell logging
 void serror(const(char) *fmt, ...) {
 	if (userlog == null) return;
 	
@@ -160,7 +164,34 @@ void slog(const(char) *msg) {
 	
 }
 
-immutable string RCFILE = ".alicedbgrc";
+immutable string RCFILE = ".adbgrc";
+
+/*enum HelpModule : ubyte {
+	debugger,
+	disassembler,
+	object,
+}
+enum HelpCategory : ubyte {
+	shell,
+	process,
+	
+}
+enum HelpSection : ubyte {
+	synopsis,
+	description,
+	notes,
+	examples,
+}
+
+immutable string shell_help_module(int category) {
+	switch (category) with (HelpModule) {
+	
+	}
+}
+immutable string shell_help_category(int category) {
+}
+immutable string shell_help_section(int category) {
+}*/
 
 immutable string MOD_SHELL = "Shell";
 immutable string MOD_DEBUGGER = "Debugger";
@@ -467,6 +498,8 @@ int command_status(int argc, const(char) **argv) {
 	return 0;
 }
 
+//TODO: List per category
+//      Comparing could be per pointer or enum
 int command_help(int argc, const(char) **argv) {
 	if (argc > 1) { // Requesting help article for command
 		const(char) *ucommand = argv[1];
@@ -480,13 +513,14 @@ int command_help(int argc, const(char) **argv) {
 		return 0;
 	}
 	
+	enum PADDING = 20;
+	static immutable const(char) *liner = "..........................................";
 	foreach (cmd; commands_list) {
-		if (cmd.alias_)
-			printf(" %c, %-12s", cmd.alias_, cmd.name.ptr);
-		else
-			printf("    %-12s", cmd.name.ptr);
+		int p = cmd.alias_ ?
+			printf(" %c, %s", cmd.alias_, cmd.name.ptr) :
+			printf("    %s", cmd.name.ptr);
 		
-		printf(" -- %s\n", cmd.help.description.ptr);
+		printf(" %.*s %s\n", PADDING - p, liner, cmd.help.description.ptr);
 	}
 	
 	return 0;
@@ -756,14 +790,14 @@ void shell_event_list_scan_results() {
 	case 2: mask = 0xffff; break;
 	case 1: mask = 0xff; break;
 	default:
-		puts("mask fail");
+		puts("fatal: mask fail");
 		return;
 	}
-	//    ffffffffffffffff  ffffffffffffffff  ffffffffffffffff
-	puts("Address           Previous          Current");
+	//    ffffffffffffffff  18446744073709551615
+	puts("Address           Previous              Current");
 	adbg_scan_result_t *result = last_scan.results;
-	for (size_t i; i < last_scan.result_count; ++i, ++result) {
-		printf("%-16llx  %-16llu  ", result.address, result.value_u64 & mask);
+	for (uint i; i < last_scan.result_count; ++i, ++result) {
+		printf("%u %-16llx  %-20llu  ", i, result.address, result.value_u64 & mask);
 		ulong udata = void;
 		if (adbg_memory_read(&process, cast(size_t)result.address, &udata, cast(uint)last_scan_size))
 			puts("???");
@@ -802,23 +836,27 @@ int command_scan(int argc, const(char) **argv) {
 		long data64;
 		int data;
 	}
-	u user;
+	u user = void;
 	if (strcmp(usub, "byte") == 0) {
 		last_scan_size = ubyte.sizeof;
-		unformat(&user.data, uin);
+		if (unformat(&user.data, uin))
+			return ShellError.unformat;
 		if (user.data > ubyte.max)
 			return ShellError.scanInputOutOfRange;
 	} else if (strcmp(usub, "short") == 0) {
 		last_scan_size = short.sizeof;
-		unformat(&user.data, uin);
+		if (unformat(&user.data, uin))
+			return ShellError.unformat;
 		if (user.data > short.max)
 			return ShellError.scanInputOutOfRange;
 	} else if (strcmp(usub, "int") == 0) {
 		last_scan_size = int.sizeof;
-		unformat(&user.data, uin);
+		if (unformat(&user.data, uin))
+			return ShellError.unformat;
 	} else if (strcmp(usub, "long") == 0) {
 		last_scan_size = long.sizeof;
-		unformat64(&user.data64, uin);
+		if (unformat64(&user.data64, uin))
+			return ShellError.unformat;
 	} else
 		return ShellError.scanInvalidSubCommand;
 	
@@ -849,23 +887,27 @@ int command_rescan(int argc, const(char) **argv) {
 		long data64;
 		int data;
 	}
-	u user;
+	u user = void;
 	if (strcmp(usub, "byte") == 0) {
 		last_scan_size = ubyte.sizeof;
-		unformat(&user.data, uin);
+		if (unformat(&user.data, uin))
+			return ShellError.unformat;
 		if (user.data > ubyte.max)
 			return ShellError.scanInputOutOfRange;
 	} else if (strcmp(usub, "short") == 0) {
 		last_scan_size = short.sizeof;
-		unformat(&user.data, uin);
+		if (unformat(&user.data, uin))
+			return ShellError.unformat;
 		if (user.data > short.max)
 			return ShellError.scanInputOutOfRange;
 	} else if (strcmp(usub, "int") == 0) {
 		last_scan_size = int.sizeof;
-		unformat(&user.data, uin);
+		if (unformat(&user.data, uin))
+			return ShellError.unformat;
 	} else if (strcmp(usub, "long") == 0) {
 		last_scan_size = long.sizeof;
-		unformat64(&user.data64, uin);
+		if (unformat64(&user.data64, uin))
+			return ShellError.unformat;
 	} else
 		return ShellError.scanInvalidSubCommand;
 	
