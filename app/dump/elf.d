@@ -90,7 +90,7 @@ void dump_elf_ehdr(adbg_object_t *o) {
 		dprint_u16("e_shstrndx", e_shstrndx);
 		}
 		break;
-	default: //TODO: assertion?
+	default:
 	}
 }
 

@@ -508,6 +508,14 @@ struct adbg_scan_result_t {
 	}
 }
 
+//TODO: For future types, len(data) * capacity
+//      Why? Data can be of any length (es. strings)
+//      Bit of a à la Windows stragegy:
+//      first buffer (uint.sizeof * capacity) is list of indexes
+//      second buffer (len(str) * capacity) is list of strings
+//      index points to list of strings
+//      could/should make functions to help with that
+
 /// Scan debuggee process memory for a specific value.
 ///
 /// This function allocates the list to contain a list of 2000 items.
@@ -540,6 +548,10 @@ struct adbg_scan_result_t {
 adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t size, ...) {
 	import adbg.v2.debugger.process : AdbgStatus;
 	
+	/// Until scanner gets better internals for variable-length
+	/// data types.
+	enum DATA_LIMIT = ulong.sizeof; 
+	
 	// Initial check and setup
 	if (tracee == null || data == null) {
 		adbg_oops(AdbgError.nullArgument);
@@ -549,7 +561,7 @@ adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t size, .
 		adbg_oops(AdbgError.scannerDataEmpty);
 		return null;
 	}
-	if (size > 8) {
+	if (size > DATA_LIMIT) {
 		adbg_oops(AdbgError.scannerDataLimit);
 		return null;
 	}

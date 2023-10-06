@@ -233,10 +233,11 @@ struct command_t {
 }
 // NOTE: Called "commands_list" to avoid conflict with future "command_list" function
 //TODO: Commands
-// - !: Run [actual] shell commands
+// - !: Run host shell commands
 // - b|breakpoint: Breakpoint management
-// - s|stack: Breakpoint management
-// - api: Enable addon or api system
+// - t|thread: Thread management (e.g., selection, callstack)
+//TODO: Paragraph cutoff
+//      Maybe use vertical tab (0xb) or group sep (0x1d)?
 immutable command_t[] commands_list = [
 	//
 	// Debugger
@@ -245,7 +246,13 @@ immutable command_t[] commands_list = [
 		0, "status", [],
 		{
 			MOD_DEBUGGER, CAT_PROCESS,
-			"Get debugger status.",
+			"Get debugger status.", [
+				{
+					//TODO: Rename to process status after function change
+					SECTION_DESCRIPTION,
+					"Prints the status of the debugger."
+				}
+			]
 		},
 		&command_status,
 	},
@@ -255,7 +262,12 @@ immutable command_t[] commands_list = [
 		],
 		{
 			MOD_DEBUGGER, CAT_PROCESS,
-			"Spawn a new process into debugger.",
+			"Spawn a new process into debugger.", [
+				{
+					SECTION_DESCRIPTION,
+					"Spawns a new process from path with the debugger attached."
+				}
+			]
 		},
 		&command_spawn,
 	},
@@ -265,7 +277,12 @@ immutable command_t[] commands_list = [
 		],
 		{
 			MOD_DEBUGGER, CAT_PROCESS,
-			"Attach debugger to live process.",
+			"Attach debugger to live process.", [
+				{
+					SECTION_DESCRIPTION,
+					"Attaches debugger to an existing process by its Process ID."
+				}
+			]
 		},
 		&command_attach,
 	},
@@ -273,7 +290,13 @@ immutable command_t[] commands_list = [
 		0, "detach", [],
 		{
 			MOD_DEBUGGER, CAT_PROCESS,
-			"Detach debugger from process.",
+			"Detach debugger from process.", [
+				{
+					SECTION_DESCRIPTION,
+					"If the debugger was attached to a live process, detach "~
+					"the debugger."
+				}
+			]
 		},
 		&command_detach,
 	},
@@ -281,7 +304,13 @@ immutable command_t[] commands_list = [
 		0, "restart", [],
 		{
 			MOD_DEBUGGER, CAT_PROCESS,
-			"Spawn a new process into debugger.",
+			"Restart the debugging process.", [
+				{
+					SECTION_DESCRIPTION,
+					"The debugger will be re-attached or the process will be "~
+					"killed and respawned."
+				}
+			]
 		},
 		&command_restart,
 	},
@@ -289,7 +318,13 @@ immutable command_t[] commands_list = [
 		0, "go", [],
 		{
 			MOD_DEBUGGER, CAT_PROCESS,
-			"Continue debugging process."
+			"Continue debugging process.", [
+				{
+					SECTION_DESCRIPTION,
+					"The debugger will be re-attached or the process will be "~
+					"killed and respawned."
+				}
+			]
 		},
 		&command_go,
 	},
@@ -297,7 +332,13 @@ immutable command_t[] commands_list = [
 		0, "kill", [],
 		{
 			MOD_DEBUGGER, CAT_PROCESS,
-			"Terminate process.",
+			"Terminate process.", [
+				{
+					SECTION_DESCRIPTION,
+					"The debugger will be re-attached or the process will be "~
+					"killed and respawned."
+				}
+			]
 		},
 		&command_kill,
 	},
@@ -305,7 +346,12 @@ immutable command_t[] commands_list = [
 		0, "stepi", [],
 		{
 			MOD_DEBUGGER, CAT_PROCESS,
-			"Perform an instruction step.",
+			"Perform an instruction step.", [
+				{
+					SECTION_DESCRIPTION,
+					"From a paused state, executes exactly one instruction."
+				}
+			]
 		},
 		&command_stepi,
 	},
@@ -318,7 +364,12 @@ immutable command_t[] commands_list = [
 		],
 		{
 			MOD_DEBUGGER, CAT_CONTEXT,
-			"Get list of registers and values from process.",
+			"Get list of registers and values from process.", [
+				{
+					SECTION_DESCRIPTION,
+					"From a paused state, executes exactly one instruction."
+				}
+			]
 		},
 		&command_regs,
 	},
@@ -331,7 +382,12 @@ immutable command_t[] commands_list = [
 		],
 		{
 			MOD_DEBUGGER, CAT_MEMORY,
-			"Dump process memory from address.",
+			"Dump process memory from address.", [
+				{
+					SECTION_DESCRIPTION,
+					"Print memory data from address as hexadecimal."
+				}
+			]
 		},
 		&command_memory,
 	},
@@ -339,7 +395,12 @@ immutable command_t[] commands_list = [
 		0, "maps", [],
 		{
 			MOD_DEBUGGER, CAT_MEMORY,
-			"Show memory mappings for process."
+			"Show memory mappings for process.", [
+				{
+					SECTION_DESCRIPTION,
+					"Lists loaded modules and their memory regions."
+				}
+			]
 		},
 		&command_maps,
 	},
@@ -363,11 +424,21 @@ immutable command_t[] commands_list = [
 	},
 	{
 		0, "scan", [
-			"TYPE VALUE"
+			"TYPE VALUE",
+			"show",
+			"clear",
 		],
 		{
 			MOD_DEBUGGER, CAT_MEMORY,
-			"Scan for value in memory."
+			"Scan for value in memory.", [
+				{
+					SECTION_DESCRIPTION,
+					"Scan memory maps for specified value. "~
+					"No writing capability is available at the moment. "~
+					"To list last scan results, use 'show' subcommand. "~
+					"To clear results, use 'clear' subcommand."
+				}
+			]
 		},
 		&command_scan,
 	},
@@ -378,12 +449,7 @@ immutable command_t[] commands_list = [
 		0, "help", [],
 		{
 			MOD_SHELL, CAT_SHELL,
-			"Show help article.", [
-				{
-					SECTION_DESCRIPTION,
-					""
-				}
-			]
+			"Show help or a command's help article."
 		},
 		&command_help,
 	},
@@ -391,7 +457,13 @@ immutable command_t[] commands_list = [
 		'q', "quit", [],
 		{
 			MOD_SHELL, CAT_SHELL,
-			"Quit debugger."
+			"Quit shell session.", [
+				{
+					SECTION_DESCRIPTION,
+					"Close the shell session along with the debugger and "~
+					"application if it was spawned using the debugger."
+				}
+			]
 		},
 		&command_quit,
 	},
@@ -456,11 +528,11 @@ void shell_event_exception(adbg_exception_t *ex) {
 }
 
 void shell_event_help(immutable(command_t) *command) {
-	with (command.help)
-		printf("%s - %s: %s\n", module_.ptr, category.ptr, command.name.ptr);
-	
-	printf("\n%s\n", SECTION_NAME.ptr);
-	printf("  %s - %s\n", command.name.ptr, command.help.description.ptr);
+	with (command.help) {
+		printf("%s - %s: %s\n\nNAME\n  %s - %s\n",
+			module_.ptr, category.ptr, command.name.ptr,
+			command.name.ptr, command.help.description.ptr);
+	}
 	
 	if (command.synopsis.length) {
 		printf("\n%s\n", SECTION_SYNOPSIS.ptr);
@@ -482,6 +554,8 @@ void shell_event_help(immutable(command_t) *command) {
 		p += COL;
 		goto L_PRINT;
 	}
+	
+	putchar('\n');
 }
 
 int command_status(int argc, const(char) **argv) {
@@ -793,11 +867,12 @@ void shell_event_list_scan_results() {
 		puts("fatal: mask fail");
 		return;
 	}
-	//    ffffffffffffffff  18446744073709551615
-	puts("Address           Previous              Current");
+	//    0000. ffffffffffffffff  18446744073709551615
+	puts("No.   Address           Previous              Current");
 	adbg_scan_result_t *result = last_scan.results;
-	for (uint i; i < last_scan.result_count; ++i, ++result) {
-		printf("%u %-16llx  %-20llu  ", i, result.address, result.value_u64 & mask);
+	uint count = cast(uint)last_scan.result_count + 1; // temp cast until better z printf
+	for (uint i = 1; i < count; ++i, ++result) {
+		printf("%4u. %-16llx  %-20llu  ", i, result.address, result.value_u64 & mask);
 		ulong udata = void;
 		if (adbg_memory_read(&process, cast(size_t)result.address, &udata, cast(uint)last_scan_size))
 			puts("???");
@@ -812,7 +887,7 @@ int command_scan(int argc, const(char) **argv) {
 	
 	const(char) *usub = argv[1];
 	
-	if (strcmp(usub, "list") == 0) {
+	if (strcmp(usub, "show") == 0) {
 		if (last_scan == null)
 			return ShellError.scanNoScan;
 		
