@@ -8,7 +8,7 @@
 module dumper;
 
 import adbg.include.c.stdio;
-import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc;
+import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, free;
 import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.v2.object.server;
@@ -120,12 +120,15 @@ int app_dump() {
 	return EXIT_FAILURE;
 }
 
-//TODO: dprint_group_start(name)/dprint_group_end
-//TODO: Consider struct DumperPrinter or similar
+//TODO: Redo entirely of dumper functions
+//      dprint_group_start(name)/dprint_group_end
+//      or dprint(group_name, // header, program_header, etc.
+//           spec, name, value, ...)
+//      or consider struct DumperPrinter or similar
 
 private enum FORMAT_FIELD = "  %-30s:  ";
 
-//TODO: Make this vararg and the defautl
+//TODO: Make this vararg and the default
 //      Then removed print_columns
 void dprint_header(const(char) *header) {
 	printf("\n# %s\n", header);
@@ -311,8 +314,13 @@ int dprint_disassemble(AdbgMachine machine,
 	if (dasm == null)
 		panic(AdbgError.crt);
 	
+	scope(exit) free(dasm);
+	
 	if (adbg_dasm_open(dasm, machine))
 		panic();
+	
+	if (globals.syntax)
+		adbg_dasm_options(dasm, AdbgDasmOption.syntax, globals.syntax, 0);
 	
 	adbg_opcode_t op = void;
 	adbg_dasm_start(dasm, data, cast(size_t)size);
@@ -365,8 +373,10 @@ L_DISASM:
 	case illegalInstruction:
 		printf("%016llx  illegal (%d bytes)\n", op.base, op.size);
 		goto L_DISASM;
-	case outOfData: break;
-	default: panic();
+	case outOfData:
+		return 0;
+	default:
+		panic();
+		return 0;
 	}
-	return 0;
 }
