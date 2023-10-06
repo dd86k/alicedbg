@@ -76,19 +76,10 @@ struct settings_t {
 	const(char) *file;	/// Debuggee: file
 	const(char) **args;	/// Debuggee: argument vector
 	const(char) **env;	/// Debuggee: environement vector
-	const(char) *dir;	/// Debuggee: directory
 	uint pid;	/// Debuggee: PID
 	uint flags;	/// Flags to pass to sub-app
-	AdbgDasmSyntax syntax;	/// 
-	AdbgMachine machine;	/// For disassembler
-	/// App settings
-	adbg_exception_t last_exception;	/// Last exception
-	FILE *inputFile;	/// 
-	//TODO: Should be allocated
-	ubyte[32] inputHex;	/// 
-	size_t inputHexSize;	/// 
-	char[60] bufferMnemonic;	/// For disassembly
-	char[40] bufferMachine;	/// For disassembly
+	AdbgMachine machine;	/// Disassembler: Target machine
+	AdbgDasmSyntax syntax;	/// Disassembler: Syntax
 }
 
 /// Global variables. Helps keeping track of app variables.
