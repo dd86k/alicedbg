@@ -831,8 +831,8 @@ size_t capstone_dyn_init()
     else version (Posix)
     {
         static immutable const(char)*[] libraries = [
-            "libcapstone.so",
             "libcapstone.so.4",
+            "libcapstone.so",
         ];
     }
     
