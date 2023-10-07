@@ -8,13 +8,14 @@
 module term;
 
 import core.stdc.stdlib;
-import adbg.include.c.stdio;
-import adbg.include.c.stdarg;
-private alias sys = core.stdc.stdlib.system;
+import core.stdc.stdio;
 
 //TODO: Consider using PDCurses instead
 
 extern (C):
+
+private
+int putchar(int);
 
 version (Windows) {
 	private import core.sys.windows.windows;

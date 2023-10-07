@@ -18,7 +18,7 @@ import adbg.include.c.stdio;
 import core.stdc.config : c_long;
 import core.stdc.string : memset;
 import adbg.platform, adbg.error;
-import adbg.utils.string : adbg_util_argv_flatten;
+import adbg.utils.strings : adbg_util_argv_flatten;
 public import adbg.v1.debugger.exception;
 
 version (Windows) {
@@ -775,7 +775,7 @@ int adbg_mm_maps(adbg_mm_map **mmaps, size_t *mcount, ...) {
 		import core.stdc.config : c_long;
 		import core.stdc.stdlib : malloc, free;
 		import core.sys.linux.unistd : readlink;
-		import adbg.utils.string : adbg_util_getline, adbg_util_getlinef;
+		import adbg.utils.strings : adbg_util_getline, adbg_util_getlinef;
 		import core.sys.linux.unistd : read, close;
 		import core.sys.linux.fcntl : open, O_RDONLY;
 		

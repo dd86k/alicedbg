@@ -122,7 +122,7 @@ LOOP:
 }
 
 int shell_exec(const(char) *command) {
-	import adbg.utils.string : adbg_util_expand;
+	import adbg.utils.strings : adbg_util_expand;
 	if (command == null) return 0;
 	int argc = void;
 	char** argv = adbg_util_expand(command, &argc);

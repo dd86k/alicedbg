@@ -9,7 +9,7 @@ module adbg.v1.disassembler.syntax.hyde;
 
 import adbg.v1.disassembler : adbg_disasm_t, adbg_disasm_operand_t, AdbgDisasmOperand;
 import adbg.v1.disassembler.formatter;
-import adbg.utils.string;
+import adbg.utils.strings;
 
 extern (C):
 

@@ -9,7 +9,6 @@ version "0.1.0"
 dependency "bindbc-loader" version="~>1.0.3"
 subConfiguration "bindbc-loader" "yesBC"
 
-
 # NOTE: BetterC flag
 #       We explicitly specify the betterC flag to support older DUB releases
 #       Like v0.9.24
@@ -121,71 +120,25 @@ buildType "release-nobounds" {
 #
 # ANCHOR Unit tests
 #
-# Individual unit tests exist here since they:
-# - Requires user input;
-# - Are too specific (e.g., crt-specific);
-# - Or are too lengthy.
+# NOTE: These MUST be ran as "dub test -b TEST"
+# NOTE: Dedicated tests must only exist if one of these conditions are met
+#       - Requires user input (e.g., readline)
+#       - Are prone to crashing application (e.g., longjmp on Windows)
 #
 
-# default unit test: utilities, etc.
-buildType "general" {
-	buildOptions "unittests"
-	sourceFiles "tests/general.d"
-}
-# disasm: mini-fuzzer
-buildType "disasm-fuzzer" {
-	buildOptions "unittests"
-	sourceFiles "tests/disasm-fuzzer.d"
-}
-# disasm: decoding/analysis
-buildType "disasm-x86" {
-	buildOptions "unittests"
-	sourceFiles "tests/disasm.d" "tests/disasm-x86.d"
-}
-# syntaxer: output
-buildType "syntax" {
-	buildOptions "unittests"
-	sourceFiles "tests/syntax.d"
-}
-# crt: setjmp
 buildType "setjmp" {
 	buildOptions "unittests"
 	sourceFiles "tests/setjmp.d"
-	importPaths "src"
+	sourcePaths "src"
 }
-# terminal: readkey
 buildType "readkey" {
 	buildOptions "unittests"
-	sourceFiles "tests/readkey.d"
+	sourceFiles "tests/readkey.d" "app/term.d"
 }
-# terminal: readline
 buildType "readline" {
 	buildOptions "unittests"
 	sourceFiles "tests/readline.d"
-}
-# utils: string expand
-buildType "expand" {
-	buildOptions "unittests"
-	sourceFiles "tests/expand.d"
-}
-# Run all non-interactive tests
-buildType "all" {
-	buildOptions "unittests"
-	sourceFiles "tests/general.d" "tests/disasm.d" "tests/syntax.d" "tests/expand.d"
-}
-
-#
-# ANCHOR External fuzzing
-#
-
-# AFL fuzzing test
-buildType "afl" {
-	toolchainRequirements dmd="no" gdc="no" ldc=">=1.0.0"
-	dflags "-plugin=$AFL_ROOT/afl-llvm-pass.so"
-	sourceFiles "$AFL_ROOT/afl-llvm-rt.o"
-	versions "AFL"
-	buildOptions "debugMode" "debugInfo"
-	dflags "-betterC" platform="ldc"
+	sourcePaths "app" "src"
 }
 
 #

@@ -14,7 +14,7 @@ public import adbg.v1.disassembler.syntax.intel,
 	adbg.v1.disassembler.syntax.hyde,
 	adbg.v1.disassembler.syntax.rv;
 package import adbg.v1.disassembler;
-package import adbg.utils.string;
+package import adbg.utils.strings;
 package import adbg.error;
 
 //TODO: Number preferred style or instruction/immediate purpose

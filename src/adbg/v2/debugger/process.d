@@ -17,7 +17,7 @@ import adbg.include.c.stdarg;
 import core.stdc.config : c_long;
 import core.stdc.string : memset;
 import adbg.platform, adbg.error;
-import adbg.utils.string : adbg_util_argv_flatten;
+import adbg.utils.strings : adbg_util_argv_flatten;
 import adbg.v2.debugger.exception : adbg_exception_t, adbg_exception_translate;
 import adbg.v2.debugger.breakpoint : adbg_breakpoint_t;
 

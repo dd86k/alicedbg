@@ -1,4 +1,4 @@
-module tests.term.readline;
+module tests.readline;
 
 import term;
 import core.stdc.stdio;
@@ -7,7 +7,7 @@ import core.stdc.string;
 unittest {
 	puts("Press ^D to exit");
 	term_init;
-//	term_config(TermConfig.noNewline);
+	term_config(TermConfig.noNewline);
 	int l = void;
 	while (true) {
 		printf("> ");

@@ -8,7 +8,7 @@
 module main;
 
 import adbg.platform;
-import adbg.utils.string : adbg_util_hex_array;
+import adbg.utils.strings : adbg_util_hex_array;
 import adbg.include.c.stdlib : exit;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
@@ -176,7 +176,7 @@ int cli_file(const(char) *val) {
 //
 
 int cli_args_stop(int argi, int argc, const(char) **argv) { // --
-	import adbg.utils.string : adbg_util_move;
+	import adbg.utils.strings : adbg_util_move;
 	
 	enum MAX = 16;
 	__gshared const(char) *[MAX] args;
@@ -195,7 +195,7 @@ int cli_args_stop(int argi, int argc, const(char) **argv) { // --
 	return EXIT_SUCCESS;
 }
 int cli_args(const(char) *val) { // --args
-	import adbg.utils.string : adbg_util_expand;
+	import adbg.utils.strings : adbg_util_expand;
 	
 	int argc = void;
 	char **argv = adbg_util_expand(val, &argc);
@@ -212,7 +212,7 @@ int cli_args(const(char) *val) { // --args
 //
 
 int cli_env(const(char) *val) {
-	import adbg.utils.string : adbg_util_env;
+	import adbg.utils.strings : adbg_util_env;
 	
 	globals.env = cast(const(char)**)adbg_util_env(val);
 	

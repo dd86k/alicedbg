@@ -1,11 +1,9 @@
-/**
- * String helper functions. Simple string functions to aid redundant typing.
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
-module adbg.utils.string;
+/// String helper functions. Simple string functions to aid redundant typing.
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
+module adbg.utils.strings;
 
 import adbg.include.c.stdio;
 import core.stdc.stdarg;
@@ -111,7 +109,6 @@ size_t adbg_util_getline(char *bf, size_t bfsz, size_t *lnsz, const(char) *src, 
 }
 
 unittest {
-	import std.stdio : writeln;
 	const(char) *src = "123\n\nabc";
 	char[16] line = void;
 	size_t linesz = void;
@@ -630,7 +627,7 @@ struct adbg_string_t {
 }
 
 unittest {
-	import adbg.utils.string : adbg_string_t;
+	import adbg.utils.strings : adbg_string_t;
 	
 	enum BUFFER_SIZE = 80;
 	enum LAST_ITEM = BUFFER_SIZE - 1;

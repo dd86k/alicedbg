@@ -267,7 +267,7 @@ L_OPT:
 		
 		import core.stdc.stdlib : malloc, free;
 		import core.sys.linux.unistd : readlink;
-		import adbg.utils.string : adbg_util_getline, adbg_util_getlinef;
+		import adbg.utils.strings : adbg_util_getline, adbg_util_getlinef;
 		import core.sys.linux.unistd : read, close;
 		import core.sys.linux.fcntl : open, O_RDONLY;
 		
