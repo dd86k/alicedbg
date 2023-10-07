@@ -191,6 +191,7 @@ size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 	return bi;
 }
 
+// NOTE: Kind would have preferred returning as int (argc)...
 /// Expand a command-line string into an array of items.
 /// The input string is copied into the internal buffer.
 /// Params:
@@ -259,6 +260,36 @@ L_RETURN:
 	_argv[_argc] = null;
 	if (argc) *argc = _argc;
 	return _argc ? cast(char**)_argv : null;
+}
+
+unittest {
+	struct Test {
+		string input;
+		const(char)*[] output;
+	}
+	immutable Test[] tests = [
+		{ null, [] },
+		{ "", [] },
+		{ "test", [ "test" ] },
+		{ "command test", [ "command", "test" ] },
+		{ "readline\n", [ "readline" ] },
+		{ "readline param\n", [ "readline", "param" ] },
+		{ "decent day, isn't it?", [ "decent", "day,", "isn't", "it?" ] },
+		{ "1 2 3 4 5 6 7 8 9", [ "1", "2", "3", "4", "5", "6", "7", "8", "9" ] },
+		{ "abc\ndef", [ "abc", "def" ] },
+	];
+	
+	foreach (test; tests) {
+		int argc = void;
+		char** argv = adbg_util_expand(test.input.ptr, &argc);
+		
+		// Part of user code
+		if (argv == null) continue;
+		
+		for (uint i; i < argc; ++i) {
+			assert(strcmp(argv[i], cast(char*)test.output[i]) == 0, test.input);
+		}
+	}
 }
 
 /// Process a comma-seperated list of key=value pairs into an internal buffer.
@@ -449,7 +480,9 @@ void adbg_util_str_lowercase(char *buf, size_t size) {
 }
 
 /// Internal structure used to append an existing buffer new typed elements.
-/// Used in the disassembler.
+/// 
+/// Should look more like MFC's CString.
+// NOTE: Was used for disassembler v1 but that's getting removed soon.
 //TODO: Consider adbg_string_t.add_s for +length
 //      Why? This has literally no use
 //TODO: Consider adbg_string_t.addm(T...)(T args)
@@ -483,8 +516,9 @@ struct adbg_string_t {
 	/// Reset counters and optionally zero-fill the buffer.
 	/// Params: zero = If true, fills the buffer of zeros.
 	void reset(bool zero = false) {
+		str[0] = 0;
 		if (zero)
-			for (size_t p; p < size; ++p)
+			for (size_t p = 1; p < size; ++p)
 				str[p] = 0;
 		length = 0;
 	}
@@ -593,4 +627,307 @@ struct adbg_string_t {
 		str[length] = 0;
 		return length >= size;
 	}
+}
+
+unittest {
+	import adbg.utils.string : adbg_string_t;
+	
+	enum BUFFER_SIZE = 80;
+	enum LAST_ITEM = BUFFER_SIZE - 1;
+	
+	char[BUFFER_SIZE] buffer = void;
+	
+	// init
+	
+	adbg_string_t s = adbg_string_t(buffer.ptr, BUFFER_SIZE);
+	assert(s.size == BUFFER_SIZE);
+	assert(s.length  == 0);
+	assert(s.str  == &buffer[0]);
+	
+	// reset
+	
+	s.length = 3;
+	s.reset(true);
+	assert(buffer[0] == 0);
+	assert(buffer[1] == 0);
+	assert(buffer[LAST_ITEM] == 0);
+	assert(s.length == 0);
+	
+	// add(char)
+	
+	s.reset();
+	assert(s.addc('a') == false);
+	assert(buffer[0] == 'a');
+	assert(buffer[1] == 0);
+	
+	s.reset();
+	assert(s.addc('a') == false);
+	assert(s.addc('b') == false);
+	assert(s.addc('c') == false);
+	assert(strcmp(s.str, "abc") == 0);
+	
+	// add(string)
+	
+	s.reset();
+	assert(s.adds("hello") == false);
+	assert(buffer[0] == 'h');
+	assert(buffer[1] == 'e');
+	assert(buffer[2] == 'l');
+	assert(buffer[3] == 'l');
+	assert(buffer[4] == 'o');
+	assert(buffer[5] == 0);
+	assert(buffer[6] == 0);
+	assert(buffer[7] == 0);
+	assert(buffer[8] == 0);
+	
+	s.reset();
+	immutable string lorem =
+		`Lorem ipsum dolor sit amet, consectetur adipiscing elit. `~
+		`Etiam dignissim iaculis lectus. Aliquam volutpat rhoncus dignissim. `~
+		`Donec maximus diam eros, a euismod quam consectetur sit amet. `~
+		`Morbi vel ante viverra, condimentum elit porttitor, tempus metus. `~
+		`Cras eget interdum turpis, vitae egestas ipsum. `~
+		`Nam accumsan aliquam enim, id sodales tellus hendrerit id. `~
+		`Proin vulputate hendrerit accumsan. Etiam vitae tempor libero.`;
+	assert(lorem.length > s.size);
+	assert(s.adds(lorem.ptr));
+	assert(buffer[0] == 'L');
+	
+	s.reset(true);
+	s.adds("123");
+	s.adds("abc");
+	assert(strcmp(s.str, "123abc") == 0);
+	
+	// addx8
+	
+	s.reset();
+	assert(s.addx8(0xe0) == false);
+	assert(buffer[0] == 'e');
+	assert(buffer[1] == '0');
+	assert(buffer[2] == 0);
+	
+	s.reset();
+	assert(s.addx8(0) == false);
+	assert(buffer[0] == '0');
+	assert(buffer[1] == 0);
+	
+	s.reset();
+	assert(s.addx8(0, true) == false);
+	assert(buffer[0] == '0');
+	assert(buffer[1] == '0');
+	assert(buffer[2] == 0);
+	
+	s.reset();
+	assert(s.addx8(0xe) == false);
+	assert(buffer[0]  == 'e');
+	assert(buffer[1] == 0);
+	
+	s.reset();
+	assert(s.addx8(0xe, true) == false);
+	assert(buffer[0] == '0');
+	assert(buffer[1] == 'e');
+	assert(buffer[2] == 0);
+	
+	s.reset();
+	assert(s.addx8(0x80) == false);
+	assert(s.addx8(0x86) == false);
+	assert(buffer[0] == '8');
+	assert(buffer[1] == '0');
+	assert(buffer[2] == '8');
+	assert(buffer[3] == '6');
+	assert(buffer[4] == 0);
+	
+	// addx16
+	
+	s.reset();
+	assert(s.addx16(0xabcd) == false);
+	assert(buffer[0] == 'a');
+	assert(buffer[1] == 'b');
+	assert(buffer[2] == 'c');
+	assert(buffer[3] == 'd');
+	assert(buffer[4] == 0);
+	
+	s.reset();
+	assert(s.addx16(0xff) == false);
+	assert(buffer[0] == 'f');
+	assert(buffer[1] == 'f');
+	assert(buffer[2] == 0);
+	
+	s.reset();
+	assert(s.addx16(0xee, true) == false);
+	assert(buffer[0] == '0');
+	assert(buffer[1] == '0');
+	assert(buffer[2] == 'e');
+	assert(buffer[3] == 'e');
+	assert(buffer[4] == 0);
+	
+	s.reset();
+	assert(s.addx16(0) == false);
+	assert(buffer[0] == '0');
+	assert(buffer[1] == 0);
+	
+	s.reset();
+	assert(s.addx16(0, true) == false);
+	assert(buffer[0] == '0');
+	assert(buffer[1] == '0');
+	assert(buffer[2] == '0');
+	assert(buffer[3] == '0');
+	assert(buffer[4] == 0);
+	
+	s.reset();
+	assert(s.addx16(0x8086) == false);
+	assert(buffer[0]  == '8');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '8');
+	assert(buffer[3]  == '6');
+	assert(buffer[4] == 0);
+	
+	s.reset();
+	assert(s.addx16(0x80) == false);
+	assert(s.addx16(0x86) == false);
+	assert(buffer[0]  == '8');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '8');
+	assert(buffer[3]  == '6');
+	assert(buffer[4] == 0);
+	
+	// addx32
+	
+	s.reset();
+	assert(s.addx32(0x1234_abcd) == false);
+	assert(buffer[0]  == '1');
+	assert(buffer[1]  == '2');
+	assert(buffer[2]  == '3');
+	assert(buffer[3]  == '4');
+	assert(buffer[4]  == 'a');
+	assert(buffer[5]  == 'b');
+	assert(buffer[6]  == 'c');
+	assert(buffer[7]  == 'd');
+	assert(buffer[8] == 0);
+	
+	s.reset();
+	assert(s.addx32(0xed) == false);
+	assert(buffer[0]  == 'e');
+	assert(buffer[1]  == 'd');
+	assert(buffer[2] == 0);
+	
+	s.reset();
+	assert(s.addx32(0xcc, true) == false);
+	assert(buffer[0]  == '0');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '0');
+	assert(buffer[3]  == '0');
+	assert(buffer[4]  == '0');
+	assert(buffer[5]  == '0');
+	assert(buffer[6]  == 'c');
+	assert(buffer[7]  == 'c');
+	assert(buffer[8] == 0);
+	
+	s.reset();
+	assert(s.addx32(0) == false);
+	assert(buffer[0]  == '0');
+	assert(buffer[1] == 0);
+	
+	s.reset();
+	assert(s.addx32(0, true) == false);
+	assert(buffer[0]  == '0');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '0');
+	assert(buffer[3]  == '0');
+	assert(buffer[4]  == '0');
+	assert(buffer[5]  == '0');
+	assert(buffer[6]  == '0');
+	assert(buffer[7]  == '0');
+	assert(buffer[8] == 0);
+	
+	s.reset();
+	assert(s.addx32(0x80486) == false);
+	assert(buffer[0]  == '8');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '4');
+	assert(buffer[3]  == '8');
+	assert(buffer[4]  == '6');
+	assert(buffer[5] == 0);
+	
+	// addx64
+	
+	s.reset();
+	assert(s.addx64(0xdd86_c0ff_ee08_0486) == false);
+	assert(buffer[0]  == 'd');
+	assert(buffer[1]  == 'd');
+	assert(buffer[2]  == '8');
+	assert(buffer[3]  == '6');
+	assert(buffer[4]  == 'c');
+	assert(buffer[5]  == '0');
+	assert(buffer[6]  == 'f');
+	assert(buffer[7]  == 'f');
+	assert(buffer[8]  == 'e');
+	assert(buffer[9]  == 'e');
+	assert(buffer[10] == '0');
+	assert(buffer[11] == '8');
+	assert(buffer[12] == '0');
+	assert(buffer[13] == '4');
+	assert(buffer[14] == '8');
+	assert(buffer[15] == '6');
+	assert(buffer[16] == 0);
+	
+	s.reset();
+	assert(s.addx64(0xbb) == false);
+	assert(buffer[0]  == 'b');
+	assert(buffer[1]  == 'b');
+	assert(buffer[2]  == 0);
+	
+	s.reset();
+	assert(s.addx64(0xdd, true) == false);
+	assert(buffer[0]  == '0');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '0');
+	assert(buffer[3]  == '0');
+	assert(buffer[4]  == '0');
+	assert(buffer[5]  == '0');
+	assert(buffer[6]  == '0');
+	assert(buffer[7]  == '0');
+	assert(buffer[8]  == '0');
+	assert(buffer[9]  == '0');
+	assert(buffer[10] == '0');
+	assert(buffer[11] == '0');
+	assert(buffer[12] == '0');
+	assert(buffer[13] == '0');
+	assert(buffer[14] == 'd');
+	assert(buffer[15] == 'd');
+	assert(buffer[16] == 0);
+	
+	s.reset();
+	assert(s.addx64(0) == false);
+	assert(buffer[0]  == '0');
+	assert(buffer[1] == 0);
+	
+	s.reset();
+	assert(s.addx64(0, true) == false);
+	assert(buffer[0]  == '0');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '0');
+	assert(buffer[3]  == '0');
+	assert(buffer[4]  == '0');
+	assert(buffer[5]  == '0');
+	assert(buffer[6]  == '0');
+	assert(buffer[7]  == '0');
+	assert(buffer[8]  == '0');
+	assert(buffer[9]  == '0');
+	assert(buffer[10] == '0');
+	assert(buffer[11] == '0');
+	assert(buffer[12] == '0');
+	assert(buffer[13] == '0');
+	assert(buffer[14] == '0');
+	assert(buffer[15] == '0');
+	assert(buffer[16] == 0);
+	
+	s.reset();
+	assert(s.addx64(0x80960) == false);
+	assert(buffer[0]  == '8');
+	assert(buffer[1]  == '0');
+	assert(buffer[2]  == '9');
+	assert(buffer[3]  == '6');
+	assert(buffer[4]  == '0');
+	assert(buffer[5] == 0);
 }
