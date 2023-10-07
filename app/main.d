@@ -1,10 +1,8 @@
-/**
- * Command line interface.
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
+/// Command line interface.
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module main;
 
 import adbg.platform;
@@ -19,12 +17,10 @@ import shell;
 private:
 extern (C):
 
-enum COPYRIGHT = "Copyright (c) dd86k <dd@dax.moe>";
+enum COPYRIGHT = "Copyright (c) 2019-2023 dd86k <dd@dax.moe>";
 
 __gshared immutable(char) *page_license =
-`BSD 3-Clause License
-
-`~COPYRIGHT~`
+COPYRIGHT~`
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
