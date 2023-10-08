@@ -236,8 +236,27 @@ void dump_pe_sections(adbg_object_t *o) {
 		dprint_x32("PointerToLinenumbers", PointerToLinenumbers);
 		dprint_u16("NumberOfRelocations", NumberOfRelocations);
 		dprint_u16("NumberOfLinenumbers", NumberOfLinenumbers);
-		//TODO: ALIGN_xBYTES with mask 0x00F00000
-		//      0 == "ALIGN_DEFAULT(16)" seen under PEDUMP (1997)
+		//TODO: Integrate with rest of Characteristics
+		static immutable const(char)*[] pe32alignments = [
+			"ALIGN_DEFAULT(16)", // PEDUMP (1997)
+			"ALIGN_1BYTES",
+			"ALIGN_2BYTES",
+			"ALIGN_4BYTES",
+			"ALIGN_8BYTES",
+			"ALIGN_16BYTES",
+			"ALIGN_32BYTES",
+			"ALIGN_64BYTES",
+			"ALIGN_128BYTES",
+			"ALIGN_256BYTES",
+			"ALIGN_512BYTES",
+			"ALIGN_1024BYTES",
+			"ALIGN_2048BYTES",
+			"ALIGN_4096BYTES",
+			"ALIGN_8192BYTES",
+			"ALIGN_RESERVED",
+		];
+		uint alignment = Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_MASK;
+		dprint_x32("Alignment", alignment, pe32alignments[alignment >> 20]);
 		dprint_flags32("Characteristics", Characteristics,
 			"TYPE_DSECT".ptr,	PE_SECTION_CHARACTERISTIC_TYPE_DSECT,
 			"TYPE_NOLOAD".ptr,	PE_SECTION_CHARACTERISTIC_TYPE_NOLOAD,
@@ -266,6 +285,7 @@ void dump_pe_sections(adbg_object_t *o) {
 			"MEM_READ".ptr,	PE_SECTION_CHARACTERISTIC_MEM_READ,
 			"MEM_WRITE".ptr,	PE_SECTION_CHARACTERISTIC_MEM_WRITE,
 			null);
+		
 	}
 }
 

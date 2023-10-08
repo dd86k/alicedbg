@@ -191,8 +191,6 @@ void dump_elf_phdr(adbg_object_t *o) {
 void dump_elf_sections(adbg_object_t *o) {
 	dprint_header("Sections");
 	
-	//TODO: id starts at 1??
-	
 	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:
 		if (o.i.elf32.ehdr == null)
