@@ -41,8 +41,10 @@ version (LDC) {
 	// See driver/main.cpp::registerPredefinedVersions.
 	// No traits to get LDC/LLVM versions.
 	// LDC started in 2009, supporting LLVM 2.0.
-	version (LDC_LLVM_1700) {
-		enum LLVM_VERSION = 17;	/// LLVM version from compiler used.
+	version (LDC_LLVM_1800) {
+		enum LLVM_VERSION = 18;	/// LLVM version used to compile.
+	} else version (LDC_LLVM_1700) {
+		enum LLVM_VERSION = 17;	/// Ditto
 	} else version (LDC_LLVM_1600) {
 		enum LLVM_VERSION = 16;	/// Ditto
 	} else version (LDC_LLVM_1500) {

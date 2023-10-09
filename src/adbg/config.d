@@ -5,7 +5,8 @@
 /// License: BSD-3-Clause
 module adbg.config;
 
-//TODO: Think of _LIB/_DYN build variants
+//TODO: Typically, should be dicdacted by defined Versions
+//      e.g., USE_CAPSTONE/AdbgUseCapstone (you get the idea)
 
 // Temprary until I think of something better
 enum AdbgConfigDisasm {
@@ -14,11 +15,5 @@ enum AdbgConfigDisasm {
 	//zydis,
 }
 
-//
-//
-//
-
 /// Choose disassembler engine
 enum AdbgConfigDisasm CONFIG_DISASM = AdbgConfigDisasm.capstone;
-
-enum bool USE_CAPSTONE = CONFIG_DISASM == AdbgConfigDisasm.capstone;

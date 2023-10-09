@@ -372,21 +372,21 @@ template DSTRVER(uint ver) {
 
 int cli_version() {
 	import adbg.include.d.config : LLVM_VERSION;
-	import adbg.config : CONFIG_DISASM, AdbgConfigDisasm;
 	puts(page_version);
+	
 	static if (LLVM_VERSION)
 		printf("LLVM: %d\n", LLVM_VERSION);
-	static if (CONFIG_DISASM == AdbgConfigDisasm.capstone) {
-		import adbg.include.capstone : capstone_dyn_init, cs_version;
-		printf("Capstone: ");
-		if (capstone_dyn_init() == false) {
-			int major = void, minor = void;
-			cs_version(&major, &minor);
-			printf("%d.%d\n", major, minor);
-		} else {
-			puts("error");
-		}
+	
+	import adbg.include.capstone : capstone_dyn_init, cs_version;
+	printf("Capstone: ");
+	if (capstone_dyn_init() == false) {
+		int major = void, minor = void;
+		cs_version(&major, &minor);
+		printf("%d.%d\n", major, minor);
+	} else {
+		puts("error");
 	}
+	
 	exit(0);
 	return 0;
 }
@@ -433,7 +433,6 @@ int main(int argc, const(char)** argv) {
 	const(char) *arg = void;
 	const(char) *val = void;
 	
-	//TODO: util in app/ for separating args
 	CLI: for (int argi = 1; argi < argc; ++argi) {
 		arg = argv[argi];
 		

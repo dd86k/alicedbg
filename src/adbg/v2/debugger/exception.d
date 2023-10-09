@@ -73,6 +73,7 @@ struct adbg_exception_t {
 	AdbgException type;
 	/// Original OS code (exception or signal value).
 	uint oscode;
+	//TODO: Attach process instead of dedicated pid/tid.
 	/// Process ID.
 	int pid;
 	/// Thread ID, if available; Otherwise zero.

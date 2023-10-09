@@ -21,9 +21,9 @@ import adbg.utils.strings : adbg_util_argv_flatten;
 import adbg.v2.debugger.exception : adbg_exception_t, adbg_exception_translate;
 import adbg.v2.debugger.breakpoint : adbg_breakpoint_t;
 
-//TODO: Pause/Resume
+//TODO: Process Pause/Resume
 //      Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
-//TODO: List threads
+//TODO: List threads of process
 
 version (Windows) {
 	import core.sys.windows.windows;
@@ -560,9 +560,6 @@ bool adbg_self_is_debugged() {
 		return false;
 	} else static assert(0, "adbg_debug_me: Implement me");
 }
-
-//TODO: unittest for adbg_is_debugged that loads the executable
-//      Or in tests/
 
 /// Insert a tracee break.
 void adbg_self_break() {

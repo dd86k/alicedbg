@@ -15,7 +15,9 @@ import adbg.platform;
 
 extern (C):
 
+//TODO: Consider renaming to adbg.utils.memory
 //TODO: INT16/INT32/INT64 templates (auto swap)
+//      e.g., I16BE!64
 
 /// Create a 1-bit bitmask with a bit position (0-based, 1 << a).
 /// Params: n = Bit position (0-based)
@@ -119,7 +121,6 @@ ushort adbg_bswap16(ushort v) pure {
 /// Params: v = 32-bit value
 /// Returns: Byte-swapped value
 uint adbg_bswap32(uint v) pure {
-	//TODO: Determine when bswap was introduced (at least works for dmd 2.078)
 	import core.bitop : bswap;
 	return bswap(v); // Intrinsic
 	// Source: https://stackoverflow.com/a/19560621
@@ -132,16 +133,20 @@ uint adbg_bswap32(uint v) pure {
 /// Returns: Byte-swapped value
 ulong adbg_bswap64(ulong v) pure {
 	// NOTE: Only recent versions of DMD inlines the intrinsic
-	//TODO: Determine when bswap was introduced (at least works for dmd 2.078)
-	import core.bitop : bswap;
-	return bswap(v); // Intrinsic
-	// Source: https://stackoverflow.com/a/19560621
-	//v = (v >> 32) | (v << 32);
-	//v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
-	//return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
+	import adbg.include.d.config : COMPILER_FEAT_BSWAP64;
+	static if (COMPILER_FEAT_BSWAP64) {
+		import core.bitop : bswap;
+		return bswap(v); // Intrinsic
+	} else {
+		// Source: https://stackoverflow.com/a/19560621
+		v = (v >> 32) | (v << 32);
+		v = ((v & 0xFFFF0000FFFF0000) >> 16) | ((v & 0x0000FFFF0000FFFF) << 16);
+		return ((v & 0xFF00FF00FF00FF00) >> 8) | ((v & 0x00FF00FF00FF00FF) << 8);
+	}
 }
 
 // Old names
+//TODO: Deprecate old names
 public alias adbg_util_bswap16 = adbg_bswap16;
 public alias adbg_util_bswap32 = adbg_bswap32;
 public alias adbg_util_bswap64 = adbg_bswap64;

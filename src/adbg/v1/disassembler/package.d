@@ -489,15 +489,11 @@ int adbg_disasm_configure(adbg_disasm_t *disasm, AdbgPlatform m) {
 		disasm.foperand = &adbg_disasm_operand_intel;
 		break;
 	case riscv32:
-		static if (USE_CAPSTONE) { // v5 has support but not v4
-			return adbg_oops(AdbgError.unsupportedPlatform);
-		} else {
-			disasm.limit = ADBG_MAX_RV32;
-			disasm.fdecode = &adbg_disasm_riscv;
-			disasm.syntax = AdbgSyntax.riscv;
-			disasm.foperand = &adbg_disasm_operand_riscv;
-			break;
-		}
+		disasm.limit = ADBG_MAX_RV32;
+		disasm.fdecode = &adbg_disasm_riscv;
+		disasm.syntax = AdbgSyntax.riscv;
+		disasm.foperand = &adbg_disasm_operand_riscv;
+		break;
 	/*case riscv64:
 		disasm.limit = ADBG_MAX_RV64;
 		disasm.fdecode = &adbg_disasm_riscv;
@@ -762,32 +758,30 @@ int adbg_disasm_fetch(T)(void *data, adbg_disasm_t *disasm, AdbgDisasmTag tag = 
 	disasm.current.sz += T.sizeof;
 	disasm.opcode.size += T.sizeof;
 	
-	static if (USE_CAPSTONE == false) {
-		if (disasm.mode >= AdbgDisasmMode.file &&
-			disasm.opcode.machineCount < ADBG_MAX_MACHINE) {
-			adbg_disasm_machine_t *n =
-				&disasm.opcode.machine[disasm.opcode.machineCount++];
-			n.tag = tag;
-			static if (is(T == ubyte)) {
-				n.i8 = *cast(T*)data;
-				n.type = AdbgDisasmType.i8;
-			} else static if (is(T == ushort)) {
-				n.i16 = *cast(T*)data;
-				n.type = AdbgDisasmType.i16;
-			} else static if (is(T == uint)) {
-				n.i32 = *cast(T*)data;
-				n.type = AdbgDisasmType.i32;
-			} else static if (is(T == ulong)) {
-				n.i64 = *cast(T*)data;
-				n.type = AdbgDisasmType.i64;
-			/*} else static if (is(T == float)) {
-				n.f32 = *cast(T*)data;
-				n.type = AdbgDisasmType.f32;
-			} else static if (is(T == double)) {
-				n.f64 = *cast(T*)data;
-				n.type = AdbgDisasmType.f64;*/
-			} else static assert(0, "fetch support type");
-		}
+	if (disasm.mode >= AdbgDisasmMode.file &&
+		disasm.opcode.machineCount < ADBG_MAX_MACHINE) {
+		adbg_disasm_machine_t *n =
+			&disasm.opcode.machine[disasm.opcode.machineCount++];
+		n.tag = tag;
+		static if (is(T == ubyte)) {
+			n.i8 = *cast(T*)data;
+			n.type = AdbgDisasmType.i8;
+		} else static if (is(T == ushort)) {
+			n.i16 = *cast(T*)data;
+			n.type = AdbgDisasmType.i16;
+		} else static if (is(T == uint)) {
+			n.i32 = *cast(T*)data;
+			n.type = AdbgDisasmType.i32;
+		} else static if (is(T == ulong)) {
+			n.i64 = *cast(T*)data;
+			n.type = AdbgDisasmType.i64;
+		/*} else static if (is(T == float)) {
+			n.f32 = *cast(T*)data;
+			n.type = AdbgDisasmType.f32;
+		} else static if (is(T == double)) {
+			n.f64 = *cast(T*)data;
+			n.type = AdbgDisasmType.f64;*/
+		} else static assert(0, "fetch support type");
 	}
 	return e;
 }

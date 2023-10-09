@@ -602,7 +602,6 @@ L_OPT:
 		return null;
 	
 	// Get optimized compare func if able
-	//TODO: Comparer struct
 	extern (C) bool function(void*, void*, size_t) cmp = void;
 	switch (size) {
 	case ulong.sizeof:	cmp = &adbg_mem_cmp_u64; break;
@@ -641,7 +640,7 @@ L_OPT:
 		version (Trace) trace("perms=%x", map.access);
 		
 		//if ((map.access & PERMS) != PERMS)
-		//	continue; //TODO: trace
+		//	continue;
 		
 		//TODO: Module detection
 		//      Scan through read+write non-exec sections
@@ -728,12 +727,10 @@ int adbg_memory_rescan(adbg_scan_t *scanner, void* data, size_t size) {
 		
 		// Same data?
 		if (cmp(read_buffer, &result.value_u64, size) == 0) {
-			//TODO: trace()?
 			continue;
 		}
 		
-		// If data couldn't be read, or is different, then move results
-	L_MOVE:
+	L_MOVE: // If data couldn't be read, or is different, then move results
 		size_t c = --scanner.result_count;
 		for (size_t ri = i; ri < c; ++ri) {
 			memcpy(result, result + 1, adbg_scan_result_t.sizeof);

@@ -236,6 +236,7 @@ struct command_t {
 // - !: Run host shell commands
 // - b|breakpoint: Breakpoint management
 // - t|thread: Thread management (e.g., selection, callstack)
+// - sym: Symbol management
 //TODO: Paragraph cutoff
 //      Maybe use vertical tab (0xb) or group sep (0x1d)?
 immutable command_t[] commands_list = [

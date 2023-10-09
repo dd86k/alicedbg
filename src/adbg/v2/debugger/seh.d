@@ -48,6 +48,7 @@ version (Windows) {
 
 extern (C):
 
+version (none)
 public int adbg_seh_enable(int function(adbg_exception_t*) func) {
 	if (func == null)
 		return adbg_oops(AdbgError.nullArgument);

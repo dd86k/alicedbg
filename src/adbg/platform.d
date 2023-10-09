@@ -12,7 +12,6 @@ import adbg.include.d.config : COMPILER_FEAT_TARGETINFO;
 
 // Other interesting versions:
 // - DRuntime_Use_Libunwind
-// - LDC_LLVM_ (LLVM version, e.g., 1100 for 11.0)
 
 extern (C):
 
@@ -21,6 +20,9 @@ extern (C):
 //
 
 //TODO: Move to config module?
+//      Or their own appropriate modules
+
+//NOTE: These should not be used directly and will likely be removed soon (v1)
 
 /// Amount of pointers to allocate
 enum ADBG_CLI_ARGV_ARRAY_COUNT	= 16;

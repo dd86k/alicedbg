@@ -210,9 +210,6 @@ int adbg_error_system() {
 // ANCHOR Error setters
 //
 
-//TODO: Parameters (at least type-safe variadic strings)
-//      adbg_oops(code, "param1", 2);
-//      or with CS: adbg_oops(code, cs_errno(disasm.cs_handle));
 /// Sets the last error code. The module path and line are automatically
 /// populated.
 /// Params:
@@ -236,8 +233,6 @@ int adbg_oops(AdbgError e, void *res = null, string m = __MODULE__, int l = __LI
 int adbg_errno() {
 	return error.code;
 }
-
-//TODO: adbg_errno_extern_string ?
 
 int adbg_errno_extern() {
 	import core.stdc.errno : errno;

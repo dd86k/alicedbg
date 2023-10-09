@@ -10,13 +10,9 @@ module dumper;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, free;
 import adbg.include.c.stdarg;
-import adbg.error;
-import adbg.v2.object.server;
-import adbg.v2.object.machines : AdbgMachine;
-import adbg.v2.disassembler.core;
+import adbg.v2, adbg.v2.object.machines;
 import adbg.utils.bit : BIT;
-import adbg.utils.file;
-import common, dump.mz, dump.pe, dump.macho, dump.elf;
+import common, utils, dump;
 
 extern (C):
 
@@ -77,7 +73,7 @@ enum DumpOpt {
 int app_dump() {
 	if (globals.flags & DumpOpt.raw) {
 		size_t size = void;
-		ubyte *buffer = adbg_util_readall(&size, globals.file);
+		ubyte *buffer = readall(globals.file, &size);
 		
 		if (buffer == null) {
 			panic(AdbgError.crt);

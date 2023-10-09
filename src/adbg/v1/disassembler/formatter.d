@@ -141,39 +141,30 @@ size_t adbg_disasm_format_operands2(adbg_disasm_t *disasm, ref adbg_string_t s, 
 
 /// 
 // Formats whole line (mnemonic + operands)
-size_t adbg_disasm_format(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op,
-	bool tab = true) {
+size_t adbg_disasm_format(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
 	version (Trace) trace("size=%u", size);
 	
-	import adbg.config : USE_CAPSTONE;
-	
-	static if (USE_CAPSTONE) {
-		import adbg.include.c.stdio : snprintf;
-		
-		return snprintf(buffer, size, "%s%c%s", op.mnemonic, tab ? '\t' : ' ', op.operand_list);
-	} else {
-		if (disasm.opcode.mnemonic == null) {
-			buffer = empty_string;
-			return 0;
-		}
-		
-		adbg_string_t s = adbg_string_t(buffer, size);
-		
-		if (op.prefixCount)
-			adbg_disasm_format_prefixes2(disasm, s, op);
-		
-		adbg_disasm_format_mnemonic2(disasm, s, op);
-		
-		if (op.operandCount || disasm.syntax == AdbgSyntax.hyde) {
-			if (disasm.syntax != AdbgSyntax.hyde)
-				if (s.addc(disasm.userMnemonicTab ? '\t' : ' '))
-					return s.length;
-			
-			return adbg_disasm_format_operands2(disasm, s, op);
-		}
-		
-		return s.length;
+	if (disasm.opcode.mnemonic == null) {
+		buffer = empty_string;
+		return 0;
 	}
+	
+	adbg_string_t s = adbg_string_t(buffer, size);
+	
+	if (op.prefixCount)
+		adbg_disasm_format_prefixes2(disasm, s, op);
+	
+	adbg_disasm_format_mnemonic2(disasm, s, op);
+	
+	if (op.operandCount || disasm.syntax == AdbgSyntax.hyde) {
+		if (disasm.syntax != AdbgSyntax.hyde)
+			if (s.addc(disasm.userMnemonicTab ? '\t' : ' '))
+				return s.length;
+		
+		return adbg_disasm_format_operands2(disasm, s, op);
+	}
+	
+	return s.length;
 }
 
 private
@@ -207,54 +198,30 @@ void adbg_disasm_format_operands_left(adbg_disasm_t *disasm, ref adbg_string_t s
 size_t adbg_disasm_machine(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
 	version (Trace) trace("size=%u", size);
 	
-	import adbg.config : USE_CAPSTONE;
-	
-	static if (USE_CAPSTONE) {
-		if (buffer == null)
-			return 0;
-		if (size == 0 || disasm == null || op == null) {
-			buffer = empty_string;
-			return 0;
-		}
-		
-		adbg_string_t s = adbg_string_t(buffer, size);
-		
-		int opsize = op.size;
-		int e2 = opsize - 1;
-		ubyte *u8 = disasm.last.i8;
-		
-		for (int i; i < opsize; ++i, ++u8) {
-			s.addx8(*u8, true);
-			if (i < e2) s.addc(' ');
-		}
-		
-		return s.length;
-	} else {
-		if (buffer == null)
-			return 0;
-		if (op.machineCount == 0) {
-			buffer = empty_string;
-			return 0;
-		}
-		
-		adbg_string_t s = adbg_string_t(buffer, size);
-		adbg_disasm_machine_t *num = &op.machine[0];
-		
-		//TODO: Unpack option would mean e.g., 4*1byte on i32
-		size_t edge = op.machineCount - 1;
-		A: for (size_t i; i < op.machineCount; ++i, ++num) {
-			switch (num.type) with (AdbgDisasmType) {
-			case i8:  if (s.addx8(num.i8, true)) break A; break;
-			case i16: if (s.addx16(num.i16, true)) break A; break;
-			case i32: if (s.addx32(num.i32, true)) break A; break;
-			case i64: if (s.addx64(num.i64, true)) break A; break;
-			default:  assert(0);
-			}
-			if (i < edge) s.addc(' ');
-		}
-		
-		return s.length;
+	if (buffer == null)
+		return 0;
+	if (op.machineCount == 0) {
+		buffer = empty_string;
+		return 0;
 	}
+	
+	adbg_string_t s = adbg_string_t(buffer, size);
+	adbg_disasm_machine_t *num = &op.machine[0];
+	
+	//TODO: Unpack option would mean e.g., 4*1byte on i32
+	size_t edge = op.machineCount - 1;
+	A: for (size_t i; i < op.machineCount; ++i, ++num) {
+		switch (num.type) with (AdbgDisasmType) {
+		case i8:  if (s.addx8(num.i8, true)) break A; break;
+		case i16: if (s.addx16(num.i16, true)) break A; break;
+		case i32: if (s.addx32(num.i32, true)) break A; break;
+		case i64: if (s.addx64(num.i64, true)) break A; break;
+		default:  assert(0);
+		}
+		if (i < edge) s.addc(' ');
+	}
+	
+	return s.length;
 }
 
 /// Render a number onto a string.

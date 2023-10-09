@@ -8,13 +8,12 @@ module adbg.v2.debugger.context;
 import adbg.v2.debugger.process : adbg_process_t;
 import adbg.include.c.stdio : snprintf;
 import adbg.error;
-import core.stdc.stdarg;
-import core.stdc.string : memset;
 
-//TODO: Register set structures or something
-//      adbg_register_set_t
-//        names[] = [ "abc", ... ]
-//TODO: Support FP registers
+//TODO: Register registers statically
+//      adbg_register_t { string name; int type; etc. }
+//      adbg_register_t[18] registers = [ ... ]
+//      - Remove usage of REG_COUNT
+//TODO: Support FPU registers
 
 version (Windows) {
 	import adbg.include.windows.wow64;
@@ -152,6 +151,7 @@ int adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {
 }
 
 /// Format a register's value into a string buffer.
+/// Errors: invalidOption for format.
 /// Params:
 /// 	buffer = Reference to text buffer.
 /// 	len = Size of buffer.
@@ -164,45 +164,40 @@ size_t adbg_context_format(char *buffer, size_t len, adbg_register_t *reg, int f
 	switch (format) {
 	case FORMAT_NORMAL:
 		switch (reg.type) with (AdbgRegisterSize) {
-		case u8:  len = snprintf(buffer, len, "%u", reg.u8); break;
-		case u16: len = snprintf(buffer, len, "%u", reg.u16); break;
-		case u32: len = snprintf(buffer, len, "%u", reg.u32); break;
-		case u64: len = snprintf(buffer, len, "%llu", reg.u64); break;
-		case f32: len = snprintf(buffer, len, "%f", reg.f32); break;
-		case f64: len = snprintf(buffer, len, "%f", reg.f64); break;
+		case u8:  return snprintf(buffer, len, "%u", reg.u8);
+		case u16: return snprintf(buffer, len, "%u", reg.u16);
+		case u32: return snprintf(buffer, len, "%u", reg.u32);
+		case u64: return snprintf(buffer, len, "%llu", reg.u64);
+		case f32: return snprintf(buffer, len, "%f", reg.f32);
+		case f64: return snprintf(buffer, len, "%f", reg.f64);
 		default:
 			adbg_oops(AdbgError.assertion);
 			return 0;
 		}
-		break;
 	case FORMAT_HEX:
 		switch (reg.type) with (AdbgRegisterSize) {
-		case u8:       len = snprintf(buffer, len, "%x", reg.u8); break;
-		case u16:      len = snprintf(buffer, len, "%x", reg.u16); break;
-		case u32, f32: len = snprintf(buffer, len, "%x", reg.u32); break;
-		case u64, f64: len = snprintf(buffer, len, "%llx", reg.u64); break;
+		case u8:       return snprintf(buffer, len, "%x", reg.u8);
+		case u16:      return snprintf(buffer, len, "%x", reg.u16);
+		case u32, f32: return snprintf(buffer, len, "%x", reg.u32);
+		case u64, f64: return snprintf(buffer, len, "%llx", reg.u64);
 		default:
 			adbg_oops(AdbgError.assertion);
 			return 0;
 		}
-		break;
 	case FORMAT_HEXPADDED:
 		switch (reg.type) with (AdbgRegisterSize) {
-		case u8:       len = snprintf(buffer, len, "%02x", reg.u8); break;
-		case u16:      len = snprintf(buffer, len, "%04x", reg.u16); break;
-		case u32, f32: len = snprintf(buffer, len, "%08x", reg.u32); break;
-		case u64, f64: len = snprintf(buffer, len, "%016llx", reg.u64); break;
+		case u8:       return snprintf(buffer, len, "%02x", reg.u8);
+		case u16:      return snprintf(buffer, len, "%04x", reg.u16);
+		case u32, f32: return snprintf(buffer, len, "%08x", reg.u32);
+		case u64, f64: return snprintf(buffer, len, "%016llx", reg.u64);
 		default:
 			adbg_oops(AdbgError.assertion);
 			return 0;
 		}
-		break;
 	default:
-		//TODO: Invalid format code
-		adbg_oops(AdbgError.assertion);
+		adbg_oops(AdbgError.invalidOption);
 		return 0;
 	}
-	return len;
 }
 
 private:

@@ -195,10 +195,6 @@ int adbg_dasm_process_exception(adbg_disassembler_t *dasm, adbg_process_t *trace
 	return 0;
 }
 
-//TODO: bool adbg_dasm_available()
-//      Try to unconditionally load capstone
-//      or bool adbg_available(FEATURE)
-
 /// Open a disassembler instance.
 /// Params:
 ///   dasm = Reference to disassembler instance.

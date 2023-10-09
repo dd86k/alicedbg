@@ -12,7 +12,6 @@ import core.stdc.string;
 extern (C):
 
 /// An empty string in case compilers does not support pool strings.
-//TODO: Made it const(char)*? Forgot why it's char*.
 __gshared char *empty_string = cast(char*)"";
 
 /// Gets the next line out of a file stream.
@@ -139,7 +138,6 @@ int adbg_util_hex_array(ubyte *dst, size_t sz, const(char) *src, ref size_t news
 		char c = src[si];
 		if (c == 0) break;
 		
-		//TODO: Use isxdigit
 		if (c >= '0' && c <= '9') {
 			b = cast(ubyte)(c - '0');
 		} else if (c >= 'a' && c <= 'f') {
@@ -171,7 +169,6 @@ int adbg_util_hex_array(ubyte *dst, size_t sz, const(char) *src, ref size_t news
 	assert(buf[2] == 0xcc);
 }
 
-//TODO: adbg_util_argv_flatten: custom loop
 size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 	if (argv == null)
 		return 0;
