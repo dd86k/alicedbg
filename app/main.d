@@ -11,8 +11,7 @@ import adbg.include.c.stdlib : exit;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
-import common, dumper;
-import shell;
+import common, dumper, shell;
 
 private:
 extern (C):
@@ -84,26 +83,21 @@ struct option_t {
 		extern(C) int function(const(char)*) fa;
 	}
 }
-//TODO: --loop-log for turning the loop UI into an non-interactive session
-//TODO: --seh/--no-seh: Enable/disable internal SEH
-//TODO: -B/--disasm-base: base address (useful for COM files / org 0x100)
-//TODO: -e/--dump-skip: skip N bytes (or do +N)
-//TODO: rename --pid to --attach
+//TODO: --dump-headers/--dump-exports is more memorable than --dump --show he (for headers+exports)
+//TODO: --dump-raw or --dump-file-raw?
 immutable option_t[] options = [
 	// general
-	{ 'a', "arch",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
+	{ 'm', "arch",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
 	{ 's', "syntax",	"Select disassembler syntax (default=platform)", true, fa: &cli_syntax },
 	// debugger
-	{ 'f', "file",	"Debugger: Load executable (default parameter)", true, fa: &cli_file },
-	{ 0,   "args",	"Debugger: Supply arguments to executable, '--' works too", true, fa: &cli_args },
+	{ 0,   "file",	"Debugger: Spawn FILE for debugging", true, fa: &cli_file },
+	{ 0,   "args",	"Debugger: Supply arguments to executable", true, fa: &cli_args },
 	{ 'E', "env",	"Debugger: Supply environment variables to executable", true, fa: &cli_env },
-	{ 'p', "pid",	"Debugger: Attach to process", true, fa: &cli_pid },
-	{ 'U', "ui",	"Debugger: Select debugger user interface (default=cmd)", true, fa: &cli_ui },
+	{ 'p', "attach-pid",	"Debugger: Attach to Process ID", true, fa: &cli_pid },
 	// dumper
 	{ 'D', "dump",	"Dumper: Dump an object file", false, &cli_dump },
 	{ 'R', "raw",	"Dumper: Specify object is raw", false, &cli_raw },
 	{ 'S', "show",	"Dumper: Select which part of the object to display (default=h)", true, fa: &cli_show },
-//	{ 'l', "length",	"Dumper: ", true, &cli_length },
 	// pages
 	{ 'h', "help",	"Show this help screen and exit", false, &cli_help },
 	{ 0,   "version",	"Show the version screen and exit", false, &cli_version },
@@ -230,37 +224,6 @@ int cli_pid(const(char) *val) {
 }
 
 //
-// ANCHOR --ui
-//
-
-struct setting_ui_t {
-	SettingUI val;
-	immutable(char)* opt, desc;
-}
-immutable setting_ui_t[] uis = [
-	{ SettingUI.loop,   "loop",   "Simple loop interface (default)" },
-	{ SettingUI.cmd,    "cmd",    "(wip) Command-line interface" },
-//	{ SettingUI.tui,    "tui",    "(wip) Interractive text user interface" },
-//	{ SettingUI.server, "server", "(wip) TCP/IP server" },
-];
-int cli_ui(const(char)* val) {
-	if (wantsHelp(val)) {
-		puts("Available UIs:");
-		foreach (setting_ui_t ui; uis) {
-			printf("%-10s%s\n", ui.opt, ui.desc);
-		}
-		exit(0);
-	}
-	foreach (setting_ui_t ui; uis) {
-		if (strcmp(val, ui.opt) == 0) {
-			globals.ui = ui.val;
-			return 0;
-		}
-	}
-	return EXIT_FAILURE;
-}
-
-//
 // ANCHOR --dump
 //
 
@@ -340,7 +303,7 @@ int cli_help() {
 	"\n"~
 	"USAGE\n"~
 	" alicedbg FILE [OPTIONS...]\n"~
-	" alicedbg --pid ID [OPTIONS...]\n"~
+	" alicedbg --attach-pid PID [OPTIONS...]\n"~
 	" alicedbg --dump FILE [OPTIONS...]\n"~
 	" alicedbg {-h|--help|--version|--license}\n"~
 	"\n"~
@@ -512,13 +475,7 @@ int main(int argc, const(char)** argv) {
 	switch (globals.mode) {
 	case SettingMode.dump: return app_dump();
 	case SettingMode.debugger:
-		switch (globals.ui) {
-		case SettingUI.tcpserver:
-			puts("main: tcp-server not yet supported");
-			return EXIT_FAILURE;
-		default:
-			return shell_loop;
-		}
+		return shell_loop;
 	default: assert(0, "Implement SettingMode");
 	}
 }

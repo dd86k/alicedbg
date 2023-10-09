@@ -72,7 +72,6 @@ enum SettingUI { cmd, loop, tcpserver }
 struct settings_t {
 	/// CLI settings
 	SettingMode mode;	/// Application mode
-	SettingUI ui;	/// Debugger user interface
 	const(char) *file;	/// Debuggee: file
 	const(char) **args;	/// Debuggee: argument vector
 	const(char) **env;	/// Debuggee: environement vector

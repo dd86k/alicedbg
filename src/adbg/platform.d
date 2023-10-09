@@ -1,4 +1,4 @@
-/// Informational compile constants.
+/// Platform compilation information.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -37,10 +37,10 @@ enum ADBG_CHILD_STACK_SIZE	= 1024 * 1024 * 8;
 // Constants
 //
 
-/// Library version
-enum ADBG_VERSION = "0.1.0";
+/// Library version.
+enum ADBG_VERSION = "0.1.0-alpha.1";
 
-debug enum __BUILDTYPE__ = "debug";	/// Ditto
+debug enum __BUILDTYPE__ = "debug";	/// Library build type.
 else  enum __BUILDTYPE__ = "release";	/// Ditto
 
 //
@@ -57,8 +57,7 @@ version (X86) {
 	enum TARGET_PLATFORM = "arm_a32";	/// Ditto
 } else version (AArch64) {
 	enum TARGET_PLATFORM = "arm_a64";	/// Ditto
-}
-else
+} else
 	static assert(0, "Platform not supported.");
 
 //
@@ -252,10 +251,8 @@ struct adbg_info_t {
 	const(char) *dflags  = D_FEATURES;	/// D compile features.
 }
 
-/**
- * Get compilation information structure.
- * Returns: AdbgInfo structure pointer
- */
+/// Get compilation information structure.
+/// Returns: AdbgInfo structure pointer
 immutable(adbg_info_t)* adbg_info() {
 	static immutable adbg_info_t info;
 	return &info;
