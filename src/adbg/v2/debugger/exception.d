@@ -243,12 +243,8 @@ AdbgException adbg_exception_from_os(uint code, uint subcode = 0) {
 }
 
 /// Get a short descriptive string for an exception type value.
-///
-/// The names are uppercased.
-///
-/// Params: code = ExceptionType
-///
-/// Returns: String
+/// Params: ex = Exception.
+/// Returns: String or null. Names are uppercased.
 const(char) *adbg_exception_name(adbg_exception_t *ex) {
 	if (ex == null) return null;
 	switch (ex.type) with (AdbgException) {
@@ -256,7 +252,7 @@ const(char) *adbg_exception_name(adbg_exception_t *ex) {
 	case Exit:	return "TERMINATED";
 	case Breakpoint:	return "BREAKPOINT";
 	case Step:	return "SINGLE STEP";
-	case Fault:
+	case Fault: //TODO: (0.2) Makes "ACCESS VIOLATION" default
 		version (Windows) return "ACCESS VIOLATION";
 		else return "SEGMENTATION FAULT";
 	case BoundExceeded:	return "OUT OF BOUNDS";

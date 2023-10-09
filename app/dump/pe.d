@@ -16,9 +16,11 @@ import common, dumper;
 
 extern (C):
 
-/// Dump PE32 info to stdout.
-/// Params: dump = Dump structure
-/// Returns: Non-zero on error
+/// Print PE object.
+/// Params:
+///   o = Object.
+///   flags = Dump settings.
+/// Returns: Non-zero on error.
 int dump_pe(adbg_object_t *o, uint flags) {
 	if (flags & DumpOpt.header) {
 		if (dump_pe_hdr(o))

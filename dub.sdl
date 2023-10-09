@@ -34,6 +34,7 @@ subConfiguration "bindbc-loader" "yesBC"
 #       -gdc-betterc build types in the future.
 
 #TODO: Consider renaming version Trace to AdbgTrace to avoid library conflicts
+#TODO: Make docs/ddox builds only peek in src/ and not in app/
 
 #
 # ANCHOR Configurations

@@ -328,8 +328,8 @@ int adbg_dasm_start(adbg_disassembler_t *dasm, void *data, size_t size) {
 
 /// Disassemble one instruction.
 /// Params:
-///   dasm = Reference to disassembler instance.
-///   opcpde = Reference to an option instance.
+///   dasm = Disassembler instance.
+///   opcode = Opcode instance.
 /// Returns: Error code.
 int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	if (dasm == null || opcode == null)
@@ -359,6 +359,13 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	return 0;
 }
 
+/// Setup buffer and disassemble one instruction.
+/// Params:
+///   dasm = Disassembler instance.
+///   opcode = Opcode instance.
+///   data = Pointer to user buffer.
+///   size = Size of user buffer.
+/// Returns: Error code.
 int adbg_dasm_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, void *data, size_t size) {
 	int e = adbg_dasm_start(dasm, data, size);
 	return e ? e : adbg_dasm(dasm, opcode);

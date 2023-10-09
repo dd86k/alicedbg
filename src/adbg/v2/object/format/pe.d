@@ -589,8 +589,8 @@ struct PE_SECTION_ENTRY { align(1):
 }
 
 /// (Internal) Called by the server to preload a PE object.
-/// Params: obj = Object
-/// Returns: Status code
+/// Params: o = Object instance.
+/// Returns: Error code.
 int adbg_object_pe_load(adbg_object_t *o) {
 	if (o.file_size < MINIMUM_SIZE)
 		return adbg_oops(AdbgError.objectTooSmall);

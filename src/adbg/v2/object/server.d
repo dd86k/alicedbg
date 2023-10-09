@@ -373,7 +373,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 }
 
 /// Get the short name of the loaded object format.
-/// Params: obj = Loaded object reference.
+/// Params: o = Object instance.
 /// Returns: Object format name.
 const(char)* adbg_object_short_name(adbg_object_t *o) {
 	if (o == null)
@@ -392,7 +392,7 @@ L_UNKNOWN:
 }
 
 /// Get the name of the loaded object format.
-/// Params: obj = Loaded object reference.
+/// Params: o = Object instance.
 /// Returns: Object format name.
 const(char)* adbg_object_name(adbg_object_t *o) {
 	if (o == null)

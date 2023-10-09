@@ -13,10 +13,11 @@ import dumper;
 
 extern (C):
 
-/// Print MZ info to stdout, a file_info_t structure must be loaded before
-/// calling this function.
-/// Params: dump = Dump structure
-/// Returns: Non-zero on error
+/// Print MZ object.
+/// Params:
+///   o = Object.
+///   flags = Dump settings.
+/// Returns: Non-zero on error.
 int dump_mz(adbg_object_t *o, uint flags) {
 	if (flags & DumpOpt.header)
 		dump_mz_hdr(o);
