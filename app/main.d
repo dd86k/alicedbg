@@ -87,7 +87,7 @@ struct option_t {
 //TODO: --dump-raw or --dump-file-raw?
 immutable option_t[] options = [
 	// general
-	{ 'm', "arch",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
+	{ 'a', "arch",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
 	{ 's', "syntax",	"Select disassembler syntax (default=platform)", true, fa: &cli_syntax },
 	// debugger
 	{ 0,   "file",	"Debugger: Spawn FILE for debugging", true, fa: &cli_file },
