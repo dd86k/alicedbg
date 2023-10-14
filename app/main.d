@@ -305,7 +305,7 @@ int cli_help() {
 	" alicedbg FILE [OPTIONS...]\n"~
 	" alicedbg --attach-pid PID [OPTIONS...]\n"~
 	" alicedbg --dump FILE [OPTIONS...]\n"~
-	" alicedbg {-h|--help|--version|--license}\n"~
+	" alicedbg {-h|--help|--version|--ver|--license}\n"~
 	"\n"~
 	"OPTIONS"
 	);
