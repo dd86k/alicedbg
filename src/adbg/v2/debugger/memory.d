@@ -391,7 +391,7 @@ L_OPT:
 			
 			//TODO: Adjust memory region permissions like libscanmem does
 			
-			version (Trace) trace("entry: %zx %s", range_start, path.ptr);
+			version (Trace) trace("entry: %zx %s", range_start, map.name.ptr);
 			
 			map.base = cast(void*)range_start;
 			map.size = range_end - range_start;

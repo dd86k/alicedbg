@@ -342,12 +342,19 @@ int cli_version() {
 	
 	import adbg.include.capstone : capstone_dyn_init, cs_version;
 	printf("Capstone: ");
-	if (capstone_dyn_init() == false) {
+	if (capstone_dyn_init()) {
+		puts("error");
+		version (Trace) {
+			import adbg.error : trace;
+			import bindbc.loader.sharedlib : errors;
+			foreach (e; errors) {
+				trace("%s", e.message);
+			}
+		}
+	} else {
 		int major = void, minor = void;
 		cs_version(&major, &minor);
 		printf("%d.%d\n", major, minor);
-	} else {
-		puts("error");
 	}
 	
 	exit(0);

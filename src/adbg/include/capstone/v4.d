@@ -814,7 +814,7 @@ __gshared pcs_op_count cs_op_count;
 __gshared pcs_op_index cs_op_index;
 __gshared pcs_regs_access cs_regs_access;
 
-size_t capstone_dyn_init()
+bool capstone_dyn_init()
 {
     version (Windows)
     {
@@ -841,7 +841,8 @@ size_t capstone_dyn_init()
     foreach (libname; libraries)
     {
         if ((lib = load(libname)) == invalidHandle)
-            return true;
+            continue;
+        break;
     }
     
     bindSymbol(lib, cast(void**)&cs_version, "cs_version");
@@ -866,7 +867,7 @@ size_t capstone_dyn_init()
     bindSymbol(lib, cast(void**)&cs_op_index, "cs_op_index");
     bindSymbol(lib, cast(void**)&cs_regs_access, "cs_regs_access");
     
-    return errorCount();
+    return errorCount() > 0;
 }
 
 }
