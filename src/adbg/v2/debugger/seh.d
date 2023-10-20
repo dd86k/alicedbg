@@ -1,4 +1,4 @@
-/// (Incomplete module) Structued Exception Handling wrapper.
+/// (Work in progress) Structued Exception Handling wrapper.
 /// 
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -48,7 +48,7 @@ version (Windows) {
 
 extern (C):
 
-version (none)
+version (none) // Disabled until setjmp works on Win64
 public int adbg_seh_enable(int function(adbg_exception_t*) func) {
 	if (func == null)
 		return adbg_oops(AdbgError.nullArgument);
@@ -134,11 +134,11 @@ void adbg_seh_catch(int sig, siginfo_t *si, void *p) {
 
 	checkpoint.exception.oscode = sig;
 	// HACK: Missing ref'd D bindings to Musl
-	version (CRuntime_Glibc)
+	/*version (CRuntime_Glibc)
 		checkpoint.exception.fault_address = cast(ulong)si._sifields._sigfault.si_addr;
 	else version (CRuntime_Musl)
 		checkpoint.exception.fault_address = cast(ulong)si.__si_fields.__sigfault.si_addr;
-	else static assert(0, "hack me");
+	else static assert(0, "hack me");*/
 
 	/+mexception.pid = mexception.tid = 0;
 	adbg_ctx_init(&mexception.registers);

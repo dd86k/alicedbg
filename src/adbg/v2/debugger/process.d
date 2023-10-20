@@ -675,17 +675,19 @@ L_DEBUG_LOOP:
 		//   - First SIGTRAP does NOT contain int3
 		//     - Windows does, though, and points to it
 		// - gdbserver and lldb never attempt to do such thing anyway
+		// NOTE: Newer D compilers fixed siginfo_t as a whole
+		//       for version (linux). Noticed on DMD 2.103.1.
+		//       Old glibc: ._sifields._sigfault.si_addr
+		//       Old musl: .__si_fields.__sigfault.si_addr
+		//       New: ._sifields._sigfault.si_addr & .si_addr()
+		// NOTE: .si_addr() emits linker errors on Musl platforms.
 		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 			siginfo_t sig = void;
 			if (ptrace(PT_GETSIGINFO, tracee.pid, null, &sig) < 0) {
 				exception.fault_address = 0;
 				break;
 			}
-			version (CRuntime_Glibc)
-				exception.fault_address = cast(ulong)sig._sifields._sigfault.si_addr;
-			else version (CRuntime_Musl)
-				exception.fault_address = cast(ulong)sig.__si_fields.__sigfault.si_addr;
-			else static assert(0, "hack me");
+			exception.fault_address = cast(size_t)sig._sifields._sigfault.si_addr;
 			break;
 //		case SIGINT, SIGTERM, SIGABRT: //TODO: Killed?
 		default:

@@ -568,15 +568,11 @@ L_DEBUG_LOOP:
 		// - gdbserver and lldb never attempt to do such thing anyway
 		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 			siginfo_t sig = void;
-			if (ptrace(PT_GETSIGINFO, g_debuggee.pid, null, &sig) >= 0) {
-				version (CRuntime_Glibc)
-					e.fault.raw = sig._sifields._sigfault.si_addr;
-				else version (CRuntime_Musl)
-					e.fault.raw = sig.__si_fields.__sigfault.si_addr;
-				else static assert(0, "hack me");
-			} else {
+			if (ptrace(PT_GETSIGINFO, g_debuggee.pid, null, &sig) < 0) {
 				e.fault.raw = null;
+				break;
 			}
+			e.fault.raw = sig._sifields._sigfault.si_addr;
 			break;
 //		case SIGINT, SIGTERM, SIGABRT: //TODO: Kill?
 		default:
