@@ -402,8 +402,6 @@ template ADBG_TYPE(T) {
 		enum ADBG_TYPE = AdbgDisasmType.i64;
 }
 
-private __gshared bool lib_cs_loaded = false;
-
 int adbg_disasm_init(adbg_disasm_t *disasm) {
 	version (Trace) trace("disasm=%p", disasm);
 	
@@ -618,8 +616,6 @@ int adbg_disasm(adbg_disasm_t *disasm, adbg_disasm_opcode_t *op) {
 	
 	if (disasm == null || op == null)
 		return adbg_oops(AdbgError.nullArgument);
-	if (lib_cs_loaded == false)
-		return adbg_oops(AdbgError.uninitiated);
 	
 	with (op) { // reset opcode
 		mnemonic = segment = null;

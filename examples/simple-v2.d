@@ -75,14 +75,16 @@ L_PROMPT:
 	case 's':
 		puts("Stepping...");
 		adbg_stepi(&process);
-		return;
+		goto L_PROMPT;
 	case 'c':
 		puts("Continuing...");
-		return;
+		adbg_continue(&process);
+		goto L_PROMPT;
 	case 'q':
 		puts("Quitting...");
 		exit(0);
 		goto default;
-	default: goto L_PROMPT;
+	default:
+		goto L_PROMPT;
 	}
 }
