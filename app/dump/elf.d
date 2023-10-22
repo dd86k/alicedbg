@@ -214,11 +214,10 @@ void dump_elf_sections(adbg_object_t *o) {
 		}
 		
 		char *table = o.bufferc + offset; // string table
-		uint count;
 		for (uint i; i < section_count; ++i) {
 			Elf32_Shdr *shdr = adbg_object_elf_shdr32(o, i);
 			with (shdr) {
-			dprint_section(++count, table + sh_name, 32);
+			dprint_section(i + 1, table + sh_name, 32);
 			dprint_x32("sh_name", sh_name);
 			dprint_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
 			dprint_x32("sh_flags", sh_flags);
@@ -267,11 +266,10 @@ void dump_elf_sections(adbg_object_t *o) {
 		}
 		
 		char *table = o.bufferc + offset; // string table
-		uint count;
 		for (uint i; i < section_count; ++i) {
 			Elf64_Shdr *shdr = adbg_object_elf_shdr64(o, i);
 			with (shdr) {
-			dprint_section(++count, table + sh_name, 32);
+			dprint_section(i + 1, table + sh_name, 32);
 			dprint_x32("sh_name", sh_name);
 			dprint_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
 			dprint_flags64("sh_flags", sh_flags,
