@@ -11,12 +11,6 @@ import adbg.v2;
 
 extern (C):
 
-void die(int code = 0, const(char) *reason = null) {
-	printf("error: %s\n", reason ? reason : adbg_error_msg);
-	if (code == 0) code = adbg_errno;
-	exit(code);
-}
-
 int main(int argc, const(char) **argv) {
 	if (argc < 2)
 		die(1, "Missing path");
@@ -28,8 +22,51 @@ int main(int argc, const(char) **argv) {
 	if (feature_disasm == false)
 		printf("warning: Disassembler unavailable (%s)", adbg_error_msg);
 	
-	LOOP: adbg_wait(&process, &loop_handler);
+	// Process input
+LOOP:
+	switch (choice("Action [?=Help]")) {
+	case '?':
+		puts(
+		"s - Instruction step.\n"~
+		"c - Continue.\n"~
+		"q - Quit."
+		);
+		goto LOOP;
+	case 's':
+		puts("Stepping...");
+		adbg_stepi(&process);
+		break;
+	case 'c':
+		puts("Continuing...");
+		adbg_continue(&process);
+		break;
+	case 'q':
+		puts("Quitting...");
+		exit(0);
+		goto default;
+	default:
+		goto LOOP;
+	}
+	
+	adbg_wait(&process, &loop_handler);
 	goto LOOP;
+}
+
+private: // Shuts up dscanner
+
+void die(int code = 0, const(char) *reason = null) {
+	printf("error: %s\n", reason ? reason : adbg_error_msg);
+	if (code == 0) code = adbg_errno;
+	exit(code);
+}
+
+int choice(const(char) *msg) {
+	import core.stdc.ctype : isprint;
+	printf("\n%s: ", msg);
+INPUT:
+	int c = getchar;
+	if (isprint(c)) return c;
+	goto INPUT;
 }
 
 __gshared adbg_disassembler_t dasm;
@@ -53,38 +90,11 @@ void loop_handler(adbg_exception_t *ex) {
 		adbg_opcode_t op = void;
 		if (adbg_dasm_process_exception(&dasm, &process, ex, &op)) {
 			printf(" (error:%s)\n", adbg_error_msg);
-			goto L_PROMPT;
+			return;
 		}
 		if (op.operands)
 			printf(" (%s %s)\n", op.mnemonic, op.operands);
 		else
 			printf(" (%s)\n", op.mnemonic);
-	}
-	
-	// Process input
-L_PROMPT:
-	printf("\nAction [?=Help]: ");
-	switch (getchar()) {
-	case '?':
-		puts(
-		"s - Instruction step.\n"~
-		"c - Continue.\n"~
-		"q - Quit."
-		);
-		goto L_PROMPT;
-	case 's':
-		puts("Stepping...");
-		adbg_stepi(&process);
-		goto L_PROMPT;
-	case 'c':
-		puts("Continuing...");
-		adbg_continue(&process);
-		goto L_PROMPT;
-	case 'q':
-		puts("Quitting...");
-		exit(0);
-		goto default;
-	default:
-		goto L_PROMPT;
 	}
 }

@@ -27,9 +27,18 @@ int main(int argc, const(char) **argv) {
 	return adbg_run(&loop_handler);
 }
 
-private:
+private: // Shuts up dscanner
 
 __gshared adbg_disasm_t dism;
+
+int choice(const(char) *msg) {
+	import core.stdc.ctype : isprint;
+	printf("\n%s: ", msg);
+INPUT:
+	int c = getchar;
+	if (isprint(c)) return c;
+	goto INPUT;
+}
 
 int loop_handler(exception_t *e) {
 	__gshared uint ex_num; /// Exception number
@@ -58,8 +67,7 @@ int loop_handler(exception_t *e) {
 	
 	// Process input
 L_PROMPT:
-	printf("\nAction [s=Step,c=Continue,q=Quit]: ");
-	switch (getchar()) with (AdbgAction) {
+	switch (choice("Action [s=Step,c=Continue,q=Quit]")) with (AdbgAction) {
 	case 's': puts("Stepping...");	return step;
 	case 'c': puts("Continuing...");	return proceed;
 	case 'q': puts("Quitting...");	return exit;
