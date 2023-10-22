@@ -229,7 +229,7 @@ void dump_pe_sections(adbg_object_t *o) {
 	PE_SECTION_ENTRY *section = void;
 	size_t i;
 	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
-		dprint_section(cast(uint)i + 1, Name.ptr, 8);
+		dprint_section(cast(uint)i, Name.ptr, 8);
 		dprint_x32("VirtualAddress", VirtualAddress);
 		dprint_x32("VirtualSize", VirtualSize);
 		dprint_x32("PointerToRawData", PointerToRawData);
