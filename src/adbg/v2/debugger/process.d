@@ -14,7 +14,6 @@ module adbg.v2.debugger.process;
 import adbg.include.c.stdlib : malloc, free;
 import adbg.include.c.stdio : snprintf;
 import adbg.include.c.stdarg;
-import core.stdc.config : c_long;
 import core.stdc.string : memset;
 import adbg.platform, adbg.error;
 import adbg.utils.strings : adbg_util_argv_flatten;
@@ -23,6 +22,7 @@ import adbg.v2.debugger.breakpoint : adbg_breakpoint_t;
 
 //TODO: Process Pause/Resume
 //      Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
+//      Linux: Send SIGSTOP/SIGCONT signals via kill(2)
 //TODO: List threads of process
 
 version (Windows) {
@@ -50,15 +50,16 @@ extern (C):
 
 //TODO: Deprecate debugger status and replace with process status
 //      In a way, it's already the case, but it's not being presented as such
+//      adbg_status -> adbg_process_status
 /// Debugger status
 enum AdbgStatus : ubyte {
-	unloaded,	/// No No tracee is loaded.
+	unloaded,	/// Process is not unloaded.
+	unknown = unloaded,	/// Alias for idle.
+	standby,	/// Process is loaded and waiting to run.
+	running,	/// Process is running.
+	paused,	/// Process is paused due to an exception or by the debugger.
 	idle = unloaded,	/// Old v1 alias for unloaded.
-	unknown = unloaded,	/// Alias for idle
-	standby,	/// Tracee is loaded and waiting to run.
 	ready = standby,	/// Old v1 alias for standby.
-	running,	/// Tracee is running.
-	paused,	/// Tracee is paused due to an exception.
 }
 
 /// Debugger event
@@ -80,12 +81,14 @@ struct adbg_debugger_event_t {
 	}
 }+/
 
+/// Process creation source.
 enum AdbgCreation : ubyte {
 	unloaded,
 	attached,
 	spawned,
 }
 
+/// Represents an instance of a process.
 struct adbg_process_t {
 	version (Windows) {
 		int pid;	/// Process identificiation number
@@ -100,7 +103,7 @@ struct adbg_process_t {
 	}
 	/// Current process status.
 	AdbgStatus status;
-	/// 
+	/// Process' creation source.
 	AdbgCreation creation;
 	/// List of breakpoints.
 	adbg_breakpoint_t *breakpoints;
@@ -155,6 +158,8 @@ struct adbg_options_spawn_t {
 	
 	return adbg_spawn_optionsv(opts, list);
 }*/
+// experimental internal call to judge if "building" the options will be useful
+// to someone in the future
 private
 int adbg_spawn_optionsv(adbg_options_spawn_t *opts, va_list list) {
 	if (opts == null)
@@ -164,6 +169,7 @@ int adbg_spawn_optionsv(adbg_options_spawn_t *opts, va_list list) {
 	
 L_OPTION:
 	switch (va_arg!int(list)) {
+	case 0: break;
 	case AdbgSpawnOpt.args:
 		opts.args = va_arg!(const(char)*)(list);
 		goto L_OPTION;
@@ -174,6 +180,7 @@ L_OPTION:
 		opts.dir = va_arg!(const(char)*)(list);
 		goto L_OPTION;
 	default:
+		return adbg_oops(AdbgError.invalidOption);
 	}
 	
 	return 0;
@@ -310,6 +317,7 @@ int adbg_spawn2(adbg_process_t *tracee, const(char) *path, adbg_options_spawn_t 
 			}
 
 			// Clone
+			//TODO: Get default stack size
 			__adbg_child_t chld = void;
 			chld.envp = cast(const(char)**)&__envp;
 			chld.argv = cast(const(char)**)&__argv;
@@ -404,13 +412,15 @@ int adbg_attach(adbg_process_t *tracee, int pid, ...) {
 	
 L_OPTION:
 	switch (va_arg!int(list)) {
+	case 0: break;
 	case AdbgAttachOpt.continue_:
-		continue_ = true;
+		continue_ = va_arg!bool(list);
 		goto L_OPTION;
 	case AdbgAttachOpt.exitkill:
-		exitkill = true;
+		exitkill = va_arg!bool(list);
 		goto L_OPTION;
 	default:
+		return adbg_oops(AdbgError.invalidOption);
 	}
 	
 	tracee.creation = AdbgCreation.attached;
@@ -764,7 +774,9 @@ int adbg_continue(adbg_process_t *tracee) {
 	return 0;
 }
 
-
+/// Performs an instruction step for the debuggee process.
+/// Params: tracee = Process being debugged.
+/// Returns: Error code.
 int adbg_stepi(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.nullArgument);
@@ -811,7 +823,11 @@ int adbg_stepi(adbg_process_t *tracee) {
 	}
 }
 
-
+/// Get the debugged process' ID.
+///
+/// This is valid regardless if process was attached or not.
+/// Params: tracee = Debugged process.
+/// Returns: Error code.
 int adbg_process_pid(adbg_process_t *tracee) {
 	if (tracee == null) return 0;
 	return tracee.pid;
