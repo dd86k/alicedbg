@@ -83,8 +83,6 @@ struct option_t {
 		extern(C) int function(const(char)*) fa;
 	}
 }
-//TODO: --dump-headers/--dump-exports is more memorable than --dump --show he (for headers+exports)
-//TODO: --dump-raw or --dump-file-raw?
 immutable option_t[] options = [
 	// general
 	{ 'a', "arch",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
@@ -93,11 +91,21 @@ immutable option_t[] options = [
 	{ 0,   "file",	"Debugger: Spawn FILE for debugging", true, fa: &cli_file },
 	{ 0,   "args",	"Debugger: Supply arguments to executable", true, fa: &cli_args },
 	{ 'E', "env",	"Debugger: Supply environment variables to executable", true, fa: &cli_env },
-	{ 'p', "attach-pid",	"Debugger: Attach to Process ID", true, fa: &cli_pid },
+	{ 'p', "attach",	"Debugger: Attach to Process ID", true, fa: &cli_pid },
 	// dumper
-	{ 'D', "dump",	"Dumper: Dump an object file", false, &cli_dump },
-	{ 'R', "raw",	"Dumper: Specify object is raw", false, &cli_raw },
-	{ 'S', "show",	"Dumper: Select which part of the object to display (default=h)", true, fa: &cli_show },
+	{ 'D', "dump",	"Aliased to --dump-headers", false, &cli_dump },
+	{ 0,   "dump-headers",	"Dump object's headers", false, &cli_dump_headers },
+	{ 0,   "dump-sections",	"Dump object's sections", false, &cli_dump_sections },
+	{ 0,   "dump-imports",	"Dump object's import information", false, &cli_dump_imports },
+	{ 0,   "dump-exports",	"Dump object's export information", false, &cli_dump_exports },
+	{ 0,   "dump-loadcfg",	"Dump object's load configuration", false, &cli_dump_loadcfg },
+//	{ 0,   "dump-source",	"Dump object's source with disassembly", false, &cli_dump_source },
+	{ 0,   "dump-reloc",	"Dump object's relocations", false, &cli_dump_reloc },
+//	{ 0,   "dump-debug",	"Dump object's debug information", false, &cli_dump_debug },
+	{ 0,   "dump-disasm",	"Dump object's disassembly", false, &cli_dump_disasm },
+	{ 0,   "dump-disasm-all",	"Dump object's disassembly for all sections", false, &cli_dump_disasm_all },
+	{ 0,   "dump-disasm-stats",	"Dump object's disassembly statistics", false, &cli_dump_disasm_stats },
+	{ 0,   "dump-blob",	"Dump as raw binary blob", false, &cli_dump_blob },
 	// pages
 	{ 'h', "help",	"Show this help screen and exit", false, &cli_help },
 	{ 0,   "version",	"Show the version screen and exit", false, &cli_version },
@@ -215,20 +223,11 @@ int cli_env(const(char) *val) {
 }
 
 //
-// ANCHOR --pid
+// ANCHOR --attach
 //
 
 int cli_pid(const(char) *val) {
 	globals.pid = cast(ushort)strtol(val, null, 10);
-	return EXIT_SUCCESS;
-}
-
-//
-// ANCHOR --dump
-//
-
-int cli_dump() {
-	globals.mode = SettingMode.dump;
 	return EXIT_SUCCESS;
 }
 
@@ -242,55 +241,64 @@ int cli_analyze() {
 }
 
 //
-// ANCHOR --raw
+// ANCHOR --dump-*
 //
 
-int cli_raw() {
+// Dump default
+int cli_dump() {
+	globals.mode = SettingMode.dump;
+	globals.flags |= DumpOpt.header;
+	return 0;
+}
+int cli_dump_headers() {
+	globals.mode = SettingMode.dump;
+	globals.flags |= DumpOpt.header;
+	return 0;
+}
+int cli_dump_sections() {
+	globals.mode = SettingMode.dump;
+	globals.flags |= DumpOpt.sections;
+	return 0;
+}
+int cli_dump_imports() {
+	globals.mode = SettingMode.dump;
+	globals.flags |= DumpOpt.imports;
+	return 0;
+}
+int cli_dump_exports() {
+	globals.mode = SettingMode.dump;
+	globals.flags |= DumpOpt.exports;
+	return 0;
+}
+int cli_dump_loadcfg() {
+	globals.mode = SettingMode.dump;
+	globals.flags |= DumpOpt.loadcfg;
+	return 0;
+}
+int cli_dump_reloc() {
+	globals.mode = SettingMode.dump;
+	globals.flags |= DumpOpt.relocs;
+	return 0;
+}
+int cli_dump_disasm() {
+	globals.mode = SettingMode.dump;
+	globals.flags |= DumpOpt.disasm;
+	return 0;
+}
+int cli_dump_disasm_all() {
+	globals.mode = SettingMode.dump;
+	globals.flags |= DumpOpt.disasm_all;
+	return 0;
+}
+int cli_dump_disasm_stats() {
+	globals.mode = SettingMode.dump;
+	globals.flags |= DumpOpt.disasm_stats;
+	return 0;
+}
+int cli_dump_blob() {
+	globals.mode = SettingMode.dump;
 	globals.flags |= DumpOpt.raw;
-	return EXIT_SUCCESS;
-}
-
-//
-// ANCHOR --show
-//
-
-struct setting_show_t {
-	align(4) char opt;	/// option character
-	immutable(char) *desc;
-	int val;	/// dumper flag
-}
-immutable setting_show_t[] showflags = [
-	{ 'h', "Show header metadata (default)", DumpOpt.header },
-	{ 's', "Show sections metadata", DumpOpt.sections },
-	{ 'i', "Show imports", DumpOpt.imports },
-	{ 'e', "Show exports", DumpOpt.exports },
-	{ 'c', "Show load configuration", DumpOpt.loadcfg },
-	{ 'r', "Show load configuration", DumpOpt.relocs },
-	{ 'p', "Show debug information", DumpOpt.debug_ },
-	{ 'd', "Disassemble code (executable sections)", DumpOpt.disasm_code },
-	{ 'D', "Disassemble all sections", DumpOpt.disasm_all },
-	{ 'S', "Show disassembler statistics instead", DumpOpt.disasm_stats },
-	{ 'A', "Show everything", DumpOpt.everything },
-];
-int cli_show(const(char) *val) {
-	if (wantsHelp(val)) {
-		puts("Available dumper display options:");
-		foreach (setting_show_t show; showflags) {
-			printf("%c\t%s\n", show.opt, show.desc);
-		}
-		exit(0);
-	}
-L_CHAR:
-	char c = *(val++);
-	if (c == 0)
-		return EXIT_SUCCESS;
-	foreach (setting_show_t show; showflags) {
-		if (c == show.opt) {
-			globals.flags |= show.val;
-			goto L_CHAR;
-		}
-	}
-	return EXIT_FAILURE;
+	return 0;
 }
 
 //
@@ -303,7 +311,7 @@ int cli_help() {
 	"\n"~
 	"USAGE\n"~
 	" alicedbg FILE [OPTIONS...]\n"~
-	" alicedbg --attach-pid PID [OPTIONS...]\n"~
+	" alicedbg --attach PID [OPTIONS...]\n"~
 	" alicedbg --dump FILE [OPTIONS...]\n"~
 	" alicedbg {-h|--help|--version|--ver|--license}\n"~
 	"\n"~
@@ -311,9 +319,9 @@ int cli_help() {
 	);
 	foreach (option_t opt; options[0..$-NUMBER_OF_SECRETS]) {
 		if (opt.alt)
-			printf(" -%c, --%-11s  %s\n", opt.alt, opt.val, opt.desc);
+			printf(" -%c, --%-17s %s\n", opt.alt, opt.val, opt.desc);
 		else
-			printf(" --%-15s  %s\n", opt.val, opt.desc);
+			printf("     --%-17s %s\n", opt.val, opt.desc);
 	}
 	puts("\nFor a list of values, for example a list of platforms, type '-m help'");
 	exit(0);
