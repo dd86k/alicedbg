@@ -29,8 +29,6 @@ version (Windows) {
 extern (C):
 
 /// Error codes.
-///
-/// These aren't really meant to be used directly.
 enum AdbgError {
 	//
 	// 0-99: Generic
@@ -143,7 +141,7 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.invalidOption, "Invalid disassembler option." },
 	{ AdbgError.invalidOptionValue, "Invalid value for disassembler option." },
 	{ AdbgError.illegalInstruction, "Illegal instruction." },
-	{ AdbgError.outOfData, "The input buffer has been depleted in an unexpected fashion." },
+	{ AdbgError.outOfData, "The input buffer has been depleted." },
 	{ AdbgError.opcodeLimit, "The opcode exhausted its architectural limit." },
 	//
 	// Object server

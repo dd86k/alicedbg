@@ -50,7 +50,7 @@ enum DumpOpt {
 	dynrelocs	= BIT!13,
 	
 	/// Disassemble executable sections
-	disasm_code	= BIT!22,
+	disasm	= BIT!22,
 	/// Disassembly statistics
 	disasm_stats	= BIT!23,
 	/// Disassemble all sections
@@ -64,8 +64,8 @@ enum DumpOpt {
 		symbols | debug_ | tls | loadcfg |
 		exports | imports | sections,
 	
-	/// Wants to disassemble at least something
-	disasm = disasm_code | disasm_stats | disasm_all,
+	/// Any form of dissasembler is requested
+	disasm_any = disasm | disasm_stats | disasm_all,
 }
 
 /// Dump given file to stdout.
@@ -121,6 +121,8 @@ int app_dump() {
 //      or dprint(group_name, // header, program_header, etc.
 //           spec, name, value, ...)
 //      or consider struct DumperPrinter or similar
+//TODO: object aware dumps
+//      generic: dump_import(lib, name), etc.
 
 private enum FORMAT_FIELD = "  %-30s:  ";
 
@@ -136,8 +138,9 @@ void dprint_warn(const(char) *message) {
 	printf("warning: %s\n", message);
 }
 void dprint_error(const(char) *message) {
+	import core.stdc.stdlib : exit;
 	printf("error: %s\n", message);
-	panic();
+	exit(1);
 }
 
 void dprint_section(uint count, const(char) *section, uint max) {
@@ -288,9 +291,7 @@ int dprint_disassemble_object(adbg_object_t *o,
 	void* data, ulong size,
 	uint flags) {
 	
-	if (size >= o.buffer_size ||
-		data < o.buffer ||
-		data + size >= o.buffer) {
+	if (data + size >= o.buffer + o.file_size) {
 		dprint_error("Buffer outside file");
 	}
 	
@@ -309,7 +310,6 @@ int dprint_disassemble(AdbgMachine machine,
 	adbg_disassembler_t *dasm = cast(adbg_disassembler_t*)malloc(adbg_disassembler_t.sizeof);
 	if (dasm == null)
 		panic(AdbgError.crt);
-	
 	scope(exit) free(dasm);
 	
 	if (adbg_dasm_open(dasm, machine))
@@ -323,37 +323,41 @@ int dprint_disassemble(AdbgMachine machine,
 	
 	// stats mode
 	if (flags & DumpOpt.disasm_stats) {
-		uint s_avg;	/// instruction average size
-		uint s_min;	/// smallest instruction size
-		uint s_max;	/// longest instruction size
-		uint s_cnt;	/// instruction count
-		uint s_ill;	/// Number of illegal instructions
+		uint stat_avg;	/// instruction average size
+		uint stat_min = uint.max;	/// smallest instruction size
+		uint stat_max;	/// longest instruction size
+		uint stat_total;	/// total instruction count
+		uint stat_illegal;	/// Number of illegal instructions
 L_STAT:
 		switch (adbg_dasm(dasm, &op)) with (AdbgError) {
 		case success:
-			s_avg += op.size;
-			++s_cnt;
-			if (op.size > s_max)
-				s_max = op.size;
-			if (op.size < s_min)
-				s_min = op.size;
+			stat_avg += op.size;
+			++stat_total;
+			if (op.size > stat_max) stat_max = op.size;
+			if (op.size < stat_min) stat_min = op.size;
 			goto L_STAT;
 		case illegalInstruction:
-			s_avg += op.size;
-			++s_cnt;
-			++s_ill;
-			goto L_DISASM;
+			stat_avg += op.size;
+			++stat_total;
+			++stat_illegal;
+			goto L_STAT;
 		case outOfData: break;
 		default: panic();
 		}
 		printf(
 		"Opcode statistics\n"~
-		"average size : %.3f\n"~
-		"smallest size: %u\n"~
-		"biggest size : %u\n"~
-		"illegal      : %u\n"~
-		"total        : %u\n",
-		cast(float)s_avg / s_cnt, s_min, s_max, s_ill, s_cnt
+		"average size : %.3f Bytes\n"~
+		"shortest     : %u Bytes\n"~
+		"largest      : %u Bytes\n"~
+		"illegal      : %u instructions\n"~
+		"valid        : %u instructions\n"~
+		"total        : %u instructions\n",
+		cast(float)stat_avg / stat_total,
+		stat_min,
+		stat_max,
+		stat_illegal,
+		stat_total - stat_illegal,
+		stat_total
 		);
 		return 0;
 	}

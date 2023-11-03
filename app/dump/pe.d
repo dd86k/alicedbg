@@ -45,7 +45,7 @@ int dump_pe(adbg_object_t *o, uint flags) {
 	if (flags & DumpOpt.debug_)
 		dump_pe_debug(o);
 	
-	if (flags & DumpOpt.disasm)
+	if (flags & DumpOpt.disasm_any)
 		dump_pe_disasm(o, flags);
 	
 	return EXIT_SUCCESS;

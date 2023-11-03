@@ -22,7 +22,7 @@ int dump_elf(adbg_object_t *o, uint flags) {
 	if (flags & DumpOpt.sections)
 		dump_elf_sections(o);
 	
-	if (flags & DumpOpt.disasm)
+	if (flags & DumpOpt.disasm_any)
 		dump_elf_disasm(o, flags);
 	
 	return 0;

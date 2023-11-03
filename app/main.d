@@ -83,6 +83,10 @@ struct option_t {
 		extern(C) int function(const(char)*) fa;
 	}
 }
+//TODO: --dump-offset/--dump-seek/--dump-start - Starting offset for raw blob
+//TODO: --dump-length/--dump-end - Length or end
+//TODO: --dump-imports-names - Shared library names only
+//TODO: --dump-imports-all - Dependency walker
 immutable option_t[] options = [
 	// general
 	{ 'a', "arch",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
@@ -104,7 +108,7 @@ immutable option_t[] options = [
 //	{ 0,   "dump-debug",	"Dump object's debug information", false, &cli_dump_debug },
 	{ 0,   "dump-disasm",	"Dump object's disassembly", false, &cli_dump_disasm },
 	{ 0,   "dump-disasm-all",	"Dump object's disassembly for all sections", false, &cli_dump_disasm_all },
-	{ 0,   "dump-disasm-stats",	"Dump object's disassembly statistics", false, &cli_dump_disasm_stats },
+	{ 0,   "dump-disasm-stats",	"Dump object's disassembly statistics for executable sections", false, &cli_dump_disasm_stats },
 	{ 0,   "dump-blob",	"Dump as raw binary blob", false, &cli_dump_blob },
 	// pages
 	{ 'h', "help",	"Show this help screen and exit", false, &cli_help },
