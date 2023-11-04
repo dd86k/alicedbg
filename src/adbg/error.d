@@ -1,17 +1,12 @@
-/**
- * Error handling module.
- *
- * This module is inspired by the way Windows deal with error codes, more or
- * less.
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
+/// Error handling module.
+///
+/// NOTE: Every thing that could go wrong should have an error code.
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module adbg.error;
 
 version (Windows) {
-	import core.sys.windows.windows;
 	enum ADBG_OS_ERROR_FORMAT = "%08X"; /// Error code format
 } else {
 	import core.stdc.errno : errno;
@@ -19,12 +14,11 @@ version (Windows) {
 	enum ADBG_OS_ERROR_FORMAT = "%d"; /// Error code format
 }
 
-// NOTE: Every thing that could go wrong should have an error code.
-
 //TODO: Consider making all codes negative values.
 //      This allows positive values to be used and follows more
 //      the "C way" of doing things.
-//TODO: Consider prefixing errors with corresponding section (e.g., debuggerNotAttached)
+//TODO: Make module thread-safe
+//      Either via TLS and/or atomic operations
 
 extern (C):
 
@@ -176,8 +170,10 @@ const(adbg_error_t)* adbg_error_current() {
 /// Get error message from the OS (or CRT) by providing the error code
 /// Params: code = Error code number from OS
 /// Returns: String
-const(char) *adbg_sys_error(int code) {
+const(char)* adbg_sys_error(int code) {
 	version (Windows) {
+		import core.sys.windows.winbase : FormatMessageA,
+			FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_MAX_WIDTH_MASK;
 		enum ERR_BUF_SZ = 512;
 		__gshared char [ERR_BUF_SZ]buffer = void;
 		size_t len = FormatMessageA(
@@ -198,9 +194,10 @@ const(char) *adbg_sys_error(int code) {
 /// Returns: GetLastError from Windows, otherwise errno
 private
 int adbg_error_system() {
-	version (Windows)
+	version (Windows) {
+		import core.sys.windows.winbase : GetLastError;
 		return GetLastError;
-	else
+	} else
 		return errno;
 }
 
@@ -228,10 +225,14 @@ int adbg_oops(AdbgError e, void *res = null, string m = __MODULE__, int l = __LI
 // ANCHOR Error getters
 //
 
+/// Obtain the last set code.
+/// Returns: Error code.
 int adbg_errno() {
 	return error.code;
 }
 
+/// Obtain the external error code.
+/// Returns: Subsystem, library, or OS error code.
 int adbg_errno_extern() {
 	import core.stdc.errno : errno;
 	import adbg.include.capstone : csh, cs_errno;
@@ -244,7 +245,7 @@ int adbg_errno_extern() {
 	}
 }
 
-/// Returns an error message with the last error code set.
+/// Obtain an error message with the last error code set.
 /// Returns: Error message
 const(char)* adbg_error_msg(int code = error.code) {
 	import core.stdc.errno : errno;
