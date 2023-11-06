@@ -352,6 +352,11 @@ int cli_version() {
 	static if (LLVM_VERSION)
 		printf("LLVM: %d\n", LLVM_VERSION);
 	
+	version (CRuntime_Glibc) {
+		import adbg.include.c.config : gnu_get_libc_version;
+		printf("Glibc: %s\n", gnu_get_libc_version());
+	}
+	
 	import adbg.include.capstone : capstone_dyn_init, cs_version;
 	printf("Capstone: ");
 	if (capstone_dyn_init()) {

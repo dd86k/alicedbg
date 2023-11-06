@@ -14,7 +14,7 @@ alias c_ulongint = c_ulong;
 
 // This is a thing because D compilers come with an older MSVCRT version,
 // and they are not compatible with the z prefix.
-// NOTE: pragma(printf) does not recognize I specifier
+// NOTE: pragma(printf) does not recognize the "I" specifier
 version (CRuntime_Microsoft) { // MSVC v13.0 and earlier (VS2015)
 	/// Unsigned integer printf specifier for size_t
 	enum PRIzu = "Iu";
@@ -26,3 +26,6 @@ version (CRuntime_Microsoft) { // MSVC v13.0 and earlier (VS2015)
 	/// Ditto
 	enum PRIzx = "zx";
 }
+
+version (CRuntime_Glibc)
+	extern (C) const(char) *gnu_get_libc_version();
