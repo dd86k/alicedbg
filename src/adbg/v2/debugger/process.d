@@ -11,7 +11,12 @@
 /// License: BSD-3-Clause
 module adbg.v2.debugger.process;
 
-import adbg.include.c.stdlib : malloc, free;
+//TODO: Process Pause/Resume
+//      Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
+//      Linux: Send SIGSTOP/SIGCONT signals via kill(2)
+//TODO: List threads of process
+
+import adbg.include.c.stdlib : malloc, calloc, free;
 import adbg.include.c.stdio : snprintf;
 import adbg.include.c.stdarg;
 import core.stdc.string : memset;
@@ -20,14 +25,12 @@ import adbg.utils.strings : adbg_util_argv_flatten;
 import adbg.v2.debugger.exception : adbg_exception_t, adbg_exception_translate;
 import adbg.v2.debugger.breakpoint : adbg_breakpoint_t;
 
-//TODO: Process Pause/Resume
-//      Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
-//      Linux: Send SIGSTOP/SIGCONT signals via kill(2)
-//TODO: List threads of process
-
 version (Windows) {
 	import core.sys.windows.windows;
 	import adbg.include.windows.wow64;
+	import adbg.include.windows.psapi_dyn : __dynlib_psapi_load,
+		EnumProcesses, EnumProcessModules,
+		GetModuleBaseNameA;
 } else version (Posix) {
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
@@ -88,6 +91,8 @@ enum AdbgCreation : ubyte {
 	spawned,
 }
 
+enum ADBG_PROCESS_NAME_LENGTH = 256;
+
 /// Represents an instance of a process.
 struct adbg_process_t {
 	version (Windows) {
@@ -105,10 +110,8 @@ struct adbg_process_t {
 	AdbgStatus status;
 	/// Process' creation source.
 	AdbgCreation creation;
-	/// List of breakpoints.
-	adbg_breakpoint_t *breakpoints;
-	/// Breakpoint index.
-	size_t breakpoint_index;
+	/// Process base module name.
+	char[ADBG_PROCESS_NAME_LENGTH] name;
 }
 
 version(USE_CLONE)
@@ -828,7 +831,221 @@ int adbg_stepi(adbg_process_t *tracee) {
 /// This is valid regardless if process was attached or not.
 /// Params: tracee = Debugged process.
 /// Returns: Error code.
-int adbg_process_pid(adbg_process_t *tracee) {
+int adbg_process_get_pid(adbg_process_t *tracee) {
 	if (tracee == null) return 0;
 	return tracee.pid;
+}
+
+/*const(char)[] adbg_process_get_basename(adbg_process_t *tracee) {
+	if (tracee == null) return null;
+	return null;
+}*/
+
+/// Options for adbg_process_enumerate.
+enum AdbgProcessEnumerateOption {
+	/// Set the size of the dynamic buffer for the list of processes.
+	/// Default: 1000
+	/// Type: uint
+	bufferSize = 1,
+	/// This option is not yet implemented.
+	sort = 2,
+}
+/// Sort option for AdbgProcessEnumerateOption.sort.
+enum AdbgProcessEnumerateSort {
+	/// Sort processes by system (Windows' default).
+	system,
+	/// Sort processes by ID (Linux's default).
+	id,
+	/// Sort processes by basename.
+	process,
+}
+
+/// Structure used with `adbg_process_enumerate`.
+///
+/// This holds the list of processes and a count.
+struct adbg_process_list_t {
+	/// Allocated list of processes.
+	adbg_process_t *processes;
+	/// Number of processes.
+	size_t count;
+}
+
+// NOTE: For the C vararg to work, list is a parameter instead of a return value.
+/// Enumerate running processes.
+///
+/// This function allocates memory. The list passed will need to be closed
+/// using `adbg_process_enumerate_close`.
+///
+/// On Windows, the list is populated by system order using `EnumProcesses`.
+/// On Linux, the list is populated by process ID using procfs.
+///
+/// Params:
+/// 	list = Process list structure instance.
+/// 	... = Options, terminated by 0.
+/// Returns: Zero for success; Or error code.
+int adbg_process_enumerate(adbg_process_list_t *list, ...) {
+	if (list == null)
+		return adbg_oops(AdbgError.nullArgument);
+	
+	/// Default fixed buffer size.
+	enum PROC_BUFFER_COUNT = 1000;
+	
+	uint procbufsz = PROC_BUFFER_COUNT;
+	
+	va_list options = void;
+	va_start(options, list);
+	
+L_OPTION:
+	switch (va_arg!int(options)) {
+	case 0: break;
+	case AdbgProcessEnumerateOption.bufferSize:
+		procbufsz = va_arg!uint(options);
+		if (procbufsz == 0)
+			return adbg_oops(AdbgError.invalidOptionValue);
+		goto L_OPTION;
+	default:
+		return adbg_oops(AdbgError.invalidOption);
+	}
+	
+	// Allocate main buffer
+	list.processes = cast(adbg_process_t*)malloc(adbg_process_t.sizeof * procbufsz);
+	if (list.processes == null)
+		return adbg_oops(AdbgError.crt);
+	
+	version (Windows) {
+		if (__dynlib_psapi_load()) {
+			free(list.processes);
+			return adbg_oops(AdbgError.libLoader);
+		}
+		
+		// Allocate temp PID buffer
+		enum HARRAY_SIZE = PROC_BUFFER_COUNT * HMODULE.sizeof;
+		DWORD *pidlist = cast(DWORD*)malloc(HARRAY_SIZE);
+		if (pidlist == null) {
+			free(list.processes);
+			return adbg_oops(AdbgError.crt);
+		}
+		scope(exit) free(pidlist);
+		
+		// Enumerate processes
+		// Note that "needed" is reusable after getting the count
+		DWORD needed = void;
+		if (EnumProcesses(pidlist, HARRAY_SIZE, &needed) == FALSE) {
+			free(pidlist);
+			return adbg_oops(AdbgError.os);
+		}
+		DWORD proccount = needed / DWORD.sizeof;
+		size_t count; /// Final count
+		for (DWORD i; i < proccount && count < PROC_BUFFER_COUNT; ++i) {
+			int pid = pidlist[i];
+			
+			HANDLE procHandle = OpenProcess(
+				PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+				FALSE, pid);
+			if (procHandle == null) {
+				continue;
+			}
+			
+			adbg_process_t *proc = &list.processes[count++];
+			proc.pid = pid;
+			proc.tid = 0;
+			proc.htid = null;
+			
+			HMODULE hmod = void;
+			if (EnumProcessModules(procHandle, &hmod, hmod.sizeof, &needed)) {
+				proc.hpid = hmod;
+				
+				DWORD len = GetModuleBaseNameA(
+					procHandle, hmod, proc.name.ptr, ADBG_PROCESS_NAME_LENGTH);
+				if (len > 0) {
+					proc.name[len] = 0;
+				} else {
+					goto L_NONAME;
+				}
+			} else {
+				import core.stdc.string : strcpy;
+			L_NONAME:
+				strcpy(proc.name.ptr, "<unknown>");
+				proc.hpid = null;
+			}
+			
+			CloseHandle(procHandle);
+		}
+		list.count = count;
+		return 0;
+	} else version (linux) {
+		import core.stdc.ctype : isdigit;
+		import core.stdc.stdlib : atoi;
+		import core.stdc.string : strcpy;
+		import core.sys.posix.dirent : opendir, readdir, dirent, DIR, DT_DIR;
+		import core.sys.posix.libgen : basename;
+		import adbg.utils.math : MIN;
+		size_t count;
+		DIR *procfd = opendir("/proc");
+		for (dirent *procent = void; (procent = readdir(procfd)) != null;) {
+			// If not directory starting with a digit, skip entry
+			if (procent.d_type != DT_DIR)
+				continue;
+			if (isdigit(procent.d_name[0]) == 0)
+				continue;
+			
+			/// Minimum read size, avoid overwriting
+			enum READSZ = MIN!(adbg_process_t.name.sizeof, dirent.d_name.sizeof);
+			
+			// Set PID
+			adbg_process_t *proc = &list.processes[count++];
+			proc.pid = atoi(procent.d_name.ptr);
+			
+			// Read /cmdline into process.name buffer
+			enum TBUFSZ = 32;
+			char[TBUFSZ] proc_comm = void; // Path buffer
+			snprintf(proc_comm.ptr, TBUFSZ, "/proc/%s/cmdline", procent.d_name.ptr);
+			int cmdlinefd = open(proc_comm.ptr, O_RDONLY);
+			if (cmdlinefd == -1)
+				continue;
+			scope(exit) close(cmdlinefd);
+			ssize_t r = read(cmdlinefd, proc.name.ptr, READSZ);
+			
+			// Get a baseline from /cmdline or /comm
+			if (procent.d_name[0] && r > 0) { // /cmdline populated
+				// NOTE: Yes, dangerous, but works under Glibc and musl.
+				//TODO: Test under Bionic, uClibc, etc.
+				strcpy(proc.name.ptr, basename(proc.name.ptr));
+			} else { // /cmdline empty, retrying with /comm
+				snprintf(proc_comm.ptr, TBUFSZ, "/proc/%s/comm", procent.d_name.ptr);
+				int commfd = open(proc_comm.ptr, O_RDONLY);
+				if (commfd == -1)
+					continue;
+				scope(exit) close(commfd);
+				r = read(commfd, proc.name.ptr, READSZ);
+				if (r < 0)
+					continue;
+				proc.name[r - 1] = 0; // Delete newline
+			}
+		}
+		list.count = count;
+		return 0;
+	} else {
+		return adbg_oops(AdbgError.unimplemented);
+	}
+}
+
+unittest {
+	adbg_process_list_t list = void;
+	assert(adbg_process_enumerate(&list, 0) == 0);
+	version (TestVerbose) {
+		import core.stdc.stdio : printf;
+		foreach (adbg_process_t proc; list.processes[0..list.count]) {
+			printf("%5u %s\n",
+				adbg_process_get_pid(&proc),
+				proc.name.ptr);
+		}
+	}
+	assert(list.count);
+	adbg_process_enumerate_close(&list);
+}
+
+void adbg_process_enumerate_close(adbg_process_list_t *list) {
+	if (list == null) return;
+	if (list.processes) free(list.processes);
 }

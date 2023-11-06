@@ -1,3 +1,8 @@
+/// Utility function for reading and writing into a process' memory.
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module adbg.v2.debugger.memory;
 
 import adbg.v2.debugger.process : adbg_process_t;
@@ -207,7 +212,6 @@ L_OPT:
 		}
 		
 		DWORD modcount = needed / HMODULE.sizeof;
-		
 		adbg_memory_map_t *map = *mmaps = cast(adbg_memory_map_t*)malloc(modcount * adbg_memory_map_t.sizeof);
 		if (map == null) {
 			free(mods);
@@ -612,7 +616,7 @@ L_OPT:
 	}
 	
 	// Make result list
-	scanner.results = cast(adbg_scan_result_t*)calloc(capacity, adbg_scan_result_t.sizeof);
+	scanner.results = cast(adbg_scan_result_t*)malloc(capacity * adbg_scan_result_t.sizeof);
 	if (scanner.results == null) {
 		adbg_memory_scan_close(scanner);
 		adbg_oops(AdbgError.crt);

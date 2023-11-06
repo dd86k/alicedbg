@@ -38,29 +38,27 @@ version (X86) {
 } else
 	static assert(0, "Missing BREAKPOINT value for target platform");
 
+struct adbg_breakpoints_t {
+	adbg_breakpoint_t *list;
+	size_t count;
+}
 struct adbg_breakpoint_t {
 	size_t address;
 	opcode_t opcode;
 }
 
-int adbg_breakpoint_add(adbg_process_t *tracee, size_t addr) {
-	return adbg_oops(AdbgError.notImplemented);
+int adbg_breakpoint_set(adbg_process_t *tracee, size_t addr) {
+	return adbg_oops(AdbgError.unimplemented);
 }
-int adbg_breakpoint_get(adbg_process_t *tracee, adbg_breakpoint_t *bp, int index) {
-	return adbg_oops(AdbgError.notImplemented);
+int adbg_breakpoint_get(adbg_process_t *tracee, size_t addr) {
+	return adbg_oops(AdbgError.unimplemented);
 }
-int adbg_breakpoint_present_at(adbg_process_t *tracee, adbg_breakpoint_t *bp, size_t addr) {
-	return adbg_oops(AdbgError.notImplemented);
+int adbg_breakpoint_list(adbg_process_t *tracee, adbg_breakpoints_t *list) {
+	return adbg_oops(AdbgError.unimplemented);
 }
-int adbg_breakpoint_list(adbg_process_t *tracee, adbg_breakpoint_t **l, uint *n) {
-	return adbg_oops(AdbgError.notImplemented);
+int adbg_breakpoint_unset(adbg_process_t *tracee, size_t address) {
+	return adbg_oops(AdbgError.unimplemented);
 }
-int adbg_breakpoint_rm(adbg_process_t *tracee, int index) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_breakpoint_rm_at(adbg_process_t *tracee, size_t addr) {
-	return adbg_oops(AdbgError.notImplemented);
-}
-int adbg_breakpoint_rm_all(adbg_process_t *tracee) {
-	return adbg_oops(AdbgError.notImplemented);
+int adbg_breakpoint_unset_all(adbg_process_t *tracee) {
+	return adbg_oops(AdbgError.unimplemented);
 }

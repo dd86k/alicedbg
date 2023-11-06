@@ -659,7 +659,7 @@ int command_detach(int argc, const(char) **argv) {
 int command_restart(int argc, const(char) **argv) {
 	switch (process.creation) with (AdbgCreation) {
 	case attached:
-		int pid = adbg_process_pid(&process);
+		int pid = adbg_process_get_pid(&process);
 		if (adbg_detach(&process)) {
 			serror("Could not detach process.");
 			return ShellError.alicedbg;

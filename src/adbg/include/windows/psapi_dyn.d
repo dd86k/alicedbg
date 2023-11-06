@@ -97,6 +97,7 @@ __gshared {
 
 private __gshared bool __dynlib_psapi_loaded;
 
+// Returns true on error.
 bool __dynlib_psapi_load() {
     if (__dynlib_psapi_loaded)
         return false;
