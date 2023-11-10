@@ -9,27 +9,68 @@ module adbg.include.d.config;
 // ANCHOR GDC versioning from DMD-FE
 //
 
-/// GDC 4.x
+/// GDC 4.x front-end version
 enum GDC_4  = 2_055; // 2.055.x: 4.6 (Debian 7)
-/// GDC 5.x
+/// GDC 5.x front-end version
 enum GDC_5  = 2_067; // 2.067.x: 5.4 (Ubuntu 16.04)
-/// GDC 8.x
+/// GDC 8.x front-end version
 enum GDC_8  = 2_068; // 2.068.1: 8.4 (Ubuntu 18.04), 8.3 (Debian 10.7)
-/// GDC 9.x
+/// GDC 9.x front-end version
 enum GDC_9  = 2_076; // 2.076.1: 9.5 (Ubuntu 22.04:gdc-9)
-/// GDC 10.x
-enum GDC_10 = 2_076; // 2.076.1: 10.3 (Ubuntu 20.04)
-/// GDC 11.x
-enum GDC_11 = 2_076; // 2.076.1: 11.2 (Ubuntu 22.04)
-/// GDC 12.x
+/// GDC 10.x front-end version
+enum GDC_10 = 2_076; // 2.076.1: 10.3,10.5 (Ubuntu 20.04)
+/// GDC 11.x front-end version
+enum GDC_11 = 2_076; // 2.076.1: 11.2,11.4 (Ubuntu 22.04)
+/// GDC 12.x front-end version
 //enum GDC_12 = 2_098; // Tested on 12.1, 2.098.0-beta.1 (or 2.098.1 at release)
 enum GDC_12 = 2_100; // 2.100.x: 12.1 (Ubuntu 22.04), 12.2 (Debian 12)
-/// GDC 13.x
+/// GDC 13.x front-end version
 enum GDC_13 = 2_103; // 2.103.x: 13.1.1 (OpenSUSE Tumbleweed 202307178, Artix Linux 20230711)
 
 // gcc/d/d-builtins.cc::d_init_versions emits nothing interesting.
 
 //TODO: enum GDC_VERSION = 0;
+version (GNU) {
+	static if (__VERSION__ == GDC_13)
+		/// GCC back-end major version for GDC. Starts at version 10 minimum.
+		enum GDC_VERSION = 13;
+	else static if (__VERSION == GDC_12)
+		/// Ditto
+		enum GDC_VERSION = 12;
+	else static if (__VERSION == GDC_11) // 11..9
+		/// Ditto
+		enum GDC_VERSION = 9;
+	else static if (__VERSION == GDC_8)
+		/// Ditto
+		enum GDC_VERSION = 8;
+	else static if (__VERSION == GDC_5)
+		/// Ditto
+		enum GDC_VERSION = 5;
+	else static if (__VERSION == GDC_4)
+		/// Ditto
+		enum GDC_VERSION = 4;
+	else // Unknown
+		/// Ditto
+		enum GDC_VERSION = 0;
+	
+	version (GNU_SjLj_Exceptions)
+		/// GDC exception implementation.
+		enum GDC_EXCEPTION_MODE = "SjLj";
+	else version (GNU_SEH_Exceptions)
+		/// Ditto
+		enum GDC_EXCEPTION_MODE = "SEH";
+	else version (GNU_DWARF2_Exceptions)
+		/// Ditto
+		enum GDC_EXCEPTION_MODE = "DWARF2";
+	else
+		/// Ditto
+		enum GDC_EXCEPTION_MODE = "Unknown";
+} else {
+	/// Ditto
+	enum GDC_VERSION = 0;
+	/// Ditto
+	enum GDC_EXCEPTION_MODE = null;
+}
 
 //
 // ANCHOR LDC LLVM versioning
@@ -98,3 +139,5 @@ enum COMPILER_FEAT_PRAGMA_PRINTF = __VERSION__ >= 2_092;
 enum COMPILER_FEAT_NORETURN      = __VERSION__ >= 2_096;
 /// Compiler has support for core.int128.
 enum COMPILER_FEAT_INT128        = __VERSION__ >= 2_100;
+/// Compiler supports @mustuse function attribute.
+enum COMPILER_FEAT_MUSTUSE       = __VERSION__ >= 2_100;

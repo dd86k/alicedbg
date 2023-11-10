@@ -346,8 +346,13 @@ template DSTRVER(uint ver) {
 }
 
 int cli_version() {
-	import adbg.include.d.config : LLVM_VERSION;
+	import adbg.include.d.config : GDC_VERSION, GDC_EXCEPTION_MODE, LLVM_VERSION;
 	puts(page_version);
+	
+	static if (GDC_VERSION) {
+		printf("GCC: %d\n", GDC_VERSION);
+		printf("GDC-EH: %s\n", GDC_EXCEPTION_MODE);
+	}
 	
 	static if (LLVM_VERSION)
 		printf("LLVM: %d\n", LLVM_VERSION);
