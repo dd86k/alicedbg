@@ -69,6 +69,7 @@ enum AdbgError {
 	objectInvalidEndian	= 313,
 	objectInvalidType	= 314,
 	objectInvalidABI	= 315,
+	objectOutsideAccess	= 320,
 	// Old meanings
 	unknownObjFormat	= objectUnknownFormat,
 	unsupportedObjFormat	= objectUnsupportedFormat,

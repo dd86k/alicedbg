@@ -18,7 +18,7 @@ import adbg.include.c.stdlib : calloc, free;
 // NOTE: The string table section is typically named .shstrtab
 
 /// Signature magic for ELF.
-enum MAGIC_ELF = CHAR32!"\x7FELF";
+enum ELF_MAGIC = CHAR32!"\x7FELF";
 
 /// Minimum file size for ELF.
 // https://stackoverflow.com/a/53383541

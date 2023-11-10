@@ -25,11 +25,11 @@ private enum LIMIT_FAT_ARCH = 200;
 private enum LIMIT_COMMANDS = 2000;
 
 enum MACHO_MAGIC	= 0xFEEDFACEu; /// Mach-O BE magic
-enum MACHO_MAGIC_64	= 0xFEEDFACFu; /// Mach-O BE x64 magic
+enum MACHO_MAGIC64	= 0xFEEDFACFu; /// Mach-O BE x64 magic
 enum MACHO_CIGAM	= 0xCEFAEDFEu; /// Mach-O LE magic
-enum MACHO_CIGAM_64	= 0xCFFAEDFEu; /// Mach-O LE x64 magic
-enum MACHO_FAT_MAGIC	= 0xCAFEBABEu; /// Mach-O FAT BE magic
-enum MACHO_FAT_CIGAM	= 0xBEBAFECAu; /// Mach-O FAT LE magic
+enum MACHO_CIGAM64	= 0xCFFAEDFEu; /// Mach-O LE x64 magic
+enum MACHO_FATMAGIC	= 0xCAFEBABEu; /// Mach-O FAT BE magic
+enum MACHO_FATCIGAM	= 0xBEBAFECAu; /// Mach-O FAT LE magic
 
 // 64-bit version just adds a 32-bit reserved field at the end.
 struct macho_header {
@@ -401,20 +401,20 @@ int adbg_object_macho_load(adbg_object_t *o) {
 	with (o.i) switch (macho.header.magic) {
 	case MACHO_MAGIC:	// 32-bit LE
 		break;
-	case MACHO_MAGIC_64:	// 64-bit LE
+	case MACHO_MAGIC64:	// 64-bit LE
 		macho.is64 = true;
 		break;
 	case MACHO_CIGAM:	// 32-bit BE
 		o.p.reversed = true;
 		break;
-	case MACHO_CIGAM_64:	// 64-bit BE
+	case MACHO_CIGAM64:	// 64-bit BE
 		o.p.reversed = true;
 		macho.is64 = true;
 		break;
-	case MACHO_FAT_MAGIC:	// Fat LE
+	case MACHO_FATMAGIC:	// Fat LE
 		macho.fat = true;
 		break;
-	case MACHO_FAT_CIGAM:	// Fat BE
+	case MACHO_FATCIGAM:	// Fat BE
 		macho.fat = true;
 		o.p.reversed = true;
 		break;
@@ -521,11 +521,11 @@ macho_load_command* adbg_object_macho_load_command(adbg_object_t *o, size_t inde
 const(char) *adbg_object_macho_magic_string(uint signature) {
 	switch (signature) {
 	case MACHO_MAGIC:	return "MACHO_MAGIC";
-	case MACHO_MAGIC_64:	return "MACHO_MAGIC_64";
+	case MACHO_MAGIC64:	return "MACHO_MAGIC_64";
 	case MACHO_CIGAM: 	return "MACHO_CIGAM";
-	case MACHO_CIGAM_64:	return "MACHO_CIGAM_64";
-	case MACHO_FAT_MAGIC:	return "MACHO_FAT_MAGIC";
-	case MACHO_FAT_CIGAM:	return "MACHO_FAT_CIGAM";
+	case MACHO_CIGAM64:	return "MACHO_CIGAM_64";
+	case MACHO_FATMAGIC:	return "MACHO_FAT_MAGIC";
+	case MACHO_FATCIGAM:	return "MACHO_FAT_CIGAM";
 	default:	return null;
 	}
 }

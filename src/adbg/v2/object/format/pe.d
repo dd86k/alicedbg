@@ -797,6 +797,8 @@ PE_OPTIONAL_HEADERROM* adbg_object_pe_optheaderrom(adbg_object_t *o) {
 }
 
 PE_SECTION_ENTRY* adbg_object_pe_section(adbg_object_t *o, size_t index) {
+	version (Trace) trace("o=%p index=%u", o, cast(uint)index);
+	
 	if (o == null) return null;
 	if (o.i.pe.sections == null) return null;
 	if (index >= o.i.pe.header.NumberOfSections) return null;
