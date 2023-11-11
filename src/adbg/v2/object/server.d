@@ -36,6 +36,7 @@ extern (C):
 //TODO: const(ubyte) *adbg_obj_section(obj, ".abc");
 //TODO: const(ubyte) *adbg_obj_section_i(obj, index);
 //TODO: uint u32 = pointer.fetch!ubyte(offset);
+//TODO: Consider adbg_object_is_dump or adbg_object_get_type or adbg_object_is(FLAG)
 
 /// Executable or object format.
 enum AdbgObject {
@@ -61,6 +62,8 @@ enum AdbgObject {
 	//codeview
 	// 
 	//dwarf
+	/// Windows' User Mini-Dump format.
+	mdmp,
 }
 
 /// Object origin. (or "load mode")
@@ -91,24 +94,24 @@ struct adbg_object_t {
 			FILE *file_handle;
 			/// File size.
 			ulong file_size;
+	
+			union {
+				void   *buffer;	/// Buffer to file object.
+				char   *bufferc;	/// Ditto
+				wchar  *bufferw;	/// Ditto
+				dchar  *bufferd;	/// Ditto
+				ubyte  *buffer8;	/// Ditto
+				ushort *buffer16;	/// Ditto
+				uint   *buffer32;	/// Ditto
+				ulong  *buffer64;	/// Ditto
+			}
+			/// Allocated buffer size.
+			size_t buffer_size;
 		}
 		struct {
 			adbg_process_t *process;
 		}
 	}
-	
-	union {
-		void   *buffer;	/// Buffer to file object.
-		char   *bufferc;	/// Ditto
-		wchar  *bufferw;	/// Ditto
-		dchar  *bufferd;	/// Ditto
-		ubyte  *buffer8;	/// Ditto
-		ushort *buffer16;	/// Ditto
-		uint   *buffer32;	/// Ditto
-		ulong  *buffer64;	/// Ditto
-	}
-	/// Allocated buffer size.
-	size_t buffer_size;
 	
 	/// Loaded object format.
 	AdbgObject format;

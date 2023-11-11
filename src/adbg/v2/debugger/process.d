@@ -385,13 +385,14 @@ private int adbg_linux_child(void* arg) {
 
 enum AdbgAttachOpt {
 	/// Continue execution when attached.
-	/// Type: none
-	/// Default: false
+	/// Type: int
+	/// Default: 0
 	continue_ = 1,
 	/// Kill tracee when debugger exits.
-	/// Type: none
-	/// Default: false
+	/// Type: int
+	/// Default: 0
 	exitkill = 2,
+	// Filter exception or stop only on these exceptions
 	//filter = 3,
 }
 
@@ -407,8 +408,8 @@ int adbg_attach(adbg_process_t *tracee, int pid, ...) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
-	bool continue_;	// continue execution after attaching
-	bool exitkill;	// kill child if debugger quits
+	int continue_;	// continue execution after attaching
+	int exitkill;	// kill child if debugger quits
 	
 	va_list list = void;
 	va_start(list, pid);
@@ -417,10 +418,10 @@ L_OPTION:
 	switch (va_arg!int(list)) {
 	case 0: break;
 	case AdbgAttachOpt.continue_:
-		continue_ = va_arg!bool(list);
+		continue_ = va_arg!int(list);
 		goto L_OPTION;
 	case AdbgAttachOpt.exitkill:
-		exitkill = va_arg!bool(list);
+		exitkill = va_arg!int(list);
 		goto L_OPTION;
 	default:
 		return adbg_oops(AdbgError.invalidOption);

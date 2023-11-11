@@ -233,7 +233,7 @@ L_START:
 		return;
 	}
 	
-	if ((flags & va_arg!ushort(args)) == 0) goto L_START; // condition
+	if ((flags & va_arg!int(args)) == 0) goto L_START; // condition
 	if (count++) putchar(',');
 	printf("%s", name);
 	goto L_START;

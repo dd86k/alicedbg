@@ -571,6 +571,7 @@ void dump_pe_imports(adbg_object_t *o) {
 		dprint_x32("FirstThunk", FirstThunk);
 		
 		//TODO: Function to get import name+hint from lte directly
+		//      adbg_object_pe_import_string(o, import_, i++);
 		
 		size_t il;
 		switch (o.i.pe.opt_header.Magic) {

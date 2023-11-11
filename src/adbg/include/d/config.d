@@ -25,28 +25,28 @@ enum GDC_11 = 2_076; // 2.076.1: 11.2,11.4 (Ubuntu 22.04)
 //enum GDC_12 = 2_098; // Tested on 12.1, 2.098.0-beta.1 (or 2.098.1 at release)
 enum GDC_12 = 2_100; // 2.100.x: 12.1 (Ubuntu 22.04), 12.2 (Debian 12)
 /// GDC 13.x front-end version
-enum GDC_13 = 2_103; // 2.103.x: 13.1.1 (OpenSUSE Tumbleweed 202307178, Artix Linux 20230711)
+enum GDC_13 = 2_103; // 2.103.x: 13.1.1,13.2 (OpenSUSE Tumbleweed 202307178, Artix Linux 20230711, Ubuntu 23.10)
 
-// gcc/d/d-builtins.cc::d_init_versions emits nothing interesting.
+// Source: gcc/d/d-builtins.cc::d_init_versions
 
 //TODO: enum GDC_VERSION = 0;
 version (GNU) {
 	static if (__VERSION__ == GDC_13)
 		/// GCC back-end major version for GDC. Starts at version 10 minimum.
 		enum GDC_VERSION = 13;
-	else static if (__VERSION == GDC_12)
+	else static if (__VERSION__ == GDC_12)
 		/// Ditto
 		enum GDC_VERSION = 12;
-	else static if (__VERSION == GDC_11) // 11..9
+	else static if (__VERSION__ == GDC_11) // 11..9
 		/// Ditto
 		enum GDC_VERSION = 9;
-	else static if (__VERSION == GDC_8)
+	else static if (__VERSION__ == GDC_8)
 		/// Ditto
 		enum GDC_VERSION = 8;
-	else static if (__VERSION == GDC_5)
+	else static if (__VERSION__ == GDC_5)
 		/// Ditto
 		enum GDC_VERSION = 5;
-	else static if (__VERSION == GDC_4)
+	else static if (__VERSION__ == GDC_4)
 		/// Ditto
 		enum GDC_VERSION = 4;
 	else // Unknown
@@ -55,21 +55,21 @@ version (GNU) {
 	
 	version (GNU_SjLj_Exceptions)
 		/// GDC exception implementation.
-		enum GDC_EXCEPTION_MODE = "SjLj";
+		enum const(char)* GDC_EXCEPTION_MODE = "SjLj";
 	else version (GNU_SEH_Exceptions)
 		/// Ditto
-		enum GDC_EXCEPTION_MODE = "SEH";
+		enum const(char)* GDC_EXCEPTION_MODE = "SEH";
 	else version (GNU_DWARF2_Exceptions)
 		/// Ditto
-		enum GDC_EXCEPTION_MODE = "DWARF2";
+		enum const(char)* GDC_EXCEPTION_MODE = "DWARF2";
 	else
 		/// Ditto
-		enum GDC_EXCEPTION_MODE = "Unknown";
+		enum const(char)* GDC_EXCEPTION_MODE = "Unknown";
 } else {
 	/// Ditto
 	enum GDC_VERSION = 0;
 	/// Ditto
-	enum GDC_EXCEPTION_MODE = null;
+	enum const(char)* GDC_EXCEPTION_MODE = null;
 }
 
 //
