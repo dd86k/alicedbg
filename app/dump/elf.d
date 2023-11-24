@@ -147,17 +147,21 @@ void dump_elf_phdr(adbg_object_t *o) {
 			Elf32_Phdr *phdr = adbg_object_elf_phdr32(o, i);
 			with (phdr) {
 			dprint_u32("p_type", p_type, adbg_object_elf_pt_string(p_type));
-			dprint_x32("p_flags", p_flags);
 			dprint_x32("p_offset", p_offset);
 			dprint_x32("p_vaddr", p_vaddr);
 			dprint_x32("p_paddr", p_paddr);
 			dprint_x32("p_filesz", p_filesz);
 			dprint_x32("p_memsz", p_memsz);
+			dprint_flags32("p_flags", p_flags,
+				"PF_R".ptr, ELF_PF_R,
+				"PF_W".ptr, ELF_PF_W,
+				"PF_X".ptr, ELF_PF_X,
+				null);
 			dprint_x32("p_align", p_align);
 			}
 			
 			//TODO: coredump
-			// if (p_type == ELF_PT_NOTE)
+			// if (p_type == ELF_PT_NOTE && p_pflags == 0)
 			// Elf32_Nhdr (like NT_X86_XSTATE)
 		}
 		break;
@@ -170,7 +174,11 @@ void dump_elf_phdr(adbg_object_t *o) {
 			Elf64_Phdr *phdr = adbg_object_elf_phdr64(o, i);
 			with (phdr) {
 			dprint_u32("p_type", p_type, adbg_object_elf_pt_string(p_type));
-			dprint_x32("p_flags", p_flags);
+			dprint_flags32("p_flags", p_flags,
+				"PF_R".ptr, ELF_PF_R,
+				"PF_W".ptr, ELF_PF_W,
+				"PF_X".ptr, ELF_PF_X,
+				null);
 			dprint_x64("p_offset", p_offset);
 			dprint_x64("p_vaddr", p_vaddr);
 			dprint_x64("p_paddr", p_paddr);
@@ -180,7 +188,7 @@ void dump_elf_phdr(adbg_object_t *o) {
 			}
 			
 			//TODO: coredump
-			// if (p_type == ELF_PT_NOTE)
+			// if (p_type == ELF_PT_NOTE && p_pflags == 0)
 			// Elf32_Nhdr (like NT_X86_XSTATE)
 		}
 		break;

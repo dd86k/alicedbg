@@ -106,24 +106,6 @@ enum ELF_ET_HIOS	= 0xFEFF;	/// OS-specific
 enum ELF_ET_LOPROC	= 0xFF00;	/// Processor-specific
 enum ELF_ET_HIPROC	= 0xFFFF;	/// Processor-specific
 
-// Program segment header values
-
-enum ELF_PT_NULL	= 0;
-enum ELF_PT_LOAD	= 1;
-enum ELF_PT_DYNAMIC	= 2;
-enum ELF_PT_INTERP	= 3;
-enum ELF_PT_NOTE	= 4;
-enum ELF_PT_SHLIB	= 5;
-enum ELF_PT_PHDR	= 6;
-enum ELF_PT_TLS	= 7;	/// Thread local storage segment
-enum ELF_PT_LOOS	= 0x60000000;	/// OS-specific
-enum ELF_PT_HIOS	= 0x6fffffff;	/// OS-specific
-enum ELF_PT_LOPROC	= 0x70000000;
-enum ELF_PT_HIPROC	= 0x7fffffff;
-enum ELF_PT_GNU_EH_FRAME	= (ELF_PT_LOOS + 0x474e550);
-enum ELF_PT_GNU_STACK	= (ELF_PT_LOOS + 0x474e551);
-enum ELF_PT_GNU_RELRO	= (ELF_PT_LOOS + 0x474e552);
-enum ELF_PT_GNU_PROPERTY	= (ELF_PT_LOOS + 0x474e553);
 
 // ELF Machine values
 // FatELF also uses this
@@ -351,6 +333,60 @@ enum ELF_EF_SPARCV9_TSO	= 0x0;	/// Total Store Ordering
 enum ELF_EF_SPARCV9_PSO	= 0x1;	/// Partial Store Ordering 
 enum ELF_EF_SPARCV9_RMO	= 0x2;	/// Relaxed Memory Ordering 
 
+// Program segment header values
+
+enum ELF_PT_NULL	= 0;
+enum ELF_PT_LOAD	= 1;
+enum ELF_PT_DYNAMIC	= 2;
+enum ELF_PT_INTERP	= 3;
+enum ELF_PT_NOTE	= 4;
+enum ELF_PT_SHLIB	= 5;
+enum ELF_PT_PHDR	= 6;
+enum ELF_PT_TLS	= 7;	/// Thread local storage segment
+enum ELF_PT_LOOS	= 0x60000000;	/// OS-specific
+enum ELF_PT_HIOS	= 0x6fffffff;	/// OS-specific
+enum ELF_PT_LOPROC	= 0x70000000;
+enum ELF_PT_HIPROC	= 0x7fffffff;
+enum ELF_PT_GNU_EH_FRAME	= (ELF_PT_LOOS + 0x474e550);
+enum ELF_PT_GNU_STACK	= (ELF_PT_LOOS + 0x474e551);
+enum ELF_PT_GNU_RELRO	= (ELF_PT_LOOS + 0x474e552);
+enum ELF_PT_GNU_PROPERTY	= (ELF_PT_LOOS + 0x474e553);
+
+enum ELF_PF_R	= 4;	/// p_flags value for Read permission
+enum ELF_PF_W	= 2;	/// p_flags value for Write permission
+enum ELF_PF_X	= 1;	/// p_flags value for Execute permission
+
+// ELF Relocation types
+enum R_386_NONE	= 0;
+enum R_386_32	= 1;
+enum R_386_PC32	= 2;
+enum R_386_GOT32	= 3;
+enum R_386_PLT32	= 4;
+enum R_386_COPY	= 5;
+enum R_386_GLOB_DAT	= 6;
+enum R_386_JMP_SLOT	= 7;
+enum R_386_RELATIVE	= 8;
+enum R_386_GOTOFF	= 9;
+enum R_386_GOTPC	= 10;
+enum R_386_NUM	= 11;
+enum R_X86_64_NONE	= 0;	/// No reloc
+enum R_X86_64_64	= 1;	/// Direct 64 bit
+enum R_X86_64_PC32	= 2;	/// PC relative 32 bit signed
+enum R_X86_64_GOT32	= 3;	/// 32 bit GOT entry
+enum R_X86_64_PLT32	= 4;	/// 32 bit PLT address
+enum R_X86_64_COPY	= 5;	/// Copy symbol at runtime
+enum R_X86_64_GLOB_DAT	= 6;	/// Create GOT entry
+enum R_X86_64_JUMP_SLOT	= 7;	/// Create PLT entry
+enum R_X86_64_RELATIVE	= 8;	/// Adjust by program base
+enum R_X86_64_GOTPCREL	= 9;	/// 32 bit signed pc relative offset to GOT
+enum R_X86_64_32	= 10;	/// Direct 32 bit zero extended
+enum R_X86_64_32S	= 11;	/// Direct 32 bit sign extended
+enum R_X86_64_16	= 12;	/// Direct 16 bit zero extended
+enum R_X86_64_PC16	= 13;	/// 16 bit sign extended pc relative
+enum R_X86_64_8	= 14;	/// Direct 8 bit sign extended 
+enum R_X86_64_PC8	= 15;	/// 8 bit sign extended pc relative
+enum R_X86_64_PC64	= 24;	/// Place relative 64-bit signed
+
 // Section type values
 
 enum ELF_SHT_NULL	= 0;	/// Inactive
@@ -508,7 +544,7 @@ struct Elf32_Phdr {
 	Elf32_Addr p_paddr;	/// Segment physical address
 	Elf32_Word p_filesz;	/// Segment size in file
 	Elf32_Word p_memsz;	/// Segment size in memory
-	Elf32_Word p_flags;	
+	Elf32_Word p_flags;	/// Segment flags
 	Elf32_Word p_align;	/// Segment alignment, file & memory
 }
 
