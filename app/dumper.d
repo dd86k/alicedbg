@@ -83,7 +83,7 @@ int app_dump() {
 			return 0;
 		
 		return dprint_disassemble(AdbgMachine.native,
-			null, 0, buffer, size, globals.flags);
+			null, 0, buffer, size, 0, globals.flags);
 	}
 	
 	adbg_object_t *o = cast(adbg_object_t*)malloc(adbg_object_t.sizeof);
@@ -288,7 +288,7 @@ void dprint_raw(const(char) *name, uint namemax,
 // name is typically section name or filename if raw
 int dprint_disassemble_object(adbg_object_t *o,
 	const(char) *name, uint namemax,
-	void* data, ulong size,
+	void* data, ulong size, ulong base_address,
 	uint flags) {
 	
 	if (data + size >= o.buffer + o.file_size) {
@@ -296,11 +296,11 @@ int dprint_disassemble_object(adbg_object_t *o,
 	}
 	
 	return dprint_disassemble(
-		adbg_object_machine(o), name, namemax, data, size, flags);
+		adbg_object_machine(o), name, namemax, data, size, base_address, flags);
 }
 int dprint_disassemble(AdbgMachine machine,
 	const(char) *name, uint namemax,
-	void* data, ulong size,
+	void* data, ulong size, ulong base_address,
 	uint flags) {
 	
 	if (name && namemax) printf("<%.*s>:\n", namemax, name);
@@ -319,7 +319,7 @@ int dprint_disassemble(AdbgMachine machine,
 		adbg_dasm_options(dasm, AdbgDasmOption.syntax, globals.syntax, 0);
 	
 	adbg_opcode_t op = void;
-	adbg_dasm_start(dasm, data, cast(size_t)size);
+	adbg_dasm_start(dasm, data, cast(size_t)size, base_address);
 	
 	// stats mode
 	if (flags & DumpOpt.disasm_stats) {
@@ -368,10 +368,10 @@ L_DISASM:
 	switch (adbg_dasm(dasm, &op)) with (AdbgError) {
 	case success:
 		//TODO: print base as 08x if small enough
-		printf("%016llx  %s\t%s\n", op.base, op.mnemonic, op.operands);
+		printf("%016llx  %s\t%s\n", op.address, op.mnemonic, op.operands);
 		goto L_DISASM;
 	case illegalInstruction:
-		printf("%016llx  illegal (%d bytes)\n", op.base, op.size);
+		printf("%016llx  illegal (%d bytes)\n", op.address, op.size);
 		goto L_DISASM;
 	case outOfData:
 		return 0;

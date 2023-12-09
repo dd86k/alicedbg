@@ -697,7 +697,7 @@ void dump_pe_disasm(adbg_object_t *o, uint flags) {
 	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
 		if (all || Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE) {
 			dprint_disassemble_object(o, Name.ptr, 8,
-				o.buffer + PointerToRawData, SizeOfRawData,
+				o.buffer + PointerToRawData, SizeOfRawData, 0,
 				flags);
 		}
 	}

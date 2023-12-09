@@ -340,7 +340,7 @@ void dump_elf_disasm(adbg_object_t *o, uint flags) {
 			if (all || sh_flags & ELF_SHF_EXECINSTR)
 				dprint_disassemble_object(o,
 					table + sh_name, 32,
-					o.buffer8 + sh_offset, sh_size,
+					o.buffer8 + sh_offset, sh_size, 0,
 					flags);
 		}
 		break;
@@ -370,7 +370,7 @@ void dump_elf_disasm(adbg_object_t *o, uint flags) {
 			if (all || sh_flags & ELF_SHF_EXECINSTR)
 				dprint_disassemble_object(o,
 					table + sh_name, 32,
-					o.buffer8 + sh_offset, sh_size,
+					o.buffer8 + sh_offset, sh_size, 0,
 					flags);
 		}
 		break;

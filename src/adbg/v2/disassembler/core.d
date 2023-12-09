@@ -100,7 +100,7 @@ struct adbg_disassembler_t {
 
 /// Decoded instruction information.
 struct adbg_opcode_t {
-	ulong base;	/// Base address
+	ulong address;	/// Base instruction address.
 	int size;	/// Instruction size in Bytes.
 	const(char) *mnemonic;	/// Instruction mnemonic.
 	const(char) *operands;	/// Instruction operands.
@@ -306,10 +306,12 @@ L_ARG:
 ///   dasm = Reference to disassembler instance.
 ///   data = Reference to user data.
 ///   size = Size of the user data.
+///   base_address = Base address.
 /// Returns: Error code.
-int adbg_dasm_start(adbg_disassembler_t *dasm, void *data, size_t size) {
+int adbg_dasm_start(adbg_disassembler_t *dasm, void *data, size_t size, ulong base_address = 0) {
 	if (dasm == null || data == null)
 		return adbg_oops(AdbgError.nullArgument);
+	dasm.address_base = base_address;
 	dasm.buffer = data;
 	dasm.buffer_size = size;
 	return 0;
@@ -328,6 +330,8 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	
 	dasm.address_last = dasm.address_current;
 	
+	opcode.address = dasm.address_base;
+	
 	if (cs_disasm_iter(dasm.cs_handle,
 		cast(const(ubyte*)*)&dasm.buffer, // CS adjusts this
 		&dasm.buffer_size,
@@ -340,7 +344,6 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	}
 	
 	//TODO: disasm modes
-	opcode.base = dasm.address_base;
 	opcode.size = dasm.cs_inst.size;
 	opcode.mnemonic = cs_insn_name(dasm.cs_handle, dasm.cs_inst.id);
 	opcode.operands = dasm.cs_inst.op_str.ptr;

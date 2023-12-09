@@ -103,5 +103,5 @@ void dump_mz_disasm(adbg_object_t *o, uint flags) {
 		return;
 	}
 	
-	dprint_disassemble_object(o, null, 0, o.buffer + start, len, flags);
+	dprint_disassemble_object(o, null, 0, o.buffer + start, len, 0, flags);
 }
