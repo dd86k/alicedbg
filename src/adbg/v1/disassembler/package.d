@@ -10,7 +10,6 @@
 module adbg.v1.disassembler;
 
 import adbg.error;
-import adbg.config;
 private import adbg.utils.strings;
 private import adbg.v1.debugger.exception : adbg_address_t;
 private import adbg.v1.disassembler.decoders;

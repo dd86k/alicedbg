@@ -5,9 +5,6 @@ authors "dd86k <dd@dax.moe>"
 copyright "Copyright © 2019-2023 dd86k <dd@dax.moe>"
 license "BSD-3-Clause"
 
-dependency "bindbc-loader" version="~>1.0.3"
-subConfiguration "bindbc-loader" "yesBC"
-
 # NOTE: BetterC flag
 #       We explicitly specify the betterC flag to support older DUB releases
 #       Like v0.9.24
@@ -152,8 +149,6 @@ subPackage {
 	sourcePaths "src"
 	importPaths "src"
 	mainSourceFile "examples/simple-v1.d"
-	dependency "bindbc-loader" version="~>1.0.3"
-	subConfiguration "bindbc-loader" "yesBC"
 }
 
 subPackage {
@@ -163,6 +158,4 @@ subPackage {
 	sourcePaths "src"
 	importPaths "src"
 	mainSourceFile "examples/simple-v2.d"
-	dependency "bindbc-loader" version="~>1.0.3"
-	subConfiguration "bindbc-loader" "yesBC"
 }

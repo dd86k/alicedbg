@@ -8,7 +8,6 @@
  */
 module common;
 
-import adbg.config;
 import adbg.error;
 import adbg.v2.disassembler;
 import adbg.v2.debugger.exception;

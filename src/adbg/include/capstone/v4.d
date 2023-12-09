@@ -22,7 +22,9 @@ extern (C):
 /* Capstone Disassembly Engine */
 /* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2016 */
 
-// Capstone D "header" refined/fixed by dd86k <dd@dax.moe>
+// Capstone D "header" enhanced by dd86k <dd@dax.moe>
+// - formatting
+// - dynamic lib support
 
 // Capstone API version
 enum CS_API_MAJOR = 4;
@@ -740,8 +742,7 @@ cs_err cs_regs_access (
 // ANCHOR: Dynamic library
 //
 
-import bindbc.loader;
-import bindbc.loader.sharedlib;
+import adbg.v2.object.symbols;
 
 private {
     alias pcs_version = uint function(int* major, int* minor);
@@ -792,82 +793,100 @@ private {
 
 alias cs_regs = ushort[64];
 
-__gshared pcs_version cs_version;
-__gshared pcs_support cs_support;
-__gshared pcs_open cs_open;
-__gshared pcs_close cs_close;
-__gshared pcs_option cs_option;
-__gshared pcs_errno cs_errno;
-__gshared pcs_strerror cs_strerror;
-__gshared pcs_disasm cs_disasm;
-__gshared pcs_disasm_ex cs_disasm_ex;
-__gshared pcs_free cs_free;
-__gshared pcs_malloc cs_malloc;
-__gshared pcs_disasm_iter cs_disasm_iter;
-__gshared pcs_reg_name cs_reg_name;
-__gshared pcs_insn_name cs_insn_name;
-__gshared pcs_group_name cs_group_name;
-__gshared pcs_insn_group cs_insn_group;
-__gshared pcs_reg_read cs_reg_read;
-__gshared pcs_reg_write cs_reg_write;
-__gshared pcs_op_count cs_op_count;
-__gshared pcs_op_index cs_op_index;
-__gshared pcs_regs_access cs_regs_access;
-
-bool capstone_dyn_init()
+__gshared
 {
+    pcs_version cs_version;
+    pcs_support cs_support;
+    pcs_open cs_open;
+    pcs_close cs_close;
+    pcs_option cs_option;
+    pcs_errno cs_errno;
+    pcs_strerror cs_strerror;
+    pcs_disasm cs_disasm;
+    pcs_disasm_ex cs_disasm_ex;
+    pcs_free cs_free;
+    pcs_malloc cs_malloc;
+    pcs_disasm_iter cs_disasm_iter;
+    pcs_reg_name cs_reg_name;
+    pcs_insn_name cs_insn_name;
+    pcs_group_name cs_group_name;
+    pcs_insn_group cs_insn_group;
+    pcs_reg_read cs_reg_read;
+    pcs_reg_write cs_reg_write;
+    pcs_op_count cs_op_count;
+    pcs_op_index cs_op_index;
+    pcs_regs_access cs_regs_access;
+}
+
+//private __gshared int libcapstone_major;
+private __gshared bool libcapstone_loaded;
+
+// Returns true on error
+bool libcapstone_dynload()
+{
+    if (libcapstone_loaded == true)
+        return false;
+    
     version (Windows)
-    {
-        static immutable const(char)*[] libraries = [
-            "capstone.dll",
-        ];
-    }
+        adbg_shared_lib_t *lib = adbg_symbols_load("capstone.dll");
     else version (OSX)
-    {
-        static immutable const(char)*[] libraries = [
-            "libcapstone.dylib",
-        ];
-    }
+        adbg_shared_lib_t *lib = adbg_symbols_load("libcapstone.dylib");
     else version (Posix)
+        adbg_shared_lib_t *lib = adbg_symbols_load("libcapstone.so.4", "libcapstone.so");
+    else
+        static assert(0, "capstone: Implement dynamic config");
+    
+    if (lib == null)
+        return true;
+    
+    adbg_symbols_bind(lib, cast(void**)&cs_version, "cs_version");
+    
+    //TODO: Check version and decide what to do with it
+    //cs_version(&libcapstone_major, null);
+    
+    adbg_symbols_bind(lib, cast(void**)&cs_support, "cs_support");
+    adbg_symbols_bind(lib, cast(void**)&cs_open, "cs_open");
+    adbg_symbols_bind(lib, cast(void**)&cs_close, "cs_close");
+    adbg_symbols_bind(lib, cast(void**)&cs_option, "cs_option");
+    adbg_symbols_bind(lib, cast(void**)&cs_errno, "cs_errno");
+    adbg_symbols_bind(lib, cast(void**)&cs_strerror, "cs_strerror");
+    adbg_symbols_bind(lib, cast(void**)&cs_disasm, "cs_disasm");
+    adbg_symbols_bind(lib, cast(void**)&cs_disasm_ex, "cs_disasm_ex");
+    adbg_symbols_bind(lib, cast(void**)&cs_free, "cs_free");
+    adbg_symbols_bind(lib, cast(void**)&cs_malloc, "cs_malloc");
+    adbg_symbols_bind(lib, cast(void**)&cs_disasm_iter, "cs_disasm_iter");
+    adbg_symbols_bind(lib, cast(void**)&cs_reg_name, "cs_reg_name");
+    adbg_symbols_bind(lib, cast(void**)&cs_insn_name, "cs_insn_name");
+    adbg_symbols_bind(lib, cast(void**)&cs_group_name, "cs_group_name");
+    adbg_symbols_bind(lib, cast(void**)&cs_insn_group, "cs_insn_group");
+    adbg_symbols_bind(lib, cast(void**)&cs_reg_read, "cs_reg_read");
+    adbg_symbols_bind(lib, cast(void**)&cs_reg_write, "cs_reg_write");
+    adbg_symbols_bind(lib, cast(void**)&cs_op_count, "cs_op_count");
+    adbg_symbols_bind(lib, cast(void**)&cs_op_index, "cs_op_index");
+    adbg_symbols_bind(lib, cast(void**)&cs_regs_access, "cs_regs_access");
+    
+    size_t missingcnt = adbg_symbols_missingcnt(lib);
+    if (missingcnt)
     {
-        static immutable const(char)*[] libraries = [
-            "libcapstone.so.4",
-            "libcapstone.so",
-        ];
+        version (Trace)
+        {
+            for (size_t i; i < missingcnt; ++i)
+            {
+                trace("missing symbol: %s", adbg_symbols_missing(i));
+            }
+        }
+        adbg_symbols_close(lib);
+        return true;
     }
     
-    SharedLib lib = void;
+    libcapstone_loaded = true;
     
-    foreach (libname; libraries)
+    version (Trace)
     {
-        if ((lib = load(libname)) == invalidHandle)
-            continue;
-        break;
+        trace("libcapstone loaded");
     }
     
-    bindSymbol(lib, cast(void**)&cs_version, "cs_version");
-    bindSymbol(lib, cast(void**)&cs_support, "cs_support");
-    bindSymbol(lib, cast(void**)&cs_open, "cs_open");
-    bindSymbol(lib, cast(void**)&cs_close, "cs_close");
-    bindSymbol(lib, cast(void**)&cs_option, "cs_option");
-    bindSymbol(lib, cast(void**)&cs_errno, "cs_errno");
-    bindSymbol(lib, cast(void**)&cs_strerror, "cs_strerror");
-    bindSymbol(lib, cast(void**)&cs_disasm, "cs_disasm");
-    bindSymbol(lib, cast(void**)&cs_disasm_ex, "cs_disasm_ex");
-    bindSymbol(lib, cast(void**)&cs_free, "cs_free");
-    bindSymbol(lib, cast(void**)&cs_malloc, "cs_malloc");
-    bindSymbol(lib, cast(void**)&cs_disasm_iter, "cs_disasm_iter");
-    bindSymbol(lib, cast(void**)&cs_reg_name, "cs_reg_name");
-    bindSymbol(lib, cast(void**)&cs_insn_name, "cs_insn_name");
-    bindSymbol(lib, cast(void**)&cs_group_name, "cs_group_name");
-    bindSymbol(lib, cast(void**)&cs_insn_group, "cs_insn_group");
-    bindSymbol(lib, cast(void**)&cs_reg_read, "cs_reg_read");
-    bindSymbol(lib, cast(void**)&cs_reg_write, "cs_reg_write");
-    bindSymbol(lib, cast(void**)&cs_op_count, "cs_op_count");
-    bindSymbol(lib, cast(void**)&cs_op_index, "cs_op_index");
-    bindSymbol(lib, cast(void**)&cs_regs_access, "cs_regs_access");
-    
-    return errorCount() > 0;
+    return false;
 }
 
 }

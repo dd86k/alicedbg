@@ -19,6 +19,8 @@ version (Windows) {
 //      the "C way" of doing things.
 //TODO: Make module thread-safe
 //      Either via TLS and/or atomic operations
+//TODO: More error should have context parameters
+//      invalidArgument
 
 extern (C):
 
@@ -29,6 +31,7 @@ enum AdbgError {
 	//
 	success	= 0,
 	invalidArgument	= 1,
+	emptyArgument	= 2,
 	nullArgument	= invalidArgument,	// Old alias for invalidArgument
 	uninitiated	= 4,	// Only when user value is important like for fopen
 	invalidOption	= 5,
@@ -70,6 +73,7 @@ enum AdbgError {
 	objectInvalidType	= 314,
 	objectInvalidABI	= 315,
 	objectOutsideAccess	= 320,
+	objectSymbolLoadFailed	= 330,
 	// Old meanings
 	unknownObjFormat	= objectUnknownFormat,
 	unsupportedObjFormat	= objectUnsupportedFormat,
@@ -80,10 +84,15 @@ enum AdbgError {
 	invalidObjType	= objectInvalidType,
 	invalidObjABI	= objectInvalidABI,
 	//
-	// 400-499: Debugger memory operations
+	// 400-499: Symbols
 	//
-	scannerDataEmpty	= 400,
-	scannerDataLimit	= 401,
+	symbolLibraryError	= 401,
+	symbolLoadError	= 402,
+	//
+	// 800-899: Memory scanner
+	//
+	scannerDataEmpty	= 800,
+	scannerDataLimit	= 801,
 	//
 	// 1000-1999: Misc
 	//
@@ -92,13 +101,15 @@ enum AdbgError {
 	todo	= unimplemented,	/// Ditto
 	notImplemented	= unimplemented,	/// Old alias to unimplemented
 	//
-	// 2000-2999: External
-	//            Libraries have their own error facilities
+	// 2000-2999: External resources
 	//
 	os	= 2001,
 	crt	= 2002,
-	libLoader	= 2003,
-	libCapstone	= 2004,
+	//
+	// 3000-3999: External libraryes
+	//
+	libLoader	= 3001,	/// BindBC
+	libCapstone	= 3002,	/// Capstone
 }
 
 /// Represents an error in alicedbg.
@@ -175,7 +186,7 @@ const(char)* adbg_sys_error(int code) {
 	version (Windows) {
 		import core.sys.windows.winbase : FormatMessageA,
 			FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_MAX_WIDTH_MASK;
-		enum ERR_BUF_SZ = 512;
+		enum ERR_BUF_SZ = 256;
 		__gshared char [ERR_BUF_SZ]buffer = void;
 		size_t len = FormatMessageA(
 			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_MAX_WIDTH_MASK,
@@ -251,17 +262,15 @@ int adbg_errno_extern() {
 const(char)* adbg_error_msg(int code = error.code) {
 	import core.stdc.errno : errno;
 	import core.stdc.string : strerror;
-	import bindbc.loader.sharedlib : errors;
 	import adbg.include.capstone : csh, cs_errno, cs_strerror;
 	
 	switch (error.code) with (AdbgError) {
-	case crt: return strerror(errno);
-	case os:  return adbg_sys_error(adbg_error_system);
-	case libCapstone:  return cs_strerror(cs_errno(*cast(csh*)error.res));
-	case libLoader:
-		if (errors.length)
-			return errors()[0].message;
-		return defaultMsg;
+	case crt:
+		return strerror(errno);
+	case os:
+		return adbg_sys_error(adbg_error_system);
+	case libCapstone:
+		return cs_strerror(cs_errno(*cast(csh*)error.res));
 	default:
 		foreach (ref e; errors_msg)
 			if (code == e.code)

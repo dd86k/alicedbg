@@ -12,6 +12,7 @@ import common, utils;
 import term, adbg;
 
 //TODO: Consider client.d with common actions
+//TODO: Print process exit code
 
 extern (C):
 

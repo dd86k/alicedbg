@@ -354,25 +354,18 @@ int cli_version() {
 		printf("GDC-EH: %s\n", GDC_EXCEPTION_MODE);
 	}
 	
-	static if (LLVM_VERSION)
-		printf("LLVM: %d\n", LLVM_VERSION);
-	
 	version (CRuntime_Glibc) {
 		import adbg.include.c.config : gnu_get_libc_version;
 		printf("Glibc: %s\n", gnu_get_libc_version());
 	}
 	
-	import adbg.include.capstone : capstone_dyn_init, cs_version;
+	static if (LLVM_VERSION)
+		printf("LLVM: %d\n", LLVM_VERSION);
+	
+	import adbg.include.capstone : libcapstone_dynload, cs_version;
 	printf("Capstone: ");
-	if (capstone_dyn_init()) {
+	if (libcapstone_dynload()) {
 		puts("error");
-		version (Trace) {
-			import adbg.error : trace;
-			import bindbc.loader.sharedlib : errors;
-			foreach (e; errors) {
-				trace("%s", e.message);
-			}
-		}
 	} else {
 		int major = void, minor = void;
 		cs_version(&major, &minor);

@@ -15,6 +15,7 @@ import adbg.error;
 import adbg.platform;
 import adbg.v2.debugger.process : adbg_process_t;
 import adbg.v2.object.machines : AdbgMachine;
+import adbg.v2.debugger.exception : adbg_exception_t;
 
 version (Win64)
 	version (X86_64)
@@ -184,7 +185,6 @@ int adbg_dasm_openproc(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
 	
 	return adbg_dasm_open(dasm, mach);
 }
-import adbg.v2.debugger.exception : adbg_exception_t;
 int adbg_dasm_process_exception(adbg_disassembler_t *dasm, adbg_process_t *tracee, adbg_exception_t *ex, adbg_opcode_t *op) {
 	import adbg.v2.debugger.memory : adbg_memory_read;
 	ubyte[16] data = void;
@@ -203,19 +203,8 @@ int adbg_dasm_process_exception(adbg_disassembler_t *dasm, adbg_process_t *trace
 int adbg_dasm_open(adbg_disassembler_t *dasm,
 	AdbgMachine machine = AdbgMachine.native) {
 	//TODO: static if (CAPSTONE_DYNAMIC)
-	if (loaded_cs == false) {
-		if (capstone_dyn_init()) {
-			version (Trace) {
-				import bindbc.loader.sharedlib : errors;
-				foreach (e; errors) {
-					trace("%s", e.message);
-				}
-			}
-			return adbg_oops(AdbgError.libLoader);
-		}
-		loaded_cs = true;
-		version (Trace) trace("capstone loaded");
-	}
+	if (libcapstone_dynload())
+		return adbg_errno;
 	
 	int cs_arch = void, cs_mode = void;
 	if (adbg_dasm_lib_a2cs(cs_arch, cs_mode, machine))
