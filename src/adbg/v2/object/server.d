@@ -149,7 +149,7 @@ struct adbg_object_t {
 		struct mz_t {
 			mz_hdr *header;
 			mz_reloc *relocs;
-			
+			void *newbase;
 			bool *reversed_relocs;
 		}
 		mz_t mz;
@@ -408,29 +408,41 @@ L_ARG:
 		if (o.file_size < mz_hdr.sizeof)
 			return adbg_oops(AdbgError.unknownObjFormat);
 		
-		uint offset = o.i.mz.header.e_lfanew;
-		if (offset == 0)
-			return adbg_object_mz_load(o);
-		if (offset >= o.file_size - PE_HEADER.sizeof)
-			return adbg_oops(AdbgError.assertion);
+		import adbg.v2.object.format.mz : LFANEW_OFFSET;
 		
-		uint sig = *cast(uint*)(o.buffer + offset);
-		if (sig == MAGIC_PE32) // text
+		// Attempt to check new file format offset and signature.
+		// If e_lfanew seem to be garbage, load file as an MZ exec instead.
+		uint e_lfanew = *cast(uint*)(o.buffer + LFANEW_OFFSET);
+		if (e_lfanew == 0)
+			return adbg_object_mz_load(o);
+		if (e_lfanew >= o.file_size)
+			return adbg_object_mz_load(o);
+		// NOTE: ReactOS checks if NtHeaderOffset is not higher than 256 MiB
+		if (e_lfanew >= 256 * 1024 * 1024)
+			return adbg_object_mz_load(o);
+		o.i.mz.newbase = o.buffer + e_lfanew; // Used by sub-loaders
+		
+		// 32-bit signature check
+		uint sig = *cast(uint*)o.i.mz.newbase;
+		switch (sig) {
+		case MAGIC_PE32:
 			return adbg_object_pe_load(o);
-		
-		switch (cast(ushort)sig) {
-		case CHAR16!"LE", CHAR16!"LX", CHAR16!"NE":
-			return adbg_oops(AdbgError.unsupportedObjFormat);
-		default: // If nothing matches, assume MZ
-			return adbg_object_mz_load(o);
+		default:
 		}
-	case MAGIC_ZM:
+		
+		// 16-bit signature check
+		switch (cast(ushort)sig) {
+		case CHAR16!"NE", CHAR16!"LE", CHAR16!"LX":
+			return adbg_oops(AdbgError.unsupportedObjFormat);
+		default:
+		}
+		
+		// If nothing matches, assume MZ
+		return adbg_object_mz_load(o);
+	case MAGIC_ZM: // Also known as old magic, but more likely just inverted
 		if (o.file_size < mz_hdr.sizeof)
 			return adbg_oops(AdbgError.unknownObjFormat);
 		
-		//TODO: Check for e_lfanew position before swapping
-		o.p.reversed = true;
-		with (o.i.mz.header) e_lfanew = adbg_bswap32(e_lfanew);
 		goto case MAGIC_MZ;
 	default:
 		return adbg_oops(AdbgError.unknownObjFormat);

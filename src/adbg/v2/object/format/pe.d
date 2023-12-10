@@ -597,7 +597,7 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	
 	o.format = AdbgObject.pe;
 	
-	void *base = o.buffer + o.i.mz.header.e_lfanew;
+	void *base = o.i.mz.newbase;
 	
 	o.i.pe.header = cast(PE_HEADER*)base;
 	o.i.pe.opt_header = cast(PE_OPTIONAL_HEADER*)(base + PE_OFFSET_OPTHDR);

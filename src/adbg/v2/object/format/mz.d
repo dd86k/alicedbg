@@ -13,7 +13,7 @@ import adbg.utils.bit;
 
 /// Minimum file size for an MZ EXE.
 // NOTE: Borland EXE about 6K (includes a CRT?).
-private enum MINIMUM_SIZE = mz_hdr.sizeof + 0x200;
+private enum MINIMUM_SIZE = mz_hdr.sizeof + PAGE;
 
 /// Magic number for MZ objects.
 enum MAGIC_MZ = CHAR16!"MZ";
@@ -27,7 +27,15 @@ enum PARAGRAPH = 16;
 /// Size of a MZ page.
 enum PAGE = 512;
 
-/// MZ header structure
+/// Offset to e_lfanew field in the MZ header, added
+/// in NE, LE, and PE32 executable images.
+enum LFANEW_OFFSET = 0x3c;
+
+/// Original MZ header structure.
+/// 
+/// Newer executables add these new fields:
+/// - ushort[ERESWDS] e_res;
+/// - uint e_lfanew;
 struct mz_hdr {
 	ushort e_magic;	/// Magic number
 	ushort e_cblp;	/// Bytes on last page of file
@@ -43,10 +51,7 @@ struct mz_hdr {
 	ushort e_cs;	/// Initial (relative) CS value
 	ushort e_lfarlc;	/// File address of relocation table
 	ushort e_ovno;	/// Overlay number
-	ushort[ERESWDS] e_res;	/// Reserved words
-	uint   e_lfanew;	/// File address of new exe header
 }
-static assert(mz_hdr.e_lfanew.offsetof == 0x3c);
 
 /// MZ relocation entry
 struct mz_reloc {
@@ -75,8 +80,6 @@ int adbg_object_mz_load(adbg_object_t *o) {
 		e_cs	= adbg_bswap16(e_cs);
 		e_lfarlc	= adbg_bswap16(e_lfarlc);
 		e_ovno	= adbg_bswap16(e_ovno);
-		for (size_t i; i < ERESWDS; ++i)
-			e_res[i] = adbg_bswap16(e_res[i]);
 	}
 	
 	o.format = AdbgObject.mz;

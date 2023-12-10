@@ -50,23 +50,6 @@ void dump_mz_hdr(adbg_object_t *o) {
 	dprint_x16("e_cs", e_cs);
 	dprint_x16("e_lfarlc", e_lfarlc);
 	dprint_u16("e_ovno", e_ovno);
-	dprint_x16("e_res[0]", e_res[0]); // lazy
-	dprint_x16("e_res[1]", e_res[1]); // lazy
-	dprint_x16("e_res[2]", e_res[2]); // lazy
-	dprint_x16("e_res[3]", e_res[3]); // lazy
-	dprint_x16("e_res[4]", e_res[4]); // lazy
-	dprint_x16("e_res[5]", e_res[5]); // lazy
-	dprint_x16("e_res[6]", e_res[6]); // lazy
-	dprint_x16("e_res[7]", e_res[7]); // lazy
-	dprint_x16("e_res[8]", e_res[8]); // lazy
-	dprint_x16("e_res[9]", e_res[9]); // lazy
-	dprint_x16("e_res[10]", e_res[10]); // lazy
-	dprint_x16("e_res[11]", e_res[11]); // lazy
-	dprint_x16("e_res[12]", e_res[12]); // lazy
-	dprint_x16("e_res[13]", e_res[13]); // lazy
-	dprint_x16("e_res[14]", e_res[14]); // lazy
-	dprint_x16("e_res[15]", e_res[15]); // lazy
-	dprint_x32("e_lfanew", e_lfanew);
 	}
 }
 
