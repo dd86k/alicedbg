@@ -5,7 +5,7 @@
 /// License: BSD-3-Clause
 module adbg.platform;
 
-import adbg.include.d.config : COMPILER_FEAT_TARGETINFO;
+import adbg.include.d.config : D_FEATURE_TARGETINFO;
 
 //TODO: has feature xyz should be dynamic
 //      e.g., capstone may not be available, but could be after installing it
@@ -146,7 +146,7 @@ else
 // ANCHOR Additional target information
 //
 
-static if (COMPILER_FEAT_TARGETINFO) {
+static if (D_FEATURE_TARGETINFO) {
 	/// Target object format string
 	enum TARGET_OBJFMT = __traits(getTargetInfo, "objectFormat");
 	/// Target float ABI string

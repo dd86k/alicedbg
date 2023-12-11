@@ -281,13 +281,13 @@ const(char)* adbg_error_msg(int code = error.code) {
 
 version (Trace) {
 	import core.stdc.stdio, core.stdc.stdarg;
-	private import adbg.include.d.config : COMPILER_FEAT_PRAGMA_PRINTF;
+	private import adbg.include.d.config : D_FEATURE_PRAGMA_PRINTF;
 	
 	private extern (C) int putchar(int);
 	
 	//TODO: Eventually deprecate this for adbg_log_trace
 	
-	static if (COMPILER_FEAT_PRAGMA_PRINTF) {
+	static if (D_FEATURE_PRAGMA_PRINTF) {
 		/// Trace application
 		pragma(printf)
 		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {

@@ -13,7 +13,7 @@
  */
 module adbg.include.c.stdio;
 
-import adbg.include.d.config : COMPILER_FEAT_PRAGMA_PRINTF, GDC_11;
+import adbg.include.d.config : D_FEATURE_PRAGMA_PRINTF, GDC_11;
 
 extern (C):
 @system:
@@ -34,7 +34,7 @@ int getchar();
 //       from core.stdc.stdio._snprintf, so this is one of those copy-paste fix.
 
 version (Windows) {
-	static if (COMPILER_FEAT_PRAGMA_PRINTF) {
+	static if (D_FEATURE_PRAGMA_PRINTF) {
 		///
 		pragma(printf)
 		int   _snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);
@@ -45,7 +45,7 @@ version (Windows) {
 		alias _snprintf snprintf;
 	}
 } else {
-	static if (COMPILER_FEAT_PRAGMA_PRINTF) {
+	static if (D_FEATURE_PRAGMA_PRINTF) {
 		///
 		pragma(printf)
 		int   snprintf(scope char* s, size_t n, scope const char* fmt, scope const ...);

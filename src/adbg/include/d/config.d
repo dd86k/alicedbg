@@ -130,14 +130,14 @@ version (LDC) {
 // Added in druntime/d07e682f21b0043354fc4b9ca6d5d2b176a63539
 // git describe --contains says v2.071.0-b1
 // but successfully compiled on GDC 6.3 (DMD-2.068)
-enum COMPILER_FEAT_BSWAP64       = __VERSION__ >= 2_068;
+enum D_FEATURE_BSWAP64       = __VERSION__ >= 2_068;
 /// If set, the compiler supports the getTargetInfo trait.
-enum COMPILER_FEAT_TARGETINFO    = __VERSION__ >= 2_083;
+enum D_FEATURE_TARGETINFO    = __VERSION__ >= 2_083;
 /// If set, the compiler supports the printf and scanf pragmas.
-enum COMPILER_FEAT_PRAGMA_PRINTF = __VERSION__ >= 2_092;
+enum D_FEATURE_PRAGMA_PRINTF = __VERSION__ >= 2_092;
 /// Compiler supports DIP1034 (bottom type, includes noreturn).
-enum COMPILER_FEAT_NORETURN      = __VERSION__ >= 2_096;
+enum D_FEATURE_NORETURN      = __VERSION__ >= 2_096;
 /// Compiler has support for core.int128.
-enum COMPILER_FEAT_INT128        = __VERSION__ >= 2_100;
+enum D_FEATURE_INT128        = __VERSION__ >= 2_100;
 /// Compiler supports @mustuse function attribute.
-enum COMPILER_FEAT_MUSTUSE       = __VERSION__ >= 2_100;
+enum D_FEATURE_MUSTUSE       = __VERSION__ >= 2_100;

@@ -133,8 +133,8 @@ uint adbg_bswap32(uint v) pure {
 /// Returns: Byte-swapped value
 ulong adbg_bswap64(ulong v) pure {
 	// NOTE: Only recent versions of DMD inlines the intrinsic
-	import adbg.include.d.config : COMPILER_FEAT_BSWAP64;
-	static if (COMPILER_FEAT_BSWAP64) {
+	import adbg.include.d.config : D_FEATURE_BSWAP64;
+	static if (D_FEATURE_BSWAP64) {
 		import core.bitop : bswap;
 		return bswap(v); // Intrinsic
 	} else {

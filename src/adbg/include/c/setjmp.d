@@ -9,7 +9,7 @@
 module adbg.include.c.setjmp;
 
 import adbg.include.c.config : c_long, c_ulong, c_longint, c_ulongint;
-import adbg.include.d.config : COMPILER_FEAT_NORETURN;
+import adbg.include.d.config : D_FEATURE_NORETURN;
 
 extern (C):
 @system:
@@ -176,7 +176,7 @@ version (Win32) { // Required by DMD, works with LDC
 	int setjmp(ref jmp_buf);
 }
 
-static if (COMPILER_FEAT_NORETURN) {
+static if (D_FEATURE_NORETURN) {
 	/// 
 	noreturn longjmp(ref jmp_buf, int);
 } else {
