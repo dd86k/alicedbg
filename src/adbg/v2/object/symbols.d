@@ -20,6 +20,14 @@
 module adbg.v2.object.symbols;
 
 //TODO: Option to load via object server.
+//TODO: Support for versioning
+//      Some libraries, like Capstone, can be found in various versions
+//      depending on the distrobution.
+//      Can try loading version-attached shared libraries and fallback to a default
+//      where maybe a callback can be checked against for a specific major version?
+//TODO: Symbol mangling guesser (low priority)
+//TODO: Format requested symbol into new structure buffer.
+//      Should be same size of missing symbols' entry buffer.
 
 // NOTE: Calling dlerror(3) clears the last error
 
@@ -53,8 +61,18 @@ enum AdbgSymbolMangling {
 	cdecl = exact,
 	/// Windows Standard Call mangled name.
 	stdcall,
-	// C++ mangled name, GCC rules.
+	// C++ mangled name for GCC/Clang.
 	//gnucpp,
+	// C++ mangled name for old GCC (2.9x)
+	//oldgnucpp,
+	// C++ mangled name for DigitalMars C++.
+	//dmcpp,
+	// C++ mangled name for Watcom C++ 10.6.
+	//watcpp,
+	// Objective-C mangled name.
+	//objc,
+	// Objective-C++ mangled name.
+	//objcpp,
 	// D mangled name.
 	//d,
 }
@@ -121,15 +139,20 @@ int adbg_symbols_bind(adbg_shared_lib_t *lib, void** proc, const(char) *symbol,
 		*proc = dlsym(lib.handle, symbol);
 	}
 	if (*proc == null) {
-		// Add symbol to count of missed
-		if (lib.missingcnt < SYMBOL_BUFCOUNT) {
-			strncpy(cast(char*)&lib.missing[lib.missingcnt++], symbol, SYMBOL_BUFSIZE);
-		}
-		
+		// Add symbol to count of missed symbols.
+		adbg_symbols_addmissing(lib, symbol);
 		return adbg_oops(AdbgError.symbolLoadError);
 	}
 	
 	return 0;
+}
+private
+void adbg_symbols_addmissing(adbg_shared_lib_t *lib, const(char) *symbol) {
+	// Check if we can fit more into the buffer.
+	if (lib.missingcnt >= SYMBOL_BUFCOUNT)
+		return;
+	
+	strncpy(cast(char*)&lib.missing[lib.missingcnt++], symbol, SYMBOL_BUFSIZE);
 }
 
 /// Returns the missing symbol count.
@@ -142,6 +165,16 @@ size_t adbg_symbols_missingcnt(adbg_shared_lib_t *lib) {
 const(char)* adbg_symbols_missing(adbg_shared_lib_t *lib, size_t index) {
 	if (lib == null || index >= lib.missingcnt) return null;
 	return cast(const(char)*)&lib.missing[index];
+}
+unittest {
+	adbg_shared_lib_t lib;
+	adbg_symbols_addmissing(&lib, "test");
+	adbg_symbols_addmissing(&lib, "some_long_name_that_should_fit_the_buffer_anyway");
+	
+	assert(adbg_symbols_missing(&lib, 0));
+	assert(adbg_symbols_missing(&lib, 1));
+	assert(adbg_symbols_missing(&lib, 2) == null);
+	assert(adbg_symbols_missing(null, 2) == null);
 }
 
 void adbg_symbols_close(adbg_shared_lib_t *lib) {
