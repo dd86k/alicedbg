@@ -5,7 +5,7 @@ scanner.
 
 Fully written in D's BetterC mode, and available as a DUB package.
 
-Library features:
+Features:
 - Debugger
 - Disassembler (using Capstone)
 - Object server
@@ -14,27 +14,20 @@ Written from scratch for educational purposes.
 
 ## Warnings
 
-**This is still lacking most features any debuggers should have.**
+⚠️ This is a toy debugger with barely any features ⚠️
 
-Long-term wishlist:
-- Source debugging
-- Windows kernel debugging
-- Linux kernel debugging
-- Support embedded platforms
-- Just-In-Time debugging
+There are currently no stable APIs. Every releases pre-1.0 will see frequent
+changes to the API.
 
-Under consideration:
-- TUI option
-- Addon system (either Lua, Squirrel, DMDScript, or AngelScript)
-
-There are currently no stable APIs. Every releases to the 0.x series can change
-the API at any given time.
-
-None of the functions are thread-safe.
+None of the functions are currently thread-safe.
 
 ## Application Usage
 
-The application is split across a few modes.
+The application features two modes:
+- Debugger
+- Image dumper
+
+### Getting Started
 
 The disassembly feature is provided by Capstone 4.0.2.
 
@@ -54,27 +47,32 @@ The debugger is the default operating mode.
 
 In this mode, the default option is to spawn a process with a file path.
 
-To attach to a live process, use the `--pid PID` option, where PID is a
+To attach to a live process, use the `--attach PID` option, where PID is a
 Process ID.
 
 Examples:
-- Spawn process
-  - Windows: `alicedbg test.exe`
-  - Posix: `alicedbg ./test`
-- Attach to process: `alicedbg --pid 3428`
+- Spawn process on Windows: `alicedbg test.exe`
+- Spawn process on Posix: `alicedbg ./test`
+- Attach to process ID 3428: `alicedbg --attach 3428`
 
-### Dumper
+### Image Dumper
 
 To invoke the object dumper, use `--dump PATH`, where PATH is a file path to a
 binary image.
 
 Examples:
-- Dump headers: `alicedbg --dump alicedbg.exe`
+- Dump headers: `alicedbg --dump alicedbg`
+- Dump exports: `alicedbg --dump-exports alicedbg.exe`
 
 ## Documentation
 
 For information about compilation, internal structures, support,
 see the repository's Wiki for further information.
+
+## Contributing
+
+Currently not looking for contributors, sorry. Feel free to provide suggestions
+regarding contributor management.
 
 ## License
 
