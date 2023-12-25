@@ -30,13 +30,10 @@ extern (C):
 //      - extent formats to include everyting else, have functions to say type (_is_dump)
 //      - keep format and add a "type/purpose" enum (exec/dump/symbols/etc.)
 //      - do type as first-class and format second
-//TODO: Consider loading only 4K for detection
-//TODO: Data provider pointers
-//      adbg_object_read -> mem|file
-//TODO: const(ubyte) *adbg_obj_section(obj, ".abc");
-//TODO: const(ubyte) *adbg_obj_section_i(obj, index);
-//TODO: uint u32 = pointer.fetch!ubyte(offset);
-//TODO: Consider adbg_object_is_dump or adbg_object_get_type or adbg_object_is(FLAG)
+//TODO: Consider loading first 4 KiB for detection before loading rest
+//TODO: const(ubyte)* adbg_obj_section(obj, ".abc");
+//TODO: const(ubyte)* adbg_obj_section_i(obj, index);
+//TODO: const(ubyte)* adbg_object_get_exec_section(obj);
 
 /// Executable or object format.
 enum AdbgObject {
@@ -62,8 +59,8 @@ enum AdbgObject {
 	//codeview
 	// 
 	//dwarf
-	/// Windows' User Mini-Dump format.
-	mdmp,
+	// Windows' User Mini-Dump format.
+	//mdmp,
 }
 
 /// Object origin. (or "load mode")
@@ -222,10 +219,39 @@ struct adbg_object_t {
 	adbg_object_internals_t i;
 }
 
+/+struct adbg_section_t {
+	const(ubyte)* data;
+	ulong size;
+	uint flags;
+}+/
+
 // Internal: Check if pointer is outside of file
+deprecated("Use adbg_object_chkbnds")
 package
 bool adbg_object_poutside(adbg_object_t *o, void *ptr) {
 	return ptr >= o.buffer + o.file_size;
+}
+// Internal: Check if pointer is within file boundaries
+package
+bool adbg_object_ptrbnds(adbg_object_t *o, void *ptr) {
+	return ptr >= o.buffer && ptr < o.buffer + o.file_size;
+}
+/// Check if offset is within file boundaries
+/// Params:
+/// 	o = Object instance.
+/// 	pos = File offset.
+/// Returns: True if in bounds.
+bool adbg_object_offbnds(adbg_object_t *o, ulong off) {
+	return off < o.file_size;
+}
+/// Check if offset with size is within file boundaries
+/// Params:
+/// 	o = Object instance.
+/// 	pos = File offset.
+/// 	size = Data size.
+/// Returns: True if in bounds.
+bool adbg_object_offbnds2(adbg_object_t *o, ulong off, size_t size) {
+	return off + size < o.file_size;
 }
 
 /// Load an object from disk into memory.
@@ -234,6 +260,7 @@ bool adbg_object_poutside(adbg_object_t *o, void *ptr) {
 ///   path = File path.
 ///   ... = Options. Terminated with 0.
 /// Returns: Error code.
+deprecated
 int adbg_object_open(adbg_object_t *o, const(char) *path, ...) {
 	if (o == null)
 		return adbg_oops(AdbgError.nullArgument);
@@ -248,13 +275,42 @@ int adbg_object_open(adbg_object_t *o, const(char) *path, ...) {
 	return adbg_object_loadv(o, list);
 }
 
-int adbg_object_open_process(adbg_object_t *o, adbg_process_t *proc) {
-	return adbg_oops(AdbgError.unimplemented);
+/// Load an object from disk into memory.
+///
+/// This function allocates memory.
+/// Params:
+///   path = File path.
+///   ... = Options. Terminated with 0.
+/// Returns: Object instance, or null on error.
+adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
+	adbg_object_t *o = cast(adbg_object_t*)malloc(adbg_object_t.sizeof);
+	if (o == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	
+	o.file_handle = fopen(path, "rb");
+	if (o.file_handle == null) {
+		free(o);
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	
+	va_list list = void;
+	va_start(list, path);
+	
+	if (adbg_object_loadv(o, list)) {
+		fclose(o.file_handle);
+		free(o);
+		return null;
+	}
+	
+	return o;
 }
 
-// Should call adbg_object_open_process
-int adbg_object_open_map(adbg_object_t *o, adbg_memory_map_t *map) {
-	return adbg_oops(AdbgError.unimplemented);
+adbg_object_t* adbg_object_open_process(adbg_process_t *proc) {
+	adbg_oops(AdbgError.unimplemented);
+	return null;
 }
 
 /// Close object instance.
@@ -451,6 +507,12 @@ L_ARG:
 
 //TODO: adbg_object_load_continue if partial was used
 //      set new buffer_size, partial=false
+
+//adbg_section_t adbg_object_section(adbg_object_t *o, size_t index, uint flags = 0) {	
+//}
+
+//adbg_section_t adbg_object_section_search(adbg_object_t *o, const(char)* name, uint flags = 0) {
+//}
 
 /// Returns the first machine type the object supports.
 /// Params: o = Object instance.

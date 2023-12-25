@@ -83,33 +83,34 @@ struct option_t {
 		extern(C) int function(const(char)*) fa;
 	}
 }
-//TODO: --dump-offset/--dump-seek/--dump-start - Starting offset for raw blob
-//TODO: --dump-length/--dump-end - Length or end
-//TODO: --dump-imports-names - Shared library names only
-//TODO: --dump-imports-all - Dependency walker
+//TODO: --dump-blob-offset/--dump-blob-seek/--dump-blob-start: Starting offset for raw blob
+//TODO: --dump-length/--dump-end: Length or end
+//TODO: --dump-imports-all: Dependency walker
+//TODO: --dump-section=name: Hex or raw dump section
+//TODO: --dump-everything: Dump everything except disassembly
 immutable option_t[] options = [
 	// general
-	{ 'a', "arch",	"Select architecture for disassembler (default=platform)", true, fa: &cli_march },
-	{ 's', "syntax",	"Select disassembler syntax (default=platform)", true, fa: &cli_syntax },
+	{ 'a', "arch",   "Select architecture for disassembler (default=platform)", true, fa: &cli_march },
+	{ 's', "syntax", "Select disassembler syntax (default=platform)", true, fa: &cli_syntax },
 	// debugger
-	{ 0,   "file",	"Debugger: Spawn FILE for debugging", true, fa: &cli_file },
-	{ 0,   "args",	"Debugger: Supply arguments to executable", true, fa: &cli_args },
-	{ 'E', "env",	"Debugger: Supply environment variables to executable", true, fa: &cli_env },
-	{ 'p', "attach",	"Debugger: Attach to Process ID", true, fa: &cli_pid },
+	{ 0,   "file",   "Debugger: Spawn FILE for debugging", true, fa: &cli_file },
+	{ 0,   "args",   "Debugger: Supply arguments to executable", true, fa: &cli_args },
+	{ 'E', "env",    "Debugger: Supply environment variables to executable", true, fa: &cli_env },
+	{ 'p', "attach", "Debugger: Attach to Process ID", true, fa: &cli_pid },
 	// dumper
-	{ 'D', "dump",	"Aliased to --dump-headers", false, &cli_dump },
-	{ 0,   "dump-headers",	"Dump object's headers", false, &cli_dump_headers },
-	{ 0,   "dump-sections",	"Dump object's sections", false, &cli_dump_sections },
-	{ 0,   "dump-imports",	"Dump object's import information", false, &cli_dump_imports },
-	{ 0,   "dump-exports",	"Dump object's export information", false, &cli_dump_exports },
-	{ 0,   "dump-loadcfg",	"Dump object's load configuration", false, &cli_dump_loadcfg },
-//	{ 0,   "dump-source",	"Dump object's source with disassembly", false, &cli_dump_source },
-	{ 0,   "dump-reloc",	"Dump object's relocations", false, &cli_dump_reloc },
-//	{ 0,   "dump-debug",	"Dump object's debug information", false, &cli_dump_debug },
-	{ 0,   "dump-disasm",	"Dump object's disassembly", false, &cli_dump_disasm },
-	{ 0,   "dump-disasm-all",	"Dump object's disassembly for all sections", false, &cli_dump_disasm_all },
-	{ 0,   "dump-disasm-stats",	"Dump object's disassembly statistics for executable sections", false, &cli_dump_disasm_stats },
-	{ 0,   "dump-blob",	"Dump as raw binary blob", false, &cli_dump_blob },
+	{ 'D', "dump",              "Aliased to --dump-headers", false, &cli_dump_headers },
+	{ 0,   "dump-headers",      "Dump object's headers", false, &cli_dump_headers },
+	{ 0,   "dump-sections",     "Dump object's sections", false, &cli_dump_sections },
+	{ 0,   "dump-imports",      "Dump object's import information", false, &cli_dump_imports },
+	{ 0,   "dump-exports",      "Dump object's export information", false, &cli_dump_exports },
+	{ 0,   "dump-loadcfg",      "Dump object's load configuration", false, &cli_dump_loadcfg },
+//	{ 0,   "dump-source",       "Dump object's source with disassembly", false, &cli_dump_source },
+	{ 0,   "dump-relocs",       "Dump object's relocations", false, &cli_dump_reloc },
+	{ 0,   "dump-debug",        "Dump object's debug information", false, &cli_dump_debug },
+	{ 0,   "dump-disasm",       "Dump object's disassembly", false, &cli_dump_disasm },
+	{ 0,   "dump-disasm-all",   "Dump object's disassembly for all sections", false, &cli_dump_disasm_all },
+	{ 0,   "dump-disasm-stats", "Dump object's disassembly statistics for executable sections", false, &cli_dump_disasm_stats },
+	{ 0,   "dump-as-blob",      "Dump as raw binary blob", false, &cli_dump_blob },
 	// pages
 	{ 'h', "help",	"Show this help screen and exit", false, &cli_help },
 	{ 0,   "version",	"Show the version screen and exit", false, &cli_version },
@@ -248,60 +249,64 @@ int cli_analyze() {
 // ANCHOR --dump-*
 //
 
-// Dump default
-int cli_dump() {
-	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.header;
-	return 0;
-}
+// Dump selectors
+
 int cli_dump_headers() {
 	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.header;
+	globals.dump_selections |= DumpSelect.headers;
 	return 0;
 }
 int cli_dump_sections() {
 	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.sections;
+	globals.dump_selections |= DumpSelect.sections;
 	return 0;
 }
 int cli_dump_imports() {
 	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.imports;
+	globals.dump_selections |= DumpSelect.imports;
 	return 0;
 }
 int cli_dump_exports() {
 	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.exports;
+	globals.dump_selections |= DumpSelect.exports;
 	return 0;
 }
 int cli_dump_loadcfg() {
 	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.loadcfg;
+	globals.dump_selections |= DumpSelect.loadcfg;
 	return 0;
 }
 int cli_dump_reloc() {
 	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.relocs;
+	globals.dump_selections |= DumpSelect.relocs;
+	return 0;
+}
+int cli_dump_debug() {
+	globals.mode = SettingMode.dump;
+	globals.dump_selections |= DumpSelect.debug_;
 	return 0;
 }
 int cli_dump_disasm() {
 	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.disasm;
+	globals.dump_selections |= DumpSelect.disasm;
 	return 0;
 }
 int cli_dump_disasm_all() {
 	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.disasm_all;
+	globals.dump_selections |= DumpSelect.disasm_all;
 	return 0;
 }
 int cli_dump_disasm_stats() {
 	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.disasm_stats;
+	globals.dump_selections |= DumpSelect.disasm_stats;
 	return 0;
 }
+
+// Dump options
+
 int cli_dump_blob() {
 	globals.mode = SettingMode.dump;
-	globals.flags |= DumpOpt.raw;
+	globals.dump_options |= DumpOptions.raw;
 	return 0;
 }
 
@@ -311,13 +316,18 @@ int cli_dump_blob() {
 
 int cli_help() {
 	puts(
-	"alicedbg - Aiming to be a simple debugger\n"~
+	"alicedbg\n"~
+	"Aiming to be a simple debugger.\n"~
 	"\n"~
 	"USAGE\n"~
-	" alicedbg FILE [OPTIONS...]\n"~
-	" alicedbg --attach PID [OPTIONS...]\n"~
-	" alicedbg --dump FILE [OPTIONS...]\n"~
-	" alicedbg {-h|--help|--version|--ver|--license}\n"~
+	"  Spawn new process to debug:\n"~
+	"    alicedbg FILE [OPTIONS...]\n"~
+	"  Attach debugger to existing process:\n"~
+	"    alicedbg --attach PID [OPTIONS...]\n"~
+	"  Dump executable image headers:\n"~
+	"    alicedbg --dump FILE [OPTIONS...]\n"~
+	"  Show information page and exit:\n"~
+	"    alicedbg {-h|--help|--version|--ver|--license}\n"~
 	"\n"~
 	"OPTIONS"
 	);

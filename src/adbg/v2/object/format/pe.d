@@ -26,6 +26,8 @@ import adbg.utils.bit;
 
 //TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
 //TODO: Function to check RVA bounds (within file_size)
+//TODO: Return everything as const(type)*
+//      Memory implementation will potentially be read-only
 
 extern (C):
 
@@ -330,17 +332,17 @@ struct PE_IMPORT_DESCRIPTOR { align(1):
 /// Import Lookup Table entry structure
 struct PE_IMPORT_LTE32 { align(1):
 	union {
-		uint val;
-		ushort num; /// Ordinal Number (val[31] is clear)
-		uint rva; /// Hint/Name Table RVA (val[31] is set)
+		uint ordinal;	/// Ordinal/Name Flag
+		ushort number;	/// Ordinal Number (val[31] is set)
+		uint rva;	/// Hint/Name Table RVA (val[31] is clear)
 	}
 }
 /// Import Lookup Table entry structure
 struct PE_IMPORT_LTE64 { align(1):
 	union {
-		ulong val;
-		ushort num; /// Ordinal Number (val2[31] is clear)
-		uint rva; /// Hint/Name Table RVA (val2[31] is set)
+		ulong ordinal;	/// Ordinal/Name Flag
+		ushort number;	/// Ordinal Number (val2[31] is set)
+		uint rva;	/// Hint/Name Table RVA (val2[31] is clear)
 	}
 }
 
@@ -876,7 +878,9 @@ char* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_
 	if (o.i.pe.directory == null) return null;
 	if (o.i.pe.directory_exports == null) return null;
 	
-	char *s = cast(char*)o.i.pe.directory_exports - o.i.pe.directory.ExportTable.rva + export_.Name;
+	char *s = cast(char*)o.i.pe.directory_exports
+		- o.i.pe.directory.ExportTable.rva
+		+ export_.Name;
 	
 	if (adbg_object_poutside(o, s)) return null;
 	
@@ -890,17 +894,23 @@ char* adbg_object_pe_export_string_hint(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *
 	if (index >= export_.NumberOfNamePointers) return null;
 	
 	// NOTE: Export Table bounds
-	// If the address specified is not within the export section (as defined
-	// by the address and length that are indicated in the optional header),
-	// 
-	void *base = cast(void*)o.i.pe.directory_exports -
-		o.i.pe.directory.ExportTable.rva;
+	//       If the address specified is not within the export section (as
+	//       defined by the address and length that are indicated in the
+	//       optional header), the field is an Export RVA: an actual
+	//       address in code or data. Otherwise, the field is a Forwarder
+	//       RVA, which names a symbol in another DLL.
+	
+	// Check bounds with table RVA
+	void *base = cast(void*)o.i.pe.directory_exports
+		- o.i.pe.directory.ExportTable.rva;
 	if (adbg_object_poutside(o, base)) return null;
 	
-	//void *table = base + export_.ExportAddressTable;
+	// Check bounds with name pointer and requested index
+	//TODO: Check if hint is forwarder
 	uint *hint = cast(uint*)(base + export_.NamePointer) + index;
 	if (adbg_object_poutside(o, hint)) return null;
 	
+	// Check bounds with hint
 	void *name = base + *hint;
 	if (adbg_object_poutside(o, name)) return null;
 	
@@ -946,7 +956,7 @@ char* adbg_object_pe_import_name(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_
 	return s;
 }
 
-//NOTE: LTEs aren't swapped just yet.
+//TODO: Byte-swap import look-up table entries
 
 PE_IMPORT_LTE32* adbg_object_pe_import_lte32(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
 	if (o == null || import_ == null) return null;
@@ -956,7 +966,7 @@ PE_IMPORT_LTE32* adbg_object_pe_import_lte32(adbg_object_t *o, PE_IMPORT_DESCRIP
 		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
 		+ index;
 	
-	if (adbg_object_poutside(o, lte32) || lte32.val == 0)
+	if (adbg_object_poutside(o, lte32) || lte32.ordinal == 0)
 		return null;
 	
 	return lte32;
@@ -984,7 +994,7 @@ PE_IMPORT_LTE64* adbg_object_pe_import_lte64(adbg_object_t *o, PE_IMPORT_DESCRIP
 	
 	version (Trace) trace("imports=%p lte64=%p fs=%p", o.i.pe.directory_imports, lte64, o.file_size);
 	
-	if (adbg_object_poutside(o, lte64) || lte64.val == 0)
+	if (adbg_object_poutside(o, lte64) || lte64.ordinal == 0)
 		return null;
 	
 	return lte64;
@@ -1003,6 +1013,25 @@ ushort* adbg_object_pe_import_lte64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR 
 	
 	return base;
 }
+
+// Import Directory Table -1,*-> lookup tables -1,1-> hint
+// Helper function
+/+const(char)* adbg_object_pe_import_string_entry(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
+	if (o == null || import_ == null) return null;
+	if (o.i.pe.directory_imports == null) return null;
+	
+	
+	switch (o.i.pe.opt_header.Magic) {
+	case PE_FMT_32:
+		PE_IMPORT_LTE32 *t32 = adbg_object_pe_import_lte32(o, import_, index);
+		if (t32 == null) return null;
+		return;
+	case PE_FMT_64:
+		return;
+	default:
+		return null;
+	}
+}+/
 
 PE_DEBUG_DIRECTORY* adbg_object_pe_debug_directory(adbg_object_t *o, size_t index) {
 	if (o == null) return null;

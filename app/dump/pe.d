@@ -21,32 +21,24 @@ extern (C):
 ///   o = Object.
 ///   flags = Dump settings.
 /// Returns: Non-zero on error.
-int dump_pe(adbg_object_t *o, uint flags) {
-	if (flags & DumpOpt.header) {
-		if (dump_pe_hdr(o))
-			return 1;
-		
-		// Anonymous objects would be here
-		if (o.i.pe.header.SizeOfOptionalHeader) {
-			dump_pe_opthdr(o);
-			dump_pe_dirs(o);
-		}
-	}
+int dump_pe(ref Dumper dump, adbg_object_t *o) {
+	if (dump.selected_headers())
+		dump_pe_hdr(dump, o);
 	
-	if (flags & DumpOpt.sections)
-		dump_pe_sections(o);
+	if (dump.selected_sections())
+		dump_pe_sections(dump, o);
 	
-	if (flags & DumpOpt.exports)
-		dump_pe_exports(o);
+	if (dump.selected_exports())
+		dump_pe_exports(dump, o);
 	
-	if (flags & DumpOpt.imports)
-		dump_pe_imports(o);
+	if (dump.selected_imports())
+		dump_pe_imports(dump, o);
 	
-	if (flags & DumpOpt.debug_)
-		dump_pe_debug(o);
+	if (dump.selected_debug())
+		dump_pe_debug(dump, o);
 	
-	if (flags & DumpOpt.disasm_any)
-		dump_pe_disasm(o, flags);
+	if (dump.selected_disasm_any())
+		dump_pe_disasm(dump, o);
 	
 	return EXIT_SUCCESS;
 }
@@ -54,8 +46,8 @@ int dump_pe(adbg_object_t *o, uint flags) {
 private:
 
 // Returns true if the machine value is unknown
-bool dump_pe_hdr(adbg_object_t *o) {
-	dprint_header("Header");
+void dump_pe_hdr(ref Dumper dump, adbg_object_t *o) {
+	print_header("Header");
 	
 	const(char) *str_mach = adbg_object_pe_machine_string(o.i.pe.header.Machine);
 	
@@ -63,13 +55,13 @@ bool dump_pe_hdr(adbg_object_t *o) {
 		str_mach = "Unknown";
 	
 	with (o.i.pe.header) {
-	dprint_x32("Machine", Machine, str_mach);
-	dprint_u32("NumberOfSections", NumberOfSections);
-	dprint_x32("TimeDateStamp", TimeDateStamp, ctime32(TimeDateStamp));
-	dprint_x32("PointerToSymbolTable", PointerToSymbolTable);
-	dprint_u32("NumberOfSymbols", NumberOfSymbols);
-	dprint_u32("SizeOfOptionalHeader", SizeOfOptionalHeader);
-	dprint_flags32("Characteristics", Characteristics,
+	print_x32("Machine", Machine, str_mach);
+	print_u32("NumberOfSections", NumberOfSections);
+	print_x32("TimeDateStamp", TimeDateStamp, ctime32(TimeDateStamp));
+	print_x32("PointerToSymbolTable", PointerToSymbolTable);
+	print_u32("NumberOfSymbols", NumberOfSymbols);
+	print_u32("SizeOfOptionalHeader", SizeOfOptionalHeader);
+	print_flags32("Characteristics", Characteristics,
 		"RELOCS_STRIPPED".ptr,	PE_CHARACTERISTIC_RELOCS_STRIPPED,
 		"EXECUTABLE_IMAGE".ptr,	PE_CHARACTERISTIC_EXECUTABLE_IMAGE,
 		"LINE_NUMS_STRIPPED".ptr,	PE_CHARACTERISTIC_LINE_NUMS_STRIPPED,
@@ -89,11 +81,17 @@ bool dump_pe_hdr(adbg_object_t *o) {
 		null);
 	}
 	
-	return str_mach == null;
+	if (str_mach == null)
+		return;
+	//TODO: Could be a server check
+	if (o.i.pe.header.SizeOfOptionalHeader == 0)
+		return;
+	
+	dump_pe_opthdr(dump, o);
 }
 
-void dump_pe_opthdr(adbg_object_t *o) {
-	dprint_header("Optional Header");
+void dump_pe_opthdr(ref Dumper dump, adbg_object_t *o) {
+	print_header("Optional Header");
 	
 	// NOTE: Server already checks magic format
 	const(char) *str_mag = adbg_object_pe_magic_string(o.i.pe.opt_header.Magic);
@@ -103,85 +101,88 @@ void dump_pe_opthdr(adbg_object_t *o) {
 	
 	// Common in all magic formats
 	with (o.i.pe.opt_header) {
-	dprint_x16("Magic", Magic, str_mag);
-	dprint_u8("MajorLinkerVersion", MajorLinkerVersion);
-	dprint_u8("MinorLinkerVersion", MinorLinkerVersion);
-	dprint_u32("SizeOfCode", SizeOfCode);
-	dprint_u32("SizeOfInitializedData", SizeOfInitializedData);
-	dprint_u32("SizeOfUninitializedData", SizeOfUninitializedData);
-	dprint_x32("AddressOfEntryPoint", AddressOfEntryPoint);
-	dprint_x32("BaseOfCode", BaseOfCode);
+	print_x16("Magic", Magic, str_mag);
+	print_u8("MajorLinkerVersion", MajorLinkerVersion);
+	print_u8("MinorLinkerVersion", MinorLinkerVersion);
+	print_u32("SizeOfCode", SizeOfCode);
+	print_u32("SizeOfInitializedData", SizeOfInitializedData);
+	print_u32("SizeOfUninitializedData", SizeOfUninitializedData);
+	print_x32("AddressOfEntryPoint", AddressOfEntryPoint);
+	print_x32("BaseOfCode", BaseOfCode);
 	}
 	
 	switch (o.i.pe.opt_header.Magic) {
 	case PE_FMT_32: // 32
 		with (o.i.pe.opt_header) {
-		dprint_x32("BaseOfData", BaseOfData);
-		dprint_x32("ImageBase", ImageBase);
-		dprint_u32("SectionAlignment", SectionAlignment);
-		dprint_u32("FileAlignment", FileAlignment);
-		dprint_u16("MajorOperatingSystemVersion", MajorOperatingSystemVersion);
-		dprint_u16("MinorOperatingSystemVersion", MinorOperatingSystemVersion);
-		dprint_u16("MajorImageVersion", MajorImageVersion);
-		dprint_u16("MinorImageVersion", MinorImageVersion);
-		dprint_u16("MajorSubsystemVersion", MajorSubsystemVersion);
-		dprint_u16("MinorSubsystemVersion", MinorSubsystemVersion);
-		dprint_x32("Win32VersionValue", Win32VersionValue);
-		dprint_u32("SizeOfImage", SizeOfImage);
-		dprint_u32("SizeOfHeaders", SizeOfHeaders);
-		dprint_x32("CheckSum", CheckSum);
-		dprint_x16("Subsystem", Subsystem, str_sys);
-		dump_pe_opthdr_dllcharacteristics(DllCharacteristics);
-		dprint_x32("SizeOfStackReserve", SizeOfStackReserve);
-		dprint_x32("SizeOfStackCommit", SizeOfStackCommit);
-		dprint_x32("SizeOfHeapReserve", SizeOfHeapReserve);
-		dprint_x32("SizeOfHeapCommit", SizeOfHeapCommit);
-		dprint_x32("LoaderFlags", LoaderFlags);
-		dprint_u32("NumberOfRvaAndSizes", NumberOfRvaAndSizes);
+		print_x32("BaseOfData", BaseOfData);
+		print_x32("ImageBase", ImageBase);
+		print_u32("SectionAlignment", SectionAlignment);
+		print_u32("FileAlignment", FileAlignment);
+		print_u16("MajorOperatingSystemVersion", MajorOperatingSystemVersion);
+		print_u16("MinorOperatingSystemVersion", MinorOperatingSystemVersion);
+		print_u16("MajorImageVersion", MajorImageVersion);
+		print_u16("MinorImageVersion", MinorImageVersion);
+		print_u16("MajorSubsystemVersion", MajorSubsystemVersion);
+		print_u16("MinorSubsystemVersion", MinorSubsystemVersion);
+		print_x32("Win32VersionValue", Win32VersionValue);
+		print_u32("SizeOfImage", SizeOfImage);
+		print_u32("SizeOfHeaders", SizeOfHeaders);
+		print_x32("CheckSum", CheckSum);
+		print_x16("Subsystem", Subsystem, str_sys);
+		dump_pe_dllcharactiristics(DllCharacteristics);
+		print_x32("SizeOfStackReserve", SizeOfStackReserve);
+		print_x32("SizeOfStackCommit", SizeOfStackCommit);
+		print_x32("SizeOfHeapReserve", SizeOfHeapReserve);
+		print_x32("SizeOfHeapCommit", SizeOfHeapCommit);
+		print_x32("LoaderFlags", LoaderFlags);
+		print_u32("NumberOfRvaAndSizes", NumberOfRvaAndSizes);
 		}
 		break;
 	case PE_FMT_64: // 64
 		with (o.i.pe.opt_header64) {
-		dprint_x64("ImageBase", ImageBase);
-		dprint_x32("SectionAlignment", SectionAlignment);
-		dprint_x32("FileAlignment", FileAlignment);
-		dprint_u16("MajorOperatingSystemVersion", MajorOperatingSystemVersion);
-		dprint_u16("MinorOperatingSystemVersion", MinorOperatingSystemVersion);
-		dprint_u16("MajorImageVersion", MajorImageVersion);
-		dprint_u16("MinorImageVersion", MinorImageVersion);
-		dprint_u16("MajorSubsystemVersion", MajorSubsystemVersion);
-		dprint_u16("MinorSubsystemVersion", MinorSubsystemVersion);
-		dprint_x32("Win32VersionValue", Win32VersionValue);
-		dprint_u32("SizeOfImage", SizeOfImage);
-		dprint_u32("SizeOfHeaders", SizeOfHeaders);
-		dprint_x32("CheckSum", CheckSum);
-		dprint_u32("Subsystem", Subsystem, str_sys);
-		dprint_u64("SizeOfStackReserve", SizeOfStackReserve);
-		dprint_u64("SizeOfStackCommit", SizeOfStackCommit);
-		dprint_u64("SizeOfHeapReserve", SizeOfHeapReserve);
-		dprint_u64("SizeOfHeapCommit", SizeOfHeapCommit);
-		dprint_x32("LoaderFlags", LoaderFlags);
-		dprint_u32("NumberOfRvaAndSizes", NumberOfRvaAndSizes);
+		print_x64("ImageBase", ImageBase);
+		print_x32("SectionAlignment", SectionAlignment);
+		print_x32("FileAlignment", FileAlignment);
+		print_u16("MajorOperatingSystemVersion", MajorOperatingSystemVersion);
+		print_u16("MinorOperatingSystemVersion", MinorOperatingSystemVersion);
+		print_u16("MajorImageVersion", MajorImageVersion);
+		print_u16("MinorImageVersion", MinorImageVersion);
+		print_u16("MajorSubsystemVersion", MajorSubsystemVersion);
+		print_u16("MinorSubsystemVersion", MinorSubsystemVersion);
+		print_x32("Win32VersionValue", Win32VersionValue);
+		print_u32("SizeOfImage", SizeOfImage);
+		print_u32("SizeOfHeaders", SizeOfHeaders);
+		print_x32("CheckSum", CheckSum);
+		print_u32("Subsystem", Subsystem, str_sys);
+		dump_pe_dllcharactiristics(DllCharacteristics);
+		print_u64("SizeOfStackReserve", SizeOfStackReserve);
+		print_u64("SizeOfStackCommit", SizeOfStackCommit);
+		print_u64("SizeOfHeapReserve", SizeOfHeapReserve);
+		print_u64("SizeOfHeapCommit", SizeOfHeapCommit);
+		print_x32("LoaderFlags", LoaderFlags);
+		print_u32("NumberOfRvaAndSizes", NumberOfRvaAndSizes);
 		}
 		break;
 	case PE_FMT_ROM: // ROM has no flags/directories
 		with (o.i.pe.opt_headerrom) {
-		dprint_x32("BaseOfData", BaseOfData);
-		dprint_x32("BaseOfBss", BaseOfBss);
-		dprint_x32("GprMask", GprMask);
-		dprint_x32("CprMask[0]", CprMask[0]);
-		dprint_x32("CprMask[1]", CprMask[1]);
-		dprint_x32("CprMask[2]", CprMask[2]);
-		dprint_x32("CprMask[3]", CprMask[3]);
-		dprint_x32("GpValue", GpValue);
+		print_x32("BaseOfData", BaseOfData);
+		print_x32("BaseOfBss", BaseOfBss);
+		print_x32("GprMask", GprMask);
+		print_x32("CprMask[0]", CprMask[0]);
+		print_x32("CprMask[1]", CprMask[1]);
+		print_x32("CprMask[2]", CprMask[2]);
+		print_x32("CprMask[3]", CprMask[3]);
+		print_x32("GpValue", GpValue);
 		}
-		break;
+		return;
 	default:
 	}
+	
+	dump_pe_dirs(dump, o);
 }
 
-void dump_pe_opthdr_dllcharacteristics(ushort DllCharacteristics) {
-	dprint_flags16("DllCharacteristics", DllCharacteristics,
+void dump_pe_dllcharactiristics(ushort dllchars) {
+	print_flags16("DllCharacteristics", dllchars,
 		"HIGH_ENTROPY_VA".ptr,	PE_DLLCHARACTERISTICS_HIGH_ENTROPY_VA,
 		"DYNAMIC_BASE".ptr,	PE_DLLCHARACTERISTICS_DYNAMIC_BASE,
 		"FORCE_INTEGRITY".ptr,	PE_DLLCHARACTERISTICS_FORCE_INTEGRITY,
@@ -196,48 +197,49 @@ void dump_pe_opthdr_dllcharacteristics(ushort DllCharacteristics) {
 		null);
 }
 
-void dump_pe_dirs(adbg_object_t *o) {
-	// ROM
+void dump_pe_dirs(ref Dumper dump, adbg_object_t *o) {
+	// ROM check
+	//TODO: Make this a server check
 	if (o.i.pe.directory == null)
 		return;
 	
-	dprint_columns("Directory", "RVA", "Size");
+	print_header("Directories");
 	
 	with (o.i.pe.directory) {
-	dprint_entry32("ExportTable", ExportTable.rva, ExportTable.size);
-	dprint_entry32("ImportTable", ImportTable.rva, ImportTable.size);
-	dprint_entry32("ResourceTable", ResourceTable.rva, ResourceTable.size);
-	dprint_entry32("ExceptionTable", ExceptionTable.rva, ExceptionTable.size);
-	dprint_entry32("CertificateTable", CertificateTable.rva, CertificateTable.size);
-	dprint_entry32("BaseRelocationTable", BaseRelocationTable.rva, BaseRelocationTable.size);
-	dprint_entry32("DebugDirectory", DebugDirectory.rva, DebugDirectory.size);
-	dprint_entry32("ArchitectureData", ArchitectureData.rva, ArchitectureData.size);
-	dprint_entry32("GlobalPtr", GlobalPtr.rva, GlobalPtr.size);
-	dprint_entry32("TLSTable", TLSTable.rva, TLSTable.size);
-	dprint_entry32("LoadConfigurationTable", LoadConfigurationTable.rva, LoadConfigurationTable.size);
-	dprint_entry32("BoundImportTable", BoundImportTable.rva, BoundImportTable.size);
-	dprint_entry32("ImportAddressTable", ImportAddressTable.rva, ImportAddressTable.size);
-	dprint_entry32("DelayImport", DelayImport.rva, DelayImport.size);
-	dprint_entry32("CLRHeader", CLRHeader.rva, CLRHeader.size);
-	dprint_entry32("Reserved", Reserved.rva, Reserved.size);
+	print_directory_entry("ExportTable", ExportTable.rva, ExportTable.size);
+	print_directory_entry("ImportTable", ImportTable.rva, ImportTable.size);
+	print_directory_entry("ResourceTable", ResourceTable.rva, ResourceTable.size);
+	print_directory_entry("ExceptionTable", ExceptionTable.rva, ExceptionTable.size);
+	print_directory_entry("CertificateTable", CertificateTable.rva, CertificateTable.size);
+	print_directory_entry("BaseRelocationTable", BaseRelocationTable.rva, BaseRelocationTable.size);
+	print_directory_entry("DebugDirectory", DebugDirectory.rva, DebugDirectory.size);
+	print_directory_entry("ArchitectureData", ArchitectureData.rva, ArchitectureData.size);
+	print_directory_entry("GlobalPtr", GlobalPtr.rva, GlobalPtr.size);
+	print_directory_entry("TLSTable", TLSTable.rva, TLSTable.size);
+	print_directory_entry("LoadConfigurationTable", LoadConfigurationTable.rva, LoadConfigurationTable.size);
+	print_directory_entry("BoundImportTable", BoundImportTable.rva, BoundImportTable.size);
+	print_directory_entry("ImportAddressTable", ImportAddressTable.rva, ImportAddressTable.size);
+	print_directory_entry("DelayImport", DelayImport.rva, DelayImport.size);
+	print_directory_entry("CLRHeader", CLRHeader.rva, CLRHeader.size);
+	print_directory_entry("Reserved", Reserved.rva, Reserved.size);
 	}
 }
 
-void dump_pe_sections(adbg_object_t *o) {
-	dprint_header("Sections");
+void dump_pe_sections(ref Dumper dump, adbg_object_t *o) {
+	print_header("Sections");
 	
 	PE_SECTION_ENTRY *section = void;
 	size_t i;
 	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
-		dprint_section(cast(uint)i, Name.ptr, 8);
-		dprint_x32("VirtualAddress", VirtualAddress);
-		dprint_x32("VirtualSize", VirtualSize);
-		dprint_x32("PointerToRawData", PointerToRawData);
-		dprint_x32("SizeOfRawData", SizeOfRawData);
-		dprint_x32("PointerToRelocations", PointerToRelocations);
-		dprint_x32("PointerToLinenumbers", PointerToLinenumbers);
-		dprint_u16("NumberOfRelocations", NumberOfRelocations);
-		dprint_u16("NumberOfLinenumbers", NumberOfLinenumbers);
+		print_section(cast(uint)i, Name.ptr, 8);
+		print_x32("VirtualAddress", VirtualAddress);
+		print_x32("VirtualSize", VirtualSize);
+		print_x32("PointerToRawData", PointerToRawData);
+		print_x32("SizeOfRawData", SizeOfRawData);
+		print_x32("PointerToRelocations", PointerToRelocations);
+		print_x32("PointerToLinenumbers", PointerToLinenumbers);
+		print_u16("NumberOfRelocations", NumberOfRelocations);
+		print_u16("NumberOfLinenumbers", NumberOfLinenumbers);
 		//TODO: Integrate with rest of Characteristics
 		static immutable const(char)*[] pe32alignments = [
 			"ALIGN_DEFAULT(16)", // PEDUMP (1997)
@@ -258,8 +260,8 @@ void dump_pe_sections(adbg_object_t *o) {
 			"ALIGN_RESERVED",
 		];
 		uint alignment = Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_MASK;
-		dprint_x32("Alignment", alignment, pe32alignments[alignment >> 20]);
-		dprint_flags32("Characteristics", Characteristics,
+		print_x32("Alignment", alignment, pe32alignments[alignment >> 20]);
+		print_flags32("Characteristics", Characteristics,
 			"TYPE_DSECT".ptr,	PE_SECTION_CHARACTERISTIC_TYPE_DSECT,
 			"TYPE_NOLOAD".ptr,	PE_SECTION_CHARACTERISTIC_TYPE_NOLOAD,
 			"TYPE_GROUP".ptr,	PE_SECTION_CHARACTERISTIC_TYPE_GROUP,
@@ -291,14 +293,14 @@ void dump_pe_sections(adbg_object_t *o) {
 	}
 }
 
-/*void dump_pe_loadconfig(adbg_object_t *obj) {
+/*void dump_pe_loadconfig(ref Dumper dump) {
 	
 	dump_h1("Load Configuration");
 	
-	if (obj.pe.loadconfig == null) { // LOAD_CONFIGURATION
+	if (dump.obj.pe.loadconfig == null) { // LOAD_CONFIGURATION
 		puts("No 
 	}
-		if (fseek(obj.handle, fo_loadcf, SEEK_SET))
+		if (fseek(dump.obj.handle, fo_loadcf, SEEK_SET))
 			return EXIT_FAILURE;
 
 		PE_LOAD_CONFIG_META lconf = void;
@@ -333,7 +335,7 @@ void dump_pe_sections(adbg_object_t *o) {
 		GlobalFlagsSet,
 		CriticalSectionDefaultTimeout);
 
-		if (OptMagic != PE_FMT_64) { // 32
+		if (dump.optMagic != PE_FMT_64) { // 32
 			with (lconf.dir32)
 			printf(
 			"DeCommitFreeBlockThreshold      %08X\n"~
@@ -531,22 +533,25 @@ void dump_pe_sections(adbg_object_t *o) {
 	}
 }*/
 
-void dump_pe_exports(adbg_object_t *o) {
+void dump_pe_exports(ref Dumper dump, adbg_object_t *o) {
+	print_header("Exports");
 	PE_EXPORT_DESCRIPTOR *export_ = void;
 	size_t i;
 	while ((export_ = adbg_object_pe_export(o, i++)) != null) with (export_) {
-		dprint_header("Export");
-		dprint_x32("ExportFlags", ExportFlags);
-		dprint_x32("Timestamp", Timestamp);
-		dprint_x16("MajorVersion", MajorVersion);
-		dprint_x16("MinorVersion", MinorVersion);
-		dprint_x32("Name", Name, adbg_object_pe_export_name(o, export_));
-		dprint_x32("OrdinalBase", OrdinalBase);
-		dprint_x32("AddressTableEntries", AddressTableEntries);
-		dprint_x32("NumberOfNamePointers", NumberOfNamePointers);
-		dprint_x32("ExportAddressTable", ExportAddressTable);
-		dprint_x32("NamePointer", NamePointer);
-		dprint_x32("OrdinalTable", OrdinalTable);
+		char* name = adbg_object_pe_export_name(o, export_);
+		print_section(cast(uint)i, name, 128);
+		
+		print_x32("ExportFlags", ExportFlags);
+		print_x32("Timestamp", Timestamp);
+		print_x16("MajorVersion", MajorVersion);
+		print_x16("MinorVersion", MinorVersion);
+		print_x32("Name", Name);
+		print_x32("OrdinalBase", OrdinalBase);
+		print_x32("AddressTableEntries", AddressTableEntries);
+		print_x32("NumberOfNamePointers", NumberOfNamePointers);
+		print_x32("ExportAddressTable", ExportAddressTable);
+		print_x32("NamePointer", NamePointer);
+		print_x32("OrdinalTable", OrdinalTable);
 		
 		char* hint = void;
 		size_t ie;
@@ -557,49 +562,62 @@ void dump_pe_exports(adbg_object_t *o) {
 	}
 }
 
-void dump_pe_imports(adbg_object_t *o) {
+void dump_pe_imports(ref Dumper dump, adbg_object_t *o) {
+	print_header("Imports");
 	PE_IMPORT_DESCRIPTOR *import_ = void;
 	size_t i;
 	while ((import_ = adbg_object_pe_import(o, i++)) != null) with (import_) {
-		dprint_header("Import");
-		dprint_x32("Characteristics", Characteristics);
-		dprint_x32("TimeDateStamp", TimeDateStamp);
-		dprint_x32("ForwarderChain", ForwarderChain);
-		// NOTE: 256 is a temporary maximum
-		//       I think these are 0-terminated, but just in case
-		dprint_x32s("Name", Name, adbg_object_pe_import_name(o, import_), 256);
-		dprint_x32("FirstThunk", FirstThunk);
+		char* name = adbg_object_pe_import_name(o, import_);
+		print_section(cast(uint)i, name, 128);
+		
+		print_x32("Characteristics", Characteristics);
+		print_x32("TimeDateStamp", TimeDateStamp);
+		print_x32("ForwarderChain", ForwarderChain);
+		print_x32("Name", Name);
+		print_x32("FirstThunk", FirstThunk);
 		
 		//TODO: Function to get import name+hint from lte directly
-		//      adbg_object_pe_import_string(o, import_, i++);
+		//      adbg_object_pe_import_entry_string(o, import_, i++);
 		
 		size_t il;
 		switch (o.i.pe.opt_header.Magic) {
 		case PE_FMT_32:
 			PE_IMPORT_LTE32 *t32 = adbg_object_pe_import_lte32(o, import_, il);
 			if (t32 == null) continue;
-			dprint_columns("RVA", "Hint", "String");
 			do with (t32) {
-				if (val >= 0x8000_0000) { // Ordinal
-					dprint_x16("", num);
+				if (ordinal >= 0x8000_0000) { // Ordinal
+					print_section(cast(uint)il);
+					print_x16("Number", number);
 				} else { // RVA
-					ushort *hint =
-						adbg_object_pe_import_lte32_hint(o, import_, t32);
-					dprint_x16__i(rva, *hint, cast(char*)hint + ushort.sizeof);
+					ushort *hint = adbg_object_pe_import_lte32_hint(o, import_, t32);
+					if (hint == null)
+						continue;
+					//TODO: Check import name bounds
+					const(char)* import_name =
+						cast(const(char)*)hint + ushort.sizeof;
+					print_section(cast(uint)il, import_name, 64);
+					print_x16("Hint", *hint);
+					print_x32("RVA", rva);
 				}
 			} while ((t32 = adbg_object_pe_import_lte32(o, import_, ++il)) != null);
 			continue;
 		case PE_FMT_64:
 			PE_IMPORT_LTE64 *t64 = adbg_object_pe_import_lte64(o, import_, il);
 			if (t64 == null) continue;
-			dprint_columns("RVA", "Hint", "String");
 			do with (t64) {
-				if (val >= 0x8000_0000_0000_0000) { // Ordinal
-					dprint_x16("", num);
+				if (ordinal >= 0x8000_0000_0000_0000) { // Ordinal
+					print_section(cast(uint)il);
+					print_x16("Number", number);
 				} else { // RVA
-					ushort *hint =
-						adbg_object_pe_import_lte64_hint(o, import_, t64);
-					dprint_x16__i(rva, *hint, cast(char*)hint + ushort.sizeof);
+					ushort *hint = adbg_object_pe_import_lte64_hint(o, import_, t64);
+					if (hint == null)
+						continue;
+					//TODO: Check import name bounds
+					const(char)* import_name =
+						cast(const(char)*)hint + ushort.sizeof;
+					print_section(cast(uint)il, import_name, 64);
+					print_x16("Hint", *hint);
+					print_x32("RVA", rva);
 				}
 			} while ((t64 = adbg_object_pe_import_lte64(o, import_, ++il)) != null);
 			continue;
@@ -608,24 +626,25 @@ void dump_pe_imports(adbg_object_t *o) {
 	}
 }
 
-void dump_pe_debug(adbg_object_t *o) {
-	dprint_header("Debug");
+void dump_pe_debug(ref Dumper dump, adbg_object_t *o) {
+	print_header("Debug");
 	
 	PE_DEBUG_DIRECTORY *debug_ = void;
 	size_t i;
 	while ((debug_ = adbg_object_pe_debug_directory(o, i++)) != null) with (debug_) {
-		dprint_x32("Characteristics", Characteristics);
-		dprint_x32("TimeDateStamp", TimeDateStamp);
-		dprint_u16("MajorVersion", MajorVersion);
-		dprint_u16("MinorVersion", MinorVersion);
-		dprint_u32("Type", Type, adbg_object_pe_debug_type_string(Type));
-		dprint_u32("SizeOfData", SizeOfData);
-		dprint_x32("AddressOfRawData", AddressOfRawData);
-		dprint_x32("PointerToRawData", PointerToRawData);
+		print_section(cast(uint)i);
+		print_x32("Characteristics", Characteristics);
+		print_x32("TimeDateStamp", TimeDateStamp);
+		print_u16("MajorVersion", MajorVersion);
+		print_u16("MinorVersion", MinorVersion);
+		print_u32("Type", Type, adbg_object_pe_debug_type_string(Type));
+		print_u32("SizeOfData", SizeOfData);
+		print_x32("AddressOfRawData", AddressOfRawData);
+		print_x32("PointerToRawData", PointerToRawData);
 		
 		void *rawdata = o.buffer + PointerToRawData;
 		if (rawdata >= o.buffer + o.file_size) {
-			dprint_warn("PointerToRawData out of bounds");
+			print_string("error", "PointerToRawData out of bounds");
 			return;
 		}
 		
@@ -638,39 +657,37 @@ void dump_pe_debug(adbg_object_t *o) {
 			uint sig = *cast(uint*)rawdata;
 			switch (sig) {
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV410: // PDB 2.0+ / CodeView 4.10
-				dprint_x32("Signature", sig, "PDB 2.0+ / CodeView 4.10");
+				print_x32("Signature", sig, "PDB 2.0+ / CodeView 4.10");
 				goto L_DEBUG_PDB20;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_PDB20PLUS: // PDB 2.0+
-				dprint_x32("Signature", sig, "PDB 2.0+ / NB10");
+				print_x32("Signature", sig, "PDB 2.0+ / NB10");
 				goto L_DEBUG_PDB20;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV500: // PDB 2.0+ / CodeView 5.0
-				dprint_x32("Signature", sig, "PDB 2.0+ / CodeView 5.0");
+				print_x32("Signature", sig, "PDB 2.0+ / CodeView 5.0");
 L_DEBUG_PDB20:
 				PE_DEBUG_DATA_CODEVIEW_PDB20* pdb =
 					cast(PE_DEBUG_DATA_CODEVIEW_PDB20*)rawdata;
-				dprint_x32("Offset", pdb.Offset);
-				dprint_x32("Timestamp", pdb.Timestamp);
-				dprint_u32("Age", pdb.Age);
-				//TODO: Consider limiting to MAX_PATH or similar
-				dprint_string("Path", pdb.Path.ptr);
+				print_x32("Offset", pdb.Offset);
+				print_x32("Timestamp", pdb.Timestamp);
+				print_u32("Age", pdb.Age);
+				print_stringl("Path", pdb.Path.ptr, 256);
 				break;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV700: // PDB 7.0 / CodeView 7.0
 				PE_DEBUG_DATA_CODEVIEW_PDB70* pdb =
 					cast(PE_DEBUG_DATA_CODEVIEW_PDB70*)rawdata;
 				char[UID_TEXTLEN] guid = void;
 				uid_text(pdb.Guid, guid, UID_GUID);
-				dprint_x32("Signature", sig, "PDB 7.0 / CodeView 7.0");
-				dprint_stringl("GUID", guid.ptr, UID_TEXTLEN);
-				dprint_u32("Age", pdb.Age); // ctime32?
-				//TODO: Consider limiting to MAX_PATH or similar
-				dprint_string("Path", pdb.Path.ptr);
+				print_x32("Signature", sig, "PDB 7.0 / CodeView 7.0");
+				print_stringl("GUID", guid.ptr, UID_TEXTLEN);
+				print_u32("Age", pdb.Age); // ctime32?
+				print_stringl("Path", pdb.Path.ptr, 256);
 				break;
 			case PE_IMAGE_DEBUG_MAGIC_EMBEDDED_PPDB: // Portable PDB
 				//NOTE: major_version >= 0x100 && minor_version == 0x100
-				dprint_x32("Signature", sig, "Portable PDB");
+				print_x32("Signature", sig, "Portable PDB");
 				break;
 			default:
-				dprint_x32("Signature", sig, "Unknown");
+				print_x32("Signature", sig, "Unknown");
 				break;
 			}
 			break;
@@ -688,17 +705,16 @@ L_DEBUG_PDB20:
 	}
 }
 
-void dump_pe_disasm(adbg_object_t *o, uint flags) {
-	dprint_header("Disassembly");
+void dump_pe_disasm(ref Dumper dump, adbg_object_t *o) {
+	print_header("Disassembly");
 	
-	bool all = (flags & DumpOpt.disasm_all) != 0;
+	bool all = dump.selected_disasm_all();
 	PE_SECTION_ENTRY *section = void;
 	size_t i;
 	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
 		if (all || Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE) {
-			dprint_disassemble_object(o, Name.ptr, 8,
-				o.buffer + PointerToRawData, SizeOfRawData, 0,
-				flags);
+			dump_disassemble_object(dump, o, Name.ptr, 8,
+				o.buffer + PointerToRawData, SizeOfRawData, 0);
 		}
 	}
 }

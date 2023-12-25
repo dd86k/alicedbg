@@ -2,7 +2,7 @@
 ///
 /// The API was inspired by fopen and uses Capstone for its backend.
 ///
-/// Tested with: Capstone 4.0.2.
+/// Tested with Capstone 4.0.2.
 /// 
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -177,7 +177,10 @@ int adbg_dasm_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 
 // NOTE: Could have done adbg_process_machine but safer to do this.
 //       would "adbg_process_disassembler" be a better name? (and in process module)
-int adbg_dasm_openproc(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
+int adbg_dasm_open_proccess(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
+	if (dasm == null || tracee == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
 	AdbgMachine mach;
 	
 	version (Win64_X86_64) // Windows + x86-64
@@ -185,8 +188,15 @@ int adbg_dasm_openproc(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
 	
 	return adbg_dasm_open(dasm, mach);
 }
+// Disassemble one instruction from exception address.
 int adbg_dasm_process_exception(adbg_disassembler_t *dasm, adbg_process_t *tracee, adbg_exception_t *ex, adbg_opcode_t *op) {
 	import adbg.v2.debugger.memory : adbg_memory_read;
+	
+	if (dasm == null || tracee == null || ex == null || op == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	if (ex.fault_address == 0)
+		return adbg_oops(AdbgError.invalidArgument);
+	
 	ubyte[16] data = void;
 	if (adbg_memory_read(tracee, ex.fault_address, data.ptr, 16))
 		return adbg_errno;
@@ -243,7 +253,7 @@ void adbg_dasm_close(adbg_disassembler_t *dasm) {
 	if (dasm.cs_inst)
 		cs_free(dasm.cs_inst, 1);
 	cs_close(&dasm.cs_handle);
-	dasm.magic = 0;
+	//free(dasm); Uncomment when _open mallocs
 }
 
 /// Configure an option to the disassembler.

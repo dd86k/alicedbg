@@ -1,13 +1,13 @@
-/**
- * Common global variables and functions so they can be used throughout the
- * entirety of the program.
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
+/// Common global variables and functions so they can be used throughout the
+/// entirety of the program.
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module common;
 
+import core.stdc.stdio : puts;
+import core.stdc.stdlib : exit;
 import adbg.error;
 import adbg.v2.disassembler;
 import adbg.v2.debugger.exception;
@@ -21,16 +21,16 @@ extern (C):
 /// Application error
 enum AppError {
 	none,
-	invalidParameter	= -1,
-	invalidCommand	= -2, // or action or sub-command
-	unavailable	= -3,
-	loadFailed	= -4,
-	pauseRequired	= -5,
-	alreadyLoaded	= -6,
-	missingOption	= -7,
-	unformat	= -8,
-	crt	= -9,
-	alicedbg	= -10,
+	invalidParameter	= 1,
+	invalidCommand	= 2, // or action or sub-command
+	unavailable	= 3,
+	loadFailed	= 4,
+	pauseRequired	= 5,
+	alreadyLoaded	= 6,
+	missingOption	= 7,
+	unformat	= 8,
+	crt	= 9,
+	alicedbg	= 10,
 }
 
 // Platforms
@@ -75,7 +75,9 @@ struct settings_t {
 	const(char) **args;	/// Debuggee: argument vector
 	const(char) **env;	/// Debuggee: environement vector
 	uint pid;	/// Debuggee: PID
-	uint flags;	/// Flags to pass to sub-app
+	deprecated uint flags;	/// Flags to pass to sub-app
+	int dump_selections;	/// 
+	int dump_options;	/// 
 	AdbgMachine machine;	/// Disassembler: Target machine
 	AdbgDasmSyntax syntax;	/// Disassembler: Syntax
 }
@@ -83,21 +85,9 @@ struct settings_t {
 /// Global variables. Helps keeping track of app variables.
 __gshared settings_t globals;
 
-T* alloc(T)() {
-	T* t = cast(T*)malloc(T.sizeof);
-	if (t == null) panic(AdbgError.crt);
-	return t;
-}
+alias oops = show_adbg_error;
 
-// Potentially dangerous since some errors require an additional component
-void panic(AdbgError code = AdbgError.success, void *add = null) {
-	import core.stdc.stdlib : exit;
-	if (code) adbg_oops(code);
-	exit(oops());
-}
-
-
-int oops(
+int show_adbg_error(
 	const(char)* func = cast(char*)__FUNCTION__,
 	const(char)* mod = cast(char*)__MODULE__,
 	int line = __LINE__) {
@@ -123,3 +113,31 @@ int oops(
 	
 	return error.code;
 }
+
+//TODO: Fix terrible hack
+// Potentially dangerous since some errors require an additional component
+void panic(AdbgError code = AdbgError.success, void *add = null) {
+	if (code) adbg_oops(code);
+	exit(oops());
+}
+
+//TODO: Finish alternative to panic
+//      Needs to be able to override error message.
+//      Cases:
+//      - Regular errors
+//      - lib errors on the app side
+//      - external errors on the lib side
+/// Quit program.
+///
+/// If no codes are given, this picks up the code from alicedbg.
+/// Params:
+/// 	message = Quit message.
+/// 	code = Exit code.
+/*void quit(int code, const(char) *message = null) {
+	if (message) {
+		puts(message);
+		exit(code);
+	} else {
+		exit(oops());
+	}
+}*/

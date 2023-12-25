@@ -18,73 +18,71 @@ extern (C):
 ///   o = Object.
 ///   flags = Dump settings.
 /// Returns: Non-zero on error.
-int dump_mz(adbg_object_t *o, uint flags) {
-	if (flags & DumpOpt.header)
-		dump_mz_hdr(o);
+int dump_mz(ref Dumper dump, adbg_object_t *o) {
+	if (dump.selected_headers())
+		dump_mz_hdr(dump, o);
 	
-	if (flags & DumpOpt.relocs)
-		dump_mz_relocs(o);
+	if (dump.selected_relocations())
+		dump_mz_relocs(dump, o);
 	
-	if (flags & DumpOpt.disasm)
-		dump_mz_disasm(o, flags);
+	if (dump.selected_disasm_any())
+		dump_mz_disasm(dump, o);
 	
 	return 0;
 }
 
 private:
 
-void dump_mz_hdr(adbg_object_t *o) {
-	dprint_header("MZ Header");
+void dump_mz_hdr(ref Dumper dump, adbg_object_t *o) {
+	print_header("Header");
 	
 	with (o.i.mz.header) {
-	dprint_u16("e_cblp", e_cblp);
-	dprint_u16("e_cp", e_cp);
-	dprint_u16("e_crlc", e_crlc);
-	dprint_u16("e_cparh", e_cparh);
-	dprint_u16("e_minalloc", e_minalloc);
-	dprint_u16("e_maxalloc", e_maxalloc);
-	dprint_x16("e_ss", e_ss);
-	dprint_x16("e_sp", e_sp);
-	dprint_x16("e_csum", e_csum);
-	dprint_x16("e_ip", e_ip);
-	dprint_x16("e_cs", e_cs);
-	dprint_x16("e_lfarlc", e_lfarlc);
-	dprint_u16("e_ovno", e_ovno);
+	print_u16("e_cblp", e_cblp);
+	print_u16("e_cp", e_cp);
+	print_u16("e_crlc", e_crlc);
+	print_u16("e_cparh", e_cparh);
+	print_u16("e_minalloc", e_minalloc);
+	print_u16("e_maxalloc", e_maxalloc);
+	print_x16("e_ss", e_ss);
+	print_x16("e_sp", e_sp);
+	print_x16("e_csum", e_csum);
+	print_x16("e_ip", e_ip);
+	print_x16("e_cs", e_cs);
+	print_x16("e_lfarlc", e_lfarlc);
+	print_u16("e_ovno", e_ovno);
 	}
 }
 
-void dump_mz_relocs(adbg_object_t *o) {
-	import core.stdc.stdio : printf;
-	
-	dprint_header("Relocations");
+void dump_mz_relocs(ref Dumper dump, adbg_object_t *o) {
+	print_header("Relocations");
 	
 	mz_reloc *reloc = void;
 	size_t i;
 	while ((reloc = adbg_object_mz_reloc(o, i++)) != null) with (reloc)
-		printf("%u. segment=%04X offset=%04X\n", cast(uint)i, segment, offset);
+		print_reloc16(cast(uint)i, segment, offset);
 }
 
-void dump_mz_disasm(adbg_object_t *o, uint flags) {
-	dprint_header("Disassembly");
-	
-	uint start = o.i.mz.header.e_cparh << 4; // *16
+void dump_mz_disasm(ref Dumper dump, adbg_object_t *o) {
+	// Point end to header size
+	uint start = o.i.mz.header.e_cparh << 4; // paragraphs * 16
 	if (start < mz_hdr.sizeof || start >= o.file_size) {
-		dprint_warn("Data start outside of exe");
+		print_string("error", "Data start outside of file buffer");
 		return;
 	}
 	
-	uint blks = void;
-	uint len  = void;
-	with (o.i.mz.header) {
-	blks = e_cblp ? e_cp - 1 : e_cp;
-	len  = (blks * PARAGRAPH) + e_cblp;
-	}
+	// Get pages
+	uint pages = o.i.mz.header.e_cp;
+	if (o.i.mz.header.e_cblp) // if has last bytes in last page
+		--pages;
+	
+	// Get data length
+	uint len = (pages << 4) + o.i.mz.header.e_cblp;
 	if (len == 0)
 		return;
 	if (len > o.file_size) {
-		dprint_warn("Data length cannot be bigger than file");
+		print_string("error", "Data length cannot be bigger than file");
 		return;
 	}
 	
-	dprint_disassemble_object(o, null, 0, o.buffer + start, len, 0, flags);
+	dump_disassemble_object(dump, o, null, 0, o.buffer + start, len, 0);
 }

@@ -94,7 +94,7 @@ int shell_loop() {
 			return oops;
 		puts("Process created.");
 	
-		if (adbg_dasm_openproc(&dasm, &process)) {
+		if (adbg_dasm_open_proccess(&dasm, &process)) {
 			dasm_available = false;
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
@@ -617,7 +617,7 @@ int command_spawn(int argc, const(char) **argv) {
 		serror("Could not spawn process.");
 		return ShellError.alicedbg;
 	}
-	if (adbg_dasm_openproc(&dasm, &process)) {
+	if (adbg_dasm_open_proccess(&dasm, &process)) {
 		dasm_available = false;
 		printf("warning: Disassembler not available (%s)\n",
 			adbg_error_msg());
@@ -637,7 +637,7 @@ int command_attach(int argc, const(char) **argv) {
 		serror("Could not attach to process.");
 		return ShellError.alicedbg;
 	}
-	if (adbg_dasm_openproc(&dasm, &process)) {
+	if (adbg_dasm_open_proccess(&dasm, &process)) {
 		dasm_available = false;
 		printf("warning: Disassembler not available (%s)\n",
 			adbg_error_msg());
@@ -671,7 +671,7 @@ int command_restart(int argc, const(char) **argv) {
 		}
 		if (dasm_available)
 			adbg_dasm_close(&dasm);
-		if (adbg_dasm_openproc(&dasm, &process)) {
+		if (adbg_dasm_open_proccess(&dasm, &process)) {
 			dasm_available = false;
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
@@ -690,7 +690,7 @@ int command_restart(int argc, const(char) **argv) {
 		}
 		if (dasm_available)
 			adbg_dasm_close(&dasm);
-		if (adbg_dasm_openproc(&dasm, &process)) {
+		if (adbg_dasm_open_proccess(&dasm, &process)) {
 			dasm_available = false;
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());

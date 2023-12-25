@@ -10,46 +10,46 @@ import adbg.v2.object.server;
 import adbg.v2.object.format.macho;
 import dumper;
 
-int dump_macho(adbg_object_t *o, uint flags) {
-	if (flags & DumpOpt.header)
-		dump_macho_hdr(o);
+int dump_macho(ref Dumper dump, adbg_object_t *o) {
+	if (dump.selected_headers)
+		dump_macho_hdr(dump, o);
 	
 	return 0;
 }
 
 private:
 
-void dump_macho_hdr(adbg_object_t *o) {
+void dump_macho_hdr(ref Dumper dump, adbg_object_t *o) {
 	if (o.i.macho.fat) {
-		dprint_header("FAT Header");
+		print_header("FAT Header");
 		
 		with (o.i.macho.fat_header) {
-		dprint_x32("magic", magic, adbg_object_macho_magic_string(magic));
-		dprint_u32("nfat_arch", nfat_arch);
+		print_x32("magic", magic, adbg_object_macho_magic_string(magic));
+		print_u32("nfat_arch", nfat_arch);
 		}
 		
-		dprint_header("FAT Arch Header");
+		print_header("FAT Arch Header");
 		
 		size_t i;
 		macho_fat_arch *fa = void;
 		while ((fa = adbg_object_macho_fat_arch(o, i++)) != null) with (fa) {
-			dprint_x32("cputype", cputype, adbg_object_macho_cputype_string(cputype));
-			dprint_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
-			dprint_x32("offset", offset);
-			dprint_x32("size", size);
-			dprint_x32("alignment", alignment);
+			print_x32("cputype", cputype, adbg_object_macho_cputype_string(cputype));
+			print_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
+			print_x32("offset", offset);
+			print_x32("size", size);
+			print_x32("alignment", alignment);
 		}
 	} else {
-		dprint_header("Header");
+		print_header("Header");
 		
 		with (o.i.macho.header) {
-		dprint_x32("magic", magic, adbg_object_macho_magic_string(magic));
-		dprint_x32("cputype", cputype, adbg_object_macho_cputype_string(cputype));
-		dprint_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
-		dprint_x32("filetype", filetype, adbg_object_macho_filetype_string(filetype));
-		dprint_u32("ncmds", ncmds);
-		dprint_u32("sizeofcmds", sizeofcmds);
-		dprint_flags32("flags", flags,
+		print_x32("magic", magic, adbg_object_macho_magic_string(magic));
+		print_x32("cputype", cputype, adbg_object_macho_cputype_string(cputype));
+		print_x32("subtype", subtype, adbg_object_macho_subtype_string(cputype, subtype));
+		print_x32("filetype", filetype, adbg_object_macho_filetype_string(filetype));
+		print_u32("ncmds", ncmds);
+		print_u32("sizeofcmds", sizeofcmds);
+		print_flags32("flags", flags,
 			"NOUNDEFS".ptr,	MACHO_FLAG_NOUNDEFS,
 			"INCRLINK".ptr,	MACHO_FLAG_INCRLINK,
 			"DYLDLINK".ptr,	MACHO_FLAG_DYLDLINK,
@@ -79,13 +79,13 @@ void dump_macho_hdr(adbg_object_t *o) {
 			null);
 		}
 		
-		dprint_header("Load commands");
+		print_header("Load commands");
 		
 		size_t i;
 		macho_load_command *command = void;
 		while ((command = adbg_object_macho_load_command(o, i++)) != null) with (command) {
-			dprint_x32("cmd", cmd, adbg_object_macho_command_string(cmd));
-			dprint_x32("cmdsize", cmdsize);
+			print_x32("cmd", cmd, adbg_object_macho_command_string(cmd));
+			print_x32("cmdsize", cmdsize);
 		}
 	}
 }

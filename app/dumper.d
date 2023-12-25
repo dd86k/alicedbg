@@ -16,12 +16,10 @@ import common, utils, dump;
 
 extern (C):
 
-//TODO: Consider a "Summary" ala objdump -f
-//      Could be default over "all headers"
 /// Bitfield. Selects which information to display.
-enum DumpOpt {
-	/// 'h' - Dump header
-	header	= BIT!0,
+enum DumpSelect {
+	/// 'h' - Dump headers
+	headers	= BIT!0,
 	/// 'd' - Dump directories (PE32)
 	dirs	= BIT!1,
 	/// 'e' - Exports
@@ -49,179 +47,181 @@ enum DumpOpt {
 	/// 'R' - Dynamic relocations
 	dynrelocs	= BIT!13,
 	
+	// Bits 31-24: Disassembly
+	
 	/// Disassemble executable sections
-	disasm	= BIT!22,
+	disasm	= BIT!24,
 	/// Disassembly statistics
-	disasm_stats	= BIT!23,
+	disasm_stats	= BIT!25,
 	/// Disassemble all sections
-	disasm_all	= BIT!24,
-	
-	/// File is raw, do not auto-detect
-	raw	= BIT!31,
-	
-	/// Display all metadata except disassembly
-	everything = header | dirs | resources | seh |
-		symbols | debug_ | tls | loadcfg |
-		exports | imports | sections,
+	disasm_all	= BIT!26,
 	
 	/// Any form of dissasembler is requested
 	disasm_any = disasm | disasm_stats | disasm_all,
+}
+enum DumpOptions {
+	/// File is raw, do not auto-detect
+	raw	= BIT!0,
+}
+
+struct Dumper {
+	extern (C):
+	
+	int selections;
+	int options;
+	
+	this(int selects, int opts) {
+		// Default selections
+		if (selects == 0)
+			selects = DumpSelect.headers;
+		
+		selections = selects;
+		options = opts;
+	}
+	
+	pragma(inline, true):
+	
+	//
+	// Selections
+	//
+	
+	bool selected_headers() { return (selections & DumpSelect.headers) != 0; }
+	bool selected_sections() { return (selections & DumpSelect.sections) != 0; }
+	bool selected_relocations() { return (selections & DumpSelect.relocs) != 0; }
+	bool selected_exports() { return (selections & DumpSelect.exports) != 0; }
+	bool selected_imports() { return (selections & DumpSelect.imports) != 0; }
+	bool selected_debug() { return (selections & DumpSelect.debug_) != 0; }
+	
+	bool selected_disasm() { return (selections & DumpSelect.disasm) != 0; }
+	bool selected_disasm_stats() { return (selections & DumpSelect.disasm_stats) != 0; }
+	bool selected_disasm_all() { return (selections & DumpSelect.disasm_all) != 0; }
+	bool selected_disasm_any() { return (selections & DumpSelect.disasm_any) != 0; }
+	
+	//
+	// Options
+	//
+	
+	bool option_blob() { return (options & DumpOptions.raw) != 0; }
 }
 
 /// Dump given file to stdout.
 /// Returns: Error code if non-zero
 int app_dump() {
-	if (globals.flags & DumpOpt.raw) {
+	Dumper dump = Dumper(globals.dump_selections, globals.dump_options);
+	
+	if (dump.option_blob()) {
+		// NOTE: Program exits and memory is free'd
 		size_t size = void;
 		ubyte *buffer = readall(globals.file, &size);
-		
-		if (buffer == null) {
+		if (buffer == null)
 			panic(AdbgError.crt);
-		}
 		
+		//TODO: Warn file is empty
 		if (size == 0)
 			return 0;
 		
-		return dprint_disassemble(AdbgMachine.native,
-			null, 0, buffer, size, 0, globals.flags);
+		return dump_disassemble(dump, globals.machine, buffer, size, 0);
 	}
 	
 	adbg_object_t *o = cast(adbg_object_t*)malloc(adbg_object_t.sizeof);
 	if (o == null)
 		panic(AdbgError.crt);
-	
-	//TODO: If only headers, use partial option
 	// Load object into memory
 	if (adbg_object_open(o, globals.file, 0)) {
 		return oops;
 	}
 	
-	// When nothing is set, the default is to show headers
-	//TODO: Set header in .init then
-	if ((globals.flags & 0xFF_FFFF) == 0)
-		globals.flags |= DumpOpt.header;
-	
-	// NOTE: adbg_object_name safely returns "Unknown" in case of unknown.
-	printf("%s object format\n", adbg_object_name(o));
+	print_string("format", adbg_object_name(o));
+	print_string("short_name", adbg_object_short_name(o));
+	print_string("filename", basename(globals.file));
+	print_u64("filesize", o.file_size);
 	
 	switch (o.format) with (AdbgObject) {
-	case mz:	return dump_mz(o, globals.flags);
-	case pe:	return dump_pe(o, globals.flags);
-	case elf:	return dump_elf(o, globals.flags);
-	case macho:	return dump_macho(o, globals.flags);
-	default:
+	case mz:	return dump_mz(dump, o);
+	case pe:	return dump_pe(dump, o);
+	case elf:	return dump_elf(dump, o);
+	case macho:	return dump_macho(dump, o);
+	default:	return EXIT_FAILURE;
 	}
-	
-	puts("\ndumper: format not supported or unknown.");
-	return EXIT_FAILURE;
 }
 
-//TODO: Redo entirely of dumper functions
-//      dprint_group_start(name)/dprint_group_end
-//      or dprint(group_name, // header, program_header, etc.
-//           spec, name, value, ...)
-//      or consider struct DumperPrinter or similar
-//TODO: object aware dumps
-//      generic: dump_import(lib, name), etc.
-
-private enum FORMAT_FIELD = "  %-30s:  ";
-
-//TODO: Make this vararg and the default
-//      Then removed print_columns
-void dprint_header(const(char) *header) {
-	printf("\n# %s\n", header);
-}
-void dprint_columns(const(char) *header, const(char) *s1, const(char) *s2) {
-	printf("\n# %-30s   %-10s  %s\n", header, s1, s2);
-}
-void dprint_warn(const(char) *message) {
-	printf("warning: %s\n", message);
-}
-void dprint_error(const(char) *message) {
-	import core.stdc.stdlib : exit;
-	printf("error: %s\n", message);
-	exit(1);
+private immutable {
+	/// Padding spacing to use in characters
+	// PE32 has fields like MinorOperatingSystemVersion (27 chars)
+	int __field_padding = -28;
 }
 
-void dprint_section(uint count, const(char) *section, uint max) {
-	printf("\n%u. %.*s:\n", count, max, section);
+void print_header(const(char)* name) {
+	printf("\n# %s\n", name);
 }
 
-void dprint_string(const(char) *name, const(char) *val) {
-	printf(FORMAT_FIELD~"%s", name, val);
-}
-void dprint_stringl(const(char) *name, const(char) *val, uint len) {
-	printf(FORMAT_FIELD~"%.*s", name, len, val);
-}
-void dprint_x8(const(char) *name, ubyte val,
-	const(char) *meaning = null, const(char) *alias_ = null) {
-	printf(FORMAT_FIELD~"0x%02x", name, val);
-	if (meaning) printf("\t(%s)", meaning);
+void print_section(uint i, const(char) *name = null, int len = 0) {
 	putchar('\n');
+	print_u32("index", i + 1);
+	if (name && len) print_stringl("name", name, len);
 }
-void dprint_u8(const(char) *name, ubyte val,
-	const(char) *meaning = null, const(char) *alias_ = null) {
-	printf(FORMAT_FIELD~"%u", name, val);
-	if (meaning) printf("\t(%s)", meaning);
-	putchar('\n');
-}
-void dprint_x16(const(char) *name, ushort val,
-	const(char) *meaning = null, const(char) *alias_ = null) {
-	printf(FORMAT_FIELD~"0x%04x", name, val);
-	if (meaning) printf("\t(%s)", meaning);
-	putchar('\n');
-}
-void dprint_u16(const(char) *name, ushort val,
-	const(char) *meaning = null, const(char) *alias_ = null) {
-	printf(FORMAT_FIELD~"%u", name, val);
-	if (meaning) printf("\t(%s)", meaning);
-	putchar('\n');
-}
-// temp for pe32 import
-void dprint_x16__i(uint rva, ushort hint, const(char) *s) {
-	printf("  %-31x  %-10x  %.256s\n", rva, hint, s);
+void print_disasm_line(adbg_opcode_t *op, const(char)* msg = null) {
+	printf("%16llx  ", op.address);
+	if (msg)
+		puts(msg);
+	else
+		printf("%s\t%s\n", op.mnemonic, op.operands);
 }
 
-void dprint_x32(const(char) *name, uint val,
-	const(char) *meaning = null, const(char) *alias_ = null) {
-	printf(FORMAT_FIELD~"0x%08x", name, val);
+void print_u8(const(char)* name, ubyte val, const(char) *meaning = null) {
+	print_u32(name, val, meaning);
+}
+void print_u16(const(char)* name, ushort val, const(char) *meaning = null) {
+	print_u32(name, val, meaning);
+}
+void print_u32(const(char)* name, uint val, const(char) *meaning = null) {
+	printf("%*s: %u", __field_padding, name, val);
 	if (meaning) printf("\t(%s)", meaning);
 	putchar('\n');
 }
-// temp for pe32 stuff
-void dprint_x32s(const(char) *name, uint val,
-	const(char) *meaning = null, uint max = 0) {
-	printf(FORMAT_FIELD~"0x%08x", name, val);
-	if (meaning) printf("\t(%.*s)", max, meaning);
-	putchar('\n');
-}
-void dprint_u32(const(char) *name, uint val,
-	const(char) *meaning = null, const(char) *alias_ = null) {
-	printf(FORMAT_FIELD~"%u", name, val);
-	if (meaning) printf("\t(%s)", meaning);
-	putchar('\n');
-}
-void dprint_x64(const(char) *name, ulong val,
-	const(char) *meaning = null, const(char) *alias_ = null) {
-	printf(FORMAT_FIELD~"0x%016llx", name, val);
-	if (meaning) printf("\t(%s)", meaning);
-	putchar('\n');
-}
-void dprint_u64(const(char) *name, ulong val,
-	const(char) *meaning = null, const(char) *alias_ = null) {
-	printf(FORMAT_FIELD~"%llu", name, val);
+void print_u64(const(char)* name, ulong val, const(char) *meaning = null) {
+	printf("%*s: %llu", __field_padding, name, val);
 	if (meaning) printf("\t(%s)", meaning);
 	putchar('\n');
 }
 
-// temp for pe32 dir entry
-void dprint_entry32(const(char) *section, uint u1, uint u2) {
-	printf(FORMAT_FIELD~"0x%08x  %u\n", section, u1, u2);
+void print_x8(const(char)* name, ubyte val, const(char) *meaning = null) {
+	printf("%*s: 0x%02x", __field_padding, name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+void print_x16(const(char)* name, ushort val, const(char) *meaning = null) {
+	printf("%*s: 0x%04x", __field_padding, name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+void print_x32(const(char)* name, uint val, const(char) *meaning = null) {
+	printf("%*s: 0x%08x", __field_padding, name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+void print_x64(const(char)* name, ulong val, const(char) *meaning = null) {
+	printf("%*s: 0x%016llx", __field_padding, name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
 }
 
-// name + rvalue (stops when name is null)
-void dprint_flags16(const(char) *section, ushort flags, ...) {
-	printf(FORMAT_FIELD~"0x%04x\t(", section, flags);
+void print_f32(const(char)* name, float val, int pad = 2) {
+	print_f64(name, val, pad);
+}
+void print_f64(const(char)* name, double val, int pad = 2) {
+	printf("%*s: %.*f\n", __field_padding, name, pad, val);
+}
+
+void print_string(const(char)* name, const(char)* val) {
+	printf("%*s: %s\n", __field_padding, name, val);
+}
+void print_stringl(const(char)* name, const(char)* val, int len) {
+	printf("%*s: %.*s\n", __field_padding, name, len, val);
+}
+
+void print_flags16(const(char) *section, ushort flags, ...) {
+	printf("%*s: 0x%04x\t(", __field_padding, section, flags);
 	
 	va_list args = void;
 	va_start(args, flags);
@@ -238,9 +238,8 @@ L_START:
 	printf("%s", name);
 	goto L_START;
 }
-// name + rvalue (stops when name is null)
-void dprint_flags32(const(char) *section, uint flags, ...) {
-	printf(FORMAT_FIELD~"0x%08x\t(", section, flags);
+void print_flags32(const(char) *section, uint flags, ...) {
+	printf("%*s: 0x%08x\t(", __field_padding, section, flags);
 	
 	va_list args = void;
 	va_start(args, flags);
@@ -257,10 +256,8 @@ L_START:
 	printf("%s", name);
 	goto L_START;
 }
-// name + rvalue (stops when name is null)
-//TODO: Could make it a template?
-void dprint_flags64(const(char) *section, ulong flags, ...) {
-	printf(FORMAT_FIELD~"0x%016llx\t(", section, flags);
+void print_flags64(const(char) *section, ulong flags, ...) {
+	printf("%*s: 0x%016llx\t(", __field_padding, section, flags);
 	
 	va_list args = void;
 	va_start(args, flags);
@@ -278,42 +275,48 @@ L_START:
 	goto L_START;
 }
 
-// hexdump
-void dprint_raw(const(char) *name, uint namemax,
-	ulong filebase, void *data, size_t size) {
-	//TODO: print "raw:<size>" or something and dump it
-	//TODO: need to think of a "raw dump" setting
+void print_directory_entry(const(char)* name, uint rva, uint size) {
+	printf("%*s: 0x%08x  %u\n", __field_padding, name, rva, size);
+}
+
+void print_reloc16(uint index, ushort seg, ushort off) {
+	printf("- %-3u. 0x%04x:0x%04x\n", index, seg, off);
 }
 
 // name is typically section name or filename if raw
-int dprint_disassemble_object(adbg_object_t *o,
-	const(char) *name, uint namemax,
-	void* data, ulong size, ulong base_address,
-	uint flags) {
+int dump_disassemble_object(ref Dumper dump, adbg_object_t *o,
+	const(char) *name, int namemax,
+	void* data, ulong size, ulong base_address) {
+	
+	print_header("Disassembly");
+	
+	if (name && namemax)
+		print_stringl("section", name, namemax);
 	
 	if (data + size >= o.buffer + o.file_size) {
-		dprint_error("Buffer outside file");
+		print_string("error", "data + size >= dump.o.buffer + dump.o.file_size");
+		return EXIT_FAILURE;
 	}
 	
-	return dprint_disassemble(
-		adbg_object_machine(o), name, namemax, data, size, base_address, flags);
+	if (data == null || size == 0) {
+		return 0;
+	}
+	
+	return dump_disassemble(dump, adbg_object_machine(o), data, size, base_address);
 }
-int dprint_disassemble(AdbgMachine machine,
-	const(char) *name, uint namemax,
-	void* data, ulong size, ulong base_address,
-	uint flags) {
-	
-	if (name && namemax) printf("<%.*s>:\n", namemax, name);
-	if (data == null || size == 0) return 0;
-	//TODO: Check data+size against object type (file_size)
-	
+
+int dump_disassemble(ref Dumper dump, AdbgMachine machine,
+	void* data, ulong size, ulong base_address) {
 	adbg_disassembler_t *dasm = cast(adbg_disassembler_t*)malloc(adbg_disassembler_t.sizeof);
 	if (dasm == null)
 		panic(AdbgError.crt);
 	scope(exit) free(dasm);
 	
-	if (adbg_dasm_open(dasm, machine))
+	if (adbg_dasm_open(dasm, machine)) {
 		panic();
+		return 1;
+	}
+	scope(exit) adbg_dasm_close(dasm);
 	
 	if (globals.syntax)
 		adbg_dasm_options(dasm, AdbgDasmOption.syntax, globals.syntax, 0);
@@ -322,7 +325,7 @@ int dprint_disassemble(AdbgMachine machine,
 	adbg_dasm_start(dasm, data, cast(size_t)size, base_address);
 	
 	// stats mode
-	if (flags & DumpOpt.disasm_stats) {
+	if (dump.selected_disasm_stats()) {
 		uint stat_avg;	/// instruction average size
 		uint stat_min = uint.max;	/// smallest instruction size
 		uint stat_max;	/// longest instruction size
@@ -344,39 +347,29 @@ L_STAT:
 		case outOfData: break;
 		default: panic();
 		}
-		printf(
-		"Opcode statistics\n"~
-		"average size : %.3f Bytes\n"~
-		"shortest     : %u Bytes\n"~
-		"largest      : %u Bytes\n"~
-		"illegal      : %u instructions\n"~
-		"valid        : %u instructions\n"~
-		"total        : %u instructions\n",
-		cast(float)stat_avg / stat_total,
-		stat_min,
-		stat_max,
-		stat_illegal,
-		stat_total - stat_illegal,
-		stat_total
-		);
+		
+		print_f32("average", cast(float)stat_avg / stat_total, 2);
+		print_u32("shortest", stat_min);
+		print_u32("largest", stat_max);
+		print_u32("illegal", stat_illegal);
+		print_u32("valid", stat_total - stat_illegal);
+		print_u32("total", stat_total);
 		return 0;
 	}
 	
 	// normal disasm mode
-	//TODO: Could do better with a while (!= EOF) and is_opcode_illegal()
 L_DISASM:
 	switch (adbg_dasm(dasm, &op)) with (AdbgError) {
 	case success:
-		//TODO: print base as 08x if small enough
-		printf("%016llx  %s\t%s\n", op.address, op.mnemonic, op.operands);
+		print_disasm_line(&op);
 		goto L_DISASM;
 	case illegalInstruction:
-		printf("%016llx  illegal (%d bytes)\n", op.address, op.size);
+		print_disasm_line(&op, "illegal");
 		goto L_DISASM;
 	case outOfData:
 		return 0;
 	default:
-		panic();
-		return 0;
+		print_string("error", adbg_error_msg());
+		return 1;
 	}
 }
