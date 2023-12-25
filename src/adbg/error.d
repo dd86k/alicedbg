@@ -14,13 +14,13 @@ version (Windows) {
 	enum ADBG_OS_ERROR_FORMAT = "%d"; /// Error code format
 }
 
-//TODO: Consider making all codes negative values.
-//      This allows positive values to be used and follows more
-//      the "C way" of doing things.
+//TODO: Consider making all codes values of 1000 or more.
 //TODO: Make module thread-safe
 //      Either via TLS and/or atomic operations
 //TODO: More error should have context parameters
-//      invalidArgument
+//      invalidArgument: string stating which argument
+//TODO: adbg_error_source -> alicedbg/crt/os/capstone, etc.
+//      adbg_error_is_external -> bool
 
 extern (C):
 
@@ -175,6 +175,8 @@ private immutable adbg_error_msg_t[] errors_msg = [
 
 /// Get error state instance.
 /// Returns: Pointer to the only error instance.
+//TODO: Deprecate as dangerous
+//      Getting extra info such as source (string) and al. should be via functions
 const(adbg_error_t)* adbg_error_current() {
 	return &error;
 }
