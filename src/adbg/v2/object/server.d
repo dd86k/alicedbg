@@ -225,12 +225,6 @@ struct adbg_object_t {
 	uint flags;
 }+/
 
-// Internal: Check if pointer is outside of file
-deprecated("Use adbg_object_chkbnds")
-package
-bool adbg_object_poutside(adbg_object_t *o, void *ptr) {
-	return ptr >= o.buffer + o.file_size;
-}
 // Internal: Check if pointer is within file boundaries
 package
 bool adbg_object_ptrbnds(adbg_object_t *o, void *ptr) {
@@ -260,7 +254,7 @@ bool adbg_object_offbnds2(adbg_object_t *o, ulong off, size_t size) {
 ///   path = File path.
 ///   ... = Options. Terminated with 0.
 /// Returns: Error code.
-deprecated
+deprecated("Use adbg_object_open_file")
 int adbg_object_open(adbg_object_t *o, const(char) *path, ...) {
 	if (o == null)
 		return adbg_oops(AdbgError.nullArgument);

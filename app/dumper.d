@@ -1,10 +1,8 @@
-/**
- * Image/object dumper, imitates objdump
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
+/// Image/object dumper, imitates objdump
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module dumper;
 
 import adbg.include.c.stdio;
@@ -123,13 +121,9 @@ int app_dump() {
 		return dump_disassemble(dump, globals.machine, buffer, size, 0);
 	}
 	
-	adbg_object_t *o = cast(adbg_object_t*)malloc(adbg_object_t.sizeof);
+	adbg_object_t *o = adbg_object_open_file(globals.file, 0);
 	if (o == null)
-		panic(AdbgError.crt);
-	// Load object into memory
-	if (adbg_object_open(o, globals.file, 0)) {
-		return oops;
-	}
+		return show_adbg_error();
 	
 	print_string("format", adbg_object_name(o));
 	print_string("short_name", adbg_object_short_name(o));

@@ -17,7 +17,7 @@ module adbg.v2.object.format.pe;
 import core.stdc.inttypes;
 import core.stdc.stdlib;
 import adbg.error;
-import adbg.v2.object.server : AdbgObject, adbg_object_t, adbg_object_poutside;
+import adbg.v2.object.server : AdbgObject, adbg_object_t, adbg_object_ptrbnds;
 import adbg.v2.object.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit;
@@ -882,7 +882,7 @@ char* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_
 		- o.i.pe.directory.ExportTable.rva
 		+ export_.Name;
 	
-	if (adbg_object_poutside(o, s)) return null;
+	if (adbg_object_ptrbnds(o, s) == false) return null;
 	
 	return s;
 }
@@ -903,16 +903,16 @@ char* adbg_object_pe_export_string_hint(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *
 	// Check bounds with table RVA
 	void *base = cast(void*)o.i.pe.directory_exports
 		- o.i.pe.directory.ExportTable.rva;
-	if (adbg_object_poutside(o, base)) return null;
+	if (adbg_object_ptrbnds(o, base) == false) return null;
 	
 	// Check bounds with name pointer and requested index
 	//TODO: Check if hint is forwarder
 	uint *hint = cast(uint*)(base + export_.NamePointer) + index;
-	if (adbg_object_poutside(o, hint)) return null;
+	if (adbg_object_ptrbnds(o, hint) == false) return null;
 	
 	// Check bounds with hint
 	void *name = base + *hint;
-	if (adbg_object_poutside(o, name)) return null;
+	if (adbg_object_ptrbnds(o, name) == false) return null;
 	
 	return cast(char*)name;
 }
@@ -950,7 +950,7 @@ char* adbg_object_pe_import_name(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_
 	
 	char *s = cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva + import_.Name;
 	
-	if (adbg_object_poutside(o, s))
+	if (adbg_object_ptrbnds(o, s) == false)
 		return null;
 	
 	return s;
@@ -966,7 +966,7 @@ PE_IMPORT_LTE32* adbg_object_pe_import_lte32(adbg_object_t *o, PE_IMPORT_DESCRIP
 		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
 		+ index;
 	
-	if (adbg_object_poutside(o, lte32) || lte32.ordinal == 0)
+	if (adbg_object_ptrbnds(o, lte32) == false || lte32.ordinal == 0)
 		return null;
 	
 	return lte32;
@@ -978,7 +978,7 @@ ushort* adbg_object_pe_import_lte32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR 
 	
 	ushort* base = cast(ushort*)
 		((cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva) + im32.rva);
-	if (adbg_object_poutside(o, base))
+	if (adbg_object_ptrbnds(o, base) == false)
 		return null;
 	
 	return base;
@@ -994,7 +994,7 @@ PE_IMPORT_LTE64* adbg_object_pe_import_lte64(adbg_object_t *o, PE_IMPORT_DESCRIP
 	
 	version (Trace) trace("imports=%p lte64=%p fs=%p", o.i.pe.directory_imports, lte64, o.file_size);
 	
-	if (adbg_object_poutside(o, lte64) || lte64.ordinal == 0)
+	if (adbg_object_ptrbnds(o, lte64) == false || lte64.ordinal == 0)
 		return null;
 	
 	return lte64;
@@ -1009,7 +1009,7 @@ ushort* adbg_object_pe_import_lte64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR 
 	
 	version (Trace) trace("base=%p fs=%p", base, o.file_size);
 	
-	if (adbg_object_poutside(o, base)) return null;
+	if (adbg_object_ptrbnds(o, base) == false) return null;
 	
 	return base;
 }
@@ -1078,7 +1078,7 @@ void* adbg_object_pe_locate(adbg_object_t *o, uint rva) {
 			continue;
 		
 		void* a = o.buffer + (s.PointerToRawData + (rva - va));
-		return adbg_object_poutside(o, a) ? null : a;
+		return adbg_object_ptrbnds(o, a) ? a : null;
 	}
 	
 	version (Trace) trace("null");

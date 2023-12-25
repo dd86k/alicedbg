@@ -75,9 +75,8 @@ struct settings_t {
 	const(char) **args;	/// Debuggee: argument vector
 	const(char) **env;	/// Debuggee: environement vector
 	uint pid;	/// Debuggee: PID
-	deprecated uint flags;	/// Flags to pass to sub-app
-	int dump_selections;	/// 
-	int dump_options;	/// 
+	int dump_selections;	/// Dumper selections
+	int dump_options;	/// Dumper options
 	AdbgMachine machine;	/// Disassembler: Target machine
 	AdbgDasmSyntax syntax;	/// Disassembler: Syntax
 }

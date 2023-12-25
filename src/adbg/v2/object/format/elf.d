@@ -731,7 +731,7 @@ int adbg_object_elf_load(adbg_object_t *o) {
 					return adbg_oops(AdbgError.assertion);
 				}
 				phdr = cast(Elf32_Phdr*)(o.buffer + ehdr.e_phoff);
-				if (adbg_object_poutside(o, phdr))
+				if (adbg_object_ptrbnds(o, phdr) == false)
 					return adbg_oops(AdbgError.assertion);
 				reversed_phdr = cast(bool*)calloc(ehdr.e_phnum, bool.sizeof);
 				if (reversed_phdr == null)
@@ -745,7 +745,7 @@ int adbg_object_elf_load(adbg_object_t *o) {
 					return adbg_oops(AdbgError.assertion);
 				}
 				shdr = cast(Elf32_Shdr*)(o.buffer + ehdr.e_shoff);
-				if (adbg_object_poutside(o, shdr))
+				if (adbg_object_ptrbnds(o, shdr) == false)
 					return adbg_oops(AdbgError.assertion);
 				reversed_shdr = cast(bool*)calloc(ehdr.e_shnum, bool.sizeof);
 				if (reversed_shdr == null)
@@ -782,7 +782,7 @@ int adbg_object_elf_load(adbg_object_t *o) {
 					return adbg_oops(AdbgError.assertion);
 				}
 				phdr = cast(Elf64_Phdr*)(o.buffer + ehdr.e_phoff);
-				if (adbg_object_poutside(o, phdr))
+				if (adbg_object_ptrbnds(o, phdr) == false)
 					return adbg_oops(AdbgError.assertion);
 				reversed_phdr = cast(bool*)calloc(ehdr.e_phnum, bool.sizeof);
 				if (reversed_phdr == null)
@@ -791,12 +791,13 @@ int adbg_object_elf_load(adbg_object_t *o) {
 				reversed_phdr = null;
 				phdr = null;
 			}
+			
 			if (ehdr.e_shoff && ehdr.e_shnum) {
 				if (ehdr.e_shoff >= o.file_size) {
 					return adbg_oops(AdbgError.assertion);
 				}
 				shdr = cast(Elf64_Shdr*)(o.buffer + ehdr.e_shoff);
-				if (adbg_object_poutside(o, shdr))
+				if (adbg_object_ptrbnds(o, shdr) == false)
 					return adbg_oops(AdbgError.assertion);
 				reversed_shdr = cast(bool*)calloc(ehdr.e_shnum, bool.sizeof);
 				if (reversed_shdr == null)
