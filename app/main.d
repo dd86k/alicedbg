@@ -11,7 +11,7 @@ import adbg.include.c.stdlib : exit;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
-import common, dumper, shell;
+import common, dumper, shell, utils;
 
 private:
 extern (C):
@@ -111,6 +111,7 @@ immutable option_t[] options = [
 	{ 0,   "dump-disassembly-all",   "Dump object's disassembly for all sections", false, &cli_dump_disasm_all },
 	{ 0,   "dump-disassembly-stats", "Dump object's disassembly statistics for executable sections", false, &cli_dump_disasm_stats },
 	{ 0,   "dump-as-blob",      "Dump as raw binary blob", false, &cli_dump_blob },
+	{ 0,   "dump-origin",       "Mark base address for disassembly", true, fa: &cli_dump_disasm_org },
 	// pages
 	{ 'h', "help",	"Show this help screen and exit", false, &cli_help },
 	{ 0,   "version",	"Show the version screen and exit", false, &cli_version },
@@ -308,6 +309,9 @@ int cli_dump_blob() {
 	globals.mode = SettingMode.dump;
 	globals.dump_options |= DumpOptions.raw;
 	return 0;
+}
+int cli_dump_disasm_org(const(char) *val) {
+	return unformat64(&globals.dump_base_address, val);
 }
 
 //

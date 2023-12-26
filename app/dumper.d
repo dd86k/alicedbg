@@ -118,7 +118,7 @@ int app_dump() {
 		if (size == 0)
 			return 0;
 		
-		return dump_disassemble(dump, globals.machine, buffer, size, 0);
+		return dump_disassemble(dump, globals.machine, buffer, size, globals.dump_base_address);
 	}
 	
 	adbg_object_t *o = adbg_object_open_file(globals.file, 0);
