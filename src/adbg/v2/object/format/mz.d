@@ -34,8 +34,6 @@ enum LFANEW_OFFSET = 0x3c;
 /// Original MZ header structure.
 /// 
 /// Newer executables add these new fields:
-/// - ushort[ERESWDS] e_res;
-/// - uint e_lfanew;
 struct mz_hdr {
 	ushort e_magic;	/// Magic number
 	ushort e_cblp;	/// Bytes on last page of file
@@ -51,6 +49,25 @@ struct mz_hdr {
 	ushort e_cs;	/// Initial (relative) CS value
 	ushort e_lfarlc;	/// File address of relocation table
 	ushort e_ovno;	/// Overlay number
+}
+/// Extended MZ header structure featured with newer executables (NE, LE, PE).
+struct mz_hdr_ext {
+	ushort e_magic;	/// Magic number
+	ushort e_cblp;	/// Bytes on last page of file
+	ushort e_cp;	/// Pages in file
+	ushort e_crlc;	/// Number of relocation entries in the table
+	ushort e_cparh;	/// Size of header in paragraphs
+	ushort e_minalloc;	/// Minimum extra paragraphs needed
+	ushort e_maxalloc;	/// Maximum extra paragraphs needed
+	ushort e_ss;	/// Initial (relative) SS value
+	ushort e_sp;	/// Initial SP value
+	ushort e_csum;	/// Checksum
+	ushort e_ip;	/// Initial IP value
+	ushort e_cs;	/// Initial (relative) CS value
+	ushort e_lfarlc;	/// File address of relocation table
+	ushort e_ovno;	/// Overlay number
+	ushort[ERESWDS] e_res;	/// Reserved words
+	uint e_lfanew;	/// 
 }
 
 /// MZ relocation entry

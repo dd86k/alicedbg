@@ -736,20 +736,32 @@ size_t adbg_object_machine_count() {
 /// Select a machine architecture from an machine enum value.
 /// Params: mach = Machine enumeration value.
 /// Returns: Machine pointer or null.
-immutable(adbg_machine_t)* adbg_object_machine_name(AdbgMachine mach) {
+immutable(adbg_machine_t)* adbg_object_machine(AdbgMachine mach) {
 	if (mach <= 0 || mach - 1 >= machines.length)
 		return null;
-	return &machines[--mach];
+	return &machines[mach - 1];
 }
 @system unittest {
-	assert(adbg_object_machine_name(cast(AdbgMachine)-1) == null);
-	assert(adbg_object_machine_name(cast(AdbgMachine)0)  == null);
+	assert(adbg_object_machine(cast(AdbgMachine)-1) == null);
+	assert(adbg_object_machine(cast(AdbgMachine)0)  == null);
 	for (size_t i = 1; i < machines.length; ++i) {
 		immutable(adbg_machine_t)* m =
-			adbg_object_machine_name(cast(AdbgMachine)i);
+			adbg_object_machine(cast(AdbgMachine)i);
 		assert(m);
 		assert(m.machine == cast(AdbgMachine)i);
 	}
+}
+/// Get machine alias from enumeration value.
+/// Params: mach = Machine value.
+/// Returns: Machine name, or null if invalid.
+const(char)* adbg_object_machine_alias(AdbgMachine mach) {
+	return adbg_object_machine(mach).alias1;
+}
+/// Get machine name from enumeration value.
+/// Params: mach = Machine value.
+/// Returns: Machine name, or null if invalid.
+const(char)* adbg_object_machine_name(AdbgMachine mach) {
+	return adbg_object_machine(mach).name;
 }
 
 /// Select a machine architecture from an alias name.

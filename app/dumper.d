@@ -274,7 +274,7 @@ void print_directory_entry(const(char)* name, uint rva, uint size) {
 }
 
 void print_reloc16(uint index, ushort seg, ushort off) {
-	printf("- %-3u. 0x%04x:0x%04x\n", index, seg, off);
+	printf("%4u. 0x%04x:0x%04x\n", index, seg, off);
 }
 
 // name is typically section name or filename if raw
@@ -293,6 +293,7 @@ int dump_disassemble_object(ref Dumper dump, adbg_object_t *o,
 	}
 	
 	if (data == null || size == 0) {
+		print_string("error", "data is NULL or size is 0");
 		return 0;
 	}
 	

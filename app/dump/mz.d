@@ -63,22 +63,19 @@ void dump_mz_relocs(ref Dumper dump, adbg_object_t *o) {
 }
 
 void dump_mz_disasm(ref Dumper dump, adbg_object_t *o) {
-	// Point end to header size
-	uint start = o.i.mz.header.e_cparh << 4; // paragraphs * 16
+	// Get start of data
+	uint start = (o.i.mz.header.e_cparh << 4) + o.i.mz.header.e_cblp; // paragraphs * 16
 	if (start < mz_hdr.sizeof || start >= o.file_size) {
 		print_string("error", "Data start outside of file buffer");
 		return;
 	}
 	
-	// Get pages
-	uint pages = o.i.mz.header.e_cp;
-	if (o.i.mz.header.e_cblp) // if has last bytes in last page
-		--pages;
-	
 	// Get data length
-	uint len = (pages << 4) + o.i.mz.header.e_cblp;
-	if (len == 0)
+	uint len = (o.i.mz.header.e_cp << 4) + o.i.mz.header.e_cblp; // paragraphs * 16
+	if (len == 0) {
+		print_string("error", "Length is zero");
 		return;
+	}
 	if (len > o.file_size) {
 		print_string("error", "Data length cannot be bigger than file");
 		return;

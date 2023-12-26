@@ -14,12 +14,8 @@ import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.platform;
 import adbg.v2.debugger.process : adbg_process_t;
-import adbg.v2.object.machines : AdbgMachine;
+import adbg.v2.object.machines : AdbgMachine, adbg_object_machine_alias;
 import adbg.v2.debugger.exception : adbg_exception_t;
-
-version (Win64)
-	version (X86_64)
-		version = Win64_X86_64;
 
 //TODO: Capstone CS_MODE_BIG_ENDIAN
 //      Depending on target endianness, Capstone may need this bit
@@ -71,15 +67,11 @@ extern (C):
 
 /// Disassembler structure.
 /// 
-/// Anything marked as used internally, should be left untouched.
+/// All fields are used internally, do not touch.
 struct adbg_disassembler_t {
 	/// Used internally.
 	int magic;
 	
-	/// Current address, typically points to next instruction.
-	ulong address_current;
-	/// Last address.
-	ulong address_last;
 	/// Base address for current disassembled instruction.
 	ulong address_base;
 	
@@ -96,6 +88,9 @@ struct adbg_disassembler_t {
 	/// CS instruction instance.
 	/// Used internally.
 	cs_insn *cs_inst;
+	
+	/// Number of successfully decoded instructions.
+	int decoded_count;
 }
 
 /// Decoded instruction information.
@@ -183,7 +178,7 @@ int adbg_dasm_open_proccess(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
 	
 	AdbgMachine mach;
 	
-	version (Win64_X86_64) // Windows + x86-64
+	version (Win64) version (X86_64) // Windows + x86-64
 		mach = tracee.wow64 ? AdbgMachine.x86 : AdbgMachine.amd64;
 	
 	return adbg_dasm_open(dasm, mach);
@@ -215,6 +210,8 @@ int adbg_dasm_open(adbg_disassembler_t *dasm,
 	//TODO: static if (CAPSTONE_DYNAMIC)
 	if (libcapstone_dynload())
 		return adbg_errno;
+	
+	version (Trace) trace("machine=%u (%s)", machine, adbg_object_machine_alias(machine));
 	
 	int cs_arch = void, cs_mode = void;
 	if (adbg_dasm_lib_a2cs(cs_arch, cs_mode, machine))
@@ -280,8 +277,7 @@ int adbg_dasm_options(adbg_disassembler_t *dasm, ...) {
 	
 	va_list args = void;
 	va_start(args, dasm);
-	
-L_ARG:
+L_OPTION:
 	switch (va_arg!int(args)) {
 	case 0: break;
 	case AdbgDasmOption.syntax:
@@ -301,7 +297,7 @@ L_ARG:
 		}
 		if (cs_option(dasm.cs_handle, CS_OPT_SYNTAX, cs_syntax))
 			return adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
-		goto L_ARG;
+		goto L_OPTION;
 	default:
 		return adbg_oops(AdbgError.invalidOption);
 	}
@@ -338,12 +334,19 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	if (dasm.magic != ADBG_DASM_MAGIC)
 		return adbg_oops(AdbgError.uninitiated);
 	
-	dasm.address_last = dasm.address_current;
+	version (Trace) trace("size=%u", cast(uint)dasm.buffer_size);
 	
-	opcode.address = dasm.address_base;
+	opcode.address = dasm.address_base; // Save before CS modifies it
 	
+	//TODO: Consider making a specific error code if decoded count is zero.
+	//      Use case:
+	//        If cs_disasm_iter returns false and cs_errno
+	//        returns CS_ERR_OK, this could mean that an invalid
+	//        machine type was specified when opening the instance.
+	
+	// NOTE: CS adjusts buffer pointer, buffer_size, and address_base.
 	if (cs_disasm_iter(dasm.cs_handle,
-		cast(const(ubyte*)*)&dasm.buffer, // CS adjusts this
+		cast(const(ubyte*)*)&dasm.buffer,
 		&dasm.buffer_size,
 		&dasm.address_base,
 		dasm.cs_inst) == false) {
@@ -353,11 +356,12 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 		return adbg_oops(AdbgError.outOfData);
 	}
 	
+	++dasm.decoded_count;
+	
 	//TODO: disasm modes
 	opcode.size = dasm.cs_inst.size;
 	opcode.mnemonic = cs_insn_name(dasm.cs_handle, dasm.cs_inst.id);
 	opcode.operands = dasm.cs_inst.op_str.ptr;
-	
 	return 0;
 }
 

@@ -33,7 +33,12 @@ extern (C):
 //TODO: Consider loading first 4 KiB for detection before loading rest
 //TODO: const(ubyte)* adbg_obj_section(obj, ".abc");
 //TODO: const(ubyte)* adbg_obj_section_i(obj, index);
-//TODO: const(ubyte)* adbg_object_get_exec_section(obj);
+//TODO: const(ubyte)* adbg_object_get_section_by_type(obj, type);
+//TODO: const(char)* adbg_object_get_debug_path(obj);
+//TODO: Consider structure definition, using a template
+//      Uses:
+//      - For swapping, uses less code than inlining it
+//      - For displaying and using field offsets
 
 /// Executable or object format.
 enum AdbgObject {
@@ -85,13 +90,10 @@ enum AdbgObjectLoadOption {
 ///
 /// All fields are used internally and should not be used directly.
 struct adbg_object_t {
+	/// Object's loading origin.
+	AdbgObjectOrigin origin;
 	union {
 		struct {
-			/// File handle to object.
-			FILE *file_handle;
-			/// File size.
-			ulong file_size;
-	
 			union {
 				void   *buffer;	/// Buffer to file object.
 				char   *bufferc;	/// Ditto
@@ -102,6 +104,12 @@ struct adbg_object_t {
 				uint   *buffer32;	/// Ditto
 				ulong  *buffer64;	/// Ditto
 			}
+			
+			/// File handle to object.
+			FILE *file_handle;
+			/// File size.
+			ulong file_size;
+	
 			/// Allocated buffer size.
 			size_t buffer_size;
 		}
@@ -112,8 +120,6 @@ struct adbg_object_t {
 	
 	/// Loaded object format.
 	AdbgObject format;
-	/// Object's loading origin.
-	AdbgObjectOrigin origin;
 	
 	// Object properties.
 	package
@@ -124,6 +130,9 @@ struct adbg_object_t {
 		// Target object has code that can be run on this platform.
 		// Examples: x86 on x86-64 or Arm A32 on Arm A64 via WoW64
 		//TODO: bool platform_native;
+		
+		// Temp field to avoid free'ing non-allocated memory
+		bool noalloc;
 	}
 	adbg_object_properties_t p;
 	
@@ -219,12 +228,6 @@ struct adbg_object_t {
 	adbg_object_internals_t i;
 }
 
-/+struct adbg_section_t {
-	const(ubyte)* data;
-	ulong size;
-	uint flags;
-}+/
-
 // Internal: Check if pointer is within file boundaries
 package
 bool adbg_object_ptrbnds(adbg_object_t *o, void *ptr) {
@@ -266,7 +269,9 @@ int adbg_object_open(adbg_object_t *o, const(char) *path, ...) {
 	va_list list = void;
 	va_start(list, path);
 	
-	return adbg_object_loadv(o, list);
+	int r = adbg_object_loadv(o, list); // Clears .p
+	o.p.noalloc = true;
+	return r;
 }
 
 /// Load an object from disk into memory.
@@ -354,6 +359,8 @@ void adbg_object_close(adbg_object_t *o) {
 		fclose(o.file_handle);
 	if (o.buffer && o.buffer_size)
 		free(o.buffer);
+	if (o.p.noalloc == false) // check is temporary
+		free(o);
 }
 
 /// Read raw data from object.
@@ -463,8 +470,10 @@ L_ARG:
 		// Attempt to check new file format offset and signature.
 		// If e_lfanew seem to be garbage, load file as an MZ exec instead.
 		uint e_lfanew = *cast(uint*)(o.buffer + LFANEW_OFFSET);
-		if (e_lfanew == 0)
+		// If within MZ extended header
+		if (e_lfanew <= mz_hdr_ext.sizeof)
 			return adbg_object_mz_load(o);
+		// If outside file
 		if (e_lfanew >= o.file_size)
 			return adbg_object_mz_load(o);
 		// NOTE: ReactOS checks if NtHeaderOffset is not higher than 256 MiB
