@@ -821,6 +821,8 @@ __gshared
 //private __gshared int libcapstone_major;
 private __gshared bool libcapstone_loaded;
 
+version (Trace) import adbg.error;
+
 // Returns true on error
 bool libcapstone_dynload()
 {
@@ -872,7 +874,7 @@ bool libcapstone_dynload()
         {
             for (size_t i; i < missingcnt; ++i)
             {
-                trace("missing symbol: %s", adbg_symbols_missing(i));
+                trace("missing symbol: %s", adbg_symbols_missing(lib, i));
             }
         }
         adbg_symbols_close(lib);

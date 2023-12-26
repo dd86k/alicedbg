@@ -97,6 +97,8 @@ __gshared
 
 private __gshared bool __dynlib_psapi_loaded;
 
+version (Trace) import adbg.error;
+
 // Returns true on error.
 bool __dynlib_psapi_load()
 {
@@ -142,7 +144,7 @@ bool __dynlib_psapi_load()
         {
             for (size_t i; i < missingcnt; ++i)
             {
-                trace("missing symbol: %s", adbg_symbols_missing(i));
+                trace("missing symbol: %s", adbg_symbols_missing(lib, i));
             }
         }
         adbg_symbols_close(lib);

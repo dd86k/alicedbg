@@ -16,3 +16,5 @@ jobs:
       run: dub build --compiler=dmd
     - name: 'Test'
       run: dub test --compiler=dmd
+    - name: 'Trace'
+      run: dub build --compiler=dmd -b trace
