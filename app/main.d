@@ -107,9 +107,9 @@ immutable option_t[] options = [
 //	{ 0,   "dump-source",       "Dump object's source with disassembly", false, &cli_dump_source },
 	{ 0,   "dump-relocs",       "Dump object's relocations", false, &cli_dump_reloc },
 	{ 0,   "dump-debug",        "Dump object's debug information", false, &cli_dump_debug },
-	{ 0,   "dump-disasm",       "Dump object's disassembly", false, &cli_dump_disasm },
-	{ 0,   "dump-disasm-all",   "Dump object's disassembly for all sections", false, &cli_dump_disasm_all },
-	{ 0,   "dump-disasm-stats", "Dump object's disassembly statistics for executable sections", false, &cli_dump_disasm_stats },
+	{ 0,   "dump-disassembly",       "Dump object's disassembly", false, &cli_dump_disasm },
+	{ 0,   "dump-disassembly-all",   "Dump object's disassembly for all sections", false, &cli_dump_disasm_all },
+	{ 0,   "dump-disassembly-stats", "Dump object's disassembly statistics for executable sections", false, &cli_dump_disasm_stats },
 	{ 0,   "dump-as-blob",      "Dump as raw binary blob", false, &cli_dump_blob },
 	// pages
 	{ 'h', "help",	"Show this help screen and exit", false, &cli_help },
