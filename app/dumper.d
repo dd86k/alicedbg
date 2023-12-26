@@ -8,6 +8,7 @@ module dumper;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, free;
 import adbg.include.c.stdarg;
+import core.stdc.string;
 import adbg.v2, adbg.v2.object.machines;
 import adbg.utils.bit : BIT;
 import common, utils, dump;
@@ -155,11 +156,37 @@ void print_section(uint i, const(char) *name = null, int len = 0) {
 	if (name && len) print_stringl("name", name, len);
 }
 void print_disasm_line(adbg_opcode_t *op, const(char)* msg = null) {
-	printf("%16llx  ", op.address);
-	if (msg)
+	// Print address
+	printf("%12llx ", op.address);
+	
+	// If opcode is empty, somehow, print message if available
+	if (op.size == 0) {
+		puts(msg ? msg : "empty");
+		return;
+	}
+	
+	// Format machine bytes
+	enum MBFSZ = (16 * 3) + 2;
+	char[MBFSZ] machine = void;
+	int left = MBFSZ;
+	int tl;
+	for (size_t bi; bi < op.size; ++bi) {
+		int l = snprintf(machine.ptr + tl, left, " %02x", op.machine[bi]);
+		if (l <= 0) break;
+		tl += l;
+		left -= l;
+	}
+	machine[tl] = 0;
+	
+	// Print machine bytes string
+	printf(" %*s ", -24, machine.ptr);
+	
+	if (msg) {
 		puts(msg);
-	else
-		printf("%s\t%s\n", op.mnemonic, op.operands);
+		return;
+	}
+	
+	printf("%*s %s\n", -10, op.mnemonic, op.operands);
 }
 
 void print_u8(const(char)* name, ubyte val, const(char) *meaning = null) {

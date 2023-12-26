@@ -16,6 +16,7 @@ import adbg.platform;
 import adbg.v2.debugger.process : adbg_process_t;
 import adbg.v2.object.machines : AdbgMachine, adbg_object_machine_alias;
 import adbg.v2.debugger.exception : adbg_exception_t;
+import core.stdc.string : memcpy;
 
 //TODO: Capstone CS_MODE_BIG_ENDIAN
 //      Depending on target endianness, Capstone may need this bit
@@ -97,6 +98,7 @@ struct adbg_disassembler_t {
 struct adbg_opcode_t {
 	ulong address;	/// Base instruction address.
 	int size;	/// Instruction size in Bytes.
+	ubyte[16] machine;	/// Machine bytes.
 	const(char) *mnemonic;	/// Instruction mnemonic.
 	const(char) *operands;	/// Instruction operands.
 }
@@ -225,6 +227,11 @@ int adbg_dasm_open(adbg_disassembler_t *dasm,
 	if (dasm.cs_inst == null)
 		return adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
 	
+	dasm.decoded_count =
+	dasm.address_base =
+	dasm.buffer_size = 0;
+	dasm.buffer = null;
+	
 	dasm.magic = ADBG_DASM_MAGIC;
 	return 0;
 }
@@ -250,7 +257,7 @@ void adbg_dasm_close(adbg_disassembler_t *dasm) {
 	if (dasm.cs_inst)
 		cs_free(dasm.cs_inst, 1);
 	cs_close(&dasm.cs_handle);
-	//free(dasm); Uncomment when _open mallocs
+	//free(dasm); Uncomment when _open uses mallocs
 }
 
 /// Configure an option to the disassembler.
@@ -353,6 +360,13 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 		if (cs_errno(dasm.cs_handle) != CS_ERR_OK)
 			return adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
 		
+		// NOTE: Can't reliably check buffer_size left.
+		
+		// Can't decode instruction but no errors happened?
+		// If there were no other instructions decoded, must be illegal
+		if (dasm.decoded_count == 0)
+			return adbg_oops(AdbgError.illegalInstruction);
+		
 		return adbg_oops(AdbgError.outOfData);
 	}
 	
@@ -362,6 +376,7 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	opcode.size = dasm.cs_inst.size;
 	opcode.mnemonic = cs_insn_name(dasm.cs_handle, dasm.cs_inst.id);
 	opcode.operands = dasm.cs_inst.op_str.ptr;
+	memcpy(opcode.machine.ptr, dasm.buffer, opcode.size);
 	return 0;
 }
 
@@ -372,7 +387,8 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 ///   data = Pointer to user buffer.
 ///   size = Size of user buffer.
 /// Returns: Error code.
-int adbg_dasm_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, void *data, size_t size) {
-	int e = adbg_dasm_start(dasm, data, size);
+int adbg_dasm_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, void *data, size_t size,
+	ulong base_address = 0) {
+	int e = adbg_dasm_start(dasm, data, size, base_address);
 	return e ? e : adbg_dasm(dasm, opcode);
 }
