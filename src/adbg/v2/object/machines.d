@@ -47,6 +47,9 @@ enum AdbgMachine {
 	arm,
 	/// Arm A64
 	aarch64,
+	/// Compiled-Hybrid Portable Executable,
+	/// a Microsoft extension
+	arm64x,
 	
 	/// IBM ROMP
 	romp,
@@ -277,6 +280,11 @@ enum AdbgMachine {
 	/// NEC V850
 	v850,
 	
+	/// LoonArch32
+	loongarch32,
+	/// LoonArch64
+	loongarch64,
+	
 	/// SHARC
 	sharc,
 	
@@ -485,6 +493,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.thumb32, "thumb32", "t32", "ARM Thumb-2 32-bit" },
 	{ AdbgMachine.arm,     "arm", "arm32", "ARM 32-bit" },
 	{ AdbgMachine.aarch64, "aarch64", "arm64", "ARM 64-bit" },
+	{ AdbgMachine.arm64x,  "arm64ec", "arm64x", "ARM64EC" },
 	
 	// IBM
 	{ AdbgMachine.romp,   "romp", null, "IBM ROMP" },
@@ -631,6 +640,10 @@ immutable adbg_machine_t[] machines = [
 	// NEC
 	{ AdbgMachine.v800, "v800", null, "NEC V800" },
 	{ AdbgMachine.v850, "v850", null, "NEC V850" },
+	
+	// Loongson
+	{ AdbgMachine.loongarch32, "loongarch32", null, "LoongArch32" },
+	{ AdbgMachine.loongarch64, "loongarch64", null, "LoongArch64" },
 	
 	// Analog Devices
 	{ AdbgMachine.sharc, "sharc", null, "SHARC 32-bit" },

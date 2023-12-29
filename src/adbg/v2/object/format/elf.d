@@ -110,6 +110,7 @@ enum ELF_ET_HIPROC	= 0xFFFF;	/// Processor-specific
 // ELF Machine values
 // FatELF also uses this
 
+// GDB has the full list of machines under include/elf/common.h
 enum ELF_EM_NONE	= 0;	/// No machine
 enum ELF_EM_M32	= 1;	/// AT&T WE 32100
 enum ELF_EM_SPARC	= 2;	/// SPARC
@@ -291,7 +292,8 @@ enum ELF_EM_VISIUM	= 221;	/// VISIUMcore
 enum ELF_EM_FT32	= 222;	/// FTDI Chip FT32 RISC (32-bit)
 enum ELF_EM_MOXIE	= 223;	/// Moxie
 enum ELF_EM_AMDGPU	= 224;	/// AMD GPU
-enum ELF_EM_RISCV	= 225;	/// RISC-V
+enum ELF_EM_RISCV	= 243;	/// RISC-V
+enum ELF_EM_LOONGARCH	= 258;	/// LoongArch
 
 //
 // ehdr e_flags
@@ -911,8 +913,8 @@ Elf64_Shdr* adbg_object_elf_shdr64(adbg_object_t *o, size_t index) {
 	return shdr;
 }
 
-AdbgMachine adbg_object_elf_machine(ushort machine) {
-	// NOTE: Intel reserved values are excluded
+AdbgMachine adbg_object_elf_machine(ushort machine, ubyte class_) {
+	// NOTE: Many reserved values are excluded
 	switch (machine) {
 	case ELF_EM_M32:	return AdbgMachine.we32100;
 	case ELF_EM_SPARC:	return AdbgMachine.sparc;
@@ -1090,6 +1092,13 @@ AdbgMachine adbg_object_elf_machine(ushort machine) {
 	case ELF_EM_MOXIE:	return AdbgMachine.moxie;
 	case ELF_EM_AMDGPU:	return AdbgMachine.amdgpu;
 	case ELF_EM_RISCV:	return AdbgMachine.riscv;
+	case ELF_EM_LOONGARCH:
+		switch (class_) {
+		case ELF_CLASS_32: return AdbgMachine.loongarch32;
+		case ELF_CLASS_64: return AdbgMachine.loongarch64;
+		default:
+		}
+		goto default;
 	default:	return AdbgMachine.unknown;
 	}
 }
@@ -1354,6 +1363,7 @@ const(char) *adbg_object_elf_em_string(ushort machine) {
 	case ELF_EM_MOXIE:	return "Moxie";
 	case ELF_EM_AMDGPU:	return "AMD GPU";
 	case ELF_EM_RISCV:	return "RISC-V";
+	case ELF_EM_LOONGARCH:	return "LoongArch";
 	default:	return null;
 	}
 }
