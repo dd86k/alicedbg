@@ -8,6 +8,7 @@
 /// - Microsoft Corporation, Microsoft Portable Executable and Common Object File Format Specification, Revision 6.0 - February 1999
 /// - Microsoft Corporation, Microsoft Portable Executable and Common Object File Format Specification, Revision 8.3 – February 6, 2013
 /// - Microsoft Corporation, PE Format, 2019-08-26
+/// - https://github.com/Microsoft/microsoft-pdb/
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -21,8 +22,16 @@ import adbg.v2.object.server : AdbgObject, adbg_object_t, adbg_object_ptrbnds;
 import adbg.v2.object.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit;
+import core.sys.windows.winnt; // For base types
 
 // NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
+// NOTE: Base types
+//
+//       This is an old module so the type usage is quite inconsistent.
+//
+//       Most types don't cause any issues, even for ULONG, although
+//       typedef'd as unsigned long, while it should be aliased as
+//       c_ulong, it is defined as uint. Let's hope that doesn't change!
 
 //TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
 //TODO: Function to check RVA bounds (within file_size)
@@ -51,6 +60,8 @@ enum : ushort { // PE_HEADER.Machine, likely all little-endian
 	PE_MACHINE_EBC	= 0xebc,	/// EFI Byte-Code
 	PE_MACHINE_I386	= 0x14c,	/// x86
 	PE_MACHINE_IA64	= 0x200,	/// Itanium
+	PE_MACHINE_LOONGARCH32	= 0x6232,	/// LoongArch32
+	PE_MACHINE_LOONGARCH64	= 0x6264,	/// LoongArch64
 	PE_MACHINE_M32R	= 0x9041,	/// Mitsubishi M32R LSB
 	PE_MACHINE_MIPS16	= 0x266,	/// 
 	PE_MACHINE_MIPSFPU	= 0x366,	/// 
@@ -69,6 +80,7 @@ enum : ushort { // PE_HEADER.Machine, likely all little-endian
 	PE_MACHINE_SH5	= 0x1a8,	/// SuperH 5
 	PE_MACHINE_THUMB	= 0x1c2,	/// arm_t32
 	PE_MACHINE_WCEMIPSV2	= 0x169,	/// MIPS WCE
+	PE_MACHINE_CHPE_X86	= 0x3a64,	/// ARM64X, source: SystemInformer
 	// https://en.wikibooks.org/wiki/X86_Disassembly/Windows_Executable_Files
 	PE_MACHINE_CLR	= 0xC0EE,	/// Pure MSIL. aka COM+ EE?
 }
@@ -418,6 +430,9 @@ enum : uint {
 	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV700	= CHAR32!"RSDS", /// PDB 7.0 / CodeView 7.0
 	// Mono source has it set as 0x4244504d
 	PE_IMAGE_DEBUG_MAGIC_EMBEDDED_PPDB	= CHAR32!"MPDB", /// Portable PDB
+	// Source: SystemInformer, except for full names
+	PE_IMAGE_DEBUG_MAGIC_POGO_LTCG	= CHAR32!"LTCG",  /// Link-Time Code Generation
+	PE_IMAGE_DEBUG_MAGIC_POGO_PGU	= CHAR32!"PGU\0", /// Profile Guided Update (/LTCG:PGUPDATE)
 }
 
 /// CodeView format for PDB 2.0 and above
@@ -452,6 +467,13 @@ struct PE_DEBUG_DATA_EMBEDDED { align(1):
 	uint UncompressedSize;
 	// SizeOfData - 8: PortablePdbImage
 	//                 Portable PDB image compressed using Deflate algorithm
+}
+
+/// POGO Entry containing filename. Should be ending with .PGD (Profile-Guided Database).
+struct PE_DEBUG_POGO_ENTRY {
+	ULONG Rva;
+	ULONG Size;
+	CHAR[1] Name;
 }
 
 /// Declares that the image has an associated PerfMap file containing a table
@@ -1155,6 +1177,8 @@ AdbgMachine adbg_object_pe_machine(ushort machine) {
 	case PE_MACHINE_ARM64:	return AdbgMachine.aarch64;
 	case PE_MACHINE_EBC:	return AdbgMachine.ebc;
 	case PE_MACHINE_IA64:	return AdbgMachine.ia64;
+	case PE_MACHINE_LOONGARCH32:	return AdbgMachine.loongarch32;
+	case PE_MACHINE_LOONGARCH64:	return AdbgMachine.loongarch64;
 	case PE_MACHINE_M32R:	return AdbgMachine.m32r;
 	case PE_MACHINE_MIPS16:	return AdbgMachine.mips16;
 	case PE_MACHINE_MIPSFPU:	return AdbgMachine.mipsfpu;
@@ -1191,6 +1215,8 @@ const(char) *adbg_object_pe_machine_string(ushort machine) {
 	case PE_MACHINE_EBC:	return "EFI Byte Code";
 	case PE_MACHINE_I386:	return "Intel x86";
 	case PE_MACHINE_IA64:	return "Intel Itanium Architecture 64";
+	case PE_MACHINE_LOONGARCH32:	return "LoongArch32";
+	case PE_MACHINE_LOONGARCH64:	return "LoongArch64";
 	case PE_MACHINE_M32R:	return "Mitsubishi M32R";
 	case PE_MACHINE_MIPS16:	return "MIPS16";
 	case PE_MACHINE_MIPSFPU:	return "MIPS I with FPU";

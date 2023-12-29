@@ -642,8 +642,8 @@ void dump_pe_debug(ref Dumper dump, adbg_object_t *o) {
 		print_x32("AddressOfRawData", AddressOfRawData);
 		print_x32("PointerToRawData", PointerToRawData);
 		
-		void *rawdata = o.buffer + PointerToRawData;
-		if (rawdata >= o.buffer + o.file_size) {
+		uint sig = void;
+		if (adbg_object_offsett!uint(o, &sig, PointerToRawData)) {
 			print_string("error", "PointerToRawData out of bounds");
 			return;
 		}
@@ -654,7 +654,6 @@ void dump_pe_debug(ref Dumper dump, adbg_object_t *o) {
 			//      For example, a modern D program use 0.0
 			//      Probably meaningless
 			
-			uint sig = *cast(uint*)rawdata;
 			switch (sig) {
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV410: // PDB 2.0+ / CodeView 4.10
 				print_x32("Signature", sig, "PDB 2.0+ / CodeView 4.10");
@@ -665,16 +664,22 @@ void dump_pe_debug(ref Dumper dump, adbg_object_t *o) {
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV500: // PDB 2.0+ / CodeView 5.0
 				print_x32("Signature", sig, "PDB 2.0+ / CodeView 5.0");
 L_DEBUG_PDB20:
-				PE_DEBUG_DATA_CODEVIEW_PDB20* pdb =
-					cast(PE_DEBUG_DATA_CODEVIEW_PDB20*)rawdata;
+				PE_DEBUG_DATA_CODEVIEW_PDB20* pdb = void;
+				if (adbg_object_offsetl(o, cast(void**)&pdb,
+					PointerToRawData, PE_DEBUG_DATA_CODEVIEW_PDB20.sizeof)) {
+					print_string("error", "PE_DEBUG_DATA_CODEVIEW_PDB20 out of bounds");
+				}
 				print_x32("Offset", pdb.Offset);
 				print_x32("Timestamp", pdb.Timestamp);
 				print_u32("Age", pdb.Age);
 				print_stringl("Path", pdb.Path.ptr, 256);
 				break;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV700: // PDB 7.0 / CodeView 7.0
-				PE_DEBUG_DATA_CODEVIEW_PDB70* pdb =
-					cast(PE_DEBUG_DATA_CODEVIEW_PDB70*)rawdata;
+				PE_DEBUG_DATA_CODEVIEW_PDB70* pdb = void;
+				if (adbg_object_offsetl(o, cast(void**)&pdb,
+					PointerToRawData, PE_DEBUG_DATA_CODEVIEW_PDB70.sizeof)) {
+					print_string("error", "PE_DEBUG_DATA_CODEVIEW_PDB70 out of bounds");
+				}
 				char[UID_TEXTLEN] guid = void;
 				uid_text(pdb.Guid, guid, UID_GUID);
 				print_x32("Signature", sig, "PDB 7.0 / CodeView 7.0");
@@ -683,7 +688,7 @@ L_DEBUG_PDB20:
 				print_stringl("Path", pdb.Path.ptr, 256);
 				break;
 			case PE_IMAGE_DEBUG_MAGIC_EMBEDDED_PPDB: // Portable PDB
-				//NOTE: major_version >= 0x100 && minor_version == 0x100
+				// NOTE: major_version >= 0x100 && minor_version == 0x100
 				print_x32("Signature", sig, "Portable PDB");
 				break;
 			default:
@@ -699,6 +704,31 @@ L_DEBUG_PDB20:
 			break;
 		case PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:
 			// TODO: PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS
+			break;
+		case PE_IMAGE_DEBUG_TYPE_POGO:
+			const(char) *pgotypestr = void;
+			switch (sig) {
+			case PE_IMAGE_DEBUG_MAGIC_POGO_LTCG:
+				pgotypestr = "POGO LTCG (Link-Time Code Generation)";
+				break;
+			case PE_IMAGE_DEBUG_MAGIC_POGO_PGU:
+				pgotypestr = "POGO PGU (Profile Guided Update)";
+				break;
+			default:
+				pgotypestr = "POGO (Unknown)";
+			}
+			print_x32("Signature", sig, pgotypestr);
+			
+			PE_DEBUG_POGO_ENTRY* pogoentry = void;
+			if (adbg_object_offsetl(o, cast(void**)&pogoentry,
+				PointerToRawData + 4, PE_DEBUG_POGO_ENTRY.sizeof + 256)) { // Guess
+				print_string("error", "PE_DEBUG_POGO_ENTRY out of bounds");
+			}
+			
+			//TODO: Check if there are multiple entries
+			print_x32("RVA", pogoentry.Rva);
+			print_x32("Size", pogoentry.Size);
+			print_stringl("Size", pogoentry.Name.ptr, 256); // Guess
 			break;
 		default:
 		}

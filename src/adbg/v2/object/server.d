@@ -25,6 +25,11 @@ import adbg.v2.debugger.memory : adbg_memory_map_t, adbg_memory_read;
 
 extern (C):
 
+// NOTE: Function names
+//       At best, prefer adbg_object_OBJECT_xyz where OBJECT is the type
+//       (e.g., pe, elf, etc.) to make things consistent. This is why
+//       auxiliary names are simply "adbg_object_offset", for example.
+
 //TODO: Object type and format enums
 //      Either:
 //      - extent formats to include everyting else, have functions to say type (_is_dump)
@@ -230,6 +235,7 @@ struct adbg_object_t {
 
 // Internal: Check if pointer is within file boundaries
 package
+deprecated("Use adbg_object_outbounds")
 bool adbg_object_ptrbnds(adbg_object_t *o, void *ptr) {
 	return ptr >= o.buffer && ptr < o.buffer + o.file_size;
 }
@@ -238,6 +244,7 @@ bool adbg_object_ptrbnds(adbg_object_t *o, void *ptr) {
 /// 	o = Object instance.
 /// 	pos = File offset.
 /// Returns: True if in bounds.
+deprecated("Use adbg_object_outbounds")
 bool adbg_object_offbnds(adbg_object_t *o, ulong off) {
 	return off < o.file_size;
 }
@@ -247,8 +254,86 @@ bool adbg_object_offbnds(adbg_object_t *o, ulong off) {
 /// 	pos = File offset.
 /// 	size = Data size.
 /// Returns: True if in bounds.
+deprecated("Use adbg_object_outbounds")
 bool adbg_object_offbnds2(adbg_object_t *o, ulong off, size_t size) {
 	return off + size < o.file_size;
+}
+
+/// Check if pointer is outside the object bounds.
+/// Params:
+/// 	o = Object instance.
+/// 	ptr = Pointer.
+/// Returns: True if outside bounds.
+bool adbg_object_outboundp(adbg_object_t *o, void *ptr) {
+	return ptr < o.buffer || ptr >= o.buffer + o.file_size;
+}
+/// Check if pointer with length is outside the object bounds.
+/// Params:
+/// 	o = Object instance.
+/// 	ptr = Pointer.
+/// 	length = Length.
+/// Returns: True if outside bounds.
+bool adbg_object_outboundpl(adbg_object_t *o, void *ptr, size_t length) {
+	return ptr < o.buffer || ptr + length >= o.buffer + o.file_size;
+}
+
+/// Check if offset is within file boundaries
+/// Params:
+/// 	o = Object instance.
+/// 	pos = File offset.
+/// Returns: True if in bounds.
+bool adbg_object_outbound(adbg_object_t *o, ulong off) {
+	return off >= o.file_size;
+}
+/// Check if offset with size is within file boundaries
+/// Params:
+/// 	o = Object instance.
+/// 	pos = File offset.
+/// 	size = Data size.
+/// Returns: True if in bounds.
+bool adbg_object_outboundl(adbg_object_t *o, ulong off, size_t size) {
+	return off + size >= o.file_size;
+}
+
+/// Get pointer from offset.
+/// Params:
+/// 	o = Object instance.
+/// 	dst = Destination pointer.
+/// 	offset = File offset.
+/// Returns: True if outside bounds.
+bool adbg_object_offset(adbg_object_t *o, void** dst, ulong offset) {
+	if (dst == null) return true;
+	if (adbg_object_outbound(o, offset)) return true;
+	*dst = o.buffer + offset;
+	return false;
+}
+/// Get pointer from offset with length.
+/// Params:
+/// 	o = Object instance.
+/// 	dst = Destination pointer.
+/// 	offset = File offset.
+/// 	length = Length request.
+/// Returns: True if outside bounds.
+bool adbg_object_offsetl(adbg_object_t *o, void** dst, ulong offset, size_t length) {
+	if (dst == null) return true;
+	if (adbg_object_outboundl(o, offset, length)) return true;
+	*dst = o.buffer + offset;
+	return false;
+}
+/// Template helper to get pointer from offset with length automatically.
+/// Params:
+/// 	o = Object instance.
+/// 	dst = Destination pointer.
+/// 	offset = File offset.
+/// Returns: True if outside bounds.
+bool adbg_object_offsett(T)(adbg_object_t *o, T* dst, ulong offset) {
+	if (dst == null) return true;
+	if (adbg_object_outboundl(o, offset, T.sizeof)) return true;
+	static if (T.sizeof <= ulong.sizeof)
+		*dst = *cast(T*)(o.buffer + offset);
+	else
+		static assert(0, "adbg_object_offsett memcpy TODO");
+	return false;
 }
 
 /// Load an object from disk into memory.
@@ -363,13 +448,13 @@ void adbg_object_close(adbg_object_t *o) {
 		free(o);
 }
 
-/// Read raw data from object.
-/// Params:
-/// 	o = Object instance.
-/// 	buffer = Buffer pointer.
-/// 	rsize = Size to read.
-/// Returns: Error code.
-int adbg_object_read(adbg_object_t *o, ulong location, void *buffer, size_t rsize) {
+// Read raw data from object.
+// Params:
+// 	o = Object instance.
+// 	buffer = Buffer pointer.
+// 	rsize = Size to read.
+// Returns: Error code.
+/+int adbg_object_read(adbg_object_t *o, ulong location, void *buffer, size_t rsize) {
 	if (rsize == 0)
 		return 0;
 	if (o == null || buffer == null) {
@@ -394,7 +479,7 @@ int adbg_object_read(adbg_object_t *o, ulong location, void *buffer, size_t rsiz
 	}
 	
 	return adbg_oops(AdbgError.unimplemented);
-}
+}+/
 
 // Object detection and loading
 private
@@ -529,7 +614,9 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	case mz:	return AdbgMachine.i8086;
 	case pe:	return adbg_object_pe_machine(o.i.pe.header.Machine);
 	case macho:	return adbg_object_macho_machine(o.i.macho.header.cputype);
-	case elf:	return adbg_object_elf_machine(o.i.elf32.ehdr.e_machine);
+	case elf:
+		with (o.i.elf32.ehdr)
+		return adbg_object_elf_machine(e_machine, e_ident[ELF_EI_CLASS]);
 	default:	return AdbgMachine.unknown;
 	}
 }
