@@ -24,6 +24,7 @@ import adbg.platform, adbg.error;
 import adbg.utils.strings : adbg_util_argv_flatten;
 import adbg.v2.debugger.exception : adbg_exception_t, adbg_exception_translate;
 import adbg.v2.debugger.breakpoint : adbg_breakpoint_t;
+import adbg.v2.object.machines;
 
 version (Windows) {
 	import core.sys.windows.windows;
@@ -830,11 +831,28 @@ int adbg_stepi(adbg_process_t *tracee) {
 /// Get the debugged process' ID.
 ///
 /// This is valid regardless if process was attached or not.
-/// Params: tracee = Debugged process.
+/// Params: tracee = Debuggee process.
 /// Returns: Error code.
 int adbg_process_get_pid(adbg_process_t *tracee) {
 	if (tracee == null) return 0;
 	return tracee.pid;
+}
+
+/// Get the current runtime machine platform.
+///
+/// This is useful when the debugger is dealing with a process running
+/// under a subsystem such as WoW or lib32-on-linux64 programs.
+/// Params: tracee = Debuggee process.
+/// Returns: Machine platform.
+AdbgMachine adbg_process_machine(adbg_process_t *tracee) {
+	AdbgMachine mach;
+	
+	if (tracee == null) return mach;
+	
+	version (Win64) version (X86_64) // Windows + x86-64
+		mach = tracee.wow64 ? AdbgMachine.x86 : AdbgMachine.amd64;
+	
+	return mach;
 }
 
 /*const(char)[] adbg_process_get_basename(adbg_process_t *tracee) {
@@ -891,11 +909,9 @@ int adbg_process_enumerate(adbg_process_list_t *list, ...) {
 	/// Default fixed buffer size.
 	enum PROC_BUFFER_COUNT = 1000;
 	
-	uint procbufsz = PROC_BUFFER_COUNT;
-	
 	va_list options = void;
 	va_start(options, list);
-	
+	uint procbufsz = PROC_BUFFER_COUNT;
 L_OPTION:
 	switch (va_arg!int(options)) {
 	case 0: break;
