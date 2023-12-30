@@ -22,16 +22,8 @@ import adbg.v2.object.server : AdbgObject, adbg_object_t, adbg_object_ptrbnds;
 import adbg.v2.object.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit;
-import core.sys.windows.winnt; // For base types
 
-// NOTE: FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
-// NOTE: Base types
-//
-//       This is an old module so the type usage is quite inconsistent.
-//
-//       Most types don't cause any issues, even for ULONG, although
-//       typedef'd as unsigned long, while it should be aliased as
-//       c_ulong, it is defined as uint. Let's hope that doesn't change!
+// NOTE: Avoid the Windows base types as they are not defined outside version (Windows)
 
 //TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
 //TODO: Function to check RVA bounds (within file_size)
@@ -471,9 +463,9 @@ struct PE_DEBUG_DATA_EMBEDDED { align(1):
 
 /// POGO Entry containing filename. Should be ending with .PGD (Profile-Guided Database).
 struct PE_DEBUG_POGO_ENTRY {
-	ULONG Rva;
-	ULONG Size;
-	CHAR[1] Name;
+	uint Rva;
+	uint Size;
+	char[1] Name;
 }
 
 /// Declares that the image has an associated PerfMap file containing a table
@@ -857,6 +849,9 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	
 	return 0;
 }
+
+//TODO: Calculate VA function
+//      FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
 
 PE_HEADER* adbg_object_pe_header(adbg_object_t *o) {
 	if (o == null) return null;
