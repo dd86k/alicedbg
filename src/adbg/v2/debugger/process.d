@@ -838,13 +838,27 @@ int adbg_process_get_pid(adbg_process_t *tracee) {
 	return tracee.pid;
 }
 
+/+int adbg_process_get_basename(adbg_process_t *tracee, char *buffer, size_t bufsize) {
+	if (tracee == null)
+		return adbg_oops(AdbgError.nullArgument);
+	
+	version (Windows) {
+		if (GetModuleBaseNameA(tracee.hpid, null, buffer, bufsize))
+			return adbg_oops(AdbgError.os);
+	} else version (linux) {
+		
+	}
+	
+	return 0;
+}+/
+
 /// Get the current runtime machine platform.
 ///
 /// This is useful when the debugger is dealing with a process running
 /// under a subsystem such as WoW or lib32-on-linux64 programs.
 /// Params: tracee = Debuggee process.
 /// Returns: Machine platform.
-AdbgMachine adbg_process_machine(adbg_process_t *tracee) {
+AdbgMachine adbg_process_get_machine(adbg_process_t *tracee) {
 	AdbgMachine mach;
 	
 	if (tracee == null) return mach;
@@ -854,11 +868,6 @@ AdbgMachine adbg_process_machine(adbg_process_t *tracee) {
 	
 	return mach;
 }
-
-/*const(char)[] adbg_process_get_basename(adbg_process_t *tracee) {
-	if (tracee == null) return null;
-	return null;
-}*/
 
 /// Options for adbg_process_enumerate.
 enum AdbgProcessEnumerateOption {

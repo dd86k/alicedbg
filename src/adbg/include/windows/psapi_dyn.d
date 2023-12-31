@@ -95,6 +95,18 @@ __gshared
     pEnumPageFilesA EnumPageFilesA;
 }
 
+union PSAPI_WORKING_SET_EX_BLOCK
+{
+    ULONG_PTR Flags;
+    // Too lazy to put in flags, don't need them
+}
+
+struct PSAPI_WORKING_SET_EX_INFORMATION
+{
+    PVOID VirtualAddress;
+    PSAPI_WORKING_SET_EX_BLOCK VirtualAttributes;
+}
+
 private __gshared bool __dynlib_psapi_loaded;
 
 version (Trace) import adbg.error;

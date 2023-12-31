@@ -94,7 +94,7 @@ int shell_loop() {
 			return oops;
 		puts("Process created.");
 	
-		if (adbg_dasm_open_proccess(&dasm, &process)) {
+		if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
 			dasm_available = false;
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
@@ -106,7 +106,7 @@ int shell_loop() {
 	
 	term_init;
 
-LOOP:
+LINPUT:
 	printf("(adbg) "); // print prompt
 	char* line = term_readline(null); // read line
 	
@@ -119,7 +119,7 @@ LOOP:
 	int error = shell_exec(line); // execute line
 	if (error)
 		printf("error: %s\n", errorstring(cast(ShellError)error));
-	goto LOOP;
+	goto LINPUT;
 }
 
 int shell_exec(const(char) *command) {
@@ -145,15 +145,19 @@ int shell_execv(int argc, const(char) **argv) {
 }
 
 private:
+__gshared:
 
-__gshared adbg_process_t process;
-__gshared adbg_disassembler_t dasm;
+//TODO: Make debugger return process pointer
+adbg_process_t process;
+//TODO: Make disassembler return instance pointer
+adbg_disassembler_t dasm;
 
-__gshared bool dasm_available;
-__gshared const(char) *last_spawn;
-__gshared const(char) **last_spawn_argv;
+//TODO: Rely on disassembler pointer instead
+bool dasm_available;
+const(char) *last_spawn;
+const(char) **last_spawn_argv;
 
-__gshared void function(const(char)* sev, const(char)* msg) userlog;
+void function(const(char)* sev, const(char)* msg) userlog;
 
 //TODO: Shell logging
 void serror(const(char) *fmt, ...) {
@@ -472,7 +476,7 @@ immutable command_t[] commands_list = [
 ];
 
 immutable(command_t)* shell_findcommand(const(char) *ucommand) {
-	bool aonly = ucommand[1] == 0; /// Alias-only
+	bool aonly = ucommand[1] == 0; /// One character: alias-only
 	
 	// NOTE: Can't use foreach for local var escape
 	for (size_t i; i < commands_list.length; ++i) {
@@ -486,25 +490,34 @@ immutable(command_t)* shell_findcommand(const(char) *ucommand) {
 	return null;
 }
 
-void shell_event_disassemble(size_t address, int count = 1) {
+void shell_event_disassemble(size_t address, int count = 1, bool showAddress = true) {
 	if (dasm_available == false)
 		return;
 	
 	for (int i; i < count; ++i) {
-		enum BUFSIZE = 16;
-		ubyte[BUFSIZE] data = void;
-		if (adbg_memory_read(&process, address, data.ptr, BUFSIZE)) {
+		enum RDSZ = 16;
+		ubyte[RDSZ] data = void;
+		if (adbg_memory_read(&process, address, data.ptr, RDSZ)) {
 			oops;
 			return;
 		}
 		adbg_opcode_t op = void;
-		if (adbg_dasm_once(&dasm, &op, data.ptr, BUFSIZE)) {
+		if (adbg_dasm_once(&dasm, &op, data.ptr, RDSZ)) {
 			printf("%8llx (error:%s)\n", cast(ulong)address, adbg_error_msg);
 			return;
 		}
 		
-		printf("%8llx %s", cast(ulong)address, op.mnemonic);
+		// Print address
+		if (showAddress)
+			printf("%8llx ", op.address);
 		
+		// Print machine bytes
+		for (size_t bi; bi < op.size; ++bi) {
+			printf("%02x ", op.machine[bi]);
+		}
+		
+		// Print mnemonic & operands
+		printf("%s", op.mnemonic);
 		if (op.operands)
 			printf(" %s", op.operands);
 		
@@ -521,11 +534,9 @@ void shell_event_exception(adbg_exception_t *ex) {
 		adbg_exception_name(ex), ex.oscode);
 	
 	if (ex.faultz) {
-		// NOTE: size_t stuff on Windows works with %Ix,
-		//       so for now, print full.
 		printf("	Fault address: %llx\n", ex.fault_address);
 		printf("	Faulting instruction: ");
-		shell_event_disassemble(ex.faultz);
+		shell_event_disassemble(ex.faultz, 1, false);
 	}
 }
 
@@ -617,7 +628,7 @@ int command_spawn(int argc, const(char) **argv) {
 		serror("Could not spawn process.");
 		return ShellError.alicedbg;
 	}
-	if (adbg_dasm_open_proccess(&dasm, &process)) {
+	if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
 		dasm_available = false;
 		printf("warning: Disassembler not available (%s)\n",
 			adbg_error_msg());
@@ -625,6 +636,9 @@ int command_spawn(int argc, const(char) **argv) {
 	
 	return 0;
 }
+
+//TODO: int shell_postload(
+//      Load disassembler, etc.
 
 int command_attach(int argc, const(char) **argv) {
 	if (argc < 2) {
@@ -637,7 +651,7 @@ int command_attach(int argc, const(char) **argv) {
 		serror("Could not attach to process.");
 		return ShellError.alicedbg;
 	}
-	if (adbg_dasm_open_proccess(&dasm, &process)) {
+	if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
 		dasm_available = false;
 		printf("warning: Disassembler not available (%s)\n",
 			adbg_error_msg());
@@ -671,7 +685,7 @@ int command_restart(int argc, const(char) **argv) {
 		}
 		if (dasm_available)
 			adbg_dasm_close(&dasm);
-		if (adbg_dasm_open_proccess(&dasm, &process)) {
+		if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
 			dasm_available = false;
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
@@ -690,7 +704,7 @@ int command_restart(int argc, const(char) **argv) {
 		}
 		if (dasm_available)
 			adbg_dasm_close(&dasm);
-		if (adbg_dasm_open_proccess(&dasm, &process)) {
+		if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
 			dasm_available = false;
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
@@ -813,11 +827,19 @@ int command_maps(int argc, const(char) **argv) {
 	if (adbg_memory_maps(&process, &mmaps, &mcount, 0)) {
 		return ShellError.alicedbg;
 	}
+	//    1234567890123456789012345678901234567890
+	puts("Region           Size       Perm File");
 	for (size_t i; i < mcount; ++i) {
 		adbg_memory_map_t *map = &mmaps[i];
-		with (map) printf("%8p %10lld %s\n", base, size, name.ptr);
+		char[4] perms = void;
+		perms[0] = map.access & AdbgMemPerm.read  ? 'r' : '-';
+		perms[1] = map.access & AdbgMemPerm.write ? 'w' : '-';
+		perms[2] = map.access & AdbgMemPerm.exec  ? 'x' : '-';
+		perms[3] = map.access & AdbgMemPerm.private_ ? 'p' : 's';
+		with (map) printf("%16zx %10lld %.4s %s\n",
+			cast(size_t)base, size, perms.ptr, name.ptr);
 	}
-	if (mcount) free(mmaps);
+	free(mmaps);
 	
 	return 0;
 }
