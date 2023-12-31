@@ -218,12 +218,6 @@ L_OPTION:
 		//
 		
 		// NOTE: NtPssCaptureVaSpaceBulk is only available since Windows 10 20H1
-		
-		// 1. NtQueryVirtualMemory + MemoryWorkingSetInformation
-		// 2. VirtualQueryEx
-		
-		// Query required size
-		
 		// NOTE: Putty 0.80 will have around 1095 entries
 		SIZE_T bfsz = MiB!1;
 		MEMORY_WORKING_SET_INFORMATION *mbinfo =
@@ -475,7 +469,6 @@ L_OPTION:
 		
 		version (Trace) trace("finished");
 		*mcount = i;
-		free(procbuf);
 		return 0;
 	} else
 		// FreeBSD: procstat(1) / pmap(9)
