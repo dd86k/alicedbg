@@ -18,7 +18,7 @@ module adbg.v2.object.format.pe;
 import core.stdc.inttypes;
 import core.stdc.stdlib;
 import adbg.error;
-import adbg.v2.object.server : AdbgObject, adbg_object_t, adbg_object_ptrbnds;
+import adbg.v2.object.server;
 import adbg.v2.object.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit;
@@ -692,8 +692,19 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	
 	switch (o.i.pe.opt_header.Magic) {
 	case PE_FMT_32:
+		if (adbg_object_outboundpl(o, o.i.pe.opt_header, PE_OPTIONAL_HEADER.sizeof))
+			return adbg_oops(AdbgError.assertion);
+		
 		o.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR32);
+		
+		if (adbg_object_outboundpl(o, o.i.pe.directory, PE_IMAGE_DATA_DIRECTORY.sizeof))
+			return adbg_oops(AdbgError.assertion);
+		
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR32);
+		
+		if (adbg_object_outboundpl(o, o.i.pe.sections,
+			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
+			return adbg_oops(AdbgError.assertion);
 		
 		if (o.p.reversed) {
 			PE_OPTIONAL_HEADER *hdr = o.i.pe.opt_header;
@@ -727,8 +738,19 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		}
 		break;
 	case PE_FMT_64:
+		if (adbg_object_outboundpl(o, o.i.pe.opt_header, PE_OPTIONAL_HEADER64.sizeof))
+			return adbg_oops(AdbgError.assertion);
+		
 		o.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR64);
+		
+		if (adbg_object_outboundpl(o, o.i.pe.directory, PE_IMAGE_DATA_DIRECTORY.sizeof))
+			return adbg_oops(AdbgError.assertion);
+		
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR64);
+		
+		if (adbg_object_outboundpl(o, o.i.pe.sections,
+			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
+			return adbg_oops(AdbgError.assertion);
 		
 		if (o.p.reversed) {
 			PE_OPTIONAL_HEADER64 *hdr = o.i.pe.opt_header64;
@@ -763,6 +785,10 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	case PE_FMT_ROM: // NOTE: ROM have no optional header and directories
 		o.i.pe.directory = null;
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDRROM);
+		
+		if (adbg_object_outboundpl(o, o.i.pe.sections,
+			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
+			return adbg_oops(AdbgError.assertion);
 		
 		if (o.p.reversed) {
 			PE_OPTIONAL_HEADERROM *hdr = o.i.pe.opt_headerrom;
@@ -852,6 +878,29 @@ int adbg_object_pe_load(adbg_object_t *o) {
 
 //TODO: Calculate VA function
 //      FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
+
+// maps rva to section if found
+void* adbg_object_pe_locate(adbg_object_t *o, uint rva) {
+	if (o == null) return null;
+	
+	uint sections = o.i.pe.header.NumberOfSections;
+	for (uint si; si < sections; ++si) {
+		PE_SECTION_ENTRY s = o.i.pe.sections[si];
+		
+		uint va = s.VirtualAddress;
+		
+		version (Trace) trace("va=%x rva=%x", va, rva);
+		
+		if (va > rva || va + s.SizeOfRawData <= rva)
+			continue;
+		
+		void* a = o.buffer + (s.PointerToRawData + (rva - va));
+		return adbg_object_outboundp(o, a) ? null : a;
+	}
+	
+	version (Trace) trace("null");
+	return null;
+}
 
 PE_HEADER* adbg_object_pe_header(adbg_object_t *o) {
 	if (o == null) return null;
@@ -957,7 +1006,7 @@ char* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_
 		- o.i.pe.directory.ExportTable.rva
 		+ export_.Name;
 	
-	if (adbg_object_ptrbnds(o, s) == false) return null;
+	if (adbg_object_outboundp(o, s)) return null;
 	
 	return s;
 }
@@ -978,16 +1027,16 @@ char* adbg_object_pe_export_string_hint(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *
 	// Check bounds with table RVA
 	void *base = cast(void*)o.i.pe.directory_exports
 		- o.i.pe.directory.ExportTable.rva;
-	if (adbg_object_ptrbnds(o, base) == false) return null;
+	if (adbg_object_outboundp(o, base)) return null;
 	
 	// Check bounds with name pointer and requested index
 	//TODO: Check if hint is forwarder
 	uint *hint = cast(uint*)(base + export_.NamePointer) + index;
-	if (adbg_object_ptrbnds(o, hint) == false) return null;
+	if (adbg_object_outboundp(o, hint)) return null;
 	
 	// Check bounds with hint
 	void *name = base + *hint;
-	if (adbg_object_ptrbnds(o, name) == false) return null;
+	if (adbg_object_outboundp(o, name)) return null;
 	
 	return cast(char*)name;
 }
@@ -1025,7 +1074,7 @@ char* adbg_object_pe_import_name(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_
 	
 	char *s = cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva + import_.Name;
 	
-	if (adbg_object_ptrbnds(o, s) == false)
+	if (adbg_object_outboundp(o, s))
 		return null;
 	
 	return s;
@@ -1041,7 +1090,7 @@ PE_IMPORT_LTE32* adbg_object_pe_import_lte32(adbg_object_t *o, PE_IMPORT_DESCRIP
 		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
 		+ index;
 	
-	if (adbg_object_ptrbnds(o, lte32) == false || lte32.ordinal == 0)
+	if (adbg_object_outboundp(o, lte32) || lte32.ordinal == 0)
 		return null;
 	
 	return lte32;
@@ -1053,7 +1102,7 @@ ushort* adbg_object_pe_import_lte32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR 
 	
 	ushort* base = cast(ushort*)
 		((cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva) + im32.rva);
-	if (adbg_object_ptrbnds(o, base) == false)
+	if (adbg_object_outboundp(o, base))
 		return null;
 	
 	return base;
@@ -1069,7 +1118,7 @@ PE_IMPORT_LTE64* adbg_object_pe_import_lte64(adbg_object_t *o, PE_IMPORT_DESCRIP
 	
 	version (Trace) trace("imports=%p lte64=%p fs=%p", o.i.pe.directory_imports, lte64, o.file_size);
 	
-	if (adbg_object_ptrbnds(o, lte64) == false || lte64.ordinal == 0)
+	if (adbg_object_outboundp(o, lte64) || lte64.ordinal == 0)
 		return null;
 	
 	return lte64;
@@ -1084,7 +1133,8 @@ ushort* adbg_object_pe_import_lte64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR 
 	
 	version (Trace) trace("base=%p fs=%p", base, o.file_size);
 	
-	if (adbg_object_ptrbnds(o, base) == false) return null;
+	if (adbg_object_outboundp(o, base))
+		return null;
 	
 	return base;
 }
@@ -1135,29 +1185,6 @@ PE_DEBUG_DIRECTORY* adbg_object_pe_debug_directory(adbg_object_t *o, size_t inde
 		o.i.pe.reversed_dir_debug[index] = true;
 	}
 	return debug_;
-}
-
-// maps rva to section if found
-void* adbg_object_pe_locate(adbg_object_t *o, uint rva) {
-	if (o == null) return null;
-	
-	uint sections = o.i.pe.header.NumberOfSections;
-	for (uint si; si < sections; ++si) {
-		PE_SECTION_ENTRY s = o.i.pe.sections[si];
-		
-		uint va = s.VirtualAddress;
-		
-		version (Trace) trace("va=%x rva=%x", va, rva);
-		
-		if (va > rva || va + s.SizeOfRawData <= rva)
-			continue;
-		
-		void* a = o.buffer + (s.PointerToRawData + (rva - va));
-		return adbg_object_ptrbnds(o, a) ? a : null;
-	}
-	
-	version (Trace) trace("null");
-	return null;
 }
 
 AdbgMachine adbg_object_pe_machine(ushort machine) {

@@ -262,19 +262,21 @@ bool adbg_object_offbnds2(adbg_object_t *o, ulong off, size_t size) {
 /// Check if pointer is outside the object bounds.
 /// Params:
 /// 	o = Object instance.
-/// 	ptr = Pointer.
+/// 	p = Pointer.
 /// Returns: True if outside bounds.
-bool adbg_object_outboundp(adbg_object_t *o, void *ptr) {
-	return ptr < o.buffer || ptr >= o.buffer + o.file_size;
+bool adbg_object_outboundp(adbg_object_t *o, void *p) {
+	version (Trace) trace("p=%zx", cast(size_t)p);
+	return p < o.buffer || p >= o.buffer + o.file_size;
 }
 /// Check if pointer with length is outside the object bounds.
 /// Params:
 /// 	o = Object instance.
-/// 	ptr = Pointer.
-/// 	length = Length.
+/// 	p = Pointer.
+/// 	size = Data size.
 /// Returns: True if outside bounds.
-bool adbg_object_outboundpl(adbg_object_t *o, void *ptr, size_t length) {
-	return ptr < o.buffer || ptr + length >= o.buffer + o.file_size;
+bool adbg_object_outboundpl(adbg_object_t *o, void *p, size_t size) {
+	version (Trace) trace("p=%zx length=%zu", cast(size_t)p, size);
+	return p < o.buffer || p + size >= o.buffer + o.file_size;
 }
 
 /// Check if offset is within file boundaries
@@ -283,6 +285,8 @@ bool adbg_object_outboundpl(adbg_object_t *o, void *ptr, size_t length) {
 /// 	pos = File offset.
 /// Returns: True if in bounds.
 bool adbg_object_outbound(adbg_object_t *o, ulong off) {
+	version (Trace) trace("offset=%llx", off);
+	if (o == null) return true;
 	return off >= o.file_size;
 }
 /// Check if offset with size is within file boundaries
@@ -292,34 +296,47 @@ bool adbg_object_outbound(adbg_object_t *o, ulong off) {
 /// 	size = Data size.
 /// Returns: True if in bounds.
 bool adbg_object_outboundl(adbg_object_t *o, ulong off, size_t size) {
-	return off + size >= o.file_size;
+	version (Trace) trace("offset=%llx length=%zu", off, size);
+	if (o == null) return true;
+	return off + size > o.file_size;
 }
 
 /// Get pointer from offset.
 /// Params:
 /// 	o = Object instance.
-/// 	dst = Destination pointer.
+/// 	p = Destination pointer.
 /// 	offset = File offset.
 /// Returns: True if outside bounds.
-bool adbg_object_offset(adbg_object_t *o, void** dst, ulong offset) {
-	if (dst == null) return true;
+bool adbg_object_offset(adbg_object_t *o, void** p, ulong offset) {
+	version (Trace) trace("p=%zx offset=%llx", cast(size_t)p, offset);
+	if (p == null) return true;
 	if (adbg_object_outbound(o, offset)) return true;
-	*dst = o.buffer + offset;
+	*p = o.buffer + offset;
 	return false;
 }
-/// Get pointer from offset with length.
+/// Get pointer from offset with size.
 /// Params:
 /// 	o = Object instance.
-/// 	dst = Destination pointer.
+/// 	p = Destination pointer.
 /// 	offset = File offset.
-/// 	length = Length request.
+/// 	size = Data size.
 /// Returns: True if outside bounds.
-bool adbg_object_offsetl(adbg_object_t *o, void** dst, ulong offset, size_t length) {
-	if (dst == null) return true;
-	if (adbg_object_outboundl(o, offset, length)) return true;
-	*dst = o.buffer + offset;
+bool adbg_object_offsetl(adbg_object_t *o, void** p, ulong offset, size_t size) {
+	version (Trace) trace("p=%zx offset=%llx length=%zu", cast(size_t)p, offset, size);
+	if (p == null) return true;
+	if (adbg_object_outboundl(o, offset, size)) return true;
+	*p = o.buffer + offset;
 	return false;
 }
+unittest {
+	adbg_object_t o = void;
+	o.buffer = cast(void*)0x10;
+	o.file_size = 10_000;
+	void *p;
+	assert(adbg_object_offsetl(&o, &p, 0x10, 100) == false);
+	assert(cast(size_t)p == 0x20);
+}
+
 /// Template helper to get pointer from offset with length automatically.
 /// Params:
 /// 	o = Object instance.
@@ -367,6 +384,8 @@ int adbg_object_open(adbg_object_t *o, const(char) *path, ...) {
 ///   ... = Options. Terminated with 0.
 /// Returns: Object instance, or null on error.
 adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
+	version (Trace) trace("path=%s", path);
+	
 	adbg_object_t *o = cast(adbg_object_t*)malloc(adbg_object_t.sizeof);
 	if (o == null) {
 		adbg_oops(AdbgError.crt);
@@ -392,10 +411,10 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 	return o;
 }
 
-adbg_object_t* adbg_object_open_process(adbg_process_t *proc) {
+/*adbg_object_t* adbg_object_open_process(adbg_process_t *proc) {
 	adbg_oops(AdbgError.unimplemented);
 	return null;
-}
+}*/
 
 /// Close object instance.
 void adbg_object_close(adbg_object_t *o) {
@@ -512,6 +531,7 @@ L_ARG:
 		return adbg_oops(AdbgError.crt);
 	if (fseek(o.file_handle, 0, SEEK_SET))
 		return adbg_oops(AdbgError.crt);
+	version (Trace) trace("filesize=%llu", o.file_size);
 	
 	//TODO: Determine absolute minimum before proceeding
 	

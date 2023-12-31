@@ -227,8 +227,9 @@ int adbg_error_system() {
 /// 	m = Automatically set to `__MODULE__`
 /// 	l = Automatically set to `__LINE__`
 /// Returns: Error code
-int adbg_oops(AdbgError e, void *res = null, string m = __MODULE__, int l = __LINE__) {
-	version (Trace) trace("code=%d res=%p", e, res);
+int adbg_oops(AdbgError e, void *res = null,
+	string m = __MODULE__, int l = __LINE__, const(char)* f = __FUNCTION__.ptr) {
+	version (Trace) trace("code=%d res=%p caller=%s", e, res, f);
 	error.mod = m.ptr;
 	error.line = l;
 	error.res = res;

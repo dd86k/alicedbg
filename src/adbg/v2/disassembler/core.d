@@ -62,10 +62,11 @@ version (X86) { // CS_OPT_SYNTAX_DEFAULT
 	static assert(0, "Set DEFAULT_PLATFORM and DEFAULT_SYNTAX");
 }
 
+/// Maximum instruction size.
+enum MAX_INSTR_SIZE = 16;
+
 private {
 	enum ADBG_DASM_MAGIC = 0xcafebabe;
-	/// Maximum instruction size.
-	enum MAXINSZ = 16;
 }
 
 extern (C):
@@ -117,7 +118,7 @@ struct adbg_disassembler_t {
 struct adbg_opcode_t {
 	ulong address;	/// Base instruction address.
 	int size;	/// Instruction size in Bytes.
-	ubyte[MAXINSZ] machine;	/// Machine bytes.
+	ubyte[MAX_INSTR_SIZE] machine;	/// Machine bytes.
 	const(char) *mnemonic;	/// Instruction mnemonic.
 	const(char) *operands;	/// Instruction operands.
 }
@@ -452,11 +453,11 @@ int adbg_dasm_process(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	if (dasm == null || opcode == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
-	if (adbg_memory_read(dasm.process, dasm.address_base, opcode.machine.ptr, MAXINSZ))
+	if (adbg_memory_read(dasm.process, dasm.address_base, opcode.machine.ptr, MAX_INSTR_SIZE))
 		return adbg_errno;
 	
 	dasm.buffer = opcode.machine.ptr;
-	dasm.buffer_size = MAXINSZ;
+	dasm.buffer_size = MAX_INSTR_SIZE;
 	
 	return adbg_dasm(dasm, opcode);
 }
@@ -472,9 +473,9 @@ int adbg_dasm_process_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, adb
 	if (dasm == null || tracee == null || opcode == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
-	if (adbg_memory_read(tracee, address, opcode.machine.ptr, MAXINSZ))
+	if (adbg_memory_read(tracee, address, opcode.machine.ptr, MAX_INSTR_SIZE))
 		return adbg_errno;
-	if (adbg_dasm_once(dasm, opcode, opcode.machine.ptr, MAXINSZ))
+	if (adbg_dasm_once(dasm, opcode, opcode.machine.ptr, MAX_INSTR_SIZE))
 		return adbg_errno;
 	return 0;
 }
