@@ -140,8 +140,9 @@ enum AdbgMemPerm : ushort {
 }
 
 private enum MEM_MAP_NAME_LEN = 512;
-/// Represents a mapped memory region
+/// Represents a mapped memory region.
 struct adbg_memory_map_t {
+	//TODO: type (file, free, commited, etc.)
 	/// Base memory region address.
 	void *base;
 	/// Size of region.
@@ -221,12 +222,6 @@ L_OPTION:
 		// 1. NtQueryVirtualMemory + MemoryWorkingSetInformation
 		// 2. VirtualQueryEx
 		
-		// Minimum page bits
-		version (X86)
-			enum PAGE_SIZE = 4096;
-		else version (X86_64)
-			enum PAGE_SIZE = 4096;
-		
 		// Query required size
 		
 		// NOTE: Putty 0.80 will have around 1095 entries
@@ -257,7 +252,7 @@ L_OPTION:
 			}
 			
 			if (GetMappedFileNameA(tracee.hpid, mem.BaseAddress, map.name.ptr, MEM_MAP_NAME_LEN)) {
-				map.name[GetModuleBaseNameA(tracee.hpid, null, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
+				map.name[GetModuleFileNameExA(tracee.hpid, null, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
 			} else {
 				map.name[0] = 0;
 			}
@@ -282,7 +277,6 @@ L_OPTION:
 			map.access |= mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : AdbgMemPerm.shared_;
 			map.base = mem.BaseAddress;
 			map.size = mem.RegionSize;
-			//strncpy(map.name.ptr, "test", 512);
 			
 			++uindex; ++map;
 		}
@@ -313,7 +307,7 @@ L_OPTION:
 			
 			// Get base name (e.g., from \Device\HarddiskVolume5\xyz.dll)
 			if (GetMappedFileNameA(tracee.hpid, minfo.lpBaseOfDll, map.name.ptr, MEM_MAP_NAME_LEN)) {
-				map.name[GetModuleBaseNameA(tracee.hpid, mod, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
+				map.name[GetModuleFileNameExA(tracee.hpid, mod, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
 			} else {
 				map.name[0] = 0;
 			}
@@ -466,7 +460,7 @@ L_OPTION:
 			
 			//TODO: Adjust memory region permissions like libscanmem does
 			
-			version (Trace) trace("entry: %zx %s", range_start, map.name.ptr);
+			version (Trace) trace("entry: %u %zx %s", i, range_start, map.name.ptr);
 			
 			map.base = cast(void*)range_start;
 			map.size = range_end - range_start;
@@ -479,6 +473,7 @@ L_OPTION:
 			++i; ++map;
 		}
 		
+		version (Trace) trace("finished");
 		*mcount = i;
 		free(procbuf);
 		return 0;
