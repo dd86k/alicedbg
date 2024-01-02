@@ -165,6 +165,11 @@ struct adbg_object_t {
 		}
 		mz_t mz;
 		
+		struct ne_t {
+			ne_header *header;
+		}
+		ne_t ne;
+		
 		struct pe_t {
 			// Headers
 			PE_HEADER *header;
@@ -572,6 +577,9 @@ L_ARG:
 		
 		import adbg.v2.object.format.mz : LFANEW_OFFSET;
 		
+		//TODO: Check e_lfarlc (relocation table offset)
+		//      NE docs say if e_lfarlc==0x40, 0x3c is assumed to be valid
+		
 		// Attempt to check new file format offset and signature.
 		// If e_lfanew seem to be garbage, load file as an MZ exec instead.
 		uint e_lfanew = *cast(uint*)(o.buffer + LFANEW_OFFSET);
@@ -596,7 +604,9 @@ L_ARG:
 		
 		// 16-bit signature check
 		switch (cast(ushort)sig) {
-		case CHAR16!"NE", CHAR16!"LE", CHAR16!"LX":
+		case CHAR16!"NE":
+			return adbg_object_ne_load(o);
+		case CHAR16!"LE", CHAR16!"LX":
 			return adbg_oops(AdbgError.unsupportedObjFormat);
 		default:
 		}
@@ -632,6 +642,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	// NOTE: Both Mach-O headers (regular/fat) match in layout for cputype
 	switch (o.format) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
+	case ne:	return AdbgMachine.i8086; // and 32-bit, but hard to know
 	case pe:	return adbg_object_pe_machine(o.i.pe.header.Machine);
 	case macho:	return adbg_object_macho_machine(o.i.macho.header.cputype);
 	case elf:
