@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause
-module examples.simple_v2;
+module examples.simple;
 
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
@@ -18,7 +18,7 @@ int main(int argc, const(char) **argv) {
 	if (adbg_spawn(&process, argv[1], 0))
 		die;
 	
-	feature_disasm = adbg_dasm_openproc(&dasm, &process) == 0;
+	feature_disasm = adbg_dasm_open(&dasm, adbg_process_get_machine(&process)) == 0;
 	if (feature_disasm == false)
 		printf("warning: Disassembler unavailable (%s)", adbg_error_msg);
 	
@@ -88,7 +88,7 @@ void loop_handler(adbg_exception_t *ex) {
 	// Print disassembly if available
 	if (feature_disasm && ex.faultz) {
 		adbg_opcode_t op = void;
-		if (adbg_dasm_process_exception(&dasm, &process, ex, &op)) {
+		if (adbg_dasm_process_once(&dasm, &op, &process, ex.fault_address)) {
 			printf(" (error:%s)\n", adbg_error_msg);
 			return;
 		}

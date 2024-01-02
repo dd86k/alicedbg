@@ -644,10 +644,6 @@ enum AdbgScanOpt {
 	/// Type: int
 	/// Default: false
 	unaligned	= 1,
-	/// Scan all modules.
-	/// Types: int
-	/// Default: false
-	scanAll	= 2,
 	/// Set the initial capacity for results, other than the default.
 	///
 	/// Currently, the capacity does not increase dynamically.
@@ -735,7 +731,6 @@ adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t datasiz
 	enum DEFAULT_CAPACITY = 20_000;
 	
 	enum OPT_UNALIGNED = 1;
-	enum OPT_SCANALL = 2;
 	
 	// Initial check and setup
 	if (tracee == null || data == null) {
@@ -769,9 +764,6 @@ L_OPT:
 	case 0: break;
 	case AdbgScanOpt.unaligned:
 		if (va_arg!int(list)) options |= OPT_UNALIGNED;
-		goto L_OPT;
-	case AdbgScanOpt.scanAll:
-		if (va_arg!int(list)) options |= OPT_SCANALL;
 		goto L_OPT;
 	case AdbgScanOpt.capacity:
 		capacity = va_arg!int(list);
@@ -826,10 +818,11 @@ L_OPT:
 	enum PERMS = AdbgMemPerm.readWrite; /// Minimum permission access
 	uint read_size = cast(uint)datasize;
 	size_t jmpsize = options & OPT_UNALIGNED ? 1 : datasize;
-	size_t modcount = options & OPT_SCANALL ? scanner.map_count : 1;
+	size_t modcount = scanner.map_count;
 	size_t i;
 	scanner.result_count = 0;
 	//TODO: Consider reading a page's worth instead of T.sizeof
+	//TODO: Skip non-residential entries (waiting on Linux fix)
 LENTRY:	for (size_t mi; mi < modcount; ++mi) {
 		adbg_memory_map_t *map = &scanner.maps[mi];
 		
@@ -837,9 +830,6 @@ LENTRY:	for (size_t mi; mi < modcount; ++mi) {
 		
 		//if ((map.access & PERMS) != PERMS)
 		//	continue;
-		
-		//TODO: Module detection
-		//      Scan through read+write non-exec sections
 		
 		void* start = map.base;
 		void* end   = start + map.size;

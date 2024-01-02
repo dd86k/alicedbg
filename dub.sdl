@@ -152,10 +152,10 @@ subPackage {
 }
 
 subPackage {
-	name "example-simple-v2"
+	name "example-simple"
 	targetType "executable"
-	targetName "simple-v2"
+	targetName "simple"
 	sourcePaths "src"
 	importPaths "src"
-	mainSourceFile "examples/simple-v2.d"
+	mainSourceFile "examples/simple.d"
 }
