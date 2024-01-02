@@ -44,11 +44,11 @@ debug enum __BUILDTYPE__ = "debug";	/// Library build type.
 else  enum __BUILDTYPE__ = "release";	/// Ditto
 
 //
-// ANCHOR ABI string
+// ANCHOR Platform information
 //
 
 version (X86) {
-	enum TARGET_PLATFORM = "x86";	/// Platform ABI string
+	enum TARGET_PLATFORM = "x86";	/// Platform string
 } else version (X86_64) {
 	enum TARGET_PLATFORM = "x86_64";	/// Ditto
 } else version (ARM_Thumb) {

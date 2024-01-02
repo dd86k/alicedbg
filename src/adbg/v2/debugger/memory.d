@@ -6,13 +6,17 @@
 module adbg.v2.debugger.memory;
 
 import adbg.v2.debugger.process : adbg_process_t;
-import adbg.include.c.stdlib : malloc, free, calloc;
+import adbg.include.c.stdlib;
 import adbg.include.c.stdio;
 import adbg.include.c.stdarg;
 import core.stdc.string : memcpy, strncpy;
 import core.stdc.config : c_long;
 import adbg.error;
 import adbg.utils.math;
+
+//TODO: uint adbg_memory_pagesize() (0 on error)
+//      Windows: GetSystemInfo + SYSTEM_INFO.dwPageSize
+//      Linux: sysconf(_SC_PAGESIZE)
 
 version (Windows) {
 	import core.sys.windows.winbase; // WriteProcessMemory
@@ -26,7 +30,6 @@ version (Windows) {
 	import core.sys.posix.signal : kill, SIGKILL, siginfo_t, raise;
 	import core.sys.posix.sys.uio;
 	import core.sys.posix.fcntl : open;
-	import core.stdc.stdlib : exit, malloc, free;
 	import adbg.include.posix.mann;
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
@@ -36,14 +39,33 @@ version (Windows) {
 
 extern (C):
 
-/// Read memory from child tracee.
+/// Get the system configured size of a page.
 ///
+/// This typically is the lowest supported page size on the platform.
+/// Returns: Page size in Bytes, or 0 on error.
+size_t adbg_memory_pagesize() {
+	version (Windows) {
+		SYSTEM_INFO sysinfo = void;
+		GetSystemInfo(&sysinfo);
+		return sysinfo.dwPageSize;
+	} else version (Posix) {
+		c_long r = sysconf(_SC_PAGE_SIZE);
+		return r < 0 ? 0 : r;
+	}
+}
+
+//TODO: adbg_memory_hugesize
+//      Windows: GetLargePageMinimum
+//      Linux: /proc/meminfo:Hugepagesize
+/*size_t adbg_memory_hugepagesize() {
+}*/
+
+/// Read memory from child tracee.
 /// Params:
 /// 	tracee = Reference to tracee instance.
 /// 	addr = Memory address (within the children address space).
 /// 	data = Pointer to data.
 /// 	size = Size of data.
-///
 /// Returns: Error code.
 int adbg_memory_read(adbg_process_t *tracee, size_t addr, void *data, uint size) {
 	if (tracee == null || data == null) {
@@ -83,13 +105,11 @@ int adbg_memory_read(adbg_process_t *tracee, size_t addr, void *data, uint size)
 }
 
 /// Write memory to debuggee child.
-///
 /// Params:
 /// 	tracee = Reference to tracee instance.
 /// 	addr = Memory address (within the children address space).
 /// 	data = Pointer to data.
 /// 	size = Size of data.
-///
 /// Returns: Error code.
 int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size) {
 	if (tracee == null || data == null) {
@@ -129,14 +149,20 @@ enum AdbgMemPerm : ushort {
 	read	= 1,	/// Read permission
 	write	= 1 << 1,	/// Write permission
 	exec	= 1 << 2,	/// Execute permission
-	private_	= 1 << 8,	/// Process memory is private
-	shared_	= 1 << 9,	/// Process memory is shared
+	private_	= 1 << 8,	/// Process memory is private; Otherwise shared
 	
 	// Common access patterns
 	readWrite	= read | write,	/// Read and write permissions
 	readExec	= read | exec,	/// Read and execution permissions
 	writeExec	= write | exec,	/// Read and execution permissions
 	all	= read | write | exec,	/// Read, write, and execute permissions
+}
+
+enum AdbgPageType : ubyte {
+	unknown,
+	resident,
+	view,
+	image,
 }
 
 private enum MEM_MAP_NAME_LEN = 512;
@@ -148,9 +174,12 @@ struct adbg_memory_map_t {
 	/// Size of region.
 	size_t size;
 	/// Access permissions.
-	/// 
-	int access;
-	/// 
+	ushort access;
+	/// Page type (private, image, view, etc.)
+	ubyte type;
+	/// Page attributes (large, etc.)
+	ubyte attributes;
+	/// Module name or mapped file.
 	char[MEM_MAP_NAME_LEN] name;
 }
 
@@ -167,6 +196,9 @@ struct adbg_memory_map_t {
 	//pid = 2,
 }*/
 
+//TODO: Process name hash (here cached in structure or on stack)
+//      Function will eventually have to filter out of a lot of entries
+//      Especially on Linux.
 /// Obtain the memory map of modules for the current process.
 ///
 /// To close, call adbg_memory_maps_close. On error, all memory buffers
@@ -201,9 +233,7 @@ L_OPTION:
 		return adbg_oops(AdbgError.notAttached);
 	
 	version (Windows) {
-		if (__dynlib_psapi_load())
-			return adbg_oops(AdbgError.libLoader);
-		if (__dynlib_ntdll_load())
+		if (__dynlib_psapi_load()) // EnumProcessModules, QueryWorkingSet
 			return adbg_oops(AdbgError.libLoader);
 		
 		size_t uindex; /// (user) map index
@@ -217,62 +247,133 @@ L_OPTION:
 		// Query memory regions for process
 		//
 		
-		// NOTE: NtPssCaptureVaSpaceBulk is only available since Windows 10 20H1
 		// NOTE: Putty 0.80 will have around 1095 entries
-		SIZE_T bfsz = MiB!1;
-		MEMORY_WORKING_SET_INFORMATION *mbinfo =
-			cast(MEMORY_WORKING_SET_INFORMATION*)malloc(bfsz);
+		uint bfsz = MiB!1;
+		PSAPI_WORKING_SET_INFORMATION *mbinfo =
+			cast(PSAPI_WORKING_SET_INFORMATION*)malloc(bfsz);
 		if (mbinfo == null)
 			return adbg_oops(AdbgError.crt);
+		
+		// NOTE: NtPssCaptureVaSpaceBulk is only available since Windows 10 20H1
+		// This queries workset addresses regardless of size, page-bounded.
+		// e.g., it will add 0x30000 and 0x31000 as entries, despite being a 8K "block".
+LRETRY:
+		uint r = QueryWorkingSet(tracee.hpid, mbinfo, bfsz);
+		switch (r) {
+		case 0:
+			return adbg_oops(AdbgError.os);
+		case ERROR_BAD_LENGTH:
+			bfsz = cast(uint)(mbinfo.NumberOfEntries * ULONG_PTR.sizeof);
+			mbinfo = cast(PSAPI_WORKING_SET_INFORMATION*)realloc(mbinfo, bfsz);
+			if (mbinfo == null)
+				return adbg_oops(AdbgError.crt);
+			goto LRETRY;
+		default:
+		}
+		
 		scope(exit) free(mbinfo);
 		
-		NTSTATUS status = NtQueryVirtualMemory(
-			tracee.hpid,
-			null,
-			MemoryWorkingSetInformation,
-			mbinfo,
-			bfsz,
-			null
-		);
-		if (status)
+		size_t pagesize = adbg_memory_pagesize();
+		if (pagesize == 0)
 			return adbg_oops(AdbgError.os);
 		
+		//TODO: Huge page support
+		//TODO: Use MEMORY_BASIC_INFORMATION32 or 64 depending on wow64
+		
+		//PSAPI_WORKING_SET_EX_INFORMATION wsinfoex = void;
 		for (size_t i; i < mbinfo.NumberOfEntries; ++i) {
-			MEMORY_WORKING_SET_BLOCK *blk = &mbinfo.WorkingSetInfo.ptr[i];
+			// NOTE: Win64 doesn't populate block flag bits
+			PSAPI_WORKING_SET_BLOCK *blk = &mbinfo.WorkingSetInfo.ptr[i];
 			
+			/*TODO: Large page support + adjustment needed
+			
+			wsinfoex.VirtualAddress = cast(void*)blk.VirtualPage;
+			if (QueryWorkingSetEx(tracee.hpid, &wsinfoex,
+				PSAPI_WORKING_SET_EX_INFORMATION.sizeof) == 0)
+				continue;
+			
+			import adbg.utils.bit : adbg_bits_extract32;
+			
+			uint pageflags = cast(uint)wsinfoex.VirtualAttributes.Flags;
+			
+			version (Trace) trace("page=%zx attr=%zx valid=%d share=%d prot=%d shared=%d node=%d locked=%d large=%d bad=%d",
+				cast(size_t)wsinfoex.VirtualAddress,
+				wsinfoex.VirtualAttributes.Flags,
+				adbg_bits_extract32(pageflags, 1, 0),
+				adbg_bits_extract32(pageflags, 3, 1),
+				adbg_bits_extract32(pageflags, 11, 4),
+				adbg_bits_extract32(pageflags, 1, 15),
+				adbg_bits_extract32(pageflags, 6, 16),
+				adbg_bits_extract32(pageflags, 1, 22),
+				adbg_bits_extract32(pageflags, 1, 23),
+				adbg_bits_extract32(pageflags, 1, 31));*/
+			
+			// Query with whatever page value
 			MEMORY_BASIC_INFORMATION mem = void;
-			if (VirtualQueryEx(tracee.hpid, cast(void*)blk.VirtualPage, &mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
+			if (VirtualQueryEx(tracee.hpid, cast(void*)blk.VirtualPage,
+				&mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
 				continue;
 			}
 			
+			// Skip memory region when non-commited
+			// Usually never happens with addresses given by QueryWorkingSet
+			if (mem.State & (MEM_FREE | MEM_RESERVE))
+				continue;
+			
+			// Get mapped file
 			if (GetMappedFileNameA(tracee.hpid, mem.BaseAddress, map.name.ptr, MEM_MAP_NAME_LEN)) {
 				map.name[GetModuleFileNameExA(tracee.hpid, null, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
 			} else {
 				map.name[0] = 0;
 			}
 			
-			if (mem.AllocationProtect & PAGE_EXECUTE_WRITECOPY)
-				map.access = AdbgMemPerm.readExec;
-			else if (mem.AllocationProtect & PAGE_EXECUTE_READWRITE)
-				map.access = AdbgMemPerm.all;
-			else if (mem.AllocationProtect & PAGE_EXECUTE_READ)
-				map.access = AdbgMemPerm.readExec;
-			else if (mem.AllocationProtect & PAGE_EXECUTE)
-				map.access = AdbgMemPerm.exec;
-			else if (mem.AllocationProtect & PAGE_WRITECOPY)
-				map.access = AdbgMemPerm.read;
-			else if (mem.AllocationProtect & PAGE_READWRITE)
-				map.access = AdbgMemPerm.readWrite;
-			else if (mem.AllocationProtect & PAGE_READONLY)
-				map.access = AdbgMemPerm.read;
-			else
-				map.access = 0;
+			// Adjust protection bits
+			map.access = mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : 0;
+			if (mem.Protect & PAGE_EXECUTE_WRITECOPY)
+				map.access |= AdbgMemPerm.readExec;
+			else if (mem.Protect & PAGE_EXECUTE_READWRITE)
+				map.access |= AdbgMemPerm.all;
+			else if (mem.Protect & PAGE_EXECUTE_READ)
+				map.access |= AdbgMemPerm.readExec;
+			else if (mem.Protect & PAGE_EXECUTE)
+				map.access |= AdbgMemPerm.exec;
+			else if (mem.Protect & PAGE_WRITECOPY)
+				map.access |= AdbgMemPerm.read;
+			else if (mem.Protect & PAGE_READWRITE)
+				map.access |= AdbgMemPerm.readWrite;
+			else if (mem.Protect & PAGE_READONLY)
+				map.access |= AdbgMemPerm.read;
 			
-			map.access |= mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : AdbgMemPerm.shared_;
+			if (mem.Type & MEM_IMAGE)
+				map.type = AdbgPageType.image;
+			else if (mem.Type & MEM_MAPPED)
+				map.type = AdbgPageType.view;
+			else if (mem.Type & MEM_PRIVATE)
+				map.type = AdbgPageType.resident;
+			else
+				map.type = AdbgPageType.unknown;
+			
 			map.base = mem.BaseAddress;
 			map.size = mem.RegionSize;
 			
 			++uindex; ++map;
+			
+			// Memory region is less or equal to pagesize?
+			// No further adjustments to do
+			if (mem.RegionSize <= pagesize)
+				continue;
+			
+			// Otherwise, get ready to skip future pages if they are
+			// related (memory address and size follows by pagesize).
+			void *end = mem.BaseAddress + mem.RegionSize;
+			while (i + 1 < mbinfo.NumberOfEntries) {
+				void *page = cast(void*)mbinfo.WorkingSetInfo.ptr[i + 1].VirtualPage;
+				if (VirtualQueryEx(tracee.hpid, page,
+					&mem, MEMORY_BASIC_INFORMATION.sizeof) == 0)
+					break;
+				if (mem.BaseAddress > end) break;
+				++i;
+			}
 		}
 		
 		//
@@ -313,25 +414,24 @@ L_OPTION:
 				continue;
 			}
 			
-			if (mem.AllocationProtect & PAGE_EXECUTE_WRITECOPY)
-				map.access = AdbgMemPerm.readExec;
-			else if (mem.AllocationProtect & PAGE_EXECUTE_READWRITE)
-				map.access = AdbgMemPerm.all;
-			else if (mem.AllocationProtect & PAGE_EXECUTE_READ)
-				map.access = AdbgMemPerm.readExec;
-			else if (mem.AllocationProtect & PAGE_EXECUTE)
-				map.access = AdbgMemPerm.exec;
-			else if (mem.AllocationProtect & PAGE_WRITECOPY)
-				map.access = AdbgMemPerm.read;
-			else if (mem.AllocationProtect & PAGE_READWRITE)
-				map.access = AdbgMemPerm.readWrite;
-			else if (mem.AllocationProtect & PAGE_READONLY)
-				map.access = AdbgMemPerm.read;
-			else
-				map.access = 0;
+			// Adjust protection bits
+			map.access = mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : 0;
+			if (mem.Protect & PAGE_EXECUTE_WRITECOPY)
+				map.access |= AdbgMemPerm.readExec;
+			else if (mem.Protect & PAGE_EXECUTE_READWRITE)
+				map.access |= AdbgMemPerm.all;
+			else if (mem.Protect & PAGE_EXECUTE_READ)
+				map.access |= AdbgMemPerm.readExec;
+			else if (mem.Protect & PAGE_EXECUTE)
+				map.access |= AdbgMemPerm.exec;
+			else if (mem.Protect & PAGE_WRITECOPY)
+				map.access |= AdbgMemPerm.read;
+			else if (mem.Protect & PAGE_READWRITE)
+				map.access |= AdbgMemPerm.readWrite;
+			else if (mem.Protect & PAGE_READONLY)
+				map.access |= AdbgMemPerm.read;
 			
-			map.access |= mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : AdbgMemPerm.shared_;
-			
+			map.type = AdbgPageType.image;
 			map.base = minfo.lpBaseOfDll;
 			map.size = minfo.SizeOfImage;
 			
@@ -459,7 +559,17 @@ L_OPTION:
 			map.base = cast(void*)range_start;
 			map.size = range_end - range_start;
 			
-			map.access = perms[3] == 'p' ? AdbgMemPerm.private_ : AdbgMemPerm.shared_;
+			bool priv = perms[3] == 'p';
+			
+			//if (offset)
+			//	map.type = AdbgPageType.view;
+			//TODO: procfs name
+			//else if (strcmp(procname, map.name.ptr) == 0)
+			//	map.type = AdbgPageType.image;
+			//else
+				map.type = AdbgPageType.resident;
+			
+			map.access = priv ? AdbgMemPerm.private_ : 0;
 			if (perms[0] == 'r') map.access |= AdbgMemPerm.read;
 			if (perms[1] == 'w') map.access |= AdbgMemPerm.write;
 			if (perms[2] == 'x') map.access |= AdbgMemPerm.exec;

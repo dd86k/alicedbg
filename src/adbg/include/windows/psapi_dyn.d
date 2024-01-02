@@ -95,16 +95,76 @@ __gshared
     pEnumPageFilesA EnumPageFilesA;
 }
 
+union PSAPI_WORKING_SET_BLOCK {
+/*  ULONG_PTR Protection : 5;
+    ULONG_PTR ShareCount : 3;
+    ULONG_PTR Shared : 1;
+    ULONG_PTR Node : 3;
+#ifdef _WIN64
+    ULONG_PTR VirtualPage : 52;
+#else
+    ULONG Virtual : 20;*/
+    ULONG_PTR VirtualPage;
+}
+
+struct PSAPI_WORKING_SET_INFORMATION {
+  ULONG_PTR               NumberOfEntries;
+  PSAPI_WORKING_SET_BLOCK[1] WorkingSetInfo;
+}
+
 union PSAPI_WORKING_SET_EX_BLOCK
 {
     ULONG_PTR Flags;
-    // Too lazy to put in flags, don't need them
+    /*union {
+        struct {
+            ULONG_PTR Valid : 1;
+            ULONG_PTR ShareCount : 3;
+            ULONG_PTR Win32Protection : 11;
+            ULONG_PTR Shared : 1;
+            ULONG_PTR Node : 6;
+            ULONG_PTR Locked : 1;
+            ULONG_PTR LargePage : 1;
+            ULONG_PTR Reserved : 7;
+            ULONG_PTR Bad : 1;
+            Win64: ULONG_PTR ReservedUlong : 32;
+        }
+        struct {
+            ULONG_PTR Valid : 1;
+            ULONG_PTR Reserved0 : 14;
+            ULONG_PTR Shared : 1;
+            ULONG_PTR Reserved1 : 15;
+            ULONG_PTR Bad : 1;
+            Win64: ULONG_PTR ReservedUlong : 32;
+        } Invalid;
+    }*/
 }
 
 struct PSAPI_WORKING_SET_EX_INFORMATION
 {
     PVOID VirtualAddress;
     PSAPI_WORKING_SET_EX_BLOCK VirtualAttributes;
+}
+
+struct MEMORY_BASIC_INFORMATION32 {
+    DWORD BaseAddress;
+    DWORD AllocationBase;
+    DWORD AllocationProtect;
+    DWORD RegionSize;
+    DWORD State;
+    DWORD Protect;
+    DWORD Type;
+}
+
+align(16) struct MEMORY_BASIC_INFORMATION64 {
+    ULONGLONG BaseAddress;
+    ULONGLONG AllocationBase;
+    DWORD     AllocationProtect;
+    DWORD     __alignment1;
+    ULONGLONG RegionSize;
+    DWORD     State;
+    DWORD     Protect;
+    DWORD     Type;
+    DWORD     __alignment2;
 }
 
 private __gshared bool __dynlib_psapi_loaded;

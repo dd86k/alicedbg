@@ -824,23 +824,32 @@ int command_maps(int argc, const(char) **argv) {
 	adbg_memory_map_t *mmaps = void;
 	size_t mcount = void;
 	
-	if (adbg_memory_maps(&process, &mmaps, &mcount, 0)) {
+	if (adbg_memory_maps(&process, &mmaps, &mcount, 0))
 		return ShellError.alicedbg;
-	}
-	//    1234567890123456789012345678901234567890
-	puts("Region           Size       Perm File");
+	
+	puts("Region           Size       T Perm File");
 	for (size_t i; i < mcount; ++i) {
 		adbg_memory_map_t *map = &mmaps[i];
+		
 		char[4] perms = void;
 		perms[0] = map.access & AdbgMemPerm.read  ? 'r' : '-';
 		perms[1] = map.access & AdbgMemPerm.write ? 'w' : '-';
 		perms[2] = map.access & AdbgMemPerm.exec  ? 'x' : '-';
 		perms[3] = map.access & AdbgMemPerm.private_ ? 'p' : 's';
-		with (map) printf("%16zx %10lld %.4s %s\n",
-			cast(size_t)base, size, perms.ptr, name.ptr);
+		
+		char t = void;
+		switch (map.type) {
+		case AdbgPageType.image: t = 'I'; break;
+		case AdbgPageType.view:  t = 'V'; break;
+		case AdbgPageType.resident:  t = 'R'; break;
+		default: t = '?';
+		}
+		
+		with (map) printf("%16zx %10lld %c %.4s %s\n",
+			cast(size_t)base, size, t, perms.ptr, name.ptr);
 	}
-	free(mmaps);
 	
+	free(mmaps);
 	return 0;
 }
 
