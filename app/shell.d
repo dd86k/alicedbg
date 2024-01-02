@@ -90,7 +90,8 @@ void registerHelp(void function(ref command2_help_t help)) {
 int shell_loop() {
 	// Load process if CLI specified it
 	if (globals.file) {
-		if (adbg_spawn(&process, globals.file, 0))
+		if (adbg_spawn(&process, globals.file,
+			AdbgSpawnOpt.argv, globals.args, 0))
 			return oops;
 		puts("Process created.");
 	
@@ -135,7 +136,7 @@ int shell_execv(int argc, const(char) **argv) {
 		return 0;
 	
 	const(char) *ucommand = argv[0];
-	immutable(command_t) *command = shell_findcommand(ucommand);
+	immutable(command2_t) *command = shell_findcommand(ucommand);
 	if (command == null) {
 		serror("unknown command: '%s'", ucommand);
 		return ShellError.invalidCommand;
@@ -154,8 +155,6 @@ adbg_disassembler_t dasm;
 
 //TODO: Rely on disassembler pointer instead
 bool dasm_available;
-const(char) *last_spawn;
-const(char) **last_spawn_argv;
 
 void function(const(char)* sev, const(char)* msg) userlog;
 
@@ -198,16 +197,16 @@ immutable string shell_help_category(int category) {
 immutable string shell_help_section(int category) {
 }*/
 
-immutable string MOD_SHELL = "Shell";
-immutable string MOD_DEBUGGER = "Debugger";
-immutable string MOD_DISASSEMBLER = "Disassembler";
-immutable string MOD_OBJECTSERVER = "Object Server";
+immutable string MODULE_SHELL = "Shell";
+immutable string MODULE_DEBUGGER = "Debugger";
+immutable string MODULE_DISASSEMBLER = "Disassembler";
+immutable string MODULE_OBJECTSERVER = "Object Server";
 
-immutable string CAT_SHELL = "Command-line";
-immutable string CAT_PROCESS = "Process management";
-immutable string CAT_CONTEXT = "Thread context management";
-immutable string CAT_MEMORY = "Memory management";
-immutable string CAT_EXCEPTION = "Exception management";
+immutable string CATEGORY_SHELL = "Command-line";
+immutable string CATEGORY_PROCESS = "Process management";
+immutable string CATEGORY_CONTEXT = "Thread context management";
+immutable string CATEGORY_MEMORY = "Memory management";
+immutable string CATEGORY_EXCEPTION = "Exception management";
 
 immutable string SECTION_NAME = "NAME";
 immutable string SECTION_SYNOPSIS = "SYNOPSIS";
@@ -217,7 +216,7 @@ immutable string SECTION_EXAMPLES = "EXAMPLES";
 
 struct command2_help_section_t {
 	string name;
-	string text;
+	string[] bodies;
 }
 struct command2_help_t {
 	// Debugger, Disassembler, Object Server
@@ -229,11 +228,13 @@ struct command2_help_t {
 	// 
 	command2_help_section_t[] sections;
 }
-struct command_t {
-	align(2) char alias_;
-	string name;
+struct command2_t {
+	string[] names;
+	string description;
 	string[] synopsis;
-	command2_help_t help;
+	string doc_module;
+	string doc_category;
+	command2_help_section_t[] doc_sections;
 	int function(int, const(char)**) entry;
 }
 // NOTE: Called "commands_list" to avoid conflict with future "command_list" function
@@ -242,249 +243,249 @@ struct command_t {
 // - b|breakpoint: Breakpoint management
 // - t|thread: Thread management (e.g., selection, callstack)
 // - sym: Symbol management
-//TODO: Paragraph cutoff
-//      Maybe use vertical tab (0xb) or group sep (0x1d)?
-immutable command_t[] commands_list = [
+immutable command2_t[] shell_commands = [
 	//
 	// Debugger
 	//
 	{
-		0, "status", [],
-		{
-			MOD_DEBUGGER, CAT_PROCESS,
-			"Get debugger status.", [
-				{
-					//TODO: Rename to process status after function change
-					SECTION_DESCRIPTION,
-					"Prints the status of the debugger."
-				}
-			]
-		},
+		[ "status" ],
+		"Get process status.",
+		[],
+		MODULE_DEBUGGER, CATEGORY_PROCESS,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "Print the status of the debuggee process." ]
+			}
+		],
 		&command_status,
 	},
 	{
-		0, "spawn", [
+		[ "spawn" ],
+		"Spawn a new process into debugger.",
+		[
 			"FILE [ARGS...]"
 		],
-		{
-			MOD_DEBUGGER, CAT_PROCESS,
-			"Spawn a new process into debugger.", [
-				{
-					SECTION_DESCRIPTION,
-					"Spawns a new process from path with the debugger attached."
-				}
-			]
-		},
+		MODULE_DEBUGGER, CATEGORY_PROCESS,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "Spawns a new process from path with the debugger attached." ]
+			}
+		],
 		&command_spawn,
 	},
 	{
-		0, "attach", [
+		[ "attach" ],
+		"Attach debugger to live process.",
+		[
 			"PID"
 		],
-		{
-			MOD_DEBUGGER, CAT_PROCESS,
-			"Attach debugger to live process.", [
-				{
-					SECTION_DESCRIPTION,
-					"Attaches debugger to an existing process by its Process ID."
-				}
-			]
-		},
+		MODULE_DEBUGGER, CATEGORY_PROCESS,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "Attaches debugger to an existing process by its Process ID." ]
+			}
+		],
 		&command_attach,
 	},
 	{
-		0, "detach", [],
-		{
-			MOD_DEBUGGER, CAT_PROCESS,
-			"Detach debugger from process.", [
-				{
-					SECTION_DESCRIPTION,
-					"If the debugger was attached to a live process, detach "~
-					"the debugger."
-				}
-			]
-		},
+		[ "detach" ],
+		"Detach debugger from process.",
+		[],
+		MODULE_DEBUGGER, CATEGORY_PROCESS,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "If the debugger was attached to a live process, detach "~
+				"the debugger." ]
+			}
+		],
 		&command_detach,
 	},
 	{
-		0, "restart", [],
-		{
-			MOD_DEBUGGER, CAT_PROCESS,
-			"Restart the debugging process.", [
-				{
-					SECTION_DESCRIPTION,
-					"The debugger will be re-attached or the process will be "~
-					"killed and respawned."
-				}
-			]
-		},
+		[ "restart" ],
+		"Restart the debugging process.",
+		[],
+		MODULE_DEBUGGER, CATEGORY_PROCESS,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "The debugger will be re-attached or the process will be "~
+				"killed and respawned." ]
+			}
+		],
 		&command_restart,
 	},
 	{
-		0, "go", [],
-		{
-			MOD_DEBUGGER, CAT_PROCESS,
-			"Continue debugging process.", [
-				{
-					SECTION_DESCRIPTION,
-					"The debugger will be re-attached or the process will be "~
-					"killed and respawned."
-				}
-			]
-		},
+		[ "go" ],
+		"Continue debugging process.",
+		[],
+		MODULE_DEBUGGER, CATEGORY_PROCESS,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "The debugger will be re-attached or the process will be "~
+				"killed and respawned." ]
+			}
+		],
 		&command_go,
 	},
 	{
-		0, "kill", [],
-		{
-			MOD_DEBUGGER, CAT_PROCESS,
-			"Terminate process.", [
-				{
-					SECTION_DESCRIPTION,
-					"The debugger will be re-attached or the process will be "~
-					"killed and respawned."
-				}
-			]
-		},
+		[ "kill" ],
+		"Terminate process.",
+		[],
+		MODULE_DEBUGGER, CATEGORY_PROCESS,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "The debugger will be re-attached or the process will be "~
+				"killed and respawned." ]
+			}
+		],
 		&command_kill,
 	},
 	{
-		0, "stepi", [],
-		{
-			MOD_DEBUGGER, CAT_PROCESS,
-			"Perform an instruction step.", [
-				{
-					SECTION_DESCRIPTION,
-					"From a paused state, executes exactly one instruction."
-				}
-			]
-		},
+		[ "stepi" ],
+		"Perform an instruction step.",
+		[],
+		MODULE_DEBUGGER, CATEGORY_PROCESS,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "From a paused state, executes exactly one instruction." ]
+			}
+		],
 		&command_stepi,
 	},
 	//
 	// Context
 	//
 	{
-		0, "regs", [
+		[ "regs" ],
+		"Lists register values.",
+		[
 			"[NAME]"
 		],
-		{
-			MOD_DEBUGGER, CAT_CONTEXT,
-			"Get list of registers and values from process.", [
-				{
-					SECTION_DESCRIPTION,
-					"From a paused state, executes exactly one instruction."
-				}
-			]
-		},
+		MODULE_DEBUGGER, CATEGORY_CONTEXT,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "Get list of registers and values from process." ]
+			}
+		],
 		&command_regs,
 	},
 	//
 	// Memory
 	//
 	{
-		'm', "memory", [
+		[ "m", "memory" ],
+		"Dump process memory from address.",
+		[
 			"ADDRESS [LENGTH=64]"
 		],
-		{
-			MOD_DEBUGGER, CAT_MEMORY,
-			"Dump process memory from address.", [
-				{
-					SECTION_DESCRIPTION,
-					"Print memory data from address as hexadecimal."
-				}
-			]
-		},
+		MODULE_DEBUGGER, CATEGORY_MEMORY,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "Print memory data from address as hexadecimal." ]
+			}
+		],
 		&command_memory,
 	},
 	{
-		0, "maps", [],
-		{
-			MOD_DEBUGGER, CAT_MEMORY,
-			"Show memory mappings for process.", [
-				{
-					SECTION_DESCRIPTION,
-					"Lists loaded modules and their memory regions."
-				}
-			]
-		},
+		[ "maps" ],
+		"List memory mapped items.",
+		[],
+		MODULE_DEBUGGER, CATEGORY_MEMORY,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "Lists loaded modules and their memory regions." ]
+			}
+		],
 		&command_maps,
 	},
 	{
-		'd', "disassemble", [
+		[ "d", "disassemble" ],
+		"Disassemble instructions at address.",
+		[
 			"ADDRESS [COUNT=1]"
 		],
-		{
-			MOD_DEBUGGER, CAT_MEMORY,
-			"Disassemble instructions at address.", [
-				{
-					SECTION_DESCRIPTION,
-					"Invoke the disassembler at the address. The debugger "~
-					"will read process memory, if able, and will repeat "~
-					"the operation COUNT times. By default, it will only "~
-					"disassemble one instruction."
-				}
-			]
-		},
+		MODULE_DEBUGGER, CATEGORY_MEMORY,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "Invoke the disassembler at the address. The debugger "~
+				"will read process memory, if able, and will repeat "~
+				"the operation COUNT times. By default, it will only "~
+				"disassemble one instruction." ]
+			}
+		],
 		&command_disassemble,
 	},
 	{
-		0, "scan", [
+		[ "scan" ],
+		"Scan for value in memory.",
+		[
 			"TYPE VALUE",
 			"show",
-			"clear",
+			"reset",
 		],
-		{
-			MOD_DEBUGGER, CAT_MEMORY,
-			"Scan for value in memory.", [
-				{
-					SECTION_DESCRIPTION,
-					"Scan memory maps for specified value. "~
-					"No writing capability is available at the moment. "~
-					"To list last scan results, use 'show' subcommand. "~
-					"To clear results, use 'clear' subcommand."
-				}
-			]
-		},
+		MODULE_DEBUGGER, CATEGORY_MEMORY,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "Scan memory maps for specified value. "~
+				"No writing capability is available at the moment. "~
+				"To list last scan results, use 'show' subcommand.",
+				"To clear results, use 'reset' subcommand." ]
+			}
+		],
 		&command_scan,
 	},
 	//
 	// Shell
 	//
 	{
-		0, "help", [],
-		{
-			MOD_SHELL, CAT_SHELL,
-			"Show help or a command's help article."
-		},
+		[ "help" ],
+		"Show help or a command's help article.",
+		[
+			"[ITEM]"
+		],
+		MODULE_SHELL, CATEGORY_SHELL,
+		[
+			
+		],
 		&command_help,
 	},
 	{
-		'q', "quit", [],
-		{
-			MOD_SHELL, CAT_SHELL,
-			"Quit shell session.", [
-				{
-					SECTION_DESCRIPTION,
-					"Close the shell session along with the debugger and "~
-					"application if it was spawned using the debugger."
-				}
-			]
-		},
+		[ "q", "quit" ],
+		"Quit shell session.",
+		[],
+		MODULE_SHELL, CATEGORY_SHELL,
+		[
+			{
+				SECTION_DESCRIPTION,
+				[ "Close the shell session along with the debugger and "~
+				"application if it was spawned using the debugger." ]
+			}
+		],
 		&command_quit,
 	},
 ];
 
-immutable(command_t)* shell_findcommand(const(char) *ucommand) {
-	bool aonly = ucommand[1] == 0; /// One character: alias-only
-	
+immutable(command2_t)* shell_findcommand(const(char) *ucommand) {
 	// NOTE: Can't use foreach for local var escape
-	for (size_t i; i < commands_list.length; ++i) {
-		immutable(command_t) *cmd = &commands_list[i];
+	for (size_t i; i < shell_commands.length; ++i) {
+		immutable(command2_t) *cmd = &shell_commands[i];
 		
-		if ((aonly && ucommand[0] == cmd.alias_) ||
-			strncmp(ucommand, cmd.name.ptr, cmd.name.length) == 0)
-			return cmd;
+		for (size_t c; c < cmd.names.length; ++c) {
+			if (strcmp(ucommand, cmd.names[c].ptr) == 0)
+				return cmd;
+		}
 	}
 	
 	return null;
@@ -540,32 +541,47 @@ void shell_event_exception(adbg_exception_t *ex) {
 	}
 }
 
-void shell_event_help(immutable(command_t) *command) {
-	with (command.help) {
-		printf("%s - %s: %s\n\nNAME\n  %s - %s\n",
-			module_.ptr, category.ptr, command.name.ptr,
-			command.name.ptr, command.help.description.ptr);
+void shell_event_help(immutable(command2_t) *command) {
+	// Print header
+	int p = 34;
+	for (size_t i; i < command.names.length; ++i) {
+		if (i) {
+			printf(", ");
+			--p;
+		}
+		p -= printf("%s", command.names[i].ptr);
 	}
+	with (command) printf("%*s  %*s\n\nNAME\n ", p, doc_module.ptr, 34, doc_category.ptr);
+	for (size_t i; i < command.names.length; ++i) {
+		if (i) putchar(',');
+		printf(" %s", command.names[i].ptr);
+	}
+	printf(" - %s\n", command.description.ptr);
 	
 	if (command.synopsis.length) {
 		printf("\n%s\n", SECTION_SYNOPSIS.ptr);
 		foreach (s; command.synopsis) {
-			printf("  %s %s\n", command.name.ptr, s.ptr);
+			printf("  %s %s\n", command.names[$-1].ptr, s.ptr);
 		}
 	}
 	
-	//TODO: per-word cut-off (spaces)
-	//      work with section.text.length
 	enum COL = 72;
-	foreach (section; command.help.sections) {
+	foreach (section; command.doc_sections) {
 		printf("\n%s\n", section.name.ptr);
-		const(char) *p = section.text.ptr;
-	L_PRINT:
-		int o = printf("  %.*s\n", COL, p);
-		if (o < COL)
-			continue;
-		p += COL;
-		goto L_PRINT;
+		
+		//TODO: Better cut-offs
+		//      [0] spacing? remove
+		//      [$-1] non-spacing? put dash
+		for (size_t i; i < section.bodies.length; ++i) {
+			const(char) *b = section.bodies[i].ptr;
+			if (i) putchar('\n');
+		LPRINT:
+			int o = printf("  %.*s\n", COL, b);
+			if (o < COL)
+				continue;
+			b += COL;
+			goto LPRINT;
+		}
 	}
 	
 	putchar('\n');
@@ -590,7 +606,7 @@ int command_status(int argc, const(char) **argv) {
 int command_help(int argc, const(char) **argv) {
 	if (argc > 1) { // Requesting help article for command
 		const(char) *ucommand = argv[1];
-		immutable(command_t) *command = shell_findcommand(ucommand);
+		immutable(command2_t) *command = shell_findcommand(ucommand);
 		if (command == null) {
 			serror("Command not found: '%s'", ucommand);
 			return ShellError.invalidCommand;
@@ -602,12 +618,17 @@ int command_help(int argc, const(char) **argv) {
 	
 	enum PADDING = 20;
 	static immutable const(char) *liner = "..........................................";
-	foreach (cmd; commands_list) {
-		int p = cmd.alias_ ?
-			printf(" %c, %s", cmd.alias_, cmd.name.ptr) :
-			printf("    %s", cmd.name.ptr);
+	foreach (cmd; shell_commands) {
+		int p;
+		for (size_t i; i < cmd.names.length; ++i) {
+			if (i) {
+				putchar(',');
+				++p;
+			}
+			p += printf(" %s", cmd.names[i].ptr);
+		}
 		
-		printf(" %.*s %s\n", PADDING - p, liner, cmd.help.description.ptr);
+		printf(" %.*s %s\n", PADDING - p, liner, cmd.description.ptr);
 	}
 	
 	return 0;
@@ -619,11 +640,11 @@ int command_spawn(int argc, const(char) **argv) {
 		return ShellError.invalidParameter;
 	}
 	
-	last_spawn = argv[1];
-	last_spawn_argv = argc > 2 ? argv + 2: null;
+	globals.file = argv[1];
+	globals.args = argc > 2 ? argv + 2: null;
 	
-	if (adbg_spawn(&process, last_spawn,
-		AdbgSpawnOpt.argv, last_spawn_argv,
+	if (adbg_spawn(&process, globals.file,
+		AdbgSpawnOpt.argv, globals.args,
 		0)) {
 		serror("Could not spawn process.");
 		return ShellError.alicedbg;
@@ -690,14 +711,15 @@ int command_restart(int argc, const(char) **argv) {
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
 		} else dasm_available = true;
+		puts("Debugger re-attached");
 		break;
 	case spawned:
 		if (adbg_terminate(&process)) {
 			serror("Could not terminate process.");
 			return ShellError.alicedbg;
 		}
-		if (adbg_spawn(&process, last_spawn,
-			AdbgSpawnOpt.argv, last_spawn_argv,
+		if (adbg_spawn(&process, globals.file,
+			AdbgSpawnOpt.argv, globals.args,
 			0)) {
 			serror("Could not spawn process.");
 			return ShellError.alicedbg;
@@ -709,6 +731,7 @@ int command_restart(int argc, const(char) **argv) {
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
 		} else dasm_available = true;
+		puts("Process respawned");
 		break;
 	default:
 		serror("No process attached or spawned.");
@@ -905,7 +928,7 @@ void shell_event_list_scan_results() {
 	adbg_scan_result_t *result = last_scan.results;
 	uint count = cast(uint)last_scan.result_count + 1; // temp cast until better z printf
 	for (uint i = 1; i < count; ++i, ++result) {
-		printf("%4u. %-16llx  %-20llu  ", i, result.address, result.value_u64 & mask);
+		printf("%4u. %-16llx  %*llu  ", i, result.address, -20, result.value_u64 & mask);
 		ulong udata = void;
 		if (adbg_memory_read(&process, cast(size_t)result.address, &udata, cast(uint)last_scan_size))
 			puts("???");
@@ -926,7 +949,7 @@ int command_scan(int argc, const(char) **argv) {
 		
 		shell_event_list_scan_results;
 		return 0;
-	} else if (strcmp(usub, "clear") == 0) {
+	} else if (strcmp(usub, "reset") == 0) {
 		if (last_scan == null)
 			return 0;
 		
