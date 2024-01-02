@@ -15,7 +15,6 @@ import adbg.platform;
 
 extern (C):
 
-//TODO: Consider renaming to adbg.utils.memory
 //TODO: INT16/INT32/INT64 templates (auto swap)
 //      e.g., I16BE!64
 
@@ -160,4 +159,16 @@ unittest {
 	assert(adbg_bswap16(N16) == R16, "bswap16");
 	assert(adbg_bswap32(N32) == R32, "bswap32");
 	assert(adbg_bswap64(N64) == R64, "bswap64");
+}
+
+uint adbg_bits_extract32(uint v, uint len, uint pos) {
+	return (v >> pos) & ((1 << len) - 1);
+}
+unittest {
+	uint flags = 0b1010_1111_0000_0011_0000;
+	assert(adbg_bits_extract32(flags, 1, 0) == 0);
+	assert(adbg_bits_extract32(flags, 1, 1) == 0);
+	assert(adbg_bits_extract32(flags, 2, 4) == 3);
+	assert(adbg_bits_extract32(flags, 4, 12) == 0xf);
+	assert(adbg_bits_extract32(flags, 4, 16) == 0b1010);
 }
