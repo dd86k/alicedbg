@@ -554,7 +554,7 @@ LRETRY:
 			
 			//TODO: Adjust memory region permissions like libscanmem does
 			
-			version (Trace) trace("entry: %u %zx %s", i, range_start, map.name.ptr);
+			version (Trace) trace("entry: %zu %zx %s", i, range_start, map.name.ptr);
 			
 			map.base = cast(void*)range_start;
 			map.size = range_end - range_start;
@@ -818,6 +818,7 @@ L_OPT:
 		adbg_oops(AdbgError.crt);
 		return null;
 	}
+	scope(exit) free(read_buffer);
 	
 	version (Trace) trace("modules=%u", cast(uint)scanner.map_count);
 	
@@ -828,7 +829,8 @@ L_OPT:
 	size_t modcount = options & OPT_SCANALL ? scanner.map_count : 1;
 	size_t i;
 	scanner.result_count = 0;
-	L_MODULE: for (size_t mi; mi < modcount; ++mi) {
+	//TODO: Consider reading a page's worth instead of T.sizeof
+LENTRY:	for (size_t mi; mi < modcount; ++mi) {
 		adbg_memory_map_t *map = &scanner.maps[mi];
 		
 		version (Trace) trace("perms=%x", map.access);
@@ -850,7 +852,7 @@ L_OPT:
 			if (adbg_memory_read(tracee, cast(size_t)start, read_buffer, read_size)) {
 				version (Trace)
 					trace("read failed for %.512s", map.name.ptr);
-				continue L_MODULE;
+				continue LENTRY;
 			}
 			
 			// Different data
@@ -866,14 +868,13 @@ L_OPT:
 			
 			// No more entries can be inserted
 			if (i >= capacity)
-				break L_MODULE;
+				break LENTRY;
 		}
 	}
 	scanner.result_count = i;
 	
 	version (Trace) trace("results=%u", cast(uint)i);
 	
-	free(read_buffer); // Clear read buffer
 	return scanner;
 }
 

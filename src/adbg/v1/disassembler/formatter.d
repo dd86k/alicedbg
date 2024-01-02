@@ -141,9 +141,7 @@ size_t adbg_disasm_format_operands2(adbg_disasm_t *disasm, ref adbg_string_t s, 
 
 /// 
 // Formats whole line (mnemonic + operands)
-size_t adbg_disasm_format(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	version (Trace) trace("size=%u", size);
-	
+size_t adbg_disasm_format(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {	
 	if (disasm.opcode.mnemonic == null) {
 		buffer = empty_string;
 		return 0;
@@ -196,8 +194,6 @@ void adbg_disasm_format_operands_left(adbg_disasm_t *disasm, ref adbg_string_t s
 /// 	size = Buffer size
 /// 	op = Opcode information
 size_t adbg_disasm_machine(adbg_disasm_t *disasm, char *buffer, size_t size, adbg_disasm_opcode_t *op) {
-	version (Trace) trace("size=%u", size);
-	
 	if (buffer == null)
 		return 0;
 	if (op.machineCount == 0) {

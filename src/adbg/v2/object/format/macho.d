@@ -452,7 +452,7 @@ int adbg_object_macho_load(adbg_object_t *o) {
 		if (macho.reversed_commands == null)
 			return adbg_oops(AdbgError.crt);
 		size_t cl = macho.is64 ? macho_header.sizeof + uint.sizeof : macho_header.sizeof;
-		version (Trace) trace("cl=%p 64=%d", cl, macho.is64);
+		version (Trace) trace("cl=%zx 64=%d", cl, macho.is64);
 		macho.commands = cast(macho_load_command*)(o.buffer + cl);
 	}
 	

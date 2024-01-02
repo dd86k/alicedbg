@@ -1116,7 +1116,7 @@ PE_IMPORT_LTE64* adbg_object_pe_import_lte64(adbg_object_t *o, PE_IMPORT_DESCRIP
 		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
 		+ index;
 	
-	version (Trace) trace("imports=%p lte64=%p fs=%p", o.i.pe.directory_imports, lte64, o.file_size);
+	version (Trace) trace("imports=%p lte64=%p fs=%zx", o.i.pe.directory_imports, lte64, o.file_size);
 	
 	if (adbg_object_outboundp(o, lte64) || lte64.ordinal == 0)
 		return null;
@@ -1131,7 +1131,7 @@ ushort* adbg_object_pe_import_lte64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR 
 	ushort* base = cast(ushort*)
 		((cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva) + im64.rva);
 	
-	version (Trace) trace("base=%p fs=%p", base, o.file_size);
+	version (Trace) trace("base=%p fs=%zx", base, o.file_size);
 	
 	if (adbg_object_outboundp(o, base))
 		return null;

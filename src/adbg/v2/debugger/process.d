@@ -845,7 +845,7 @@ int adbg_process_get_pid(adbg_process_t *tracee) {
 /// 	basename = Request for basename; Otherwise full file path.
 /// Returns: Error code.
 int adbg_process_get_name(int pid, char *buffer, size_t bufsize, bool basename) {
-	if (pid == 0 || buffer == null || bufsize == 0)
+	if (pid <= 0 || buffer == null || bufsize == 0)
 		return adbg_oops(AdbgError.nullArgument);
 	
 	version (Windows) {
@@ -865,29 +865,28 @@ int adbg_process_get_name(int pid, char *buffer, size_t bufsize, bool basename) 
 			return adbg_oops(AdbgError.os);
 		return 0;
 	} else version (linux) {
-		if (tracee.pid <= 0)
-			return adbg_oops(AdbgError.assertion);
-		
 		enum TBUFSZ = 32;
 		char[TBUFSZ] pathbuf = void; // Path buffer
-		snprintf(pathbuf.ptr, TBUFSZ, "/proc/%u/cmdline", tracee.pid);
+		ssize_t r;
+		
+		snprintf(pathbuf.ptr, TBUFSZ, "/proc/%d/cmdline", pid);
 		int cmdlinefd = open(pathbuf.ptr, O_RDONLY);
-		if (cmdlinefd == -1)
-			continue;
-		scope(exit) close(cmdlinefd);
-		ssize_t r = read(cmdlinefd, buffer, bufsize);
-		buffer[r] = 0;
+		if (cmdlinefd > 0) {
+			r = read(cmdlinefd, buffer, bufsize);
+			buffer[r] = 0;
+			close(cmdlinefd);
+		}
 		
 		// Error reading /cmdline, retry with /comm
 		if (r <= 0) {
-			snprintf(pathbuf.ptr, TBUFSZ, "/proc/%s/comm", tracee.pid);
+			snprintf(pathbuf.ptr, TBUFSZ, "/proc/%d/comm", pid);
 			int commfd = open(pathbuf.ptr, O_RDONLY);
 			if (commfd == -1)
-				continue;
+				return adbg_oops(AdbgError.os);
 			scope(exit) close(commfd);
 			r = read(commfd, buffer, bufsize);
 			if (r < 0)
-				continue;
+				return adbg_oops(AdbgError.os);
 			buffer[r - 1] = 0; // Delete newline
 		}
 		
