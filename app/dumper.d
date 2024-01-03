@@ -135,6 +135,7 @@ int app_dump() {
 	case mz:	return dump_mz(dump, o);
 	case ne:	return dump_ne(dump, o);
 	case pe:	return dump_pe(dump, o);
+	case lx:	return dump_lx(dump, o);
 	case elf:	return dump_elf(dump, o);
 	case macho:	return dump_macho(dump, o);
 	default:	return EXIT_FAILURE;

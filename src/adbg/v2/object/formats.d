@@ -9,5 +9,6 @@ public import
 	adbg.v2.object.format.elf,
 	adbg.v2.object.format.macho,
 	adbg.v2.object.format.mz,
-	adbg.v2.object.format.pe,
-	adbg.v2.object.format.ne;
+	adbg.v2.object.format.ne,
+	adbg.v2.object.format.lx,
+	adbg.v2.object.format.pe;

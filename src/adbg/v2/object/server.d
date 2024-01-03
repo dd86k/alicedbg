@@ -170,6 +170,11 @@ struct adbg_object_t {
 		}
 		ne_t ne;
 		
+		struct lx_t {
+			lx_header *header;
+		}
+		lx_t lx;
+		
 		struct pe_t {
 			// Headers
 			PE_HEADER *header;
@@ -577,8 +582,10 @@ L_ARG:
 		
 		import adbg.v2.object.format.mz : LFANEW_OFFSET;
 		
-		//TODO: Check e_lfarlc (relocation table offset)
-		//      NE docs say if e_lfarlc==0x40, 0x3c is assumed to be valid
+		// If e_lfarlc (relocation table) starts lower than e_lfanew,
+		// then assume old MZ.
+		if (o.i.mz.header.e_lfarlc < 0x40)
+			return adbg_object_mz_load(o);
 		
 		// Attempt to check new file format offset and signature.
 		// If e_lfanew seem to be garbage, load file as an MZ exec instead.
@@ -604,10 +611,10 @@ L_ARG:
 		
 		// 16-bit signature check
 		switch (cast(ushort)sig) {
-		case CHAR16!"NE":
+		case NE_MAGIC:
 			return adbg_object_ne_load(o);
-		case CHAR16!"LE", CHAR16!"LX":
-			return adbg_oops(AdbgError.unsupportedObjFormat);
+		case LX_MAGIC, LE_MAGIC:
+			return adbg_object_lx_load(o);
 		default:
 		}
 		
