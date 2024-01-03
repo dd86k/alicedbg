@@ -118,6 +118,11 @@ int app_dump() {
 		//TODO: Warn file is empty
 		if (size == 0)
 			return 0;
+	
+		print_string("filename", basename(globals.file));
+		print_u64("filesize", size);
+		print_string("format", "Blob");
+		print_string("short_name", "blob");
 		
 		return dump_disassemble(dump, globals.machine, buffer, size, globals.dump_base_address);
 	}
@@ -126,10 +131,10 @@ int app_dump() {
 	if (o == null)
 		return show_adbg_error();
 	
-	print_string("format", adbg_object_name(o));
-	print_string("short_name", adbg_object_short_name(o));
 	print_string("filename", basename(globals.file));
 	print_u64("filesize", o.file_size);
+	print_string("format", adbg_object_name(o));
+	print_string("short_name", adbg_object_short_name(o));
 	
 	switch (o.format) with (AdbgObject) {
 	case mz:	return dump_mz(dump, o);
