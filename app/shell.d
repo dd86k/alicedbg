@@ -93,7 +93,22 @@ int shell_loop() {
 		if (adbg_spawn(&process, globals.file,
 			AdbgSpawnOpt.argv, globals.args, 0))
 			return oops;
+		
 		puts("Process created.");
+	
+		if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
+			dasm_available = false;
+			printf("warning: Disassembler not available (%s)\n",
+				adbg_error_msg());
+		} else dasm_available = true;
+		
+		if (globals.syntax && dasm_available)
+			adbg_dasm_options(&dasm, AdbgDasmOption.syntax, globals.syntax, 0);
+	} else if (globals.pid) {
+		if (adbg_attach(&process, globals.pid, 0))
+			return oops;
+		
+		puts("Debugger attached to process");
 	
 		if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
 			dasm_available = false;
@@ -490,6 +505,9 @@ immutable(command2_t)* shell_findcommand(const(char) *ucommand) {
 	
 	return null;
 }
+
+//TODO: shell_spawn
+//TODO: shell_attach
 
 void shell_event_disassemble(size_t address, int count = 1, bool showAddress = true) {
 	if (dasm_available == false)
