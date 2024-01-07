@@ -149,6 +149,9 @@ subPackage {
 	sourcePaths "src"
 	importPaths "src"
 	mainSourceFile "examples/simple-v1.d"
+	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
+	dflags "-betterC" "--vgc" platform="ldc"
+	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
 
 subPackage {
@@ -158,4 +161,7 @@ subPackage {
 	sourcePaths "src"
 	importPaths "src"
 	mainSourceFile "examples/simple.d"
+	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
+	dflags "-betterC" "--vgc" platform="ldc"
+	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
