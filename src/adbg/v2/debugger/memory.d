@@ -158,11 +158,16 @@ enum AdbgMemPerm : ushort {
 	all	= read | write | exec,	/// Read, write, and execute permissions
 }
 
-enum AdbgPageType : ubyte {
+/// Page usage.
+enum AdbgPageUse : ubyte {
+	/// Unknown.
 	unknown,
+	/// Private memory.
 	resident,
-	view,
-	image,
+	/// Slice or memory-mapped file.
+	fileview,
+	/// Module, like a shared object or dynamic linked library.
+	module_,
 }
 
 private enum MEM_MAP_NAME_LEN = 512;
@@ -345,13 +350,13 @@ LRETRY:
 				map.access |= AdbgMemPerm.read;
 			
 			if (mem.Type & MEM_IMAGE)
-				map.type = AdbgPageType.image;
+				map.type = AdbgPageUse.module_;
 			else if (mem.Type & MEM_MAPPED)
-				map.type = AdbgPageType.view;
+				map.type = AdbgPageUse.fileview;
 			else if (mem.Type & MEM_PRIVATE)
-				map.type = AdbgPageType.resident;
+				map.type = AdbgPageUse.resident;
 			else
-				map.type = AdbgPageType.unknown;
+				map.type = AdbgPageUse.unknown;
 			
 			map.base = mem.BaseAddress;
 			map.size = mem.RegionSize;
@@ -431,7 +436,7 @@ LRETRY:
 			else if (mem.Protect & PAGE_READONLY)
 				map.access |= AdbgMemPerm.read;
 			
-			map.type = AdbgPageType.image;
+			map.type = AdbgPageUse.module_;
 			map.base = minfo.lpBaseOfDll;
 			map.size = minfo.SizeOfImage;
 			
@@ -562,12 +567,12 @@ LRETRY:
 			bool priv = perms[3] == 'p';
 			
 			//if (offset)
-			//	map.type = AdbgPageType.view;
+			//	map.type = AdbgPageUse.view;
 			//TODO: procfs name
 			//else if (strcmp(procname, map.name.ptr) == 0)
-			//	map.type = AdbgPageType.image;
+			//	map.type = AdbgPageUse.image;
 			//else
-				map.type = AdbgPageType.resident;
+				map.type = AdbgPageUse.resident;
 			
 			map.access = priv ? AdbgMemPerm.private_ : 0;
 			if (perms[0] == 'r') map.access |= AdbgMemPerm.read;

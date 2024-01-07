@@ -185,33 +185,6 @@ void slog(const(char) *msg) {
 
 immutable string RCFILE = ".adbgrc";
 
-/*enum HelpModule : ubyte {
-	debugger,
-	disassembler,
-	object,
-}
-enum HelpCategory : ubyte {
-	shell,
-	process,
-	
-}
-enum HelpSection : ubyte {
-	synopsis,
-	description,
-	notes,
-	examples,
-}
-
-immutable string shell_help_module(int category) {
-	switch (category) with (HelpModule) {
-	
-	}
-}
-immutable string shell_help_category(int category) {
-}
-immutable string shell_help_section(int category) {
-}*/
-
 immutable string MODULE_SHELL = "Shell";
 immutable string MODULE_DEBUGGER = "Debugger";
 immutable string MODULE_DISASSEMBLER = "Disassembler";
@@ -880,10 +853,10 @@ int command_maps(int argc, const(char) **argv) {
 		
 		char t = void;
 		switch (map.type) {
-		case AdbgPageType.image: t = 'I'; break;
-		case AdbgPageType.view:  t = 'V'; break;
-		case AdbgPageType.resident:  t = 'R'; break;
-		default: t = '?';
+		case AdbgPageUse.resident: 	t = 'R'; break;
+		case AdbgPageUse.fileview: 	t = 'F'; break;
+		case AdbgPageUse.module_:	t = 'M'; break;
+		default:	t = '?';
 		}
 		
 		with (map) printf("%16zx %10lld %c %.4s %s\n",
