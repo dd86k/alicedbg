@@ -159,7 +159,7 @@ void print_header(const(char)* name) {
 
 void print_section(uint i, const(char) *name = null, int len = 0) {
 	putchar('\n');
-	print_u32("index", i + 1);
+	print_u32("index", i);
 	if (name && len) print_stringl("name", name, len);
 }
 void print_disasm_line(adbg_opcode_t *op, const(char)* msg = null) {
