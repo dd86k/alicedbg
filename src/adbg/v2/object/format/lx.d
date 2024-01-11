@@ -66,18 +66,19 @@ enum : uint {
 	LX_FLAG_MODTYPE_VIRTDEV	= 0x00028000,
 }
 
+private enum E32RESBYTES3 = 196 - 176; // lx_header.sizeof
 /// LX/LE header
-struct lx_header {
+struct lx_header { // NOTE: Names are taken from spec except for its "e32_exe" name
 	/// Header magic. "LX" or "LE"
-	ushort Magic;
+	ushort magic;
 	/// Byte Ordering.
 	///
 	/// 0 for little-endian, 1 for big-endian.
-	ubyte ByteOrder;
+	ubyte border;
 	/// Word Ordering.
 	///
 	/// 0 for little-endian, 1 for big-endian.
-	ubyte WordOrder;
+	ubyte worder;
 	/// Linear EXE Format Level.
 	///
 	/// The  Linear EXE Format Level is set  to  0  for  the
@@ -87,91 +88,97 @@ struct lx_header {
 	/// to recognized future EXE file versions  so  that  an
 	/// appropriate  error message  may  be displayed  if an
 	/// attempt is made to load them.
-	uint FormatLevel;
+	uint level;
 	/// Module CPU Type.
 	///
 	/// 1=i286 and later, 2=i386 and later, 3=i486 and later
-	ushort CPUType;
+	ushort cpu;
 	/// Module OS Type.
-	ushort OSType;
+	ushort os;
 	/// Version of the linear EXE module.
-	uint Version;
+	uint ver;
 	/// Flag bits for the module.
-	uint Flags;
+	uint mflags;
 	/// Number of pages in module.
-	uint Pages;
+	uint mpages;
 	/// The Object number to which the Entry Address is relative.
-	uint EIPObject;
+	uint startobj;
 	/// Entry Address of module.
-	uint EIP;
+	uint eip;
 	/// Starting stack address of module.
-	uint ESP;
+	uint stackobj;
 	/// The size of one page for this system.
-	uint PageSize;
+	uint esp;
+	/// Module page size.
+	uint pagesize;
 	/// The shift left bits for page offsets.
-	uint PageOffset;
+	uint pageshift;
 	/// Total size of the fixup information in bytes.
-	uint FixupSectionSize;
+	uint fixupsize;
 	/// Checksum for fixup information.
-	uint FixupSectionChecksum;
+	uint fixupsum;
 	/// Size of memory resident tables.
-	uint LoaderSectionSize;
+	uint ldrsize;
 	/// Checksum for loader section.
-	uint LoaderSectionChecksum;
+	uint ldrsum;
 	/// Object Table offset.
-	uint ObjectTableOffset;
-	/// DD  Object Table Count.
-	uint ObjectTableCount;
+	uint objtab;
+	/// Object Table Count.
+	uint objcnt;
 	/// Object Page Table offset.
-	uint ObjectPageTableOffset;
+	uint objmap;
 	/// Object Iterated Pages offset.
-	uint ObjectIteratedPagesOffset;
+	uint itermap;
 	/// Resource Table offset.
-	uint ResourceTableOffset;
+	uint rsrctab;
 	/// Number of entries in Resource Table.
-	uint ResourceTableCount;
+	uint rsrccnt;
 	/// Resident Name Table offset.
-	uint ResidentNameTableOffset;
+	uint restab;
 	/// Entry Table offset.
-	uint EntryTableOffset;
+	uint enttab;
 	/// Module Format Directives Table offset.
-	uint ModuleDirectivesOffset;
+	uint dirtab;
 	/// Number of Module Format Directives in the Table.
-	uint ModuleDirectivesCount;
+	uint dircnt;
 	/// Fixup Page Table offset.
-	uint FixupPageTableOffset;
+	uint fpagetab;
 	/// Fixup Record Table Offset
-	uint FixupRecordTableOffset;
+	uint frectab;
 	/// Import Module Name Table offset.
-	uint ImportModuleTableOffset;
+	uint impmod;
 	/// The number of entries in the Import Module Name Table.
-	uint ImportModuleTableCount;
+	uint impmodcnt;
 	/// Import Procedure Name Table offset.
-	uint ImportProcTableOffset;
+	uint impproc;
 	/// Per-Page Checksum Table offset.
-	uint PageChecksumOffset;
+	uint pagesum;
 	/// Data Pages Offset.
-	uint DataPagesOffset;
+	uint datapage;
 	/// Number of Preload pages for this module.
-	uint PreloadPageCount;
+	uint preload;
 	/// Non-Resident Name Table offset.
-	uint NonResNameTableOffset;
+	uint nrestab;
 	/// Number of bytes in the Non-resident name table.
-	uint NonResNameTableSize;
+	uint cbnrestab;
 	/// Non-Resident Name Table Checksum.
-	uint NonResNameTableChecksum;
+	uint nressum;
 	/// The Auto Data Segment Object number.
-	uint AutoDSObjectNumber;
+	uint autodata;
 	/// Debug Information offset.
-	uint DebugInfoOffset;
+	uint debuginfo;
 	/// Debug Information length;
-	uint DebugInfoSize;
+	uint debuglen;
 	/// Instance pages in preload section.
-	uint InstancePageCount;
+	uint instpreload;
 	/// Instance pages in demand section.
-	uint InstanceDemandCount;
+	uint instdemand;
 	/// Heap size added to the Auto DS Object.
-	uint HeapSize;
+	uint heapsize;
+	/// Size of requested stack.
+	uint stacksize;
+	/// Pad structure to 196 bytes
+	ubyte[E32RESBYTES3] res3;
 }
 
 int adbg_object_lx_load(adbg_object_t *o) {
@@ -205,11 +212,11 @@ const(char)* adbg_object_lx_ostype_string(ushort os) {
 
 const(char)* adbg_object_lx_modtype_string(uint flags) {
 	switch (flags & LX_FLAG_MODTYPE_MASK) { // 17:15
-	case LX_FLAG_MODTYPE_PROG:	return "Program module";
-	case LX_FLAG_MODTYPE_LIB:	return "Library module";
-	case LX_FLAG_MODTYPE_PROTLIB:	return "Protected Memory Library module";
-	case LX_FLAG_MODTYPE_PHYSDEV:	return "Physical Device Driver module";
-	case LX_FLAG_MODTYPE_VIRTDEV:	return "Virtual Device Driver module";
+	case LX_FLAG_MODTYPE_PROG:	return "Program";
+	case LX_FLAG_MODTYPE_LIB:	return "Library";
+	case LX_FLAG_MODTYPE_PROTLIB:	return "Protected Memory Library";
+	case LX_FLAG_MODTYPE_PHYSDEV:	return "Physical Device Driver";
+	case LX_FLAG_MODTYPE_VIRTDEV:	return "Virtual Device Driver";
 	default:	return "Unkown";
 	}
 }

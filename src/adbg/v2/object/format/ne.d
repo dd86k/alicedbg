@@ -88,7 +88,7 @@ enum : ubyte {
 }
 
 /// NE header
-struct ne_header {
+struct ne_header { // NOTE: No struct definition so names are made up
 	/// Signature word.
 	ushort Magic;
 	/// Version number of the linker.
