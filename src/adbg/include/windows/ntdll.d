@@ -1,4 +1,4 @@
-/// Command shell and interface to debugger.
+/// ntdll bindings.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -6,14 +6,14 @@
 module adbg.include.windows.ntdll;
 
 version (Windows):
-extern(C):
 
 import core.sys.windows.windef;
-import core.stdc.config : c_long;
+import core.sys.windows.ntdef;  // NTSTATUS
+import core.sys.windows.ntdll;
 import adbg.v2.object.symbols;
 import adbg.error;
 
-alias NTSTATUS = c_long;
+extern(C):
 
 alias MEMORY_INFORMATION_CLASS = int;
 enum

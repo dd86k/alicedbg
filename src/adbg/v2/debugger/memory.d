@@ -14,10 +14,6 @@ import core.stdc.config : c_long;
 import adbg.error;
 import adbg.utils.math;
 
-//TODO: uint adbg_memory_pagesize() (0 on error)
-//      Windows: GetSystemInfo + SYSTEM_INFO.dwPageSize
-//      Linux: sysconf(_SC_PAGESIZE)
-
 version (Windows) {
 	import core.sys.windows.winbase; // WriteProcessMemory
 	import core.sys.windows.winnt;
@@ -112,9 +108,8 @@ int adbg_memory_read(adbg_process_t *tracee, size_t addr, void *data, uint size)
 /// 	size = Size of data.
 /// Returns: Error code.
 int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size) {
-	if (tracee == null || data == null) {
+	if (tracee == null || data == null)
 		return adbg_oops(AdbgError.nullArgument);
-	}
 	
 	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
 	version (Windows) {
@@ -122,8 +117,6 @@ int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size
 			return adbg_oops(AdbgError.os);
 		return 0;
 	} else version (linux) { // Based on https://www.linuxjournal.com/article/6100
-		import core.stdc.errno : errno;
-		
 		c_long *user = cast(c_long*)data;	/// user data pointer
 		int i;	/// offset index
 		int j = size / c_long.sizeof;	/// number of "blocks" to process
@@ -134,6 +127,7 @@ int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size
 				return adbg_oops(AdbgError.os);
 		}
 		
+		//TODO: Save remainder before writing
 		j = size % c_long.sizeof;
 		if (j) {
 			if (ptrace(PT_POKEDATA, tracee.pid,
@@ -171,6 +165,7 @@ enum AdbgPageUse : ubyte {
 }
 
 private enum MEM_MAP_NAME_LEN = 512;
+//TODO: Map groups
 /// Represents a mapped memory region.
 struct adbg_memory_map_t {
 	//TODO: type (file, free, commited, etc.)
@@ -184,12 +179,14 @@ struct adbg_memory_map_t {
 	ubyte type;
 	/// Page attributes (large, etc.)
 	ubyte attributes;
+	//TODO: Should take this out into its own function
+	//      e.g., adbg_memory_get_map_name()
 	/// Module name or mapped file.
 	char[MEM_MAP_NAME_LEN] name;
 }
 
 //TODO: Options for process modules and process memory regions separatively
-//TODO: Option to include free memory regions (linux: ---p)
+//TODO: Option to include free/reserved memory regions (linux: ---p)
 // Memory options for adbg_memory_maps.
 /*enum AdbgMapOpt {
 	// Only get the memory regions for this process.
@@ -239,7 +236,7 @@ L_OPTION:
 	
 	version (Windows) {
 		if (__dynlib_psapi_load()) // EnumProcessModules, QueryWorkingSet
-			return adbg_oops(AdbgError.libLoader);
+			return adbg_errno();
 		
 		size_t uindex; /// (user) map index
 		

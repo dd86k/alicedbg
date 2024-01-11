@@ -697,7 +697,7 @@ struct adbg_mm_map {
 int adbg_mm_maps(adbg_mm_map **mmaps, size_t *mcount, ...) {
 	version (Windows) {
 		if (__dynlib_psapi_load())
-			return adbg_oops(AdbgError.libLoader);
+			return adbg_errno();
 		
 		if (g_debuggee.pid == 0) {
 			return adbg_oops(AdbgError.notAttached);

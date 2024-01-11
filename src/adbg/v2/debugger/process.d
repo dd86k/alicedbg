@@ -16,35 +16,39 @@ module adbg.v2.debugger.process;
 //      Linux: Send SIGSTOP/SIGCONT signals via kill(2)
 //TODO: List threads of process
 
-import adbg.include.c.stdlib : malloc, calloc, free;
-import adbg.include.c.stdio : snprintf;
+import adbg.include.c.stdlib; // malloc, calloc, free, exit;
+import adbg.include.c.stdio;  // snprintf;
 import adbg.include.c.stdarg;
-import core.stdc.string : memset;
-import adbg.platform, adbg.error;
+import adbg.platform;
+import adbg.error;
 import adbg.utils.strings : adbg_util_argv_flatten;
 import adbg.v2.debugger.exception : adbg_exception_t, adbg_exception_translate;
 import adbg.v2.debugger.breakpoint : adbg_breakpoint_t;
 import adbg.v2.object.machines;
+import core.stdc.string : memset;
 
 version (Windows) {
-	import core.sys.windows.windows;
 	import adbg.include.windows.wow64;
-	import adbg.include.windows.psapi_dyn : __dynlib_psapi_load,
-		EnumProcesses, EnumProcessModules,
-		GetModuleBaseNameA;
+	import adbg.include.windows.psapi_dyn;
+	import adbg.include.windows.winnt;
+	import core.sys.windows.basetsd;
+	import core.sys.windows.winbase;
+	import core.sys.windows.tlhelp32;
 } else version (Posix) {
+	import adbg.include.posix.mann;
+	import adbg.include.posix.ptrace;
+	import adbg.include.posix.unistd : clone, CLONE_PTRACE;
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
 	import core.sys.posix.signal;
 	import core.sys.posix.sys.uio;
 	import core.sys.posix.fcntl : open, O_RDONLY;
 	import core.sys.posix.unistd : read, close, execve;
-	import core.stdc.stdlib : exit, malloc, free;
-	import adbg.include.posix.mann;
-	import adbg.include.posix.ptrace;
-	import adbg.include.posix.unistd : clone, CLONE_PTRACE;
-	import adbg.include.linux.user;
-	private enum __WALL = 0x40000000;
+	
+	version (linux) {
+		import adbg.include.linux.user;
+		private enum __WALL = 0x40000000;
+	}
 }
 
 version (linux)
@@ -385,11 +389,12 @@ private int adbg_linux_child(void* arg) {
 }
 
 enum AdbgAttachOpt {
-	/// Continue execution when attached.
+	/// When set, stop execution when attached.
+	/// Note: Currently not supported on Windows. Will always stop.
 	/// Type: int
 	/// Default: 0
-	continue_ = 1,
-	/// Kill tracee when debugger exits.
+	stop = 1,
+	/// When set, kill tracee when debugger exits.
 	/// Type: int
 	/// Default: 0
 	exitkill = 2,
@@ -403,23 +408,22 @@ enum AdbgAttachOpt {
 /// 	tracee = Tracee reference.
 /// 	pid = Process ID.
 /// 	... = Options. Pass 0 for none or to end list.
-///
 /// Returns: Error code.
 int adbg_attach(adbg_process_t *tracee, int pid, ...) {
 	if (tracee == null)
-		return adbg_oops(AdbgError.nullArgument);
-	
-	int continue_;	// continue execution after attaching
-	int exitkill;	// kill child if debugger quits
+		return adbg_oops(AdbgError.invalidArgument);
+	if (pid <= 0)
+		return adbg_oops(AdbgError.invalidArgument);
 	
 	va_list list = void;
 	va_start(list, pid);
-	
+	int stop;
+	int exitkill;
 L_OPTION:
 	switch (va_arg!int(list)) {
 	case 0: break;
-	case AdbgAttachOpt.continue_:
-		continue_ = va_arg!int(list);
+	case AdbgAttachOpt.stop:
+		stop = va_arg!int(list);
 		goto L_OPTION;
 	case AdbgAttachOpt.exitkill:
 		exitkill = va_arg!int(list);
@@ -428,70 +432,46 @@ L_OPTION:
 		return adbg_oops(AdbgError.invalidOption);
 	}
 	
+	version (Trace) trace("pid=%d stop=%d exitkill=%d", pid, stop, exitkill);
+	
 	tracee.creation = AdbgCreation.attached;
 	
 	version (Windows) {
-		// Creates events:
-		// - CREATE_PROCESS_DEBUG_EVENT
-		// - CREATE_THREAD_DEBUG_EVENT
-		if (DebugActiveProcess(pid) == FALSE)
-			return adbg_oops(AdbgError.os);
+		//TODO: Integrate ObRegisterCallbacks?
+		//      https://blog.xpnsec.com/anti-debug-openprocess/
 		
+		// NOTE: Emulate ProcessIdToHandle
+		//       Uses NtOpenProcess with ClientId.UniqueProcess=PID
+		//       Uses PROCESS_ALL_ACCESS, but let's start with the basics
 		tracee.pid = cast(DWORD)pid;
 		tracee.hpid = OpenProcess(
-			PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
+			PROCESS_VM_OPERATION |
+			PROCESS_VM_WRITE |
+			PROCESS_VM_READ |
+			PROCESS_SUSPEND_RESUME |
+			PROCESS_QUERY_INFORMATION,
 			FALSE,
 			cast(DWORD)pid);
+		if (tracee.hpid == null)
+			return adbg_oops(AdbgError.os);
 		
-		// Default is TRUE on Windows
+		// Check if process already has an attached debugger
+		BOOL dbgpresent = void;
+		if (CheckRemoteDebuggerPresent(tracee.hpid, &dbgpresent) == FALSE)
+			return adbg_oops(AdbgError.os);
+		if (dbgpresent)
+			return adbg_oops(AdbgError.debuggerPresent);
+		
+		// Breaks into remote process and initiates break-in
+		if (DebugActiveProcess(tracee.pid) == FALSE)
+			return adbg_oops(AdbgError.os);
+		
+		// DebugActiveProcess, by default, kills the process on exit.
 		if (exitkill == false)
 			DebugSetProcessKillOnExit(FALSE);
-		
-		// DebugActiveProcess stops debuggee when attached
-		if (continue_) {
-			DEBUG_EVENT e = void;
-			
-			wait: while (WaitForDebugEvent(&e, 100)) {
-				switch (e.dwDebugEventCode) {
-				case CREATE_PROCESS_DEBUG_EVENT:
-				case CREATE_THREAD_DEBUG_EVENT:
-					continue;
-				case EXCEPTION_DEBUG_EVENT:
-					ContinueDebugEvent(e.dwProcessId, e.dwThreadId, DBG_CONTINUE);
-					continue;
-				default:
-					break wait;
-				}
-			}
-			
-			// This was my second attempt, but, could be useful later...
-			/*import core.sys.windows.tlhelp32 :
-				CreateToolhelp32Snapshot, Thread32First, Thread32Next,
-				THREADENTRY32, TH32CS_SNAPTHREAD;
-			
-			// CreateToolhelp32Snapshot ignores th32ProcessID for TH32CS_SNAPTHREAD
-			HANDLE h_thread_snapshot =  CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
-			if (h_thread_snapshot == INVALID_HANDLE_VALUE)
-				return adbg_oops(AdbgError.os);
-			
-			THREADENTRY32 te32 = void;
-			te32.dwSize = THREADENTRY32.sizeof;
-			
-			// If the first fails, all successive ones will fail
-			if (Thread32First(h_thread_snapshot, &te32) == FALSE)
-			{
-				CloseHandle(h_thread_snapshot);
-				return adbg_oops(AdbgError.os);
-			}
-			
-			do {
-				if (te32.th32OwnerProcessID == pid) {
-					ContinueDebugEvent(pid, te32.th32ThreadID, DBG_CONTINUE);
-				}
-			} while (Thread32Next(h_thread_snapshot, &te32));*/
-		}
 	} else version (Posix) {
-		if (ptrace(continue_ ? PT_SEIZE : PT_ATTACH, pid, null, null) < 0)
+		version (Trace) if (stop) trace("Sending break...");
+		if (ptrace(stop ? PT_ATTACH : PT_SEIZE, pid, null, null) < 0)
 			return adbg_oops(AdbgError.os);
 		
 		tracee.pid = cast(pid_t)pid;
@@ -501,7 +481,7 @@ L_OPTION:
 	}
 	
 	tracee.creation = AdbgCreation.attached;
-	tracee.status = continue_ ? AdbgStatus.running : AdbgStatus.paused;
+	tracee.status = stop ? AdbgStatus.paused : AdbgStatus.running;
 	return 0;
 }
 
@@ -690,6 +670,7 @@ L_DEBUG_LOOP:
 		//   - First SIGTRAP does NOT contain int3
 		//     - Windows does, though, and points to it
 		// - gdbserver and lldb never attempt to do such thing anyway
+		// - RIP-1 (x86) could *maybe* point to int3 or similar.
 		// NOTE: Newer D compilers fixed siginfo_t as a whole
 		//       for version (linux). Noticed on DMD 2.103.1.
 		//       Old glibc: ._sifields._sigfault.si_addr
@@ -961,8 +942,9 @@ struct adbg_process_list_t {
 }
 
 //TODO: Redo adbg_process_enumerate
-//      1. List of PIDs instead, use adbg_process_get_name for file path.
-//      2. Allocate structure with count + items
+//      int adbg_process_list(adbg_process_list_t*)
+//      - List of PIDs instead, use adbg_process_get_name for file path.
+
 // NOTE: For the C vararg to work, list is a parameter instead of a return value.
 /// Enumerate running processes.
 ///
@@ -1006,7 +988,7 @@ L_OPTION:
 	version (Windows) {
 		if (__dynlib_psapi_load()) {
 			free(list.processes);
-			return adbg_oops(AdbgError.libLoader);
+			return adbg_errno();
 		}
 		
 		// Allocate temp PID buffer
@@ -1038,8 +1020,8 @@ L_OPTION:
 			
 			adbg_process_t *proc = &list.processes[count++];
 			proc.pid = pid;
+			proc.hpid = procHandle;
 			proc.tid = 0;
-			proc.htid = procHandle;
 			
 			//TODO: Is EnumProcessModules really necessary?
 			HMODULE hmod = void;

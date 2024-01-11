@@ -5,8 +5,16 @@
 /// License: BSD-3-Clause
 module adbg.include.windows.winnt;
 
+version (Windows):
+
+public import core.sys.windows.winnt;
+
+extern (Windows):
+
 alias ULONGLONG = ulong;
 alias DWORD = uint;
+
+enum PROCESS_SUSPEND_RESUME = 0x0800;
 
 //
 // Process specific MEMORY_BASIC_INFORMATION, useful for WoW processes.
