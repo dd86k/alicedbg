@@ -40,6 +40,7 @@ extern (C):
 //TODO: const(ubyte)* adbg_obj_section_i(obj, index);
 //TODO: const(ubyte)* adbg_object_get_section_by_type(obj, type);
 //TODO: const(char)* adbg_object_get_debug_path(obj);
+//TODO: int adbg_object_load_debug(obj, path);
 //TODO: Consider structure definition, using a template
 //      Uses:
 //      - For swapping, uses less code than inlining it

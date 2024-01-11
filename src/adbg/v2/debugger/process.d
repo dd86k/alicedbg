@@ -33,7 +33,6 @@ version (Windows) {
 	import adbg.include.windows.winnt;
 	import core.sys.windows.basetsd;
 	import core.sys.windows.winbase;
-	import core.sys.windows.tlhelp32;
 } else version (Posix) {
 	import adbg.include.posix.mann;
 	import adbg.include.posix.ptrace;

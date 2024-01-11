@@ -90,7 +90,7 @@ enum : ubyte {
 /// NE header
 struct ne_header {
 	/// Signature word.
-	char[2] Magic;
+	ushort Magic;
 	/// Version number of the linker.
 	ubyte LinkerVersion;
 	/// Revision number of the linker.
@@ -172,7 +172,7 @@ struct ne_header {
 	/// Number of resource entries.
 	ushort ResourceCount;
 	/// Executable type, used by loader.
-	ushort Type;
+	ubyte Type;
 	/// Reserved, currently 0's.
 	ubyte[8] Reserved;
 }
@@ -290,13 +290,12 @@ int adbg_object_ne_load(adbg_object_t *o) {
 		Movable	= adbg_bswap16(Movable);
 		SectorAlign	= adbg_bswap16(SectorAlign);
 		ResourceCount	= adbg_bswap16(ResourceCount);
-		Type	= adbg_bswap16(Type);
 	}
 	
 	return 0;
 }
 
-const(char)* adbg_object_ne_type(ushort type) {
+const(char)* adbg_object_ne_type(ubyte type) {
 	switch (type) {
 	case NE_TYPE_WINDOWS: return "Windows";
 	default: return "Unknown";

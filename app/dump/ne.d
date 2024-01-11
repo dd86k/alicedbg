@@ -53,7 +53,7 @@ void dump_ne_hdr(ref Dumper dump, adbg_object_t *o) {
 	print_u16("Movable", Movable);
 	print_u16("SectorAlign", SectorAlign);
 	print_u16("ResourceCount", ResourceCount);
-	print_u16("Type", Type, adbg_object_ne_type(Type));
+	print_u8("Type", Type, adbg_object_ne_type(Type));
 	print_x8("Reserved[0]", Reserved[0]);
 	print_x8("Reserved[1]", Reserved[1]);
 	print_x8("Reserved[2]", Reserved[2]);
