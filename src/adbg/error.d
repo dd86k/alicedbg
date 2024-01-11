@@ -7,12 +7,15 @@
 module adbg.error;
 
 version (Windows) {
+	import core.sys.windows.winbase : GetLastError, FormatMessageA,
+		FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_MAX_WIDTH_MASK;
 	enum ADBG_OS_ERROR_FORMAT = "%08X"; /// Error code format
 } else {
-	import core.stdc.errno : errno;
-	import core.stdc.string : strerror;
 	enum ADBG_OS_ERROR_FORMAT = "%d"; /// Error code format
 }
+import core.stdc.errno : errno;
+import core.stdc.string : strerror;
+import adbg.include.capstone : csh, cs_errno, cs_strerror;
 
 //TODO: Consider making all codes values of 1000 or more.
 //TODO: Make module thread-safe
@@ -21,6 +24,7 @@ version (Windows) {
 //      invalidArgument: string stating which argument
 //TODO: adbg_error_source -> alicedbg/crt/os/capstone, etc.
 //      adbg_error_is_external -> bool
+//TODO: Maybe redo error code functions to reduce confusion between errno/external/system/current
 
 extern (C):
 
@@ -32,16 +36,17 @@ enum AdbgError {
 	success	= 0,
 	invalidArgument	= 1,
 	emptyArgument	= 2,
-	nullArgument	= invalidArgument,	// Old alias for invalidArgument
 	uninitiated	= 4,	// Only when user value is important like for fopen
 	invalidOption	= 5,
 	invalidOptionValue	= 6,
+	nullArgument	= invalidArgument,	// Old alias for invalidArgument
 	//
 	// 100-199: Debugger
 	//
 	debuggerUnattached = 100,
 	debuggerUnpaused = 101,
 	debuggerInvalidAction = 102,	/// Wrong action from creation method.
+	debuggerPresent = 103,	/// Debugger already present in remote process
 	// Old meanings
 	notAttached = debuggerUnattached,	/// Old value for debuggerUnattached
 	notPaused = debuggerUnpaused,	/// Old value for debuggerUnpaused
@@ -73,7 +78,6 @@ enum AdbgError {
 	objectInvalidType	= 314,
 	objectInvalidABI	= 315,
 	objectOutsideAccess	= 320,
-	objectSymbolLoadFailed	= 330,
 	// Old meanings
 	unknownObjFormat	= objectUnknownFormat,
 	unsupportedObjFormat	= objectUnsupportedFormat,
@@ -106,7 +110,7 @@ enum AdbgError {
 	os	= 2001,
 	crt	= 2002,
 	//
-	// 3000-3999: External libraryes
+	// 3000-3999: External libraries
 	//
 	libLoader	= 3001,	/// BindBC
 	libCapstone	= 3002,	/// Capstone
@@ -117,7 +121,7 @@ struct adbg_error_t {
 	const(char)* mod;	/// Source module
 	int line;	/// Line source
 	int code;	/// Error code
-	void *res;	/// Resource
+	void *res;	/// External handle or code
 }
 /// Last error in alicedbg.
 private __gshared adbg_error_t error;
@@ -161,15 +165,15 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.invalidObjType, "Invalid object type." },
 	{ AdbgError.invalidObjABI, "Invalid ABI value for object." },
 	//
-	// Memory subsystem
+	// Memory module
 	//
 	{ AdbgError.scannerDataEmpty, "Size of data given to memory scanner is empty." },
-	{ AdbgError.scannerDataLimit, "Size of data given to memory scanner is too high." },
+	{ AdbgError.scannerDataLimit, "Size of data given to memory scanner is too large." },
 	//
 	// Misc.
 	//
 	{ AdbgError.unimplemented, "Feature is not implemented." },
-	{ AdbgError.assertion, "A soft assert was hit." },
+	{ AdbgError.assertion, "A soft debugging assertion was hit." },
 	{ AdbgError.success, "No errors occured." },
 ];
 
@@ -186,8 +190,7 @@ const(adbg_error_t)* adbg_error_current() {
 /// Returns: String
 const(char)* adbg_sys_error(int code) {
 	version (Windows) {
-		import core.sys.windows.winbase : FormatMessageA,
-			FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_MAX_WIDTH_MASK;
+		//TODO: Handle NTSTATUS codes
 		enum ERR_BUF_SZ = 256;
 		__gshared char [ERR_BUF_SZ]buffer = void;
 		size_t len = FormatMessageA(
@@ -209,8 +212,7 @@ const(char)* adbg_sys_error(int code) {
 private
 int adbg_error_system() {
 	version (Windows) {
-		import core.sys.windows.winbase : GetLastError;
-		return GetLastError;
+		return error.res ? cast(uint)error.res : GetLastError();
 	} else
 		return errno;
 }
@@ -249,9 +251,6 @@ int adbg_errno() {
 /// Obtain the external error code.
 /// Returns: Subsystem, library, or OS error code.
 int adbg_errno_extern() {
-	import core.stdc.errno : errno;
-	import adbg.include.capstone : csh, cs_errno;
-	
 	switch (error.code) with (AdbgError) {
 	case crt:	return errno;
 	case os:	return adbg_error_system;
@@ -263,15 +262,11 @@ int adbg_errno_extern() {
 /// Obtain an error message with the last error code set.
 /// Returns: Error message
 const(char)* adbg_error_msg(int code = error.code) {
-	import core.stdc.errno : errno;
-	import core.stdc.string : strerror;
-	import adbg.include.capstone : csh, cs_errno, cs_strerror;
-	
 	switch (error.code) with (AdbgError) {
 	case crt:
 		return strerror(errno);
 	case os:
-		return adbg_sys_error(adbg_error_system);
+		return adbg_sys_error(adbg_error_system());
 	case libCapstone:
 		return cs_strerror(cs_errno(*cast(csh*)error.res));
 	default:
@@ -287,8 +282,6 @@ version (Trace) {
 	private import adbg.include.d.config : D_FEATURE_PRAGMA_PRINTF;
 	
 	private extern (C) int putchar(int);
-	
-	//TODO: Eventually deprecate this for adbg_log_trace
 	
 	static if (D_FEATURE_PRAGMA_PRINTF) {
 		/// Trace application
