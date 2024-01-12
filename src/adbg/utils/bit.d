@@ -56,6 +56,28 @@ template CHAR32(char[4] s) {
 	version (BigEndian)    assert(CHAR32!"ABCD" == 0x41424344);
 }
 
+/// Turn a 8-character string into a 8-byte number
+/// Params: s = 8-character string
+template CHAR64(char[8] s) {
+	version (BigEndian)
+		enum ulong CHAR64 =
+			(cast(ulong)s[0] << 56) | (cast(ulong)s[1] << 48) |
+			(cast(ulong)s[2] << 40) | (cast(ulong)s[3] << 32) |
+			(cast(ulong)s[4] << 24) | (cast(ulong)s[5] << 16) |
+			(cast(ulong)s[6] << 8)  | s[7];
+	else
+		enum ulong CHAR64 =
+			(cast(ulong)s[7] << 56) | (cast(ulong)s[6] << 48) |
+			(cast(ulong)s[5] << 40) | (cast(ulong)s[4] << 32) |
+			(cast(ulong)s[3] << 24) | (cast(ulong)s[2] << 16) |
+			(cast(ulong)s[1] << 8)  | s[0];
+}
+/// 
+@system unittest {
+	version (LittleEndian) assert(CHAR64!"ABCDabcd" == 0x6463626144434241);
+	version (BigEndian)    assert(CHAR64!"ABCDabcd" == 0x4142434461626364);
+}
+
 /// Ensure endianness on 16-bit number.
 /// Params:
 ///   v = Value.
