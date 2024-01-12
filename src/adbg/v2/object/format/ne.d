@@ -269,7 +269,8 @@ int adbg_object_ne_load(adbg_object_t *o) {
 	
 	o.i.ne.header = cast(ne_header*)o.i.mz.newbase;
 	
-	if (o.p.reversed) with (o.i.ne.header) {
+	with (o.i.ne.header)
+	if (o.p.reversed) {
 		EntryTableOffset	= adbg_bswap16(EntryTableOffset);
 		EntryTableSize	= adbg_bswap16(EntryTableSize);
 		Flags	= adbg_bswap16(Flags);

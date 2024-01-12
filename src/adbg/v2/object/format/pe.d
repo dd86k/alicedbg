@@ -319,7 +319,7 @@ struct PE_EXPORT_DESCRIPTOR { align(1):
 	uint32_t OrdinalTable;	/// RVA
 }
 
-struct PE_EXPORT_ENTRY { align(1):
+union PE_EXPORT_ENTRY { align(1):
 	uint32_t Export;	/// RVA
 	uint32_t Forwarder;	/// RVA
 }
@@ -334,7 +334,7 @@ struct PE_IMPORT_DESCRIPTOR { align(1):
 }
 
 /// Import Lookup Table entry structure
-struct PE_IMPORT_LTE32 { align(1):
+struct PE_IMPORT_ENTRY32 { align(1):
 	union {
 		uint ordinal;	/// Ordinal/Name Flag
 		ushort number;	/// Ordinal Number (val[31] is set)
@@ -342,7 +342,7 @@ struct PE_IMPORT_LTE32 { align(1):
 	}
 }
 /// Import Lookup Table entry structure
-struct PE_IMPORT_LTE64 { align(1):
+struct PE_IMPORT_ENTRY64 { align(1):
 	union {
 		ulong ordinal;	/// Ordinal/Name Flag
 		ushort number;	/// Ordinal Number (val2[31] is set)
@@ -672,12 +672,13 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	
 	o.format = AdbgObject.pe;
 	
+	// Boundchecks are done later
 	void *base = o.i.mz.newbase;
-	
 	o.i.pe.header = cast(PE_HEADER*)base;
 	o.i.pe.opt_header = cast(PE_OPTIONAL_HEADER*)(base + PE_OFFSET_OPTHDR);
 	
-	if (o.p.reversed) with (o.i.pe.header) {
+	with (o.i.pe.header)
+	if (o.p.reversed) {
 		Signature32	= adbg_bswap32(Signature32);
 		Machine	= adbg_bswap16(Machine);
 		NumberOfSections	= adbg_bswap16(NumberOfSections);
@@ -696,12 +697,10 @@ int adbg_object_pe_load(adbg_object_t *o) {
 			return adbg_oops(AdbgError.assertion);
 		
 		o.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR32);
-		
 		if (adbg_object_outboundpl(o, o.i.pe.directory, PE_IMAGE_DATA_DIRECTORY.sizeof))
 			return adbg_oops(AdbgError.assertion);
 		
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR32);
-		
 		if (adbg_object_outboundpl(o, o.i.pe.sections,
 			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
 			return adbg_oops(AdbgError.assertion);
@@ -742,12 +741,10 @@ int adbg_object_pe_load(adbg_object_t *o) {
 			return adbg_oops(AdbgError.assertion);
 		
 		o.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR64);
-		
 		if (adbg_object_outboundpl(o, o.i.pe.directory, PE_IMAGE_DATA_DIRECTORY.sizeof))
 			return adbg_oops(AdbgError.assertion);
 		
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR64);
-		
 		if (adbg_object_outboundpl(o, o.i.pe.sections,
 			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
 			return adbg_oops(AdbgError.assertion);
@@ -785,7 +782,6 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	case PE_FMT_ROM: // NOTE: ROM have no optional header and directories
 		o.i.pe.directory = null;
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDRROM);
-		
 		if (adbg_object_outboundpl(o, o.i.pe.sections,
 			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
 			return adbg_oops(AdbgError.assertion);
@@ -854,9 +850,10 @@ int adbg_object_pe_load(adbg_object_t *o) {
 				return adbg_oops(AdbgError.crt);
 		}
 		with (o.i.pe.directory.ExportTable) if (size && rva) {
-			size_t count = size / PE_DEBUG_DIRECTORY.sizeof;
-			o.i.pe.reversed_dir_exports = cast(bool*)calloc(count, bool.sizeof);
-			if (o.i.pe.reversed_dir_exports == null)
+			size_t count = size / PE_EXPORT_DESCRIPTOR.sizeof;
+			o.i.pe.reversed_dir_exports = false;
+			o.i.pe.reversed_dir_export_entries = cast(bool*)calloc(count, bool.sizeof);
+			if (o.i.pe.reversed_dir_export_entries == null)
 				return adbg_oops(AdbgError.crt);
 		}
 		with (o.i.pe.directory.ImportTable) if (size && rva) {
@@ -962,25 +959,35 @@ PE_SECTION_ENTRY* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 // - [ ] DelayImport
 // - [ ] CLRHeader
 
-PE_EXPORT_DESCRIPTOR* adbg_object_pe_export(adbg_object_t *o, size_t index) {
+//
+// Export directory functions
+//
+// One descriptortable, multiple entries, because one module can emit one table.
+//   Name -> Name of the module
+//   ExportAddressTable -> raw address to RVAs
+//     AddressTableEntries for count
+//     RVA -> hint + entry
+
+PE_EXPORT_DESCRIPTOR* adbg_object_pe_export(adbg_object_t *o) {
 	if (o == null) return null;
 	if (o.i.pe.directory == null) return null;
-	size_t count = o.i.pe.directory.ExportTable.size / PE_EXPORT_DESCRIPTOR.sizeof;
-	if (index >= count) return null;
 	
 	// Set base
-	if (o.i.pe.directory_exports == null) {
-		o.i.pe.directory_exports = cast(PE_EXPORT_DESCRIPTOR*)
-			adbg_object_pe_locate(o, o.i.pe.directory.ExportTable.rva);
+	with (o.i.pe)
+	if (directory_exports == null) {
+		directory_exports = cast(PE_EXPORT_DESCRIPTOR*)
+			adbg_object_pe_locate(o, directory.ExportTable.rva);
 		// Not found
-		if (o.i.pe.directory_exports == null) return null;
+		if (directory_exports == null) return null;
 	}
 	
-	PE_EXPORT_DESCRIPTOR* export_ = o.i.pe.directory_exports + index;
-	// Double check, count is sometimes misleading
-	if (export_.Name == 0) return null;
+	// adbg_object_pe_locate checked pointer bounds
+	PE_EXPORT_DESCRIPTOR* exportdir = o.i.pe.directory_exports;
 	
-	if (o.p.reversed && o.i.pe.reversed_dir_exports[index] == false) with (export_) {
+	// ExportFlags must be zero
+	if (exportdir.ExportFlags != 0) return null;
+	
+	if (o.p.reversed && o.i.pe.reversed_dir_exports == false) with (exportdir) {
 		ExportFlags	= adbg_bswap32(ExportFlags);
 		Timestamp	= adbg_bswap32(Timestamp);
 		MajorVersion	= adbg_bswap16(MajorVersion);
@@ -992,30 +999,57 @@ PE_EXPORT_DESCRIPTOR* adbg_object_pe_export(adbg_object_t *o, size_t index) {
 		ExportAddressTable	= adbg_bswap32(ExportAddressTable);
 		NamePointer	= adbg_bswap32(NamePointer);
 		OrdinalTable	= adbg_bswap32(OrdinalTable);
-		o.i.pe.reversed_dir_exports[index] = true;
+		o.i.pe.reversed_dir_exports = true;
 	}
-	return export_;
+	
+	return exportdir;
 }
 
-char* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_) {
+const(char)* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_) {
 	if (o == null || export_ == null) return null;
 	if (o.i.pe.directory == null) return null;
 	if (o.i.pe.directory_exports == null) return null;
 	
-	char *s = cast(char*)o.i.pe.directory_exports
+	const(char) *name =
+		cast(const(char)*)o.i.pe.directory_exports
 		- o.i.pe.directory.ExportTable.rva
 		+ export_.Name;
 	
-	if (adbg_object_outboundp(o, s)) return null;
+	if (adbg_object_outboundp(o, cast(void*)name))
+		return null;
 	
-	return s;
+	return name;
 }
 
-char* adbg_object_pe_export_string_hint(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, size_t index) {
+PE_EXPORT_ENTRY* adbg_object_pe_export_name_entry(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, size_t index) {
 	if (o == null || export_ == null) return null;
 	if (o.i.pe.directory == null) return null;
 	if (o.i.pe.directory_exports == null) return null;
 	if (index >= export_.NumberOfNamePointers) return null;
+	
+	// Check bounds with table RVA
+	void *base = cast(void*)o.i.pe.directory_exports
+		- o.i.pe.directory.ExportTable.rva
+		+ export_.NamePointer;
+	if (adbg_object_outboundp(o, base))
+		return null;
+	
+	// Check bounds with name pointer and requested index
+	PE_EXPORT_ENTRY *entry = cast(PE_EXPORT_ENTRY*)base + index;
+	if (adbg_object_outboundp(o, entry))
+		return null;
+	
+	if (o.p.reversed && o.i.pe.reversed_dir_export_entries[index] == false) with (entry) {
+		entry.Export = adbg_bswap32(entry.Export);
+		o.i.pe.reversed_dir_export_entries[index] = true;
+	}
+	
+	return entry;
+}
+
+const(char)* adbg_object_pe_export_name_string(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, PE_EXPORT_ENTRY *entry) {
+	if (o == null || export_ == null || entry == null)
+		return null;
 	
 	// NOTE: Export Table bounds
 	//       If the address specified is not within the export section (as
@@ -1024,22 +1058,19 @@ char* adbg_object_pe_export_string_hint(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *
 	//       address in code or data. Otherwise, the field is a Forwarder
 	//       RVA, which names a symbol in another DLL.
 	
+	//TODO: Forwarder check
+	//if (entry.Export >= o.i.pe.directory.ExportTable.size)
+	//	return null;
+	
 	// Check bounds with table RVA
-	void *base = cast(void*)o.i.pe.directory_exports
-		- o.i.pe.directory.ExportTable.rva;
-	if (adbg_object_outboundp(o, base)) return null;
-	
-	// Check bounds with name pointer and requested index
-	//TODO: Check if hint is forwarder
-	uint *hint = cast(uint*)(base + export_.NamePointer) + index;
-	if (adbg_object_outboundp(o, hint)) return null;
-	
-	// Check bounds with hint
-	void *name = base + *hint;
-	if (adbg_object_outboundp(o, name)) return null;
-	
-	return cast(char*)name;
+	void *base = cast(void*)o.i.pe.directory_exports -
+		o.i.pe.directory.ExportTable.rva + entry.Export;
+	return adbg_object_outboundp(o, base) ? null : cast(const(char)*)base;
 }
+
+//
+// Import directory functions
+//
 
 PE_IMPORT_DESCRIPTOR* adbg_object_pe_import(adbg_object_t *o, size_t index) {
 	if (o == null) return null;
@@ -1082,11 +1113,11 @@ char* adbg_object_pe_import_name(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_
 
 //TODO: Byte-swap import look-up table entries
 
-PE_IMPORT_LTE32* adbg_object_pe_import_lte32(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
+PE_IMPORT_ENTRY32* adbg_object_pe_import_entry32(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
 	if (o == null || import_ == null) return null;
 	if (o.i.pe.directory_imports == null) return null;
 	
-	PE_IMPORT_LTE32* lte32 = cast(PE_IMPORT_LTE32*)
+	PE_IMPORT_ENTRY32* lte32 = cast(PE_IMPORT_ENTRY32*)
 		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
 		+ index;
 	
@@ -1096,7 +1127,7 @@ PE_IMPORT_LTE32* adbg_object_pe_import_lte32(adbg_object_t *o, PE_IMPORT_DESCRIP
 	return lte32;
 }
 
-ushort* adbg_object_pe_import_lte32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_LTE32 *im32) {
+ushort* adbg_object_pe_import_entry32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_ENTRY32 *im32) {
 	if (o == null || import_ == null) return null;
 	if (o.i.pe.directory_imports == null) return null;
 	
@@ -1108,11 +1139,11 @@ ushort* adbg_object_pe_import_lte32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR 
 	return base;
 }
 
-PE_IMPORT_LTE64* adbg_object_pe_import_lte64(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
+PE_IMPORT_ENTRY64* adbg_object_pe_import_entry64(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
 	if (o == null || import_ == null) return null;
 	if (o.i.pe.directory_imports == null) return null;
 	
-	PE_IMPORT_LTE64* lte64 = cast(PE_IMPORT_LTE64*)
+	PE_IMPORT_ENTRY64* lte64 = cast(PE_IMPORT_ENTRY64*)
 		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
 		+ index;
 	
@@ -1124,7 +1155,7 @@ PE_IMPORT_LTE64* adbg_object_pe_import_lte64(adbg_object_t *o, PE_IMPORT_DESCRIP
 	return lte64;
 }
 
-ushort* adbg_object_pe_import_lte64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_LTE64 *im64) {
+ushort* adbg_object_pe_import_entry64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_ENTRY64 *im64) {
 	if (o == null || import_ == null) return null;
 	if (o.i.pe.directory_imports == null) return null;
 	
@@ -1158,6 +1189,10 @@ ushort* adbg_object_pe_import_lte64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR 
 	}
 }+/
 
+//
+// Debug directory functions
+//
+
 PE_DEBUG_DIRECTORY* adbg_object_pe_debug_directory(adbg_object_t *o, size_t index) {
 	if (o == null) return null;
 	if (o.i.pe.directory == null) return null;
@@ -1186,6 +1221,10 @@ PE_DEBUG_DIRECTORY* adbg_object_pe_debug_directory(adbg_object_t *o, size_t inde
 	}
 	return debug_;
 }
+
+//
+// Other helpers
+//
 
 AdbgMachine adbg_object_pe_machine(ushort machine) {
 	switch (machine) {

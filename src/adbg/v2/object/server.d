@@ -197,9 +197,11 @@ struct adbg_object_t {
 			PE_SECTION_ENTRY *sections;
 			
 			bool *reversed_sections;
-			bool *reversed_dir_exports;
+			bool *reversed_dir_export_entries;
 			bool *reversed_dir_imports;
 			bool *reversed_dir_debug;
+			
+			bool reversed_dir_exports;
 		}
 		pe_t pe;
 		
@@ -244,32 +246,6 @@ struct adbg_object_t {
 	adbg_object_internals_t i;
 }
 
-// Internal: Check if pointer is within file boundaries
-package
-deprecated("Use adbg_object_outbounds")
-bool adbg_object_ptrbnds(adbg_object_t *o, void *ptr) {
-	return ptr >= o.buffer && ptr < o.buffer + o.file_size;
-}
-/// Check if offset is within file boundaries
-/// Params:
-/// 	o = Object instance.
-/// 	pos = File offset.
-/// Returns: True if in bounds.
-deprecated("Use adbg_object_outbounds")
-bool adbg_object_offbnds(adbg_object_t *o, ulong off) {
-	return off < o.file_size;
-}
-/// Check if offset with size is within file boundaries
-/// Params:
-/// 	o = Object instance.
-/// 	pos = File offset.
-/// 	size = Data size.
-/// Returns: True if in bounds.
-deprecated("Use adbg_object_outbounds")
-bool adbg_object_offbnds2(adbg_object_t *o, ulong off, size_t size) {
-	return off + size < o.file_size;
-}
-
 /// Check if pointer is outside the object bounds.
 /// Params:
 /// 	o = Object instance.
@@ -300,6 +276,7 @@ bool adbg_object_outbound(adbg_object_t *o, ulong off) {
 	if (o == null) return true;
 	return off >= o.file_size;
 }
+
 /// Check if offset with size is within file boundaries
 /// Params:
 /// 	o = Object instance.
@@ -325,6 +302,7 @@ bool adbg_object_offset(adbg_object_t *o, void** p, ulong offset) {
 	*p = o.buffer + offset;
 	return false;
 }
+
 /// Get pointer from offset with size.
 /// Params:
 /// 	o = Object instance.
@@ -362,29 +340,6 @@ bool adbg_object_offsett(T)(adbg_object_t *o, T* dst, ulong offset) {
 	else
 		static assert(0, "adbg_object_offsett memcpy TODO");
 	return false;
-}
-
-/// Load an object from disk into memory.
-/// Params:
-///   o = Object instance.
-///   path = File path.
-///   ... = Options. Terminated with 0.
-/// Returns: Error code.
-deprecated("Use adbg_object_open_file")
-int adbg_object_open(adbg_object_t *o, const(char) *path, ...) {
-	if (o == null)
-		return adbg_oops(AdbgError.nullArgument);
-	
-	o.file_handle = fopen(path, "rb");
-	if (o.file_handle == null)
-		return adbg_oops(AdbgError.crt);
-	
-	va_list list = void;
-	va_start(list, path);
-	
-	int r = adbg_object_loadv(o, list); // Clears .p
-	o.p.noalloc = true;
-	return r;
 }
 
 /// Load an object from disk into memory.
@@ -438,7 +393,7 @@ void adbg_object_close(adbg_object_t *o) {
 	case pe:
 		with (o.i.pe) {
 			if (reversed_sections) free(reversed_sections);
-			if (reversed_dir_exports) free(reversed_dir_exports);
+			if (reversed_dir_export_entries) free(reversed_dir_export_entries);
 			if (reversed_dir_imports) free(reversed_dir_imports);
 			if (reversed_dir_debug) free(reversed_dir_debug);
 		}

@@ -82,7 +82,8 @@ int adbg_object_mz_load(adbg_object_t *o) {
 	if (o.file_size < MINIMUM_SIZE)
 		return adbg_oops(AdbgError.objectTooSmall);
 	
-	if (o.p.reversed) with (o.i.mz.header) {
+	with (o.i.mz.header)
+	if (o.p.reversed) {
 		e_magic	= adbg_bswap16(e_magic);
 		e_cblp	= adbg_bswap16(e_cblp);
 		e_cp	= adbg_bswap16(e_cp);
@@ -100,7 +101,8 @@ int adbg_object_mz_load(adbg_object_t *o) {
 	}
 	
 	o.format = AdbgObject.mz;
-	with (o.i.mz) if (header.e_lfarlc && header.e_crlc && header.e_lfarlc < o.file_size) {
+	with (o.i.mz)
+	if (header.e_lfarlc && header.e_crlc && header.e_lfarlc < o.file_size) {
 		relocs = cast(mz_reloc*)(o.buffer + header.e_lfarlc);
 		if (o.p.reversed)
 			o.i.mz.reversed_relocs = cast(bool*)calloc(header.e_crlc, bool.sizeof);

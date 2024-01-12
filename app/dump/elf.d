@@ -41,10 +41,10 @@ void dump_elf_ehdr(ref Dumper dump, adbg_object_t *o) {
 	ubyte ei_osabi	= e_ident[ELF_EI_OSABI];
 	ubyte ei_abiversion	= e_ident[ELF_EI_ABIVERSION];
 	
-	print_x8("e_ident[0]", '\x7f', "\\x7f");
-	print_x8("e_ident[1]", 'E', "E");
-	print_x8("e_ident[2]", 'L', "L");
-	print_x8("e_ident[3]", 'F', "F");
+	print_x8("e_ident[0]", '\x7f', `\x7f`);
+	print_x8("e_ident[1]", 'E', `E`);
+	print_x8("e_ident[2]", 'L', `L`);
+	print_x8("e_ident[3]", 'F', `F`);
 	print_u8("e_ident[EI_CLASS]", ei_class, adbg_object_elf_class_string(ei_class));
 	print_u8("e_ident[EI_DATA]", ei_data, adbg_object_elf_data_string(ei_data));
 	print_u8("e_ident[EI_VERSION]", ei_version);
@@ -138,8 +138,7 @@ void dump_elf_phdr(ref Dumper dump, adbg_object_t *o) {
 	
 	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:
-		if (o.i.elf32.phdr == null ||
-			o.i.elf32.ehdr.e_phnum == 0)
+		with (o.i.elf32) if (phdr == null || ehdr.e_phnum == 0)
 			return;
 		
 		//TODO: adbg_object_elf32_phnum function?
@@ -167,8 +166,7 @@ void dump_elf_phdr(ref Dumper dump, adbg_object_t *o) {
 		}
 		break;
 	case ELF_CLASS_64:
-		if (o.i.elf64.phdr == null ||
-			o.i.elf64.ehdr.e_phnum == 0)
+		with (o.i.elf64) if (phdr == null || ehdr.e_phnum == 0)
 			return;
 		
 		for (uint i; i < o.i.elf64.ehdr.e_phnum; ++i) {
@@ -312,7 +310,6 @@ void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
 }
 
 void dump_elf_disasm(ref Dumper dump, adbg_object_t *o) {
-	import core.stdc.stdlib : malloc;
 	print_header("Disassembly");
 	
 	bool all = dump.selected_disasm_all();

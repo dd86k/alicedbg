@@ -535,30 +535,29 @@ void dump_pe_sections(ref Dumper dump, adbg_object_t *o) {
 
 void dump_pe_exports(ref Dumper dump, adbg_object_t *o) {
 	print_header("Exports");
-	PE_EXPORT_DESCRIPTOR *export_ = void;
-	size_t i;
-	while ((export_ = adbg_object_pe_export(o, i++)) != null) with (export_) {
-		char* name = adbg_object_pe_export_name(o, export_);
-		print_section(cast(uint)i, name, 128);
-		
-		print_x32("ExportFlags", ExportFlags);
-		print_x32("Timestamp", Timestamp);
-		print_x16("MajorVersion", MajorVersion);
-		print_x16("MinorVersion", MinorVersion);
-		print_x32("Name", Name);
-		print_x32("OrdinalBase", OrdinalBase);
-		print_x32("AddressTableEntries", AddressTableEntries);
-		print_x32("NumberOfNamePointers", NumberOfNamePointers);
-		print_x32("ExportAddressTable", ExportAddressTable);
-		print_x32("NamePointer", NamePointer);
-		print_x32("OrdinalTable", OrdinalTable);
-		
-		char* hint = void;
-		size_t ie;
-		while ((hint = adbg_object_pe_export_string_hint(o, export_, ie++)) != null) {
-			import core.stdc.stdio : printf;
-			printf("  - %s\n", hint);
-		}
+	
+	PE_EXPORT_DESCRIPTOR *export_ = adbg_object_pe_export(o);
+	if (export_ == null)
+		return;
+	
+	with (export_) {
+	print_x32("ExportFlags", ExportFlags);
+	print_x32("Timestamp", Timestamp);
+	print_x16("MajorVersion", MajorVersion);
+	print_x16("MinorVersion", MinorVersion);
+	print_x32("Name", Name, adbg_object_pe_export_name(o, export_));
+	print_x32("OrdinalBase", OrdinalBase);
+	print_x32("AddressTableEntries", AddressTableEntries);
+	print_x32("NumberOfNamePointers", NumberOfNamePointers);
+	print_x32("ExportAddressTable", ExportAddressTable);
+	print_x32("NamePointer", NamePointer);
+	print_x32("OrdinalTable", OrdinalTable);
+	}
+	
+	PE_EXPORT_ENTRY *entry = void;
+	size_t ie;
+	while ((entry = adbg_object_pe_export_name_entry(o, export_, ie++)) != null) {
+		print_x32("Export", entry.Export, adbg_object_pe_export_name_string(o, export_, entry));
 	}
 }
 
@@ -582,44 +581,48 @@ void dump_pe_imports(ref Dumper dump, adbg_object_t *o) {
 		size_t il;
 		switch (o.i.pe.opt_header.Magic) {
 		case PE_FMT_32:
-			PE_IMPORT_LTE32 *t32 = adbg_object_pe_import_lte32(o, import_, il);
+			PE_IMPORT_ENTRY32 *t32 = adbg_object_pe_import_entry32(o, import_, il);
 			if (t32 == null) continue;
 			do with (t32) {
 				if (ordinal >= 0x8000_0000) { // Ordinal
 					print_section(cast(uint)il);
 					print_x16("Number", number);
 				} else { // RVA
-					ushort *hint = adbg_object_pe_import_lte32_hint(o, import_, t32);
-					if (hint == null)
+					ushort *hint = adbg_object_pe_import_entry32_hint(o, import_, t32);
+					if (hint == null) {
+				LBADINDEX32:
+						print_string("warning", "String index outside buffer");
 						continue;
-					//TODO: Check import name bounds
-					const(char)* import_name =
-						cast(const(char)*)hint + ushort.sizeof;
-					print_section(cast(uint)il, import_name, 64);
-					print_x16("Hint", *hint);
+					}
+					const(char)* import_name = cast(const(char)*)hint + ushort.sizeof;
+					if (adbg_object_outboundp(o, cast(void*)import_name))
+						goto LBADINDEX32;
 					print_x32("RVA", rva);
+					print_x16l("Hint", *hint, import_name, 64);
 				}
-			} while ((t32 = adbg_object_pe_import_lte32(o, import_, ++il)) != null);
+			} while ((t32 = adbg_object_pe_import_entry32(o, import_, ++il)) != null);
 			continue;
 		case PE_FMT_64:
-			PE_IMPORT_LTE64 *t64 = adbg_object_pe_import_lte64(o, import_, il);
+			PE_IMPORT_ENTRY64 *t64 = adbg_object_pe_import_entry64(o, import_, il);
 			if (t64 == null) continue;
 			do with (t64) {
 				if (ordinal >= 0x8000_0000_0000_0000) { // Ordinal
 					print_section(cast(uint)il);
 					print_x16("Number", number);
 				} else { // RVA
-					ushort *hint = adbg_object_pe_import_lte64_hint(o, import_, t64);
-					if (hint == null)
+					ushort *hint = adbg_object_pe_import_entry64_hint(o, import_, t64);
+					if (hint == null) {
+				LBADINDEX64:
+						print_string("warning", "String index outside buffer");
 						continue;
-					//TODO: Check import name bounds
-					const(char)* import_name =
-						cast(const(char)*)hint + ushort.sizeof;
-					print_section(cast(uint)il, import_name, 64);
-					print_x16("Hint", *hint);
+					}
+					const(char)* import_name = cast(const(char)*)hint + ushort.sizeof;
+					if (adbg_object_outboundp(o, cast(void*)import_name))
+						goto LBADINDEX64;
 					print_x32("RVA", rva);
+					print_x16l("Hint", *hint, import_name, 64);
 				}
-			} while ((t64 = adbg_object_pe_import_lte64(o, import_, ++il)) != null);
+			} while ((t64 = adbg_object_pe_import_entry64(o, import_, ++il)) != null);
 			continue;
 		default:
 		}

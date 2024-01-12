@@ -223,6 +223,11 @@ void print_x16(const(char)* name, ushort val, const(char) *meaning = null) {
 	if (meaning) printf("\t(%s)", meaning);
 	putchar('\n');
 }
+void print_x16l(const(char)* name, ushort val, const(char) *meaning = null, int length = 0) {
+	printf("%*s: 0x%04x", __field_padding, name, val);
+	if (meaning) printf("\t(%.*s)", length, meaning);
+	putchar('\n');
+}
 void print_x32(const(char)* name, uint val, const(char) *meaning = null) {
 	printf("%*s: 0x%08x", __field_padding, name, val);
 	if (meaning) printf("\t(%s)", meaning);

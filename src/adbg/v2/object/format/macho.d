@@ -424,7 +424,8 @@ int adbg_object_macho_load(adbg_object_t *o) {
 	
 	version (Trace) trace("64=%d reversed=%d fat=%d", o.i.macho.is64, o.p.reversed, o.i.macho.fat);
 	
-	with (o.i) if (o.p.reversed) {
+	with (o.i)
+	if (o.p.reversed) {
 		if (macho.fat) {
 			macho.fat_header.nfat_arch = adbg_util_bswap32(macho.fat_header.nfat_arch);
 			macho.fat_arch.cputype = adbg_util_bswap32(macho.fat_arch.cputype);
@@ -442,7 +443,8 @@ int adbg_object_macho_load(adbg_object_t *o) {
 		}
 	}
 	
-	with (o.i) if (macho.fat) {
+	with (o.i)
+	if (macho.fat) {
 		macho.fat_arch = cast(macho_fat_arch*)(o.buffer + macho_fatmach_header.sizeof);
 		macho.reversed_fat_arch = cast(bool*)calloc(macho.fat_header.nfat_arch, bool.sizeof);
 		if (macho.reversed_fat_arch == null)
@@ -618,9 +620,9 @@ const(char) *adbg_object_macho_subtype_string(uint type, uint subtype) {
 		}
 	case MACHO_CPUTYPE_ROMP:
 		switch (subtype) {
-		case MACHO_SUBTYPE_RT_PC:	return "RT_PC";
-		case MACHO_SUBTYPE_RT_APC:	return "RT_APC";
-		case MACHO_SUBTYPE_RT_135:	return "RT_135";
+		case MACHO_SUBTYPE_RT_PC:	return "ROMP RT_PC";
+		case MACHO_SUBTYPE_RT_APC:	return "ROMP RT_APC";
+		case MACHO_SUBTYPE_RT_135:	return "ROMP RT_135";
 		default:	return "ROMP";
 		}
 	case MACHO_CPUTYPE_NS32032:	return "NS32032";
@@ -641,10 +643,10 @@ const(char) *adbg_object_macho_subtype_string(uint type, uint subtype) {
 	case MACHO_CPUTYPE_X86_64:	return "x86-64";
 	case MACHO_CPUTYPE_MIPS:
 		switch (subtype) {
-		case MACHO_SUBTYPE_R2300:	return "R2300";
-		case MACHO_SUBTYPE_R2600:	return "R2600";
-		case MACHO_SUBTYPE_R2800:	return "R2800";
-		case MACHO_SUBTYPE_R2800a:	return "R2800a";
+		case MACHO_SUBTYPE_R2300:	return "MIPS R2300";
+		case MACHO_SUBTYPE_R2600:	return "MIPS R2600";
+		case MACHO_SUBTYPE_R2800:	return "MIPS R2800";
+		case MACHO_SUBTYPE_R2800a:	return "MIPS R2800a";
 		default:	return "MIPS";
 		}
 	case MACHO_CPUTYPE_MC680x0:
@@ -682,7 +684,7 @@ const(char) *adbg_object_macho_subtype_string(uint type, uint subtype) {
 		}
 	case MACHO_CPUTYPE_I860:	return "i860";
 	case MACHO_CPUTYPE_I860_LITTLE:	return "i860 (little-endian)";
-	case MACHO_CPUTYPE_RS6000:	return "RS6000";
+	case MACHO_CPUTYPE_RS6000:	return "IBM RS6000";
 	case MACHO_CPUTYPE_POWERPC64:
 		switch (subtype) {
 		case MACHO_SUBTYPE_POWERPC_601:	return "PowerPC64 601";
