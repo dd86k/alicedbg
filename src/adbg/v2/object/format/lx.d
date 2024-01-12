@@ -5,6 +5,8 @@
 /// License: BSD-3-Clause
 module adbg.v2.object.format.lx;
 
+// NOTE: LX is mainly 16-bit only and LE mixed 16/32-bit
+
 import adbg.error;
 import adbg.v2.object.server : adbg_object_t, AdbgObject;
 import adbg.v2.object.machines;
@@ -62,8 +64,10 @@ enum : uint {
 	LX_FLAG_MODTYPE_PROTLIB	= 0x00018000,
 	/// Physical Device Driver module.
 	LX_FLAG_MODTYPE_PHYSDEV	= 0x00020000,
-	/// Virtual Device Driver module.
+	/// Virtual Device Driver module (static).
 	LX_FLAG_MODTYPE_VIRTDEV	= 0x00028000,
+	/// Virtual Device Driver module (dynamic).
+	LX_FLAG_MODTYPE_VXDDYN	= 0x00038000,
 }
 
 private enum E32RESBYTES3 = 196 - 176; // lx_header.sizeof
@@ -111,8 +115,12 @@ struct lx_header { // NOTE: Names are taken from spec except for its "e32_exe" n
 	uint esp;
 	/// Module page size.
 	uint pagesize;
-	/// The shift left bits for page offsets.
-	uint pageshift;
+	union {
+		/// Size of last page. (LE)
+		uint lastpage;
+		/// The shift left bits for page offsets. (LX)
+		uint pageshift;
+	}
 	/// Total size of the fixup information in bytes.
 	uint fixupsize;
 	/// Checksum for fixup information.
@@ -177,8 +185,160 @@ struct lx_header { // NOTE: Names are taken from spec except for its "e32_exe" n
 	uint heapsize;
 	/// Size of requested stack.
 	uint stacksize;
-	/// Pad structure to 196 bytes
-	ubyte[E32RESBYTES3] res3;
+	union {
+		/// Pad structure to 196 bytes
+		ubyte[E32RESBYTES3] res;
+		struct { // LE specifics
+			ubyte[8] res1;
+			uint winresoff;	/// Windows VxD version info resource offset
+			uint winreslen;	/// Windows VxD version info resource lenght
+			ushort device_id;	/// Windows VxD device ID
+			ushort ddk_version;	/// Windows VxD DDK version (usually 0x030A)
+		}
+	}
+}
+
+struct lx_record {
+	uint size;	/// Object virtual size
+	uint addr;	/// Base virtual address
+	uint flags;
+	uint mapidx;	/// Page map index
+	uint mapsize;	/// Count of entries in page map
+	uint reserved;
+}
+
+// Record flags
+enum {
+	LX_OBJ_READABLE        = 0x0001,
+	LX_OBJ_WRITEABLE       = 0x0002,
+	LX_OBJ_EXECUTABLE      = 0x0004,
+	LX_OBJ_RESOURCE        = 0x0008,
+	LX_OBJ_DISCARDABLE     = 0x0010,
+	LX_OBJ_SHARABLE        = 0x0020,
+	LX_OBJ_HAS_PRELOAD     = 0x0040,
+	LX_OBJ_HAS_INVALID     = 0x0080,
+	LX_OBJ_PERM_SWAPPABLE  = 0x0100,  /* LE */
+	LX_OBJ_HAS_ZERO_FILL   = 0x0100,  /* LX */
+	LX_OBJ_PERM_RESIDENT   = 0x0200,
+	LX_OBJ_PERM_CONTIGUOUS = 0x0300,  /* LX */
+	LX_OBJ_PERM_LOCKABLE   = 0x0400,
+	LX_OBJ_ALIAS_REQUIRED  = 0x1000,
+	LX_OBJ_BIG             = 0x2000,
+	LX_OBJ_CONFORMING      = 0x4000,
+	LX_OBJ_IOPL            = 0x8000,
+}
+
+struct lx_le_map_entry {  /* LE */
+	ubyte[3] page_num;    /* 24-bit page number in .exe file */
+	ubyte    flags;
+}
+
+struct lx_lx_map_entry { /* LX */
+	/// Offset from Preload page start
+	/// shifted by page_shift in hdr
+	uint   page_offset;
+	/// Size of entry in bytes.
+	ushort data_size;
+	ushort flags;
+}
+
+union lx_map_entry {
+	lx_le_map_entry    le;
+	lx_lx_map_entry    lx;
+}
+
+// Page entries
+enum {
+	PAGE_VALID      = 0,
+	PAGE_ITERATED   = 1,
+	PAGE_INVALID    = 2,
+	PAGE_ZEROED     = 3,
+	PAGE_RANGE      = 4,
+}
+
+struct lx_flat_bundle_prefix {
+    ubyte  b32_cnt;
+    ubyte  b32_type;
+    ushort b32_obj;
+}
+
+struct flat_null_prefix {
+    ubyte b32_cnt;
+    ubyte b32_type;
+}
+
+/* values for the b32_type field */
+alias bundle_types = int;
+enum {
+    FLT_BNDL_EMPTY  = 0,
+    FLT_BNDL_ENTRY16,
+    FLT_BNDL_GATE16,
+    FLT_BNDL_ENTRY32,
+    FLT_BNDL_ENTRYFWD
+}
+
+struct lx_flat_bundle_entry32 {
+    ubyte e32_flags;      /* flag bits are same as in OS/2 1.x */
+    uint  e32_offset;
+}
+
+struct lx_flat_bundle_gate16 {
+    ubyte  e32_flags;      /* flag bits are same as in OS/2 1.x */
+    ushort offset;
+    ushort callgate;
+}
+
+/*
+ * other, unused bundle types are:
+ */
+
+struct lx_flat_bundle_entry16 {
+    ubyte  e32_flags;      /* flag bits are same as in OS/2 1.x */
+    ushort e32_offset;
+}
+
+struct lx_flat_bundle_entryfwd {
+    ubyte  e32_flags;      /* flag bits are same as in OS/2 1.x */
+    ushort modord;
+    uint   value;
+}
+
+struct lx_flat_res_table {
+    ushort type_id;
+    ushort name_id;
+    uint   res_size;
+    ushort object;
+    uint   offset;
+}
+
+/* fixup record source flags */
+enum {
+	LX_OSF_SOURCE_MASK             = 0x0F,
+	LX_OSF_SOURCE_BYTE             = 0x00,
+	LX_OSF_SOURCE_UNDEFINED        = 0x01,
+	LX_OSF_SOURCE_SEG              = 0x02,
+	LX_OSF_SOURCE_PTR_32           = 0x03,
+	LX_OSF_SOURCE_OFF_16           = 0x05,
+	LX_OSF_SOURCE_PTR_48           = 0x06,
+	LX_OSF_SOURCE_OFF_32           = 0x07,
+	LX_OSF_SOURCE_OFF_32_REL       = 0x08,
+	LX_OSF_SFLAG_FIXUP_TO_ALIAS    = 0x10,
+	LX_OSF_SFLAG_LIST              = 0x20,
+}
+
+/* fixup record target flags */
+enum {
+	LX_OSF_TARGET_MASK             = 0x03,
+	LX_OSF_TARGET_INTERNAL         = 0x00,
+	LX_OSF_TARGET_EXT_ORD          = 0x01,
+	LX_OSF_TARGET_EXT_NAME         = 0x02,
+	LX_OSF_TARGET_INT_VIA_ENTRY    = 0x03,
+	LX_OSF_TFLAG_ADDITIVE_VAL      = 0x04,
+	LX_OSF_TFLAG_INT_CHAIN         = 0x08,
+	LX_OSF_TFLAG_OFF_32BIT         = 0x10,
+	LX_OSF_TFLAG_ADD_32BIT         = 0x20,
+	LX_OSF_TFLAG_OBJ_MOD_16BIT     = 0x40,
+	LX_OSF_TFLAG_ORDINAL_8BIT      = 0x80,
 }
 
 int adbg_object_lx_load(adbg_object_t *o) {
@@ -216,7 +376,8 @@ const(char)* adbg_object_lx_modtype_string(uint flags) {
 	case LX_FLAG_MODTYPE_LIB:	return "Library";
 	case LX_FLAG_MODTYPE_PROTLIB:	return "Protected Memory Library";
 	case LX_FLAG_MODTYPE_PHYSDEV:	return "Physical Device Driver";
-	case LX_FLAG_MODTYPE_VIRTDEV:	return "Virtual Device Driver";
+	case LX_FLAG_MODTYPE_VIRTDEV:	return "Static Virtual Device Driver";
+	case LX_FLAG_MODTYPE_VXDDYN:	return "Dynamic Virtual Device Driver (VxD)";
 	default:	return "Unkown";
 	}
 }

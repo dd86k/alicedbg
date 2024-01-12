@@ -21,19 +21,11 @@ int dump_lx(ref Dumper dump, adbg_object_t *o) {
 
 private:
 
-union lxmagic {
-	ushort raw;
-	char[4] str;
-}
-
 void dump_lx_hdr(ref Dumper dump, adbg_object_t *o) {
 	print_header("Header");
 	
 	with (o.i.lx.header) {
-	char[4] mstr = void;
-	*cast(ushort*)mstr.ptr = magic;
-	mstr[2] = mstr[3] = 0;
-	print_x16("e32_magic", magic, mstr.ptr);
+	print_x16("e32_magic", magic, magic == LE_MAGIC ? "LE" : "LX");
 	print_x8("e32_border", border);
 	print_x8("e32_worder", worder);
 	print_x32("e32_level", level);
@@ -90,25 +82,32 @@ void dump_lx_hdr(ref Dumper dump, adbg_object_t *o) {
 	print_x32("e32_instdemand", instdemand);
 	print_u32("e32_heapsize", heapsize);
 	print_u32("e32_stacksize", stacksize);
-	print_x8("e32_res3[0]", res3[0]);
-	print_x8("e32_res3[1]", res3[1]);
-	print_x8("e32_res3[2]", res3[2]);
-	print_x8("e32_res3[3]", res3[3]);
-	print_x8("e32_res3[4]", res3[4]);
-	print_x8("e32_res3[5]", res3[5]);
-	print_x8("e32_res3[6]", res3[6]);
-	print_x8("e32_res3[7]", res3[7]);
-	print_x8("e32_res3[8]", res3[8]);
-	print_x8("e32_res3[9]", res3[9]);
-	print_x8("e32_res3[10]", res3[10]);
-	print_x8("e32_res3[11]", res3[11]);
-	print_x8("e32_res3[12]", res3[12]);
-	print_x8("e32_res3[13]", res3[13]);
-	print_x8("e32_res3[14]", res3[14]);
-	print_x8("e32_res3[15]", res3[15]);
-	print_x8("e32_res3[16]", res3[16]);
-	print_x8("e32_res3[17]", res3[17]);
-	print_x8("e32_res3[18]", res3[18]);
-	print_x8("e32_res3[19]", res3[19]);
+	print_x8("e32_res[0]", res1[0]);
+	print_x8("e32_res[1]", res1[1]);
+	print_x8("e32_res[2]", res1[2]);
+	print_x8("e32_res[3]", res1[3]);
+	print_x8("e32_res[4]", res1[4]);
+	print_x8("e32_res[5]", res1[5]);
+	print_x8("e32_res[6]", res1[6]);
+	print_x8("e32_res[7]", res1[7]);
+	if (magic == LE_MAGIC) {
+		print_x32("winresoff", winresoff);
+		print_u32("winreslen", winreslen);
+		print_x16("device_id", device_id);
+		print_x16("ddk_version", ddk_version);
+	} else {
+		print_x8("e32_res[8]",  res[8]);
+		print_x8("e32_res[9]",  res[9]);
+		print_x8("e32_res[10]", res[10]);
+		print_x8("e32_res[11]", res[11]);
+		print_x8("e32_res[12]", res[12]);
+		print_x8("e32_res[13]", res[13]);
+		print_x8("e32_res[14]", res[14]);
+		print_x8("e32_res[15]", res[15]);
+		print_x8("e32_res[16]", res[16]);
+		print_x8("e32_res[17]", res[17]);
+		print_x8("e32_res[18]", res[18]);
+		print_x8("e32_res[19]", res[19]);
+	}
 	}
 }
