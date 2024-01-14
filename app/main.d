@@ -87,7 +87,6 @@ struct option_t {
 //TODO: --dump-length/--dump-end: Length or end
 //TODO: --dump-imports-all: Dependency walker
 //TODO: --dump-section=name: Hex or raw dump section
-//TODO: --dump-everything: Dump everything except disassembly
 immutable option_t[] options = [
 	// general
 	{ 'a', "arch",   "Select architecture for disassembler (default=platform)", true, fa: &cli_march },
@@ -107,6 +106,7 @@ immutable option_t[] options = [
 //	{ 0,   "dump-source",       "Dump object's source with disassembly", false, &cli_dump_source },
 	{ 0,   "dump-relocs",       "Dump object's relocations", false, &cli_dump_reloc },
 	{ 0,   "dump-debug",        "Dump object's debug information", false, &cli_dump_debug },
+	{ 0,   "dump-everything",        "Dump everything except disassemblyn", false, &cli_dump_everything },
 	{ 0,   "dump-disassembly",       "Dump object's disassembly", false, &cli_dump_disasm },
 	{ 0,   "dump-disassembly-all",   "Dump object's disassembly for all sections", false, &cli_dump_disasm_all },
 	{ 0,   "dump-disassembly-stats", "Dump object's disassembly statistics for executable sections", false, &cli_dump_disasm_stats },
@@ -300,6 +300,12 @@ int cli_dump_disasm_all() {
 int cli_dump_disasm_stats() {
 	globals.mode = SettingMode.dump;
 	globals.dump_selections |= DumpSelect.disasm_stats;
+	return 0;
+}
+
+int cli_dump_everything() {
+	globals.mode = SettingMode.dump;
+	globals.dump_selections |= DumpSelect.all_but_disasm;
 	return 0;
 }
 

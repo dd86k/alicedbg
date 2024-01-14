@@ -55,6 +55,8 @@ enum DumpSelect {
 	/// Disassemble all sections
 	disasm_all	= BIT!26,
 	
+	/// 
+	all_but_disasm = 0xff_ffff,
 	/// Any form of dissasembler is requested
 	disasm_any = disasm | disasm_stats | disasm_all,
 }
