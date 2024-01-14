@@ -166,38 +166,6 @@ pdb70_file_header* adbg_object_pdb70_header(adbg_object_t *o) {
 // - https://github.com/dotnet/runtime/blob/main/docs/design/specs/PortablePdb-Metadata.md
 // - https://github.com/mono/mono/blob/main/mono/metadata/debug-mono-ppdb.c
 
-// 
-struct MetadataRootHeader {
-	/// Magic signature for physical metadata : 0x424A5342.
-	// or "BSJB"
-	char[4] Magic;
-	/// Major version, 1 (ignore on read)
-	ushort MajorVersion;
-	/// Minor version, 1 (ignore on read)
-	ushort MinorVersion;
-	/// Reserved, always 0.
-	uint Reserved;
-	/// Length of version string, multi
-	uint Length;
-	/// UTF-8 "Version" string.
-	// 4-Byte aligned, maximum 255 (?).
-	// Values:
-	// - "PDB v1.00" with a value of 12 (.NET 6)
-	// - "Standard CLI 2002" (17 chars, so rounded to 20 chars)
-	char[1] Version;
-}
-// After MetadataRootHeader + Version string
-struct MetadataRootHeader_Flags {
-	ushort Flags;
-	ushort Streams;
-}
-
-struct MetadataRootStream {
-	uint Offset;
-	uint Size;
-	char[1] Name;
-}
-
 struct pdb_stream {
 	char[20] id;
 	uint EntryPoint;

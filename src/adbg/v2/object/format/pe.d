@@ -425,13 +425,14 @@ enum : uint {
 	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV700	= CHAR32!"RSDS", /// PDB 7.0 / CodeView 7.0
 	// Mono source has it set as 0x4244504d
 	PE_IMAGE_DEBUG_MAGIC_EMBEDDED_PPDB	= CHAR32!"MPDB", /// Portable PDB
-//	PE_IMAGE_DEBUG_MAGIC_EMBEDDED_PPDB	= CHAR32!"BSJB", /// Portable PDB
+	PE_IMAGE_DEBUG_MAGIC_PPDB	= CHAR32!"BSJB", /// Portable PDB
 	// Source: SystemInformer, except for full names
 	PE_IMAGE_DEBUG_MAGIC_POGO_LTCG	= CHAR32!"LTCG",  /// Link-Time Code Generation
 	PE_IMAGE_DEBUG_MAGIC_POGO_PGU	= CHAR32!"PGU\0", /// Profile Guided Update (/LTCG:PGUPDATE)
 }
 
 struct PE_DEBUG_DATA_MISC { align(1):
+	char[4] Signature;	/// 
 	uint DataType;	/// Must be 1
 	uint Length;	/// Multiple of four; Total length of data block
 	bool Unicode;	/// If true, Unicode string
@@ -476,7 +477,40 @@ struct PE_DEBUG_DATA_EMBEDDED { align(1):
 
 /// POGO Entry containing filename. Should be ending with .PGD (Profile-Guided Database).
 struct PE_DEBUG_POGO_ENTRY {
+	uint Magic;
 	uint Rva;
+	uint Size;
+	char[1] Name;
+}
+
+// aka MetadataRootHeader
+struct PE_DEBUG_DATA_PPDB {
+	/// Magic signature for physical metadata : 0x424A5342.
+	// or "BSJB"
+	char[4] Signature;
+	/// Major version, 1 (ignore on read)
+	ushort MajorVersion;
+	/// Minor version, 1 (ignore on read)
+	ushort MinorVersion;
+	/// Reserved, always 0.
+	uint Reserved;
+	/// Length of version string, multi-byte.
+	uint Length;
+	/// UTF-8 "Version" string.
+	// 4-Byte aligned, maximum 255 (?).
+	// Values:
+	// - "PDB v1.00" with a value of 12 (.NET 6)
+	// - "Standard CLI 2002" (17 chars, so rounded to 20 chars)
+	char[1] Version;
+}
+// After MetadataRootHeader + Version string
+struct PE_DEBUG_DATA_PPDB_FLAGS {
+	ushort Flags;
+	ushort Streams;
+}
+
+struct PE_DEBUG_DATA_PPDB_STREAM {
+	uint Offset;
 	uint Size;
 	char[1] Name;
 }
