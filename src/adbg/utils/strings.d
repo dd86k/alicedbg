@@ -473,18 +473,12 @@ void adbg_util_str_lowercase(char *buf, size_t size) {
 			buf[i] += 32;
 }
 
+// NOTE: adbg_string_t is currently used for disassembler v1
+//       It might be kept or removed in future versions
+
 /// Internal structure used to append an existing buffer new typed elements.
 /// 
 /// Should look more like MFC's CString.
-// NOTE: Was used for disassembler v1 but that's getting removed soon.
-//TODO: Consider adbg_string_t.add_s for +length
-//      Why? This has literally no use
-//TODO: Consider adbg_string_t.addm(T...)(T args)
-//      Test in godbolt first
-//      char -> addc
-//      const(char)* -> adds
-//      ubyte -> addx8
-//      etc
 //TODO: Add decimal
 //      addu8/addu16/addu32/addu64(T v, bool signed)
 //TODO: Consider having settings instead of arguments
@@ -492,6 +486,7 @@ void adbg_util_str_lowercase(char *buf, size_t size) {
 //      bool signed = false;
 //TODO: bool positive parameter
 //      Adds '+' if >=0
+//TODO: Better constructors (for dynamic and constant strings)
 struct adbg_string_t {
 	char  *str;	/// String pointer
 	size_t size;	/// Buffer capacity

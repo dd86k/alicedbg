@@ -816,7 +816,6 @@ int adbg_process_get_pid(adbg_process_t *tracee) {
 	return tracee.pid;
 }
 
-//TODO: bool commandline: Include command-line arguments
 /// Get the process file path.
 /// Params:
 /// 	pid = Process ID.

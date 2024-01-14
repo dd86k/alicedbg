@@ -29,7 +29,6 @@ enum GDC_13 = 2_103; // 2.103.x: 13.1.1,13.2 (OpenSUSE Tumbleweed 202307178, Art
 
 // Source: gcc/d/d-builtins.cc::d_init_versions
 
-//TODO: enum GDC_VERSION = 0;
 version (GNU) {
 	static if (__VERSION__ == GDC_13)
 		/// GCC back-end major version for GDC. Starts at version 10 minimum.

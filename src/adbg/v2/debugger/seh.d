@@ -5,7 +5,7 @@
 /// License: BSD-3-Clause
 module adbg.v2.debugger.seh;
 
-//TODO: adbg_seh_unset
+//TODO: adbg_seh_disable
 //TODO: Would be cool to have try/catch mechanic
 //      setjmp is broken on Win64 :(
 
@@ -15,8 +15,6 @@ version (Windows) {
 	import adbg.v2.debugger.exception;
 	import adbg.include.windows.windef;
 	import adbg.include.c.setjmp;
-	
-	private enum SEM = SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX;
 
 	private alias void* LPTOP_LEVEL_EXCEPTION_FILTER;
 	private alias _CONTEXT* PCONTEXT;
@@ -49,39 +47,31 @@ version (Windows) {
 extern (C):
 
 version (none) // Disabled until setjmp works on Win64
-public int adbg_seh_enable(int function(adbg_exception_t*) func) {
+public
+int adbg_seh_enable(int function(adbg_exception_t*) func) {
 	if (func == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
-	version (Windows) {
-		if (checkpoint.enabled == false) {
-			if (SetThreadErrorMode(SEM, null) == 0)
-				return adbg_oops(AdbgError.os);
-			if (SetUnhandledExceptionFilter(cast(void*)&adbg_seh_catch) == null)
-				return adbg_oops(AdbgError.os);
-			checkpoint.enabled = true;
-		}
-	} else version (Posix) {
-		import core.stdc.string : memcpy;
-		if (checkpoint.enabled == false) {
-			sigaction_t sa = void;
-			sigemptyset(&sa.sa_mask);
-			sa.sa_flags = SA_SIGINFO;
-			sa.sa_sigaction = &adbg_seh_catch;
-			if (sigaction(SIGSEGV, &sa, NO_SIGACTION) == -1 ||
-				sigaction(SIGTRAP, &sa, NO_SIGACTION) == -1 ||
-				sigaction(SIGFPE, &sa, NO_SIGACTION) == -1 ||
-				sigaction(SIGILL, &sa, NO_SIGACTION) == -1 ||
-				sigaction(SIGBUS, &sa, NO_SIGACTION) == -1) {
-				return adbg_oops(AdbgError.os); // Well, crt, but you know
-			}
-			checkpoint.enabled = true;
-		}
-//		memcpy(&mjbuf, &c.buffer, jmp_buf.sizeof);
-//		if ((c.value = setjmp(mjbuf)) != 0)
-//			memcpy(&c.exception, &mexception, exception_t.sizeof);
+version (Windows) {
+	if (SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX, null) == 0)
+		return adbg_oops(AdbgError.os);
+	if (SetUnhandledExceptionFilter(cast(void*)&adbg_seh_catch) == null)
+		return adbg_oops(AdbgError.os);
+} else version (Posix) {
+	sigaction_t sa = void;
+	sigemptyset(&sa.sa_mask);
+	sa.sa_flags = SA_SIGINFO;
+	sa.sa_sigaction = &adbg_seh_catch;
+	if (sigaction(SIGSEGV, &sa, NO_SIGACTION) == -1 ||
+		sigaction(SIGTRAP, &sa, NO_SIGACTION) == -1 ||
+		sigaction(SIGFPE, &sa, NO_SIGACTION) == -1 ||
+		sigaction(SIGILL, &sa, NO_SIGACTION) == -1 ||
+		sigaction(SIGBUS, &sa, NO_SIGACTION) == -1) {
+		return adbg_oops(AdbgError.os);
 	}
+}
 	
+	checkpoint.enabled = true;
 	checkpoint.user = func;
 	return 0;
 }
@@ -94,6 +84,7 @@ struct adbg_checkpoint_t {
 	bool enabled;
 }
 
+//TODO: Rename __checkpoint
 __gshared adbg_checkpoint_t checkpoint;
 
 version (Windows)

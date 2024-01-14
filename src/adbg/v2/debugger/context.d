@@ -150,6 +150,7 @@ int adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {
 	return 0;
 }
 
+//TODO: Could be multiple functions (_format, _format_hex, _format_hex0)
 /// Format a register's value into a string buffer.
 /// Errors: invalidOption for format.
 /// Params:

@@ -21,7 +21,6 @@ import adbg.v2.debugger.memory : adbg_memory_read;
 
 //TODO: Capstone CS_MODE_BIG_ENDIAN
 //      Depending on target endianness, Capstone may need this bit
-//TODO: Consider user buffer to opcode struct for multi-buffer support?
 
 version (X86) { // CS_OPT_SYNTAX_DEFAULT
 	private enum {

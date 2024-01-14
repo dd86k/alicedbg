@@ -236,7 +236,7 @@ AdbgException adbg_exception_from_os(uint code, uint subcode = 0) {
 			}
 		case SIGSTOP: return Breakpoint;
 		case SIGSYS: return Unknown;	// SYS_SECCOMP
-		//TODO: case SIGKILL:
+		case SIGKILL: return Exit;
 		default: return Unknown;
 		}
 	}
@@ -252,9 +252,9 @@ const(char) *adbg_exception_name(adbg_exception_t *ex) {
 	case Exit:	return "TERMINATED";
 	case Breakpoint:	return "BREAKPOINT";
 	case Step:	return "SINGLE STEP";
-	case Fault: //TODO: (0.2) Makes "ACCESS VIOLATION" default
-		version (Windows) return "ACCESS VIOLATION";
-		else return "SEGMENTATION FAULT";
+	// NOTE: Cause it's also known as a segmentation fault,
+	//       "access violation" remains a more proper term.
+	case Fault:	return "ACCESS VIOLATION";
 	case BoundExceeded:	return "OUT OF BOUNDS";
 	case Misalignment:	return "MISALIGNMENT";
 	case Illegal:	return "ILLEGAL INSTRUCTION";

@@ -309,7 +309,6 @@ version (X86) {
 	public import core.sys.posix.ucontext : mcontext_t;
 	public import core.sys.posix.signal : sigset_t;
 	
-	//TODO: Move uint128_t in some config file (c, d, or adbg.config)
 	struct __uint128_t {
 		ulong[2] parts;
 	}

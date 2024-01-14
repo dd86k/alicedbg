@@ -15,9 +15,6 @@ import adbg.platform;
 
 extern (C):
 
-//TODO: INT16/INT32/INT64 templates (auto swap)
-//      e.g., I16BE!64
-
 /// Create a 1-bit bitmask with a bit position (0-based, 1 << a).
 /// Params: n = Bit position (0-based)
 template BIT(int n) if (n < 32) { enum { BIT = 1 << n } }
