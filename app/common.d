@@ -8,6 +8,8 @@ module common;
 
 import core.stdc.stdio : puts;
 import core.stdc.stdlib : exit;
+import core.stdc.string : strerror;
+import core.stdc.errno : errno;
 import adbg.error;
 import adbg.v2.disassembler;
 import adbg.v2.debugger.exception;
@@ -85,9 +87,9 @@ struct settings_t {
 /// Global variables. Helps keeping track of app variables.
 __gshared settings_t globals;
 
-alias oops = show_adbg_error;
+alias oops = show_error;
 
-int show_adbg_error(
+int show_error(
 	const(char)* func = cast(char*)__FUNCTION__,
 	const(char)* mod = cast(char*)__MODULE__,
 	int line = __LINE__) {
@@ -114,30 +116,34 @@ int show_adbg_error(
 	return error.code;
 }
 
-//TODO: Fix terrible hack
-// Potentially dangerous since some errors require an additional component
-void panic(AdbgError code = AdbgError.success, void *add = null) {
-	if (code) adbg_oops(code);
-	exit(oops());
-}
-
-//TODO: Finish alternative to panic
-//      Needs to be able to override error message.
-//      Cases:
-//      - Regular errors
-//      - lib errors on the app side
-//      - external errors on the lib side
 /// Quit program.
-///
-/// If no codes are given, this picks up the code from alicedbg.
 /// Params:
 /// 	message = Quit message.
 /// 	code = Exit code.
-/*void quit(int code, const(char) *message = null) {
-	if (message) {
-		puts(message);
+void quit(int code, const(char) *message) {
+	puts(message);
+	exit(code);
+}
+
+enum ErrSource {
+	crt,
+	adbg,
+}
+
+/// Quit due to external factor.
+void quitext(ErrSource src,
+	const(char)* func = cast(char*)__FUNCTION__,
+	const(char)* mod = cast(char*)__MODULE__,
+	int line = __LINE__) {
+	switch (src) {
+	case ErrSource.crt:
+		int code = errno;
+		puts(strerror(code));
 		exit(code);
-	} else {
-		exit(oops());
+	case ErrSource.adbg:
+		exit(show_error());
+	default:
+		puts("(Unknown source)");
+		exit(1);
 	}
-}*/
+}

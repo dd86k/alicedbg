@@ -113,7 +113,7 @@ int app_dump() {
 		size_t size = void;
 		ubyte *buffer = readall(globals.file, &size);
 		if (buffer == null)
-			panic(AdbgError.crt);
+			quitext(ErrSource.crt);
 		
 		//TODO: Warn file is empty
 		if (size == 0)
@@ -129,7 +129,7 @@ int app_dump() {
 	
 	adbg_object_t *o = adbg_object_open_file(globals.file, 0);
 	if (o == null)
-		return show_adbg_error();
+		return show_error();
 	
 	print_string("filename", basename(globals.file));
 	print_u64("filesize", o.file_size);
@@ -174,27 +174,25 @@ void print_disasm_line(adbg_opcode_t *op, const(char)* msg = null) {
 		return;
 	}
 	
-	// Format machine bytes
-	enum MBFSZ = (16 * 3) + 2;
+	// Format and print machine bytes
+	enum MBFSZ = (16 * 3) + 2; // Enough for 16 bytes and spaces
 	char[MBFSZ] machine = void;
-	int left = MBFSZ;
-	int tl;
+	int left = MBFSZ; // Buffer left
+	int tl; // Total length
 	for (size_t bi; bi < op.size; ++bi) {
 		int l = snprintf(machine.ptr + tl, left, " %02x", op.machine[bi]);
-		if (l <= 0) break;
+		if (l <= 0) break; // Ran out of buffer space
 		tl += l;
 		left -= l;
 	}
 	machine[tl] = 0;
-	
-	// Print machine bytes string
 	printf(" %*s ", -24, machine.ptr);
 	
+	// Print message or mnemonics
 	if (msg) {
 		puts(msg);
 		return;
 	}
-	
 	printf("%*s %s\n", -10, op.mnemonic, op.operands);
 }
 
@@ -350,13 +348,11 @@ int dump_disassemble(ref Dumper dump, AdbgMachine machine,
 	void* data, ulong size, ulong base_address) {
 	adbg_disassembler_t *dasm = cast(adbg_disassembler_t*)malloc(adbg_disassembler_t.sizeof);
 	if (dasm == null)
-		panic(AdbgError.crt);
+		quitext(ErrSource.crt);
 	scope(exit) free(dasm);
 	
-	if (adbg_dasm_open(dasm, machine)) {
-		panic();
-		return 1;
-	}
+	if (adbg_dasm_open(dasm, machine))
+		quitext(ErrSource.adbg);
 	scope(exit) adbg_dasm_close(dasm);
 	
 	if (globals.syntax)
@@ -386,7 +382,8 @@ L_STAT:
 			++stat_illegal;
 			goto L_STAT;
 		case outOfData: break;
-		default: panic();
+		default:
+			quitext(ErrSource.adbg);
 		}
 		
 		print_f32("average", cast(float)stat_avg / stat_total, 2);

@@ -39,7 +39,6 @@ ubyte *readall(const(char) *path, size_t *size) {
 	FILE *fd = fopen(path, "rb");
 	if (fd == null)
 		return null;
-	
 	scope(exit) fclose(fd);
 	
 	if (fseek(fd, 0, SEEK_END))
