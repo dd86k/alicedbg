@@ -22,6 +22,7 @@ import adbg.v2.object.formats;
 import adbg.v2.object.machines : AdbgMachine;
 import adbg.v2.debugger.process : adbg_process_t;
 import adbg.v2.debugger.memory : adbg_memory_map_t, adbg_memory_read;
+import core.stdc.string;
 
 extern (C):
 
@@ -62,8 +63,10 @@ enum AdbgObject {
 	elf,
 	/// Mach Object format.
 	macho,
-	// Microsoft Program Database format.
-	//pdb,
+	// Microsoft Program Database format 2.0.
+	pdb20,
+	// Microsoft Program Database format 7.0.
+	pdb70,
 	// Microsoft Debug format.
 	//dbg,
 	// 
@@ -139,6 +142,9 @@ struct adbg_object_t {
 		
 		// Temp field to avoid free'ing non-allocated memory
 		bool noalloc;
+		
+		// 
+		size_t debug_offset;
 	}
 	adbg_object_properties_t p;
 	
@@ -241,6 +247,16 @@ struct adbg_object_t {
 			bool *reversed_shdr;
 		}
 		elf64_t elf64;
+		
+		struct pdb20_t {
+			pdb20_file_header *header;
+		}
+		pdb20_t pdb20;
+		
+		struct pdb70_t {
+			pdb70_file_header *header;
+		}
+		pdb70_t pdb70;
 	}
 	/// Internal object definitions.
 	adbg_object_internals_t i;
@@ -519,7 +535,20 @@ L_ARG:
 	// Auto-detection
 	//TODO: Consider moving auto-detection as separate function?
 	//      Especially if debugger can return process' base address for image headers
-	switch (*o.buffer32) {	// Try 32-bit magic
+	
+	/// PDB detection
+	if (o.file_size > PDB_DEFAULT_PAGESIZE) {
+		if (memcmp(o.buffer, PDB20_MAGIC.ptr, PDB20_MAGIC.length) == 0)
+			return adbg_object_pdb20_load(o);
+		if (memcmp(o.buffer, PDB70_MAGIC.ptr, PDB70_MAGIC.length) == 0)
+			return adbg_object_pdb70_load(o);
+	}
+	
+	//TODO: 64-bit detection
+	//      starting with MSCOFF
+	
+	// 32-bit detection
+	switch (*o.buffer32) {
 	case ELF_MAGIC:	// ELF
 		return adbg_object_elf_load(o);
 	case MACHO_MAGIC:	// Mach-O 32-bit
@@ -531,7 +560,9 @@ L_ARG:
 		return adbg_object_macho_load(o);
 	default:
 	}
-	switch (*o.buffer16) {	// Try 16-bit magic
+	
+	// 16-bit detection
+	switch (*o.buffer16) {
 	case MAGIC_MZ:
 		if (o.file_size < mz_hdr.sizeof)
 			return adbg_oops(AdbgError.unknownObjFormat);
@@ -628,6 +659,8 @@ const(char)* adbg_object_short_name(adbg_object_t *o) {
 	case pe:	return "pe32";
 	case macho:	return "macho";
 	case elf:	return "elf";
+	case pdb20:	return "pdb20";
+	case pdb70:	return "pdb70";
 	default:
 	}
 L_UNKNOWN:
@@ -647,6 +680,8 @@ const(char)* adbg_object_name(adbg_object_t *o) {
 	case pe:	return `Portable Executable`;
 	case macho:	return `Mach-O`;
 	case elf:	return `Executable and Linkable Format`;
+	case pdb20:	return `Program Database 2.0`;
+	case pdb70:	return `Program Database 7.0`;
 	default:
 	}
 L_UNKNOWN:

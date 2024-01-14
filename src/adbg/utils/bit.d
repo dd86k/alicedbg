@@ -28,6 +28,13 @@ template BIT(int n) if (n < 32) { enum { BIT = 1 << n } }
 	assert(BIT!4 == 0b1_0000);
 }
 
+template I16(ubyte b1, ubyte b2) {
+	version (BigEndian)
+		enum ushort I16 = (b1 << 8) | b2;
+	else
+		enum ushort I16 = (b2 << 8) | b1;
+}
+
 /// Turn a 2-character string into a 2-byte number
 /// Params: s = 2-character string
 template CHAR16(char[2] s) {

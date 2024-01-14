@@ -25,6 +25,7 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 //TODO: adbg_error_source -> alicedbg/crt/os/capstone, etc.
 //      adbg_error_is_external -> bool
 //TODO: Maybe redo error code functions to reduce confusion between errno/external/system/current
+//TODO: objectMalformed (Object might be corrupted)
 
 extern (C):
 

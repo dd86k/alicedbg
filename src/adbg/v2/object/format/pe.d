@@ -415,16 +415,28 @@ enum : uint {
 
 // Magics for debug structures
 enum : uint {
-//	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CVxxx	= CHAR32!"NB05", /// CodeView 4.00?
+	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_LINK510	= CHAR32!"NB02", /// MS LINK 5.10
+	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_LINK520	= CHAR32!"NB05", /// MS LINK 5.20
+	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_QUICKC	= CHAR32!"NB07", /// Quick C for Windows 1.0
+	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV400	= CHAR32!"NB08", /// PDB 2.0+ / CodeView 4.00-4.05
 	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV410	= CHAR32!"NB09", /// PDB 2.0+ / CodeView 4.10
-	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_PDB20PLUS	= CHAR32!"NB10", /// PDB 2.0+
+	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_PDB20PLUS	= CHAR32!"NB10", /// PDB 2.0+ / MS C/C++ PDB 2.0
 	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV500	= CHAR32!"NB11", /// PDB 2.0+ / CodeView 5.0
 	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV700	= CHAR32!"RSDS", /// PDB 7.0 / CodeView 7.0
 	// Mono source has it set as 0x4244504d
 	PE_IMAGE_DEBUG_MAGIC_EMBEDDED_PPDB	= CHAR32!"MPDB", /// Portable PDB
+//	PE_IMAGE_DEBUG_MAGIC_EMBEDDED_PPDB	= CHAR32!"BSJB", /// Portable PDB
 	// Source: SystemInformer, except for full names
 	PE_IMAGE_DEBUG_MAGIC_POGO_LTCG	= CHAR32!"LTCG",  /// Link-Time Code Generation
 	PE_IMAGE_DEBUG_MAGIC_POGO_PGU	= CHAR32!"PGU\0", /// Profile Guided Update (/LTCG:PGUPDATE)
+}
+
+struct PE_DEBUG_DATA_MISC { align(1):
+	uint DataType;	/// Must be 1
+	uint Length;	/// Multiple of four; Total length of data block
+	bool Unicode;	/// If true, Unicode string
+	byte[3] Reserved;
+	byte[1] Data;
 }
 
 /// CodeView format for PDB 2.0 and above
@@ -433,9 +445,9 @@ struct PE_DEBUG_DATA_CODEVIEW_PDB20 { align(1):
 	// Old PE32 doc mentions "NB05" -- CodeView 4.0 or earlier?
 	char[4] Signature;	/// Magic: "NB09"/"NB10"/"NB11" bytes
 	/// Offset to the start of the actual debug information from the
-	/// beginning of the CodeView data
+	/// beginning of the CodeView data. Zero if it's another file.
 	uint32_t Offset;
-	uint32_t Timestamp;	/// 
+	uint32_t Timestamp;	///
 	uint32_t Age;	/// incremented each time the executable is remade by the linker
 	char[1] Path;	/// Path to PDB (0-terminated)
 }
@@ -447,7 +459,7 @@ struct PE_DEBUG_DATA_CODEVIEW_PDB70 { align(1):
 	char[4] Signature;	/// Magic: "RSDS" bytes
 	UID Guid;	/// GUID of PDB file, matches with PDB file
 	uint32_t Age;	/// incremented each time the executable is remade by the linker
-	char[1] Path;	/// Path to PDB (0-terminated)
+	char[1] Path;	/// Path to PDB (0-terminated UTF-8)
 }
 
 /// Declares that debugging information is embedded in the PE file at location
@@ -455,10 +467,11 @@ struct PE_DEBUG_DATA_CODEVIEW_PDB70 { align(1):
 // https://github.com/dotnet/runtime/blob/main/docs/design/specs/PE-COFF.md
 // Version Major=any, Minor=0x0100 of the data format:
 struct PE_DEBUG_DATA_EMBEDDED { align(1):
-	char[4] Signature;
+	char[4] Signature;	/// Magic: "MPDB"
 	uint UncompressedSize;
 	// SizeOfData - 8: PortablePdbImage
 	//                 Portable PDB image compressed using Deflate algorithm
+	ubyte[1] PortablePdbImage;
 }
 
 /// POGO Entry containing filename. Should be ending with .PGD (Profile-Guided Database).

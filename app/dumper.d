@@ -143,6 +143,8 @@ int app_dump() {
 	case lx:	return dump_lx(dump, o);
 	case elf:	return dump_elf(dump, o);
 	case macho:	return dump_macho(dump, o);
+	case pdb20:	return dump_pdb20(dump, o);
+	case pdb70:	return dump_pdb70(dump, o);
 	default:	return EXIT_FAILURE;
 	}
 }
@@ -231,6 +233,11 @@ void print_x16l(const(char)* name, ushort val, const(char) *meaning = null, int 
 void print_x32(const(char)* name, uint val, const(char) *meaning = null) {
 	printf("%*s: 0x%08x", __field_padding, name, val);
 	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+void print_x32l(const(char)* name, uint val, const(char) *meaning = null, int length = 0) {
+	printf("%*s: 0x%08x", __field_padding, name, val);
+	if (meaning) printf("\t(%.*s)", length, meaning);
 	putchar('\n');
 }
 void print_x64(const(char)* name, ulong val, const(char) *meaning = null) {

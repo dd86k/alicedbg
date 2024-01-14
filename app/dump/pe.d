@@ -651,6 +651,7 @@ void dump_pe_debug(ref Dumper dump, adbg_object_t *o) {
 			return;
 		}
 		
+		const(char) *sigstr = void;
 		switch (Type) {
 		case PE_IMAGE_DEBUG_TYPE_CODEVIEW:
 			//TODO: Check MajorVersion/MinorVersion
@@ -659,29 +660,32 @@ void dump_pe_debug(ref Dumper dump, adbg_object_t *o) {
 			
 			switch (sig) {
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV410: // PDB 2.0+ / CodeView 4.10
-				print_x32("Signature", sig, "PDB 2.0+ / CodeView 4.10");
+				sigstr = "PDB 2.0+ / CodeView 4.10";
 				goto L_DEBUG_PDB20;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_PDB20PLUS: // PDB 2.0+
-				print_x32("Signature", sig, "PDB 2.0+ / NB10");
+				sigstr = "PDB 2.0+ / NB10";
 				goto L_DEBUG_PDB20;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV500: // PDB 2.0+ / CodeView 5.0
-				print_x32("Signature", sig, "PDB 2.0+ / CodeView 5.0");
-L_DEBUG_PDB20:
+				sigstr = "PDB 2.0+ / CodeView 5.0";
+			L_DEBUG_PDB20:
+				print_x32("Signature", sig, sigstr);
 				PE_DEBUG_DATA_CODEVIEW_PDB20* pdb = void;
 				if (adbg_object_offsetl(o, cast(void**)&pdb,
 					PointerToRawData, PE_DEBUG_DATA_CODEVIEW_PDB20.sizeof)) {
 					print_string("error", "PE_DEBUG_DATA_CODEVIEW_PDB20 out of bounds");
+					continue;
 				}
 				print_x32("Offset", pdb.Offset);
-				print_x32("Timestamp", pdb.Timestamp);
+				print_x32("Timestamp", pdb.Timestamp, ctime32(pdb.Timestamp));
 				print_u32("Age", pdb.Age);
-				print_stringl("Path", pdb.Path.ptr, 256);
+				if (pdb.Offset == 0) print_stringl("Path", pdb.Path.ptr, 256);
 				break;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV700: // PDB 7.0 / CodeView 7.0
 				PE_DEBUG_DATA_CODEVIEW_PDB70* pdb = void;
 				if (adbg_object_offsetl(o, cast(void**)&pdb,
 					PointerToRawData, PE_DEBUG_DATA_CODEVIEW_PDB70.sizeof)) {
 					print_string("error", "PE_DEBUG_DATA_CODEVIEW_PDB70 out of bounds");
+					continue;
 				}
 				char[UID_TEXTLEN] guid = void;
 				uid_text(pdb.Guid, guid, UID_GUID);
@@ -700,6 +704,24 @@ L_DEBUG_PDB20:
 			}
 			break;
 		case PE_IMAGE_DEBUG_TYPE_MISC:
+			PE_DEBUG_DATA_MISC* misc = void;
+			if (adbg_object_offsetl(o, cast(void**)&misc,
+				PointerToRawData, PE_DEBUG_DATA_MISC.sizeof)) {
+				print_string("error", "PE_DEBUG_DATA_MISC out of bounds");
+				continue;
+			}
+			if (misc.DataType != 1) { // IMAGE_DEBUG_MISC_EXENAME
+				print_string("error", "PE_DEBUG_DATA_MISC.DataType is not set to 1.");
+				continue;
+			}
+			print_x32("DataType", misc.DataType);
+			print_x32("Length", misc.Length);
+			print_u8("Unicode", misc.Unicode);
+			print_u8("Reserved[0]", misc.Reserved[0]);
+			print_u8("Reserved[1]", misc.Reserved[1]);
+			print_u8("Reserved[2]", misc.Reserved[2]);
+			if (misc.Unicode == false)
+				print_stringl("Data", cast(char*)misc.Data.ptr, 256);
 			// TODO: PE_IMAGE_DEBUG_TYPE_MISC. Used for separate .DBG files
 			break;
 		case PE_IMAGE_DEBUG_TYPE_FPO:
@@ -732,6 +754,8 @@ L_DEBUG_PDB20:
 			print_x32("RVA", pogoentry.Rva);
 			print_x32("Size", pogoentry.Size);
 			print_stringl("Size", pogoentry.Name.ptr, 256); // Guess
+			break;
+		case PE_IMAGE_DEBUG_TYPE_R2R_PERFMAP:
 			break;
 		default:
 		}
