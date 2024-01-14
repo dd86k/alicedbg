@@ -17,7 +17,6 @@ import core.stdc.errno : errno;
 import core.stdc.string : strerror;
 import adbg.include.capstone : csh, cs_errno, cs_strerror;
 
-//TODO: Consider making all codes values of 1000 or more.
 //TODO: Make module thread-safe
 //      Either via TLS and/or atomic operations
 //TODO: More error should have context parameters
@@ -55,13 +54,11 @@ enum AdbgError {
 	//
 	// 200-299: Disasembler
 	//
-	disasmInvalidAddress = 201,
 	disasmUnsupportedMachine = 202,
 	disasmIllegalInstruction = 220,
 	disasmEndOfData = 221,
 	disasmOpcodeLimit = 221,
 	// Old meanings
-	nullAddress	= disasmInvalidAddress,
 	unsupportedPlatform	= disasmUnsupportedMachine,
 	illegalInstruction	= disasmIllegalInstruction,
 	outOfData	= disasmEndOfData,
@@ -78,7 +75,7 @@ enum AdbgError {
 	objectInvalidEndian	= 313,
 	objectInvalidType	= 314,
 	objectInvalidABI	= 315,
-	objectOutsideAccess	= 320,
+	objectOutsideBounds	= 320,
 	// Old meanings
 	unknownObjFormat	= objectUnknownFormat,
 	unsupportedObjFormat	= objectUnsupportedFormat,
@@ -127,55 +124,59 @@ struct adbg_error_t {
 /// Last error in alicedbg.
 private __gshared adbg_error_t error;
 
+//TODO: Strongly consider string, provides .ptr and .length
 private struct adbg_error_msg_t {
 	uint code;
 	const(char) *msg;
 }
-private immutable const(char) *defaultMsg = "Internal error.";
+private immutable const(char) *defaultMsg = "Unknown error occured.";
 private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	// Generics
 	//
-	{ AdbgError.invalidArgument, "Invalid parameter value." },
-	{ AdbgError.nullArgument, "Parameter is null." },
-	{ AdbgError.uninitiated, "Object or structure is uninitiated." },
+	{ AdbgError.invalidArgument,	"Invalid parameter value." },
+	{ AdbgError.emptyArgument,	"Parameter is empty." },
+	{ AdbgError.uninitiated,	"Object or structure is uninitiated." },
+	{ AdbgError.invalidOption,	"Invalid option." },
+	{ AdbgError.invalidOptionValue,	"Invalid value for given option." },
 	//
 	// Debugger
 	//
-	{ AdbgError.notAttached, "No processes are attached to debugger." },
-	{ AdbgError.notPaused, "Tracee is requied to be stopped for this feature." },
+	{ AdbgError.debuggerUnattached,	"No processes are attached to debugger." },
+	{ AdbgError.debuggerUnpaused,	"Process must be paused for this feature." },
+	{ AdbgError.debuggerInvalidAction,	"Wrong action given to process." },
+	{ AdbgError.debuggerPresent,	"Debugger already present to remote process." },
 	//
 	// Disassembler
 	//
-	{ AdbgError.nullAddress, "Input address is null." },
-	{ AdbgError.unsupportedPlatform, "Platform target not supported." },
-	{ AdbgError.invalidOption, "Invalid disassembler option." },
-	{ AdbgError.invalidOptionValue, "Invalid value for disassembler option." },
-	{ AdbgError.illegalInstruction, "Illegal instruction." },
-	{ AdbgError.outOfData, "The input buffer has been depleted." },
-	{ AdbgError.opcodeLimit, "The opcode exhausted its architectural limit." },
+	{ AdbgError.disasmUnsupportedMachine,	"Platform target not supported for disassembler." },
+	{ AdbgError.disasmIllegalInstruction,	"An illegal instruction was met." },
+	{ AdbgError.disasmEndOfData,	"Disassembler input buffer ran out." },
+	{ AdbgError.disasmOpcodeLimit,	"Architectural opcode limit reached." },
 	//
 	// Object server
 	//
-	{ AdbgError.unknownObjFormat, "Unknown object format." },
-	{ AdbgError.unsupportedObjFormat, "Unsupported object format." },
-	{ AdbgError.invalidObjVersion, "Invalid version for object." },
-	{ AdbgError.invalidObjMachine, "Invalid machine/platform value for object." },
-	{ AdbgError.invalidObjClass, "Invalid class/bitness value for object." },
-	{ AdbgError.invalidObjEndian, "Invalid endianess value for object." },
-	{ AdbgError.invalidObjType, "Invalid object type." },
-	{ AdbgError.invalidObjABI, "Invalid ABI value for object." },
+	{ AdbgError.objectUnknownFormat,	"Unknown object format." },
+	{ AdbgError.objectUnsupportedFormat,	"Unsupported object format." },
+	{ AdbgError.objectTooSmall,	"Object is too small to be valid." },
+	{ AdbgError.objectInvalidVersion,	"Invalid version for object." },
+	{ AdbgError.objectInvalidMachine,	"Invalid machine/platform value for object." },
+	{ AdbgError.objectInvalidClass,	"Invalid class/bitness value for object." },
+	{ AdbgError.objectInvalidEndian,	"Invalid endianess value for object." },
+	{ AdbgError.objectInvalidType,	"Invalid object type." },
+	{ AdbgError.objectInvalidABI,	"Invalid ABI value for object." },
+	{ AdbgError.objectOutsideBounds,	"Access outside bounds." },
 	//
 	// Memory module
 	//
-	{ AdbgError.scannerDataEmpty, "Size of data given to memory scanner is empty." },
-	{ AdbgError.scannerDataLimit, "Size of data given to memory scanner is too large." },
+	{ AdbgError.scannerDataEmpty,	"Size of data given to memory scanner is empty." },
+	{ AdbgError.scannerDataLimit,	"Size of data given to memory scanner is too large." },
 	//
 	// Misc.
 	//
-	{ AdbgError.unimplemented, "Feature is not implemented." },
-	{ AdbgError.assertion, "A soft debugging assertion was hit." },
-	{ AdbgError.success, "No errors occured." },
+	{ AdbgError.assertion,	"A soft debugging assertion was hit." },
+	{ AdbgError.unimplemented,	"Feature is not currently implemented." },
+	{ AdbgError.success,	"No errors occured." },
 ];
 
 /// Get error state instance.

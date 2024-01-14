@@ -442,7 +442,7 @@ AdbgStatus adbg_state() {
  */
 int adbg_run(int function(exception_t*) userfunc) {
 	if (userfunc == null)
-		return adbg_oops(AdbgError.nullAddress);
+		return adbg_oops(AdbgError.nullArgument);
 	
 	exception_t e = void;
 	
