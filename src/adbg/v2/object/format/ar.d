@@ -1,11 +1,17 @@
-/// Microsoft COFF archive format.
+/// COFF Library archive format.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause
-module adbg.v2.object.format.mscoff;
+module adbg.v2.object.format.ar;
 
 import adbg.utils.bit;
+
+// Sources:
+// - gdb/include/aout/ar.h
+// - Microsoft Portable Executable and Common Object File Format Specification
+//   Microsoft Corporation, Revision 6.0 - February 1999
+//   Microsoft Corporation, Revision 8.3 - February 2013
 
 // Format:
 //   Signature
@@ -15,11 +21,18 @@ import adbg.utils.bit;
 //   Header + obj n + Data
 
 /// COFF archive magic.
-enum MSCOFF_MAGIC = CHAR64!"!<arch>\n";
+enum AR_MAGIC = CHAR64!"!<arch>\n";
+/// Thin COFF archive magic.
+enum AR_THIN_MAGIC = CHAR64!"!<thin>\n";
 
-struct mscoff_member_header {
-	/// Magic containing "!<arch>\n"
+/// 
+struct ar_file_header {
+	/// Magic containing "!<arch>\n" or similar
 	char[8] Magic;
+}
+
+/// 
+struct ar_member_header {
 	/// Name of archive member, with a slash (/) appended
 	/// to terminate the name. If the first character is a slash,
 	/// the name has a special interpretation, as described
@@ -55,11 +68,33 @@ struct mscoff_member_header {
 	/// ASCII decimal representation of the total size of the
 	/// archive member, not including the size of the header.
 	char[10] Size;
-	/// The two bytes in the C string "\\n".
+	/// The two bytes in the C string: "`\n" (0x60 0x0a).
 	char[2] End;
 }
 
-// 
+/// When first name is "/"
+struct mscoff_first_linker_header {
+	/// 
+	uint SymbolCount;
+	/// Offsets in big-endian
+	uint[1] Offsets;
+	// String table after SymbolCount * uint.sizeof
+}
+
+/// When second name is "/"
+struct mscoff_second_linker_header {
+	uint MemberCount;
+	uint[1] Offsets;
+	// uint SymbolCount; // Follows Offset table
+	// ushort[*] Indices;
+	// String Table after Indices
+}
+
+//
+// MSCOFF import
+//
+
+/// 
 struct mscoff_import_header {
 	/// Must be IMAGE_FILE_MACHINE_UNKNOWN.
 	ushort Sig1;
