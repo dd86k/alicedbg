@@ -130,6 +130,11 @@ struct adbg_object_t {
 	/// Loaded object format.
 	AdbgObject format;
 	
+	//TODO: Consider grouping all properties into one
+	//      Instead of multiple structures, it might be
+	//      better to group all the options/properties/internals
+	//      into one structure (e.g., "struct info_t" member .info)
+	
 	// Object properties.
 	package
 	struct adbg_object_properties_t {

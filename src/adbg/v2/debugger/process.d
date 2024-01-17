@@ -37,8 +37,8 @@ version (Windows) {
 	import adbg.include.posix.mann;
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd : clone, CLONE_PTRACE;
+	import adbg.include.posix.sys.wait;
 	import core.sys.posix.sys.stat;
-	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
 	import core.sys.posix.signal;
 	import core.sys.posix.sys.uio;
 	import core.sys.posix.fcntl : open, O_RDONLY;
@@ -561,6 +561,7 @@ void adbg_self_break() {
 		DebugBreak();
 	} else version (Posix) {
 		ptrace(PT_TRACEME, 0, null, null);
+		raise(SIGSTOP);
 	} else static assert(0, "adbg_debug_me: Implement me");
 }
 
@@ -592,6 +593,13 @@ int adbg_wait(adbg_process_t *tracee, void function(adbg_exception_t*) userfunc)
 	if (tracee.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
+	//TODO: Urgent: The process instance should ideally not be modified
+	//      Changing process information (e.g., PID) can in turn
+	//      be bad news for other API functions (e.g., breakpoints).
+	//
+	//      Children processes should be allocated and attached to exception
+	//      (via adbg_exception_get_process?).
+	
 	adbg_exception_t exception = void;
 	
 	version (Windows) {
@@ -603,6 +611,8 @@ L_DEBUG_LOOP:
 			tracee.creation = AdbgCreation.unloaded;
 			return adbg_oops(AdbgError.os);
 		}
+		
+		//TODO: Assign pid from event?
 		
 		// Filter events
 		switch (de.dwDebugEventCode) {
@@ -627,6 +637,7 @@ L_DEBUG_LOOP:
 		adbg_exception_translate(&exception, &de, null);
 	} else version (Posix) {
 		int wstatus = void;
+		int stopsig = void;
 L_DEBUG_LOOP:
 		tracee.pid = waitpid(-1, &wstatus, 0);
 		
@@ -637,6 +648,17 @@ L_DEBUG_LOOP:
 			return adbg_oops(AdbgError.crt);
 		}
 		
+		version (Trace) trace("wstatus=%08x", wstatus);
+		
+		// If exited or killed by signal, it's gone.
+		if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus))
+			goto L_UNLOADED;
+		
+		// Skip glibc "continue" signals.
+		version (CRuntime_Glibc)
+		if (WIFCONTINUED(wstatus))
+			goto L_DEBUG_LOOP;
+		
 		//TODO: Check waitpid status for BSDs
 		// Bits  Description (Linux)
 		// 6:0   Signo that caused child to exit
@@ -645,15 +667,10 @@ L_DEBUG_LOOP:
 		//  7    Core dumped
 		// 15:8  exit value (or returned main value)
 		//       or signal that cause child to stop/continue
-		int chld_signo = wstatus >> 8;
+		stopsig = WEXITSTATUS(wstatus);
 		
-		// Only interested if child is continuing or stopped; Otherwise
-		// it exited and there's nothing more we can do about it.
-		if ((wstatus & 0x7F) != 0x7F)
-			goto L_UNLOADED;
-		
-		// Signal filtering
-		switch (chld_signo) {
+		// Get fault address
+		switch (stopsig) {
 		case SIGCONT: goto L_DEBUG_LOOP;
 		// NOTE: si_addr is NOT populated under ptrace for SIGTRAP
 		// 
@@ -690,7 +707,7 @@ L_DEBUG_LOOP:
 		}
 		
 		tracee.status = AdbgStatus.paused;
-		adbg_exception_translate(&exception, &tracee.pid, &chld_signo);
+		adbg_exception_translate(&exception, &tracee.pid, &stopsig);
 	}
 	
 	userfunc(&exception);

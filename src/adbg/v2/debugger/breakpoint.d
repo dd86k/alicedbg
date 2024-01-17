@@ -10,6 +10,9 @@ import adbg.error;
 
 extern (C):
 
+// NOTE: When a breakpoint is hit by the debugger, the address should
+//       be checked against the process' breakpoint list.
+
 version (X86) {
 	private alias ubyte opcode_t;
 	private enum opcode_t BREAKPOINT = 0xCC; // INT3

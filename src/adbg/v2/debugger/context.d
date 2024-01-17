@@ -139,7 +139,12 @@ int adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {
 			adbg_context_fill_win(ctx, &winctx);
 		}
 	} else version (Posix) {
-		//TODO: PTRACE_GETFPREGS
+		//TODO: PT_GETFPREGS
+		//      PT_GETWMMXREGS
+		//      PT_GET_THREAD_AREA
+		//      PT_GETCRUNCHREGS
+		//      PT_GETVFPREGS
+		//      PT_GETHBPREGS
 		user_regs_struct u = void;
 		if (ptrace(PT_GETREGS, tracee.pid, null, &u) < 0) {
 			ctx.count = 0;

@@ -12,6 +12,9 @@ import adbg.utils.bit;
 
 // Sources:
 // - https://llvm.org/docs/PDB/MsfFile.html
+// - https://github.com/microsoft/microsoft-pdb
+// - https://github.com/ziglang/zig/blob/master/lib/std/pdb.zig
+// - https://github.com/MolecularMatters/raw_pdb
 
 //
 // Windows PDB
