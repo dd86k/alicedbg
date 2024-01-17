@@ -216,8 +216,9 @@ version (Windows) {
 		case BUS_OBJERR: return Unknown;
 		//case BUS_MCEERR_AR:
 		//case BUS_MCEERR_AO:
-		default: break;
+		default:
 		}
+		break;
 	case SIGTRAP:
 		/*switch (subcode) {
 		case TRAP_BRKPT: return Breakpoint;
@@ -237,8 +238,9 @@ version (Windows) {
 		case CLD_TRAPPED: return Breakpoint;
 		case CLD_STOPPED: return Unknown;
 		case CLD_CONTINUED: return Unknown;
-		default: break;
+		default:
 		}
+		break;
 	case /*SIGIO, */SIGPOLL:
 		switch (subcode) {
 		case POLL_IN: return Unknown;
@@ -247,8 +249,9 @@ version (Windows) {
 		case POLL_ERR: return Unknown;
 		case POLL_PRI: return Unknown;
 		case POLL_HUP: return Unknown;
-		default: break;
+		default:
 		}
+		break;
 	// Because Windows' DebugBreak uses a regular breakpoint (int3)
 	case SIGSTOP: return Breakpoint;
 	case SIGSYS: return Unknown;	// SYS_SECCOMP
