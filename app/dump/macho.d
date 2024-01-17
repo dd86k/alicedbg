@@ -5,9 +5,9 @@
 /// License: BSD-3-Clause
 module dump.macho;
 
-import adbg.v2.disassembler.core;
-import adbg.v2.object.server;
-import adbg.v2.object.format.macho;
+import adbg.disassembler.core;
+import adbg.object.server;
+import adbg.object.format.macho;
 import dumper;
 
 int dump_macho(ref Dumper dump, adbg_object_t *o) {

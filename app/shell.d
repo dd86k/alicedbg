@@ -5,11 +5,12 @@
 /// License: BSD-3-Clause
 module shell;
 
+import adbg.error, adbg.debugger, adbg.disassembler, adbg.object;
 import adbg.include.c.stdio : printf, puts, putchar;
 import adbg.include.c.stdlib : atoi, malloc, free, exit;
 import core.stdc.string : strcmp, strncmp;
 import common, utils;
-import term, adbg;
+import term;
 
 //TODO: Print process exit code
 

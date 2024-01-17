@@ -6,10 +6,10 @@
 module dump.pe;
 
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE;
-import adbg.v2.disassembler.core;
-import adbg.v2.object.server;
-import adbg.v2.object.machines : AdbgMachine;
-import adbg.v2.object.format.pe;
+import adbg.disassembler.core;
+import adbg.object.server;
+import adbg.object.machines : AdbgMachine;
+import adbg.object.format.pe;
 import adbg.utils.date : ctime32;
 import adbg.utils.uid, adbg.utils.bit;
 import common, dumper;

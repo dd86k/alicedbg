@@ -10,7 +10,7 @@ version (Windows):
 import core.sys.windows.windef;
 import core.sys.windows.ntdef;  // NTSTATUS
 import core.sys.windows.ntdll;
-import adbg.v2.object.symbols;
+import adbg.object.symbols;
 import adbg.error;
 
 extern(C):

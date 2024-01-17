@@ -5,10 +5,10 @@
 /// License: BSD-3-Clause
 module dump.pdb70;
 
-import adbg.v2.disassembler.core;
-import adbg.v2.object.server;
-import adbg.v2.object.machines;
-import adbg.v2.object.format.pdb;
+import adbg.disassembler.core;
+import adbg.object.server;
+import adbg.object.machines;
+import adbg.object.format.pdb;
 import adbg.utils.uid;
 import adbg.utils.date;
 import dumper;

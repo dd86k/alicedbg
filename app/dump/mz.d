@@ -5,10 +5,10 @@
 /// License: BSD-3-Clause
 module dump.mz;
 
-import adbg.v2.disassembler.core;
-import adbg.v2.object.server;
-import adbg.v2.object.machines : AdbgMachine;
-import adbg.v2.object.format.mz;
+import adbg.disassembler.core;
+import adbg.object.server;
+import adbg.object.machines : AdbgMachine;
+import adbg.object.format.mz;
 import dumper;
 
 extern (C):

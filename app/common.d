@@ -11,9 +11,9 @@ import core.stdc.stdlib : exit;
 import core.stdc.string : strerror;
 import core.stdc.errno : errno;
 import adbg.error;
-import adbg.v2.disassembler;
-import adbg.v2.debugger.exception;
-import adbg.v2.object.machines : AdbgMachine;
+import adbg.disassembler;
+import adbg.debugger.exception;
+import adbg.object.machines : AdbgMachine;
 import core.stdc.stdio : FILE;
 import core.stdc.stdlib : malloc;
 

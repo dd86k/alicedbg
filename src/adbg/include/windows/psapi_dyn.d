@@ -12,7 +12,7 @@ version (ANSI) {} else version = Unicode;
 import core.sys.windows.windef;
 public import core.sys.windows.psapi;
 
-import adbg.v2.object.symbols;
+import adbg.object.symbols;
 
 extern (Windows):
 

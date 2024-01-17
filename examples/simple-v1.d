@@ -6,7 +6,7 @@
 module examples.simple_v1;
 
 import adbg.include.c.stdio;
-import adbg.v1.debugger, adbg.v1.disassembler, adbg.error;
+import adbg.legacy.debugger, adbg.legacy.disassembler, adbg.error;
 
 extern (C):
 

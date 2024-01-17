@@ -5,11 +5,12 @@
 /// License: BSD-3-Clause
 module dumper;
 
+import adbg.error, adbg.disassembler, adbg.object;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, free;
 import adbg.include.c.stdarg;
 import core.stdc.string;
-import adbg.v2, adbg.v2.object.machines;
+import adbg.object.machines;
 import adbg.utils.bit : BIT;
 import common, utils, dump;
 

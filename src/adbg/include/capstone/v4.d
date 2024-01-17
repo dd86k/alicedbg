@@ -742,7 +742,7 @@ cs_err cs_regs_access (
 // ANCHOR: Dynamic library
 //
 
-import adbg.v2.object.symbols;
+import adbg.object.symbols;
 
 private {
     alias pcs_version = uint function(int* major, int* minor);
