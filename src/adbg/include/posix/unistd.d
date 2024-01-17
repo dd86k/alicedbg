@@ -1,24 +1,24 @@
-/**
- * Up to date Posix universal standard defitions (unistd.h) and other utilities.
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
+/// Up to date Posix universal standard defitions (unistd.h) and other utilities.
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module adbg.include.posix.unistd;
 
 version (Posix):
 
+public import core.sys.posix.unistd;
+
+// Missing XOpen (XSI) definitions for Musl
 version (CRuntime_Musl) {
 	public import core.sys.posix.stdlib : ssize_t, off_t;
-	public import core.sys.posix.unistd : fork, execve, pipe;
 	public extern (C) ssize_t pread(int, void *, size_t, off_t);
 	public extern (C) ssize_t pwrite(int, const(void)*, size_t, off_t);
-} else {
-	public import core.sys.posix.unistd : fork, execve, pread, pwrite, pipe, sysconf, _SC_PAGE_SIZE;
 }
 
 extern (C):
+
+//TODO: Check if BSDs have clone(2)...
 
 /*
  * cloning flags:
