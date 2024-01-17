@@ -7,18 +7,29 @@ __dummy.html
 /docs/
 /alicedbg
 alicedbg-test-*
-*.pdb
-*.so
-*.dylib
-*.dll
-*.a
-*.lib
-*.exe
-*.o
-*.obj
-*.lst
 *.json
 *.log
+*.lst
+
+# Executable objects
+*.dll
+*.dylib
+*.so
+*.exe
+
+# Debug objects
+*.pdb
+*.dbg
+
+# Library archives and objects
+*.lib
+*.a
+*.obj
+*.o
+
+# Archives
+*.zip
+*.tar.*
 
 # C headers
 /include/

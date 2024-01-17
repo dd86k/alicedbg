@@ -114,6 +114,14 @@ buildType "release-nobounds" {
 	dflags "-betterC" platform="ldc"
 }
 
+# Compile in release mode with no bound checking as statically link.
+buildType "release-nobounds-static" {
+	versions "Release" "ReleaseNobounds"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck"
+	dflags "-betterC" "--static" platform="ldc"
+	dflags "-betterC" "-Wl,-static" platform="gdc"
+}
+
 #
 # ANCHOR Unit tests
 #
