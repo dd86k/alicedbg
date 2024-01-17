@@ -7,7 +7,7 @@ module examples.simple;
 
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
-import adbg.v2;
+import adbg;
 
 extern (C):
 
