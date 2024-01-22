@@ -5,7 +5,11 @@
 /// License: BSD-3-Clause
 module adbg.object.format.ar;
 
+import adbg.error;
+import adbg.object.server;
 import adbg.utils.bit;
+import core.stdc.stdlib : atoi;
+import core.stdc.string : memcpy;
 
 // Sources:
 // - gdb/include/aout/ar.h
@@ -20,10 +24,14 @@ import adbg.utils.bit;
 //   Header + Longnames Member + Data
 //   Header + obj n + Data
 
+// NOTE: MSVC linker can only process libraries under 4 GiB in size.
+
 /// COFF archive magic.
 enum AR_MAGIC = CHAR64!"!<arch>\n";
 /// Thin COFF archive magic.
 enum AR_THIN_MAGIC = CHAR64!"!<thin>\n";
+/// 
+private enum AR_EOL = CHAR16!"`\n";
 
 /// 
 struct ar_file_header {
@@ -68,8 +76,11 @@ struct ar_member_header {
 	/// ASCII decimal representation of the total size of the
 	/// archive member, not including the size of the header.
 	char[10] Size;
-	/// The two bytes in the C string: "`\n" (0x60 0x0a).
-	char[2] End;
+	union {
+		/// The two bytes in the C string: "`\n" (0x60 0x0a).
+		char[2] End;
+		ushort EndMarker;
+	}
 }
 
 /// When first name is "/"
@@ -90,16 +101,77 @@ struct mscoff_second_linker_header {
 	// String Table after Indices
 }
 
+int adbg_object_ar_load(adbg_object_t *o) {
+	o.format = AdbgObject.archive;
+	return 0;
+}
+
+ar_member_header* adbg_object_ar_header(adbg_object_t *o, size_t index) {
+	if (o == null)
+		return null;
+	
+	version (Trace) trace("index=%zu", index);
+	
+	ar_member_header *p = cast(ar_member_header*)(o.buffer + ar_file_header.sizeof);
+	void *max = o.buffer + 0x8000_0000; // 2 GiB limit
+	for (size_t i; p < max; ++i) {
+		if (i == index)
+			return p.EndMarker == AR_EOL ? p : null;
+		
+		// Adjust pointer
+		size_t offset = atoi(p.Size.ptr) + ar_member_header.sizeof;
+		version (Trace) trace("offset=%zu", offset);
+		p = cast(ar_member_header*)(cast(void*)p + offset);
+		
+		// Outside bounds
+		if (adbg_object_outboundpl(o, p, ar_member_header.sizeof))
+			return null;
+	}
+	
+	return null;
+}
+
+int adbg_object_ar_header_size(adbg_object_t *o, ar_member_header *mhdr) {
+	if (o == null || mhdr == null)
+		return -1;
+	
+	char[12] str = void;
+	memcpy(str.ptr, mhdr.Size.ptr, mhdr.Size.sizeof);
+	str[10] = 0;
+	return atoi(str.ptr);
+}
+
+void* adbg_object_ar_data(adbg_object_t *o, ar_member_header *mhdr) {
+	if (o == null || mhdr == null)
+		return null;
+	
+	void *p = cast(void*)mhdr + ar_member_header.sizeof;
+	int size = adbg_object_ar_header_size(o, mhdr);
+	if (size < 0)
+		return null;
+	if (adbg_object_outboundpl(o, p, size))
+		return null;
+	return p;
+}
+
 //
 // MSCOFF import
 //
 
 /// 
 struct mscoff_import_header {
-	/// Must be IMAGE_FILE_MACHINE_UNKNOWN.
-	ushort Sig1;
-	/// Must be 0xFFFF.
-	ushort Sig2;
+	union {
+		/// Must be a combination of IMAGE_FILE_MACHINE_UNKNOWN and 0xFFFF.
+		///
+		/// Effectively only 0xFFFF, since the enum value is 0.
+		uint Signature;
+		struct {
+			/// Must be IMAGE_FILE_MACHINE_UNKNOWN.
+			ushort Signature1;
+			/// Must be 0xFFFF.
+			ushort Signature2;
+		}
+	}
 	ushort Version;
 	ushort Machine;
 	uint TimeStamp;

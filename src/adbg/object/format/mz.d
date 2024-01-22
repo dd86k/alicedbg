@@ -69,6 +69,7 @@ struct mz_hdr_ext {
 	ushort[ERESWDS] e_res;	/// Reserved words
 	uint e_lfanew;	/// 
 }
+static assert(mz_hdr_ext.e_lfanew.offsetof == LFANEW_OFFSET);
 
 /// MZ relocation entry
 struct mz_reloc {

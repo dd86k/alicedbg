@@ -63,10 +63,12 @@ enum AdbgObject {
 	elf,
 	/// Mach Object format.
 	macho,
-	// Microsoft Program Database format 2.0.
+	/// Microsoft Program Database format 2.0.
 	pdb20,
-	// Microsoft Program Database format 7.0.
+	/// Microsoft Program Database format 7.0.
 	pdb70,
+	/// Library archive.
+	archive,
 	// Microsoft Debug format.
 	//dbg,
 	// 
@@ -170,7 +172,10 @@ struct adbg_object_t {
 		void *header;
 		
 		struct mz_t {
-			mz_hdr *header;
+			union {
+				mz_hdr *header;
+				mz_hdr_ext *header_ext;
+			}
 			mz_reloc *relocs;
 			void *newbase;
 			bool *reversed_relocs;
@@ -549,10 +554,14 @@ L_ARG:
 			return adbg_object_pdb70_load(o);
 	}
 	
-	//TODO: 64-bit detection
-	//      starting with MSCOFF
+	// 64-bit signature detection
+	switch (*o.buffer64) {
+	case AR_MAGIC:
+		return adbg_object_ar_load(o);
+	default:
+	}
 	
-	// 32-bit detection
+	// 32-bit signature detection
 	switch (*o.buffer32) {
 	case ELF_MAGIC:	// ELF
 		return adbg_object_elf_load(o);
@@ -566,32 +575,31 @@ L_ARG:
 	default:
 	}
 	
-	// 16-bit detection
+	// 16-bit signature detection
 	switch (*o.buffer16) {
 	case MAGIC_MZ:
 		if (o.file_size < mz_hdr.sizeof)
 			return adbg_oops(AdbgError.unknownObjFormat);
 		
-		import adbg.object.format.mz : LFANEW_OFFSET;
-		
 		// If e_lfarlc (relocation table) starts lower than e_lfanew,
 		// then assume old MZ.
-		if (o.i.mz.header.e_lfarlc < 0x40)
+		if (o.i.mz.header.e_lfarlc <= 0x40)
 			return adbg_object_mz_load(o);
 		
-		// Attempt to check new file format offset and signature.
-		// If e_lfanew seem to be garbage, load file as an MZ exec instead.
-		uint e_lfanew = *cast(uint*)(o.buffer + LFANEW_OFFSET);
-		// If within MZ extended header
-		if (e_lfanew <= mz_hdr_ext.sizeof)
+		// If e_lfanew points within MZ extended header
+		if (o.i.mz.header_ext.e_lfanew <= mz_hdr_ext.sizeof)
 			return adbg_object_mz_load(o);
-		// If outside file
-		if (e_lfanew >= o.file_size)
+		
+		// If e_lfanew points outside file
+		if (o.i.mz.header_ext.e_lfanew >= o.file_size)
 			return adbg_object_mz_load(o);
+		
 		// NOTE: ReactOS checks if NtHeaderOffset is not higher than 256 MiB
-		if (e_lfanew >= 256 * 1024 * 1024)
+		if (o.i.mz.header_ext.e_lfanew >= 256 * 1024 * 1024)
 			return adbg_object_mz_load(o);
-		o.i.mz.newbase = o.buffer + e_lfanew; // Used by sub-loaders
+		
+		// Set where new header is located, used by sub-loaders
+		o.i.mz.newbase = o.buffer + o.i.mz.header_ext.e_lfanew;
 		
 		// 32-bit signature check
 		uint sig = *cast(uint*)o.i.mz.newbase;
@@ -666,7 +674,8 @@ const(char)* adbg_object_short_name(adbg_object_t *o) {
 	case elf:	return "elf";
 	case pdb20:	return "pdb20";
 	case pdb70:	return "pdb70";
-	default:
+	case archive:	return "archive";
+	default:	// Because of unknown
 	}
 L_UNKNOWN:
 	return "unknown";
@@ -687,8 +696,9 @@ const(char)* adbg_object_name(adbg_object_t *o) {
 	case elf:	return `Executable and Linkable Format`;
 	case pdb20:	return `Program Database 2.0`;
 	case pdb70:	return `Program Database 7.0`;
-	default:
+	case archive:	return `COFF Library Archive`;
+	default:	// Because of unknown
 	}
 L_UNKNOWN:
-	return "Unknown";
+	return "unknown";
 }

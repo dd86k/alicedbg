@@ -148,7 +148,8 @@ int app_dump() {
 	case macho:	return dump_macho(dump, o);
 	case pdb20:	return dump_pdb20(dump, o);
 	case pdb70:	return dump_pdb70(dump, o);
-	default:	return EXIT_FAILURE;
+	case archive:	return dump_archive(dump, o);
+	default:	assert(0, "Invalid object type"); // Raw/unknown
 	}
 }
 
@@ -156,6 +157,8 @@ private immutable {
 	/// Padding spacing to use in characters
 	// PE32 has fields like MinorOperatingSystemVersion (27 chars)
 	int __field_padding = -28;
+	/// 
+	int __columns = 16;
 }
 
 void print_header(const(char)* name) {
@@ -314,6 +317,58 @@ L_START:
 	if (count++) putchar(',');
 	printf("%s", name);
 	goto L_START;
+}
+
+void print_raw(const(char)* name, void *data, size_t dsize, adbg_object_t *o) {
+	// Is size fitting within file?
+	if (adbg_object_outboundpl(o, data, dsize)) {
+		print_string("warning", "Data goes beyond file bounds.");
+		return;
+	}
+	
+	import core.stdc.ctype : isprint;
+	
+	print_header(name);
+	
+	size_t offset = data - o.buffer;
+	
+	// Print header
+	static immutable string _soff = "Offset    ";
+	printf(_soff.ptr);
+	//TODO: Print extra spaces after offset string
+	for (int ib; ib < __columns; ++ib)
+		printf("%02x ", ib);
+	putchar('\n');
+	
+	// Print data
+	ubyte *d = cast(ubyte*)data;
+	size_t afo; // Absolute file offset
+	for (size_t id; id < dsize; id += __columns, offset += __columns) {
+		printf("%8zx  ", offset);
+		
+		// Adjust column for row
+		size_t col = __columns;//id + __columns >= dsize ? dsize - __columns : __columns;
+		size_t off = afo;
+		
+		// Print data bytes
+		for (size_t ib; ib < col; ++ib, ++off)
+			printf("%02x ", d[off]);
+		
+		// Adjust spacing between the two
+		if (col < __columns) {
+			
+		} else
+			putchar(' ');
+		
+		// Print printable characters
+		off = afo;
+		for (size_t ib; ib < col; ++ib, ++off)
+			putchar(isprint(d[off]) ? d[off] : '.');
+		
+		// New row
+		afo += col;
+		putchar('\n');
+	}
 }
 
 void print_directory_entry(const(char)* name, uint rva, uint size) {

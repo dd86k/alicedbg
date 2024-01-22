@@ -6,6 +6,92 @@
 module utils;
 
 import core.stdc.stdio : sscanf;
+import core.stdc.ctype : isprint;
+
+char hexc0(ubyte upper) {
+	ubyte h = upper >> 4;
+	return cast(char)(h >= 0xa ? h + ('a' - 0xa) : h + '0');
+}
+unittest {
+	assert(hexc0(0x00) == '0');
+	assert(hexc0(0x10) == '1');
+	assert(hexc0(0x20) == '2');
+	assert(hexc0(0x30) == '3');
+	assert(hexc0(0x40) == '4');
+	assert(hexc0(0x50) == '5');
+	assert(hexc0(0x60) == '6');
+	assert(hexc0(0x70) == '7');
+	assert(hexc0(0x80) == '8');
+	assert(hexc0(0x90) == '9');
+	assert(hexc0(0xa0) == 'a');
+	assert(hexc0(0xb0) == 'b');
+	assert(hexc0(0xc0) == 'c');
+	assert(hexc0(0xd0) == 'd');
+	assert(hexc0(0xe0) == 'e');
+	assert(hexc0(0xf0) == 'f');
+}
+char hexc1(ubyte lower) {
+	ubyte l = lower & 15;
+	return cast(char)(l >= 0xa ? l + ('a' - 0xa) : l + '0');
+}
+unittest {
+	assert(hexc1(0) == '0');
+	assert(hexc1(1) == '1');
+	assert(hexc1(2) == '2');
+	assert(hexc1(3) == '3');
+	assert(hexc1(4) == '4');
+	assert(hexc1(5) == '5');
+	assert(hexc1(6) == '6');
+	assert(hexc1(7) == '7');
+	assert(hexc1(8) == '8');
+	assert(hexc1(9) == '9');
+	assert(hexc1(0xa) == 'a');
+	assert(hexc1(0xb) == 'b');
+	assert(hexc1(0xc) == 'c');
+	assert(hexc1(0xd) == 'd');
+	assert(hexc1(0xe) == 'e');
+	assert(hexc1(0xf) == 'f');
+}
+
+int realstring(char* buffer, size_t bsize, const(char)* str, size_t ssize,
+	char pre = 0, char post = 0) {
+	int len; // total length
+	
+	if (bsize == 0)
+		return 0;
+	
+	if (pre && bsize)
+		buffer[len++] = pre;
+	
+	for (size_t i; i < ssize && len < bsize; ++i) {
+		char c = str[i];
+		if (isprint(c)) {
+			if (len >= bsize) break;
+			buffer[len++] = c;
+		} else {
+			if (len + 4 >= bsize) break;
+			buffer[len++] = '\\';
+			buffer[len++] = 'x';
+			buffer[len++] = hexc0(c);
+			buffer[len++] = hexc1(c);
+		}
+	}
+	
+	if (post && len < bsize)
+		buffer[len++] = post;
+	
+	return len;
+}
+unittest {
+	char[2]  bi = "`\n";
+	char[10] bo = void; // '`' '\\x0a'
+	assert(realstring(bo.ptr, 10, bi.ptr, 2) == 5);
+	assert(bo[0] == '`');
+	assert(bo[1] == '\\');
+	assert(bo[2] == 'x');
+	assert(bo[3] == '0');
+	assert(bo[4] == 'a');
+}
 
 /// Unformat text number.
 /// Params:
