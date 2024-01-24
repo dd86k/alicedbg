@@ -834,32 +834,38 @@ int adbg_process_get_pid(adbg_process_t *tracee) {
 }
 
 /// Get the process file path.
+///
+/// The string is null-terminated.
 /// Params:
 /// 	pid = Process ID.
 /// 	buffer = Buffer.
 /// 	bufsize = Size of the buffer.
 /// 	basename = Request for basename; Otherwise full file path.
-/// Returns: Error code.
-int adbg_process_get_name(int pid, char *buffer, size_t bufsize, bool basename) {
+/// Returns: String length; Or zero on error.
+size_t adbg_process_get_name(int pid, char *buffer, size_t bufsize, bool basename) {
 	if (pid <= 0 || buffer == null || bufsize == 0)
 		return adbg_oops(AdbgError.nullArgument);
 	
 	version (Windows) {
+		// Get process handle
 		HANDLE hand = OpenProcess(
 			PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
 			FALSE, pid);
-		if (hand == null)
-			return adbg_oops(AdbgError.os);
+		if (hand == null) {
+			adbg_oops(AdbgError.os);
+			return 0;
+		}
 		scope(exit) CloseHandle(hand);
 		
+		// Get filename or basename
 		uint bf = cast(uint)bufsize;
 		uint r = basename ?
 			GetModuleBaseNameA(hand, null, buffer, bf) :
 			GetModuleFileNameA(hand, buffer, bf);
 		buffer[r] = 0;
 		if (r == 0)
-			return adbg_oops(AdbgError.os);
-		return 0;
+			adbg_oops(AdbgError.os);
+		return r;
 	} else version (linux) {
 		enum TBUFSZ = 32;
 		char[TBUFSZ] pathbuf = void; // Path buffer
@@ -877,12 +883,16 @@ int adbg_process_get_name(int pid, char *buffer, size_t bufsize, bool basename) 
 		if (r <= 0) {
 			snprintf(pathbuf.ptr, TBUFSZ, "/proc/%d/comm", pid);
 			int commfd = open(pathbuf.ptr, O_RDONLY);
-			if (commfd == -1)
-				return adbg_oops(AdbgError.os);
+			if (commfd == -1) {
+				adbg_oops(AdbgError.os);
+				return 0;
+			}
 			scope(exit) close(commfd);
 			r = read(commfd, buffer, bufsize);
-			if (r < 0)
-				return adbg_oops(AdbgError.os);
+			if (r < 0) {
+				adbg_oops(AdbgError.os);
+				return 0;
+			}
 			buffer[r - 1] = 0; // Delete newline
 		}
 		
@@ -905,9 +915,11 @@ int adbg_process_get_name(int pid, char *buffer, size_t bufsize, bool basename) 
 			
 		}*/
 	
+		return r;
+	} else {
+		adbg_oops(AdbgError.unimplemented);
 		return 0;
-	} else
-		return adbg_oops(AdbgError.unimplemented);
+	}
 }
 
 /// Get the current runtime machine platform.
@@ -957,7 +969,7 @@ struct adbg_process_list_t {
 }
 
 //TODO: Redo adbg_process_enumerate
-//      int adbg_process_list(adbg_process_list_t*)
+//      int* adbg_process_list(size_t *count, ...)
 //      - List of PIDs instead, use adbg_process_get_name for file path.
 
 // NOTE: For the C vararg to work, list is a parameter instead of a return value.

@@ -265,6 +265,16 @@ struct adbg_object_t {
 		
 		struct pdb70_t {
 			pdb70_file_header *header;
+			ubyte *fpm;	/// Points to used FPM block
+			void *dir;	/// Directory buffer (Stream 0)
+			
+			// Stream 0 meta
+			uint strcnt;	/// Stream count
+			uint *strsize;	/// Stream size (Points to Stream[0].size)
+			uint *stroff;	/// Block IDs (Points to Stream[0].block[0])
+			
+			// Lookup table made from Stream 0
+			pdb70_stream *strmap;	/// Stream mapping
 		}
 		pdb70_t pdb70;
 	}
@@ -448,6 +458,10 @@ void adbg_object_close(adbg_object_t *o) {
 			break;
 		default:
 		}
+		break;
+	case pdb70:
+		with (o.i.pdb70) if (dir) free(dir);
+		with (o.i.pdb70) if (strmap) free(strmap);
 		break;
 	default:
 	}

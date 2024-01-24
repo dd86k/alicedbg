@@ -165,6 +165,11 @@ void print_header(const(char)* name) {
 	printf("\n# %s\n", name);
 }
 
+// Field name only
+void print_name(const(char)* name) {
+	printf("%*s: ", __field_padding, name);
+}
+
 void print_section(uint i, const(char) *name = null, int len = 0) {
 	putchar('\n');
 	print_u32("index", i);
@@ -263,6 +268,7 @@ void print_string(const(char)* name, const(char)* val) {
 void print_stringl(const(char)* name, const(char)* val, int len) {
 	printf("%*s: %.*s\n", __field_padding, name, len, val);
 }
+//TODO: print_stringf
 
 void print_flags16(const(char) *section, ushort flags, ...) {
 	printf("%*s: 0x%04x\t(", __field_padding, section, flags);

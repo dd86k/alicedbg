@@ -87,6 +87,8 @@ struct option_t {
 //TODO: --dump-length/--dump-end: Length or end
 //TODO: --dump-imports-all: Dependency walker
 //TODO: --dump-section=name: Hex or raw dump section
+//TODO: --dump-stats: File statistics?
+//                    pdb: stream count, positions, etc.
 immutable option_t[] options = [
 	// general
 	{ 'a', "arch",   "Select architecture for disassembler (default=platform)", true, fa: &cli_march },
