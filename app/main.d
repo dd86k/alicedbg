@@ -16,7 +16,7 @@ import common, dumper, shell, utils;
 private:
 extern (C):
 
-enum COPYRIGHT = "Copyright (c) 2019-2023 dd86k <dd@dax.moe>";
+enum COPYRIGHT = "Copyright (c) 2019-2024 dd86k <dd@dax.moe>";
 
 __gshared immutable(char) *page_license =
 COPYRIGHT~`

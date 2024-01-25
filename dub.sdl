@@ -2,7 +2,7 @@ name "alicedbg"
 description "Aiming to be a simple debugger"
 homepage "http://github.com/dd86k/alicedbg"
 authors "dd86k <dd@dax.moe>"
-copyright "Copyright © 2019-2023 dd86k <dd@dax.moe>"
+copyright "Copyright © dd86k <dd@dax.moe>"
 license "BSD-3-Clause"
 
 # NOTE: BetterC flag
