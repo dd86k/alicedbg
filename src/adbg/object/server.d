@@ -75,8 +75,8 @@ enum AdbgObject {
 	//codeview
 	// 
 	//dwarf
-	// Windows' User Mini-Dump format.
-	//mdmp,
+	/// Windows Minidump format.
+	mdmp,
 }
 
 /// Object origin. (or "load mode")
@@ -95,6 +95,14 @@ enum AdbgObjectOrigin {
 /// Object server options.
 enum AdbgObjectLoadOption {
 	partial = 1,
+}
+
+package
+enum AdbgObjectInternalFlags {
+	/// Object has its fields swapped because of its target endianness.
+	reversed	= 0x1,
+	/// 
+	notnative	= 0x2,
 }
 
 /// Represents a file object image.
@@ -277,6 +285,11 @@ struct adbg_object_t {
 			pdb70_stream *strmap;	/// Stream mapping
 		}
 		pdb70_t pdb70;
+		
+		struct mdmp_t {
+			mdump_header *header;
+		}
+		mdmp_t mdmp;
 	}
 	/// Internal object definitions.
 	adbg_object_internals_t i;
@@ -586,6 +599,8 @@ L_ARG:
 	case MACHO_FATMAGIC:	// Mach-O Fat
 	case MACHO_FATCIGAM:	// Mach-O Fat reversed
 		return adbg_object_macho_load(o);
+	case MDMP_MAGIC:
+		return adbg_object_mdmp_load(o);
 	default:
 	}
 	
@@ -609,6 +624,8 @@ L_ARG:
 			return adbg_object_mz_load(o);
 		
 		// NOTE: ReactOS checks if NtHeaderOffset is not higher than 256 MiB
+		//       At this point, it could be malformed.
+		//       Have you seen a 256M DOS executable?
 		if (o.i.mz.header_ext.e_lfanew >= 256 * 1024 * 1024)
 			return adbg_object_mz_load(o);
 		
@@ -679,7 +696,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 const(char)* adbg_object_short_name(adbg_object_t *o) {
 	if (o == null)
 		goto L_UNKNOWN;
-	switch (o.format) with (AdbgObject) {
+	final switch (o.format) with (AdbgObject) {
 	case mz:	return "mz";
 	case ne:	return "ne";
 	case lx:	return "lx";
@@ -689,10 +706,10 @@ const(char)* adbg_object_short_name(adbg_object_t *o) {
 	case pdb20:	return "pdb20";
 	case pdb70:	return "pdb70";
 	case archive:	return "archive";
-	default:	// Because of unknown
+	case mdmp:	return "mdmp";
+	L_UNKNOWN:
+	case raw:	return "unknown";
 	}
-L_UNKNOWN:
-	return "unknown";
 }
 
 /// Get the full name of the loaded object format.
@@ -701,7 +718,7 @@ L_UNKNOWN:
 const(char)* adbg_object_name(adbg_object_t *o) {
 	if (o == null)
 		goto L_UNKNOWN;
-	switch (o.format) with (AdbgObject) {
+	final switch (o.format) with (AdbgObject) {
 	case mz:	return `Mark Zbikowski`;
 	case ne:	return `New Executable`;
 	case lx:	return `Linked Executable`;
@@ -711,8 +728,9 @@ const(char)* adbg_object_name(adbg_object_t *o) {
 	case pdb20:	return `Program Database 2.0`;
 	case pdb70:	return `Program Database 7.0`;
 	case archive:	return `COFF Library Archive`;
-	default:	// Because of unknown
+	case mdmp:	return `Minidump`;
+	L_UNKNOWN:
+	case raw:	return "unknown";
 	}
-L_UNKNOWN:
-	return "unknown";
+
 }

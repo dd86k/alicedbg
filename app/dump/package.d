@@ -16,4 +16,5 @@ public import
 	dump.macho,
 	dump.pdb70,
 	dump.pdb20,
-	dump.ar;
+	dump.ar,
+	dump.mdmp;

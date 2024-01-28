@@ -139,7 +139,7 @@ int app_dump() {
 	print_string("format", adbg_object_name(o));
 	print_string("short_name", adbg_object_short_name(o));
 	
-	switch (o.format) with (AdbgObject) {
+	final switch (o.format) with (AdbgObject) {
 	case mz:	return dump_mz(dump, o);
 	case ne:	return dump_ne(dump, o);
 	case pe:	return dump_pe(dump, o);
@@ -149,7 +149,8 @@ int app_dump() {
 	case pdb20:	return dump_pdb20(dump, o);
 	case pdb70:	return dump_pdb70(dump, o);
 	case archive:	return dump_archive(dump, o);
-	default:	assert(0, "Invalid object type"); // Raw/unknown
+	case mdmp:	return dump_minidump(dump, o);
+	case raw:	assert(0, "Unknown object type"); // Raw/unknown
 	}
 }
 

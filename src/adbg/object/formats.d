@@ -13,4 +13,5 @@ public import
 	adbg.object.format.lx,
 	adbg.object.format.pe,
 	adbg.object.format.pdb,
-	adbg.object.format.ar;
+	adbg.object.format.ar,
+	adbg.object.format.mdmp;
