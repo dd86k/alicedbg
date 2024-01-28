@@ -17,4 +17,5 @@ public import
 	dump.pdb70,
 	dump.pdb20,
 	dump.ar,
-	dump.mdmp;
+	dump.mdmp,
+	dump.dmp;

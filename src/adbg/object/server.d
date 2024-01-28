@@ -18,6 +18,7 @@ import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.utils.bit;
+import adbg.utils.math;
 import adbg.object.formats;
 import adbg.object.machines : AdbgMachine;
 import adbg.debugger.process : adbg_process_t;
@@ -47,10 +48,12 @@ extern (C):
 //      - For swapping, uses less code than inlining it
 //      - For displaying and using field offsets
 
-/// Executable or object format.
+/// Executable or object file format.
 enum AdbgObject {
 	/// Raw binary file, or unknown object format.
 	raw,
+	/// Ditto
+	unknown = raw,
 	/// Mark Zbikowski format.
 	mz,
 	/// New Executable format.
@@ -69,12 +72,8 @@ enum AdbgObject {
 	pdb70,
 	/// Library archive.
 	archive,
-	// Microsoft Debug format.
-	//dbg,
-	// 
-	//codeview
-	// 
-	//dwarf
+	/// Windows memory dump format.
+	dmp,
 	/// Windows Minidump format.
 	mdmp,
 }
@@ -290,6 +289,11 @@ struct adbg_object_t {
 			mdump_header *header;
 		}
 		mdmp_t mdmp;
+		
+		struct dmp_t {
+			dmp_header *header;
+		}
+		dmp_t dmp;
 	}
 	/// Internal object definitions.
 	adbg_object_internals_t i;
@@ -552,6 +556,12 @@ L_ARG:
 		return adbg_oops(AdbgError.crt);
 	version (Trace) trace("filesize=%llu", o.file_size);
 	
+	// HACK: To avoid loading gigabyte memory dumps
+	//       Until partial system is implemented, or something
+	enum TEMP_LIMIT = MiB!100;
+	if (o.file_size > TEMP_LIMIT)
+		o.file_size = TEMP_LIMIT;
+	
 	//TODO: Determine absolute minimum before proceeding
 	
 	// Allocate
@@ -573,7 +583,7 @@ L_ARG:
 	//TODO: Consider moving auto-detection as separate function?
 	//      Especially if debugger can return process' base address for image headers
 	
-	/// PDB detection
+	// Magic detection over 8 Bytes
 	if (o.file_size > PDB_DEFAULT_PAGESIZE) {
 		if (memcmp(o.buffer, PDB20_MAGIC.ptr, PDB20_MAGIC.length) == 0)
 			return adbg_object_pdb20_load(o);
@@ -585,6 +595,8 @@ L_ARG:
 	switch (*o.buffer64) {
 	case AR_MAGIC:
 		return adbg_object_ar_load(o);
+	case PAGEDUMP32_MAGIC, PAGEDUMP64_MAGIC:
+		return adbg_object_dmp_load(o);
 	default:
 	}
 	
@@ -626,7 +638,7 @@ L_ARG:
 		// NOTE: ReactOS checks if NtHeaderOffset is not higher than 256 MiB
 		//       At this point, it could be malformed.
 		//       Have you seen a 256M DOS executable?
-		if (o.i.mz.header_ext.e_lfanew >= 256 * 1024 * 1024)
+		if (o.i.mz.header_ext.e_lfanew >= MiB!256)
 			return adbg_object_mz_load(o);
 		
 		// Set where new header is located, used by sub-loaders
@@ -707,8 +719,9 @@ const(char)* adbg_object_short_name(adbg_object_t *o) {
 	case pdb70:	return "pdb70";
 	case archive:	return "archive";
 	case mdmp:	return "mdmp";
+	case dmp:	return "dmp";
 	L_UNKNOWN:
-	case raw:	return "unknown";
+	case unknown:	return "unknown";
 	}
 }
 
@@ -728,9 +741,10 @@ const(char)* adbg_object_name(adbg_object_t *o) {
 	case pdb20:	return `Program Database 2.0`;
 	case pdb70:	return `Program Database 7.0`;
 	case archive:	return `COFF Library Archive`;
-	case mdmp:	return `Minidump`;
+	case mdmp:	return `Windows Minidump`;
+	case dmp:	return `Windows Memory Dump`;
 	L_UNKNOWN:
-	case raw:	return "unknown";
+	case unknown:	return "Unknown";
 	}
 
 }

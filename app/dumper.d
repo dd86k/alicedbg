@@ -150,7 +150,8 @@ int app_dump() {
 	case pdb70:	return dump_pdb70(dump, o);
 	case archive:	return dump_archive(dump, o);
 	case mdmp:	return dump_minidump(dump, o);
-	case raw:	assert(0, "Unknown object type"); // Raw/unknown
+	case dmp:	return dump_dmp(dump, o);
+	case unknown:	assert(0, "Unknown object type"); // Raw/unknown
 	}
 }
 
@@ -237,7 +238,7 @@ void print_x16(const(char)* name, ushort val, const(char) *meaning = null) {
 }
 void print_x16l(const(char)* name, ushort val, const(char) *meaning = null, int length = 0) {
 	printf("%*s: 0x%04x", __field_padding, name, val);
-	if (meaning) printf("\t(%.*s)", length, meaning);
+	if (meaning) printf("\t(\"%.*s\")", length, meaning);
 	putchar('\n');
 }
 void print_x32(const(char)* name, uint val, const(char) *meaning = null) {
@@ -247,12 +248,12 @@ void print_x32(const(char)* name, uint val, const(char) *meaning = null) {
 }
 void print_x32l(const(char)* name, uint val, const(char) *meaning = null, int length = 0) {
 	printf("%*s: 0x%08x", __field_padding, name, val);
-	if (meaning) printf("\t(%.*s)", length, meaning);
+	if (meaning) printf("\t(\"%.*s\")", length, meaning);
 	putchar('\n');
 }
 void print_x64(const(char)* name, ulong val, const(char) *meaning = null) {
 	printf("%*s: 0x%016llx", __field_padding, name, val);
-	if (meaning) printf("\t(%s)", meaning);
+	if (meaning) printf(`\t(%s)`, meaning);
 	putchar('\n');
 }
 
