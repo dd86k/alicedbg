@@ -44,6 +44,20 @@ debug enum __BUILDTYPE__ = "debug";	/// Library build type.
 else  enum __BUILDTYPE__ = "release";	/// Ditto
 
 //
+// ANCHOR Endianness
+//
+
+version (LittleEndian) {
+	enum PLATFORM_LSB = 1;	/// Set if target little-endian
+	enum PLATFORM_MSB = 0;	/// Set if target big-endian
+	enum TARGET_ENDIAN = "lsb";	/// Target endian name
+} else {
+	enum PLATFORM_LSB = 0;	/// Ditto
+	enum PLATFORM_MSB = 1;	/// Ditto
+	enum TARGET_ENDIAN = "msb";	/// Ditto
+}
+
+//
 // ANCHOR Platform information
 //
 
@@ -59,43 +73,6 @@ version (X86) {
 	enum TARGET_PLATFORM = "arm_a64";	/// Ditto
 } else
 	static assert(0, "Platform not supported.");
-
-//
-// ANCHOR Endianness
-//
-
-version (LittleEndian) {
-	enum PLATFORM_LSB = 1;	/// Set if target little-endian
-	enum PLATFORM_MSB = 0;	/// Set if target big-endian
-	enum TARGET_ENDIAN = "lsb";	/// Target endian name
-} else {
-	enum PLATFORM_LSB = 0;	/// Ditto
-	enum PLATFORM_MSB = 1;	/// Ditto
-	enum TARGET_ENDIAN = "msb";	/// Ditto
-}
-
-//
-// ANCHOR CRT string
-//
-
-version (CRuntime_Bionic)
-	enum TARGET_CRT = "bionic";	/// Platform CRT string
-else version (CRuntime_DigitalMars)
-	enum TARGET_CRT = "digitalmars";	/// Ditto
-else version (CRuntime_Glibc)
-	enum TARGET_CRT = "glibc";	/// Ditto
-else version (CRuntime_Microsoft)
-	enum TARGET_CRT = "mscvrt";	/// Ditto
-else version (CRuntime_Musl)
-	enum TARGET_CRT = "musl";	/// Ditto
-else version (CRuntime_Newlib) // Cygwin
-	enum TARGET_CRT = "newlib";	/// Ditto
-else version (CRuntime_UClibc)
-	enum TARGET_CRT = "uclibc";	/// Ditto
-else version (CRuntime_WASI) // WebAssembly
-	enum TARGET_CRT = "wasi";	/// Ditto
-else
-	enum TARGET_CRT = "unknown";	/// Ditto
 
 //
 // ANCHOR OS string
@@ -123,24 +100,43 @@ else version (Solaris)
 	enum TARGET_OS = "solaris";	/// Ditto
 else version (AIX)
 	enum TARGET_OS = "aix";	/// Ditto
-else version (SkyOS)
-	enum TARGET_OS = "skyos";	/// Ditto
-else version (SysV3)
-	enum TARGET_OS = "sysv3";	/// Ditto
-else version (SysV4)
-	enum TARGET_OS = "sysv4";	/// Ditto
 else version (Hurd)
-	enum TARGET_OS = "hurd";	/// Ditto
-else version (Android)
-	enum TARGET_OS = "android";	/// Ditto
-else version (Emscripten)
-	enum TARGET_OS = "emscripten";	/// Ditto
-else version (PlayStation)
-	enum TARGET_OS = "playstation";	/// Ditto
-else version (PlayStation3)
-	enum TARGET_OS = "playstation3";	/// Ditto
+	enum TARGET_OS = "hurd";	/// 
 else
 	enum TARGET_OS = "unknown";	/// Ditto
+
+//
+// ANCHOR Environement string
+//        Typically the C library, otherwise system wrappers.
+//
+
+version (MinGW)
+	enum TARGET_ENV = "mingw";	/// Ditto
+else version (Cygwin)
+	enum TARGET_ENV = "cygwin";	/// Ditto
+else version (CRuntime_DigitalMars)
+	enum TARGET_ENV = "digitalmars";	/// Ditto
+else version (CRuntime_Microsoft)
+	enum TARGET_ENV = "mscvrt";	/// Ditto
+else version (CRuntime_Bionic)
+	enum TARGET_ENV = "bionic";	/// Platform environment string
+else version (CRuntime_Musl)
+	enum TARGET_ENV = "musl";	/// Ditto
+else version (CRuntime_Glibc)
+	enum TARGET_ENV = "glibc";	/// Ditto
+else version (CRuntime_Newlib)
+	enum TARGET_ENV = "newlib";	/// Ditto
+else version (CRuntime_UClibc)
+	enum TARGET_ENV = "uclibc";	/// Ditto
+else version (CRuntime_WASI)	// WebAssembly
+	enum TARGET_ENV = "wasi";	/// Ditto
+else version (FreeStanding)
+	enum TARGET_ENV = "freestanding";	/// Ditto
+else
+	enum TARGET_ENV = "unknown";	/// Ditto
+
+/// Full target triple.
+enum TARGET_TRIPLE = TARGET_PLATFORM ~ "-" ~ TARGET_OS ~ "-" ~ TARGET_ENV;
 
 //
 // ANCHOR Additional target information
@@ -149,23 +145,24 @@ else
 static if (D_FEATURE_TARGETINFO) {
 	/// Target object format string
 	enum TARGET_OBJFMT = __traits(getTargetInfo, "objectFormat");
+	
 	/// Target float ABI string
 	enum TARGET_FLTABI = __traits(getTargetInfo, "floatAbi");
+	
 	private enum __cppinfo = __traits(getTargetInfo, "cppRuntimeLibrary");
-	// Likely to happen on non-Windows platforms
-	static if (__cppinfo == null)
-		enum TARGET_CPPRT = "none";	/// Target C++ Runtime string
-	else
-		enum TARGET_CPPRT = __cppinfo;	/// Ditto
-} else {
+	/// Target C++ Runtime string
+	enum TARGET_CPPRT = __cppinfo == null ? "none" : __cppinfo;
+} else { // Legacy
 	/// Target object format string
 	enum TARGET_OBJFMT = "unknown";
+	
 	version (D_HardFloat)
-		enum TARGET_FLTABI  = "hard"; /// Target float ABI string
+		enum TARGET_FLTABI  = "hard";	/// Target float ABI string
 	else version (D_SoftFloat)
-		enum TARGET_FLTABI  = "soft"; /// Ditto
+		enum TARGET_FLTABI  = "soft";	/// Ditto
 	else
-		enum TARGET_FLTABI  = "unknown"; /// Ditto
+		enum TARGET_FLTABI  = "unknown";	/// Ditto
+	
 	version (CppRuntime_Gcc)
 		enum TARGET_CPPRT = "libstdc++";	/// Target C++ Runtime string
 	else version (CppRuntime_Microsoft)
@@ -180,35 +177,13 @@ static if (D_FEATURE_TARGETINFO) {
 		enum TARGET_CPPRT = "none";	/// Ditto
 }
 
-//
-// ANCHOR Environement string
-//        Typically the C library, otherwise system wrappers.
-//
-
-version (MinGW) { // <- checked first since it's a stub of msvcrt
-	enum TARGET_ENV = "mingw";	/// Target environment
-} else version (Cygwin) {
-	enum TARGET_ENV = "cygwin";	/// Ditto
-} else version (CRuntime_Microsoft) {
-	enum TARGET_ENV = "msvc";	/// Ditto
-} else version (CRuntime_Glibc) {
-	enum TARGET_ENV = "gnu";	/// Ditto
-} else version (CRuntime_Musl) {
-	enum TARGET_ENV = "musl";	/// Ditto
-} else version (FreeStanding) { // now that would surprise me
-	enum TARGET_ENV = "freestanding";	/// Ditto
-} else {
-	enum TARGET_ENV = "unknown";	/// Ditto
-}
-
 version (PrintTargetInfo) {
 	pragma(msg, "ADBG_VERSION     ", ADBG_VERSION);
 	pragma(msg, "__BUILDTYPE__    ", __BUILDTYPE__);
 	pragma(msg, "TARGET_PLATFORM  ", TARGET_PLATFORM);
 	pragma(msg, "TARGET_OS        ", TARGET_OS);
-	pragma(msg, "TARGET_CRT       ", TARGET_CRT);
-	pragma(msg, "TARGET_CPPRT     ", TARGET_CPPRT);
 	pragma(msg, "TARGET_ENV       ", TARGET_ENV);
+	pragma(msg, "TARGET_CPPRT     ", TARGET_CPPRT);
 	pragma(msg, "TARGET_OBJFMT    ", TARGET_OBJFMT);
 	pragma(msg, "TARGET_FLTABI    ", TARGET_FLTABI);
 }
@@ -243,9 +218,8 @@ struct adbg_info_t {
 	const(char) *build   = __BUILDTYPE__;	/// "debug" or "release".
 	const(char) *arch    = TARGET_PLATFORM;	/// Architecture.
 	const(char) *os      = TARGET_OS;	/// Operating system.
-	const(char) *crt     = TARGET_CRT;	/// C runtime.
-	const(char) *cpprt   = TARGET_CPPRT;	/// C++ runtime.
 	const(char) *env     = TARGET_ENV;	/// Target environment.
+	const(char) *cpprt   = TARGET_CPPRT;	/// C++ runtime.
 	const(char) *objfmt  = TARGET_OBJFMT;	/// Object format (e.g., coff).
 	const(char) *fltabi  = TARGET_FLTABI;	/// Float ABI (hard or soft).
 	const(char) *dflags  = D_FEATURES;	/// D compile features.
