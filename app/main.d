@@ -6,12 +6,13 @@
 module main;
 
 import adbg.platform;
-import adbg.utils.strings : adbg_util_hex_array;
 import adbg.include.c.stdlib : exit;
+import adbg.include.d.config : GDC_VERSION, GDC_EXCEPTION_MODE, LLVM_VERSION;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
-import common, dumper, shell, utils;
+import common, dumper, shell;
+import utils : unformat64;
 
 private:
 extern (C):
@@ -51,18 +52,6 @@ debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__;
 else  enum FULL_VERSION = ADBG_VERSION;
 
 enum __D_VERSION__ = DSTRVER!__VERSION__;
-
-__gshared immutable(char) *page_version =
-"alicedbg "~FULL_VERSION~" (built: "~__TIMESTAMP__~")\n"~
-COPYRIGHT~"\n"~
-"License: BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
-"Homepage: <https://git.dd86k.space/dd86k/alicedbg>\n"~
-"Compiler: "~__VENDOR__~" "~__D_VERSION__~"\n"~
-"Target: "~TARGET_OBJFMT~" object, "~TARGET_FLTABI~" float\n"~
-"Platform: "~TARGET_PLATFORM~"-"~TARGET_OS~"-"~TARGET_ENV~"\n"~
-"CRT: "~TARGET_CRT~"\n"~
-"CppRT: "~TARGET_CPPRT~"\n"~
-"DFlags:"~D_FEATURES;
 
 //NOTE: The CLI module is meh, waiting on some betterC getopt
 
@@ -117,7 +106,8 @@ immutable option_t[] options = [
 	// pages
 	{ 'h', "help",	"Show this help screen and exit", false, &cli_help },
 	{ 0,   "version",	"Show the version screen and exit", false, &cli_version },
-	{ 0,   "ver",	"Show the version string and exit", false, &cli_ver },
+	{ 0,   "debug-version",	"Show the build and debug information and exit", false, &cli_debug_version },
+	{ 0,   "ver",	"Show only the version string and exit", false, &cli_ver },
 	{ 0,   "license",	"Show the license page and exit", false, &cli_license },
 	// secrets
 	{ 0,   "meow",	"Meow and exit", false, &cli_meow },
@@ -367,25 +357,31 @@ template DSTRVER(uint ver) {
 		cast(char)((ver % 10) + '0');
 }
 
-int cli_version() {
-	import adbg.include.d.config : GDC_VERSION, GDC_EXCEPTION_MODE, LLVM_VERSION;
-	puts(page_version);
+int cli_debug_version() {
+	__gshared immutable(char) *page =
+	"Compiler    "~__VENDOR__~" "~__D_VERSION__~"\n"~
+	"Target      "~TARGET_TRIPLE~"\n"~
+	"Object      "~TARGET_OBJFMT~"\n"~
+	"FPU         "~TARGET_FLTABI~"\n"~
+	"CppRT       "~TARGET_CPPRT~"\n"~
+	"Config     "~D_FEATURES;
+	puts(page);
 	
 	static if (GDC_VERSION) {
-		printf("GCC: %d\n", GDC_VERSION);
-		printf("GDC-EH: %s\n", GDC_EXCEPTION_MODE);
+		printf("GCC         %d\n", GDC_VERSION);
+		printf("GDC-EH      %s\n", GDC_EXCEPTION_MODE);
 	}
 	
 	version (CRuntime_Glibc) {
 		import adbg.include.c.config : gnu_get_libc_version;
-		printf("Glibc: %s\n", gnu_get_libc_version());
+		printf("Glibc       %s\n", gnu_get_libc_version());
 	}
 	
 	static if (LLVM_VERSION)
-		printf("LLVM: %d\n", LLVM_VERSION);
+		printf("LLVM        %d\n", LLVM_VERSION);
 	
 	import adbg.include.capstone : libcapstone_dynload, cs_version;
-	printf("Capstone: ");
+	printf("Capstone    ");
 	if (libcapstone_dynload()) {
 		puts("error");
 	} else {
@@ -393,6 +389,19 @@ int cli_version() {
 		cs_version(&major, &minor);
 		printf("%d.%d\n", major, minor);
 	}
+	
+	exit(0);
+	return 0;
+}
+
+int cli_version() {
+	__gshared immutable(char) *page_version =
+	"alicedbg    "~FULL_VERSION~" (built "~__TIMESTAMP__~")\n"~
+	"            "~COPYRIGHT~"\n"~
+	"License     BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
+	"Homepage    https://git.dd86k.space/dd86k/alicedbg";
+	
+	puts(page_version);
 	
 	exit(0);
 	return 0;
