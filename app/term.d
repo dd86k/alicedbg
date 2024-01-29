@@ -64,6 +64,10 @@ version (Windows) {
 		private int tcsetattr(int fd, int a, termios *termios_p);
 		private int ioctl(int fd, ulong request, ...);
 	}
+	version (CRuntime_Bionic) {
+		private int tcgetattr(int __fd, termios* __t);
+		private int tcsetattr(int __fd, int __optional_actions, termios* __t);
+	}
 	
 	private enum TERM_ATTR = ~(ICANON | ECHO);
 	private enum SIGWINCH = 28;

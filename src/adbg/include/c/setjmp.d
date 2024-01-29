@@ -72,7 +72,7 @@ version (Windows) {
 		}
 		
 		static assert (_JUMP_BUFFER.sizeof == _JBTYPE.sizeof * _JBLEN);
-	} else version (Aarch64) {
+	} else version (AArch64) {
 		private enum _JBLEN = 24;
 		private alias int _JTYPE;
 
@@ -161,6 +161,18 @@ version (Windows) {
 		ulong[128 / c_long.sizeof] __ss;
 	}
 	alias __jmp_buf_tag jmp_buf;
+} else version (CRuntime_Bionic) {
+	version (X86) {
+		enum _JBLEN = 10;
+	} else version (X86_64) {
+		enum _JBLEN = 11;
+	} else version (ARM) {
+		enum _JBLEN = 64;
+	} else version (AArch64) {
+		enum _JBLEN = 32;
+	}
+	
+	alias jmp_buf = c_long[_JBLEN];
 } else static assert(0, "Missing setjmp definitions");
 
 version (Win32) { // Required by DMD, works with LDC
