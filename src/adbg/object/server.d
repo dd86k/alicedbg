@@ -622,9 +622,12 @@ L_ARG:
 		if (o.file_size < mz_hdr.sizeof)
 			return adbg_oops(AdbgError.unknownObjFormat);
 		
+		version (Trace) trace("e_lfarlc=%#x", o.i.mz.header.e_lfarlc);
+		
 		// If e_lfarlc (relocation table) starts lower than e_lfanew,
 		// then assume old MZ.
-		if (o.i.mz.header.e_lfarlc <= 0x40)
+		// NOTE: e_lfarlc can point to 0x40.
+		if (o.i.mz.header.e_lfarlc < 0x40)
 			return adbg_object_mz_load(o);
 		
 		// If e_lfanew points within MZ extended header
