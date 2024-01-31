@@ -220,6 +220,11 @@ void print_u32(const(char)* name, uint val, const(char) *meaning = null) {
 	if (meaning) printf("\t(%s)", meaning);
 	putchar('\n');
 }
+void print_u32l(const(char)* name, uint val, const(char) *meaning = null, int length = 0) {
+	printf("%*s: %u", __field_padding, name, val);
+	if (meaning && length) printf("\t(\"%.*s\")", length, meaning);
+	putchar('\n');
+}
 void print_u64(const(char)* name, ulong val, const(char) *meaning = null) {
 	printf("%*s: %llu", __field_padding, name, val);
 	if (meaning) printf("\t(%s)", meaning);

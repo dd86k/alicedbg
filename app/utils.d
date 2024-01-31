@@ -53,7 +53,51 @@ unittest {
 	assert(hexc1(0xf) == 'f');
 }
 
-int realstring(char* buffer, size_t bsize, const(char)* str, size_t ssize,
+int hexstr(char *buffer, size_t bsize, ubyte *data, size_t dsize, char sep = 0) {
+	int min = sep ? 3 : 2;
+	int len;
+	for (size_t i; i < dsize; ++i) {
+		if (len + min > bsize)
+			return len;
+		
+		if (sep && len) buffer[len++] = sep;
+		ubyte b = data[i];
+		buffer[len++] = hexc0(b);
+		buffer[len++] = hexc1(b);
+	}
+	return len;
+}
+unittest {
+	ubyte[4] data = [ 0x12, 0x34, 0x56, 0x78 ];
+	char[8] buf = void;
+	int len = hexstr(buf.ptr, 8, data.ptr, 4);
+	assert(len == 8);
+	assert(buf[0] == '1');
+	assert(buf[1] == '2');
+	assert(buf[2] == '3');
+	assert(buf[3] == '4');
+	assert(buf[4] == '5');
+	assert(buf[5] == '6');
+	assert(buf[6] == '7');
+	assert(buf[7] == '8');
+}
+
+int realchar(char *buffer, size_t bsize, char c) {
+	int len;
+	if (isprint(c)) {
+		if (len >= bsize) goto end;
+		buffer[len++] = c;
+	} else {
+		if (len + 4 >= bsize) goto end;
+		buffer[len++] = '\\';
+		buffer[len++] = 'x';
+		buffer[len++] = hexc0(c);
+		buffer[len++] = hexc1(c);
+	}
+	end: return len;
+}
+
+int realstring(char *buffer, size_t bsize, const(char)* str, size_t ssize,
 	char pre = 0, char post = 0) {
 	int len; // total length
 	

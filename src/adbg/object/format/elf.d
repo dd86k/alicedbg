@@ -14,6 +14,7 @@ import adbg.object.machines : AdbgMachine;
 import adbg.error;
 import adbg.utils.bit;
 import adbg.include.c.stdlib : calloc, free;
+import adbg.include.c.config;
 
 // NOTE: The string table section is typically named .shstrtab
 
@@ -336,7 +337,6 @@ enum ELF_EF_SPARCV9_PSO	= 0x1;	/// Partial Store Ordering
 enum ELF_EF_SPARCV9_RMO	= 0x2;	/// Relaxed Memory Ordering 
 
 // Program segment header values
-
 enum ELF_PT_NULL	= 0;
 enum ELF_PT_LOAD	= 1;
 enum ELF_PT_DYNAMIC	= 2;
@@ -349,45 +349,46 @@ enum ELF_PT_LOOS	= 0x60000000;	/// OS-specific
 enum ELF_PT_HIOS	= 0x6fffffff;	/// OS-specific
 enum ELF_PT_LOPROC	= 0x70000000;
 enum ELF_PT_HIPROC	= 0x7fffffff;
-enum ELF_PT_GNU_EH_FRAME	= (ELF_PT_LOOS + 0x474e550);
+enum ELF_PT_GNU_EH_FRAME	= (ELF_PT_LOOS + 0x474e550);	// 0x6474e550
 enum ELF_PT_GNU_STACK	= (ELF_PT_LOOS + 0x474e551);
 enum ELF_PT_GNU_RELRO	= (ELF_PT_LOOS + 0x474e552);
 enum ELF_PT_GNU_PROPERTY	= (ELF_PT_LOOS + 0x474e553);
 
+// ELF program header flags
 enum ELF_PF_R	= 4;	/// p_flags value for Read permission
 enum ELF_PF_W	= 2;	/// p_flags value for Write permission
 enum ELF_PF_X	= 1;	/// p_flags value for Execute permission
 
 // ELF Relocation types
-enum R_386_NONE	= 0;
-enum R_386_32	= 1;
-enum R_386_PC32	= 2;
-enum R_386_GOT32	= 3;
-enum R_386_PLT32	= 4;
-enum R_386_COPY	= 5;
-enum R_386_GLOB_DAT	= 6;
-enum R_386_JMP_SLOT	= 7;
-enum R_386_RELATIVE	= 8;
-enum R_386_GOTOFF	= 9;
-enum R_386_GOTPC	= 10;
-enum R_386_NUM	= 11;
-enum R_X86_64_NONE	= 0;	/// No reloc
-enum R_X86_64_64	= 1;	/// Direct 64 bit
-enum R_X86_64_PC32	= 2;	/// PC relative 32 bit signed
-enum R_X86_64_GOT32	= 3;	/// 32 bit GOT entry
-enum R_X86_64_PLT32	= 4;	/// 32 bit PLT address
-enum R_X86_64_COPY	= 5;	/// Copy symbol at runtime
-enum R_X86_64_GLOB_DAT	= 6;	/// Create GOT entry
-enum R_X86_64_JUMP_SLOT	= 7;	/// Create PLT entry
-enum R_X86_64_RELATIVE	= 8;	/// Adjust by program base
-enum R_X86_64_GOTPCREL	= 9;	/// 32 bit signed pc relative offset to GOT
-enum R_X86_64_32	= 10;	/// Direct 32 bit zero extended
-enum R_X86_64_32S	= 11;	/// Direct 32 bit sign extended
-enum R_X86_64_16	= 12;	/// Direct 16 bit zero extended
-enum R_X86_64_PC16	= 13;	/// 16 bit sign extended pc relative
-enum R_X86_64_8	= 14;	/// Direct 8 bit sign extended 
-enum R_X86_64_PC8	= 15;	/// 8 bit sign extended pc relative
-enum R_X86_64_PC64	= 24;	/// Place relative 64-bit signed
+enum ELF_R_386_NONE	= 0;
+enum ELF_R_386_32	= 1;
+enum ELF_R_386_PC32	= 2;
+enum ELF_R_386_GOT32	= 3;
+enum ELF_R_386_PLT32	= 4;
+enum ELF_R_386_COPY	= 5;
+enum ELF_R_386_GLOB_DAT	= 6;
+enum ELF_R_386_JMP_SLOT	= 7;
+enum ELF_R_386_RELATIVE	= 8;
+enum ELF_R_386_GOTOFF	= 9;
+enum ELF_R_386_GOTPC	= 10;
+enum ELF_R_386_NUM	= 11;
+enum ELF_R_X86_64_NONE	= 0;	/// No reloc
+enum ELF_R_X86_64_64	= 1;	/// Direct 64 bit
+enum ELF_R_X86_64_PC32	= 2;	/// PC relative 32 bit signed
+enum ELF_R_X86_64_GOT32	= 3;	/// 32 bit GOT entry
+enum ELF_R_X86_64_PLT32	= 4;	/// 32 bit PLT address
+enum ELF_R_X86_64_COPY	= 5;	/// Copy symbol at runtime
+enum ELF_R_X86_64_GLOB_DAT	= 6;	/// Create GOT entry
+enum ELF_R_X86_64_JUMP_SLOT	= 7;	/// Create PLT entry
+enum ELF_R_X86_64_RELATIVE	= 8;	/// Adjust by program base
+enum ELF_R_X86_64_GOTPCREL	= 9;	/// 32 bit signed pc relative offset to GOT
+enum ELF_R_X86_64_32	= 10;	/// Direct 32 bit zero extended
+enum ELF_R_X86_64_32S	= 11;	/// Direct 32 bit sign extended
+enum ELF_R_X86_64_16	= 12;	/// Direct 16 bit zero extended
+enum ELF_R_X86_64_PC16	= 13;	/// 16 bit sign extended pc relative
+enum ELF_R_X86_64_8	= 14;	/// Direct 8 bit sign extended 
+enum ELF_R_X86_64_PC8	= 15;	/// 8 bit sign extended pc relative
+enum ELF_R_X86_64_PC64	= 24;	/// Place relative 64-bit signed
 
 // Section type values
 
@@ -414,6 +415,8 @@ enum ELF_SHT_LOPROC	= 0x70000000;	/// Processor specific
 enum ELF_SHT_HIPROC	= 0x7fffffff;	/// Processor specific
 enum ELF_SHT_LOUSER	= 0x80000000;	/// Application specific
 enum ELF_SHT_HIUSER	= 0xffffffff;	/// Application specific
+/// This section contains unwind function table entries for stack unwinding
+enum ELF_SHT_X86_64_UNWIND	= 0x70000001;
 
 // Section flags
 
@@ -430,6 +433,7 @@ enum ELF_SHF_TLS	= 0x400;	/// Section contains Thread Local Storage data
 enum ELF_SHF_COMPRESSED	= 0x800;	/// Section is compressed
 enum ELF_SHF_MASKOS	= 0x0ff00000;	/// OS-specific
 enum ELF_SHF_MASKPROC	= 0xf0000000;	/// Processor-specific
+enum ELF_SHF_X86_64_LARGE	= 0x10000000;	/// Addresses can hold addresses over 2 GiB
 
 //
 // ET_CORE
@@ -686,6 +690,320 @@ struct Elf64_Chdr {
 	Elf64_Word  ch_reserved;	/// Reserved, obviously
 	Elf64_Xword ch_size;	/// Uncompressed size
 	Elf64_Xword ch_addralign;	/// Uncompressed alignment
+}
+
+//
+// GDB structures
+//
+
+//#define ELF_ET_DYN_BASE  (mmap_is_ia32() ? 0x000400000UL : \
+//                         (DEFAULT_MAP_WINDOW / 3 * 2))
+
+
+//TODO: Move them to some include folder
+
+struct elf_prstatus32_timeval {
+	uint tv_sec;
+	uint tv_usec;
+}
+struct elf_prstatus64_timeval {
+	align(8) ulong tv_sec;
+	align(8) ulong tv_usec;
+}
+
+alias pid_t = int;
+
+struct user_regs32_struct {
+	uint ebx;
+	uint ecx;
+	uint edx;
+	uint esi;
+	uint edi;
+	uint ebp;
+	uint eax;
+	uint xds;
+	uint xes;
+	uint xfs;
+	uint xgs;
+	uint orig_eax;
+	uint eip;
+	uint xcs;
+	uint eflags;
+	uint esp;
+	uint xss;
+}
+
+// typedef struct user_i387_struct elf_fpregset_t;
+
+struct x86_fp80_t {
+	union {
+		ubyte[10] data;
+	}
+}
+struct x86_uint128_t {
+	union {
+		ubyte[16] data;
+		ulong[2] data64;
+	}
+}
+
+// user_32.h
+struct user_i387_struct {
+	int cwd;
+	int swd;
+	int twd;
+	int fip;
+	int fcs;
+	int foo;
+	int fos;
+	union {
+		int[20] st_space;	/* 8*10 bytes for each FP-reg = 80 bytes */
+		x86_fp80_t[8] fpreg;
+	}
+}
+// user_32.h
+struct user_fxsr_struct {
+	ushort	cwd;
+	ushort	swd;
+	ushort	twd;
+	ushort	fop;
+	int	fip;
+	int	fcs;
+	int	foo;
+	int	fos;
+	int	mxcsr;
+	int	reserved;
+	union {
+		int[32]	st_space;	/* 8*16 bytes for each FP-reg = 128 bytes */
+		x86_uint128_t[8] st_space128;
+	}
+	union {
+		int[32]	xmm_space;	/* 8*16 bytes for each XMM-reg = 128 bytes */
+		x86_uint128_t[8] xmm_space128;
+	}
+	int[56]	padding;
+}
+
+// user_64.h
+/* This matches the 64bit FXSAVE format as defined by AMD. It is the same
+   as the 32bit format defined by Intel, except that the selector:offset pairs
+   for data and eip are replaced with flat 64bit pointers. */
+struct user_i387_struct64 {
+	ushort	cwd;
+	ushort	swd;
+	// Note this is not the same as the 32bit/x87/FSAVE twd
+	ushort	twd;
+	ushort	fop;
+	ulong	rip;
+	ulong	rdp;
+	uint	mxcsr;
+	uint	mxcsr_mask;
+	union {
+		uint[32]	st_space;	/* 8*16 bytes for each FP-reg = 128 bytes */
+		x86_uint128_t[8]	st_space128;
+	}
+	union {
+		uint[64]	xmm_space;	/* 16*16 bytes for each XMM-reg = 256 bytes */
+		x86_uint128_t[16]	xmm_space128;
+	}
+	uint[24]	padding;
+}
+
+// user_64.h
+struct user_regs64_struct { align(8):
+	ulong r15;
+	ulong r14;
+	ulong r13;
+	ulong r12;
+	ulong rbp;
+	ulong rbx;
+	ulong r11;
+	ulong r10;
+	ulong r9;
+	ulong r8;
+	ulong rax;
+	ulong rcx;
+	ulong rdx;
+	ulong rsi;
+	ulong rdi;
+	ulong orig_rax;
+	ulong rip;
+	ulong cs;
+	ulong eflags;
+	ulong rsp;
+	ulong ss;
+	ulong fs_base;
+	ulong gs_base;
+	ulong ds;
+	ulong es;
+	ulong fs;
+	ulong gs;
+}
+
+//typedef uint32_t elf_greg32_t;
+//#define ELF_NGREG32 (sizeof (struct user_regs32_struct) / sizeof(elf_greg32_t))
+//typedef elf_greg32_t elf_gregset32_t[ELF_NGREG32];
+alias elf_greg32_t = uint;
+enum ELF_NGREG32 = user_regs32_struct.sizeof / elf_greg32_t.sizeof;
+alias elf_gregset32_t = elf_greg32_t[ELF_NGREG32];
+
+//typedef a8_uint64_t elf_greg64_t;
+//#define ELF_NGREG64 (sizeof (struct user_regs64_struct) / sizeof(elf_greg64_t))
+//typedef elf_greg64_t elf_gregset64_t[ELF_NGREG64];
+alias elf_greg64_t = ulong;
+enum ELF_NGREG64 = user_regs64_struct.sizeof / elf_greg64_t.sizeof;
+alias elf_gregset64_t = elf_greg64_t[ELF_NGREG64];
+
+struct elf_siginfo {
+	/// signal number
+	int si_signo;
+	/// extra code
+	int si_code;
+	/// errno
+	int si_errno;
+}
+
+struct elf_prstatus32 {
+	/// Info associated with signal.
+	elf_siginfo pr_info; // struct elf_siginfo pr_info;
+	/// Current signal
+	c_short_int pr_cursig;
+	/// Set of pending signals.
+	uint pr_sigpend;
+	/// Set of held signals.
+	uint pr_sighold;
+	/// 
+	pid_t pr_pid;
+	/// 
+	pid_t pr_ppid;
+	/// 
+	pid_t pr_pgrp;
+	/// 
+	pid_t pr_sid;
+	/// User time.
+	elf_prstatus32_timeval pr_utime;
+	/// System time.
+	elf_prstatus32_timeval pr_stime;
+	/// Cumulative user time.
+	elf_prstatus32_timeval pr_cutime;
+	/// Cumulative system time.
+	elf_prstatus32_timeval pr_cstime;
+	/// GP registers.
+	elf_gregset32_t pr_reg;
+	/// True if math copro being used.
+	int pr_fpvalid;
+}
+
+struct elf_prstatusx32 {
+	/// Info associated with signal.
+	elf_siginfo pr_info;	// struct elf_siginfo pr_info;
+	/// Current signal.
+	c_short_int pr_cursig;
+	/// Set of pending signals.
+	uint pr_sigpend;
+	/// Set of held signals.
+	uint pr_sighold;
+	/// 
+	pid_t pr_pid;
+	/// 
+	pid_t pr_ppid;
+	/// 
+	pid_t pr_pgrp;
+	/// 
+	pid_t pr_sid;
+	/// User time.
+	elf_prstatus32_timeval pr_utime;
+	/// System time.
+	elf_prstatus32_timeval pr_stime;
+	/// Cumulative user time.
+	elf_prstatus32_timeval pr_cutime;
+	/// Cumulative system time.
+	elf_prstatus32_timeval pr_cstime;
+	/// GP registers.
+	elf_gregset64_t pr_reg;
+	/// True if math copro being used.
+	int pr_fpvalid;
+}
+
+struct elf_prstatus64 {
+	/// Info associated with signal.
+	elf_siginfo pr_info;
+	/// Current signal.
+	c_short_int pr_cursig;
+	/// Set of pending signals.
+	align(8) ulong pr_sigpend;
+	/// Set of held signals.
+	align(8) ulong pr_sighold;
+	/// 
+	pid_t pr_pid;
+	/// 
+	pid_t pr_ppid;
+	/// 
+	pid_t pr_pgrp;
+	/// 
+	pid_t pr_sid;
+	/// User time.
+	elf_prstatus64_timeval pr_utime;
+	/// System time.
+	elf_prstatus64_timeval pr_stime;
+	/// Cumulative user time.
+	elf_prstatus64_timeval pr_cutime;
+	/// Cumulative system time.
+	elf_prstatus64_timeval pr_cstime;
+	/// GP registers.
+	elf_gregset64_t pr_reg;
+	/// True if math copro being used.
+	int pr_fpvalid;
+}
+
+enum ELF_PRARGSZ = 80;
+
+struct elf_prpsinfo32 {
+	/// Numeric process state.
+	ubyte pr_state;
+	/// Char for pr_state.
+	ubyte pr_sname;
+	/// Zombie.
+	ubyte pr_zomb;
+	/// Nice val.
+	ubyte pr_nice;
+	/// Flags.
+	uint pr_flag;
+	/// 
+	c_ushort_int pr_uid;
+	/// 
+	c_ushort_int pr_gid;
+	/// 
+	int pr_pid, pr_ppid, pr_pgrp, pr_sid;
+	/* Lots missing */
+	/// Filename of executable.
+	char[16] pr_fname;
+	/// Initial part of arg list.
+	char[ELF_PRARGSZ] pr_psargs;
+}
+
+struct elf_prpsinfo64 {
+	/// Numeric process state.
+	ubyte pr_state;
+	/// Char for pr_state.
+	char pr_sname;
+	/// Zombie.
+	ubyte pr_zomb;
+	/// Nice val.
+	ubyte pr_nice;
+	/// Flags.
+	align(8) ulong pr_flag;
+	/// 
+	uint pr_uid;
+	/// 
+	uint pr_gid;
+	/// 
+	int pr_pid, pr_ppid, pr_pgrp, pr_sid;
+	/* Lots missing */
+	/// Filename of executable.
+	char[16] pr_fname;
+	/// Initial part of arg list.
+	char[ELF_PRARGSZ] pr_psargs;
 }
 
 //
@@ -1380,6 +1698,92 @@ const(char) *adbg_object_elf_sht_string(int section) {
 	case ELF_SHT_HIPROC:	return "HIPROC";
 	case ELF_SHT_LOUSER:	return "LOUSER";
 	case ELF_SHT_HIUSER:	return "HIUSER";
+	// x86-64 types
+	case ELF_SHT_X86_64_UNWIND:	return "X86_64_UNWIND";
 	default:	return null;
+	}
+}
+
+const(char)* adbg_object_elf_nt_type_string(uint type) {
+	// NOTE: Duplicates are commented
+	switch (type) {
+	case ELF_NT_PRSTATUS:	return "NT_PRSTATUS";
+	case ELF_NT_PRFPREG:	return "NT_PRFPREG";
+//	case ELF_NT_FPREGSET:	return "NT_FPREGSET";
+	case ELF_NT_PRPSINFO:	return "NT_PRPSINFO";
+//	case ELF_NT_PRXREG:	return "NT_PRXREG";
+	case ELF_NT_TASKSTRUCT:	return "NT_TASKSTRUCT";
+	case ELF_NT_PLATFORM:	return "NT_PLATFORM";
+	case ELF_NT_AUXV:	return "NT_AUXV";
+	case ELF_NT_GWINDOWS:	return "NT_GWINDOWS";
+	case ELF_NT_ASRS:	return "NT_ASRS";
+	case ELF_NT_PSTATUS:	return "NT_PSTATUS";
+	case ELF_NT_PSINFO:	return "NT_PSINFO";
+	case ELF_NT_PRCRED:	return "NT_PRCRED";
+	case ELF_NT_UTSNAME:	return "NT_UTSNAME";
+	case ELF_NT_LWPSTATUS:	return "NT_LWPSTATUS";
+	case ELF_NT_LWPSINFO:	return "NT_LWPSINFO";
+	case ELF_NT_PRFPXREG:	return "NT_PRFPXREG";
+	case ELF_NT_SIGINFO:	return "NT_SIGINFO";
+	case ELF_NT_FILE:	return "NT_FILE";
+	case ELF_NT_PRXFPREG:	return "NT_PRXFPREG";
+	case ELF_NT_PPC_VMX:	return "NT_PPC_VMX";
+	case ELF_NT_PPC_SPE:	return "NT_PPC_SPE";
+	case ELF_NT_PPC_VSX:	return "NT_PPC_VSX";
+	case ELF_NT_PPC_TAR:	return "NT_PPC_TAR";
+	case ELF_NT_PPC_PPR:	return "NT_PPC_PPR";
+	case ELF_NT_PPC_DSCR:	return "NT_PPC_DSCR";
+	case ELF_NT_PPC_EBB:	return "NT_PPC_EBB";
+	case ELF_NT_PPC_PMU:	return "NT_PPC_PMU";
+	case ELF_NT_PPC_TM_CGPR:	return "NT_PPC_TM_CGPR";
+	case ELF_NT_PPC_TM_CFPR:	return "NT_PPC_TM_CFPR";
+	case ELF_NT_PPC_TM_CVMX:	return "NT_PPC_TM_CVMX";
+	case ELF_NT_PPC_TM_CVSX:	return "NT_PPC_TM_CVSX";
+	case ELF_NT_PPC_TM_SPR:	return "NT_PPC_TM_SPR";
+	case ELF_NT_PPC_TM_CTAR:	return "NT_PPC_TM_CTAR";
+	case ELF_NT_PPC_TM_CPPR:	return "NT_PPC_TM_CPPR";
+	case ELF_NT_PPC_TM_CDSCR:	return "NT_PPC_TM_CDSCR";
+	case ELF_NT_386_TLS:	return "NT_386_TLS";
+	case ELF_NT_386_IOPERM:	return "NT_386_IOPERM";
+	case ELF_NT_X86_XSTATE:	return "NT_X86_XSTATE";
+	case ELF_NT_S390_HIGH_GPRS:	return "NT_S390_HIGH_GPRS";
+	case ELF_NT_S390_TIMER:	return "NT_S390_TIMER";
+	case ELF_NT_S390_TODCMP:	return "NT_S390_TODCMP";
+	case ELF_NT_S390_TODPREG:	return "NT_S390_TODPREG";
+	case ELF_NT_S390_CTRS:	return "NT_S390_CTRS";
+	case ELF_NT_S390_PREFIX:	return "NT_S390_PREFIX";
+	case ELF_NT_S390_LAST_BREAK:	return "NT_S390_LAST_BREAK";
+	case ELF_NT_S390_SYSTEM_CALL:	return "NT_S390_SYSTEM_CALL";
+	case ELF_NT_S390_TDB:	return "NT_S390_TDB";
+	case ELF_NT_S390_VXRS_LOW:	return "NT_S390_VXRS_LOW";
+	case ELF_NT_S390_VXRS_HIGH:	return "NT_S390_VXRS_HIGH";
+	case ELF_NT_S390_GS_CB:	return "NT_S390_GS_CB";
+	case ELF_NT_S390_GS_BC:	return "NT_S390_GS_BC";
+	case ELF_NT_S390_RI_CB:	return "NT_S390_RI_CB";
+	case ELF_NT_ARM_VFP:	return "NT_ARM_VFP";
+	case ELF_NT_ARM_TLS:	return "NT_ARM_TLS";
+	case ELF_NT_ARM_HW_BREAK:	return "NT_ARM_HW_BREAK";
+	case ELF_NT_ARM_HW_WATCH:	return "NT_ARM_HW_WATCH";
+	case ELF_NT_ARM_SYSTEM_CALL:	return "NT_ARM_SYSTEM_CALL";
+	case ELF_NT_ARM_SVE:	return "NT_ARM_SVE";
+	case ELF_NT_ARM_PAC_MASK:	return "NT_ARM_PAC_MASK";
+	case ELF_NT_ARM_PACA_KEYS:	return "NT_ARM_PACA_KEYS";
+	case ELF_NT_ARM_PACG_KEYS:	return "NT_ARM_PACG_KEYS";
+	case ELF_NT_METAG_CBUF:	return "NT_METAG_CBUF";
+	case ELF_NT_METAG_RPIPE:	return "NT_METAG_RPIPE";
+	case ELF_NT_METAG_TLS:	return "NT_METAG_TLS";
+	case ELF_NT_ARC_V2:	return "NT_ARC_V2";
+	case ELF_NT_VMCOREDD:	return "NT_VMCOREDD";
+	case ELF_NT_MIPS_DSP:	return "NT_MIPS_DSP";
+	case ELF_NT_MIPS_FP_MODE:	return "NT_MIPS_FP_MODE";
+	case ELF_NT_MIPS_MSA:	return "NT_MIPS_MSA";
+	case ELF_NT_LOONGARCH_CPUCFG:	return "NT_LOONGARCH_CPUCFG";
+	case ELF_NT_LOONGARCH_CSR:	return "NT_LOONGARCH_CSR";
+	case ELF_NT_LOONGARCH_LSX:	return "NT_LOONGARCH_LSX";
+	case ELF_NT_LOONGARCH_LASX:	return "NT_LOONGARCH_LASX";
+	case ELF_NT_LOONGARCH_LBT:	return "NT_LOONGARCH_LBT";
+	case ELF_NT_LOONGARCH_HW_BREAK:	return "NT_LOONGARCH_HW_BREAK";
+	case ELF_NT_LOONGARCH_HW_WATCH:	return "NT_LOONGARCH_HW_WATCH";
+	default:	return "unknown";
 	}
 }

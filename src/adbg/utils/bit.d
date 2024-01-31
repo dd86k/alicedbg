@@ -12,6 +12,7 @@
 module adbg.utils.bit;
 
 import adbg.platform;
+import core.bitop : bswap;
 
 extern (C):
 
@@ -87,6 +88,7 @@ template CHAR64(char[8] s) {
 ///   v = Value.
 ///   little = Little-endianness desired.
 /// Returns: Potentially swapped value.
+deprecated
 ushort adbg_util_ensure16(ushort v, bool little) pure {
 	return little == PLATFORM_LSB ? v : adbg_util_bswap16(v);
 }
@@ -95,6 +97,7 @@ ushort adbg_util_ensure16(ushort v, bool little) pure {
 ///   v = Value.
 ///   little = Little-endianness desired.
 /// Returns: Potentially swapped value.
+deprecated
 uint adbg_util_ensure32(uint v, bool little) pure {
 	return little == PLATFORM_LSB ? v : adbg_util_bswap32(v);
 }
@@ -103,6 +106,7 @@ uint adbg_util_ensure32(uint v, bool little) pure {
 ///   v = Value.
 ///   little = Little-endianness desired.
 /// Returns: Potentially swapped value.
+deprecated
 ulong adbg_util_ensure64(ulong v, bool little) pure {
 	return little == PLATFORM_LSB ? v : adbg_util_bswap64(v);
 }
@@ -116,13 +120,13 @@ struct adbg_swapper_t {
 adbg_swapper_t adbg_util_swapper(bool little) {
 	adbg_swapper_t swapper = void;
 	if (little == PLATFORM_LSB) {
-		swapper.swap16 = &adbg_util_nop16;
-		swapper.swap32 = &adbg_util_nop32;
-		swapper.swap64 = &adbg_util_nop64;
+		swapper.swap16 = &adbg_nop16;
+		swapper.swap32 = &adbg_nop32;
+		swapper.swap64 = &adbg_nop64;
 	} else {
-		swapper.swap16 = &adbg_util_bswap16;
-		swapper.swap32 = &adbg_util_bswap32;
-		swapper.swap64 = &adbg_util_bswap64;
+		swapper.swap16 = &adbg_bswap16;
+		swapper.swap32 = &adbg_bswap32;
+		swapper.swap64 = &adbg_bswap64;
 	}
 	return swapper;
 }
@@ -131,9 +135,9 @@ alias swapfunc16 = ushort function(ushort);
 alias swapfunc32 = uint function(uint);
 alias swapfunc64 = ulong function(ulong);
 
-private ushort adbg_util_nop16(ushort v) pure { return v; }
-private uint adbg_util_nop32(uint v) pure { return v; }
-private ulong adbg_util_nop64(ulong v) pure { return v; }
+private ushort adbg_nop16(ushort v) pure { return v; }
+private uint   adbg_nop32(uint v)   pure { return v; }
+private ulong  adbg_nop64(ulong v)  pure { return v; }
 
 /// Byte-swap an 16-bit value.
 /// Params: v = 16-bit value
@@ -146,7 +150,6 @@ ushort adbg_bswap16(ushort v) pure {
 /// Params: v = 32-bit value
 /// Returns: Byte-swapped value
 uint adbg_bswap32(uint v) pure {
-	import core.bitop : bswap;
 	return bswap(v); // Intrinsic
 	// Source: https://stackoverflow.com/a/19560621
 	//v = (v >> 16) | (v << 16);
@@ -160,7 +163,6 @@ ulong adbg_bswap64(ulong v) pure {
 	// NOTE: Only recent versions of DMD inlines the intrinsic
 	import adbg.include.d.config : D_FEATURE_BSWAP64;
 	static if (D_FEATURE_BSWAP64) {
-		import core.bitop : bswap;
 		return bswap(v); // Intrinsic
 	} else {
 		// Source: https://stackoverflow.com/a/19560621
@@ -172,9 +174,13 @@ ulong adbg_bswap64(ulong v) pure {
 
 // Old names
 //TODO: Deprecate old names
-public alias adbg_util_bswap16 = adbg_bswap16;
-public alias adbg_util_bswap32 = adbg_bswap32;
-public alias adbg_util_bswap64 = adbg_bswap64;
+deprecated public alias adbg_util_bswap16 = adbg_bswap16;
+deprecated public alias adbg_util_bswap32 = adbg_bswap32;
+deprecated public alias adbg_util_bswap64 = adbg_bswap64;
+
+deprecated public alias adbg_nop_bswap16 = adbg_nop16;
+deprecated public alias adbg_nop_bswap32 = adbg_nop32;
+deprecated public alias adbg_nop_bswap64 = adbg_nop64;
 
 /// 
 unittest {
@@ -197,4 +203,38 @@ unittest {
 	assert(adbg_bits_extract32(flags, 2, 4) == 3);
 	assert(adbg_bits_extract32(flags, 4, 12) == 0xf);
 	assert(adbg_bits_extract32(flags, 4, 16) == 0b1010);
+}
+
+size_t adbg_align4up(size_t x) {
+	enum mask = uint.sizeof - 1;
+	return (x + mask) & (~mask);
+}
+unittest {
+	assert(adbg_align4up(0) == 0);
+	assert(adbg_align4up(1) == 4);
+	assert(adbg_align4up(2) == 4);
+	assert(adbg_align4up(3) == 4);
+	assert(adbg_align4up(4) == 4);
+	assert(adbg_align4up(5) == 8);
+	assert(adbg_align4up(6) == 8);
+	assert(adbg_align4up(7) == 8);
+	assert(adbg_align4up(8) == 8);
+	assert(adbg_align4up(9) == 12);
+}
+
+size_t adbg_align8up(size_t x) {
+	enum mask = ulong.sizeof - 1;
+	return (x + mask) & (~mask);
+}
+unittest {
+	assert(adbg_align8up(0) == 0);
+	assert(adbg_align8up(1) == 8);
+	assert(adbg_align8up(2) == 8);
+	assert(adbg_align8up(3) == 8);
+	assert(adbg_align8up(4) == 8);
+	assert(adbg_align8up(5) == 8);
+	assert(adbg_align8up(6) == 8);
+	assert(adbg_align8up(7) == 8);
+	assert(adbg_align8up(8) == 8);
+	assert(adbg_align8up(9) == 16);
 }

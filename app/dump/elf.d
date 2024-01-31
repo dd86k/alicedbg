@@ -5,11 +5,14 @@
 /// License: BSD-3-Clause
 module dump.elf;
 
+import adbg.utils.bit : adbg_align4up;
 import adbg.disassembler.core;
 import adbg.object.server;
 import adbg.object.machines;
 import adbg.object.format.elf;
+import core.stdc.string : memcmp;
 import dumper;
+import utils : realchar, hexstr;
 
 extern (C):
 
@@ -29,6 +32,8 @@ int dump_elf(ref Dumper dump, adbg_object_t *o) {
 }
 
 private:
+
+__gshared immutable(char)[] SIG_CORE = "CORE\0\0\0";
 
 void dump_elf_ehdr(ref Dumper dump, adbg_object_t *o) {
 	print_header("Header");
@@ -187,13 +192,206 @@ void dump_elf_phdr(ref Dumper dump, adbg_object_t *o) {
 			print_x64("p_align", p_align);
 			}
 			
-			//TODO: coredump
-			// if (p_type == ELF_PT_NOTE && p_pflags == 0)
-			// Elf32_Nhdr (like NT_X86_XSTATE)
+			// ELF is a coredump and program header is a note?
+			// Worth checking if it is really a coredump
+			// Notes usually have no flags
+			if (o.i.elf32.ehdr.e_type == ELF_ET_CORE &&
+				phdr.p_type == ELF_PT_NOTE &&
+				phdr.p_flags == 0) {
+				dump_elf_coredump64(o, phdr);
+			}
 		}
 		break;
 	default:
 	}
+}
+
+void dump_elf_coredump32(adbg_object_t *o, Elf32_Phdr *phdr) {
+	
+}
+void dump_elf_coredump64(adbg_object_t *o, Elf64_Phdr *phdr) {
+	// NOTE: 8-byte alignment?
+	
+	ulong noffset = phdr.p_offset;
+	long nleft = phdr.p_filesz;
+	uint idx;
+	
+	// Process new note header
+LNEWNHDR:
+	if (nleft < Elf64_Nhdr.sizeof)
+		return;
+	
+	void *note = void;
+	if (adbg_object_offsetl(o, &note, noffset, nleft)) {
+		print_string("warning", "Elf64_Phdr::p_offset points outside of file bounds");
+		return;
+	}
+	
+	Elf64_Nhdr *nhdr = cast(Elf64_Nhdr*)note;
+	
+	// NOTE: Note names
+	//       If zero, it's reserved
+	//       If name is "CORE", standard coredump stuff, like NT_PRSTATUS
+	//       If name is "LINUX", Linux-specific note, like NT_X86_XSTATE
+	if (nhdr.n_namesz == 0)
+		return;
+	
+	print_section(++idx, cast(const(char)*)note + Elf64_Nhdr.sizeof, nhdr.n_namesz);
+	print_u32l("n_namesz", nhdr.n_namesz);
+	print_u32("n_descsz", nhdr.n_descsz);
+	print_u32("n_type", nhdr.n_type, adbg_object_elf_nt_type_string(nhdr.n_type));
+	
+	size_t nnamesz = adbg_align4up(nhdr.n_namesz);
+	void *data = note + Elf64_Nhdr.sizeof + nnamesz;
+	
+	// NOTE: Only for x86-64, for now
+	switch (nhdr.n_type) {
+	case ELF_NT_PRSTATUS:
+		elf_prstatus64 *prstatus = cast(elf_prstatus64*)data;
+		print_u32("pr_info.si_signo", prstatus.pr_info.si_signo);
+		print_u32("pr_info.si_code", prstatus.pr_info.si_code);
+		print_u32("pr_info.si_errno", prstatus.pr_info.si_errno);
+		print_u16("pr_cursig", prstatus.pr_cursig);
+		print_u64("pr_sigpend", prstatus.pr_sigpend);
+		print_u64("pr_sighold", prstatus.pr_sighold);
+		print_u32("pr_pid", prstatus.pr_pid);
+		print_u32("pr_ppid", prstatus.pr_ppid);
+		print_u32("pr_pgrp", prstatus.pr_pgrp);
+		print_u32("pr_sid", prstatus.pr_sid);
+		print_u64("pr_utime.tv_sec", prstatus.pr_utime.tv_sec);
+		print_u64("pr_utime.tv_usec", prstatus.pr_utime.tv_usec);
+		print_u64("pr_stime.tv_sec", prstatus.pr_stime.tv_sec);
+		print_u64("pr_stime.tv_usec", prstatus.pr_stime.tv_usec);
+		print_u64("pr_cutime.tv_sec", prstatus.pr_cutime.tv_sec);
+		print_u64("pr_cutime.tv_usec", prstatus.pr_cutime.tv_usec);
+		print_u64("pr_cstime.tv_sec", prstatus.pr_cstime.tv_sec);
+		print_u64("pr_cstime.tv_usec", prstatus.pr_cstime.tv_usec);
+		print_x64("pr_reg[r15]", prstatus.pr_reg[0]);
+		print_x64("pr_reg[r14]", prstatus.pr_reg[1]);
+		print_x64("pr_reg[r13]", prstatus.pr_reg[2]);
+		print_x64("pr_reg[r12]", prstatus.pr_reg[3]);
+		print_x64("pr_reg[rbp]", prstatus.pr_reg[4]);
+		print_x64("pr_reg[rbx]", prstatus.pr_reg[5]);
+		print_x64("pr_reg[r11]", prstatus.pr_reg[6]);
+		print_x64("pr_reg[r10]", prstatus.pr_reg[7]);
+		print_x64("pr_reg[r9]", prstatus.pr_reg[8]);
+		print_x64("pr_reg[r8]", prstatus.pr_reg[9]);
+		print_x64("pr_reg[rax]", prstatus.pr_reg[10]);
+		print_x64("pr_reg[rcx]", prstatus.pr_reg[11]);
+		print_x64("pr_reg[rdx]", prstatus.pr_reg[12]);
+		print_x64("pr_reg[rsi]", prstatus.pr_reg[13]);
+		print_x64("pr_reg[rdi]", prstatus.pr_reg[14]);
+		print_x64("pr_reg[orig_rax]", prstatus.pr_reg[15]);
+		print_x64("pr_reg[rip]", prstatus.pr_reg[16]);
+		print_x64("pr_reg[cs]", prstatus.pr_reg[17]);
+		print_x64("pr_reg[eflags]", prstatus.pr_reg[18]);
+		print_x64("pr_reg[rsp]", prstatus.pr_reg[19]);
+		print_x64("pr_reg[ss]", prstatus.pr_reg[20]);
+		print_x64("pr_reg[fs_base]", prstatus.pr_reg[21]);
+		print_x64("pr_reg[gs_base]", prstatus.pr_reg[22]);
+		print_x64("pr_reg[ds]", prstatus.pr_reg[23]);
+		print_x64("pr_reg[es]", prstatus.pr_reg[24]);
+		print_x64("pr_reg[fs]", prstatus.pr_reg[25]);
+		print_x64("pr_reg[gs]", prstatus.pr_reg[26]);
+		print_u64("pr_fpvalid", prstatus.pr_fpvalid);
+		break;
+	case ELF_NT_PRPSINFO:
+		elf_prpsinfo64 *prpsinfo = cast(elf_prpsinfo64*)data;
+		char[4] pr_sname = void;
+		int l = realchar(pr_sname.ptr, 4, prpsinfo.pr_sname);
+		print_u8("pr_state", prpsinfo.pr_state);
+		print_stringl("pr_sname", pr_sname.ptr, l);
+		print_u8("pr_zomb", prpsinfo.pr_zomb);
+		print_u8("pr_nice", prpsinfo.pr_nice);
+		print_u64("pr_flag", prpsinfo.pr_flag);
+		print_u32("pr_uid", prpsinfo.pr_uid);
+		print_u32("pr_gid", prpsinfo.pr_gid);
+		print_u32("pr_pid", prpsinfo.pr_pid);
+		print_u32("pr_ppid", prpsinfo.pr_ppid);
+		print_u32("pr_pgrp", prpsinfo.pr_pgrp);
+		print_u32("pr_sid", prpsinfo.pr_sid);
+		print_stringl("pr_fname", prpsinfo.pr_fname.ptr, prpsinfo.pr_fname.sizeof);
+		print_stringl("pr_psargs", prpsinfo.pr_psargs.ptr, prpsinfo.pr_psargs.sizeof);
+		break;
+	case ELF_NT_SIGINFO: // siginfo
+		// NOTE: SI_MAX_SIZE is defined with 128, must be same size
+		goto default;
+	case ELF_NT_FPREGSET:
+		user_i387_struct64 *fregset = cast(user_i387_struct64*)data;
+		char[2*16] fpbuf = void;
+		int fplen = void;
+		print_x16("cwd", fregset.cwd);
+		print_x16("swd", fregset.swd);
+		print_x16("twd", fregset.twd);
+		print_x16("fop", fregset.fop);
+		print_x64("rip", fregset.rip);
+		print_x64("rdp", fregset.rdp);
+		print_x32("mxcsr", fregset.mxcsr);
+		print_x32("mxcsr_mask", fregset.mxcsr_mask);
+		// x87
+		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[0].data.ptr, 16);
+		print_stringl("st_space[0]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[1].data.ptr, 16);
+		print_stringl("st_space[1]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[2].data.ptr, 16);
+		print_stringl("st_space[2]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[3].data.ptr, 16);
+		print_stringl("st_space[3]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[4].data.ptr, 16);
+		print_stringl("st_space[4]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[5].data.ptr, 16);
+		print_stringl("st_space[5]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[6].data.ptr, 16);
+		print_stringl("st_space[6]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[7].data.ptr, 16);
+		print_stringl("st_space[7]", fpbuf.ptr, fplen);
+		// sse
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[0].data.ptr, 16);
+		print_stringl("xmm_space[0]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[1].data.ptr, 16);
+		print_stringl("xmm_space[1]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[2].data.ptr, 16);
+		print_stringl("xmm_space[2]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[3].data.ptr, 16);
+		print_stringl("xmm_space[3]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[4].data.ptr, 16);
+		print_stringl("xmm_space[4]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[5].data.ptr, 16);
+		print_stringl("xmm_space[5]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[6].data.ptr, 16);
+		print_stringl("xmm_space[6]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[7].data.ptr, 16);
+		print_stringl("xmm_space[7]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[8].data.ptr, 16);
+		print_stringl("xmm_space[8]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[9].data.ptr, 16);
+		print_stringl("xmm_space[9]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[10].data.ptr, 16);
+		print_stringl("xmm_space[10]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[11].data.ptr, 16);
+		print_stringl("xmm_space[11]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[12].data.ptr, 16);
+		print_stringl("xmm_space[12]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[13].data.ptr, 16);
+		print_stringl("xmm_space[13]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[14].data.ptr, 16);
+		print_stringl("xmm_space[14]", fpbuf.ptr, fplen);
+		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[15].data.ptr, 16);
+		print_stringl("xmm_space[15]", fpbuf.ptr, fplen);
+		break;
+	default:
+		print_raw("Dump", data, nhdr.n_descsz, o);
+	}
+	
+	// Adjust to next sub header
+	ulong nsize =
+		Elf64_Nhdr.sizeof +
+		nnamesz +
+		adbg_align4up(nhdr.n_descsz);
+	noffset += nsize;
+	nleft -= nsize;
+	
+	goto LNEWNHDR;
 }
 
 void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
@@ -308,6 +506,8 @@ void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
 	default:
 	}
 }
+
+//TODO: Section machine-specific flags (like SHF_X86_64_LARGE)
 
 void dump_elf_disasm(ref Dumper dump, adbg_object_t *o) {
 	print_header("Disassembly");
