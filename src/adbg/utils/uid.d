@@ -91,10 +91,10 @@ int uid_string(ref UID uid, char *buf, size_t buflen, int target) {
 /// Swap endianness of a UID. GUID (LSB) becomes UUID (MSB) and vice-versa.
 /// Params: uid = UID structure
 void uid_swap(ref UID uid) {
-	uid.time_low = adbg_util_bswap32(uid.time_low);
-	uid.time_mid = adbg_util_bswap16(uid.time_mid);
-	uid.time_ver = adbg_util_bswap16(uid.time_ver);
-	uid.clock    = adbg_util_bswap16(uid.clock);
+	uid.time_low = adbg_bswap32(uid.time_low);
+	uid.time_mid = adbg_bswap16(uid.time_mid);
+	uid.time_ver = adbg_bswap16(uid.time_ver);
+	uid.clock    = adbg_bswap16(uid.clock);
 }
 @system unittest {
 	UID uid;

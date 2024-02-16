@@ -36,13 +36,13 @@ extern (C):
 //      Either:
 //      - extent formats to include everyting else, have functions to say type (_is_dump)
 //      - keep format and add a "type/purpose" enum (exec/dump/symbols/etc.)
-//      - do type as first-class and format second
 //TODO: Consider loading first 4 KiB for detection before loading rest
 //TODO: const(ubyte)* adbg_obj_section(obj, ".abc");
 //TODO: const(ubyte)* adbg_obj_section_i(obj, index);
 //TODO: const(ubyte)* adbg_object_get_section_by_type(obj, type);
 //TODO: const(char)* adbg_object_get_debug_path(obj);
-//TODO: int adbg_object_load_debug(obj, path);
+//TODO: Function to attach debug or coredump object to executable
+//      int adbg_object_load_debug(obj, path);
 //TODO: Consider structure definition, using a template
 //      Uses:
 //      - For swapping, uses less code than inlining it

@@ -313,22 +313,20 @@ int adbg_obj_macho_load(adbg_object_t *obj, int sig) {
 	}
 	
 	if (obj.macho.reversed) {
-		//obj.macho.hdr.magic = adbg_util_bswap32(obj.macho.hdr.magic);
-		
 		if (obj.macho.fat) {
-			obj.macho.fathdr.nfat_arch = adbg_util_bswap32(obj.macho.fathdr.nfat_arch);
-			obj.macho.fatarch.cputype = adbg_util_bswap32(obj.macho.fatarch.cputype);
-			obj.macho.fatarch.subtype = adbg_util_bswap32(obj.macho.fatarch.subtype);
-			obj.macho.fatarch.offset = adbg_util_bswap32(obj.macho.fatarch.offset);
-			obj.macho.fatarch.size = adbg_util_bswap32(obj.macho.fatarch.size);
-			obj.macho.fatarch.alignment = adbg_util_bswap32(obj.macho.fatarch.alignment);
+			obj.macho.fathdr.nfat_arch = adbg_bswap32(obj.macho.fathdr.nfat_arch);
+			obj.macho.fatarch.cputype = adbg_bswap32(obj.macho.fatarch.cputype);
+			obj.macho.fatarch.subtype = adbg_bswap32(obj.macho.fatarch.subtype);
+			obj.macho.fatarch.offset = adbg_bswap32(obj.macho.fatarch.offset);
+			obj.macho.fatarch.size = adbg_bswap32(obj.macho.fatarch.size);
+			obj.macho.fatarch.alignment = adbg_bswap32(obj.macho.fatarch.alignment);
 		} else {
-			obj.macho.hdr.cputype = adbg_util_bswap32(obj.macho.hdr.cputype);
-			obj.macho.hdr.subtype = adbg_util_bswap32(obj.macho.hdr.subtype);
-			obj.macho.hdr.filetype = adbg_util_bswap32(obj.macho.hdr.filetype);
-			obj.macho.hdr.ncmds = adbg_util_bswap32(obj.macho.hdr.ncmds);
-			obj.macho.hdr.sizeofcmds = adbg_util_bswap32(obj.macho.hdr.sizeofcmds);
-			obj.macho.hdr.flags = adbg_util_bswap32(obj.macho.hdr.flags);
+			obj.macho.hdr.cputype = adbg_bswap32(obj.macho.hdr.cputype);
+			obj.macho.hdr.subtype = adbg_bswap32(obj.macho.hdr.subtype);
+			obj.macho.hdr.filetype = adbg_bswap32(obj.macho.hdr.filetype);
+			obj.macho.hdr.ncmds = adbg_bswap32(obj.macho.hdr.ncmds);
+			obj.macho.hdr.sizeofcmds = adbg_bswap32(obj.macho.hdr.sizeofcmds);
+			obj.macho.hdr.flags = adbg_bswap32(obj.macho.hdr.flags);
 		}
 	}
 	

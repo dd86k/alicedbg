@@ -99,7 +99,7 @@ ushort adbg_util_ensure16(ushort v, bool little) pure {
 /// Returns: Potentially swapped value.
 deprecated
 uint adbg_util_ensure32(uint v, bool little) pure {
-	return little == PLATFORM_LSB ? v : adbg_util_bswap32(v);
+	return little == PLATFORM_LSB ? v : adbg_bswap32(v);
 }
 /// Ensure endianness on 64-bit number.
 /// Params:

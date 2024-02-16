@@ -22,29 +22,30 @@ version (Windows) {
 	import adbg.include.windows.ntdll;
 } else version (Posix) {
 	import core.sys.posix.sys.stat;
-	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
 	import core.sys.posix.signal : kill, SIGKILL, siginfo_t, raise;
 	import core.sys.posix.sys.uio;
 	import core.sys.posix.fcntl : open;
 	import adbg.include.posix.mann;
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
-	import adbg.include.linux.user;
-	private enum __WALL = 0x40000000;
+	
+	version (linux) {
+		import adbg.include.linux.user;
+		import core.stdc.errno : errno;
+	}
 }
 
 extern (C):
 
-/// Get the system configured size of a page.
-///
-/// This typically is the lowest supported page size on the platform.
-/// Returns: Page size in Bytes, or 0 on error.
+/// Get the system configured size of a page, typically target's smallest size.
+/// Returns: Page size in bytes; Or 0 on error.
 size_t adbg_memory_pagesize() {
 	version (Windows) {
 		SYSTEM_INFO sysinfo = void;
 		GetSystemInfo(&sysinfo);
 		return sysinfo.dwPageSize;
 	} else version (Posix) {
+		// NOTE: sysconf, on error, returns -1
 		c_long r = sysconf(_SC_PAGE_SIZE);
 		return r < 0 ? 0 : r;
 	}
@@ -64,19 +65,17 @@ size_t adbg_memory_pagesize() {
 /// 	size = Size of data.
 /// Returns: Error code.
 int adbg_memory_read(adbg_process_t *tracee, size_t addr, void *data, uint size) {
-	if (tracee == null || data == null) {
-		return adbg_oops(AdbgError.nullArgument);
-	}
+	if (tracee == null || data == null)
+		return adbg_oops(AdbgError.invalidArgument);
 	
 	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
 	//      Linux 6.2 (include/uapi/linux/ptrace.h) still has no PT_IO
+	//TODO: Under Linux, /proc/pid/mem could be interesting
 	version (Windows) {
 		if (ReadProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
 			return adbg_oops(AdbgError.os);
 		return 0;
 	} else version (linux) { // Based on https://www.linuxjournal.com/article/6100
-		import core.stdc.errno : errno;
-		
 		c_long *dest = cast(c_long*)data;	/// target
 		int r = size / c_long.sizeof;	/// number of "long"s to read
 		
@@ -109,7 +108,7 @@ int adbg_memory_read(adbg_process_t *tracee, size_t addr, void *data, uint size)
 /// Returns: Error code.
 int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size) {
 	if (tracee == null || data == null)
-		return adbg_oops(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.invalidArgument);
 	
 	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
 	version (Windows) {
@@ -213,7 +212,7 @@ struct adbg_memory_map_t {
 /// Returns: Error code.
 int adbg_memory_maps(adbg_process_t *tracee, adbg_memory_map_t **mmaps, size_t *mcount, ...) {
 	if (tracee == null || mmaps == null || mcount == null)
-		return adbg_oops(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.invalidArgument);
 	
 	// Get options
 	va_list list = void;
@@ -232,7 +231,7 @@ L_OPTION:
 	*mcount = 0;
 	
 	if (tracee.pid == 0)
-		return adbg_oops(AdbgError.notAttached);
+		return adbg_oops(AdbgError.debuggerUnattached);
 	
 	version (Windows) {
 		if (__dynlib_psapi_load()) // EnumProcessModules, QueryWorkingSet
@@ -736,7 +735,7 @@ adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t datasiz
 	
 	// Initial check and setup
 	if (tracee == null || data == null) {
-		adbg_oops(AdbgError.nullArgument);
+		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	if (datasize == 0) {
@@ -752,7 +751,7 @@ adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t datasiz
 	switch (tracee.status) with (AdbgStatus) {
 	case standby, paused, running: break;
 	default:
-		adbg_oops(AdbgError.notPaused);
+		adbg_oops(AdbgError.debuggerUnpaused);
 		return null;
 	}
 	
@@ -873,7 +872,7 @@ LENTRY:	for (size_t mi; mi < modcount; ++mi) {
 int adbg_memory_rescan(adbg_scan_t *scanner, void* data, size_t size) {
 	// Initial check and setup
 	if (scanner == null || data == null)
-		return adbg_oops(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.invalidArgument);
 	if (size == 0)
 		return adbg_oops(AdbgError.scannerDataEmpty);
 	if (size > 8)

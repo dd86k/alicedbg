@@ -427,19 +427,19 @@ int adbg_object_macho_load(adbg_object_t *o) {
 	with (o.i)
 	if (o.p.reversed) {
 		if (macho.fat) {
-			macho.fat_header.nfat_arch = adbg_util_bswap32(macho.fat_header.nfat_arch);
-			macho.fat_arch.cputype = adbg_util_bswap32(macho.fat_arch.cputype);
-			macho.fat_arch.subtype = adbg_util_bswap32(macho.fat_arch.subtype);
-			macho.fat_arch.offset = adbg_util_bswap32(macho.fat_arch.offset);
-			macho.fat_arch.size = adbg_util_bswap32(macho.fat_arch.size);
-			macho.fat_arch.alignment = adbg_util_bswap32(macho.fat_arch.alignment);
+			macho.fat_header.nfat_arch = adbg_bswap32(macho.fat_header.nfat_arch);
+			macho.fat_arch.cputype = adbg_bswap32(macho.fat_arch.cputype);
+			macho.fat_arch.subtype = adbg_bswap32(macho.fat_arch.subtype);
+			macho.fat_arch.offset = adbg_bswap32(macho.fat_arch.offset);
+			macho.fat_arch.size = adbg_bswap32(macho.fat_arch.size);
+			macho.fat_arch.alignment = adbg_bswap32(macho.fat_arch.alignment);
 		} else {
-			macho.header.cputype = adbg_util_bswap32(macho.header.cputype);
-			macho.header.subtype = adbg_util_bswap32(macho.header.subtype);
-			macho.header.filetype = adbg_util_bswap32(macho.header.filetype);
-			macho.header.ncmds = adbg_util_bswap32(macho.header.ncmds);
-			macho.header.sizeofcmds = adbg_util_bswap32(macho.header.sizeofcmds);
-			macho.header.flags = adbg_util_bswap32(macho.header.flags);
+			macho.header.cputype = adbg_bswap32(macho.header.cputype);
+			macho.header.subtype = adbg_bswap32(macho.header.subtype);
+			macho.header.filetype = adbg_bswap32(macho.header.filetype);
+			macho.header.ncmds = adbg_bswap32(macho.header.ncmds);
+			macho.header.sizeofcmds = adbg_bswap32(macho.header.sizeofcmds);
+			macho.header.flags = adbg_bswap32(macho.header.flags);
 		}
 	}
 	
@@ -483,11 +483,11 @@ macho_fat_arch* adbg_object_macho_fat_arch(adbg_object_t *o, size_t index) {
 	
 	macho_fat_arch* fat_arch = &o.i.macho.fat_arch[index];
 	if (o.p.reversed && o.i.macho.reversed_fat_arch[index] == false) {
-		fat_arch.cputype	= adbg_util_bswap32(fat_arch.cputype);
-		fat_arch.subtype	= adbg_util_bswap32(fat_arch.subtype);
-		fat_arch.offset	= adbg_util_bswap32(fat_arch.offset);
-		fat_arch.size	= adbg_util_bswap32(fat_arch.size);
-		fat_arch.alignment	= adbg_util_bswap32(fat_arch.alignment);
+		fat_arch.cputype	= adbg_bswap32(fat_arch.cputype);
+		fat_arch.subtype	= adbg_bswap32(fat_arch.subtype);
+		fat_arch.offset	= adbg_bswap32(fat_arch.offset);
+		fat_arch.size	= adbg_bswap32(fat_arch.size);
+		fat_arch.alignment	= adbg_bswap32(fat_arch.alignment);
 		o.i.macho.reversed_fat_arch[index] = true;
 	}
 	return fat_arch;
@@ -508,8 +508,8 @@ macho_load_command* adbg_object_macho_load_command(adbg_object_t *o, size_t inde
 		command = cast(macho_load_command*)(cast(void*)o.i.macho.commands + next);
 		if (o.p.reversed && o.i.macho.reversed_commands[i] == false) {
 			version (Trace) trace("Reversing %u", cast(uint)i);
-			command.cmd = adbg_util_bswap32(command.cmd);
-			command.cmdsize = adbg_util_bswap32(command.cmdsize);
+			command.cmd = adbg_bswap32(command.cmd);
+			command.cmdsize = adbg_bswap32(command.cmdsize);
 			o.i.macho.reversed_commands[i] = true;
 		}
 		version (Trace) trace("command cmd=%x size=0x%x", command.cmd, command.cmdsize);
