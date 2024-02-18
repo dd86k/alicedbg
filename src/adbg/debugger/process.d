@@ -38,11 +38,17 @@ version (Windows) {
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd : clone, CLONE_PTRACE;
 	import adbg.include.posix.sys.wait;
+	import core.stdc.ctype : isdigit;
+	import core.stdc.stdlib : atoi;
+	import core.stdc.string : strcpy;
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.signal;
 	import core.sys.posix.sys.uio;
 	import core.sys.posix.fcntl : open, O_RDONLY;
 	import core.sys.posix.unistd : read, close, execve;
+	import core.sys.posix.dirent;
+	import core.sys.posix.libgen : basename;
+	import adbg.utils.math : MIN;
 	
 	version (linux) {
 		import adbg.include.linux.user;
@@ -1001,25 +1007,33 @@ version (Windows) {
 		plist[i] = pidlist[i];
 	}
 } else version (linux) {
-	
+	// Count amount of entries to allocate
 	size_t cnt; // minimum amount of entries
 	DIR *procfd = opendir("/proc");
+	if (procfd == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	scope (exit) closedir(procfd);
 	for (dirent *procent = void; (procent = readdir(procfd)) != null;) {
 		// If not directory starting with a digit, skip entry
 		if (procent.d_type != DT_DIR)
 			continue;
 		if (isdigit(procent.d_name[0]) == 0)
 			continue;
+		
 		++cnt;
 	}
 	
-	procfd = cast(int*)malloc(cnt * int.sizeof);
-	if (procfd == null) {
+	// Allocate list
+	plist = cast(int*)malloc(cnt * int.sizeof);
+	if (plist == null) {
 		adbg_oops(AdbgError.crt);
 		return null;
 	}
 	*count = cnt;
 	
+	// Populate list
 	rewinddir(procfd);
 	size_t i;
 	for (dirent *procent = void; (procent = readdir(procfd)) != null;) {
@@ -1032,7 +1046,6 @@ version (Windows) {
 		// Set PID
 		plist[i++] = atoi(procent.d_name.ptr);
 	}
-	closedir(procfd);
 }
 
 	return plist;
@@ -1171,13 +1184,6 @@ L_OPTION:
 		list.count = count;
 		return 0;
 	} else version (linux) {
-		import core.stdc.ctype : isdigit;
-		import core.stdc.stdlib : atoi;
-		import core.stdc.string : strcpy;
-		import core.sys.posix.dirent : opendir, readdir, dirent, DIR, DT_DIR;
-		import core.sys.posix.libgen : basename;
-		import adbg.utils.math : MIN;
-		
 		//TODO: Consider pre-running /proc to get initial count
 		size_t count;
 		DIR *procfd = opendir("/proc");
