@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause
-module adbg.debugger.context;
+module adbg.debugger.thread;
 
 import adbg.debugger.process : adbg_process_t;
 import adbg.include.c.stdio : snprintf;
