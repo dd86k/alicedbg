@@ -6,7 +6,7 @@
 module dump.pe;
 
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE;
-import adbg.disassembler.core;
+import adbg.disassembler;
 import adbg.object.server;
 import adbg.object.machines : AdbgMachine;
 import adbg.object.format.pe;

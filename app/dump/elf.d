@@ -6,7 +6,7 @@
 module dump.elf;
 
 import adbg.utils.bit : adbg_align4up;
-import adbg.disassembler.core;
+import adbg.disassembler;
 import adbg.object.server;
 import adbg.object.machines;
 import adbg.object.format.elf;

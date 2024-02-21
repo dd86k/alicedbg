@@ -7,17 +7,16 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause
-module adbg.disassembler.core;
+module adbg.disassembler;
 
 import adbg.include.capstone;
 import adbg.include.c.stdarg;
-import core.stdc.string : memcpy;
 import adbg.error;
-import adbg.platform;
 import adbg.debugger.process : adbg_process_t;
 import adbg.object.machines : AdbgMachine, adbg_object_machine_alias;
 import adbg.debugger.exception : adbg_exception_t;
 import adbg.debugger.memory : adbg_memory_read;
+import core.stdc.string : memcpy;
 
 //TODO: Capstone CS_MODE_BIG_ENDIAN
 //      Depending on target endianness, Capstone may need this bit
@@ -212,19 +211,6 @@ int adbg_dasm_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 		return adbg_oops(AdbgError.unsupportedPlatform);
 	}
 	return 0;
-}
-
-deprecated("Use adbg_process_machine")
-int adbg_dasm_open_proccess(adbg_disassembler_t *dasm, adbg_process_t *tracee) {
-	if (dasm == null || tracee == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	
-	AdbgMachine mach;
-	
-	version (Win64) version (X86_64) // Windows + x86-64
-		mach = tracee.wow64 ? AdbgMachine.x86 : AdbgMachine.amd64;
-	
-	return adbg_dasm_open(dasm, mach);
 }
 
 /// Open a disassembler instance.
@@ -423,22 +409,6 @@ int adbg_dasm_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, void *data,
 //
 // Process wrappers
 //
-
-// Disassemble one instruction from exception address.
-deprecated("Used adbg_dasm_once_process")
-int adbg_dasm_exception(adbg_disassembler_t *dasm, adbg_process_t *tracee, adbg_exception_t *ex, adbg_opcode_t *op) {
-	if (dasm == null || tracee == null || ex == null || op == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	if (ex.fault_address == 0)
-		return adbg_oops(AdbgError.invalidArgument);
-	
-	ubyte[16] data = void;
-	if (adbg_memory_read(tracee, ex.fault_address, data.ptr, 16))
-		return adbg_errno;
-	if (adbg_dasm_once(dasm, op, data.ptr, 16))
-		return adbg_errno;
-	return 0;
-}
 
 int adbg_dasm_start_process(adbg_disassembler_t *dasm, adbg_process_t *process, ulong location) {
 	if (dasm == null || process == null)
