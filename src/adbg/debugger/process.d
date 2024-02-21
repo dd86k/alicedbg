@@ -15,6 +15,7 @@ module adbg.debugger.process;
 //      Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
 //      Linux: Send SIGSTOP/SIGCONT signals via kill(2)
 //TODO: List threads of process (maybe in a module called threading.d)
+//TODO: Has remote debugger attached?
 
 import adbg.include.c.stdlib; // malloc, calloc, free, exit;
 import adbg.include.c.stdio;  // snprintf;
@@ -61,9 +62,6 @@ version (linux)
 
 extern (C):
 
-//TODO: Deprecate debugger status and replace with process status
-//      In a way, it's already the case, but it's not being presented as such
-//      adbg_status -> adbg_process_status
 /// Debugger status
 enum AdbgProcStatus : ubyte {
 	unknown,	/// Process status is not known.
@@ -465,67 +463,6 @@ version (Windows) {
 }
 	
 	return 0;
-}
-
-/// Is this process being debugged?
-/// Returns: True if a debugger is attached to this process.
-bool adbg_self_is_debugged() {
-version (Windows) {
-	return IsDebuggerPresent() == TRUE; // converts int to bool
-} else version (linux) { // https://stackoverflow.com/a/24969863
-	import core.stdc.string : strstr;
-	
-	// Linux 5.10 example status for cat(1) is 1392 Bytes
-	enum BUFFERSZ = 4096;
-	
-	char *buffer = cast(char*)malloc(BUFFERSZ);
-	if (buffer == null)
-		return false;
-
-	scope(exit) free(buffer);
-
-	const int status_fd = open("/proc/self/status", O_RDONLY);
-	if (status_fd == -1)
-		return false;
-
-	const ssize_t num_read = read(status_fd, buffer, BUFFERSZ - 1);
-	close(status_fd);
-
-	if (num_read <= 0)
-		return false;
-
-	buffer[num_read] = 0;
-	const(char)* strptr = strstr(buffer, "TracerPid:");
-	if (strptr == null)
-		return false;
-	
-	// Example: "TracerPid:\t0\n"
-	// "TracerPid:": 10 chars
-	// ulong.max (18446744073709551615): 20 chars
-	// spacing is either one tab or a few spaces: 1-8
-	// So max search lenght at 40 is a decent guess.
-	// Search starts at pos 10, at the spacing.
-	for (size_t i = 10; i < 40; ++i) {
-		switch (strptr[i]) {
-		case '0', '\t', ' ': continue; // spacing
-		case '\n', '\r', 0: return false; // EOL/EOF
-		default: return true; // non-zero digit
-		}
-	}
-
-	return false;
-} else
-	static assert(0, "adbg_debug_me: Implement me");
-}
-
-/// Insert a tracee break.
-void adbg_self_break() {
-	version (Windows) {
-		DebugBreak();
-	} else version (Posix) {
-		ptrace(PT_TRACEME, 0, null, null);
-		raise(SIGSTOP);
-	} else static assert(0, "adbg_debug_me: Implement me");
 }
 
 //TODO: Check process debugged

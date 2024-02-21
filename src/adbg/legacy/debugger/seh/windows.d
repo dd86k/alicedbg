@@ -82,5 +82,5 @@ uint adbg_seh_handle(_EXCEPTION_POINTERS *e) {
 //	adbg_ctx_init(&mcheckpoint.exception.registers);
 //	adbg_ctx_os(&mcheckpoint.exception.registers, cast(CONTEXT*)e.ContextRecord);
 //	longjmp(mcheckpoint.buffer, 1);
-	return EXCEPTION_EXECUTE_HANDLER;
+	return 1;
 }

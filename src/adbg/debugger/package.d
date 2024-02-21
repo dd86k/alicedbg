@@ -4,5 +4,4 @@ public import
 	adbg.debugger.process,
 	adbg.debugger.thread,
 	adbg.debugger.exception,
-	adbg.debugger.memory,
-	adbg.debugger.seh;
+	adbg.debugger.memory;

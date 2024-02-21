@@ -1,20 +1,16 @@
-/// (Work in progress) Structued Exception Handling wrapper.
+/// Runtime utilities for self diagnosis.
 /// 
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause
-module adbg.debugger.seh;
-
-//TODO: adbg_seh_disable
-//TODO: Would be cool to have try/catch mechanic
-//      setjmp is broken on Win64 :(
+module adbg.self;
 
 import adbg.error;
+import adbg.debugger.exception;
 
 version (Windows) {
-	import adbg.debugger.exception;
 	import adbg.include.windows.windef;
-	import adbg.include.c.setjmp;
+	import core.sys.windows.winbase;
 
 	private alias void* LPTOP_LEVEL_EXCEPTION_FILTER;
 	private alias _CONTEXT* PCONTEXT;
@@ -36,103 +32,168 @@ version (Windows) {
 		PVOID AddVectoredExceptionHandler(ULONG, PVECTORED_EXCEPTION_HANDLER);
 	}
 } else version (Posix) {
-	import adbg.debugger.exception;
-	import adbg.include.c.setjmp;
 	import core.sys.posix.signal;
 	import core.sys.posix.ucontext;
+	import core.sys.posix.unistd;
 	
 	private enum NO_SIGACTION = cast(sigaction_t*)0;
 }
 
+//TODO: Probably required to set error mode for all threads (Windows)
+
 extern (C):
 
-version (none) // Disabled until setjmp works on Win64
-public
-int adbg_seh_enable(int function(adbg_exception_t*) func) {
+/// Insert a tracee break.
+void adbg_self_break() {
+version (Windows) {
+	DebugBreak();
+} else version (Posix) {
+	ptrace(PT_TRACEME, 0, null, null);
+	raise(SIGSTOP);
+} else static assert(0, "Implement me");
+}
+
+/// Is this process being debugged?
+/// Returns: True if a debugger is attached to this process.
+bool adbg_self_is_debugged() {
+version (Windows) {
+	return IsDebuggerPresent() == TRUE;
+} else version (linux) { // https://stackoverflow.com/a/24969863
+	import core.stdc.string : strstr;
+	
+	// Linux 5.10 example status for cat(1) is 1392 Bytes
+	enum BUFFERSZ = 4096;
+	
+	char *buffer = cast(char*)malloc(BUFFERSZ);
+	if (buffer == null)
+		return false;
+
+	scope(exit) free(buffer);
+
+	const int status_fd = open("/proc/self/status", O_RDONLY);
+	if (status_fd == -1)
+		return false;
+
+	const ssize_t num_read = read(status_fd, buffer, BUFFERSZ - 1);
+	close(status_fd);
+
+	if (num_read <= 0)
+		return false;
+
+	buffer[num_read] = 0;
+	const(char)* strptr = strstr(buffer, "TracerPid:");
+	if (strptr == null)
+		return false;
+	
+	// Example: "TracerPid:\t0\n"
+	// "TracerPid:": 10 chars
+	// ulong.max (18446744073709551615): 20 chars
+	// spacing is either one tab or a few spaces: 1-8
+	// So max search lenght at 40 is a decent guess.
+	// Search starts at pos 10, at the spacing.
+	for (size_t i = 10; i < 40; ++i) {
+		switch (strptr[i]) {
+		case '0', '\t', ' ': continue; // spacing
+		case '\n', '\r', 0: return false; // EOL/EOF
+		default: return true; // non-zero digit
+		}
+	}
+
+	return false;
+} else
+	static assert(0, "Implement me");
+}
+
+/// Set a custom crash handler.
+/// Params: func = User handler function.
+/// Returns: Zero on success; Non-zero on error.
+int adbg_self_set_crashhandler(int function(adbg_exception_t*) func) {
 	if (func == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
 version (Windows) {
-	if (SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX, null) == 0)
-		return adbg_oops(AdbgError.os);
-	if (SetUnhandledExceptionFilter(cast(void*)&adbg_seh_catch) == null)
+	if (SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX, null) == 0 ||
+		SetUnhandledExceptionFilter(cast(void*)&adbg_internal_handler) == null)
 		return adbg_oops(AdbgError.os);
 } else version (Posix) {
 	sigaction_t sa = void;
 	sigemptyset(&sa.sa_mask);
 	sa.sa_flags = SA_SIGINFO;
-	sa.sa_sigaction = &adbg_seh_catch;
-	if (sigaction(SIGSEGV, &sa, NO_SIGACTION) == -1 ||
-		sigaction(SIGTRAP, &sa, NO_SIGACTION) == -1 ||
-		sigaction(SIGFPE, &sa, NO_SIGACTION) == -1 ||
-		sigaction(SIGILL, &sa, NO_SIGACTION) == -1 ||
-		sigaction(SIGBUS, &sa, NO_SIGACTION) == -1) {
-		return adbg_oops(AdbgError.os);
+	sa.sa_sigaction = &adbg_internal_handler;
+	
+	static immutable int[5] __ossignals = [
+		SIGSEGV, SIGTRAP, SIGFPE, SIGILL, SIGBUS
+	];
+	foreach (sig; __ossignals) {
+		if (sigaction(sig, &sa, NO_SIGACTION) < 0)
+			return adbg_oops(AdbgError.os);
 	}
 }
 	
-	checkpoint.enabled = true;
-	checkpoint.user = func;
+	__ufunction = func;
+	
 	return 0;
 }
 
 private:
 
-struct adbg_checkpoint_t {
-	adbg_exception_t exception;
-	int function(adbg_exception_t*) user;
-	bool enabled;
-}
-
-//TODO: Rename __checkpoint
-__gshared adbg_checkpoint_t checkpoint;
+__gshared int function(adbg_exception_t*) __ufunction;
 
 version (Windows)
 extern (Windows)
-uint adbg_seh_catch(_EXCEPTION_POINTERS *e) {
+uint adbg_internal_handler(_EXCEPTION_POINTERS *e) {
 	import core.sys.windows.winbase :
 		EXCEPTION_IN_PAGE_ERROR, EXCEPTION_ACCESS_VIOLATION;
 	
-	checkpoint.exception.oscode = e.ExceptionRecord.ExceptionCode;
-	checkpoint.exception.faultz = cast(size_t)e.ExceptionRecord.ExceptionAddress;
-	checkpoint.exception.pid = checkpoint.exception.tid = 0;
+	adbg_exception_t ex = void;
 	
-	switch (checkpoint.exception.oscode) {
+	ex.oscode = e.ExceptionRecord.ExceptionCode;
+	ex.faultz = cast(size_t)e.ExceptionRecord.ExceptionAddress;
+	ex.pid = GetCurrentProcessId();
+	ex.tid = GetCurrentThreadId();
+	
+	switch (ex.oscode) {
 	case EXCEPTION_IN_PAGE_ERROR:
 	case EXCEPTION_ACCESS_VIOLATION:
-		checkpoint.exception.type = adbg_exception_from_os(
+		ex.type = adbg_exception_from_os(
 			e.ExceptionRecord.ExceptionCode,
 			cast(uint)e.ExceptionRecord.ExceptionInformation[0]);
 		break;
 	default:
-		checkpoint.exception.type = adbg_exception_from_os(
+		ex.type = adbg_exception_from_os(
 			e.ExceptionRecord.ExceptionCode);
 	}
 	
-	//TODO: Call user function
+	__ufunction(&ex);
 	
 //	adbg_ctx_init(&mcheckpoint.exception.registers);
 //	adbg_ctx_os(&mcheckpoint.exception.registers, cast(CONTEXT*)e.ContextRecord);
-//	longjmp(mcheckpoint.buffer, 1);
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
 /// See http://man7.org/linux/man-pages/man2/sigaction.2.html
 version (Posix)
-void adbg_seh_catch(int sig, siginfo_t *si, void *p) {
-	ucontext_t *ctx = cast(ucontext_t*)p;
-	mcontext_t *m = &ctx.uc_mcontext;
+void adbg_internal_handler(int sig, siginfo_t *si, void *p) {
+	ucontext_t *uctx = cast(ucontext_t*)p;
+	mcontext_t *mctx = &uctx.uc_mcontext;
 
-	checkpoint.exception.oscode = sig;
-	// HACK: Missing ref'd D bindings to Musl
-	/*version (CRuntime_Glibc)
-		checkpoint.exception.fault_address = cast(ulong)si._sifields._sigfault.si_addr;
-	else version (CRuntime_Musl)
-		checkpoint.exception.fault_address = cast(ulong)si.__si_fields.__sigfault.si_addr;
-	else static assert(0, "hack me");*/
-
-	/+mexception.pid = mexception.tid = 0;
-	adbg_ctx_init(&mexception.registers);
+	adbg_exception_t ex = void;
+	ex.oscode = sig;
+	ex.type = adbg_exception_from_os(si.si_signo, si.si_code);
+	ex.pid = getpid();
+	ex.tid = gettid();
+	
+	switch (sig) {
+	case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
+		ex.fault_address = cast(size_t)sig._sifields._sigfault.si_addr;
+		break;
+	default:
+		ex.fault_address = 0;
+	}
+	
+	__ufunction(&ex);
+	
+	/+adbg_ctx_init(&mexception.registers);
 	version (X86) {
 		mexception.registers.count = 10;
 		version (CRuntime_Glibc) {
@@ -150,8 +211,7 @@ void adbg_seh_catch(int sig, siginfo_t *si, void *p) {
 			m.gregs[REG_CS], m.gregs[REG_DS], m.gregs[REG_ES],
 			m.gregs[REG_FS], m.gregs[REG_GS], m.gregs[REG_SS],
 			*/
-		} else
-		version (CRuntime_Musl) {
+		} else version (CRuntime_Musl) {
 			mexception.registers.items[0].u32 = m.__space[REG_EIP];
 			mexception.registers.items[1].u32 = m.__space[REG_EFL];
 			mexception.registers.items[2].u32 = m.__space[REG_EAX];
@@ -163,8 +223,7 @@ void adbg_seh_catch(int sig, siginfo_t *si, void *p) {
 			mexception.registers.items[8].u32 = m.__space[REG_ESI];
 			mexception.registers.items[9].u32 = m.__space[REG_EDI];
 		}
-	} else
-	version (X86_64) {
+	} else version (X86_64) {
 		mexception.registers.count = 18;
 		version (CRuntime_Glibc) {
 			mexception.registers.items[0].u64 = m.gregs[REG_RIP];
@@ -190,8 +249,7 @@ void adbg_seh_catch(int sig, siginfo_t *si, void *p) {
 			cast(ushort)(m.gregs[REG_CSGSFS] >> 16),
 			cast(ushort)(m.gregs[REG_CSGSFS] >> 32),
 			*/
-		} else
-		version (CRuntime_Musl) {
+		} else version (CRuntime_Musl) {
 			mexception.registers.items[0].u64 = m.__space[16];
 			mexception.registers.items[1].u32 = cast(uint)m.__space[17];
 			mexception.registers.items[2].u64 = m.__space[13];
@@ -212,6 +270,4 @@ void adbg_seh_catch(int sig, siginfo_t *si, void *p) {
 			mexception.registers.items[17].u64 = m.__space[7];
 		}
 	}+/
-
-	//TODO: Call user function
 }
