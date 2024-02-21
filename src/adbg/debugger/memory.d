@@ -722,7 +722,7 @@ struct adbg_scan_result_t {
 ///
 /// Returns: An instance of the scanner or null on error.
 adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t datasize, ...) {
-	import adbg.debugger.process : AdbgStatus;
+	import adbg.debugger.process : AdbgProcStatus;
 	
 	/// Until scanner gets better internals for variable-length
 	/// data types. Don't want to scan gigabyte-sized types now.
@@ -748,7 +748,7 @@ adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t datasiz
 	}
 	
 	// Check debugger status
-	switch (tracee.status) with (AdbgStatus) {
+	switch (tracee.status) with (AdbgProcStatus) {
 	case standby, paused, running: break;
 	default:
 		adbg_oops(AdbgError.debuggerUnpaused);

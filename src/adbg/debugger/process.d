@@ -65,9 +65,9 @@ extern (C):
 //      In a way, it's already the case, but it's not being presented as such
 //      adbg_status -> adbg_process_status
 /// Debugger status
-enum AdbgStatus : ubyte {
-	unloaded,	/// Process is not unloaded.
-	unknown = unloaded,	/// Alias for idle.
+enum AdbgProcStatus : ubyte {
+	unknown,	/// Process status is not known.
+	unloaded = unknown,	/// Process is unloaded.
 	standby,	/// Process is loaded and waiting to run.
 	running,	/// Process is running.
 	paused,	/// Process is paused due to an exception or by the debugger.
@@ -117,8 +117,8 @@ struct adbg_process_t {
 		pid_t pid;	/// Process ID // @suppress(dscanner.suspicious.label_var_same_name)
 		int mhandle;	/// Memory file handle
 	}
-	/// Current process status.
-	AdbgStatus status;
+	/// Last known process status.
+	AdbgProcStatus status;
 	/// Process' creation source.
 	AdbgCreation creation;
 	/// Process base module name.
@@ -154,52 +154,6 @@ enum AdbgSpawnOpt {
 	//useClone	= 7,
 }
 
-private
-struct adbg_options_spawn_t {
-	const(char) *args;
-	const(char) *dir;
-	const(char) **envp;
-	const(char) **argv;
-	int flags;
-}
-
-/*int adbg_spawn_options(adbg_options_spawn_t *opts, ...) {
-	if (opts == null)
-		return adbg_oops(AdbgError.nullArgument);
-	
-	va_list list = void;
-	va_start(list, opts);
-	
-	return adbg_spawn_optionsv(opts, list);
-}*/
-// experimental internal call to judge if "building" the options will be useful
-// to someone in the future
-private
-int adbg_spawn_optionsv(adbg_options_spawn_t *opts, va_list list) {
-	if (opts == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	
-	memset(opts, 0, adbg_options_spawn_t.sizeof);
-	
-L_OPTION:
-	switch (va_arg!int(list)) {
-	case 0: break;
-	case AdbgSpawnOpt.args:
-		opts.args = va_arg!(const(char)*)(list);
-		goto L_OPTION;
-	case AdbgSpawnOpt.argv:
-		opts.argv = va_arg!(const(char)**)(list);
-		goto L_OPTION;
-	case AdbgSpawnOpt.startDir:
-		opts.dir = va_arg!(const(char)*)(list);
-		goto L_OPTION;
-	default:
-		return adbg_oops(AdbgError.invalidOption);
-	}
-	
-	return 0;
-}
-
 /// Load executable image into the debugger.
 ///
 /// Loads an executable into the debugger, with optional null-terminated
@@ -213,31 +167,31 @@ L_OPTION:
 /// 	path = Command, path to executable.
 /// 	... = Options
 /// Returns: Error code.
-int adbg_spawn(adbg_process_t *tracee, const(char) *path, ...) {
+int adbg_debugger_spawn(adbg_process_t *tracee, const(char) *path, ...) {
 	if (tracee == null || path == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
-	version (Trace) trace("path=%s", path);
 	va_list list = void;
 	va_start(list, path);
 	
-	return adbg_spawnv(tracee, path, list);
-}
-private
-int adbg_spawnv(adbg_process_t *tracee, const(char) *path, va_list list) {
-	if (tracee == null || path == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	
-	adbg_options_spawn_t opts = void;
-	int e = adbg_spawn_optionsv(&opts, list);
-	if (e) return e;
-	
-	return adbg_spawn2(tracee, path, &opts);
-}
-private
-int adbg_spawn2(adbg_process_t *tracee, const(char) *path, adbg_options_spawn_t *opts) {
-	if (tracee == null || path == null || opts == null)
-		return adbg_oops(AdbgError.invalidArgument);
+	const(char)  *args;
+	const(char) **argv;
+	const(char)  *dir;
+LOPT:
+	switch (va_arg!int(list)) {
+	case 0: break;
+	case AdbgSpawnOpt.args:
+		args = va_arg!(const(char)*)(list);
+		goto LOPT;
+	case AdbgSpawnOpt.argv:
+		argv = va_arg!(const(char)**)(list);
+		goto LOPT;
+	case AdbgSpawnOpt.startDir:
+		dir = va_arg!(const(char)*)(list);
+		goto LOPT;
+	default:
+		return adbg_oops(AdbgError.invalidOption);
+	}
 	
 version (Windows) {
 	int bs = 0x4000; // buffer size, 16 KiB
@@ -251,8 +205,8 @@ version (Windows) {
 		return adbg_oops(AdbgError.crt);
 	
 	// Flatten argv
-	if (opts.argv)
-		bi += adbg_util_argv_flatten(b + bi, bs, opts.argv);
+	if (argv)
+		bi += adbg_util_argv_flatten(b + bi, bs, argv);
 	
 	//TODO: Parse envp
 	
@@ -380,7 +334,7 @@ version (Windows) {
 	} // fork(2)
 }
 	
-	tracee.status = AdbgStatus.standby;
+	tracee.status = AdbgProcStatus.standby;
 	tracee.creation = AdbgCreation.spawned;
 	return 0;
 }
@@ -394,6 +348,7 @@ private int adbg_linux_child(void* arg) {
 	return adbg_oops(AdbgError.os);
 }
 
+/// Debugger process attachment options
 enum AdbgAttachOpt {
 	/// When set, stop execution when attached.
 	/// Note: Currently not supported on Windows. Will always stop.
@@ -415,7 +370,7 @@ enum AdbgAttachOpt {
 /// 	pid = Process ID.
 /// 	... = Options. Pass 0 for none or to end list.
 /// Returns: Error code.
-int adbg_attach(adbg_process_t *tracee, int pid, ...) {
+int adbg_debugger_attach(adbg_process_t *tracee, int pid, ...) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (pid <= 0)
@@ -487,19 +442,19 @@ version (Windows) {
 }
 	
 	tracee.creation = AdbgCreation.attached;
-	tracee.status = stop ? AdbgStatus.paused : AdbgStatus.running;
+	tracee.status = stop ? AdbgProcStatus.paused : AdbgProcStatus.running;
 	return 0;
 }
 
 /// Detach debugger from current process.
-int adbg_detach(adbg_process_t *tracee) {
+int adbg_debugger_detach(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (tracee.creation != AdbgCreation.attached)
 		return adbg_oops(AdbgError.debuggerInvalidAction);
 	
 	tracee.creation = AdbgCreation.unloaded;
-	tracee.status = AdbgStatus.idle;
+	tracee.status = AdbgProcStatus.idle;
 	
 version (Windows) {
 	if (DebugActiveProcessStop(tracee.pid) == FALSE)
@@ -578,8 +533,8 @@ void adbg_self_break() {
 
 /// Get the debugger's current state.
 /// Returns: Debugger status.
-AdbgStatus adbg_status(adbg_process_t *tracee) pure {
-	if (tracee == null) return AdbgStatus.unknown;
+AdbgProcStatus adbg_process_status(adbg_process_t *tracee) pure {
+	if (tracee == null) return AdbgProcStatus.unknown;
 	return tracee.status;
 }
 
@@ -597,7 +552,7 @@ AdbgStatus adbg_status(adbg_process_t *tracee) pure {
 /// 	tracee = Tracee instance.
 /// 	userfunc = User function callback.
 /// Returns: Error code.
-int adbg_wait(adbg_process_t *tracee, void function(adbg_exception_t*) userfunc) {
+int adbg_debugger_wait(adbg_process_t *tracee, void function(adbg_exception_t*) userfunc) {
 	if (tracee == null || userfunc == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (tracee.creation == AdbgCreation.unloaded)
@@ -617,7 +572,7 @@ version (Windows) {
 L_DEBUG_LOOP:
 	// Something bad happened
 	if (WaitForDebugEvent(&de, INFINITE) == FALSE) {
-		tracee.status = AdbgStatus.unloaded;
+		tracee.status = AdbgProcStatus.unloaded;
 		tracee.creation = AdbgCreation.unloaded;
 		return adbg_oops(AdbgError.os);
 	}
@@ -643,7 +598,7 @@ L_DEBUG_LOOP:
 		goto L_DEBUG_LOOP;
 	}
 	
-	tracee.status = AdbgStatus.paused;
+	tracee.status = AdbgProcStatus.paused;
 	adbg_exception_translate(&exception, &de, null);
 } else version (Posix) {
 	int wstatus = void;
@@ -653,7 +608,7 @@ L_DEBUG_LOOP:
 	
 	// Something bad happened
 	if (tracee.pid < 0) {
-		tracee.status = AdbgStatus.unloaded;
+		tracee.status = AdbgProcStatus.unloaded;
 		tracee.creation = AdbgCreation.unloaded;
 		return adbg_oops(AdbgError.crt);
 	}
@@ -724,30 +679,30 @@ L_DEBUG_LOOP:
 	return 0;
 
 L_UNLOADED:
-	tracee.status = AdbgStatus.unloaded;
+	tracee.status = AdbgProcStatus.unloaded;
 	tracee.creation = AdbgCreation.unloaded;
 	return 0;
 }
 
 
-int adbg_stop(adbg_process_t *tracee) {
+int adbg_debugger_stop(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (tracee.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
 	return tracee.creation == AdbgCreation.attached ?
-		adbg_detach(tracee) : adbg_terminate(tracee);
+		adbg_debugger_detach(tracee) : adbg_debugger_terminate(tracee);
 }
 
 
-int adbg_terminate(adbg_process_t *tracee) {
+int adbg_debugger_terminate(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (tracee.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
-	tracee.status = AdbgStatus.unloaded; // exited in any case
+	tracee.status = AdbgProcStatus.unloaded; // exited in any case
 	tracee.creation = AdbgCreation.unloaded;
 	
 version (Windows) {
@@ -762,24 +717,24 @@ version (Windows) {
 }
 
 
-int adbg_continue(adbg_process_t *tracee) {
+int adbg_debugger_continue(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (tracee.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
-	if (tracee.status != AdbgStatus.paused)
+	if (tracee.status != AdbgProcStatus.paused)
 		return 0;
 	
-	tracee.status = AdbgStatus.running;
+	tracee.status = AdbgProcStatus.running;
 	
 version (Windows) {
 	if (ContinueDebugEvent(tracee.pid, tracee.tid, DBG_CONTINUE) == FALSE) {
-		tracee.status = AdbgStatus.idle;
+		tracee.status = AdbgProcStatus.idle;
 		return adbg_oops(AdbgError.os);
 	}
 } else {
 	if (ptrace(PT_CONT, tracee.pid, null, null) < 0) {
-		tracee.status = AdbgStatus.idle;
+		tracee.status = AdbgProcStatus.idle;
 		return adbg_oops(AdbgError.os);
 	}
 }
@@ -790,7 +745,7 @@ version (Windows) {
 /// Performs an instruction step for the debuggee process.
 /// Params: tracee = Process being debugged.
 /// Returns: Error code.
-int adbg_stepi(adbg_process_t *tracee) {
+int adbg_debugger_stepi(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (tracee.creation == AdbgCreation.unloaded)
@@ -825,7 +780,7 @@ version (Windows) {
 		FlushInstructionCache(tracee.hpid, null, 0);
 	}
 	
-	return adbg_continue(tracee);
+	return adbg_debugger_continue(tracee);
 } else {
 	if (ptrace(PT_SINGLESTEP, tracee.pid, null, null) < 0) {
 		tracee.status = AdbgStatus.idle;

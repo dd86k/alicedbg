@@ -9,9 +9,10 @@ import adbg.error, adbg.disassembler, adbg.object;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, free;
 import adbg.include.c.stdarg;
-import core.stdc.string;
 import adbg.object.machines;
 import adbg.utils.bit : BIT;
+import core.stdc.string;
+import core.stdc.ctype : isprint;
 import common, utils, dump;
 
 extern (C):
@@ -118,9 +119,10 @@ int app_dump() {
 		if (buffer == null)
 			quitext(ErrSource.crt);
 		
-		//TODO: Warn file is empty
-		if (size == 0)
+		if (size == 0) {
+			puts("Warning: File is empty");
 			return 0;
+		}
 	
 		print_string("filename", basename(globals.file));
 		print_u64("filesize", size);
@@ -339,8 +341,6 @@ void print_raw(const(char)* name, void *data, size_t dsize, adbg_object_t *o) {
 		return;
 	}
 	
-	import core.stdc.ctype : isprint;
-	
 	print_header(name);
 	
 	size_t offset = data - o.buffer;
@@ -348,7 +348,6 @@ void print_raw(const(char)* name, void *data, size_t dsize, adbg_object_t *o) {
 	// Print header
 	static immutable string _soff = "Offset    ";
 	printf(_soff.ptr);
-	//TODO: Print extra spaces after offset string
 	for (int ib; ib < __columns; ++ib)
 		printf("%02x ", ib);
 	putchar('\n');

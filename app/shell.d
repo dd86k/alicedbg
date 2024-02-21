@@ -90,7 +90,7 @@ void registerHelp(void function(ref command2_help_t help)) {
 int shell_loop() {
 	// Load process if CLI specified it
 	if (globals.file) {
-		if (adbg_spawn(&process, globals.file,
+		if (adbg_debugger_spawn(&process, globals.file,
 			AdbgSpawnOpt.argv, globals.args, 0))
 			return oops;
 		
@@ -105,7 +105,7 @@ int shell_loop() {
 		if (globals.syntax && dasm_available)
 			adbg_dasm_options(&dasm, AdbgDasmOption.syntax, globals.syntax, 0);
 	} else if (globals.pid) {
-		if (adbg_attach(&process, globals.pid, 0))
+		if (adbg_debugger_attach(&process, globals.pid, 0))
 			return oops;
 		
 		puts("Debugger attached to process");
@@ -579,9 +579,9 @@ void shell_event_help(immutable(command2_t) *command) {
 }
 
 int command_status(int argc, const(char) **argv) {
-	AdbgStatus state = adbg_status(&process);
+	AdbgProcStatus state = adbg_process_status(&process);
 	const(char) *m = void;
-	switch (state) with (AdbgStatus) {
+	switch (state) with (AdbgProcStatus) {
 	case unloaded:	m = "unloaded"; break;
 	case standby:	m = "standby"; break;
 	case running:	m = "running"; break;
@@ -634,7 +634,7 @@ int command_spawn(int argc, const(char) **argv) {
 	globals.file = argv[1];
 	globals.args = argc > 2 ? argv + 2: null;
 	
-	if (adbg_spawn(&process, globals.file,
+	if (adbg_debugger_spawn(&process, globals.file,
 		AdbgSpawnOpt.argv, globals.args,
 		0)) {
 		serror("Could not spawn process.");
@@ -659,7 +659,7 @@ int command_attach(int argc, const(char) **argv) {
 	}
 	
 	int pid = atoi(argv[1]);
-	if (adbg_attach(&process, pid, 0)) {
+	if (adbg_debugger_attach(&process, pid, 0)) {
 		serror("Could not attach to process.");
 		return ShellError.alicedbg;
 	}
@@ -673,7 +673,7 @@ int command_attach(int argc, const(char) **argv) {
 }
 
 int command_detach(int argc, const(char) **argv) {
-	if (adbg_detach(&process)) {
+	if (adbg_debugger_detach(&process)) {
 		serror("Could not detach process.");
 		return ShellError.alicedbg;
 	}
@@ -687,11 +687,11 @@ int command_restart(int argc, const(char) **argv) {
 	switch (process.creation) with (AdbgCreation) {
 	case attached:
 		int pid = adbg_process_get_pid(&process);
-		if (adbg_detach(&process)) {
+		if (adbg_debugger_detach(&process)) {
 			serror("Could not detach process.");
 			return ShellError.alicedbg;
 		}
-		if (adbg_attach(&process, pid)) {
+		if (adbg_debugger_attach(&process, pid)) {
 			serror("Could not attach process.");
 			return ShellError.alicedbg;
 		}
@@ -705,11 +705,11 @@ int command_restart(int argc, const(char) **argv) {
 		puts("Debugger re-attached");
 		break;
 	case spawned:
-		if (adbg_terminate(&process)) {
+		if (adbg_debugger_terminate(&process)) {
 			serror("Could not terminate process.");
 			return ShellError.alicedbg;
 		}
-		if (adbg_spawn(&process, globals.file,
+		if (adbg_debugger_spawn(&process, globals.file,
 			AdbgSpawnOpt.argv, globals.args,
 			0)) {
 			serror("Could not spawn process.");
@@ -733,51 +733,49 @@ int command_restart(int argc, const(char) **argv) {
 }
 
 int command_go(int argc, const(char) **argv) {
-	if (adbg_continue(&process))
+	if (adbg_debugger_continue(&process))
 		return ShellError.alicedbg;
-	if (adbg_wait(&process, &shell_event_exception))
+	if (adbg_debugger_wait(&process, &shell_event_exception))
 		return ShellError.alicedbg;
 	// Temporary: Cheap hack for process exit
-	if (adbg_status(&process) == AdbgStatus.unloaded)
+	if (adbg_process_status(&process) == AdbgProcStatus.unloaded)
 		printf("*\tProcess %d exited\n", process.pid);
 	return 0;
 }
 
 int command_kill(int argc, const(char) **argv) {
-	if (adbg_terminate(&process))
+	if (adbg_debugger_terminate(&process))
 		return ShellError.alicedbg;
 	return 0;
 }
 
 int command_stepi(int argc, const(char) **argv) {
-	if (adbg_stepi(&process))
+	if (adbg_debugger_stepi(&process))
 		return ShellError.alicedbg;
-	if (adbg_wait(&process, &shell_event_exception))
+	if (adbg_debugger_wait(&process, &shell_event_exception))
 		return ShellError.alicedbg;
 	return 0;
 }
 
 int command_regs(int argc, const(char) **argv) {
-	adbg_thread_context_t *context = adbg_context_easy(&process);
+	adbg_registers_t regs = void;
+	adbg_registers(&regs, &process);
 	
-	if (context == null)
-		return ShellError.alicedbg;
-	if (context.count == 0) {
+	if (regs.count == 0) {
 		serror("No registers available");
 		return ShellError.unavailable;
 	}
 	
-	adbg_register_t *regs = context.items.ptr;
+	adbg_register_t *reg = regs.items.ptr;
 	const(char) *rselect = argc >= 2 ? argv[1] : null;
 	bool found;
-	for (size_t i; i < context.count; ++i) {
-		adbg_register_t *reg = &context.items[i];
-		bool show = rselect == null || strcmp(rselect, regs[i].name) == 0;
+	for (size_t i; i < regs.count; ++i, ++reg) {
+		bool show = rselect == null || strcmp(rselect, reg.name) == 0;
 		if (show == false) continue;
 		char[20] normal = void, hexdec = void;
-		adbg_context_format(normal.ptr, 20, reg, FORMAT_NORMAL);
-		adbg_context_format(hexdec.ptr, 20, reg, FORMAT_HEXPADDED);
-		printf("%-8s  0x%8s  %s\n", regs[i].name, hexdec.ptr, normal.ptr);
+		adbg_register_format(normal.ptr, 20, reg, FORMAT_DEC);
+		adbg_register_format(hexdec.ptr, 20, reg, FORMAT_HEXPADDED);
+		printf("%-8s  0x%8s  %s\n", reg.name, hexdec.ptr, normal.ptr);
 		found = true;
 	}
 	if (rselect && found == false) {

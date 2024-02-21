@@ -7,6 +7,7 @@ module adbg.debugger.thread;
 
 import adbg.debugger.process : adbg_process_t;
 import adbg.include.c.stdio : snprintf;
+import core.stdc.string : memset;
 import adbg.error;
 
 //TODO: Register registers statically
@@ -46,14 +47,14 @@ enum AdbgRegisterSize : ubyte {
 }
 
 enum {
-	FORMAT_NORMAL,
+	FORMAT_DEC,
 	FORMAT_HEX,
 	FORMAT_HEXPADDED,
 }
 
 /// Register structure, designs a single register for UI ends to understand
 struct adbg_register_t {
-	const(char) *name;	/// Register name from adbg_ex_reg_init
+	const(char) *name;	/// Register name
 	union {
 		ulong  u64;	/// Register data: ulong (u64)
 		uint   u32;	/// Register data: uint (u32)
@@ -67,22 +68,21 @@ struct adbg_register_t {
 
 /// Represents a thread context structure with the register values once a
 /// process is paused.
-struct adbg_thread_context_t {
+struct adbg_registers_t {
 	/// Register count in registers field.
 	ushort count;
 	/// Register population, this may depends by platform.
 	adbg_register_t[REG_COUNT] items;
 }
 
-adbg_thread_context_t* adbg_context_easy(adbg_process_t *tracee) {
-	__gshared adbg_thread_context_t ctx;
-	adbg_context_start(&ctx, tracee);
-	return adbg_context_fill(tracee, &ctx) ? null : &ctx;
+void adbg_registers(adbg_registers_t *ctx, adbg_process_t *tracee) {
+	adbg_register_init(ctx, tracee);
+	adbg_register_fill(tracee, ctx);
 }
 
 /// Initiate register fields with their names and sizes.
 /// This is usually done by the debugger itself.
-void adbg_context_start(adbg_thread_context_t *ctx, adbg_process_t *tracee) {
+void adbg_register_init(adbg_registers_t *ctx, adbg_process_t *tracee) {
 	version (Trace) trace("tracee=%p ctx=%p", ctx, tracee);
 	if (tracee == null || ctx == null)
 		return;
@@ -101,13 +101,17 @@ void adbg_context_start(adbg_thread_context_t *ctx, adbg_process_t *tracee) {
 		ctx.count = 0;
 }
 
-int adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {
+int adbg_register_fill(adbg_process_t *tracee, adbg_registers_t *ctx) {
 	import adbg.debugger.process : AdbgCreation;
 	
 	version (Trace) trace("tracee=%p ctx=%p", ctx, tracee);
 	
 	if (tracee == null || ctx == null)
 		return adbg_oops(AdbgError.nullArgument);
+	
+	ctx.count = 0;
+	memset(ctx, 0, adbg_registers_t.sizeof);
+	
 	if (tracee.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
@@ -118,14 +122,12 @@ int adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {
 			if (tracee.wow64) {
 				winctxwow64.ContextFlags = CONTEXT_ALL;
 				if (Wow64GetThreadContext(tracee.htid, &winctxwow64) == FALSE) {
-					ctx.count = 0;
 					return adbg_oops(AdbgError.os);
 				}
 				adbg_context_fill_wow64(ctx, &winctxwow64);
 			} else {
 				winctx.ContextFlags = CONTEXT_ALL;
 				if (GetThreadContext(tracee.htid, &winctx) == FALSE) {
-					ctx.count = 0;
 					return adbg_oops(AdbgError.os);
 				}
 				adbg_context_fill_win(ctx, &winctx);
@@ -133,7 +135,6 @@ int adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {
 		} else {
 			winctx.ContextFlags = CONTEXT_ALL;
 			if (GetThreadContext(tracee.htid, &winctx) == FALSE) {
-				ctx.count = 0;
 				return adbg_oops(AdbgError.os);
 			}
 			adbg_context_fill_win(ctx, &winctx);
@@ -147,7 +148,6 @@ int adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {
 		//      PT_GETHBPREGS
 		user_regs_struct u = void;
 		if (ptrace(PT_GETREGS, tracee.pid, null, &u) < 0) {
-			ctx.count = 0;
 			return adbg_oops(AdbgError.os);
 		}
 		adbg_context_fill_linux(ctx, &u);
@@ -164,52 +164,49 @@ int adbg_context_fill(adbg_process_t *tracee, adbg_thread_context_t *ctx) {
 /// 	reg = Register.
 /// 	format = String format.
 /// Returns: Number of characters written.
-size_t adbg_context_format(char *buffer, size_t len, adbg_register_t *reg, int format) {
+size_t adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, int format) {
 	if (reg == null || buffer == null || len == 0)
 		return 0;
+	
+	const(char) *sformat = void;
 	switch (format) {
-	case FORMAT_NORMAL:
+	case FORMAT_DEC:
 		switch (reg.type) with (AdbgRegisterSize) {
-		case u8:  return snprintf(buffer, len, "%u", reg.u8);
-		case u16: return snprintf(buffer, len, "%u", reg.u16);
-		case u32: return snprintf(buffer, len, "%u", reg.u32);
-		case u64: return snprintf(buffer, len, "%llu", reg.u64);
-		case f32: return snprintf(buffer, len, "%f", reg.f32);
-		case f64: return snprintf(buffer, len, "%f", reg.f64);
+		case u8, u16, u32, u64:
+			sformat = "%llu"; break;
+		case f32, f64:
+			sformat = "%f"; break;
 		default:
 			adbg_oops(AdbgError.assertion);
 			return 0;
 		}
+		break;
 	case FORMAT_HEX:
-		switch (reg.type) with (AdbgRegisterSize) {
-		case u8:       return snprintf(buffer, len, "%x", reg.u8);
-		case u16:      return snprintf(buffer, len, "%x", reg.u16);
-		case u32, f32: return snprintf(buffer, len, "%x", reg.u32);
-		case u64, f64: return snprintf(buffer, len, "%llx", reg.u64);
-		default:
-			adbg_oops(AdbgError.assertion);
-			return 0;
-		}
+		sformat = "%llx";
+		break;
 	case FORMAT_HEXPADDED:
 		switch (reg.type) with (AdbgRegisterSize) {
-		case u8:       return snprintf(buffer, len, "%02x", reg.u8);
-		case u16:      return snprintf(buffer, len, "%04x", reg.u16);
-		case u32, f32: return snprintf(buffer, len, "%08x", reg.u32);
-		case u64, f64: return snprintf(buffer, len, "%016llx", reg.u64);
+		case u8:       sformat = "%02x"; break;
+		case u16:      sformat = "%04x"; break;
+		case u32, f32: sformat = "%08x"; break;
+		case u64, f64: sformat = "%016llx"; break;
 		default:
 			adbg_oops(AdbgError.assertion);
 			return 0;
 		}
+		break;
 	default:
 		adbg_oops(AdbgError.invalidOption);
 		return 0;
 	}
+	
+	return snprintf(buffer, len, sformat, reg.u64);
 }
 
 private:
 
 version (X86_ANY)
-void adbg_context_start_x86(adbg_thread_context_t *ctx) {
+void adbg_context_start_x86(adbg_registers_t *ctx) {
 	version (Trace) trace("ctx=%p", ctx);
 	ctx.count = 10;
 	ctx.items[0].name = "eip";
@@ -235,7 +232,7 @@ void adbg_context_start_x86(adbg_thread_context_t *ctx) {
 }
 
 version (X86_64)
-void adbg_context_start_x86_64(adbg_thread_context_t *ctx) {
+void adbg_context_start_x86_64(adbg_registers_t *ctx) {
 	version (Trace) trace("ctx=%p", ctx);
 	ctx.count = 18;
 	ctx.items[0].name  = "rip";
@@ -278,7 +275,7 @@ void adbg_context_start_x86_64(adbg_thread_context_t *ctx) {
 
 version (Windows) {
 	// Populate exception_t.registers array from Windows' CONTEXT
-	void adbg_context_fill_win(adbg_thread_context_t *ctx, CONTEXT *winctx) {
+	void adbg_context_fill_win(adbg_registers_t *ctx, CONTEXT *winctx) {
 		version (Trace) trace("ctx=%p win=%p", ctx, winctx);
 		version (X86) {
 			ctx.items[0].u32 = winctx.Eip;
@@ -315,7 +312,7 @@ version (Windows) {
 
 	version (Win64) {
 		version (X86_64)
-		void adbg_context_fill_wow64(adbg_thread_context_t *ctx, WOW64_CONTEXT *winctx) {
+		void adbg_context_fill_wow64(adbg_registers_t *ctx, WOW64_CONTEXT *winctx) {
 			version (Trace) trace("ctx=%p win=%p", ctx, winctx);
 			ctx.items[0].u32 = winctx.Eip;
 			ctx.items[1].u32 = winctx.EFlags;
@@ -333,7 +330,7 @@ version (Windows) {
 	}
 } else version (linux) {
 	/// Populate exception_t.registers array from user_regs_struct
-	void adbg_context_fill_linux(adbg_thread_context_t *ctx, user_regs_struct *u) {
+	void adbg_context_fill_linux(adbg_registers_t *ctx, user_regs_struct *u) {
 		version (Trace) trace("ctx=%p u=%p", ctx, u);
 		version (X86) {
 			ctx.items[0].u32 = u.eip;
