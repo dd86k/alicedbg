@@ -35,10 +35,12 @@ version (Windows) {
 		PVOID AddVectoredExceptionHandler(ULONG, PVECTORED_EXCEPTION_HANDLER);
 	}
 } else version (Posix) {
+	import adbg.include.posix.unistd;
+	import adbg.include.posix.ptrace;
+	import core.stdc.string : strstr;
 	import core.sys.posix.signal;
 	import core.sys.posix.ucontext;
-	import core.sys.posix.unistd;
-	import adbg.include.posix.ptrace;
+	import core.sys.posix.fcntl;
 	
 	private enum NO_SIGACTION = cast(sigaction_t*)0;
 }
@@ -63,8 +65,6 @@ bool adbg_self_is_debugged() {
 version (Windows) {
 	return IsDebuggerPresent() == TRUE;
 } else version (linux) { // https://stackoverflow.com/a/24969863
-	import core.stdc.string : strstr;
-	
 	// Linux 5.10 example status for cat(1) is 1392 Bytes
 	enum BUFFERSZ = 4096;
 	
@@ -146,9 +146,6 @@ __gshared int function(adbg_exception_t*) __ufunction;
 version (Windows)
 extern (Windows)
 uint adbg_internal_handler(_EXCEPTION_POINTERS *e) {
-	import core.sys.windows.winbase :
-		EXCEPTION_IN_PAGE_ERROR, EXCEPTION_ACCESS_VIOLATION;
-	
 	adbg_exception_t ex = void;
 	
 	ex.oscode = e.ExceptionRecord.ExceptionCode;
@@ -185,11 +182,12 @@ void adbg_internal_handler(int sig, siginfo_t *si, void *p) {
 	ex.oscode = sig;
 	ex.type = adbg_exception_from_os(si.si_signo, si.si_code);
 	ex.pid = getpid();
-	ex.tid = gettid();
+	//TODO: gettid() definition
+	//ex.tid = gettid();
 	
 	switch (sig) {
 	case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
-		ex.fault_address = cast(size_t)sig._sifields._sigfault.si_addr;
+		ex.fault_address = cast(size_t)si._sifields._sigfault.si_addr;
 		break;
 	default:
 		ex.fault_address = 0;

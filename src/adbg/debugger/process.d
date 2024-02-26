@@ -26,7 +26,7 @@ import adbg.utils.strings : adbg_util_argv_flatten;
 import adbg.debugger.exception : adbg_exception_t, adbg_exception_translate;
 import adbg.debugger.breakpoint : adbg_breakpoint_t;
 import adbg.object.machines;
-import core.stdc.string : memset;
+import core.stdc.string;
 
 version (Windows) {
 	import adbg.include.windows.wow64;
@@ -37,17 +37,14 @@ version (Windows) {
 } else version (Posix) {
 	import adbg.include.posix.mann;
 	import adbg.include.posix.ptrace;
-	import adbg.include.posix.unistd : clone, CLONE_PTRACE;
+	import adbg.include.posix.unistd;
 	import adbg.include.posix.sys.wait;
 	import adbg.utils.math : MIN;
 	import core.stdc.ctype : isdigit;
-	import core.stdc.stdlib : atoi;
-	import core.stdc.string : strcpy;
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.signal;
 	import core.sys.posix.sys.uio;
 	import core.sys.posix.fcntl : open, O_RDONLY;
-	import core.sys.posix.unistd : read, close, execve;
 	import core.sys.posix.dirent;
 	import core.sys.posix.libgen : basename;
 	
@@ -143,7 +140,7 @@ enum AdbgSpawnOpt {
 	/// Default: Current directory of debugger.
 	startDir	= 3,
 	// Pass environment table to tracee.
-	//environment	= 4,
+	environment	= 4,
 	// Continue after spawning process.
 	//continue_	= 5,
 	// Tell debugger to use the shell instead of the OS interface.
@@ -175,6 +172,7 @@ int adbg_debugger_spawn(adbg_process_t *tracee, const(char) *path, ...) {
 	const(char)  *args;
 	const(char) **argv;
 	const(char)  *dir;
+	const(char) **envp;
 LOPT:
 	switch (va_arg!int(list)) {
 	case 0: break;
@@ -186,6 +184,9 @@ LOPT:
 		goto LOPT;
 	case AdbgSpawnOpt.startDir:
 		dir = va_arg!(const(char)*)(list);
+		goto LOPT;
+	case AdbgSpawnOpt.environment:
+		envp = va_arg!(const(char)**)(list);
 		goto LOPT;
 	default:
 		return adbg_oops(AdbgError.invalidOption);

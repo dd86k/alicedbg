@@ -209,7 +209,7 @@ else                       private enum NoBoundsCheck = "";
 enum D_FEATURES = PIC~PIE~SIMD~AVX~AVX2~NoBoundsCheck;
 
 //
-// ANCHOR Functions
+// ANCHOR Info functions
 //
 
 /// Target information structure
