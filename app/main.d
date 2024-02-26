@@ -396,9 +396,11 @@ int cli_debug_version() {
 
 int cli_version() {
 	__gshared immutable(char) *page_version =
-	"alicedbg    "~FULL_VERSION~" (built "~__TIMESTAMP__~")\n"~
+	"alicedbg    "~FULL_VERSION~"\n"~
+	"            Built "~__TIMESTAMP__~"\n"~
 	"            "~COPYRIGHT~"\n"~
-	"License     BSD 3-Clause <https://opensource.org/licenses/BSD-3-Clause>\n"~
+	"License     BSD-3-Clause\n"~
+	"            <https://opensource.org/licenses/BSD-3-Clause>\n"~
 	"Homepage    https://git.dd86k.space/dd86k/alicedbg";
 	
 	puts(page_version);
