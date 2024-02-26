@@ -5,6 +5,9 @@
 /// License: BSD-3-Clause
 module adbg.self;
 
+import adbg.include.c.stdlib; // malloc, calloc, free, exit;
+import adbg.include.c.stdio;  // snprintf;
+import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.debugger.exception;
 
@@ -35,6 +38,7 @@ version (Windows) {
 	import core.sys.posix.signal;
 	import core.sys.posix.ucontext;
 	import core.sys.posix.unistd;
+	import adbg.include.posix.ptrace;
 	
 	private enum NO_SIGACTION = cast(sigaction_t*)0;
 }

@@ -39,6 +39,7 @@ version (Windows) {
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd : clone, CLONE_PTRACE;
 	import adbg.include.posix.sys.wait;
+	import adbg.utils.math : MIN;
 	import core.stdc.ctype : isdigit;
 	import core.stdc.stdlib : atoi;
 	import core.stdc.string : strcpy;
@@ -49,7 +50,6 @@ version (Windows) {
 	import core.sys.posix.unistd : read, close, execve;
 	import core.sys.posix.dirent;
 	import core.sys.posix.libgen : basename;
-	import adbg.utils.math : MIN;
 	
 	version (linux) {
 		import adbg.include.linux.user;
@@ -265,10 +265,10 @@ version (Windows) {
 			return adbg_oops(AdbgError.os);
 
 		// Adjust argv
-		if (opts.argv) {
+		if (argv) {
 			size_t i0, i1 = 1;
-			while (opts.argv[i0] && i1 < 15)
-				__argv[i1++] = opts.argv[i0++];
+			while (argv[i0] && i1 < 15)
+				__argv[i1++] = argv[i0++];
 			__argv[i1] = null;
 		} else {
 			__argv[1] = null;
@@ -277,9 +277,9 @@ version (Windows) {
 
 		// Adjust envp
 		//TODO: Is this still valid?
-		if (opts.envp == null) {
-			opts.envp = cast(const(char)**)&__envp;
-			opts.envp[0] = null;
+		if (envp == null) {
+			envp = cast(const(char)**)&__envp;
+			envp[0] = null;
 		}
 
 		// Clone
@@ -299,10 +299,10 @@ version (Windows) {
 			return adbg_oops(AdbgError.os);
 		if (tracee.pid == 0) { // Child process
 			// Adjust argv
-			if (opts.argv) {
+			if (argv) {
 				size_t i0, i1 = 1;
-				while (opts.argv[i0] && i1 < 15)
-					__argv[i1++] = opts.argv[i0++];
+				while (argv[i0] && i1 < 15)
+					__argv[i1++] = argv[i0++];
 				__argv[i1] = null;
 			} else {
 				__argv[1] = null;
@@ -310,9 +310,9 @@ version (Windows) {
 			__argv[0] = path;
 			
 			// Adjust envp
-			if (opts.envp == null) {
-				opts.envp = cast(const(char)**)&__envp;
-				opts.envp[0] = null;
+			if (envp == null) {
+				envp = cast(const(char)**)&__envp;
+				envp[0] = null;
 			}
 			
 			// Trace me
@@ -608,7 +608,7 @@ L_DEBUG_LOOP:
 		exception.fault_address = 0;
 	}
 	
-	tracee.status = AdbgStatus.paused;
+	tracee.status = AdbgProcStatus.paused;
 	adbg_exception_translate(&exception, &tracee.pid, &stopsig);
 }
 	
@@ -720,7 +720,7 @@ version (Windows) {
 	return adbg_debugger_continue(tracee);
 } else {
 	if (ptrace(PT_SINGLESTEP, tracee.pid, null, null) < 0) {
-		tracee.status = AdbgStatus.idle;
+		tracee.status = AdbgProcStatus.idle;
 		return adbg_oops(AdbgError.os);
 	}
 	
