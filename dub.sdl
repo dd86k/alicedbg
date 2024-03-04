@@ -123,7 +123,7 @@ buildType "release-nobounds-static" {
 }
 
 #
-# ANCHOR Unit tests
+# ANCHOR Integration tests
 #
 # NOTE: These MUST be ran as "dub test -b TEST"
 # NOTE: Dedicated tests must only exist if one of these conditions are met
@@ -144,6 +144,11 @@ buildType "readline" {
 	buildOptions "unittests"
 	sourceFiles "tests/readline.d"
 	sourcePaths "app" "src"
+}
+buildType "readln" {
+	buildOptions "unittests"
+	sourceFiles "tests/readln.d"
+	sourceFiles "app/term.d"
 }
 
 #

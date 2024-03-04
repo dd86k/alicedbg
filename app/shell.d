@@ -88,7 +88,7 @@ void registerHelp(void function(ref command2_help_t help)) {
 }*/
 
 int shell_loop() {
-	// Load process if CLI specified it
+	// Load or attach process if CLI specified it
 	if (globals.file) {
 		if (adbg_debugger_spawn(&process, globals.file,
 			AdbgSpawnOpt.argv, globals.args, 0))
@@ -123,16 +123,17 @@ int shell_loop() {
 	term_init;
 
 LINPUT:
-	printf("(adbg) "); // print prompt
-	char* line = term_readline(null); // read line
+	printf("(adbg) ");
 	
-	//TODO: remove once term gets key events
+	// .ptr is temporary because a slice with a length of 0
+	// also make its pointer null.
+	char* line = term_readln().ptr;
+	
 	if (line == null) {
-		printf("^D");
 		return 0;
 	}
 	
-	int error = shell_exec(line); // execute line
+	int error = shell_exec(line);
 	if (error)
 		printf("error: %s\n", errorstring(cast(ShellError)error));
 	goto LINPUT;
@@ -156,7 +157,6 @@ int shell_execv(int argc, const(char) **argv) {
 		serror("unknown command: '%s'", ucommand);
 		return ShellError.invalidCommand;
 	}
-	
 	return command.entry(argc, argv);
 }
 

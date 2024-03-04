@@ -14,8 +14,8 @@ import core.stdc.stdio;
 
 extern (C):
 
-private
-int putchar(int);
+private int putchar(int);
+private int getchar();
 
 version (Windows) {
 	private import core.sys.windows.windows;
@@ -358,17 +358,43 @@ L_END:
 	}
 }
 
-//TODO: Consider redoing with getchar+fwrite(stdin)
+// onSpecial: tab, ^D, etc.
+// make onError?
+/// Read a line from stdin.
+/// Params:
+/// 	onSpecial = (Not implemented) Callback on special characters
+/// Returns: Character slice; Or null on error.
+char[] term_readln(void function(int) onSpecial = null) {
+	import core.stdc.ctype : isprint;
+	
+	// GNU readline has this set to 512
+	enum BUFFERSIZE = 1024;
+	
+	__gshared char* buffer;
+	
+	if (buffer == null) {
+		buffer = cast(char*)malloc(BUFFERSIZE);
+		if (buffer == null)
+			return null;
+	}
+	
+	// NOTE: stdin is line-buffered by the host console/terminal
+	//       Once it sees a newline, it returns, and we copy up until the newline
+	size_t i;
+LFETCHC:
+	int c = getchar();
+	if (c == '\n' || c == EOF) {
+		buffer[i] = 0;
+		return buffer[0..i];
+	}
+	buffer[i++] = cast(char)c;
+	goto LFETCHC;
+}
 
-//TODO: term_readline_event(Key, void function(Key))
-//      or just term_event_ctrld (etc.)
-//TODO: damage-based display (putchar)
-//      instead of reprinting the whole string at every stroke
-//      yes, it's very noticeable on windows (because of cursor positioning?)
-//TODO: Use realloc with enum INITBSZ = 2048
 /// Read a line from input keystrokes
 /// Params: length = Pointer that will contain the number of characters in the buffer
 /// Returns: Internal buffer pointer
+deprecated("Use term_readln")
 char* term_readline(int *length) {
 	enum BUFFER_SIZE = 1024;
 	__gshared char[BUFFER_SIZE] buffer;
