@@ -9,7 +9,7 @@ extern (C) int putchar(int);
 unittest {
 	while (true) {
 		printf("prompt: ");
-		char[] input = term_readln();
+		char[] input = conrdln();
 		foreach (char c; input)
 			if (isprint(c))
 				putchar(c);

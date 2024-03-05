@@ -1,16 +1,16 @@
-/**
- * In-house console/terminal library
- *
- * Authors: dd86k <dd@dax.moe>
- * Copyright: © dd86k <dd@dax.moe>
- * License: BSD-3-Clause
- */
+/// In-house console/terminal library
+///
+/// Authors: dd86k <dd@dax.moe>
+/// Copyright: © dd86k <dd@dax.moe>
+/// License: BSD-3-Clause
 module term;
 
 import core.stdc.stdlib;
 import core.stdc.stdio;
 
 //TODO: Consider using PDCurses instead
+
+// NOTE: Functions prefixed with "con" to avoid clashing with the "tc" POSIX stuff
 
 extern (C):
 
@@ -22,12 +22,6 @@ version (Windows) {
 	private enum ALT_PRESSED =  RIGHT_ALT_PRESSED  | LEFT_ALT_PRESSED;
 	private enum CTRL_PRESSED = RIGHT_CTRL_PRESSED | LEFT_CTRL_PRESSED;
 	private __gshared HANDLE handleIn, handleOut, handleOld;
-	// Internal buf
-	//TODO: structure
-	private __gshared ushort ibuf_x, ibuf_y, ibuf_w, ibuf_h;
-	private __gshared CHAR_INFO *ibuf;
-	private __gshared COORD ibuf_size, ibuf_pos;
-	private __gshared SMALL_RECT ibuf_rect;
 } else version (Posix) {
 	private import core.sys.posix.sys.ioctl;
 	private import core.sys.posix.unistd;
@@ -74,17 +68,13 @@ version (Windows) {
 	private __gshared termios old_tio = void, new_tio = void;
 }
 
-/// User defined function for resize events
-private __gshared
-void function(ushort,ushort) term_resize_handler;
+// Flags: CONFxyz
 
-/// Terminal configuration options
-enum TermConfig {
-	/// readline: no dot insert and output newline (Enter)
-	noNewline = 1 << 0,
+private __gshared {
+	/// User defined function for resize events
+	void function(ushort,ushort) term_resize_handler;
+	int term_opts; // default to 0
 }
-
-private __gshared int term_opts; // default to 0
 
 //
 // ANCHOR Initiation
@@ -92,66 +82,31 @@ private __gshared int term_opts; // default to 0
 
 /// Initiates terminal basics
 /// Returns: Error keyCode, non-zero on error
-int term_init() {
-	version (Posix) {
-		tcgetattr(STDIN_FILENO, &old_tio);
-		new_tio = old_tio;
-		new_tio.c_lflag &= TERM_ATTR;
+int coninit(int flags = 0) {
+version (Posix) {
+	tcgetattr(STDIN_FILENO, &old_tio);
+	new_tio = old_tio;
+	new_tio.c_lflag &= TERM_ATTR;
 
-		//TODO: See flags we can put
-		// tty_ioctl TIOCSETD
-	} else {
-		handleOut = GetStdHandle(STD_OUTPUT_HANDLE);
-		handleIn  = GetStdHandle(STD_INPUT_HANDLE);
-	}
+	//TODO: See flags we can put
+	// tty_ioctl TIOCSETD
+} else {
+	handleOut = GetStdHandle(STD_OUTPUT_HANDLE);
+	handleIn  = GetStdHandle(STD_INPUT_HANDLE);
+}
 	return 0;
 }
 
-/// Configure terminal settings with the TermConfig enumeration
-/// Params: flags = New set of flags
-void term_config(int flags) {
-	term_opts = flags;
-}
-
-// Restore console buf
-/*void term_restore() {
-	version (Windows) {
-		SetConsoleActiveScreenBuffer(hOld);
-	}
-}*/
-
-// Set terminal window resize event handler
-// Params: f = Handler function
-/*void term_event_resize(void function(ushort,ushort) f) {
-	version (Windows) {
-		term_resize_handler = f;
-	} else
-	version (Posix) {
-		//TODO: SIGWINCH : Signal Window change
-		sigaction_t sa;
-		sa.sa_handler = &term_event_resize_posix;
-		sigaction(SIGWINCH, &sa, cast(sigaction_t*)0);
-	}
-}*/
-
-// Internal Posix function for handling initial resize signal
-/*version (Posix) private
-void term_event_resize_posix(int) {
-	WindowSize ws = void;
-	term_size(&ws);
-	term_resize_handler(ws.width, ws.height);
-}*/
-
-/// Invert console color with defaultColor
-/*void term_color_invert() {
+// Invert console color with defaultColor
+/*void thcolin() {
 	version (Windows)
 		SetConsoleTextAttribute(hOut, COMMON_LVB_REVERSE_VIDEO | defaultColor);
 	version (Posix)
 		fputs("\033[7m", stdout);
 }
 
-/// Reset console color to defaultColor
-void term_color_reset() {
+// Reset console color to defaultColor
+void thcolrst() {
 	version (Windows)
 		SetConsoleTextAttribute(hOut, defaultColor);
 	version (Posix)
@@ -159,212 +114,204 @@ void term_color_reset() {
 }*/
 
 /// Clear screen
-void term_clear() {
-	version (Windows) {
-		CONSOLE_SCREEN_BUFFER_INFO csbi = void;
-		COORD c; // 0, 0
-		GetConsoleScreenBufferInfo(handleOut, &csbi);
-		//const int buflen = csbi.dwSize.X * csbi.dwSize.Y; buf buflen
-		const int buflen = // window buflen
-			(csbi.srWindow.Right - csbi.srWindow.Left + 1)* // width
-			(csbi.srWindow.Bottom - csbi.srWindow.Top + 1); // height
-		DWORD num = void; // kind of ala .NET
-		FillConsoleOutputCharacterA(handleOut, ' ', buflen, c, &num);
-		FillConsoleOutputAttribute(handleOut, csbi.wAttributes, buflen, c, &num);
-		term_curpos(0, 0);
-	} else version (Posix) {
-		// "ESC [ 2 J" acts like clear(1)
-		// "ESC c" is a full reset ala cls (Windows)
-		printf("\033c");
-	}
-	else static assert(0, "clear: Not implemented");
+void conclear() {
+version (Windows) {
+	CONSOLE_SCREEN_BUFFER_INFO csbi = void;
+	COORD c; // 0, 0
+	GetConsoleScreenBufferInfo(handleOut, &csbi);
+	//const int buflen = csbi.dwSize.X * csbi.dwSize.Y; buf buflen
+	const int buflen = // window buflen
+		(csbi.srWindow.Right - csbi.srWindow.Left + 1)* // width
+		(csbi.srWindow.Bottom - csbi.srWindow.Top + 1); // height
+	DWORD num = void; // kind of ala .NET
+	FillConsoleOutputCharacterA(handleOut, ' ', buflen, c, &num);
+	FillConsoleOutputAttribute(handleOut, csbi.wAttributes, buflen, c, &num);
+	conmvcur(0, 0);
+} else version (Posix) {
+	// "ESC [ 2 J" acts like clear(1)
+	// "ESC c" is a full reset ala cls (Windows)
+	printf("\033c");
+}
+else static assert(false, "Not implemented");
 }
 
-/**
- * Get current window buflen
- * Params: ws = Pointer to a WindowSize structure
- *
- * Note: A COORD uses SHORT (short) and Linux uses unsigned shorts.
- */
-void term_size(WindowSize *ws) {
-	version (Windows) {
-		CONSOLE_SCREEN_BUFFER_INFO c = void;
-		GetConsoleScreenBufferInfo(handleOut, &c);
-		ibuf_w = ws.width =
-			cast(ushort)(c.srWindow.Right - c.srWindow.Left + 1);
-		ibuf_h = ws.height =
-			cast(ushort)(c.srWindow.Bottom - c.srWindow.Top + 1);
-	} else
-	version (Posix) {
-		winsize w = void;
-		ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-		ws.width  = w.ws_col;
-		ws.height = w.ws_row;
-	}
+/// Get host console screen size.
+/// Params:
+///   w = Width (columns) pointer.
+///   h = Height (rows) pointer.
+void consize(int *w, int *h) {
+	/// NOTE: A COORD uses SHORT (short) and Linux uses unsigned shorts.
+version (Windows) {
+	CONSOLE_SCREEN_BUFFER_INFO c = void;
+	GetConsoleScreenBufferInfo(handleOut, &c);
+	*w = c.srWindow.Right - c.srWindow.Left + 1;
+	*h = c.srWindow.Bottom - c.srWindow.Top + 1;
+} else version (Posix) {
+	winsize w = void;
+	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
+	*w = w.ws_col;
+	*h = w.ws_row;
+}
 }
 
-/**
- * Set cursor position x and y position respectively from the top left corner,
- * 0-based.
- * Params:
- *   x = X position (horizontal)
- *   y = Y position (vertical)
- */
-void term_curpos(int x, int y) {
-	version (Windows) { // 0-based
-		COORD c = { cast(SHORT)x, cast(SHORT)y };
-		SetConsoleCursorPosition(handleOut, c);
-	} else version (Posix) { // 1-based
-		printf("\033[%d;%dH", y + 1, x + 1);
-	}
+/// Set cursor position.
+///
+/// Coordonates start at zero.
+/// Params:
+///   x = X position (horizontal, columns)
+///   y = Y position (vertical, rows)
+void conmvcur(int x, int y) {
+version (Windows) { // 0-based
+	COORD c = { cast(SHORT)x, cast(SHORT)y };
+	SetConsoleCursorPosition(handleOut, c);
+} else version (Posix) { // 1-based
+	printf("\033[%d;%dH", y + 1, x + 1);
+}
 }
 
-//TODO: Return structure instead
-void term_get_curpos(int *x, int *y) {
-	version (Windows) { // 0-based
-		CONSOLE_SCREEN_BUFFER_INFO csbi = void;
-		GetConsoleScreenBufferInfo(handleOut, &csbi);
-		*x = csbi.dwCursorPosition.X;
-		*y = csbi.dwCursorPosition.Y;
-	} else version (Posix) { // 1-based
-		tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
-		printf("\033[6n");
-		scanf("\033[%d;%dR", y, x); // row, col
-		tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
-		--*x;
-		--*y;
-	}
+/// Get cursor position.
+///
+/// Coordonates start at zero.
+/// Params:
+///   x = X position (horizontal, columns)
+///   y = Y position (vertical, rows)
+void congetxy(int *x, int *y) {
+version (Windows) { // 0-based
+	CONSOLE_SCREEN_BUFFER_INFO csbi = void;
+	GetConsoleScreenBufferInfo(handleOut, &csbi);
+	*x = csbi.dwCursorPosition.X;
+	*y = csbi.dwCursorPosition.Y;
+} else version (Posix) { // 1-based
+	tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
+	printf("\033[6n");
+	scanf("\033[%d;%dR", y, x); // row, col
+	tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
+	--*x;
+	--*y;
+}
 }
 
 //
 // ANCHOR Terminal input
 //
 
-/**
- * Read a single immediate terminal/console event such as a keyboard or mouse.
- * Window resize events are handled externally.
- * Windows: User handler function called if EventType is WINDOW_BUFFER_SIZE_EVENT.
- * Posix: Handled externally via the SIGWINCH signal.
- * Params: ii = InputInfo structure
- */
-void term_read(InputInfo *ii) {
+/// Read a single immediate terminal/console event such as a keyboard or mouse.
+///
+/// Window resize events are handled externally.
+/// Windows: User handler function called if EventType is WINDOW_BUFFER_SIZE_EVENT.
+/// Posix: Handled externally via the SIGWINCH signal.
+/// Params: ii = InputInfo structure
+void conrdkey(InputInfo *ii) {
 	ii.type = InputType.None;
-	version (Windows) {
-		INPUT_RECORD ir = void;
-		DWORD d = void;
+version (Windows) {
+	INPUT_RECORD ir = void;
+	DWORD d = void;
 L_READ_AGAIN:
-		if (ReadConsoleInput(handleIn, &ir, 1, &d) == FALSE)
-			return;
+	if (ReadConsoleInput(handleIn, &ir, 1, &d) == FALSE)
+		return;
 
-		switch (ir.EventType) {
-		case KEY_EVENT:
-			if (ir.KeyEvent.bKeyDown == FALSE)
-				goto L_READ_AGAIN;
-			
-			with (ii) {
-			type = InputType.Key;
-			const DWORD state = ir.KeyEvent.dwControlKeyState;
-			key.alt   = (state & ALT_PRESSED)   != 0;
-			key.ctrl  = (state & CTRL_PRESSED)  != 0;
-			key.shift = (state & SHIFT_PRESSED) != 0;
-			key.keyChar = ir.KeyEvent.AsciiChar;
-			key.keyCode = key.ctrl ?
-				cast(Key)ir.KeyEvent.AsciiChar :
-				cast(Key)ir.KeyEvent.wVirtualKeyCode;
-			}
-			break;
-		case MOUSE_EVENT: //TODO: MOUSE_EVENT
-			ii.type = InputType.Mouse;
-			break;
-		case WINDOW_BUFFER_SIZE_EVENT:
-			with (ir)
-			if (term_resize_handler)
-				term_resize_handler(
-					WindowBufferSizeEvent.dwSize.X,
-					WindowBufferSizeEvent.dwSize.Y);
-			FlushConsoleInputBuffer(handleIn);
-			break;
-		default: // Menu and Focus events
+	switch (ir.EventType) {
+	case KEY_EVENT:
+		if (ir.KeyEvent.bKeyDown == FALSE)
 			goto L_READ_AGAIN;
+		
+		with (ii) {
+		type = InputType.Key;
+		const DWORD state = ir.KeyEvent.dwControlKeyState;
+		key.alt   = (state & ALT_PRESSED)   != 0;
+		key.ctrl  = (state & CTRL_PRESSED)  != 0;
+		key.shift = (state & SHIFT_PRESSED) != 0;
+		key.keyChar = ir.KeyEvent.AsciiChar;
+		key.keyCode = key.ctrl ?
+			cast(Key)ir.KeyEvent.AsciiChar :
+			cast(Key)ir.KeyEvent.wVirtualKeyCode;
 		}
-	} else version (Posix) {
-		//TODO: Get modifier keys states
-		// or better yet
-		//TODO: See console_ioctl for KDGETKEYCODE
-		// https://linux.die.net/man/4/console_ioctl
+		break;
+	case MOUSE_EVENT: //TODO: MOUSE_EVENT
+		ii.type = InputType.Mouse;
+		break;
+	case WINDOW_BUFFER_SIZE_EVENT:
+		with (ir)
+		if (term_resize_handler)
+			term_resize_handler(
+				WindowBufferSizeEvent.dwSize.X,
+				WindowBufferSizeEvent.dwSize.Y);
+		FlushConsoleInputBuffer(handleIn);
+		break;
+	default: // Menu and Focus events
+		goto L_READ_AGAIN;
+	}
+} else version (Posix) {
+	//TODO: Get modifier keys states
+	//TODO: See console_ioctl for KDGETKEYCODE
+	//      https://linux.die.net/man/4/console_ioctl
 
-		ii.type = InputType.Key;
+	ii.type = InputType.Key;
 
-		tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
+	tcsetattr(STDIN_FILENO, TCSANOW, &new_tio);
+	scope(exit) tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
 
-		uint c = getchar;
+	uint c = getchar;
 
-		with (ii.key)
-		switch (c) {
-		case 0: keyCode = Key.Null; goto L_END;
-		case 1: keyCode = Key.HeadingStart; goto L_END;
-		case 2: keyCode = Key.TextStart; goto L_END;
-		case 3: /* ^C */ keyCode = Key.TextEnd; goto L_END;
-		case 4: /* ^D */ keyCode = Key.TransmissionEnd; goto L_END;
-		case 5: keyCode = Key.Enquiry; goto L_END;
-		case 6: keyCode = Key.Acknowledge; goto L_END;
-		case 7: keyCode = Key.Bell; goto L_END;
-		case '\n', '\r': // \n (RETURN) or \r (ENTER)
-			keyCode = Key.Enter;
-			goto L_END;
-		case 27: // ESC
+	with (ii.key)
+	switch (c) {
+	case 0: keyCode = Key.Null; return;
+	case 1: keyCode = Key.HeadingStart; return;
+	case 2: keyCode = Key.TextStart; return;
+	case 3: /* ^C */ keyCode = Key.TextEnd; return;
+	case 4: /* ^D */ keyCode = Key.TransmissionEnd; return;
+	case 5: keyCode = Key.Enquiry; return;
+	case 6: keyCode = Key.Acknowledge; return;
+	case 7: keyCode = Key.Bell; return;
+	case '\n', '\r': // \n (RETURN) or \r (ENTER)
+		keyCode = Key.Enter;
+		return;
+	case 27: // ESC
+		switch (c = getchar) {
+		case '[':
 			switch (c = getchar) {
-			case '[':
-				switch (c = getchar) {
-				case 'A': keyCode = Key.UpArrow; goto L_END;
-				case 'B': keyCode = Key.DownArrow; goto L_END;
-				case 'C': keyCode = Key.RightArrow; goto L_END;
-				case 'D': keyCode = Key.LeftArrow; goto L_END;
-				case 'F': keyCode = Key.End; goto L_END;
-				case 'H': keyCode = Key.Home; goto L_END;
-				// There is an additional getchar due to the pending '~'
-				case '2': keyCode = Key.Insert; getchar; goto L_END;
-				case '3': keyCode = Key.Delete; getchar; goto L_END;
-				case '5': keyCode = Key.PageUp; getchar; goto L_END;
-				case '6': keyCode = Key.PageDown; getchar; goto L_END;
-				default: goto L_DEFAULT;
-				} // [
+			case 'A': keyCode = Key.UpArrow; return;
+			case 'B': keyCode = Key.DownArrow; return;
+			case 'C': keyCode = Key.RightArrow; return;
+			case 'D': keyCode = Key.LeftArrow; return;
+			case 'F': keyCode = Key.End; return;
+			case 'H': keyCode = Key.Home; return;
+			// There is an additional getchar due to the pending '~'
+			case '2': keyCode = Key.Insert; getchar; return;
+			case '3': keyCode = Key.Delete; getchar; return;
+			case '5': keyCode = Key.PageUp; getchar; return;
+			case '6': keyCode = Key.PageDown; getchar; return;
 			default: goto L_DEFAULT;
-			} // ESC
-		case 0x08, 0x7F: // backspace
-			keyCode = Key.Backspace;
-			goto L_END;
-		case 23: // #
-			keyCode = Key.NumSign;
-			keyChar = '#';
-			goto L_END;
-		default:
-			if (c >= 'a' && c <= 'z') {
-				keyCode = cast(Key)(c - 32);
-				keyChar = cast(char)c;
-				goto L_END;
-			} else if (c >= 20 && c <= 126) {
-				keyCode = cast(Key)c;
-				keyChar = cast(char)c;
-				goto L_END;
-			}
+			} // [
+		default: goto L_DEFAULT;
+		} // ESC
+	case 0x08, 0x7F: // backspace
+		keyCode = Key.Backspace;
+		return;
+	case 23: // #
+		keyCode = Key.NumSign;
+		keyChar = '#';
+		return;
+	default:
+		if (c >= 'a' && c <= 'z') {
+			keyCode = cast(Key)(c - 32);
+			keyChar = cast(char)c;
+			return;
+		} else if (c >= 20 && c <= 126) {
+			keyCode = cast(Key)c;
+			keyChar = cast(char)c;
+			return;
 		}
+	}
 
 L_DEFAULT:
-		ii.key.keyCode = cast(Key)c;
-
-L_END:
-		tcsetattr(STDIN_FILENO, TCSANOW, &old_tio);
-	}
+	ii.key.keyCode = cast(Key)c;
+} // version (Posix)
 }
 
-// onSpecial: tab, ^D, etc.
-// make onError?
 /// Read a line from stdin.
-/// Params:
-/// 	onSpecial = (Not implemented) Callback on special characters
 /// Returns: Character slice; Or null on error.
-char[] term_readln(void function(int) onSpecial = null) {
+char[] conrdln() {
 	import core.stdc.ctype : isprint;
 	
 	// GNU readline has this set to 512
@@ -378,154 +325,18 @@ char[] term_readln(void function(int) onSpecial = null) {
 			return null;
 	}
 	
-	// NOTE: stdin is line-buffered by the host console/terminal
-	//       Once it sees a newline, it returns, and we copy up until the newline
-	size_t i;
-LFETCHC:
-	int c = getchar();
-	if (c == '\n' || c == EOF) {
-		buffer[i] = 0;
-		return buffer[0..i];
+	// NOTE: stdin is line-buffered by the host console in their own buffer.
+	//       Hitting return or enter makes the console write its buffer to stdin.
+	//       Reading stdin, we copy until we see a newline.
+	size_t len;
+	while (len < BUFFERSIZE) {
+		int c = getchar();
+		if (c == '\n' || c == EOF)
+			break;
+		buffer[len++] = cast(char)c;
 	}
-	buffer[i++] = cast(char)c;
-	goto LFETCHC;
-}
-
-/// Read a line from input keystrokes
-/// Params: length = Pointer that will contain the number of characters in the buffer
-/// Returns: Internal buffer pointer
-deprecated("Use term_readln")
-char* term_readline(int *length) {
-	enum BUFFER_SIZE = 1024;
-	__gshared char[BUFFER_SIZE] buffer;
-	
-	int spos;	/// Current cursor position
-	int slen;	/// Current input length
-	int ox = void, oy = void;	/// Original cursor X and Y positions
-	term_get_curpos(&ox, &oy);
-	InputInfo input = void;
-
-L_READKEY:
-	bool modified;	/// if output was modified
-	bool trimmed;	/// if output was trimmed
-	
-	term_read(&input);
-	
-	if (input.type != InputType.Key) goto L_READKEY;
-	
-	with (Key)
-	switch (input.key.keyCode) {
-	//
-	// History navigation
-	//
-	case UpArrow: // TODO: history: previous entry
-		
-		break;
-	case DownArrow: // TODO: history: next entry
-	
-		break;
-	//
-	// Line edition: Navigation
-	//
-	case LeftArrow: // line: move cursor left
-		//TODO: input.key.ctrl: move by word left
-		if (spos > 0) --spos;
-		break;
-	case RightArrow: // line: move cursor right
-		//TODO: input.key.ctrl: move by word right
-		if (spos < slen) ++spos;
-		break;
-	case Home:
-		spos = 0;
-		break;
-	case End:
-		if (slen > 0) spos = slen;
-		break;
-	//
-	// Line edition: Deletion
-	//
-	case Backspace: // remove cursor-previous character
-		// cursor is at beginning? skip
-		if (spos == 0) break;
-		
-		modified = true;
-		trimmed = true;
-		
-		--slen; --spos;
-		
-		// move buffer leftwards from pos to end
-		if (spos != slen) {
-			int pos = spos;
-			while (pos < slen) {
-				buffer[pos] = buffer[pos + 1];
-				++pos;
-			}
-		}
-		break;
-	case Delete: //TODO: remove cursor-selected character
-		
-		break;
-	//
-	// Special
-	//
-	case Enter: // send
-		if (term_opts & TermConfig.noNewline) {
-			buffer[slen] = 0;
-		} else {
-			putchar('\n');
-			buffer[slen] = '\n';
-			buffer[++slen] = 0;
-		}
-		if (length) *length = slen;
-		return buffer.ptr;
-	case Tab: //TODO: auto-complete callback
-	
-		break;
-	case TransmissionEnd: return null; // ^D
-	//
-	// Line edition: Insert
-	//
-	default:
-		// can't fit a character? skip
-		if (spos + 1 >= BUFFER_SIZE) break;
-		
-		const char c = input.key.keyChar;
-		
-		// character out of print scope? skip
-		if (c < 20 || c > 126) break;
-		
-		modified = true;
-		
-		// move buffer rightwards if cursor position not at end
-		if (spos != slen) {
-			// move stuff rightwards from len to pos
-			int pos = slen - 1;
-			while (pos >= spos) {
-				buffer[pos + 1] = buffer[pos];
-				--pos;
-			}
-		}
-		
-		buffer[spos] = c;
-		++slen; ++spos;
-	}
-	
-	// Update output string if modified
-	if (modified && slen > 0) {
-		term_curpos(ox, oy);
-		printf("%.*s", slen, buffer.ptr);
-		if (trimmed)
-			putchar(' ');
-	} else if (modified && slen == 0) {
-		term_curpos(ox, oy);
-		putchar(' ');
-	}
-	
-	// Update output cursor from spos
-	//TODO: get term buflen then do 2D calculation
-	term_curpos(ox + spos, oy);
-	
-	goto L_READKEY;
+	buffer[len] = 0;
+	return buffer[0..len];
 }
 
 /// Key information structure
@@ -547,12 +358,6 @@ struct InputInfo {
 		KeyInfo key;	/// Keyboard event structure
 		MouseInfo mouse;	/// Mouse event structure
 	}
-}
-
-/// Window structure
-struct WindowSize {
-	ushort width;	/// Width in characters
-	ushort height;	/// Height in characters
 }
 
 /// Input type for InputInfo structure

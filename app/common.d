@@ -69,6 +69,9 @@ enum SettingMode { debugger, dump, analyze }
 /// Debugger UIs
 enum SettingUI { cmd, loop, tcpserver }
 
+//TODO: globals should be moved to an internal app API
+//      Dedicated shell/dump APIs to set global settings
+
 /// Settings structure for the application (only!)
 struct settings_t {
 	/// CLI settings

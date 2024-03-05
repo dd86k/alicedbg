@@ -140,15 +140,9 @@ buildType "readkey" {
 	buildOptions "unittests"
 	sourceFiles "tests/readkey.d" "app/term.d"
 }
-buildType "readline" {
-	buildOptions "unittests"
-	sourceFiles "tests/readline.d"
-	sourcePaths "app" "src"
-}
 buildType "readln" {
 	buildOptions "unittests"
-	sourceFiles "tests/readln.d"
-	sourceFiles "app/term.d"
+	sourceFiles "tests/readln.d" "app/term.d"
 }
 
 #

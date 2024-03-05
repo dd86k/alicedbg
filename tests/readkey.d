@@ -4,12 +4,12 @@ import term;
 import core.stdc.stdio;
 
 unittest {
-	term_init;
+	coninit();
 	InputInfo input = void;
 	puts("Press ^C to quit");
 	puts("Reading keys...");
 loop:
-	term_read(&input);
+	conrdkey(&input);
 	switch (input.type) {
 	case InputType.Key:
 		with (input.key)

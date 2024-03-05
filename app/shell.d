@@ -120,16 +120,16 @@ int shell_loop() {
 			adbg_dasm_options(&dasm, AdbgDasmOption.syntax, globals.syntax, 0);
 	}
 	
-	term_init;
+	coninit();
 
 LINPUT:
 	printf("(adbg) ");
 	
 	// .ptr is temporary because a slice with a length of 0
 	// also make its pointer null.
-	char* line = term_readln().ptr;
+	char* line = conrdln().ptr;
 	
-	if (line == null) {
+	if (line == null || line[0] == 4) { // or ^D
 		return 0;
 	}
 	
@@ -600,7 +600,7 @@ int command_help(int argc, const(char) **argv) {
 		immutable(command2_t) *command = shell_findcommand(ucommand);
 		if (command == null) {
 			serror("Command not found: '%s'", ucommand);
-			return ShellError.invalidCommand;
+			return ShellError.invalidParameter;
 		}
 		
 		shell_event_help(command);
