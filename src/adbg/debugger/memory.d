@@ -233,366 +233,367 @@ L_OPTION:
 	if (tracee.pid == 0)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
-	version (Windows) {
-		if (__dynlib_psapi_load()) // EnumProcessModules, QueryWorkingSet
-			return adbg_errno();
-		
-		size_t uindex; /// (user) map index
-		
-		// Create user buffer
-		adbg_memory_map_t *map = *mmaps = cast(adbg_memory_map_t*)malloc(2048 * adbg_memory_map_t.sizeof);
-		if (map == null)
-			return adbg_oops(AdbgError.os);
-		
-		//
-		// Query memory regions for process
-		//
-		
-		// NOTE: Putty 0.80 will have around 1095 entries
-		uint bfsz = MiB!1;
-		PSAPI_WORKING_SET_INFORMATION *mbinfo =
-			cast(PSAPI_WORKING_SET_INFORMATION*)malloc(bfsz);
+	// Add EnumPageFilesA?
+version (Windows) {
+	if (__dynlib_psapi_load()) // EnumProcessModules, QueryWorkingSet
+		return adbg_errno();
+	
+	size_t uindex; /// (user) map index
+	
+	// Create user buffer
+	adbg_memory_map_t *map = *mmaps = cast(adbg_memory_map_t*)malloc(2048 * adbg_memory_map_t.sizeof);
+	if (map == null)
+		return adbg_oops(AdbgError.os);
+	
+	//
+	// Query memory regions for process
+	//
+	
+	// NOTE: Putty 0.80 will have around 1095 entries
+	uint bfsz = MiB!1;
+	PSAPI_WORKING_SET_INFORMATION *mbinfo =
+		cast(PSAPI_WORKING_SET_INFORMATION*)malloc(bfsz);
+	if (mbinfo == null)
+		return adbg_oops(AdbgError.crt);
+	
+	// NOTE: NtPssCaptureVaSpaceBulk is only available since Windows 10 20H1
+	// This queries workset addresses regardless of size, page-bounded.
+	// e.g., it will add 0x30000 and 0x31000 as entries, despite being a 8K "block".
+LRETRY:
+	uint r = QueryWorkingSet(tracee.hpid, mbinfo, bfsz);
+	switch (r) {
+	case 0:
+		return adbg_oops(AdbgError.os);
+	case ERROR_BAD_LENGTH:
+		bfsz = cast(uint)(mbinfo.NumberOfEntries * ULONG_PTR.sizeof);
+		mbinfo = cast(PSAPI_WORKING_SET_INFORMATION*)realloc(mbinfo, bfsz);
 		if (mbinfo == null)
 			return adbg_oops(AdbgError.crt);
+		goto LRETRY;
+	default:
+	}
+	
+	scope(exit) free(mbinfo);
+	
+	size_t pagesize = adbg_memory_pagesize();
+	if (pagesize == 0)
+		return adbg_oops(AdbgError.os);
+	
+	//TODO: Huge page support
+	//TODO: Use MEMORY_BASIC_INFORMATION32 or 64 depending on wow64
+	
+	//PSAPI_WORKING_SET_EX_INFORMATION wsinfoex = void;
+	for (size_t i; i < mbinfo.NumberOfEntries; ++i) {
+		// NOTE: Win64 doesn't populate block flag bits
+		PSAPI_WORKING_SET_BLOCK *blk = &mbinfo.WorkingSetInfo.ptr[i];
 		
-		// NOTE: NtPssCaptureVaSpaceBulk is only available since Windows 10 20H1
-		// This queries workset addresses regardless of size, page-bounded.
-		// e.g., it will add 0x30000 and 0x31000 as entries, despite being a 8K "block".
-LRETRY:
-		uint r = QueryWorkingSet(tracee.hpid, mbinfo, bfsz);
-		switch (r) {
-		case 0:
-			return adbg_oops(AdbgError.os);
-		case ERROR_BAD_LENGTH:
-			bfsz = cast(uint)(mbinfo.NumberOfEntries * ULONG_PTR.sizeof);
-			mbinfo = cast(PSAPI_WORKING_SET_INFORMATION*)realloc(mbinfo, bfsz);
-			if (mbinfo == null)
-				return adbg_oops(AdbgError.crt);
-			goto LRETRY;
-		default:
+		/*TODO: Large page support + adjustment needed
+		
+		wsinfoex.VirtualAddress = cast(void*)blk.VirtualPage;
+		if (QueryWorkingSetEx(tracee.hpid, &wsinfoex,
+			PSAPI_WORKING_SET_EX_INFORMATION.sizeof) == 0)
+			continue;
+		
+		import adbg.utils.bit : adbg_bits_extract32;
+		
+		uint pageflags = cast(uint)wsinfoex.VirtualAttributes.Flags;
+		
+		version (Trace) trace("page=%zx attr=%zx valid=%d share=%d prot=%d shared=%d node=%d locked=%d large=%d bad=%d",
+			cast(size_t)wsinfoex.VirtualAddress,
+			wsinfoex.VirtualAttributes.Flags,
+			adbg_bits_extract32(pageflags, 1, 0),
+			adbg_bits_extract32(pageflags, 3, 1),
+			adbg_bits_extract32(pageflags, 11, 4),
+			adbg_bits_extract32(pageflags, 1, 15),
+			adbg_bits_extract32(pageflags, 6, 16),
+			adbg_bits_extract32(pageflags, 1, 22),
+			adbg_bits_extract32(pageflags, 1, 23),
+			adbg_bits_extract32(pageflags, 1, 31));*/
+		
+		// Query with whatever page value
+		MEMORY_BASIC_INFORMATION mem = void;
+		if (VirtualQueryEx(tracee.hpid, cast(void*)blk.VirtualPage,
+			&mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
+			continue;
 		}
 		
-		scope(exit) free(mbinfo);
+		// Skip memory region when non-commited
+		// Usually never happens with addresses given by QueryWorkingSet
+		if (mem.State & (MEM_FREE | MEM_RESERVE))
+			continue;
 		
-		size_t pagesize = adbg_memory_pagesize();
-		if (pagesize == 0)
-			return adbg_oops(AdbgError.os);
-		
-		//TODO: Huge page support
-		//TODO: Use MEMORY_BASIC_INFORMATION32 or 64 depending on wow64
-		
-		//PSAPI_WORKING_SET_EX_INFORMATION wsinfoex = void;
-		for (size_t i; i < mbinfo.NumberOfEntries; ++i) {
-			// NOTE: Win64 doesn't populate block flag bits
-			PSAPI_WORKING_SET_BLOCK *blk = &mbinfo.WorkingSetInfo.ptr[i];
-			
-			/*TODO: Large page support + adjustment needed
-			
-			wsinfoex.VirtualAddress = cast(void*)blk.VirtualPage;
-			if (QueryWorkingSetEx(tracee.hpid, &wsinfoex,
-				PSAPI_WORKING_SET_EX_INFORMATION.sizeof) == 0)
-				continue;
-			
-			import adbg.utils.bit : adbg_bits_extract32;
-			
-			uint pageflags = cast(uint)wsinfoex.VirtualAttributes.Flags;
-			
-			version (Trace) trace("page=%zx attr=%zx valid=%d share=%d prot=%d shared=%d node=%d locked=%d large=%d bad=%d",
-				cast(size_t)wsinfoex.VirtualAddress,
-				wsinfoex.VirtualAttributes.Flags,
-				adbg_bits_extract32(pageflags, 1, 0),
-				adbg_bits_extract32(pageflags, 3, 1),
-				adbg_bits_extract32(pageflags, 11, 4),
-				adbg_bits_extract32(pageflags, 1, 15),
-				adbg_bits_extract32(pageflags, 6, 16),
-				adbg_bits_extract32(pageflags, 1, 22),
-				adbg_bits_extract32(pageflags, 1, 23),
-				adbg_bits_extract32(pageflags, 1, 31));*/
-			
-			// Query with whatever page value
-			MEMORY_BASIC_INFORMATION mem = void;
-			if (VirtualQueryEx(tracee.hpid, cast(void*)blk.VirtualPage,
-				&mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
-				continue;
-			}
-			
-			// Skip memory region when non-commited
-			// Usually never happens with addresses given by QueryWorkingSet
-			if (mem.State & (MEM_FREE | MEM_RESERVE))
-				continue;
-			
-			// Get mapped file
-			if (GetMappedFileNameA(tracee.hpid, mem.BaseAddress, map.name.ptr, MEM_MAP_NAME_LEN)) {
-				map.name[GetModuleFileNameExA(tracee.hpid, null, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
-			} else {
-				map.name[0] = 0;
-			}
-			
-			// Adjust protection bits
-			map.access = mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : 0;
-			if (mem.Protect & PAGE_EXECUTE_WRITECOPY)
-				map.access |= AdbgMemPerm.readExec;
-			else if (mem.Protect & PAGE_EXECUTE_READWRITE)
-				map.access |= AdbgMemPerm.all;
-			else if (mem.Protect & PAGE_EXECUTE_READ)
-				map.access |= AdbgMemPerm.readExec;
-			else if (mem.Protect & PAGE_EXECUTE)
-				map.access |= AdbgMemPerm.exec;
-			else if (mem.Protect & PAGE_WRITECOPY)
-				map.access |= AdbgMemPerm.read;
-			else if (mem.Protect & PAGE_READWRITE)
-				map.access |= AdbgMemPerm.readWrite;
-			else if (mem.Protect & PAGE_READONLY)
-				map.access |= AdbgMemPerm.read;
-			
-			if (mem.Type & MEM_IMAGE)
-				map.type = AdbgPageUse.module_;
-			else if (mem.Type & MEM_MAPPED)
-				map.type = AdbgPageUse.fileview;
-			else if (mem.Type & MEM_PRIVATE)
-				map.type = AdbgPageUse.resident;
-			else
-				map.type = AdbgPageUse.unknown;
-			
-			map.base = mem.BaseAddress;
-			map.size = mem.RegionSize;
-			
-			++uindex; ++map;
-			
-			// Memory region is less or equal to pagesize?
-			// No further adjustments to do
-			if (mem.RegionSize <= pagesize)
-				continue;
-			
-			// Otherwise, get ready to skip future pages if they are
-			// related (memory address and size follows by pagesize).
-			void *end = mem.BaseAddress + mem.RegionSize;
-			while (i + 1 < mbinfo.NumberOfEntries) {
-				void *page = cast(void*)mbinfo.WorkingSetInfo.ptr[i + 1].VirtualPage;
-				if (VirtualQueryEx(tracee.hpid, page,
-					&mem, MEMORY_BASIC_INFORMATION.sizeof) == 0)
-					break;
-				if (mem.BaseAddress > end) break;
-				++i;
-			}
+		// Get mapped file
+		if (GetMappedFileNameA(tracee.hpid, mem.BaseAddress, map.name.ptr, MEM_MAP_NAME_LEN)) {
+			map.name[GetModuleFileNameExA(tracee.hpid, null, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
+		} else {
+			map.name[0] = 0;
 		}
 		
-		//
-		// Query modules for process
-		//
+		// Adjust protection bits
+		map.access = mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : 0;
+		if (mem.Protect & PAGE_EXECUTE_WRITECOPY)
+			map.access |= AdbgMemPerm.readExec;
+		else if (mem.Protect & PAGE_EXECUTE_READWRITE)
+			map.access |= AdbgMemPerm.all;
+		else if (mem.Protect & PAGE_EXECUTE_READ)
+			map.access |= AdbgMemPerm.readExec;
+		else if (mem.Protect & PAGE_EXECUTE)
+			map.access |= AdbgMemPerm.exec;
+		else if (mem.Protect & PAGE_WRITECOPY)
+			map.access |= AdbgMemPerm.read;
+		else if (mem.Protect & PAGE_READWRITE)
+			map.access |= AdbgMemPerm.readWrite;
+		else if (mem.Protect & PAGE_READONLY)
+			map.access |= AdbgMemPerm.read;
 		
-		// Allocate temp buffer for module handles
-		uint buffersz = cast(uint)(512 * HMODULE.sizeof);
-		HMODULE *mods = cast(HMODULE*)malloc(buffersz);
-		if (mods == null)
-			return adbg_oops(AdbgError.crt);
-		scope(exit) free(mods);
-		
-		// Enum process modules
-		DWORD needed = void; //TODO: Could re-use this with option
-		if (EnumProcessModules(tracee.hpid, mods, buffersz, &needed) == FALSE)
-			return adbg_oops(AdbgError.os);
-		
-		DWORD modcount = needed / HMODULE.sizeof;
-		for (DWORD mod_i; mod_i < modcount; ++mod_i) {
-			HMODULE mod = mods[mod_i];
-			MODULEINFO minfo = void;
-			if (GetModuleInformation(tracee.hpid, mod, &minfo, MODULEINFO.sizeof) == FALSE) {
-				continue;
-			}
-			
-			// Get base name (e.g., from \Device\HarddiskVolume5\xyz.dll)
-			if (GetMappedFileNameA(tracee.hpid, minfo.lpBaseOfDll, map.name.ptr, MEM_MAP_NAME_LEN)) {
-				map.name[GetModuleFileNameExA(tracee.hpid, mod, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
-			} else {
-				map.name[0] = 0;
-			}
-			
-			//TODO: version (Win64) if (proc.wow) use MEMORY_BASIC_INFORMATION32
-			
-			MEMORY_BASIC_INFORMATION mem = void;
-			if (VirtualQueryEx(tracee.hpid, minfo.lpBaseOfDll, &mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
-				continue;
-			}
-			
-			// Adjust protection bits
-			map.access = mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : 0;
-			if (mem.Protect & PAGE_EXECUTE_WRITECOPY)
-				map.access |= AdbgMemPerm.readExec;
-			else if (mem.Protect & PAGE_EXECUTE_READWRITE)
-				map.access |= AdbgMemPerm.all;
-			else if (mem.Protect & PAGE_EXECUTE_READ)
-				map.access |= AdbgMemPerm.readExec;
-			else if (mem.Protect & PAGE_EXECUTE)
-				map.access |= AdbgMemPerm.exec;
-			else if (mem.Protect & PAGE_WRITECOPY)
-				map.access |= AdbgMemPerm.read;
-			else if (mem.Protect & PAGE_READWRITE)
-				map.access |= AdbgMemPerm.readWrite;
-			else if (mem.Protect & PAGE_READONLY)
-				map.access |= AdbgMemPerm.read;
-			
+		if (mem.Type & MEM_IMAGE)
 			map.type = AdbgPageUse.module_;
-			map.base = minfo.lpBaseOfDll;
-			map.size = minfo.SizeOfImage;
-			
-			++uindex; ++map;
+		else if (mem.Type & MEM_MAPPED)
+			map.type = AdbgPageUse.fileview;
+		else if (mem.Type & MEM_PRIVATE)
+			map.type = AdbgPageUse.resident;
+		else
+			map.type = AdbgPageUse.unknown;
+		
+		map.base = mem.BaseAddress;
+		map.size = mem.RegionSize;
+		
+		++uindex; ++map;
+		
+		// Memory region is less or equal to pagesize?
+		// No further adjustments to do
+		if (mem.RegionSize <= pagesize)
+			continue;
+		
+		// Otherwise, get ready to skip future pages if they are
+		// related (memory address and size follows by pagesize).
+		void *end = mem.BaseAddress + mem.RegionSize;
+		while (i + 1 < mbinfo.NumberOfEntries) {
+			void *page = cast(void*)mbinfo.WorkingSetInfo.ptr[i + 1].VirtualPage;
+			if (VirtualQueryEx(tracee.hpid, page,
+				&mem, MEMORY_BASIC_INFORMATION.sizeof) == 0)
+				break;
+			if (mem.BaseAddress > end) break;
+			++i;
+		}
+	}
+	
+	//
+	// Query modules for process
+	//
+	
+	// Allocate temp buffer for module handles
+	uint buffersz = cast(uint)(512 * HMODULE.sizeof);
+	HMODULE *mods = cast(HMODULE*)malloc(buffersz);
+	if (mods == null)
+		return adbg_oops(AdbgError.crt);
+	scope(exit) free(mods);
+	
+	// Enum process modules
+	DWORD needed = void; //TODO: Could re-use this with option
+	if (EnumProcessModules(tracee.hpid, mods, buffersz, &needed) == FALSE)
+		return adbg_oops(AdbgError.os);
+	
+	DWORD modcount = needed / HMODULE.sizeof;
+	for (DWORD mod_i; mod_i < modcount; ++mod_i) {
+		HMODULE mod = mods[mod_i];
+		MODULEINFO minfo = void;
+		if (GetModuleInformation(tracee.hpid, mod, &minfo, MODULEINFO.sizeof) == FALSE) {
+			continue;
 		}
 		
-		*mcount = uindex;
-		return 0;
-	} else version (linux) {
-		// Inspired by libscanmem
-		// https://github.com/scanmem/scanmem/blob/main/maps.c
-		
-		import core.sys.linux.unistd : readlink;
-		import adbg.utils.strings : adbg_util_getline, adbg_util_getlinef;
-		import core.sys.linux.unistd : read, close;
-		import core.sys.linux.fcntl : open, O_RDONLY;
-		
-		*mcount = 0;
-		
-		// Formulate proc map path
-		enum PROC_MAPS_LEN = 32;
-		char[PROC_MAPS_LEN] proc_maps = void;
-		snprintf(proc_maps.ptr, PROC_MAPS_LEN, "/proc/%u/maps", tracee.pid);
-		version (Trace) trace("maps: %s", proc_maps.ptr);
-		
-		// Open process maps
-		int fd_maps = open(proc_maps.ptr, O_RDONLY);
-		if (fd_maps == -1)
-			return adbg_oops(AdbgError.os);
-		scope(exit) close(fd_maps);
-		
-		/*
-		// Get proc exe path (e.g., /usr/bin/cat)
-		enum PROC_EXE_LEN = 32;
-		char[PROC_EXE_LEN] proc_exe = void;
-		snprintf(proc_exe.ptr, PROC_EXE_LEN, "/proc/%u/exe", tracee.pid);
-		
-		// Read link from proc exe for process path
-		enum EXE_PATH_LEN = 256;
-		char[EXE_PATH_LEN] exe_path = void;
-		version (Trace) trace("exe: %s", proc_exe.ptr);
-		ssize_t linksz = readlink(proc_exe.ptr, exe_path.ptr, EXE_PATH_LEN);
-		if (linksz > 0) {
-			exe_path[linksz] = 0;
-		} else { // Failed or empty
-			exe_path[0] = 0;
-		}*/
-		
-		// Allocate enough for maps buffer
-		// For example: One Firefox process has around 149 KiB worth of
-		// maps data with 1953 entries.
-		enum READSZ = MiB!1;
-		char *procbuf = cast(char*)malloc(READSZ);
-		if (procbuf == null)
-			return adbg_oops(AdbgError.crt);
-		scope(exit) free(procbuf);
-		
-		// Read maps, as much as possible
-		ssize_t readsz = read(fd_maps, procbuf, READSZ);
-		if (readsz == -1)
-			return adbg_oops(AdbgError.os);
-		version (Trace) trace("flen=%zu", readsz);
-		
-		// Count number of newlines for number of items to allocate
-		// Cut lines don't have newlines, so no worries here
-		size_t itemcnt;
-		for (size_t i; i < readsz; ++i)
-			if (procbuf[i] == '\n') ++itemcnt;
-		
-		// Allocate map items
-		version (Trace) trace("allocating %zu items", itemcnt);
-		adbg_memory_map_t *map = *mmaps =
-			cast(adbg_memory_map_t*)malloc(itemcnt * adbg_memory_map_t.sizeof);
-		if (map == null)
-			return adbg_oops(AdbgError.crt);
-		
-		// Go through each entry, which may look like this (without header):
-		// Address range             Perm Offset   Dev   inode      Path
-		// 55adaf007000-55adaf009000 r--p 00000000 08:02 1311130    /usr/bin/cat
-		// Perms: r=read, w=write, x=execute, s=shared or p=private (CoW)
-		// Path: Path or [stack], [stack:%id] (3.4 to 4.4), [heap]
-		//       [vdso]: virtual dynamic shared object: https://lwn.net/Articles/615809/
-		//       [vvar]: Stores a "mirror" of kernel variables required by virt syscalls
-		//       [vsyscall]: Legacy user-kernel (jump?) tables for some syscalls
-		enum LINE_LEN = 256;
-		char[LINE_LEN] line = void;
-		size_t linesz = void; /// line size
-		size_t srcidx; /// maps source buffer index
-		size_t i; /// maps index
-		//TODO: use a variant with mutable string and actively cuts lines
-		while (adbg_util_getline(line.ptr, LINE_LEN, &linesz, procbuf, &srcidx)) {
-			size_t range_start = void;
-			size_t range_end   = void;
-			char[4] perms      = void; // rwxp/rwxs
-			uint offset        = void;
-			uint dev_major     = void;
-			uint dev_minor     = void;
-			uint inode         = void;
-			
-			//TODO: Check for (deleted) column (last)
-			if (sscanf(line.ptr, "%zx-%zx %4s %x %x:%x %u %512s",
-				&range_start, &range_end,
-				perms.ptr, &offset,
-				&dev_major, &dev_minor,
-				&inode, map.name.ptr) < 8) {
-				continue;
-			}
-			
-			// Skip regions with empty permissions as they are irrelevent
-			if (perms[0] == '-' && perms[1] == '-' && perms[2] == '-')
-				continue;
-			
-			// NOTE: ELF regions with same executable path
-			//
-			// section  perms  comment
-			// .text:   r-x
-			// .rodata: r--    could be absent
-			// .data:   rw-
-			// .bss:    rw-    empty path and inode=0, could be absent
-			
-			//TODO: Adjust memory region permissions like libscanmem does
-			
-			version (Trace) trace("entry: %zu %zx %s", i, range_start, map.name.ptr);
-			
-			map.base = cast(void*)range_start;
-			map.size = range_end - range_start;
-			
-			bool priv = perms[3] == 'p';
-			
-			//if (offset)
-			//	map.type = AdbgPageUse.view;
-			//TODO: procfs name
-			//else if (strcmp(procname, map.name.ptr) == 0)
-			//	map.type = AdbgPageUse.image;
-			//else
-				map.type = AdbgPageUse.resident;
-			
-			map.access = priv ? AdbgMemPerm.private_ : 0;
-			if (perms[0] == 'r') map.access |= AdbgMemPerm.read;
-			if (perms[1] == 'w') map.access |= AdbgMemPerm.write;
-			if (perms[2] == 'x') map.access |= AdbgMemPerm.exec;
-			
-			++i; ++map;
+		// Get base name (e.g., from \Device\HarddiskVolume5\xyz.dll)
+		if (GetMappedFileNameA(tracee.hpid, minfo.lpBaseOfDll, map.name.ptr, MEM_MAP_NAME_LEN)) {
+			map.name[GetModuleFileNameExA(tracee.hpid, mod, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
+		} else {
+			map.name[0] = 0;
 		}
 		
-		version (Trace) trace("finished");
-		*mcount = i;
-		return 0;
-	} else
-		// FreeBSD: procstat(1) / pmap(9)
-		// - https://man.freebsd.org/cgi/man.cgi?query=vm_map
-		// - https://github.com/freebsd/freebsd-src/blob/main/lib/libutil/kinfo_getvmmap.c
-		// - args[0] = CTL_KERN
-		// - args[1] = KERN_PROC
-		// - args[2] = KERN_PROC_VMMAP
-		// - args[3] = pid
-		// NetBSD: pmap(1) / uvm_map(9)
-		// OpenBSD: procmap(1)
-		// - kvm_open + kvm_getprocs + KERN_PROC_PID
-		return adbg_oops(AdbgError.notImplemented);
+		//TODO: version (Win64) if (proc.wow) use MEMORY_BASIC_INFORMATION32
+		
+		MEMORY_BASIC_INFORMATION mem = void;
+		if (VirtualQueryEx(tracee.hpid, minfo.lpBaseOfDll, &mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
+			continue;
+		}
+		
+		// Adjust protection bits
+		map.access = mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : 0;
+		if (mem.Protect & PAGE_EXECUTE_WRITECOPY)
+			map.access |= AdbgMemPerm.readExec;
+		else if (mem.Protect & PAGE_EXECUTE_READWRITE)
+			map.access |= AdbgMemPerm.all;
+		else if (mem.Protect & PAGE_EXECUTE_READ)
+			map.access |= AdbgMemPerm.readExec;
+		else if (mem.Protect & PAGE_EXECUTE)
+			map.access |= AdbgMemPerm.exec;
+		else if (mem.Protect & PAGE_WRITECOPY)
+			map.access |= AdbgMemPerm.read;
+		else if (mem.Protect & PAGE_READWRITE)
+			map.access |= AdbgMemPerm.readWrite;
+		else if (mem.Protect & PAGE_READONLY)
+			map.access |= AdbgMemPerm.read;
+		
+		map.type = AdbgPageUse.module_;
+		map.base = minfo.lpBaseOfDll;
+		map.size = minfo.SizeOfImage;
+		
+		++uindex; ++map;
+	}
+	
+	*mcount = uindex;
+	return 0;
+} else version (linux) {
+	// Inspired by libscanmem
+	// https://github.com/scanmem/scanmem/blob/main/maps.c
+	
+	import core.sys.linux.unistd : readlink;
+	import adbg.utils.strings : adbg_util_getline, adbg_util_getlinef;
+	import core.sys.linux.unistd : read, close;
+	import core.sys.linux.fcntl : open, O_RDONLY;
+	
+	*mcount = 0;
+	
+	// Formulate proc map path
+	enum PROC_MAPS_LEN = 32;
+	char[PROC_MAPS_LEN] proc_maps = void;
+	snprintf(proc_maps.ptr, PROC_MAPS_LEN, "/proc/%u/maps", tracee.pid);
+	version (Trace) trace("maps: %s", proc_maps.ptr);
+	
+	// Open process maps
+	int fd_maps = open(proc_maps.ptr, O_RDONLY);
+	if (fd_maps == -1)
+		return adbg_oops(AdbgError.os);
+	scope(exit) close(fd_maps);
+	
+	/*
+	// Get proc exe path (e.g., /usr/bin/cat)
+	enum PROC_EXE_LEN = 32;
+	char[PROC_EXE_LEN] proc_exe = void;
+	snprintf(proc_exe.ptr, PROC_EXE_LEN, "/proc/%u/exe", tracee.pid);
+	
+	// Read link from proc exe for process path
+	enum EXE_PATH_LEN = 256;
+	char[EXE_PATH_LEN] exe_path = void;
+	version (Trace) trace("exe: %s", proc_exe.ptr);
+	ssize_t linksz = readlink(proc_exe.ptr, exe_path.ptr, EXE_PATH_LEN);
+	if (linksz > 0) {
+		exe_path[linksz] = 0;
+	} else { // Failed or empty
+		exe_path[0] = 0;
+	}*/
+	
+	// Allocate enough for maps buffer
+	// For example: One Firefox process has around 149 KiB worth of
+	// maps data with 1953 entries.
+	enum READSZ = MiB!1;
+	char *procbuf = cast(char*)malloc(READSZ);
+	if (procbuf == null)
+		return adbg_oops(AdbgError.crt);
+	scope(exit) free(procbuf);
+	
+	// Read maps, as much as possible
+	ssize_t readsz = read(fd_maps, procbuf, READSZ);
+	if (readsz == -1)
+		return adbg_oops(AdbgError.os);
+	version (Trace) trace("flen=%zu", readsz);
+	
+	// Count number of newlines for number of items to allocate
+	// Cut lines don't have newlines, so no worries here
+	size_t itemcnt;
+	for (size_t i; i < readsz; ++i)
+		if (procbuf[i] == '\n') ++itemcnt;
+	
+	// Allocate map items
+	version (Trace) trace("allocating %zu items", itemcnt);
+	adbg_memory_map_t *map = *mmaps =
+		cast(adbg_memory_map_t*)malloc(itemcnt * adbg_memory_map_t.sizeof);
+	if (map == null)
+		return adbg_oops(AdbgError.crt);
+	
+	// Go through each entry, which may look like this (without header):
+	// Address range             Perm Offset   Dev   inode      Path
+	// 55adaf007000-55adaf009000 r--p 00000000 08:02 1311130    /usr/bin/cat
+	// Perms: r=read, w=write, x=execute, s=shared or p=private (CoW)
+	// Path: Path or [stack], [stack:%id] (3.4 to 4.4), [heap]
+	//       [vdso]: virtual dynamic shared object: https://lwn.net/Articles/615809/
+	//       [vvar]: Stores a "mirror" of kernel variables required by virt syscalls
+	//       [vsyscall]: Legacy user-kernel (jump?) tables for some syscalls
+	enum LINE_LEN = 256;
+	char[LINE_LEN] line = void;
+	size_t linesz = void; /// line size
+	size_t srcidx; /// maps source buffer index
+	size_t i; /// maps index
+	//TODO: use a variant with mutable string and actively cuts lines
+	while (adbg_util_getline(line.ptr, LINE_LEN, &linesz, procbuf, &srcidx)) {
+		size_t range_start = void;
+		size_t range_end   = void;
+		char[4] perms      = void; // rwxp/rwxs
+		uint offset        = void;
+		uint dev_major     = void;
+		uint dev_minor     = void;
+		uint inode         = void;
+		
+		//TODO: Check for (deleted) column (last)
+		if (sscanf(line.ptr, "%zx-%zx %4s %x %x:%x %u %512s",
+			&range_start, &range_end,
+			perms.ptr, &offset,
+			&dev_major, &dev_minor,
+			&inode, map.name.ptr) < 8) {
+			continue;
+		}
+		
+		// Skip regions with empty permissions as they are irrelevent
+		if (perms[0] == '-' && perms[1] == '-' && perms[2] == '-')
+			continue;
+		
+		// NOTE: ELF regions with same executable path
+		//
+		// section  perms  comment
+		// .text:   r-x
+		// .rodata: r--    could be absent
+		// .data:   rw-
+		// .bss:    rw-    empty path and inode=0, could be absent
+		
+		//TODO: Adjust memory region permissions like libscanmem does
+		
+		version (Trace) trace("entry: %zu %zx %s", i, range_start, map.name.ptr);
+		
+		map.base = cast(void*)range_start;
+		map.size = range_end - range_start;
+		
+		bool priv = perms[3] == 'p';
+		
+		//if (offset)
+		//	map.type = AdbgPageUse.view;
+		//TODO: procfs name
+		//else if (strcmp(procname, map.name.ptr) == 0)
+		//	map.type = AdbgPageUse.image;
+		//else
+			map.type = AdbgPageUse.resident;
+		
+		map.access = priv ? AdbgMemPerm.private_ : 0;
+		if (perms[0] == 'r') map.access |= AdbgMemPerm.read;
+		if (perms[1] == 'w') map.access |= AdbgMemPerm.write;
+		if (perms[2] == 'x') map.access |= AdbgMemPerm.exec;
+		
+		++i; ++map;
+	}
+	
+	version (Trace) trace("finished");
+	*mcount = i;
+	return 0;
+} else
+	// FreeBSD: procstat(1) / pmap(9)
+	// - https://man.freebsd.org/cgi/man.cgi?query=vm_map
+	// - https://github.com/freebsd/freebsd-src/blob/main/lib/libutil/kinfo_getvmmap.c
+	// - args[0] = CTL_KERN
+	// - args[1] = KERN_PROC
+	// - args[2] = KERN_PROC_VMMAP
+	// - args[3] = pid
+	// NetBSD: pmap(1) / uvm_map(9)
+	// OpenBSD: procmap(1)
+	// - kvm_open + kvm_getprocs + KERN_PROC_PID
+	return adbg_oops(AdbgError.notImplemented);
 }
 
 /// Close the memory maps structure previously created by adbg_memory_maps.

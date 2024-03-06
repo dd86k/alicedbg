@@ -93,6 +93,12 @@ version (Posix) {
 } else {
 	handleOut = GetStdHandle(STD_OUTPUT_HANDLE);
 	handleIn  = GetStdHandle(STD_INPUT_HANDLE);
+	
+	// Disable annoying mouse mode.
+	DWORD mode = void;
+	GetConsoleMode(handleIn, &mode);
+	mode &= ~ENABLE_MOUSE_INPUT;
+	SetConsoleMode(handleIn, mode);
 }
 	return 0;
 }
@@ -147,10 +153,10 @@ version (Windows) {
 	*w = c.srWindow.Right - c.srWindow.Left + 1;
 	*h = c.srWindow.Bottom - c.srWindow.Top + 1;
 } else version (Posix) {
-	winsize w = void;
-	ioctl(STDOUT_FILENO, TIOCGWINSZ, &w);
-	*w = w.ws_col;
-	*h = w.ws_row;
+	winsize win = void;
+	ioctl(STDOUT_FILENO, TIOCGWINSZ, &win);
+	*w = win.ws_col;
+	*h = win.ws_row;
 }
 }
 

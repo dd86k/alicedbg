@@ -740,35 +740,57 @@ int adbg_process_get_pid(adbg_process_t *tracee) {
 /// Get the process file path.
 ///
 /// The string is null-terminated.
+/// Bug: On Windows, GetModuleFileNameA causes a crash with MSVC malloc buffers.
 /// Params:
 /// 	pid = Process ID.
 /// 	buffer = Buffer.
 /// 	bufsize = Size of the buffer.
-/// 	basename = Request for basename; Otherwise full file path.
+/// 	base = Request for basename; Otherwise full file path.
 /// Returns: String length; Or zero on error.
-size_t adbg_process_get_name(int pid, char *buffer, size_t bufsize, bool basename) {
-	if (pid <= 0 || buffer == null || bufsize == 0)
-		return adbg_oops(AdbgError.invalidArgument);
+size_t adbg_process_get_name(int pid, char *buffer, size_t bufsize, bool base) {
+	version (Trace)
+		trace("pid=%d buffer=%p bufsize=%zd base=%d", pid, buffer, bufsize, base);
+	
+	if (pid <= 0 || buffer == null || bufsize == 0) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
 	
 version (Windows) {
+	if (__dynlib_psapi_load()) // Sets error
+		return 0;
+	
 	// Get process handle
-	HANDLE hand = OpenProcess(
-		PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
-		FALSE, pid);
-	if (hand == null) {
+	HANDLE procHandle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
+	if (procHandle == null) {
 		adbg_oops(AdbgError.os);
 		return 0;
 	}
-	scope(exit) CloseHandle(hand);
+	scope(exit) CloseHandle(procHandle);
 	
+	DWORD needed = void;
+	DWORD pidlist = void;
+	if (EnumProcesses(&pidlist, DWORD.sizeof, &needed) == FALSE) {
+		adbg_oops(AdbgError.os);
+		return 0;
+	}
+	HMODULE hmod = void;
+	if (base && EnumProcessModules(procHandle, &hmod, hmod.sizeof, &needed)) {
+		adbg_oops(AdbgError.os);
+		return 0;
+	}
+	
+	// NOTE: GetModuleFileNameA requires module handle
+	// NOTE: GetProcessImageFileNameA returns native path (not Win32 path)
+	// NOTE: QueryFullProcessImageNameA is Vista and later
 	// Get filename or basename
 	uint bf = cast(uint)bufsize;
-	uint r = basename ?
-		GetModuleBaseNameA(hand, null, buffer, bf) :
-		GetModuleFileNameA(hand, buffer, bf);
+	uint r = base ?
+		GetModuleBaseNameA(procHandle, hmod, buffer, bf) :
+		GetProcessImageFileNameA(procHandle, buffer, bf);
+		//GetModuleFileNameA(hmod, buffer, bf);
 	buffer[r] = 0;
-	if (r == 0)
-		adbg_oops(AdbgError.os);
+	if (r == 0) adbg_oops(AdbgError.os);
 	return r;
 } else version (linux) {
 	//TODO: Could use /proc/pid/exe? (symbolic path)
@@ -803,8 +825,8 @@ version (Windows) {
 	
 	// Basename requested but was given full path
 	// e.g. /usr/bin/cat to cat
-	if (basename && buffer[0] == '/') {
-		ssize_t i = r;
+	if (base && buffer[0] == '/') {
+		ptrdiff_t i = r;
 		while (--i >= 0) {
 			if (buffer[i] == '/') break;
 		}
@@ -863,7 +885,7 @@ int* adbg_process_list(size_t *count, ...) {
 		return null;
 	}
 	
-	int capacity = 10_000;
+	enum CAPACITY = 5_000; // * 4 = ~20K
 	
 	int *plist = void;
 	
@@ -872,10 +894,11 @@ version (Windows) {
 		return null;
 	
 	// Allocate temp PID buffer
-	uint hsize = cast(uint)(capacity * HMODULE.sizeof);
+	uint hsize = cast(uint)(CAPACITY * HMODULE.sizeof);
 	DWORD *pidlist = cast(DWORD*)malloc(hsize);
 	if (pidlist == null) {
 		adbg_oops(AdbgError.crt);
+		return null;
 	}
 	scope(exit) free(pidlist);
 	
@@ -889,16 +912,16 @@ version (Windows) {
 	}
 	DWORD proccount = needed / DWORD.sizeof;
 	
-	*count = proccount;
 	plist = cast(int*)malloc(proccount * int.sizeof);
 	if (plist == null) {
 		adbg_oops(AdbgError.crt);
 		return null;
 	}
 	
-	for (DWORD i; i < proccount; ++i) {
-		plist[i] = pidlist[i];
-	}
+	// Skip PID 0 (idle) and 4 (system)
+	enum SKIP = 2;
+	memcpy(plist, pidlist + SKIP, (proccount * DWORD.sizeof) - (SKIP * DWORD.sizeof));
+	*count = proccount - SKIP;
 } else version (linux) {
 	// Count amount of entries to allocate
 	size_t cnt; // minimum amount of entries
@@ -908,6 +931,7 @@ version (Windows) {
 		return null;
 	}
 	scope (exit) closedir(procfd);
+	
 	for (dirent *procent = void; (procent = readdir(procfd)) != null;) {
 		// If not directory starting with a digit, skip entry
 		if (procent.d_type != DT_DIR)
@@ -974,8 +998,6 @@ struct adbg_process_list_t {
 	/// Number of processes.
 	size_t count;
 }
-
-// NOTE: For the C vararg to work, list is a parameter instead of a return value.
 /// Enumerate running processes.
 ///
 /// This function allocates memory. The list passed will need to be closed
@@ -989,6 +1011,11 @@ struct adbg_process_list_t {
 /// 	... = Options, terminated by 0.
 /// Returns: Zero for success; Or error code.
 int adbg_process_enumerate(adbg_process_list_t *list, ...) {
+	// NOTE: KEEP THIS FUNCTION AROUND AND DO NOT TOUCH IT
+	//       This function *must* be kept around until I understand why both
+	//       GetModuleBaseNameA and GetModuleFileNameA work here but not
+	//       when used separaterely from EnumProcesses/EnumProcessModules.
+	
 	if (list == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	

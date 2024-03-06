@@ -435,6 +435,21 @@ immutable command2_t[] shell_commands = [
 		&command_scan,
 	},
 	//
+	// Process management
+	//
+	{
+		[ "plist" ],
+		"",
+		[],
+		MODULE_DEBUGGER, CATEGORY_PROCESS,
+		[
+			{ SECTION_DESCRIPTION,
+			[ "List active processes" ]
+			}
+		],
+		&command_plist,
+	},
+	//
 	// Shell
 	//
 	{
@@ -619,7 +634,7 @@ int command_help(int argc, const(char) **argv) {
 			p += printf(" %s", cmd.names[i].ptr);
 		}
 		
-		printf(" %.*s %s\n", PADDING - p, liner, cmd.description.ptr);
+		printf("  %.*s %s\n", PADDING - p, liner, cmd.description.ptr);
 	}
 	
 	return 0;
@@ -1037,6 +1052,52 @@ int command_rescan(int argc, const(char) **argv) {
 	last_scan_data = user.data64;
 	
 	printf("Scan completed with %u results.\n", cast(uint)last_scan.result_count);
+	return 0;
+}
+
+int command_plist(int argc, const(char) **argv) {
+	// Disabled until adbg_process_get_name works on Windows
+version (none) {
+	size_t count = void;
+	int *plist = adbg_process_list(&count, 0);
+	if (plist == null)
+		return AppError.alicedbg;
+	
+	enum BUFFERSIZE = 2048;
+	char[BUFFERSIZE] buffer = void;
+	
+	version (Trace)
+		trace("count=%zd", count);
+	
+	puts("PID         Name");
+	foreach (int pid; plist[0..count]) {
+		printf("%10d  ", pid);
+		if (adbg_process_get_name(pid, buffer.ptr, BUFFERSIZE, false)) {
+			puts(buffer.ptr);
+			continue;
+		}
+		if (adbg_process_get_name(pid, buffer.ptr, BUFFERSIZE, true)) {
+			puts(buffer.ptr);
+			continue;
+		}
+		version (Trace)
+			trace("error: %s", adbg_error_msg());
+		putchar('\n');
+	}
+	
+	free(plist);
+} else {
+	adbg_process_list_t list = void;
+	if (adbg_process_enumerate(&list, 0)) {
+		return AppError.alicedbg;
+	}
+	
+	puts("PID         Name");
+	foreach (adbg_process_t proc; list.processes[0..list.count]) {
+		printf("%10d  %s\n", proc.pid, proc.name.ptr);
+	}
+}
+	
 	return 0;
 }
 
