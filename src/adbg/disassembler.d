@@ -17,6 +17,7 @@ import adbg.object.machines : AdbgMachine, adbg_object_machine_alias;
 import adbg.debugger.exception : adbg_exception_t;
 import adbg.debugger.memory : adbg_memory_read;
 import core.stdc.string : memcpy;
+import core.stdc.stdlib : malloc, free;
 
 //TODO: Capstone CS_MODE_BIG_ENDIAN
 //      Depending on target endianness, Capstone may need this bit
@@ -60,11 +61,12 @@ version (X86) { // CS_OPT_SYNTAX_DEFAULT
 	static assert(0, "Set DEFAULT_PLATFORM and DEFAULT_SYNTAX");
 }
 
-/// Maximum instruction size.
+/// Maximum instruction size in bytes.
+/// Currently, this title goes to x86. Congrats!
 enum MAX_INSTR_SIZE = 16;
 
 private {
-	enum ADBG_DASM_MAGIC = 0xcafebabe;
+	enum ADBG_MAGIC = 0xcafebabe;
 }
 
 extern (C):
@@ -122,7 +124,7 @@ struct adbg_opcode_t {
 }
 
 /// Assembler syntax.
-enum AdbgDasmSyntax {
+enum AdbgDisSyntax {
 	/// Default option for platform.
 	native,
 	/// Intel syntax
@@ -153,7 +155,7 @@ enum AdbgDasmSyntax {
 }
 
 /// Disassembler options.
-enum AdbgDasmOption {
+enum AdbgDisOpt {
 	/// Change syntax.
 	/// Type: int
 	/// Default: AdbgDasmSyntax.native
@@ -164,7 +166,7 @@ enum AdbgDasmOption {
 
 // Platform to CS' ARCH and MODE types
 private
-int adbg_dasm_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
+int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 	switch (platform) with (AdbgMachine) {
 	case native: // equals 0
 		cs_arch = CS_DEFAULT_PLATFORM;
@@ -218,57 +220,53 @@ int adbg_dasm_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 ///   dasm = Reference to disassembler instance.
 ///   machine = Machine architecture.
 /// Returns: Error code.
-int adbg_dasm_open(adbg_disassembler_t *dasm,
-	AdbgMachine machine = AdbgMachine.native) {
+adbg_disassembler_t* adbg_dis_open(AdbgMachine machine = AdbgMachine.native) {
 	//TODO: static if (CAPSTONE_DYNAMIC)
 	if (libcapstone_dynload())
-		return adbg_errno;
+		return null;
 	
 	version (Trace) trace("machine=%u (%s)", machine, adbg_object_machine_alias(machine));
 	
 	int cs_arch = void, cs_mode = void;
-	if (adbg_dasm_lib_a2cs(cs_arch, cs_mode, machine))
-		return adbg_errno;
+	if (adbg_dis_lib_a2cs(cs_arch, cs_mode, machine))
+		return null;
 	
-	//TODO: If already opened, close
-	if (cs_open(cs_arch, cs_mode, &dasm.cs_handle))
-		return adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
+	adbg_disassembler_t *dasm = cast(adbg_disassembler_t*)malloc(adbg_disassembler_t.sizeof);
+	if (dasm == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	
+	if (cs_open(cs_arch, cs_mode, &dasm.cs_handle)) {
+		free(dasm);
+		adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
+		return null;
+	}
 	
 	dasm.cs_inst = cs_malloc(dasm.cs_handle);
-	if (dasm.cs_inst == null)
-		return adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
+	if (dasm.cs_inst == null) {
+		free(dasm);
+		adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
+		return null;
+	}
 	
-	dasm.decoded_count =
-	dasm.address_base =
-	dasm.buffer_size = 0;
+	dasm.decoded_count = 0;
+	dasm.address_base  = 0;
+	dasm.buffer_size   = 0;
 	dasm.buffer = null;
-	
-	dasm.magic = ADBG_DASM_MAGIC;
-	return 0;
-}
-
-/// Re-open a disassembler instance by closing it and opening it again.
-/// Params:
-///   dasm = Reference to disassembler instance.
-///   machine = Machine architecture.
-/// Returns: Error code.
-int adbg_dasm_reopen(adbg_disassembler_t *dasm, AdbgMachine machine) {
-	if (dasm == null)
-		return adbg_oops(AdbgError.nullArgument);
-	adbg_dasm_close(dasm);
-	return adbg_dasm_open(dasm, machine);
+	dasm.magic = ADBG_MAGIC;
+	return dasm;
 }
 
 /// Closes a disassembler instance.
 /// Params: dasm = Reference to disassembler instance.
-void adbg_dasm_close(adbg_disassembler_t *dasm) {
-	import core.stdc.stdlib : free;
-	if (dasm == null || dasm.magic != ADBG_DASM_MAGIC)
+void adbg_dis_close(adbg_disassembler_t *dasm) {
+	if (dasm == null || dasm.magic != ADBG_MAGIC)
 		return;
 	if (dasm.cs_inst)
 		cs_free(dasm.cs_inst, 1);
 	cs_close(&dasm.cs_handle);
-	//free(dasm); Uncomment when _open uses mallocs
+	free(dasm);
 }
 
 /// Configure an option to the disassembler.
@@ -277,7 +275,7 @@ void adbg_dasm_close(adbg_disassembler_t *dasm) {
 ///
 /// Example:
 /// ---
-/// adbg_dasm_options(dasm,
+/// adbg_dis_options(dasm,
 ///   AdbgDasmOption.syntax, AdbgDasmSyntax.intel,
 ///   0);
 /// ---
@@ -285,29 +283,27 @@ void adbg_dasm_close(adbg_disassembler_t *dasm) {
 ///   dasm = Reference to disassembler instance.
 ///   ... = Options.
 /// Returns: Error code.
-int adbg_dasm_options(adbg_disassembler_t *dasm, ...) {
+int adbg_dis_options(adbg_disassembler_t *dasm, ...) {
 	if (dasm == null)
-		return adbg_oops(AdbgError.nullArgument);
-	
-	if (dasm.magic != ADBG_DASM_MAGIC &&
-		adbg_dasm_open(dasm))
-		return adbg_errno;
+		return adbg_oops(AdbgError.invalidArgument);
+	if (dasm.magic != ADBG_MAGIC)
+		return adbg_oops(AdbgError.uninitiated);
 	
 	va_list args = void;
 	va_start(args, dasm);
 L_OPTION:
 	switch (va_arg!int(args)) {
 	case 0: break;
-	case AdbgDasmOption.syntax:
+	case AdbgDisOpt.syntax:
 		int cs_syntax = void;
 		switch (va_arg!int(args)) {
-		case AdbgDasmSyntax.native:
+		case AdbgDisSyntax.native:
 			cs_syntax = CS_OPT_SYNTAX_DEFAULT;
 			break;
-		case AdbgDasmSyntax.intel:
+		case AdbgDisSyntax.intel:
 			cs_syntax = CS_OPT_SYNTAX_INTEL;
 			break;
-		case AdbgDasmSyntax.att:
+		case AdbgDisSyntax.att:
 			cs_syntax = CS_OPT_SYNTAX_ATT;
 			break;
 		default:
@@ -332,9 +328,9 @@ L_OPTION:
 ///   size = Size of the user data.
 ///   base_address = Base address.
 /// Returns: Error code.
-int adbg_dasm_start(adbg_disassembler_t *dasm, void *data, size_t size, ulong base_address = 0) {
+int adbg_dis_start(adbg_disassembler_t *dasm, void *data, size_t size, ulong base_address = 0) {
 	if (dasm == null || data == null)
-		return adbg_oops(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.invalidArgument);
 	dasm.address_base = base_address;
 	dasm.buffer = data;
 	dasm.buffer_size = size;
@@ -347,10 +343,10 @@ int adbg_dasm_start(adbg_disassembler_t *dasm, void *data, size_t size, ulong ba
 ///   dasm = Disassembler instance.
 ///   opcode = Opcode instance.
 /// Returns: Error code.
-int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
+int adbg_dis_step(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	if (dasm == null || opcode == null)
-		return adbg_oops(AdbgError.nullArgument);
-	if (dasm.magic != ADBG_DASM_MAGIC)
+		return adbg_oops(AdbgError.invalidArgument);
+	if (dasm.magic != ADBG_MAGIC)
 		return adbg_oops(AdbgError.uninitiated);
 	
 	version (Trace) trace("buffer_size=%u", cast(uint)dasm.buffer_size);
@@ -400,17 +396,17 @@ int adbg_dasm(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 ///   data = Pointer to user buffer.
 ///   size = Size of user buffer.
 /// Returns: Error code.
-int adbg_dasm_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, void *data, size_t size,
+int adbg_dis_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, void *data, size_t size,
 	ulong base_address = 0) {
-	int e = adbg_dasm_start(dasm, data, size, base_address);
-	return e ? e : adbg_dasm(dasm, opcode);
+	int e = adbg_dis_start(dasm, data, size, base_address);
+	return e ? e : adbg_dis_step(dasm, opcode);
 }
 
 //
 // Process wrappers
 //
 
-int adbg_dasm_start_process(adbg_disassembler_t *dasm, adbg_process_t *process, ulong location) {
+int adbg_dis_process_start(adbg_disassembler_t *dasm, adbg_process_t *process, ulong location) {
 	if (dasm == null || process == null)
 		return adbg_oops(AdbgError.nullArgument);
 	dasm.address_base = location;
@@ -418,7 +414,7 @@ int adbg_dasm_start_process(adbg_disassembler_t *dasm, adbg_process_t *process, 
 	return 0;
 }
 
-int adbg_dasm_process(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
+int adbg_dis_process_step(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	if (dasm == null || opcode == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
@@ -428,7 +424,7 @@ int adbg_dasm_process(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	dasm.buffer = opcode.machine.ptr;
 	dasm.buffer_size = MAX_INSTR_SIZE;
 	
-	return adbg_dasm(dasm, opcode);
+	return adbg_dis_step(dasm, opcode);
 }
 
 /// Wrapper that reads memory from process that disassembles one instruction.
@@ -438,13 +434,13 @@ int adbg_dasm_process(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 /// 	tracee = Debuggee process.
 /// 	address = Process virtual memory location.
 /// Returns: Error code.
-int adbg_dasm_process_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, adbg_process_t *tracee, ulong address) {
+int adbg_dis_process_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, adbg_process_t *tracee, ulong address) {
 	if (dasm == null || tracee == null || opcode == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	if (adbg_memory_read(tracee, address, opcode.machine.ptr, MAX_INSTR_SIZE))
 		return adbg_errno;
-	if (adbg_dasm_once(dasm, opcode, opcode.machine.ptr, MAX_INSTR_SIZE))
+	if (adbg_dis_once(dasm, opcode, opcode.machine.ptr, MAX_INSTR_SIZE))
 		return adbg_errno;
 	return 0;
 }

@@ -51,12 +51,12 @@ immutable setting_platform_t[] platforms = [
 // Syntaxes
 
 struct setting_syntax_t {
-	AdbgDasmSyntax val;
+	AdbgDisSyntax val;
 	const(char)* opt, desc;
 }
 immutable setting_syntax_t[] syntaxes = [
-	{ AdbgDasmSyntax.att,   "att",   "AT&T syntax" },
-	{ AdbgDasmSyntax.intel, "intel", "Intel syntax" },
+	{ AdbgDisSyntax.att,   "att",   "AT&T syntax" },
+	{ AdbgDisSyntax.intel, "intel", "Intel syntax" },
 ];
 
 //
@@ -84,7 +84,7 @@ struct settings_t {
 	int dump_options;	/// Dumper options
 	long dump_base_address;	/// Dumper base address (org)
 	AdbgMachine machine;	/// Disassembler: Target machine
-	AdbgDasmSyntax syntax;	/// Disassembler: Syntax
+	AdbgDisSyntax syntax;	/// Disassembler: Syntax
 }
 
 /// Global variables. Helps keeping track of app variables.

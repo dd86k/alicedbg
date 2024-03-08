@@ -416,20 +416,16 @@ int dump_disassemble_object(ref Dumper dump, adbg_object_t *o,
 
 int dump_disassemble(ref Dumper dump, AdbgMachine machine,
 	void* data, ulong size, ulong base_address) {
-	adbg_disassembler_t *dasm = cast(adbg_disassembler_t*)malloc(adbg_disassembler_t.sizeof);
-	if (dasm == null)
-		quitext(ErrSource.crt);
-	scope(exit) free(dasm);
-	
-	if (adbg_dasm_open(dasm, machine))
+	adbg_disassembler_t *dis = adbg_dis_open(machine);
+	if (dis == null)
 		quitext(ErrSource.adbg);
-	scope(exit) adbg_dasm_close(dasm);
+	scope(exit) adbg_dis_close(dis);
 	
 	if (globals.syntax)
-		adbg_dasm_options(dasm, AdbgDasmOption.syntax, globals.syntax, 0);
+		adbg_dis_options(dis, AdbgDisOpt.syntax, globals.syntax, 0);
 	
 	adbg_opcode_t op = void;
-	adbg_dasm_start(dasm, data, cast(size_t)size, base_address);
+	adbg_dis_start(dis, data, cast(size_t)size, base_address);
 	
 	// stats mode
 	if (dump.selected_disasm_stats()) {
@@ -439,7 +435,7 @@ int dump_disassemble(ref Dumper dump, AdbgMachine machine,
 		uint stat_total;	/// total instruction count
 		uint stat_illegal;	/// Number of illegal instructions
 L_STAT:
-		switch (adbg_dasm(dasm, &op)) with (AdbgError) {
+		switch (adbg_dis_step(dis, &op)) with (AdbgError) {
 		case success:
 			stat_avg += op.size;
 			++stat_total;
@@ -467,7 +463,7 @@ L_STAT:
 	
 	// normal disasm mode
 L_DISASM:
-	switch (adbg_dasm(dasm, &op)) with (AdbgError) {
+	switch (adbg_dis_step(dis, &op)) with (AdbgError) {
 	case success:
 		print_disasm_line(&op);
 		goto L_DISASM;

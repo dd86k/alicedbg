@@ -110,14 +110,14 @@ int shell_loop() {
 	}
 	
 	if (globals.file || globals.pid) {
-		if (adbg_dasm_open(&dasm, adbg_process_get_machine(process))) {
-			dasm_available = false;
+		dis = adbg_dis_open(adbg_process_get_machine(process));
+		if (dis == null) {
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
-		} else dasm_available = true;
+		}
 		
-		if (globals.syntax && dasm_available)
-			adbg_dasm_options(&dasm, AdbgDasmOption.syntax, globals.syntax, 0);
+		if (globals.syntax && dis)
+			adbg_dis_options(dis, AdbgDisOpt.syntax, globals.syntax, 0);
 	}
 	
 	coninit();
@@ -163,12 +163,8 @@ int shell_execv(int argc, const(char) **argv) {
 private:
 __gshared:
 
-adbg_process_t* process;
-//TODO: Make disassembler return instance pointer
-adbg_disassembler_t dasm;
-
-//TODO: Rely on disassembler pointer instead
-bool dasm_available;
+adbg_process_t *process;
+adbg_disassembler_t *dis;
 
 void function(const(char)* sev, const(char)* msg) userlog;
 
@@ -497,7 +493,7 @@ immutable(command2_t)* shell_findcommand(const(char) *ucommand) {
 //TODO: shell_attach
 
 void shell_event_disassemble(size_t address, int count = 1, bool showAddress = true) {
-	if (dasm_available == false)
+	if (dis == null)
 		return;
 	
 	for (int i; i < count; ++i) {
@@ -508,7 +504,7 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 			return;
 		}
 		adbg_opcode_t op = void;
-		if (adbg_dasm_once(&dasm, &op, data.ptr, RDSZ)) {
+		if (adbg_dis_once(dis, &op, data.ptr, RDSZ)) {
 			printf("%8llx (error:%s)\n", cast(ulong)address, adbg_error_msg);
 			return;
 		}
@@ -655,11 +651,11 @@ int command_spawn(int argc, const(char) **argv) {
 		serror("Could not spawn process.");
 		return ShellError.alicedbg;
 	}
-	if (adbg_dasm_open(&dasm, adbg_process_get_machine(process))) {
-		dasm_available = false;
+	dis = adbg_dis_open(adbg_process_get_machine(process));
+	if (dis == null) {
 		printf("warning: Disassembler not available (%s)\n",
 			adbg_error_msg());
-	} else dasm_available = true;
+	}
 	
 	return 0;
 }
@@ -679,11 +675,11 @@ int command_attach(int argc, const(char) **argv) {
 		serror("Could not attach to process.");
 		return ShellError.alicedbg;
 	}
-	if (adbg_dasm_open(&dasm, adbg_process_get_machine(process))) {
-		dasm_available = false;
+	dis = adbg_dis_open(adbg_process_get_machine(process));
+	if (dis == null) {
 		printf("warning: Disassembler not available (%s)\n",
 			adbg_error_msg());
-	} else dasm_available = true;
+	}
 	
 	return 0;
 }
@@ -693,8 +689,7 @@ int command_detach(int argc, const(char) **argv) {
 		serror("Could not detach process.");
 		return ShellError.alicedbg;
 	}
-	if (dasm_available)
-		adbg_dasm_close(&dasm);
+	adbg_dis_close(dis);
 	
 	return 0;
 }
@@ -712,13 +707,6 @@ int command_restart(int argc, const(char) **argv) {
 			serror("Could not attach process.");
 			return ShellError.alicedbg;
 		}
-		if (dasm_available)
-			adbg_dasm_close(&dasm);
-		if (adbg_dasm_open(&dasm, adbg_process_get_machine(process))) {
-			dasm_available = false;
-			printf("warning: Disassembler not available (%s)\n",
-				adbg_error_msg());
-		} else dasm_available = true;
 		puts("Debugger re-attached");
 		break;
 	case spawned:
@@ -733,18 +721,18 @@ int command_restart(int argc, const(char) **argv) {
 			serror("Could not spawn process.");
 			return ShellError.alicedbg;
 		}
-		if (dasm_available)
-			adbg_dasm_close(&dasm);
-		if (adbg_dasm_open(&dasm, adbg_process_get_machine(process))) {
-			dasm_available = false;
-			printf("warning: Disassembler not available (%s)\n",
-				adbg_error_msg());
-		} else dasm_available = true;
 		puts("Process respawned");
 		break;
 	default:
 		serror("No process attached or spawned.");
 		return 0;
+	}
+	
+	adbg_dis_close(dis);
+	dis = adbg_dis_open(adbg_process_get_machine(process));
+	if (dis == null) {
+		printf("warning: Disassembler not available (%s)\n",
+			adbg_error_msg());
 	}
 	
 	return 0;
@@ -885,11 +873,10 @@ int command_maps(int argc, const(char) **argv) {
 
 //TODO: start,+length start,end syntax
 int command_disassemble(int argc, const(char) **argv) {
-	if (dasm_available == false)
+	if (dis == null)
 		return ShellError.unavailable;
-	if (argc < 2) {
+	if (argc < 2)
 		return ShellError.missingOption;
-	}
 	
 	long uaddress = void;
 	if (unformat64(&uaddress, argv[1]))

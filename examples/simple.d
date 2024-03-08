@@ -7,6 +7,7 @@ module examples.simple;
 
 import core.stdc.stdio;
 import core.stdc.stdlib;
+import core.stdc.ctype : isprint;
 import adbg;
 
 extern (C):
@@ -19,12 +20,11 @@ int main(int argc, const(char) **argv) {
 	if (process == null)
 		die;
 	
-	feature_disasm = adbg_dasm_open(&dasm, adbg_process_get_machine(process)) == 0;
-	if (feature_disasm == false)
-		printf("warning: Disassembler unavailable (%s)", adbg_error_msg);
+	dis = adbg_dis_open(adbg_process_get_machine(process));
+	if (dis == null)
+		printf("warning: Disassembler unavailable (%s)\n", adbg_error_msg());
 	
-	// Process input
-LOOP:
+LOOP:	// Process input
 	switch (choice("Action [?=Help]")) {
 	case '?':
 		puts(
@@ -61,40 +61,36 @@ void die(int code = 0, const(char) *reason = null) {
 }
 
 int choice(const(char) *msg) {
-	import core.stdc.ctype : isprint;
 	printf("\n%s: ", msg);
-INPUT:
-	int c = getchar;
+LINPUT:	int c = getchar;
 	if (isprint(c)) return c;
-	goto INPUT;
+	goto LINPUT;
 }
 
 __gshared adbg_process_t *process;
-__gshared adbg_disassembler_t dasm;
-__gshared bool feature_disasm;
+__gshared adbg_disassembler_t *dis;
 
 void loop_handler(adbg_exception_t *ex) {
-	__gshared uint ex_num; /// Exception counter
 	printf(
 	"\n----------------------------------------\n"~
-	"* EXCEPTION #%u: %s ("~ADBG_OS_ERROR_FORMAT~")\n"~
+	"* EXCEPTION ("~ADBG_OS_ERROR_FORMAT~"): %s\n"~
 	"* PID=%u TID=%u\n"~
-	"* FAULT=%8llx ",
-	ex_num++, adbg_exception_name(ex), ex.oscode,
+	"* FAULT=%8llx",
+	ex.oscode, adbg_exception_name(ex),
 	ex.pid, ex.tid,
 	ex.fault_address
 	);
 	
 	// Print disassembly if available
-	if (feature_disasm && ex.faultz) {
+	if (dis && ex.faultz) {
 		adbg_opcode_t op = void;
-		if (adbg_dasm_process_once(&dasm, &op, process, ex.fault_address)) {
-			printf(" (error:%s)\n", adbg_error_msg);
+		if (adbg_dis_process_once(dis, &op, process, ex.fault_address)) {
+			printf("  (error:%s)\n", adbg_error_msg);
 			return;
 		}
 		if (op.operands)
-			printf(" (%s %s)\n", op.mnemonic, op.operands);
+			printf("  (%s %s)\n", op.mnemonic, op.operands);
 		else
-			printf(" (%s)\n", op.mnemonic);
+			printf("  (%s)\n", op.mnemonic);
 	}
 }
