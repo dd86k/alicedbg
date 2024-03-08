@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause
-module examples.simple_v1;
+module examples.simple_legacy;
 
 import adbg.include.c.stdio;
 import adbg.legacy.debugger, adbg.legacy.disassembler, adbg.error;

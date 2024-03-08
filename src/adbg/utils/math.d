@@ -16,7 +16,16 @@ template MIN(size_t a, size_t b) {
 
 @system unittest {
 	static assert(MAX!(1, 2) == 2);
+	static assert(MAX!(2, 2) == 2);
 	static assert(MIN!(1, 2) == 1);
+	static assert(MIN!(1, 1) == 1);
+}
+
+size_t max(size_t a, size_t b) {
+	return a >= b ? a : b;
+}
+size_t min(size_t a, size_t b) {
+	return a <= b ? a : b;
 }
 
 /// Make a constant binary size (base 1024^3).

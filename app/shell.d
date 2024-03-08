@@ -12,6 +12,9 @@ import core.stdc.string : strcmp, strncmp;
 import common, utils;
 import term;
 
+// Enable new process name, although it is currently broken on Windows
+//version = UseNewProcessName
+
 //TODO: Print process exit code
 
 extern (C):
@@ -88,29 +91,26 @@ void registerHelp(void function(ref command2_help_t help)) {
 }*/
 
 int shell_loop() {
+	//TODO: these should be dedicated shell functions
 	// Load or attach process if CLI specified it
 	if (globals.file) {
-		if (adbg_debugger_spawn(&process, globals.file,
-			AdbgSpawnOpt.argv, globals.args, 0))
+		process = adbg_debugger_spawn(globals.file,
+			AdbgSpawnOpt.argv, globals.args,
+			0);
+		if (process == null)
 			return oops;
 		
 		puts("Process created.");
-	
-		if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
-			dasm_available = false;
-			printf("warning: Disassembler not available (%s)\n",
-				adbg_error_msg());
-		} else dasm_available = true;
-		
-		if (globals.syntax && dasm_available)
-			adbg_dasm_options(&dasm, AdbgDasmOption.syntax, globals.syntax, 0);
 	} else if (globals.pid) {
-		if (adbg_debugger_attach(&process, globals.pid, 0))
+		process = adbg_debugger_attach(globals.pid, 0);
+		if (process == null)
 			return oops;
 		
-		puts("Debugger attached to process");
+		puts("Debugger attached.");
+	}
 	
-		if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
+	if (globals.file || globals.pid) {
+		if (adbg_dasm_open(&dasm, adbg_process_get_machine(process))) {
 			dasm_available = false;
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
@@ -129,7 +129,7 @@ LINPUT:
 	// also make its pointer null.
 	char* line = conrdln().ptr;
 	
-	if (line == null || line[0] == 4) { // or ^D
+	if (line == null || line[0] == 4) { // 4 == ^D
 		return 0;
 	}
 	
@@ -163,8 +163,7 @@ int shell_execv(int argc, const(char) **argv) {
 private:
 __gshared:
 
-//TODO: Make debugger return process pointer
-adbg_process_t process;
+adbg_process_t* process;
 //TODO: Make disassembler return instance pointer
 adbg_disassembler_t dasm;
 
@@ -504,7 +503,7 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 	for (int i; i < count; ++i) {
 		enum RDSZ = 16;
 		ubyte[RDSZ] data = void;
-		if (adbg_memory_read(&process, address, data.ptr, RDSZ)) {
+		if (adbg_memory_read(process, address, data.ptr, RDSZ)) {
 			oops;
 			return;
 		}
@@ -594,7 +593,7 @@ void shell_event_help(immutable(command2_t) *command) {
 }
 
 int command_status(int argc, const(char) **argv) {
-	AdbgProcStatus state = adbg_process_status(&process);
+	AdbgProcStatus state = adbg_process_status(process);
 	const(char) *m = void;
 	switch (state) with (AdbgProcStatus) {
 	case unloaded:	m = "unloaded"; break;
@@ -649,13 +648,14 @@ int command_spawn(int argc, const(char) **argv) {
 	globals.file = argv[1];
 	globals.args = argc > 2 ? argv + 2: null;
 	
-	if (adbg_debugger_spawn(&process, globals.file,
+	process = adbg_debugger_spawn(globals.file,
 		AdbgSpawnOpt.argv, globals.args,
-		0)) {
+		0);
+	if (process == null) {
 		serror("Could not spawn process.");
 		return ShellError.alicedbg;
 	}
-	if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
+	if (adbg_dasm_open(&dasm, adbg_process_get_machine(process))) {
 		dasm_available = false;
 		printf("warning: Disassembler not available (%s)\n",
 			adbg_error_msg());
@@ -674,11 +674,12 @@ int command_attach(int argc, const(char) **argv) {
 	}
 	
 	int pid = atoi(argv[1]);
-	if (adbg_debugger_attach(&process, pid, 0)) {
+	process = adbg_debugger_attach(pid, 0);
+	if (process == null) {
 		serror("Could not attach to process.");
 		return ShellError.alicedbg;
 	}
-	if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
+	if (adbg_dasm_open(&dasm, adbg_process_get_machine(process))) {
 		dasm_available = false;
 		printf("warning: Disassembler not available (%s)\n",
 			adbg_error_msg());
@@ -688,7 +689,7 @@ int command_attach(int argc, const(char) **argv) {
 }
 
 int command_detach(int argc, const(char) **argv) {
-	if (adbg_debugger_detach(&process)) {
+	if (adbg_debugger_detach(process)) {
 		serror("Could not detach process.");
 		return ShellError.alicedbg;
 	}
@@ -701,18 +702,19 @@ int command_detach(int argc, const(char) **argv) {
 int command_restart(int argc, const(char) **argv) {
 	switch (process.creation) with (AdbgCreation) {
 	case attached:
-		int pid = adbg_process_get_pid(&process);
-		if (adbg_debugger_detach(&process)) {
+		int pid = adbg_process_get_pid(process);
+		if (adbg_debugger_detach(process)) {
 			serror("Could not detach process.");
 			return ShellError.alicedbg;
 		}
-		if (adbg_debugger_attach(&process, pid)) {
+		process = adbg_debugger_attach(pid, 0);
+		if (process == null) {
 			serror("Could not attach process.");
 			return ShellError.alicedbg;
 		}
 		if (dasm_available)
 			adbg_dasm_close(&dasm);
-		if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
+		if (adbg_dasm_open(&dasm, adbg_process_get_machine(process))) {
 			dasm_available = false;
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
@@ -720,19 +722,20 @@ int command_restart(int argc, const(char) **argv) {
 		puts("Debugger re-attached");
 		break;
 	case spawned:
-		if (adbg_debugger_terminate(&process)) {
+		if (adbg_debugger_terminate(process)) {
 			serror("Could not terminate process.");
 			return ShellError.alicedbg;
 		}
-		if (adbg_debugger_spawn(&process, globals.file,
+		process = adbg_debugger_spawn(globals.file,
 			AdbgSpawnOpt.argv, globals.args,
-			0)) {
+			0);
+		if (process == null) {
 			serror("Could not spawn process.");
 			return ShellError.alicedbg;
 		}
 		if (dasm_available)
 			adbg_dasm_close(&dasm);
-		if (adbg_dasm_open(&dasm, adbg_process_get_machine(&process))) {
+		if (adbg_dasm_open(&dasm, adbg_process_get_machine(process))) {
 			dasm_available = false;
 			printf("warning: Disassembler not available (%s)\n",
 				adbg_error_msg());
@@ -748,33 +751,33 @@ int command_restart(int argc, const(char) **argv) {
 }
 
 int command_go(int argc, const(char) **argv) {
-	if (adbg_debugger_continue(&process))
+	if (adbg_debugger_continue(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(&process, &shell_event_exception))
+	if (adbg_debugger_wait(process, &shell_event_exception))
 		return ShellError.alicedbg;
 	// Temporary: Cheap hack for process exit
-	if (adbg_process_status(&process) == AdbgProcStatus.unloaded)
+	if (adbg_process_status(process) == AdbgProcStatus.unloaded)
 		printf("*\tProcess %d exited\n", process.pid);
 	return 0;
 }
 
 int command_kill(int argc, const(char) **argv) {
-	if (adbg_debugger_terminate(&process))
+	if (adbg_debugger_terminate(process))
 		return ShellError.alicedbg;
 	return 0;
 }
 
 int command_stepi(int argc, const(char) **argv) {
-	if (adbg_debugger_stepi(&process))
+	if (adbg_debugger_stepi(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(&process, &shell_event_exception))
+	if (adbg_debugger_wait(process, &shell_event_exception))
 		return ShellError.alicedbg;
 	return 0;
 }
 
 int command_regs(int argc, const(char) **argv) {
 	adbg_registers_t regs = void;
-	adbg_registers(&regs, &process);
+	adbg_registers(&regs, process);
 	
 	if (regs.count == 0) {
 		serror("No registers available");
@@ -821,7 +824,7 @@ int command_memory(int argc, const(char) **argv) {
 	if (data == null)
 		return ShellError.crt;
 	
-	if (adbg_memory_read(&process, cast(size_t)uaddress, data, ulength))
+	if (adbg_memory_read(process, cast(size_t)uaddress, data, ulength))
 		return ShellError.alicedbg;
 	
 	// Print column header
@@ -851,7 +854,7 @@ int command_maps(int argc, const(char) **argv) {
 	adbg_memory_map_t *mmaps = void;
 	size_t mcount = void;
 	
-	if (adbg_memory_maps(&process, &mmaps, &mcount, 0))
+	if (adbg_memory_maps(process, &mmaps, &mcount, 0))
 		return ShellError.alicedbg;
 	
 	puts("Region           Size       T Perm File");
@@ -934,7 +937,7 @@ void shell_event_list_scan_results() {
 	for (uint i = 1; i < count; ++i, ++result) {
 		printf("%4u. %-16llx  %*llu  ", i, result.address, -20, result.value_u64 & mask);
 		ulong udata = void;
-		if (adbg_memory_read(&process, cast(size_t)result.address, &udata, cast(uint)last_scan_size))
+		if (adbg_memory_read(process, cast(size_t)result.address, &udata, cast(uint)last_scan_size))
 			puts("???");
 		else
 			printf("%llu\n", udata & mask);
@@ -1000,7 +1003,7 @@ int command_scan(int argc, const(char) **argv) {
 	
 	last_scan_data = user.data64;
 	
-	if ((last_scan = adbg_memory_scan(&process, &user, last_scan_size,
+	if ((last_scan = adbg_memory_scan(process, &user, last_scan_size,
 		AdbgScanOpt.capacity, 100,
 		0)) == null)
 		return ShellError.alicedbg;
@@ -1057,7 +1060,7 @@ int command_rescan(int argc, const(char) **argv) {
 
 int command_plist(int argc, const(char) **argv) {
 	// Disabled until adbg_process_get_name works on Windows
-version (none) {
+version (UseNewProcessName) {
 	size_t count = void;
 	int *plist = adbg_process_list(&count, 0);
 	if (plist == null)
@@ -1072,11 +1075,11 @@ version (none) {
 	puts("PID         Name");
 	foreach (int pid; plist[0..count]) {
 		printf("%10d  ", pid);
-		if (adbg_process_get_name(pid, buffer.ptr, BUFFERSIZE, false)) {
+		if (adbg_process_get_name(pid, buffer.ptr, BUFFERSIZE, true)) {
 			puts(buffer.ptr);
 			continue;
 		}
-		if (adbg_process_get_name(pid, buffer.ptr, BUFFERSIZE, true)) {
+		if (adbg_process_get_name(pid, buffer.ptr, BUFFERSIZE, false)) {
 			puts(buffer.ptr);
 			continue;
 		}
