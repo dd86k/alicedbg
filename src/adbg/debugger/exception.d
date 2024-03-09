@@ -46,7 +46,7 @@ enum AdbgException {
 	Fault,	/// An access violations or segmentation fault occured.
 	BoundExceeded,	/// Array bounds exceeded.
 	Misalignment,	/// Data type misaligned.
-	Illegal,	/// Illegal opcode.
+	IllegalInstruction,	/// Illegal opcode.
 	ZeroDivision,	/// Integer divide by zero.
 	DivZero = ZeroDivision,	/// Old alias for ZeroDivision.
 	PageError,	/// In-page error. (Windows: Disk demand-page failed)
@@ -108,7 +108,7 @@ struct adbg_exception_t {
 /// Windows: `DEBUG_INFO.Exception.ExceptionRecord.ExceptionCode` and
 /// `cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]` in certain
 /// cases.
-/// Posix: Signal number (`si_signo`) and its code `si_code` in certain cases.
+/// Posix: Signal number (`si_signo`) and its code (`si_code`) in certain cases.
 ///
 /// Params:
 /// 	code = OS code.
@@ -125,39 +125,19 @@ version (Windows) {
 	// Instruction breakpoint
 	case STATUS_BREAKPOINT, STATUS_WX86_BREAKPOINT:
 		return Breakpoint;
-	case STATUS_ILLEGAL_INSTRUCTION:	return Illegal;
+	case STATUS_ILLEGAL_INSTRUCTION:
+		return IllegalInstruction;
 	// Memory access violation
-	case STATUS_ACCESS_VIOLATION:
-		// no similar sigcode for sub-operation
-		/*switch (subcode) {
-		case 0: // Read access error
-			return Fault;
-		case 1: // Write access error
-			return Fault;
-		case 8: // DEP violation
-			return Fault;
-		default: return Unknown;
-		}*/
+	case STATUS_ACCESS_VIOLATION: // no similar sigcode for sub-operation
 		return Fault;
 	// Specifically to swap
-	case STATUS_IN_PAGE_ERROR:
-		// no similar sigcode for sub-operation
-		/*switch (subcode) {
-		case 0: // Read access error
-			return PageError;
-		case 1: // Write access error
-			return PageError;
-		case 8: // DEP violation
-			return PageError;
-		default: return PageError;
-		}*/
+	case STATUS_IN_PAGE_ERROR: // no similar sigcode for sub-operation
 		return PageError;
 	case STATUS_ARRAY_BOUNDS_EXCEEDED:	return BoundExceeded;
 	case STATUS_DATATYPE_MISALIGNMENT:	return Misalignment;
 	// Arithmetic
 	case EXCEPTION_INT_DIVIDE_BY_ZERO:	return ZeroDivision;
 	case EXCEPTION_INT_OVERFLOW:	return IntOverflow;
-	case STATUS_INVALID_DISPOSITION:	return Disposition;
 	case EXCEPTION_PRIV_INSTRUCTION:	return PrivilegedOpcode;
 	// Stack
 	case STATUS_STACK_OVERFLOW, STATUS_STACK_BUFFER_OVERRUN:
@@ -171,24 +151,14 @@ version (Windows) {
 	case EXCEPTION_FLT_STACK_CHECK:	return FPUStackOverflow;
 	case EXCEPTION_FLT_UNDERFLOW:	return FPUUnderflow;
 	// Misc
+	case STATUS_INVALID_DISPOSITION:	return Disposition;
 	case STATUS_NONCONTINUABLE_EXCEPTION:	return NoContinue;
 	default:
 	}
 } else {
 	switch (code) with (AdbgException) {
 	case SIGILL:
-		/*
-		switch (subcode) {
-		case ILL_ILLOPC: opcode
-		case ILL_ILLOPN: operand
-		case ILL_ILLADR: address mode
-		case ILL_ILLTRP: trap
-		case ILL_PRVOPC: priv code
-		case ILL_PRVREG: priv register
-		case ILL_COPROC: co-processor error
-		case ILL_BADSTK: internal stack error.
-		}*/
-		return Illegal;
+		return IllegalInstruction;
 	case SIGFPE:
 		switch (subcode) {
 		case FPE_INTDIV: return ZeroDivision;
@@ -203,32 +173,17 @@ version (Windows) {
 		}
 	case SIGSEGV:
 		switch (subcode) {
-		case SEGV_MAPERR: return Fault;
-		case SEGV_ACCERR: return Fault;
 		case SEGV_BNDERR: return BoundExceeded;
-		//case SEGV_PKUERR: return 
-		default: return Fault;
+		default:
 		}
+		return Fault;
 	case SIGBUS:
 		switch (subcode) {
 		case BUS_ADRALN: return Misalignment;
-		case BUS_ADRERR: return Unknown;
-		case BUS_OBJERR: return Unknown;
-		//case BUS_MCEERR_AR:
-		//case BUS_MCEERR_AO:
 		default:
 		}
 		break;
 	case SIGTRAP:
-		/*switch (subcode) {
-		case TRAP_BRKPT: return Breakpoint;
-		case TRAP_TRACE:
-		case TRAP_DTRACE:
-		case TRAP_RWATCH:
-		case TRAP_WWATCH:
-		case TRAP_XWATCH:
-		default: return Breakpoint;
-		}*/
 		return Breakpoint;
 	case SIGCHLD:
 		switch (subcode) {
@@ -241,20 +196,8 @@ version (Windows) {
 		default:
 		}
 		break;
-	case /*SIGIO, */SIGPOLL:
-		switch (subcode) {
-		case POLL_IN: return Unknown;
-		case POLL_OUT: return Unknown;
-		case POLL_MSG: return Unknown;
-		case POLL_ERR: return Unknown;
-		case POLL_PRI: return Unknown;
-		case POLL_HUP: return Unknown;
-		default:
-		}
-		break;
 	// Because Windows' DebugBreak uses a regular breakpoint (int3)
 	case SIGSTOP: return Breakpoint;
-	case SIGSYS: return Unknown;	// SYS_SECCOMP
 	case SIGKILL: return Exit;
 	default:
 	}
@@ -278,7 +221,7 @@ const(char) *adbg_exception_name(adbg_exception_t *ex) {
 	case Fault:	return "ACCESS VIOLATION";
 	case BoundExceeded:	return "INDEX OUT OF BOUNDS";
 	case Misalignment:	return "DATA MISALIGNMENT";
-	case Illegal:	return "ILLEGAL INSTRUCTION";
+	case IllegalInstruction:	return "ILLEGAL INSTRUCTION";
 	case DivZero:	return "ZERO DIVISION";
 	case PageError:	return "PAGE ERROR";
 	case IntOverflow:	return "INTEGER OVERFLOW";
