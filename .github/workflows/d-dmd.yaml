@@ -19,4 +19,4 @@ jobs:
     - name: 'Trace'
       run: dub build --compiler=dmd -b trace
     - name: 'Example'
-      run: dub build --compiler=dmd :example-simple
+      run: dub build --compiler=dmd :simple
