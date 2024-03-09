@@ -463,7 +463,7 @@ L_OPTION:
 		return null;
 	}
 	
-	version (Trace) trace("pid=%d stop=%d exitkill=%d", pid, stop, exitkill);
+	version (Trace) trace("pid=%d options=%#x", pid, options);
 	
 	adbg_process_t *proc = cast(adbg_process_t*)malloc(adbg_process_t.sizeof);
 	if (proc == null) {
@@ -847,7 +847,7 @@ int adbg_process_get_pid(adbg_process_t *tracee) {
 /// Returns: String length; Or zero on error.
 size_t adbg_process_get_name(int pid, char *buffer, size_t bufsize, bool absolute) {
 	version (Trace)
-		trace("pid=%d buffer=%p bufsize=%zd base=%d", pid, buffer, bufsize, base);
+		trace("pid=%d buffer=%p bufsize=%zd base=%d", pid, buffer, bufsize, absolute);
 	
 	if (pid <= 0 || buffer == null || bufsize == 0) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -959,20 +959,8 @@ version (Windows) {
 		++last; // We're looking past '/'
 		
 		// Write into buffer
-		for (r = 0; last[r]; ++r) {
+		for (r = 0; last[r]; ++r)
 			buffer[r] = last[r];
-		}
-		
-		/*ptrdiff_t i = r;
-		while (--i >= 0) {
-			if (buffer[i] == '/') break;
-		}
-		if (i < 0) // Nothing to do
-			return 0;
-		size_t s = i + 1; // Start of substring
-		size_t l = r - s; // Length
-		for (size_t e; e < l; ++e, ++s)
-			buffer[e] = buffer[s];*/
 	} 
 	//TODO: Name is not absolute, search in PATH
 	/* else if (absolute && buffer[0] != '/') {
