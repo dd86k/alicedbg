@@ -10,6 +10,9 @@ import adbg.include.c.stdio;  // snprintf;
 import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.debugger.exception;
+import adbg.debugger.thread;
+import adbg.debugger.process;
+import adbg.object.machines;
 
 version (Windows) {
 	import adbg.include.windows.windef;
@@ -45,9 +48,22 @@ version (Windows) {
 	private enum NO_SIGACTION = cast(sigaction_t*)0;
 }
 
-//TODO: Probably required to set error mode for all threads (Windows)
-
 extern (C):
+
+adbg_process_t* adbg_self_process() {
+	__gshared adbg_process_t proc;
+	proc.creation = AdbgCreation.unloaded;
+	proc.status = AdbgProcStatus.running;
+version (Windows) {
+	proc.hpid = GetCurrentProcess();
+	proc.htid = GetCurrentThread();
+	proc.pid = GetCurrentProcessId();
+	proc.tid = GetCurrentThreadId();
+} else version (Posix) {
+	proc.pid = getpid();
+}
+	return &proc;
+}
 
 /// Insert a tracee break.
 void adbg_self_break() {
@@ -108,10 +124,25 @@ version (Windows) {
 	static assert(0, "Implement me");
 }
 
+/// Get the current machine architecture process is running in.
+/// Returns: Current machine.
+AdbgMachine adbg_self_machine() {
+version (X86)
+	return AdbgMachine.x86;
+else version (X86_64)
+	return AdbgMachine.amd64;
+else version (Arm)
+	return AdbgMachine.arm;
+else version (AArch64)
+	return AdbgMachine.aarch64;
+else
+	static assert(false, "adbg_self_machine");
+}
+
 /// Set a custom crash handler.
 /// Params: func = User handler function.
 /// Returns: Zero on success; Non-zero on error.
-int adbg_self_set_crashhandler(int function(adbg_exception_t*) func) {
+int adbg_self_set_crashhandler(void function(adbg_exception_t*) func) {
 	if (func == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
@@ -135,40 +166,33 @@ version (Windows) {
 }
 	
 	__ufunction = func;
-	
 	return 0;
 }
 
 private:
 
-__gshared int function(adbg_exception_t*) __ufunction;
+__gshared void function(adbg_exception_t*) __ufunction;
 
 version (Windows)
 extern (Windows)
 uint adbg_internal_handler(_EXCEPTION_POINTERS *e) {
+	// Setup exception info
 	adbg_exception_t ex = void;
-	
 	ex.oscode = e.ExceptionRecord.ExceptionCode;
 	ex.faultz = cast(size_t)e.ExceptionRecord.ExceptionAddress;
 	ex.pid = GetCurrentProcessId();
 	ex.tid = GetCurrentThreadId();
-	
-	switch (ex.oscode) {
+	with (e.ExceptionRecord) switch (ex.oscode) {
 	case EXCEPTION_IN_PAGE_ERROR:
 	case EXCEPTION_ACCESS_VIOLATION:
-		ex.type = adbg_exception_from_os(
-			e.ExceptionRecord.ExceptionCode,
-			cast(uint)e.ExceptionRecord.ExceptionInformation[0]);
+		ex.type = adbg_exception_from_os(ExceptionCode, cast(uint)ExceptionInformation[0]);
 		break;
 	default:
-		ex.type = adbg_exception_from_os(
-			e.ExceptionRecord.ExceptionCode);
+		ex.type = adbg_exception_from_os(ExceptionCode);
 	}
 	
+	// Call user function
 	__ufunction(&ex);
-	
-//	adbg_ctx_init(&mcheckpoint.exception.registers);
-//	adbg_ctx_os(&mcheckpoint.exception.registers, cast(CONTEXT*)e.ContextRecord);
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -178,13 +202,12 @@ void adbg_internal_handler(int sig, siginfo_t *si, void *p) {
 	ucontext_t *uctx = cast(ucontext_t*)p;
 	mcontext_t *mctx = &uctx.uc_mcontext;
 
+	// Setup exception info
 	adbg_exception_t ex = void;
 	ex.oscode = sig;
 	ex.type = adbg_exception_from_os(si.si_signo, si.si_code);
 	ex.pid = getpid();
-	//TODO: gettid() definition
-	//ex.tid = gettid();
-	
+	ex.tid = 0; // NOTE: gettid(2) is only available on Linux
 	switch (sig) {
 	case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 		ex.fault_address = cast(size_t)si._sifields._sigfault.si_addr;
@@ -192,6 +215,10 @@ void adbg_internal_handler(int sig, siginfo_t *si, void *p) {
 	default:
 		ex.fault_address = 0;
 	}
+	
+	// Setup register info
+	adbg_registers_t regs = void;
+	adbg_register_list_init(&regs, adbg_self_machine());
 	
 	__ufunction(&ex);
 	

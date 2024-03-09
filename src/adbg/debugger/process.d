@@ -81,6 +81,7 @@ struct adbg_debugger_event_t {
 	}
 }+/
 
+//TODO: Rename to AdbgDebuggerRelation
 /// Process creation source.
 enum AdbgCreation : ubyte {
 	unloaded,
@@ -108,6 +109,7 @@ struct adbg_process_t {
 	AdbgProcStatus status;
 	/// Process' creation source.
 	AdbgCreation creation;
+	//TODO: Deprecate and remove static buffer in process struct
 	/// Process base module name.
 	char[ADBG_PROCESS_NAME_LENGTH] name;
 }
@@ -256,7 +258,9 @@ version (Windows) {
 	memset(&pi, 0, pi.sizeof);
 	si.cb = STARTUPINFOA.sizeof;
 	
-	DWORD flags = options & OPT_DEBUG_ALL ? DEBUG_PROCESS : DEBUG_ONLY_THIS_PROCESS;
+	DWORD flags = options & OPT_DEBUG_ALL ? DEBUG_PROCESS : DEBUG_PROCESS | DEBUG_ONLY_THIS_PROCESS;
+	
+	flags |= CREATE_DEFAULT_ERROR_MODE;
 	
 	if (CreateProcessA(
 		path,	// lpApplicationName
@@ -287,6 +291,7 @@ version (Windows) {
 	//      with GetProcAddress("kernel32", "IsWow64Process2")
 	//      Introduced in Windows 10, version 1511
 	//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
+	// NOTE: Could be moved to adbg_process_get_machine
 	version (Win64) {
 		if (IsWow64Process(proc.hpid, &proc.wow64) == FALSE) {
 			free(proc);

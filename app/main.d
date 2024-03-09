@@ -8,6 +8,11 @@ module main;
 import adbg.platform;
 import adbg.include.c.stdlib : exit;
 import adbg.include.d.config : GDC_VERSION, GDC_EXCEPTION_MODE, LLVM_VERSION;
+import adbg.debugger.exception : adbg_exception_t, adbg_exception_name;
+import adbg.self;
+import adbg.disassembler;
+import adbg.error;
+import adbg.debugger.process;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.string : strcmp;
 import core.stdc.stdio;
@@ -426,11 +431,11 @@ int cli_license() {
 int cli_meow() {
 	puts(
 `
-+------------------------+
-| I love PowerISA, meow! |
-+---  -------------------+
++-------------------+
+| I hate x86, meow. |
++---  --------------+
     \|  A_A
-       (*.*)
+       (-.-)
        /   \    _
       /     \__/
       \_||__/
@@ -447,10 +452,59 @@ int cli_meow() {
 //TODO: Support --option=value syntax
 //TODO: Support stdin (-) for -A, -D
 
+void crash_handler(adbg_exception_t *ex) {
+	scope(exit) exit(ex.oscode);
+	
+	adbg_process_t *self = adbg_self_process();
+	
+	puts(
+r"
+   _ _ _   _ _ _       _ _       _ _ _   _     _   _
+ _|_|_|_| |_|_|_|_   _|_|_|_   _|_|_|_| |_|   |_| |_|
+|_|       |_|_ _|_| |_|_ _|_| |_|_ _    |_|_ _|_| |_|
+|_|       |_|_|_|_  |_|_|_|_|   |_|_|_  |_|_|_|_| |_|
+|_|_ _ _  |_|   |_| |_|   |_|  _ _ _|_| |_|   |_|  _
+  |_|_|_| |_|   |_| |_|   |_| |_|_|_|   |_|   |_| |_|
+"
+	);
+	
+	printf(
+	"Exception  : %s\n"~
+	"PID        : %d\n",
+	adbg_exception_name(ex), cast(int)self.pid); // casting is temp
+	
+	// Fault address & disasm if available
+	if (ex.faultz) {
+		printf("Address    : %#zx\n", ex.faultz);
+		
+		adbg_opcode_t op = void;
+		adbg_disassembler_t *dis = adbg_dis_open(adbg_self_machine());
+		if (dis && adbg_dis_process_once(dis, &op, self, ex.fault_address) == 0) {
+			// Print address
+			printf("Instruction:");
+			// Print machine bytes
+			for (size_t bi; bi < op.size; ++bi)
+				printf(" %02x", op.machine[bi]);
+			// 
+			printf(" (%s", op.mnemonic);
+			if (op.operands)
+				printf(" %s", op.operands);
+			// 
+			puts(")");
+		} else {
+			printf(" Unavailable (%s)\n", adbg_error_msg());
+		}
+	}
+}
+
 int main(int argc, const(char)** argv) {
+	// Ignore on error
+	adbg_self_set_crashhandler(&crash_handler);
+	
+	*cast(int*)0 = 1;
+	
 	const(char) *arg = void;
 	const(char) *val = void;
-	
 	CLI: for (int argi = 1; argi < argc; ++argi) {
 		arg = argv[argi];
 		

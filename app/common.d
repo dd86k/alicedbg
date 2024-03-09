@@ -20,21 +20,6 @@ import core.stdc.stdlib : malloc;
 public:
 extern (C):
 
-/// Application error
-enum AppError {
-	none,
-	invalidParameter	= 1,
-	invalidCommand	= 2, // or action or sub-command
-	unavailable	= 3,
-	loadFailed	= 4,
-	pauseRequired	= 5,
-	alreadyLoaded	= 6,
-	missingOption	= 7,
-	unformat	= 8,
-	crt	= 9,
-	alicedbg	= 10,
-}
-
 // Platforms
 
 // temporary

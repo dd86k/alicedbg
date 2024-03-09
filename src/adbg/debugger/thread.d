@@ -7,8 +7,10 @@ module adbg.debugger.thread;
 
 import adbg.debugger.process : adbg_process_t;
 import adbg.include.c.stdio : snprintf;
-import core.stdc.string : memset;
+import adbg.include.c.stdlib;
+import core.stdc.string : memset, strncmp;
 import adbg.error;
+import adbg.object.machines;
 
 //TODO: Register registers statically
 //      adbg_register_t { string name; int type; etc. }
@@ -40,12 +42,15 @@ version (X86) {
 
 extern (C):
 
+//TODO: Rename to AdbgRegType
+//TODO: Support f80 (x87)
 /// Register size
 enum AdbgRegisterSize : ubyte {
 	u8, u16, u32, u64,
 	f32, f64
 }
 
+//TODO: Rename to AdbgRegFormat
 enum {
 	FORMAT_DEC,
 	FORMAT_HEX,
@@ -55,6 +60,7 @@ enum {
 /// Register structure, designs a single register for UI ends to understand
 struct adbg_register_t {
 	const(char) *name;	/// Register name
+	AdbgRegisterSize type;	/// Register type (size)
 	union {
 		ulong  u64;	/// Register data: ulong (u64)
 		uint   u32;	/// Register data: uint (u32)
@@ -63,7 +69,6 @@ struct adbg_register_t {
 		double f64;	/// Register data: double (f64)
 		float  f32;	/// Register data: float (f32)
 	}
-	AdbgRegisterSize type;	/// Register type (size)
 }
 
 /// Represents a thread context structure with the register values once a
@@ -75,14 +80,41 @@ struct adbg_registers_t {
 	adbg_register_t[REG_COUNT] items;
 }
 
-void adbg_registers(adbg_registers_t *ctx, adbg_process_t *tracee) {
-	adbg_register_init(ctx, tracee);
-	adbg_register_fill(tracee, ctx);
+adbg_registers_t* adbg_registers_new(AdbgMachine mach) {
+	adbg_registers_t* regs = cast(adbg_registers_t*)malloc(adbg_registers_t.sizeof);
+	if (regs == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	if (adbg_registers_config(regs, mach)) {
+		free(regs);
+		return null;
+	}
+	return regs;
 }
 
+int adbg_registers_config(adbg_registers_t *ctx, AdbgMachine mach) {
+	if (ctx == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	switch (mach) with (AdbgMachine) {
+	case x86:
+		adbg_context_start_x86(ctx);
+		break;
+	case amd64:
+		adbg_context_start_x86_64(ctx);
+		break;
+	default:
+		return adbg_oops(AdbgError.objectInvalidMachine);
+	}
+	
+	return 0;
+}
+
+//TODO: Deprecate this in favor of adbg_register_list_init due to lack of flexibility
 /// Initiate register fields with their names and sizes.
 /// This is usually done by the debugger itself.
-void adbg_register_init(adbg_registers_t *ctx, adbg_process_t *tracee) {
+void adbg_registers_init(adbg_registers_t *ctx, adbg_process_t *tracee) {
 	version (Trace) trace("tracee=%p ctx=%p", ctx, tracee);
 	if (tracee == null || ctx == null)
 		return;
@@ -101,7 +133,8 @@ void adbg_register_init(adbg_registers_t *ctx, adbg_process_t *tracee) {
 		ctx.count = 0;
 }
 
-int adbg_register_fill(adbg_process_t *tracee, adbg_registers_t *ctx) {
+//TODO: Thread type, to hold its context
+int adbg_registers_fill(adbg_registers_t *ctx, adbg_process_t *tracee) {
 	import adbg.debugger.process : AdbgCreation;
 	
 	version (Trace) trace("tracee=%p ctx=%p", ctx, tracee);
@@ -155,7 +188,6 @@ int adbg_register_fill(adbg_process_t *tracee, adbg_registers_t *ctx) {
 	return 0;
 }
 
-//TODO: Could be multiple functions (_format, _format_hex, _format_hex0)
 /// Format a register's value into a string buffer.
 /// Errors: invalidOption for format.
 /// Params:
@@ -201,6 +233,16 @@ size_t adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, int 
 	}
 	
 	return snprintf(buffer, len, sformat, reg.u64);
+}
+unittest {
+	adbg_register_t reg;
+	reg.name = "TEST";
+	reg.type = AdbgRegisterSize.u16;
+	reg.u16  = 0x1234;
+	
+	char[16] buffer = void;
+	assert(adbg_register_format(buffer.ptr, 16, &reg, FORMAT_HEXPADDED) == 4);
+	assert(strncmp(buffer.ptr, "1234", 16) == 0);
 }
 
 private:

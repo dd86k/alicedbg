@@ -31,6 +31,7 @@ enum ShellError {
 	missingOption	= -7,
 	unformat	= -8,
 	invalidCount	= -9,
+	unattached	= -10,
 	
 	scanMissingType	= -20,
 	scanMissingValue	= -21,
@@ -64,6 +65,8 @@ const(char) *errorstring(ShellError code) {
 		return "Input is not a number.";
 	case invalidCount:
 		return "Count must be 1 or higher.";
+	case unattached:
+		return "Need to be attached to a process for this feature.";
 	
 	case scanMissingType:
 		return "Missing type parameter.";
@@ -165,6 +168,7 @@ __gshared:
 
 adbg_process_t *process;
 adbg_disassembler_t *dis;
+adbg_registers_t *registers;
 
 void function(const(char)* sev, const(char)* msg) userlog;
 
@@ -515,14 +519,15 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 		
 		// Print machine bytes
 		for (size_t bi; bi < op.size; ++bi) {
-			printf("%02x ", op.machine[bi]);
+			printf(" %02x", op.machine[bi]);
 		}
 		
 		// Print mnemonic & operands
-		printf("%s", op.mnemonic);
+		printf("\t%s", op.mnemonic);
 		if (op.operands)
 			printf(" %s", op.operands);
 		
+		// Terminate line
 		putchar('\n');
 		
 		address += op.size;
@@ -764,18 +769,26 @@ int command_stepi(int argc, const(char) **argv) {
 }
 
 int command_regs(int argc, const(char) **argv) {
-	adbg_registers_t regs = void;
-	adbg_registers(&regs, process);
+	if (process == null)
+		return ShellError.pauseRequired;
 	
-	if (regs.count == 0) {
+	if (registers == null) {
+		registers = adbg_registers_new(adbg_process_get_machine(process));
+		if (registers == null)
+			return ShellError.alicedbg;
+	}
+	
+	adbg_registers_fill(registers, process);
+	
+	if (registers.count == 0) {
 		serror("No registers available");
 		return ShellError.unavailable;
 	}
 	
-	adbg_register_t *reg = regs.items.ptr;
+	adbg_register_t *reg = registers.items.ptr;
 	const(char) *rselect = argc >= 2 ? argv[1] : null;
 	bool found;
-	for (size_t i; i < regs.count; ++i, ++reg) {
+	for (size_t i; i < registers.count; ++i, ++reg) {
 		bool show = rselect == null || strcmp(rselect, reg.name) == 0;
 		if (show == false) continue;
 		char[20] normal = void, hexdec = void;
@@ -873,6 +886,8 @@ int command_maps(int argc, const(char) **argv) {
 
 //TODO: start,+length start,end syntax
 int command_disassemble(int argc, const(char) **argv) {
+	if (process == null)
+		return ShellError.unattached;
 	if (dis == null)
 		return ShellError.unavailable;
 	if (argc < 2)
@@ -1051,7 +1066,7 @@ version (UseNewProcessName) {
 	size_t count = void;
 	int *plist = adbg_process_list(&count, 0);
 	if (plist == null)
-		return AppError.alicedbg;
+		return ShellError.alicedbg;
 	
 	enum BUFFERSIZE = 2048;
 	char[BUFFERSIZE] buffer = void;
@@ -1079,7 +1094,7 @@ version (UseNewProcessName) {
 } else {
 	adbg_process_list_t list = void;
 	if (adbg_process_enumerate(&list, 0)) {
-		return AppError.alicedbg;
+		return ShellError.alicedbg;
 	}
 	
 	puts("PID         Name");
