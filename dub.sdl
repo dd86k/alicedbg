@@ -29,7 +29,6 @@ license "BSD-3-Clause"
 #       Yes, it works with -fno-druntime, so it can be possible to add
 #       -gdc-betterc build types in the future.
 
-#TODO: Consider renaming version Trace to AdbgTrace to avoid library conflicts
 #TODO: Make docs/ddox builds only peek in src/ and not in app/
 
 #
@@ -55,7 +54,7 @@ configuration "library" {
 # output will be cryptid.
 # Only to be used with small reproductible bugs.
 buildType "trace" {
-	versions "Trace"
+	versions "Trace" "AdbgTrace"
 	buildOptions "debugMode" "debugInfo"
 	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
 	dflags "-betterC" "--vgc" platform="ldc"
@@ -150,19 +149,19 @@ buildType "readln" {
 #
 
 subPackage {
-	name "example-simple-v1"
+	name "simple-legacy"
 	targetType "executable"
-	targetName "simple-v1"
+	targetName "simple-legacy"
 	sourcePaths "src"
 	importPaths "src"
-	mainSourceFile "examples/simple-v1.d"
+	mainSourceFile "examples/simple-legacy.d"
 	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
 	dflags "-betterC" "--vgc" platform="ldc"
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
 
 subPackage {
-	name "example-simple"
+	name "simple"
 	targetType "executable"
 	targetName "simple"
 	sourcePaths "src"
