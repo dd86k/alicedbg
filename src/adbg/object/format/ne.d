@@ -87,24 +87,25 @@ enum : ubyte {
 	NE_RFLAG_ADDITIVE = 0x4
 }
 
+// NOTE: Names from winnt.h:_IMAGE_OS2_HEADER
 /// NE header
-struct ne_header { // NOTE: No struct definition so names are made up
+struct ne_header {
 	/// Signature word.
-	ushort Magic;
+	ushort ne_magic;
 	/// Version number of the linker.
-	ubyte LinkerVersion;
+	ubyte ne_ver;
 	/// Revision number of the linker.
-	ubyte LinkerRevision;
+	ubyte ne_rev;
 	/// Entry Table file offset, relative to the beginning of
 	/// the segmented EXE header.
-	ushort EntryTableOffset;
+	ushort ne_enttab;
 	/// Number of bytes in the entry table.
-	ushort EntryTableSize;
+	ushort ne_cbenttab;
 	/// 32-bit CRC of entire contents of file.
 	/// These words are taken as zero during the calculation.
-	uint Checksum;
+	uint ne_crc;
 	/// Flag word.
-	ushort Flags;
+	ushort ne_flags;
 	/// Segment number of automatic data segment.
 	///
 	/// This value is set to zero if SINGLEDATA and
@@ -114,17 +115,17 @@ struct ne_header { // NOTE: No struct definition so names are made up
 	/// A Segment number is an index into the module's segment
 	/// table. The first entry in the segment table is segment
 	/// number 1.
-	ushort Segment;
+	ushort ne_autodata;
 	/// Initial size, in bytes, of dynamic heap added to the
 	/// data segment. This value is zero if no initial local
 	/// heap is allocated.
-	ushort HeapSize;
+	ushort ne_heap;
 	/// Initial size, in bytes, of stack added to the data
 	/// segment. This value is zero to indicate no initial
 	/// stack allocation, or when SS is not equal to DS.
-	ushort StackSize;
+	ushort ne_stack;
 	/// Segment number:offset of CS:IP.
-	uint CSIP;
+	uint ne_csip;
 	/// Segment number:offset of SS:SP.
 	///
 	/// If SS equals the automatic data segment and SP equals
@@ -139,42 +140,54 @@ struct ne_header { // NOTE: No struct definition so names are made up
 	// +--------------------------+
 	// | loaded auto data segment |
 	// +--------------------------+ <- DS, SS
-	uint SSSP;
+	uint ne_sssp;
 	/// Number of entries in the Segment Table.
-	ushort SegmentCount;
+	ushort ne_cseg;
 	/// Number of entries in the Module Reference Table.
-	ushort ModuleCount;
+	ushort ne_cmod;
 	/// Number of bytes in the Non-Resident Name Table.
-	ushort NonResidentSize;
+	ushort ne_cbnrestab;
 	/// Segment Table file offset, relative to the beginning
 	/// of the segmented EXE header.
-	ushort SegmentOffset;
+	ushort ne_segtab;
 	/// Resource Table file offset, relative to the beginning
 	/// of the segmented EXE header.
-	ushort ResourceOffset;
+	ushort ne_rsrctab;
 	/// Resident Name Table file offset, relative to the
 	/// beginning of the segmented EXE header.
-	ushort ResidentOffset;
+	ushort ne_restab;
 	/// Module Reference Table file offset, relative to the
 	/// beginning of the segmented EXE header.
-	ushort ModuleOffset;
+	ushort ne_modtab;
 	/// Imported Names Table file offset, relative to the
 	/// beginning of the segmented EXE header.
-	ushort ImportedOffset;
+	ushort ne_imptab;
 	/// Non-Resident Name Table offset, relative to the
 	/// beginning of the file.
-	uint NonResidentOffset;
+	uint ne_nrestab;
 	/// Number of movable entries in the Entry Table.
-	ushort Movable;
+	ushort ne_cmovent;
 	/// Logical sector alignment shift count, log(base 2) of
 	/// the segment sector size (default 9).
-	ushort SectorAlign;
+	ushort ne_align;
 	/// Number of resource entries.
-	ushort ResourceCount;
+	ushort ne_cres;
 	/// Executable type, used by loader.
-	ubyte Type;
-	/// Reserved, currently 0's.
-	ubyte[8] Reserved;
+	ubyte ne_exetyp;
+	
+	// NOTE: The old document stopped here with ubyte[8] reserved.
+	//       winnt.h continue with these
+	
+	/// Other .EXE flags
+	ubyte ne_flagsothers;
+	/// Offset to retturn thunks
+	ushort ne_pretthunks;
+	/// Offset to segment ref. bytes
+	ushort ne_psegrefbytes;
+	/// Minimum code swap area size
+	ushort ne_swaparea;
+	/// Expected Windows version number
+	ushort ne_expver;
 }
 
 /// NE segment, after header
@@ -271,26 +284,31 @@ int adbg_object_ne_load(adbg_object_t *o) {
 	
 	with (o.i.ne.header)
 	if (o.p.reversed) {
-		EntryTableOffset	= adbg_bswap16(EntryTableOffset);
-		EntryTableSize	= adbg_bswap16(EntryTableSize);
-		Flags	= adbg_bswap16(Flags);
-		Segment	= adbg_bswap16(Segment);
-		HeapSize	= adbg_bswap16(HeapSize);
-		StackSize	= adbg_bswap16(StackSize);
-		CSIP	= adbg_bswap32(CSIP);
-		SSSP	= adbg_bswap32(SSSP);
-		SegmentCount	= adbg_bswap16(SegmentCount);
-		ModuleCount	= adbg_bswap16(ModuleCount);
-		NonResidentSize	= adbg_bswap16(NonResidentSize);
-		SegmentOffset	= adbg_bswap16(SegmentOffset);
-		ResourceOffset	= adbg_bswap16(ResourceOffset);
-		ResidentOffset	= adbg_bswap16(ResidentOffset);
-		ModuleOffset	= adbg_bswap16(ModuleOffset);
-		ImportedOffset	= adbg_bswap16(ImportedOffset);
-		NonResidentOffset	= adbg_bswap32(NonResidentOffset);
-		Movable	= adbg_bswap16(Movable);
-		SectorAlign	= adbg_bswap16(SectorAlign);
-		ResourceCount	= adbg_bswap16(ResourceCount);
+		ne_enttab	= adbg_bswap16(ne_enttab);
+		ne_cbenttab	= adbg_bswap16(ne_cbenttab);
+		ne_crc	= adbg_bswap32(ne_crc);
+		ne_flags	= adbg_bswap16(ne_flags);
+		ne_autodata	= adbg_bswap16(ne_autodata);
+		ne_heap	= adbg_bswap16(ne_heap);
+		ne_stack	= adbg_bswap16(ne_stack);
+		ne_csip	= adbg_bswap32(ne_csip);
+		ne_sssp	= adbg_bswap32(ne_sssp);
+		ne_cseg	= adbg_bswap16(ne_cseg);
+		ne_cmod	= adbg_bswap16(ne_cmod);
+		ne_cbnrestab	= adbg_bswap16(ne_cbnrestab);
+		ne_segtab	= adbg_bswap16(ne_segtab);
+		ne_rsrctab	= adbg_bswap16(ne_rsrctab);
+		ne_restab	= adbg_bswap16(ne_restab);
+		ne_modtab	= adbg_bswap16(ne_modtab);
+		ne_imptab	= adbg_bswap16(ne_imptab);
+		ne_nrestab	= adbg_bswap32(ne_nrestab);
+		ne_cmovent	= adbg_bswap16(ne_cmovent);
+		ne_align	= adbg_bswap16(ne_align);
+		ne_cres	= adbg_bswap16(ne_cres);
+		ne_pretthunks	= adbg_bswap16(ne_pretthunks);
+		ne_psegrefbytes	= adbg_bswap16(ne_psegrefbytes);
+		ne_swaparea	= adbg_bswap16(ne_swaparea);
+		ne_expver	= adbg_bswap16(ne_expver);
 	}
 	
 	return 0;
