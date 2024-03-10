@@ -71,6 +71,8 @@ enum : uint {
 }
 
 private enum E32RESBYTES3 = 196 - 176; // lx_header.sizeof
+
+// winnt.h:_IMAGE_VXD_HEADER
 /// LX/LE header
 struct lx_header { // NOTE: Names are taken from spec except for its "e32_exe" name
 	/// Header magic. "LX" or "LE"
@@ -183,6 +185,14 @@ struct lx_header { // NOTE: Names are taken from spec except for its "e32_exe" n
 	uint instdemand;
 	/// Heap size added to the Auto DS Object.
 	uint heapsize;
+	
+	// NOTE: winnt.h defines
+	//       - BYTE   e32_res3[12];
+	//       - DWORD  e32_winresoff;
+	//       - DWORD  e32_winreslen;
+	//       - WORD   e32_devid;
+	//       - WORD   e32_ddkver;
+	
 	/// Size of requested stack.
 	uint stacksize;
 	union {

@@ -153,31 +153,3 @@ void* adbg_object_ar_data(adbg_object_t *o, ar_member_header *mhdr) {
 		return null;
 	return p;
 }
-
-//
-// MSCOFF import
-//
-
-/// 
-struct mscoff_import_header {
-	union {
-		/// Must be a combination of IMAGE_FILE_MACHINE_UNKNOWN and 0xFFFF.
-		///
-		/// Effectively only 0xFFFF, since the enum value is 0.
-		uint Signature;
-		struct {
-			/// Must be IMAGE_FILE_MACHINE_UNKNOWN.
-			ushort Signature1;
-			/// Must be 0xFFFF.
-			ushort Signature2;
-		}
-	}
-	ushort Version;
-	ushort Machine;
-	uint TimeStamp;
-	uint Size;
-	ushort Ordinal;
-	union {
-		ulong Reserved;
-	}
-}

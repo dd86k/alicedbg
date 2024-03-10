@@ -153,6 +153,7 @@ int app_dump() {
 	case archive:	return dump_archive(dump, o);
 	case mdmp:	return dump_minidump(dump, o);
 	case dmp:	return dump_dmp(dump, o);
+	case coff, mscoff:
 	case unknown:	assert(0, "Unknown object type"); // Raw/unknown
 	}
 }

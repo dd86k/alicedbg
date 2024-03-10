@@ -1,4 +1,4 @@
-/// COFF archive format.
+/// COFF format.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>

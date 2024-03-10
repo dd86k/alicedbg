@@ -54,28 +54,32 @@ enum AdbgObject {
 	raw,
 	/// Ditto
 	unknown = raw,
-	/// Mark Zbikowski format.
+	/// Mark Zbikowski format. (.exe)
 	mz,
-	/// New Executable format.
+	/// New Executable format. (.exe)
 	ne,
-	/// Linked Executable/LX format.
+	/// Linked Executable/LX format. (.exe)
 	lx,
-	/// Portable Executable format.
+	/// Portable Executable format. (.exe)
 	pe,
 	/// Executable and Linkable Format.
 	elf,
 	/// Mach Object format.
 	macho,
-	/// Microsoft Program Database format 2.0.
+	/// Microsoft Program Database format 2.0. (.pdb)
 	pdb20,
-	/// Microsoft Program Database format 7.0.
+	/// Microsoft Program Database format 7.0. (.pdb)
 	pdb70,
-	/// Library archive.
-	archive,
-	/// Windows memory dump format.
+	/// Windows memory dump format. (.dmp)
 	dmp,
-	/// Windows Minidump format.
+	/// Windows Minidump format. (.mdmp)
 	mdmp,
+	/// Library archive. (.lib)
+	archive,
+	/// COFF object. (.obj)
+	coff,
+	/// MSCOFF object. (.obj)
+	mscoff,
 }
 
 /// Object origin. (or "load mode")
@@ -720,9 +724,11 @@ const(char)* adbg_object_short_name(adbg_object_t *o) {
 	case elf:	return "elf";
 	case pdb20:	return "pdb20";
 	case pdb70:	return "pdb70";
-	case archive:	return "archive";
 	case mdmp:	return "mdmp";
 	case dmp:	return "dmp";
+	case archive:	return "archive";
+	case coff:	return "coff";
+	case mscoff:	return "mscoff";
 	L_UNKNOWN:
 	case unknown:	return "unknown";
 	}
@@ -743,9 +749,11 @@ const(char)* adbg_object_name(adbg_object_t *o) {
 	case elf:	return `Executable and Linkable Format`;
 	case pdb20:	return `Program Database 2.0`;
 	case pdb70:	return `Program Database 7.0`;
-	case archive:	return `COFF Library Archive`;
 	case mdmp:	return `Windows Minidump`;
 	case dmp:	return `Windows Memory Dump`;
+	case archive:	return `Common Object File Format Library Archive`;
+	case coff:	return `Common Object File Format`;
+	case mscoff:	return `Microsoft Common Object File Format`;
 	L_UNKNOWN:
 	case unknown:	return "Unknown";
 	}
