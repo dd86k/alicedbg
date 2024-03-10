@@ -40,11 +40,11 @@ enum AdbgRegType : ubyte {
 	f32, f64
 }
 
-//TODO: Rename to AdbgRegFormat
-enum {
-	FORMAT_DEC,
-	FORMAT_HEX,
-	FORMAT_HEXPADDED,
+/// Register 
+enum AdbgRegFormat {
+	dec,
+	hex,
+	hexPadded,
 }
 
 /// Register name and type.
@@ -232,13 +232,13 @@ version (Windows) {
 /// 	reg = Register.
 /// 	format = String format.
 /// Returns: Number of characters written.
-size_t adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, int format) {
+size_t adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, AdbgRegFormat format) {
 	if (reg == null || buffer == null || len == 0)
 		return 0;
 	
 	const(char) *sformat = void;
-	switch (format) {
-	case FORMAT_DEC:
+	switch (format) with (AdbgRegFormat) {
+	case dec:
 		switch (reg.info.type) with (AdbgRegType) {
 		case u8, u16, u32, u64:
 			sformat = "%llu"; break;
@@ -249,10 +249,10 @@ size_t adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, int 
 			return 0;
 		}
 		break;
-	case FORMAT_HEX:
+	case hex:
 		sformat = "%llx";
 		break;
-	case FORMAT_HEXPADDED:
+	case hexPadded:
 		switch (reg.info.type) with (AdbgRegType) {
 		case u8:       sformat = "%02x"; break;
 		case u16:      sformat = "%04x"; break;

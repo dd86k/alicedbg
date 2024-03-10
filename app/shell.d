@@ -792,8 +792,8 @@ int command_regs(int argc, const(char) **argv) {
 		bool show = rselect == null || strcmp(rselect, reg.info.name) == 0;
 		if (show == false) continue;
 		char[20] normal = void, hexdec = void;
-		adbg_register_format(normal.ptr, 20, reg, FORMAT_DEC);
-		adbg_register_format(hexdec.ptr, 20, reg, FORMAT_HEXPADDED);
+		adbg_register_format(normal.ptr, 20, reg, AdbgRegFormat.dec);
+		adbg_register_format(hexdec.ptr, 20, reg, AdbgRegFormat.hexPadded);
 		printf("%-8s  0x%8s  %s\n", reg.info.name, hexdec.ptr, normal.ptr);
 		found = true;
 	}
