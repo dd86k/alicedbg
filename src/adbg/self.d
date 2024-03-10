@@ -218,7 +218,7 @@ void adbg_internal_handler(int sig, siginfo_t *si, void *p) {
 	
 	// Setup register info
 	adbg_registers_t regs = void;
-	adbg_register_list_init(&regs, adbg_self_machine());
+	adbg_registers_config(&regs, adbg_self_machine());
 	
 	__ufunction(&ex);
 	

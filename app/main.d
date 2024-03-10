@@ -498,10 +498,9 @@ r"
 }
 
 int main(int argc, const(char)** argv) {
-	// Ignore on error
+	// Set crash handle, and ignore on error
+	// Could do a warning, but it might be a little confusing
 	adbg_self_set_crashhandler(&crash_handler);
-	
-	*cast(int*)0 = 1;
 	
 	const(char) *arg = void;
 	const(char) *val = void;
