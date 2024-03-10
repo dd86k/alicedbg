@@ -222,7 +222,7 @@ LNEWNHDR:
 		return;
 	
 	void *note = void;
-	if (adbg_object_offsetl(o, &note, noffset, nleft)) {
+	if (adbg_object_offsetl(o, &note, noffset, cast(size_t)nleft)) {
 		print_string("warning", "Elf64_Phdr::p_offset points outside of file bounds");
 		return;
 	}

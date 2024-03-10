@@ -789,12 +789,12 @@ int command_regs(int argc, const(char) **argv) {
 	const(char) *rselect = argc >= 2 ? argv[1] : null;
 	bool found;
 	for (size_t i; i < registers.count; ++i, ++reg) {
-		bool show = rselect == null || strcmp(rselect, reg.name) == 0;
+		bool show = rselect == null || strcmp(rselect, reg.info.name) == 0;
 		if (show == false) continue;
 		char[20] normal = void, hexdec = void;
 		adbg_register_format(normal.ptr, 20, reg, FORMAT_DEC);
 		adbg_register_format(hexdec.ptr, 20, reg, FORMAT_HEXPADDED);
-		printf("%-8s  0x%8s  %s\n", reg.name, hexdec.ptr, normal.ptr);
+		printf("%-8s  0x%8s  %s\n", reg.info.name, hexdec.ptr, normal.ptr);
 		found = true;
 	}
 	if (rselect && found == false) {
@@ -876,7 +876,7 @@ int command_maps(int argc, const(char) **argv) {
 		default:	t = '?';
 		}
 		
-		with (map) printf("%16zx %10lld %c %.4s %s\n",
+		with (map) printf("%16zx %10zd %c %.4s %s\n",
 			cast(size_t)base, size, t, perms.ptr, name.ptr);
 	}
 	

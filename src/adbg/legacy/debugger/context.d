@@ -109,7 +109,7 @@ void adbg_ctx_get(thread_context_t *ctx) {
 			}
 		} else {
 			winctx.ContextFlags = CONTEXT_ALL;
-			if (GetThreadContext(g_debuggee.htid, &winctx)) {
+			if (GetThreadContext(g_debuggee.htid, cast(LPCONTEXT)&winctx)) {
 				ctx.count = 0;
 				return;
 			}

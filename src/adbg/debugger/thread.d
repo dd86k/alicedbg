@@ -28,25 +28,14 @@ version (Windows) {
 	import core.sys.posix.signal;
 }
 
-version (X86) {
-	version = X86_ANY;
-	private enum REG_COUNT = 10;	/// Number of registers for platform
-} else version (X86_64) {
-	version = X86_ANY;
-	private enum REG_COUNT = 18;	/// Ditto
-} else version (ARM) {
-	private enum REG_COUNT = 0;	/// Ditto
-} else version (AArch64) {
-	private enum REG_COUNT = 0;	/// Ditto
-} else
-	private enum REG_COUNT = 0;	/// Ditto
+/// Number of registers, used for buffer
+private enum REG_COUNT = 18; // Currently, x86-64 has highest number
 
 extern (C):
 
-//TODO: Rename to AdbgRegType
 //TODO: Support f80 (x87)
 /// Register size
-enum AdbgRegisterSize : ubyte {
+enum AdbgRegType : ubyte {
 	u8, u16, u32, u64,
 	f32, f64
 }
@@ -58,11 +47,17 @@ enum {
 	FORMAT_HEXPADDED,
 }
 
+/// Register name and type.
+struct adbg_register_info_t {
+	const(char) *name;	/// Register name
+	AdbgRegType type;	/// Register type (size)
+}
+
 /// Register structure, designs a single register for UI ends to understand
 struct adbg_register_t {
-	const(char) *name;	/// Register name
-	AdbgRegisterSize type;	/// Register type (size)
-	union {
+	/// Register name and type.
+	adbg_register_info_t info;
+	union { // Data
 		ulong  u64;	/// Register data: ulong (u64)
 		uint   u32;	/// Register data: uint (u32)
 		ushort u16;	/// Register data: ushort (u16)
@@ -98,15 +93,54 @@ int adbg_registers_config(adbg_registers_t *ctx, AdbgMachine mach) {
 	if (ctx == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
+	static immutable adbg_register_info_t[] regs_x86 = [
+		{ "eip",	AdbgRegType.u32 },
+		{ "eflags",	AdbgRegType.u32 },
+		{ "eax",	AdbgRegType.u32 },
+		{ "ebx",	AdbgRegType.u32 },
+		{ "ecx",	AdbgRegType.u32 },
+		{ "edx",	AdbgRegType.u32 },
+		{ "esp",	AdbgRegType.u32 },
+		{ "ebp",	AdbgRegType.u32 },
+		{ "esi",	AdbgRegType.u32 },
+		{ "edi",	AdbgRegType.u32 },
+	];
+	static immutable adbg_register_info_t[] regs_x86_64 = [
+		{ "rip",	AdbgRegType.u64 },
+		{ "rflags",	AdbgRegType.u64 },
+		{ "rax",	AdbgRegType.u64 },
+		{ "rbx",	AdbgRegType.u64 },
+		{ "rcx",	AdbgRegType.u64 },
+		{ "rdx",	AdbgRegType.u64 },
+		{ "rsp",	AdbgRegType.u64 },
+		{ "rbp",	AdbgRegType.u64 },
+		{ "rsi",	AdbgRegType.u64 },
+		{ "rdi",	AdbgRegType.u64 },
+		{ "r8",	AdbgRegType.u64 },
+		{ "r9",	AdbgRegType.u64 },
+		{ "r10",	AdbgRegType.u64 },
+		{ "r11",	AdbgRegType.u64 },
+		{ "r12",	AdbgRegType.u64 },
+		{ "r13",	AdbgRegType.u64 },
+		{ "r14",	AdbgRegType.u64 },
+		{ "r15",	AdbgRegType.u64 },
+	];
+	
+	immutable(adbg_register_info_t)[] regs = void;
+	
 	switch (mach) with (AdbgMachine) {
 	case x86:
-		adbg_context_start_x86(ctx);
+		regs = regs_x86;
 		break;
 	case amd64:
-		adbg_context_start_x86_64(ctx);
+		regs = regs_x86_64;
 		break;
 	default:
 		return adbg_oops(AdbgError.objectInvalidMachine);
+	}
+	
+	for (size_t i; i < regs.length; ++i) {
+		ctx.items[i].info = regs[i];
 	}
 	
 	return 0;
@@ -121,15 +155,15 @@ void adbg_registers_init(adbg_registers_t *ctx, adbg_process_t *tracee) {
 		return;
 	
 	version (X86) {
-		adbg_context_start_x86(ctx);
+		adbg_registers_config(ctx, AdbgMachine.x86);
 	} else version (X86_64) {
 		version (Win64) { // Windows 64-bit
 			if (tracee.wow64)
-				adbg_context_start_x86(ctx);
+				adbg_registers_config(ctx, AdbgMachine.x86);
 			else
-				adbg_context_start_x86_64(ctx);
+				adbg_registers_config(ctx, AdbgMachine.amd64);
 		} else // Anything else 64-bit
-			adbg_context_start_x86_64(ctx);
+			adbg_registers_config(ctx, AdbgMachine.amd64);
 	} else
 		ctx.count = 0;
 }
@@ -144,48 +178,49 @@ int adbg_registers_fill(adbg_registers_t *ctx, adbg_process_t *tracee) {
 		return adbg_oops(AdbgError.nullArgument);
 	
 	ctx.count = 0;
-	memset(ctx, 0, adbg_registers_t.sizeof);
 	
 	if (tracee.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
-	version (Windows) {
-		CONTEXT winctx = void;
-		version (Win64) {
-			WOW64_CONTEXT winctxwow64 = void;
-			if (tracee.wow64) {
-				winctxwow64.ContextFlags = CONTEXT_ALL;
-				if (Wow64GetThreadContext(tracee.htid, &winctxwow64) == FALSE) {
-					return adbg_oops(AdbgError.os);
-				}
-				adbg_context_fill_wow64(ctx, &winctxwow64);
-			} else {
-				winctx.ContextFlags = CONTEXT_ALL;
-				if (GetThreadContext(tracee.htid, cast(LPCONTEXT)&winctx) == FALSE) {
-					return adbg_oops(AdbgError.os);
-				}
-				adbg_context_fill_win(ctx, &winctx);
+	memset(ctx, 0, adbg_registers_t.sizeof);
+	
+version (Windows) {
+	CONTEXT winctx = void;
+	version (Win64) {
+		WOW64_CONTEXT winctxwow64 = void;
+		if (tracee.wow64) {
+			winctxwow64.ContextFlags = CONTEXT_ALL;
+			if (Wow64GetThreadContext(tracee.htid, &winctxwow64) == FALSE) {
+				return adbg_oops(AdbgError.os);
 			}
+			adbg_context_fill_wow64(ctx, &winctxwow64);
 		} else {
 			winctx.ContextFlags = CONTEXT_ALL;
-			if (GetThreadContext(tracee.htid, &winctx) == FALSE) {
+			if (GetThreadContext(tracee.htid, cast(LPCONTEXT)&winctx) == FALSE) {
 				return adbg_oops(AdbgError.os);
 			}
 			adbg_context_fill_win(ctx, &winctx);
 		}
-	} else version (Posix) {
-		//TODO: PT_GETFPREGS
-		//      PT_GETWMMXREGS
-		//      PT_GET_THREAD_AREA
-		//      PT_GETCRUNCHREGS
-		//      PT_GETVFPREGS
-		//      PT_GETHBPREGS
-		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, tracee.pid, null, &u) < 0) {
+	} else {
+		winctx.ContextFlags = CONTEXT_ALL;
+		if (GetThreadContext(tracee.htid, cast(LPCONTEXT)&winctx) == FALSE) {
 			return adbg_oops(AdbgError.os);
 		}
-		adbg_context_fill_linux(ctx, &u);
+		adbg_context_fill_win(ctx, &winctx);
 	}
+} else version (Posix) {
+	//TODO: PT_GETFPREGS
+	//      PT_GETWMMXREGS
+	//      PT_GET_THREAD_AREA
+	//      PT_GETCRUNCHREGS
+	//      PT_GETVFPREGS
+	//      PT_GETHBPREGS
+	user_regs_struct u = void;
+	if (ptrace(PT_GETREGS, tracee.pid, null, &u) < 0) {
+		return adbg_oops(AdbgError.os);
+	}
+	adbg_context_fill_linux(ctx, &u);
+} // version (Posix)
 	return 0;
 }
 
@@ -204,7 +239,7 @@ size_t adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, int 
 	const(char) *sformat = void;
 	switch (format) {
 	case FORMAT_DEC:
-		switch (reg.type) with (AdbgRegisterSize) {
+		switch (reg.info.type) with (AdbgRegType) {
 		case u8, u16, u32, u64:
 			sformat = "%llu"; break;
 		case f32, f64:
@@ -218,7 +253,7 @@ size_t adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, int 
 		sformat = "%llx";
 		break;
 	case FORMAT_HEXPADDED:
-		switch (reg.type) with (AdbgRegisterSize) {
+		switch (reg.info.type) with (AdbgRegType) {
 		case u8:       sformat = "%02x"; break;
 		case u16:      sformat = "%04x"; break;
 		case u32, f32: sformat = "%08x"; break;
@@ -241,170 +276,108 @@ unittest {
 	reg.type = AdbgRegisterSize.u16;
 	reg.u16  = 0x1234;
 	
-	char[16] buffer = void;
-	assert(adbg_register_format(buffer.ptr, 16, &reg, FORMAT_HEXPADDED) == 4);
-	assert(strncmp(buffer.ptr, "1234", 16) == 0);
+	enum BUFSZ = 16;
+	char[BUFSZ] buffer = void;
+	assert(adbg_register_format(buffer.ptr, BUFSZ, &reg, FORMAT_HEXPADDED) == 4);
+	// 16 to check null terminator
+	assert(strncmp(buffer.ptr, "1234", BUFSZ) == 0);
 }
 
 private:
 
-version (X86_ANY)
-void adbg_context_start_x86(adbg_registers_t *ctx) {
-	version (Trace) trace("ctx=%p", ctx);
-	ctx.count = 10;
-	ctx.items[0].name = "eip";
-	ctx.items[0].type = AdbgRegisterSize.u32;
-	ctx.items[1].name = "eflags";
-	ctx.items[1].type = AdbgRegisterSize.u32;
-	ctx.items[2].name = "eax";
-	ctx.items[2].type = AdbgRegisterSize.u32;
-	ctx.items[3].name = "ebx";
-	ctx.items[3].type = AdbgRegisterSize.u32;
-	ctx.items[4].name = "ecx";
-	ctx.items[4].type = AdbgRegisterSize.u32;
-	ctx.items[5].name = "edx";
-	ctx.items[5].type = AdbgRegisterSize.u32;
-	ctx.items[6].name = "esp";
-	ctx.items[6].type = AdbgRegisterSize.u32;
-	ctx.items[7].name = "ebp";
-	ctx.items[7].type = AdbgRegisterSize.u32;
-	ctx.items[8].name = "esi";
-	ctx.items[8].type = AdbgRegisterSize.u32;
-	ctx.items[9].name = "edi";
-	ctx.items[9].type = AdbgRegisterSize.u32;
-}
-
-version (X86_64)
-void adbg_context_start_x86_64(adbg_registers_t *ctx) {
-	version (Trace) trace("ctx=%p", ctx);
-	ctx.count = 18;
-	ctx.items[0].name  = "rip";
-	ctx.items[0].type  = AdbgRegisterSize.u64;
-	ctx.items[1].name  = "rflags";
-	ctx.items[1].type  = AdbgRegisterSize.u64;
-	ctx.items[2].name  = "rax";
-	ctx.items[2].type  = AdbgRegisterSize.u64;
-	ctx.items[3].name  = "rbx";
-	ctx.items[3].type  = AdbgRegisterSize.u64;
-	ctx.items[4].name  = "rcx";
-	ctx.items[4].type  = AdbgRegisterSize.u64;
-	ctx.items[5].name  = "rdx";
-	ctx.items[5].type  = AdbgRegisterSize.u64;
-	ctx.items[6].name  = "rsp";
-	ctx.items[6].type  = AdbgRegisterSize.u64;
-	ctx.items[7].name  = "rbp";
-	ctx.items[7].type  = AdbgRegisterSize.u64;
-	ctx.items[8].name  = "rsi";
-	ctx.items[8].type  = AdbgRegisterSize.u64;
-	ctx.items[9].name  = "rdi";
-	ctx.items[9].type  = AdbgRegisterSize.u64;
-	ctx.items[10].name = "r8";
-	ctx.items[10].type = AdbgRegisterSize.u64;
-	ctx.items[11].name = "r9";
-	ctx.items[11].type = AdbgRegisterSize.u64;
-	ctx.items[12].name = "r10";
-	ctx.items[12].type = AdbgRegisterSize.u64;
-	ctx.items[13].name = "r11";
-	ctx.items[13].type = AdbgRegisterSize.u64;
-	ctx.items[14].name = "r12";
-	ctx.items[14].type = AdbgRegisterSize.u64;
-	ctx.items[15].name = "r13";
-	ctx.items[15].type = AdbgRegisterSize.u64;
-	ctx.items[16].name = "r14";
-	ctx.items[16].type = AdbgRegisterSize.u64;
-	ctx.items[17].name = "r15";
-	ctx.items[17].type = AdbgRegisterSize.u64;
-}
-
 version (Windows) {
-	// Populate exception_t.registers array from Windows' CONTEXT
-	void adbg_context_fill_win(adbg_registers_t *ctx, CONTEXT *winctx) {
-		version (Trace) trace("ctx=%p win=%p", ctx, winctx);
-		version (X86) {
-			ctx.items[0].u32 = winctx.Eip;
-			ctx.items[1].u32 = winctx.EFlags;
-			ctx.items[2].u32 = winctx.Eax;
-			ctx.items[3].u32 = winctx.Ebx;
-			ctx.items[4].u32 = winctx.Ecx;
-			ctx.items[5].u32 = winctx.Edx;
-			ctx.items[6].u32 = winctx.Esp;
-			ctx.items[7].u32 = winctx.Ebp;
-			ctx.items[8].u32 = winctx.Esi;
-			ctx.items[9].u32 = winctx.Edi;
-		} else version (X86_64) {
-			ctx.items[0].u64  = winctx.Rip;
-			ctx.items[1].u64  = winctx.EFlags;
-			ctx.items[2].u64  = winctx.Rax;
-			ctx.items[3].u64  = winctx.Rbx;
-			ctx.items[4].u64  = winctx.Rcx;
-			ctx.items[5].u64  = winctx.Rdx;
-			ctx.items[6].u64  = winctx.Rsp;
-			ctx.items[7].u64  = winctx.Rbp;
-			ctx.items[8].u64  = winctx.Rsi;
-			ctx.items[9].u64  = winctx.Rdi;
-			ctx.items[10].u64 = winctx.R8;
-			ctx.items[11].u64 = winctx.R9;
-			ctx.items[12].u64 = winctx.R10;
-			ctx.items[13].u64 = winctx.R11;
-			ctx.items[14].u64 = winctx.R12;
-			ctx.items[15].u64 = winctx.R13;
-			ctx.items[16].u64 = winctx.R14;
-			ctx.items[17].u64 = winctx.R15;
-		}
-	}
 
-	version (Win64) {
-		version (X86_64)
-		void adbg_context_fill_wow64(adbg_registers_t *ctx, WOW64_CONTEXT *winctx) {
-			version (Trace) trace("ctx=%p win=%p", ctx, winctx);
-			ctx.items[0].u32 = winctx.Eip;
-			ctx.items[1].u32 = winctx.EFlags;
-			ctx.items[2].u32 = winctx.Eax;
-			ctx.items[3].u32 = winctx.Ebx;
-			ctx.items[4].u32 = winctx.Ecx;
-			ctx.items[5].u32 = winctx.Edx;
-			ctx.items[6].u32 = winctx.Esp;
-			ctx.items[7].u32 = winctx.Ebp;
-			ctx.items[8].u32 = winctx.Esi;
-			ctx.items[9].u32 = winctx.Edi;
-		}
-		
-		//TODO: Windows WoW64 AArch64 filler
+// Populate exception_t.registers array from Windows' CONTEXT
+void adbg_context_fill_win(adbg_registers_t *ctx, CONTEXT *winctx) {
+	version (Trace) trace("ctx=%p win=%p", ctx, winctx);
+	version (X86) {
+		ctx.items[0].u32 = winctx.Eip;
+		ctx.items[1].u32 = winctx.EFlags;
+		ctx.items[2].u32 = winctx.Eax;
+		ctx.items[3].u32 = winctx.Ebx;
+		ctx.items[4].u32 = winctx.Ecx;
+		ctx.items[5].u32 = winctx.Edx;
+		ctx.items[6].u32 = winctx.Esp;
+		ctx.items[7].u32 = winctx.Ebp;
+		ctx.items[8].u32 = winctx.Esi;
+		ctx.items[9].u32 = winctx.Edi;
+	} else version (X86_64) {
+		ctx.items[0].u64  = winctx.Rip;
+		ctx.items[1].u64  = winctx.EFlags;
+		ctx.items[2].u64  = winctx.Rax;
+		ctx.items[3].u64  = winctx.Rbx;
+		ctx.items[4].u64  = winctx.Rcx;
+		ctx.items[5].u64  = winctx.Rdx;
+		ctx.items[6].u64  = winctx.Rsp;
+		ctx.items[7].u64  = winctx.Rbp;
+		ctx.items[8].u64  = winctx.Rsi;
+		ctx.items[9].u64  = winctx.Rdi;
+		ctx.items[10].u64 = winctx.R8;
+		ctx.items[11].u64 = winctx.R9;
+		ctx.items[12].u64 = winctx.R10;
+		ctx.items[13].u64 = winctx.R11;
+		ctx.items[14].u64 = winctx.R12;
+		ctx.items[15].u64 = winctx.R13;
+		ctx.items[16].u64 = winctx.R14;
+		ctx.items[17].u64 = winctx.R15;
 	}
+}
+
+version (Win64) {
+	version (X86_64)
+	void adbg_context_fill_wow64(adbg_registers_t *ctx, WOW64_CONTEXT *winctx) {
+		version (Trace) trace("ctx=%p win=%p", ctx, winctx);
+		ctx.items[0].u32 = winctx.Eip;
+		ctx.items[1].u32 = winctx.EFlags;
+		ctx.items[2].u32 = winctx.Eax;
+		ctx.items[3].u32 = winctx.Ebx;
+		ctx.items[4].u32 = winctx.Ecx;
+		ctx.items[5].u32 = winctx.Edx;
+		ctx.items[6].u32 = winctx.Esp;
+		ctx.items[7].u32 = winctx.Ebp;
+		ctx.items[8].u32 = winctx.Esi;
+		ctx.items[9].u32 = winctx.Edi;
+	}
+	
+	//TODO: Windows WoW64 AArch64 filler
+}
+
 } else version (linux) {
-	/// Populate exception_t.registers array from user_regs_struct
-	void adbg_context_fill_linux(adbg_registers_t *ctx, user_regs_struct *u) {
-		version (Trace) trace("ctx=%p u=%p", ctx, u);
-		version (X86) {
-			ctx.items[0].u32 = u.eip;
-			ctx.items[1].u32 = u.eflags;
-			ctx.items[2].u32 = u.eax;
-			ctx.items[3].u32 = u.ebx;
-			ctx.items[4].u32 = u.ecx;
-			ctx.items[5].u32 = u.edx;
-			ctx.items[6].u32 = u.esp;
-			ctx.items[7].u32 = u.ebp;
-			ctx.items[8].u32 = u.esi;
-			ctx.items[9].u32 = u.edi;
-		} else version (X86_64) {
-			ctx.items[0].u64 = u.rip;
-			ctx.items[1].u64 = u.eflags;
-			ctx.items[2].u64 = u.rax;
-			ctx.items[3].u64 = u.rbx;
-			ctx.items[4].u64 = u.rcx;
-			ctx.items[5].u64 = u.rdx;
-			ctx.items[6].u64 = u.rsp;
-			ctx.items[7].u64 = u.rbp;
-			ctx.items[8].u64 = u.rsi;
-			ctx.items[9].u64 = u.rdi;
-			ctx.items[10].u64 = u.r8;
-			ctx.items[11].u64 = u.r9;
-			ctx.items[12].u64 = u.r10;
-			ctx.items[13].u64 = u.r11;
-			ctx.items[14].u64 = u.r12;
-			ctx.items[15].u64 = u.r13;
-			ctx.items[16].u64 = u.r14;
-			ctx.items[17].u64 = u.r15;
-		}
+	
+/// Populate exception_t.registers array from user_regs_struct
+void adbg_context_fill_linux(adbg_registers_t *ctx, user_regs_struct *u) {
+	version (Trace) trace("ctx=%p u=%p", ctx, u);
+	version (X86) {
+		ctx.items[0].u32 = u.eip;
+		ctx.items[1].u32 = u.eflags;
+		ctx.items[2].u32 = u.eax;
+		ctx.items[3].u32 = u.ebx;
+		ctx.items[4].u32 = u.ecx;
+		ctx.items[5].u32 = u.edx;
+		ctx.items[6].u32 = u.esp;
+		ctx.items[7].u32 = u.ebp;
+		ctx.items[8].u32 = u.esi;
+		ctx.items[9].u32 = u.edi;
+	} else version (X86_64) {
+		ctx.items[0].u64 = u.rip;
+		ctx.items[1].u64 = u.eflags;
+		ctx.items[2].u64 = u.rax;
+		ctx.items[3].u64 = u.rbx;
+		ctx.items[4].u64 = u.rcx;
+		ctx.items[5].u64 = u.rdx;
+		ctx.items[6].u64 = u.rsp;
+		ctx.items[7].u64 = u.rbp;
+		ctx.items[8].u64 = u.rsi;
+		ctx.items[9].u64 = u.rdi;
+		ctx.items[10].u64 = u.r8;
+		ctx.items[11].u64 = u.r9;
+		ctx.items[12].u64 = u.r10;
+		ctx.items[13].u64 = u.r11;
+		ctx.items[14].u64 = u.r12;
+		ctx.items[15].u64 = u.r13;
+		ctx.items[16].u64 = u.r14;
+		ctx.items[17].u64 = u.r15;
 	}
-} // version Posix
+}
+
+} // version linux

@@ -63,7 +63,7 @@ version (X86) { // CS_OPT_SYNTAX_DEFAULT
 }
 
 /// Maximum instruction size in bytes.
-/// Currently, this title goes to x86. Congrats!
+/// Currently, this title goes to x86 with 15 bytes. Congrats!
 enum MAX_INSTR_SIZE = 16;
 
 private {
@@ -419,7 +419,7 @@ int adbg_dis_process_step(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	if (dasm == null || opcode == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
-	if (adbg_memory_read(dasm.process, dasm.address_base, opcode.machine.ptr, MAX_INSTR_SIZE))
+	if (adbg_memory_read(dasm.process, cast(size_t)dasm.address_base, opcode.machine.ptr, MAX_INSTR_SIZE))
 		return adbg_errno;
 	
 	dasm.buffer = opcode.machine.ptr;
@@ -439,7 +439,7 @@ int adbg_dis_process_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, adbg
 	if (dasm == null || tracee == null || opcode == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
-	if (adbg_memory_read(tracee, address, opcode.machine.ptr, MAX_INSTR_SIZE))
+	if (adbg_memory_read(tracee, cast(size_t)address, opcode.machine.ptr, MAX_INSTR_SIZE))
 		return adbg_errno;
 	if (adbg_dis_once(dasm, opcode, opcode.machine.ptr, MAX_INSTR_SIZE))
 		return adbg_errno;
