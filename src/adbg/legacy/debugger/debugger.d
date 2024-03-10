@@ -22,9 +22,10 @@ import adbg.utils.strings : adbg_util_argv_flatten;
 public import adbg.legacy.debugger.exception;
 
 version (Windows) {
-	import core.sys.windows.windows;
-	import adbg.include.windows.wow64;
+	import adbg.include.windows.wow64apiset;
 	import adbg.include.windows.psapi_dyn;
+	import adbg.include.windows.winnt;
+	import core.sys.windows.winbase;
 } else version (Posix) {
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.sys.wait : waitpid, SIGCONT, WUNTRACED;
@@ -497,10 +498,10 @@ L_DEBUG_LOOP:
 					Wow64SetThreadContext(g_debuggee.htid, &winctxwow64);
 				} else {
 					winctx.ContextFlags = CONTEXT_CONTROL;
-					GetThreadContext(g_debuggee.htid, &winctx);
+					GetThreadContext(g_debuggee.htid, cast(LPCONTEXT)&winctx);
 					FlushInstructionCache(g_debuggee.hpid, null, 0);
 					winctx.EFlags |= 0x100;
-					SetThreadContext(g_debuggee.htid, &winctx);
+					SetThreadContext(g_debuggee.htid, cast(LPCONTEXT)&winctx);
 				}
 			} else {
 				CONTEXT winctx = void;

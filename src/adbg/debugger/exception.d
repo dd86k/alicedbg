@@ -132,6 +132,8 @@ version (Windows) {
 		return Fault;
 	// Specifically to swap
 	case STATUS_IN_PAGE_ERROR: // no similar sigcode for sub-operation
+		// NOTE: The third array element specifies the underlying
+		//       NTSTATUS code that resulted in the exception.
 		return PageError;
 	case STATUS_ARRAY_BOUNDS_EXCEEDED:	return BoundExceeded;
 	case STATUS_DATATYPE_MISALIGNMENT:	return Misalignment;

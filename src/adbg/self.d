@@ -15,12 +15,10 @@ import adbg.debugger.process;
 import adbg.object.machines;
 
 version (Windows) {
-	import adbg.include.windows.windef;
+	import adbg.include.windows.winnt;
 	import core.sys.windows.winbase;
 
 	private alias void* LPTOP_LEVEL_EXCEPTION_FILTER;
-	private alias _CONTEXT* PCONTEXT;
-	private alias _EXCEPTION_RECORD* PEXCEPTION_RECORD;
 
 	/// The system does not display the critical-error-handler message box.
 	/// Instead, the system sends the error to the calling process. 
@@ -175,7 +173,7 @@ __gshared void function(adbg_exception_t*) __ufunction;
 
 version (Windows)
 extern (Windows)
-uint adbg_internal_handler(_EXCEPTION_POINTERS *e) {
+uint adbg_internal_handler(EXCEPTION_POINTERS *e) {
 	// Setup exception info
 	adbg_exception_t ex = void;
 	ex.oscode = e.ExceptionRecord.ExceptionCode;

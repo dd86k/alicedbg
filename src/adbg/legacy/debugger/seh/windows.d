@@ -10,7 +10,7 @@ module adbg.legacy.debugger.seh.windows;
 version (Windows):
 
 import adbg.legacy.debugger.exception;
-import adbg.include.windows.windef;
+import adbg.include.windows.winnt;
 import adbg.include.c.setjmp;
 
 struct checkpoint_t {
@@ -41,8 +41,6 @@ __gshared checkpoint_t mcheckpoint;
 __gshared bool sehinit;
 
 alias void* LPTOP_LEVEL_EXCEPTION_FILTER;
-alias _CONTEXT* PCONTEXT;
-alias _EXCEPTION_RECORD* PEXCEPTION_RECORD;
 
 /// The system does not display the critical-error-handler message box.
 /// Instead, the system sends the error to the calling process. 
@@ -61,7 +59,7 @@ extern (Windows) {
 }
 
 extern (Windows)
-uint adbg_seh_handle(_EXCEPTION_POINTERS *e) {
+uint adbg_seh_handle(EXCEPTION_POINTERS *e) {
 	import core.sys.windows.winbase :
 		EXCEPTION_IN_PAGE_ERROR, EXCEPTION_ACCESS_VIOLATION;
 	mcheckpoint.exception.oscode = e.ExceptionRecord.ExceptionCode;

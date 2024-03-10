@@ -105,7 +105,7 @@ void dump_minidump_debug(ref Dumper dump, adbg_object_t *o) {
 				print_x32("Priority", thread.Priority);
 				print_x64("Teb", thread.Teb);
 				
-				CONTEXT_X86 *context = void;
+				X86_NT_CONTEXT *context = void;
 				if (adbg_object_offsetl(o, cast(void**)&context,
 					thread.ThreadContext.Rva, thread.ThreadContext.Size)) {
 					print_string("warning", "Thread.Context.Rva points outbound");

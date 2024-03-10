@@ -17,7 +17,7 @@ import adbg.utils.math;
 version (Windows) {
 	import core.sys.windows.winbase; // WriteProcessMemory
 	import core.sys.windows.winnt;
-	import adbg.include.windows.wow64;
+	import adbg.include.windows.wow64apiset;
 	import adbg.include.windows.psapi_dyn;
 	import adbg.include.windows.ntdll;
 } else version (Posix) {

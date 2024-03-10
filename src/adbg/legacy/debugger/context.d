@@ -12,8 +12,9 @@ import adbg.include.c.stdio : snprintf;
 import core.stdc.stdarg;
 
 version (Windows) {
-	import adbg.include.windows.wow64;
-	import core.sys.windows.windows;
+	import adbg.include.windows.wow64apiset;
+	import adbg.include.windows.winnt;
+	import core.sys.windows.winbase;
 } else version (Posix) {
 	import adbg.include.linux.user;
 	import adbg.include.posix.ptrace;
@@ -100,7 +101,7 @@ void adbg_ctx_get(thread_context_t *ctx) {
 				adbg_ctx_os_wow64(ctx, &winctxwow64);
 			} else {
 				winctx.ContextFlags = CONTEXT_ALL;
-				if (GetThreadContext(g_debuggee.htid, &winctx)) {
+				if (GetThreadContext(g_debuggee.htid, cast(LPCONTEXT)&winctx)) {
 					ctx.count = 0;
 					return;
 				}

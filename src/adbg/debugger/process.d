@@ -28,7 +28,7 @@ import adbg.object.machines : AdbgMachine;
 import core.stdc.string;
 
 version (Windows) {
-	import adbg.include.windows.wow64;
+	import adbg.include.windows.wow64apiset;
 	import adbg.include.windows.psapi_dyn;
 	import adbg.include.windows.winnt;
 	import core.sys.windows.basetsd;
@@ -94,16 +94,18 @@ enum ADBG_PROCESS_NAME_LENGTH = 256;
 
 /// Represents an instance of a process.
 struct adbg_process_t {
-	version (Windows) {
+	version (Windows) { // Original identifiers; Otherwise informal
 		int pid;	/// Process identificiation number
 		int tid;	/// Thread identification number
 		HANDLE hpid;	/// Process handle
 		HANDLE htid;	/// Thread handle
+		//TODO: Deprecate and remove wow64 field
+		//      Promote AdbgMachine enum
 		version (Win64) int wow64; /// If running under WoW64
 	}
 	version (Posix) {
 		pid_t pid;	/// Process ID // @suppress(dscanner.suspicious.label_var_same_name)
-		int mhandle;	/// Memory file handle
+		version (linux) int mhandle;	/// Memory file handle to /mem
 	}
 	/// Last known process status.
 	AdbgProcStatus status;
@@ -514,6 +516,7 @@ version (Windows) {
 	}
 	
 	// Breaks into remote process and initiates break-in
+	//TODO: try NtContinue for continue option
 	if (DebugActiveProcess(proc.pid) == FALSE) {
 		free(proc);
 		adbg_oops(AdbgError.os);
@@ -796,30 +799,25 @@ version (Windows) {
 	enum EFLAGS_TF = 0x100;
 	
 	// Enable single-stepping via Trap flag
-	version (Win64) {
-		if (tracee.wow64) {
-			WOW64_CONTEXT winctxwow64 = void;
-			winctxwow64.ContextFlags = CONTEXT_CONTROL;
-			Wow64GetThreadContext(tracee.htid, &winctxwow64);
-			winctxwow64.EFlags |= EFLAGS_TF;
-			Wow64SetThreadContext(tracee.htid, &winctxwow64);
-			FlushInstructionCache(tracee.hpid, null, 0);
-		} else {
-			CONTEXT winctx = void;
-			winctx.ContextFlags = CONTEXT_CONTROL;
-			GetThreadContext(tracee.htid, &winctx);
-			winctx.EFlags |= EFLAGS_TF;
-			SetThreadContext(tracee.htid, &winctx);
-			FlushInstructionCache(tracee.hpid, null, 0);
-		}
-	} else {
-		CONTEXT winctx = void;
-		winctx.ContextFlags = CONTEXT_ALL;
-		GetThreadContext(tracee.htid, &winctx);
-		winctx.EFlags |= EFLAGS_TF;
-		SetThreadContext(tracee.htid, &winctx);
+	version (Win64) 
+	if (tracee.wow64) {
+		WOW64_CONTEXT winctxwow64 = void;
+		winctxwow64.ContextFlags = CONTEXT_CONTROL;
+		Wow64GetThreadContext(tracee.htid, &winctxwow64);
+		winctxwow64.EFlags |= EFLAGS_TF;
+		Wow64SetThreadContext(tracee.htid, &winctxwow64);
 		FlushInstructionCache(tracee.hpid, null, 0);
+		
+		return adbg_debugger_continue(tracee);
 	}
+	
+	// X86, AMD64
+	CONTEXT winctx = void;
+	winctx.ContextFlags = CONTEXT_ALL;
+	GetThreadContext(tracee.htid, cast(LPCONTEXT)&winctx);
+	winctx.EFlags |= EFLAGS_TF;
+	SetThreadContext(tracee.htid, cast(LPCONTEXT)&winctx);
+	FlushInstructionCache(tracee.hpid, null, 0);
 	
 	return adbg_debugger_continue(tracee);
 } else {

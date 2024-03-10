@@ -19,8 +19,9 @@ import adbg.object.machines;
 //TODO: Support FPU registers
 
 version (Windows) {
-	import adbg.include.windows.wow64;
-	import core.sys.windows.windows;
+	import adbg.include.windows.wow64apiset;
+	import adbg.include.windows.winnt;
+	import core.sys.windows.winbase;
 } else version (Posix) {
 	import adbg.include.linux.user;
 	import adbg.include.posix.ptrace;
@@ -160,7 +161,7 @@ int adbg_registers_fill(adbg_registers_t *ctx, adbg_process_t *tracee) {
 				adbg_context_fill_wow64(ctx, &winctxwow64);
 			} else {
 				winctx.ContextFlags = CONTEXT_ALL;
-				if (GetThreadContext(tracee.htid, &winctx) == FALSE) {
+				if (GetThreadContext(tracee.htid, cast(LPCONTEXT)&winctx) == FALSE) {
 					return adbg_oops(AdbgError.os);
 				}
 				adbg_context_fill_win(ctx, &winctx);
