@@ -232,10 +232,25 @@ version (Windows) {
 /// 	reg = Register.
 /// 	format = String format.
 /// Returns: Number of characters written.
-size_t adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, AdbgRegFormat format) {
+int adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, AdbgRegFormat format) {
 	if (reg == null || buffer == null || len == 0)
 		return 0;
 	
+	// Get value
+	ulong n = void;
+	switch (reg.info.type) with (AdbgRegType) {
+	case u8:  n = reg.u8; break;
+	case u16: n = reg.u16; break;
+	case u32: n = reg.u32; break;
+	case u64: n = reg.u64; break;
+	case f32: *cast(double*)n = reg.f32; break;
+	case f64: *cast(double*)n = reg.f64; break;
+	default:
+		adbg_oops(AdbgError.invalidOption);
+		return 0;
+	}
+	
+	// Get format
 	const(char) *sformat = void;
 	switch (format) with (AdbgRegFormat) {
 	case dec:
@@ -268,17 +283,16 @@ size_t adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, Adbg
 		return 0;
 	}
 	
-	return snprintf(buffer, len, sformat, reg.u64);
+	return snprintf(buffer, len, sformat, n);
 }
 unittest {
-	adbg_register_t reg;
-	reg.name = "TEST";
-	reg.type = AdbgRegisterSize.u16;
+	adbg_register_t reg = void;
+	reg.info.type = AdbgRegType.u16;
 	reg.u16  = 0x1234;
-	
 	enum BUFSZ = 16;
 	char[BUFSZ] buffer = void;
-	assert(adbg_register_format(buffer.ptr, BUFSZ, &reg, FORMAT_HEXPADDED) == 4);
+	int r = adbg_register_format(buffer.ptr, BUFSZ, &reg, AdbgRegFormat.hex);
+	assert(r == 4);
 	// 16 to check null terminator
 	assert(strncmp(buffer.ptr, "1234", BUFSZ) == 0);
 }
