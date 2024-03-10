@@ -5,11 +5,13 @@
 /// License: BSD-3-Clause
 module adbg.include.windows.winnt;
 
-// NOTE: For minidumps dumping, these definitions are left defined regardless of platform.
+// NOTE: For minidumps, define the structures with D types.
 
 // Sources:
 // - {Windows Kits}\um\winnt.h
 // - https://learn.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-exception_record
+
+extern (Windows):
 
 //
 // Public region required for Minidump support
@@ -17,16 +19,6 @@ module adbg.include.windows.winnt;
 
 alias ULONGLONG = ulong;
 alias DWORD = uint;
-
-//
-// Windows-specific region
-//
-
-version (Windows):
-
-public import core.sys.windows.winnt;
-
-extern (Windows):
 
 /// Size of x87 registers in bytes
 enum SIZE_OF_80387_REGISTERS = 80;
@@ -47,25 +39,61 @@ enum ARM_MAX_BREAKPOINTS       = 8;
 /// 
 enum ARM_MAX_WATCHPOINTS       = 1;
 
+struct FLOATING_SAVE_AREA {
+    uint ControlWord;
+    uint StatusWord;
+    uint TagWord;
+    uint ErrorOffset;
+    uint ErrorSelector;
+    uint DataOffset;
+    uint DataSelector;
+    ubyte[SIZE_OF_80387_REGISTERS] RegisterArea;
+    uint Spare0;
+}
+alias PFLOATING_SAVE_AREA = FLOATING_SAVE_AREA*;
+
+struct X86_NT_CONTEXT {
+    uint ContextFlags;
+    uint Dr0;
+    uint Dr1;
+    uint Dr2;
+    uint Dr3;
+    uint Dr6;
+    uint Dr7;
+    FLOATING_SAVE_AREA FloatSave;
+    uint SegGs;
+    uint SegFs;
+    uint SegEs;
+    uint SegDs;
+    uint Edi;
+    uint Esi;
+    uint Ebx;
+    uint Edx;
+    uint Ecx;
+    uint Eax;
+    uint Ebp;
+    uint Eip;
+    uint SegCs;
+    uint EFlags;
+    uint Esp;
+    uint SegSs;
+    ubyte[MAXIMUM_SUPPORTED_EXTENSION] ExtendedRegisters;
+}
+alias PX86_NT_CONTEXT = X86_NT_CONTEXT*;
+
+//
+// Windows-specific region
+//
+
+version (Windows):
+
+public import core.sys.windows.winnt;
+
 align(16) struct M128A {
     ulong Low;
     long High;
 }
 alias PM128A = M128A*;
-
-struct FLOATING_SAVE_AREA {
-    DWORD   ControlWord;
-    DWORD   StatusWord;
-    DWORD   TagWord;
-    DWORD   ErrorOffset;
-    DWORD   ErrorSelector;
-    DWORD   DataOffset;
-    DWORD   DataSelector;
-    BYTE[SIZE_OF_80387_REGISTERS] RegisterArea;
-    DWORD   Spare0;
-}
-
-alias PFLOATING_SAVE_AREA = FLOATING_SAVE_AREA*;
 
 union ARM64_NT_NEON128 {
     struct {
@@ -89,35 +117,6 @@ version (AArch64) { // defined(_ARM64_)
     }
     alias PNEON128 = NEON128*;
 }
-
-struct X86_NT_CONTEXT {
-    DWORD ContextFlags;
-    DWORD Dr0;
-    DWORD Dr1;
-    DWORD Dr2;
-    DWORD Dr3;
-    DWORD Dr6;
-    DWORD Dr7;
-    FLOATING_SAVE_AREA FloatSave;
-    DWORD SegGs;
-    DWORD SegFs;
-    DWORD SegEs;
-    DWORD SegDs;
-    DWORD Edi;
-    DWORD Esi;
-    DWORD Ebx;
-    DWORD Edx;
-    DWORD Ecx;
-    DWORD Eax;
-    DWORD Ebp;
-    DWORD Eip;
-    DWORD SegCs;
-    DWORD EFlags;
-    DWORD Esp;
-    DWORD SegSs;
-    BYTE[MAXIMUM_SUPPORTED_EXTENSION] ExtendedRegisters;
-}
-alias PX86_NT_CONTEXT = X86_NT_CONTEXT*;
 
 // NOTE: It's the same layout
 public alias WOW64_CONTEXT = X86_NT_CONTEXT;
