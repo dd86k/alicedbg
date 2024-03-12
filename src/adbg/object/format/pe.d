@@ -23,9 +23,9 @@ import adbg.object.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit;
 
-// NOTE: Avoid the Windows base types as they are not defined outside version (Windows)
+// NOTE: Avoid the Windows base types as they are not defined outside "version (Windows)"
+// NOTE: Microsoft loader limits sections to 96 maximum
 
-//TODO: PE-OBJ: ANON_OBJECT_HEADER, ANON_OBJECT_HEADER_V2
 //TODO: Function to check RVA bounds (within file_size)
 //TODO: Return everything as const(type)*
 //      Memory implementation will potentially be read-only
@@ -35,9 +35,13 @@ extern (C):
 /// Magic number for PE32 object files.
 enum MAGIC_PE32 = CHAR32!"PE\0\0";
 
-/// Minimum file size for PE32.
-// https://stackoverflow.com/a/47311684
-private enum MINIMUM_SIZE = 97;
+private enum {
+	/// Minimum file size for PE32.
+	/// See: https://stackoverflow.com/a/47311684
+	MINIMUM_SIZE = 97,
+	/// Specifications limit number of sections to 96.
+	MAXIMUM_SECTIONS = 96,
+}
 
 enum : ushort { // PE_HEADER.Machine, likely all little-endian
 	PE_MACHINE_UNKNOWN	= 0,	/// Any machine
@@ -737,6 +741,9 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		
 		with (o.i.pe.opt_header) Magic = adbg_bswap16(Magic);
 	}
+	
+	if (o.i.pe.header.NumberOfSections > MAXIMUM_SECTIONS)
+		return adbg_oops(AdbgError.assertion);
 	
 	switch (o.i.pe.opt_header.Magic) {
 	case PE_FMT_32:
