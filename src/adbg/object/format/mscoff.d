@@ -5,35 +5,38 @@
 /// License: BSD-3-Clause
 module adbg.object.format.mscoff;
 
+import adbg.object.server : AdbgObject, adbg_object_t;
 import adbg.utils.uid;
 
 //
 // Non-COFF Object file headers (.obj from VS2002-VS2015, mscoff)
 //
 
-// NOTE: Version
-//       0 -> Import
-//       1 -> Anonymous
-//       2 -> Anonymous V2
+enum {
+	MSCOFF_VERSION_IMPORT = 0,
+	MSCOFF_VERSION_ANON   = 1,
+	MSCOFF_VERSION_ANONV2 = 2,
+}
 
-/*
-typedef enum IMPORT_OBJECT_TYPE
-{
-    IMPORT_OBJECT_CODE = 0,
-    IMPORT_OBJECT_DATA = 1,
-    IMPORT_OBJECT_CONST = 2,
-} IMPORT_OBJECT_TYPE;
+enum {
+	MSCOFF_OBJECT_CODE = 0,
+	MSCOFF_OBJECT_DATA = 1,
+	MSCOFF_OBJECT_CONST = 2,
+}
 
-typedef enum IMPORT_OBJECT_NAME_TYPE
-{
-    IMPORT_OBJECT_ORDINAL = 0,          // Import by ordinal
-    IMPORT_OBJECT_NAME = 1,             // Import name == public symbol name.
-    IMPORT_OBJECT_NAME_NO_PREFIX = 2,   // Import name == public symbol name skipping leading ?, @, or optionally _.
-    IMPORT_OBJECT_NAME_UNDECORATE = 3,  // Import name == public symbol name skipping leading ?, @, or optionally _
-                                        //  and truncating at first @.
-    IMPORT_OBJECT_NAME_EXPORTAS = 4,    // Import name == a name is explicitly provided after the DLL name.
-} IMPORT_OBJECT_NAME_TYPE;
-*/
+enum {
+	/// Import by ordinal
+	MSCOFF_IMPORT_NAME_ORDINAL = 0,
+	/// Import name is public symbol name.
+	MSCOFF_IMPORT_NAME = 1,
+	/// Import name is public symbol name skipping leading "?", "@", or optionally "_".
+	MSCOFF_IMPORT_NAME_NO_PREFIX = 2,
+	/// Import name is public symbol name skipping leading "?", "@", or optionally "_"
+	/// and truncating at first "@".
+	MSCOFF_IMPORT_NAME_UNDECORATE = 3,
+	/// Import name is a name is explicitly provided after the DLL name.
+	MSCOFF_IMPORT_NAME_EXPORTAS = 4,
+}
 
 struct mscoff_import_header { // IMPORT_OBJECT_HEADER
 	/// Must be IMAGE_FILE_MACHINE_UNKNOWN.
@@ -43,6 +46,7 @@ struct mscoff_import_header { // IMPORT_OBJECT_HEADER
 	ushort Version;
 	ushort Machine;
 	uint TimeStamp;
+	
 	uint Size;
 	ushort Ordinal; // or Hint
 	// Type : 2 -> IMPORT_TYPE
@@ -57,6 +61,7 @@ struct mscoff_anon_header { // ANON_OBJECT_HEADER
 	ushort Version;         // >= 1 (implies the CLSID field is present)
 	ushort Machine;
 	uint   TimeDateStamp;
+	
 	/*CLSID*/ UID   ClassID;         // Used to invoke CoCreateInstance
 	uint   SizeOfData;      // Size of data that follows the header
 }
@@ -67,6 +72,7 @@ struct mscoff_anon_header_v2 { // ANON_OBJECT_HEADER_V2
 	ushort Version;         // >= 2 (implies the Flags field is present - otherwise V1)
 	ushort Machine;
 	uint   TimeDateStamp;
+	
 	/* CLSID */ UID   ClassID;         // Used to invoke CoCreateInstance
 	uint   SizeOfData;      // Size of data that follows the header
 	uint   Flags;           // 0x1 -> contains metadata
@@ -81,6 +87,7 @@ struct mscoff_anon_header_bigobj { // ANON_OBJECT_HEADER_BIGOBJ
 	ushort Version;         // >= 2 (implies the Flags field is present)
 	ushort Machine;         // Actual machine - IMAGE_FILE_MACHINE_xxx
 	uint   TimeDateStamp;
+	
 	/* CLSID */ UID   ClassID;         // {D1BAA1C7-BAEE-4ba9-AF20-FAF66AA4DCB8}
 	uint   SizeOfData;      // Size of data that follows the header
 	uint   Flags;           // 0x1 -> contains metadata
@@ -91,4 +98,12 @@ struct mscoff_anon_header_bigobj { // ANON_OBJECT_HEADER_BIGOBJ
 	uint   NumberOfSections; // extended from WORD
 	uint   PointerToSymbolTable;
 	uint   NumberOfSymbols;
+}
+
+int adbg_object_mscoff_load(adbg_object_t *o) {
+	o.format = AdbgObject.mscoff;
+	
+	// NOTE: No swapping is done because there is currently no sane way of detecting it
+	
+	return 0;
 }

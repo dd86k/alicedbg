@@ -298,6 +298,19 @@ struct adbg_object_t {
 			dmp_header *header;
 		}
 		dmp_t dmp;
+		
+		struct coff_t {
+			coff_header *header;
+		}
+		coff_t coff;
+		
+		union mscoff_t {
+			mscoff_import_header      *import_header;
+			mscoff_anon_header        *anon_header;
+			mscoff_anon_header_v2     *anon_v2_header;
+			mscoff_anon_header_bigobj *anon_big_header;
+		}
+		mscoff_t mscoff;
 	}
 	/// Internal object definitions.
 	adbg_object_internals_t i;
@@ -675,6 +688,13 @@ L_ARG:
 			return adbg_oops(AdbgError.unknownObjFormat);
 		
 		goto case MAGIC_MZ;
+	case 0: // MS-COFF
+		if (o.file_size < mscoff_anon_header_bigobj.sizeof)
+			return adbg_oops(AdbgError.unknownObjFormat);
+		if (o.i.mscoff.import_header.Sig2 != 0xffff)
+			return adbg_oops(AdbgError.unknownObjFormat);
+		
+		return adbg_object_mscoff_load(o);
 	default:
 		return adbg_oops(AdbgError.unknownObjFormat);
 	}
