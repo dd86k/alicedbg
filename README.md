@@ -21,13 +21,11 @@ changes to the API.
 
 None of the functions are currently thread-safe.
 
-## Application Usage
+# Usage
 
 The application features two modes:
 - Debugger
 - Image dumper
-
-### Getting Started
 
 The disassembly feature is provided by Capstone 4.0.2.
 
@@ -41,7 +39,7 @@ For other platforms, package names are typically:
 
 Capstone is licensed under the 3-clause BSD license.
 
-### Debugger
+## Debugger
 
 The debugger is the default operating mode.
 
@@ -55,7 +53,7 @@ Examples:
 - Spawn process on Posix: `alicedbg ./test`
 - Attach to process ID 3428: `alicedbg --attach 3428`
 
-### Image Dumper
+## Image Dumper
 
 To invoke the object dumper, use `--dump PATH`, where PATH is a file path to a
 binary image.
@@ -64,16 +62,16 @@ Examples:
 - Dump headers: `alicedbg --dump alicedbg`
 - Dump exports: `alicedbg --dump-exports alicedbg.exe`
 
-## Documentation
+# Documentation
 
 For information about compilation, internal structures, support,
-see the repository's Wiki for further information.
+see the repository's Wiki for information.
 
-## Contributing
+# Contributing
 
 Currently not looking for contributors, sorry. Feel free to provide suggestions
 regarding contributor management.
 
-## License
+# License
 
 This project is licensed under the BSD 3-Clause license.
