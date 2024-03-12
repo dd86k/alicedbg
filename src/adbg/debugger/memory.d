@@ -1,4 +1,4 @@
-/// Utility function for reading and writing into a process' memory.
+/// Utility function for memory management.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -14,6 +14,10 @@ import core.stdc.config : c_long;
 import adbg.error;
 import adbg.utils.math;
 
+// NOTE: Linux ptrace memory I/O based on https://www.linuxjournal.com/article/6100
+//       However, when possible, /proc/PID/mem is used.
+//       On BSD, PT_IO is used.
+
 version (Windows) {
 	import core.sys.windows.winbase; // WriteProcessMemory
 	import core.sys.windows.winnt;
@@ -22,9 +26,8 @@ version (Windows) {
 	import adbg.include.windows.ntdll;
 } else version (Posix) {
 	import core.sys.posix.sys.stat;
-	import core.sys.posix.signal : kill, SIGKILL, siginfo_t, raise;
 	import core.sys.posix.sys.uio;
-	import core.sys.posix.fcntl : open;
+	import core.sys.posix.fcntl;
 	import adbg.include.posix.mann;
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
@@ -57,6 +60,9 @@ size_t adbg_memory_pagesize() {
 /*size_t adbg_memory_hugepagesize() {
 }*/
 
+//TODO: Provide a way to return number of bytes written/read
+//      1. Could make size parameter a pointer
+//      2. Could return a ptrdiff_t, -1 on error
 /// Read memory from child tracee.
 /// Params:
 /// 	tracee = Reference to tracee instance.
@@ -68,35 +74,52 @@ int adbg_memory_read(adbg_process_t *tracee, size_t addr, void *data, uint size)
 	if (tracee == null || data == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
-	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
-	//      Linux 6.2 (include/uapi/linux/ptrace.h) still has no PT_IO
-	//TODO: Under Linux, /proc/pid/mem could be interesting
-	version (Windows) {
-		if (ReadProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
+//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
+version (Windows) {
+	if (ReadProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
+		return adbg_oops(AdbgError.os);
+	return 0;
+} else version (linux) {
+	// /mem handle is set and ready to be used
+	if (tracee.mhandle > 0) {
+LREAD:
+		if (read(tracee.mhandle, data, size) < 1)
 			return adbg_oops(AdbgError.os);
-		return 0;
-	} else version (linux) { // Based on https://www.linuxjournal.com/article/6100
-		c_long *dest = cast(c_long*)data;	/// target
-		int r = size / c_long.sizeof;	/// number of "long"s to read
-		
-		for (; r > 0; --r, ++dest, addr += c_long.sizeof) {
-			errno = 0; // As manpage wants
-			*dest = ptrace(PT_PEEKDATA, tracee.pid, addr, null);
-			if (errno)
-				return adbg_oops(AdbgError.os);
-		}
-		
-		r = size % c_long.sizeof;
-		if (r) {
-			errno = 0;
-			c_long l = ptrace(PT_PEEKDATA, tracee.pid, addr, null);
-			if (errno)
-				return adbg_oops(AdbgError.os);
-			ubyte* dest8 = cast(ubyte*)dest, src8 = cast(ubyte*)&l;
-			for (; r; --r) *dest8++ = *src8++; // inlined memcpy
-		}
-		return 0;
-	} else return adbg_oops(AdbgError.unimplemented);
+	}
+	// /mem handle is not opened, try to
+	else if (tracee.mhandle && tracee.memfailed == 0) {
+		char[32] pathbuf = void;
+		snprintf(pathbuf.ptr, 32, "/proc/%d/mem", tracee.pid);
+		tracee.mhandle = open(pathbuf.ptr, O_RDWR);
+		// Success? Try reading
+		if (tracee.mhandle)
+			goto LREAD;
+		// On failure, mark fail and proceed to try ptrace fallback
+		tracee.memfailed = 1;
+	}
+	
+	c_long *dest = cast(c_long*)data;	/// target
+	int r = size / c_long.sizeof;	/// number of "long"s to read
+	
+	for (; r > 0; --r, ++dest, addr += c_long.sizeof) {
+		errno = 0; // As manpage wants
+		*dest = ptrace(PT_PEEKDATA, tracee.pid, addr, null);
+		if (errno)
+			return adbg_oops(AdbgError.os);
+	}
+	
+	r = size % c_long.sizeof;
+	if (r) {
+		errno = 0;
+		c_long l = ptrace(PT_PEEKDATA, tracee.pid, addr, null);
+		if (errno)
+			return adbg_oops(AdbgError.os);
+		ubyte* dest8 = cast(ubyte*)dest, src8 = cast(ubyte*)&l;
+		for (; r; --r) *dest8++ = *src8++; // inlined memcpy
+	}
+	return 0;
+} else // version (linux)
+	return adbg_oops(AdbgError.unimplemented);
 }
 
 /// Write memory to debuggee child.
@@ -111,30 +134,49 @@ int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
-	version (Windows) {
-		if (WriteProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
+version (Windows) {
+	if (WriteProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
+		return adbg_oops(AdbgError.os);
+	return 0;
+} else version (linux) {
+	// /mem handle is set and ready to be used
+	if (tracee.mhandle > 0) {
+LWRITE:
+		if (write(tracee.mhandle, data, size) < 1)
 			return adbg_oops(AdbgError.os);
-		return 0;
-	} else version (linux) { // Based on https://www.linuxjournal.com/article/6100
-		c_long *user = cast(c_long*)data;	/// user data pointer
-		int i;	/// offset index
-		int j = size / c_long.sizeof;	/// number of "blocks" to process
-		
-		for (; i < j; ++i, ++user) {
-			if (ptrace(PT_POKEDATA, tracee.pid,
-				addr + (i * c_long.sizeof), user) < 0)
-				return adbg_oops(AdbgError.os);
-		}
-		
-		//TODO: Save remainder before writing
-		j = size % c_long.sizeof;
-		if (j) {
-			if (ptrace(PT_POKEDATA, tracee.pid,
-				addr + (i * c_long.sizeof), user) < 0)
-				return adbg_oops(AdbgError.os);
-		}
-		return 0;
-	} else return adbg_oops(AdbgError.unimplemented);
+	}
+	// /mem handle is not opened, try to
+	else if (tracee.mhandle && tracee.memfailed == 0) {
+		char[32] pathbuf = void;
+		snprintf(pathbuf.ptr, 32, "/proc/%d/mem", tracee.pid);
+		tracee.mhandle = open(pathbuf.ptr, O_RDWR);
+		// Success? Try reading
+		if (tracee.mhandle)
+			goto LWRITE;
+		// On failure, mark fail and proceed to try ptrace fallback
+		tracee.memfailed = 1;
+	}
+	
+	c_long *user = cast(c_long*)data;	/// user data pointer
+	int i;	/// offset index
+	int j = size / c_long.sizeof;	/// number of "blocks" to process
+	
+	for (; i < j; ++i, ++user) {
+		if (ptrace(PT_POKEDATA, tracee.pid,
+			addr + (i * c_long.sizeof), user) < 0)
+			return adbg_oops(AdbgError.os);
+	}
+	
+	//TODO: Save remainder before writing
+	j = size % c_long.sizeof;
+	if (j) {
+		if (ptrace(PT_POKEDATA, tracee.pid,
+			addr + (i * c_long.sizeof), user) < 0)
+			return adbg_oops(AdbgError.os);
+	}
+	return 0;
+} else // version (linux)
+	return adbg_oops(AdbgError.unimplemented);
 }
 
 /// Memory permission access bits.

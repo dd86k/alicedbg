@@ -105,7 +105,10 @@ struct adbg_process_t {
 	}
 	version (Posix) {
 		pid_t pid;	/// Process ID // @suppress(dscanner.suspicious.label_var_same_name)
-		version (linux) int mhandle;	/// Memory file handle to /mem
+	}
+	version (linux) {
+		int mhandle;	/// Internal memory file handle to /mem
+		int memfailed;	/// Set if we fail to open /mem
 	}
 	/// Last known process status.
 	AdbgProcStatus status;
@@ -123,7 +126,7 @@ struct __adbg_child_t {
 	const(char) **argv, envp;
 }
 
-//TODO: Stream redirection options
+//TODO: Stream redirection options (FILE* and os handle options)
 //TODO: "start suspended" option
 //      Windows: CREATE_SUSPENDED
 //      Posix:
@@ -210,7 +213,7 @@ LOPT:
 		return null;
 	}
 	
-	adbg_process_t *proc = cast(adbg_process_t*)malloc(adbg_process_t.sizeof);
+	adbg_process_t *proc = cast(adbg_process_t*)calloc(1, adbg_process_t.sizeof);
 	if (proc == null) {
 		adbg_oops(AdbgError.crt);
 		return null;
@@ -472,7 +475,7 @@ L_OPTION:
 	
 	version (Trace) trace("pid=%d options=%#x", pid, options);
 	
-	adbg_process_t *proc = cast(adbg_process_t*)malloc(adbg_process_t.sizeof);
+	adbg_process_t *proc = cast(adbg_process_t*)calloc(1, adbg_process_t.sizeof);
 	if (proc == null) {
 		adbg_oops(AdbgError.crt);
 		return null;
@@ -988,15 +991,15 @@ unittest {
 /// Params: tracee = Debuggee process.
 /// Returns: Machine platform.
 AdbgMachine adbg_process_get_machine(adbg_process_t *tracee) {
-	AdbgMachine mach;
-	
-	if (tracee == null) return mach;
+	if (tracee == null)
+		return AdbgMachine.native;
 	
 	//TODO: There's probably a way to remotely check this
+	//      Windows: IsWow64Process/IsWow64Process2 with process handle
 	version (Win64) version (X86_64) // Windows + x86-64
-		mach = tracee.wow64 ? AdbgMachine.x86 : AdbgMachine.amd64;
+		if (tracee.wow64) return AdbgMachine.x86;
 	
-	return mach;
+	return AdbgMachine.native;
 }
 
 /// Get a list of process IDs running.
