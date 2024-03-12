@@ -859,21 +859,33 @@ int command_memory(int argc, const(char) **argv) {
 	if (adbg_memory_read(process, cast(size_t)uaddress, data, ulength))
 		return ShellError.alicedbg;
 	
-	// Print column header
 	enum COLS = 16; /// Columns in bytes
-	size_t count = ulength / COLS;
-	printf("                  ");
-	for (size_t c; c < COLS; ++c) {
+	enum PADD = 12; /// Address padding
+	
+	// Print column header
+	for (int c; c < PADD; ++c)
+		putchar(' ');
+	putchar(' ');
+	putchar(' ');
+	for (int c; c < COLS; ++c)
 		printf("%2x ", cast(uint)c);
-	}
 	putchar('\n');
 	
-	// Print rows
+	// Print data rows
+	size_t count = ulength / COLS;
 	for (size_t c; c < count; ++c, uaddress += COLS) {
-		printf("%16llx  ", uaddress);
-		for (size_t i; i < COLS && c * i < ulength; ++i) {
+		// Print address
+		printf("%.*llx  ", PADD, uaddress);
+		
+		// Print data column
+		for (size_t i; i < COLS && c * i < ulength; ++i)
 			printf("%02x ", data[(c * COLS) + i]);
-		}
+		
+		// Print ascii column
+		putchar(' ');
+		for (size_t i; i < COLS && c * i < ulength; ++i)
+			putchar(asciichar(data[(c * COLS) + i], '.'));
+		
 		putchar('\n');
 	}
 	

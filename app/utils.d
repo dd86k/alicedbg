@@ -212,3 +212,12 @@ unittest {
 	assert(base);
 	assert(strcmp(base, "file.lib") == 0);
 }
+
+/// Returns default character if given character is outside ASCII range.
+/// Params:
+///   c = Character to evaluate.
+///   d = Default character, fallback.
+/// Returns: Character.
+int asciichar(int c, int d) {
+	return c < 32 || c > 126 ? d : c;
+}
