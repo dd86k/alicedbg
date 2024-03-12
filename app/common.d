@@ -64,7 +64,7 @@ struct settings_t {
 	const(char) *file;	/// Debuggee: file
 	const(char) **args;	/// Debuggee: argument vector
 	const(char) **env;	/// Debuggee: environement vector
-	uint pid;	/// Debuggee: PID
+	int pid;	/// Debuggee: PID
 	int dump_selections;	/// Dumper selections
 	int dump_options;	/// Dumper options
 	long dump_base_address;	/// Dumper base address (org)

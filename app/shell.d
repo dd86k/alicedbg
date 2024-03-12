@@ -6,9 +6,10 @@
 module shell;
 
 import adbg.error, adbg.debugger, adbg.disassembler, adbg.object;
-import adbg.include.c.stdio : printf, puts, putchar;
-import adbg.include.c.stdlib : atoi, malloc, free, exit;
-import core.stdc.string : strcmp, strncmp;
+import adbg.include.c.stdio;
+import adbg.include.c.stdlib;
+import adbg.include.c.stdarg;
+import core.stdc.string;
 import common, utils;
 import term;
 
@@ -43,7 +44,7 @@ enum ShellError {
 	alicedbg	= -1001,
 }
 
-const(char) *errorstring(ShellError code) {
+const(char) *shell_error_string(int code) {
 	switch (code) with (ShellError) {
 	case alicedbg:
 		return adbg_error_msg;
@@ -94,33 +95,24 @@ void registerHelp(void function(ref command2_help_t help)) {
 }*/
 
 int shell_loop() {
-	//TODO: these should be dedicated shell functions
+	int ecode = void;
+	
+	if (loginit(null))
+		return 1337;
+	
 	// Load or attach process if CLI specified it
 	if (globals.file) {
-		process = adbg_debugger_spawn(globals.file,
-			AdbgSpawnOpt.argv, globals.args,
-			0);
-		if (process == null)
-			return oops;
-		
-		puts("Process created.");
-	} else if (globals.pid) {
-		process = adbg_debugger_attach(globals.pid, 0);
-		if (process == null)
-			return oops;
-		
-		puts("Debugger attached.");
-	}
-	
-	if (globals.file || globals.pid) {
-		dis = adbg_dis_open(adbg_process_get_machine(process));
-		if (dis == null) {
-			printf("warning: Disassembler not available (%s)\n",
-				adbg_error_msg());
+		ecode = shell_proc_spawn(globals.file, globals.args);
+		if (ecode) {
+			printf("Error: %s\n", adbg_error_msg());
+			return ecode;
 		}
-		
-		if (globals.syntax && dis)
-			adbg_dis_options(dis, AdbgDisOpt.syntax, globals.syntax, 0);
+	} else if (globals.pid) {
+		ecode = shell_proc_attach(globals.pid);
+		if (ecode) {
+			printf("Error: %s\n", adbg_error_msg());
+			return ecode;
+		}
 	}
 	
 	coninit();
@@ -136,9 +128,9 @@ LINPUT:
 		return 0;
 	}
 	
-	int error = shell_exec(line);
-	if (error)
-		printf("error: %s\n", errorstring(cast(ShellError)error));
+	ecode = shell_exec(line);
+	if (ecode)
+		logerror(shell_error_string(ecode));
 	goto LINPUT;
 }
 
@@ -157,7 +149,6 @@ int shell_execv(int argc, const(char) **argv) {
 	const(char) *ucommand = argv[0];
 	immutable(command2_t) *command = shell_findcommand(ucommand);
 	if (command == null) {
-		serror("unknown command: '%s'", ucommand);
 		return ShellError.invalidCommand;
 	}
 	return command.entry(argc, argv);
@@ -170,16 +161,50 @@ adbg_process_t *process;
 adbg_disassembler_t *dis;
 adbg_registers_t *registers;
 
-void function(const(char)* sev, const(char)* msg) userlog;
+// NOTE: BetterC stderr bindings on Windows are broken
+//       And don't allow re-opening the streams, so screw it
 
-//TODO: Shell logging
-void serror(const(char) *fmt, ...) {
-	if (userlog == null) return;
+FILE *logfd;
+int loginit(const(char) *path) {
+	version (Windows) {
+		// 1. HANDLE stdHandle = GetStdHandle(STD_ERROR_HANDLE);
+		// 2. int fileDescriptor = _open_osfhandle((intptr_t)stdHandle, _O_TEXT);
+		// 3. FILE* file = _fdopen(fileDescriptor, "w");
+		// 4. int dup2Result = _dup2(_fileno(file), _fileno(stderr));
+		// 5. setvbuf(stderr, NULL, _IONBF, 0);
+		if (path == null) path = "CONOUT$";
+	} else {
+		if (path == null) path = "/dev/stderr";
+	}
 	
+	logfd = fopen(path, "wb");
+	if (logfd) {
+		setvbuf(logfd, null, _IONBF, 0);
+	}
+	return logfd == null;
 }
-void slog(const(char) *msg) {
-	if (userlog == null) return;
-	
+void logerror(const(char) *fmt, ...) {
+	va_list args = void;
+	va_start(args, fmt);
+	logwrite("error", fmt, args);
+}
+void logwarn(const(char) *fmt, ...) {
+	va_list args = void;
+	va_start(args, fmt);
+	logwrite("warning", fmt, args);
+}
+void loginfo(const(char) *fmt, ...) {
+	va_list args = void;
+	va_start(args, fmt);
+	logwrite(null, fmt, args);
+}
+void logwrite(const(char) *level, const(char) *fmt, va_list args) {
+	if (level) {
+		fputs(level, logfd);
+		fputs(": ", logfd);
+	}
+	vfprintf(logfd, fmt, args);
+	putchar('\n');
 }
 
 immutable string RCFILE = ".adbgrc";
@@ -493,8 +518,51 @@ immutable(command2_t)* shell_findcommand(const(char) *ucommand) {
 	return null;
 }
 
-//TODO: shell_spawn
-//TODO: shell_attach
+int shell_proc_spawn(const(char) *exec, const(char) **argv) {
+	// Save for restart
+	globals.file = exec;
+	globals.args = argv;
+	
+	// Spawn process
+	process = adbg_debugger_spawn(globals.file,
+		AdbgSpawnOpt.argv, argv,
+		0);
+	if (process == null) {
+		return ShellError.alicedbg;
+	} else
+		puts("Process created.");
+	
+	// Open disassembler for process machine type
+	dis = adbg_dis_open(adbg_process_get_machine(process));
+	if (dis == null) {
+		logwarn("Disassembler not available (%s).", adbg_error_msg());
+	}
+	
+	return 0;
+}
+
+int shell_proc_attach(int pid) {
+	// Save for restart
+	globals.pid = pid;
+	
+	// Attach to process
+	process = adbg_debugger_attach(pid, 0);
+	if (process == null) {
+		return ShellError.alicedbg;
+	}
+	
+	// Open disassembler for process machine type
+	dis = adbg_dis_open(adbg_process_get_machine(process));
+	if (dis) {
+		if (globals.syntax)
+			adbg_dis_options(dis, AdbgDisOpt.syntax, globals.syntax, 0);
+	} else {
+		printf("warning: Disassembler not available (%s)\n",
+			adbg_error_msg());
+	}
+	
+	return 0;
+}
 
 void shell_event_disassemble(size_t address, int count = 1, bool showAddress = true) {
 	if (dis == null)
@@ -614,7 +682,6 @@ int command_help(int argc, const(char) **argv) {
 		const(char) *ucommand = argv[1];
 		immutable(command2_t) *command = shell_findcommand(ucommand);
 		if (command == null) {
-			serror("Command not found: '%s'", ucommand);
 			return ShellError.invalidParameter;
 		}
 		
@@ -642,27 +709,10 @@ int command_help(int argc, const(char) **argv) {
 
 int command_spawn(int argc, const(char) **argv) {
 	if (argc < 2) {
-		serror("Missing file argument.");
 		return ShellError.invalidParameter;
 	}
 	
-	globals.file = argv[1];
-	globals.args = argc > 2 ? argv + 2: null;
-	
-	process = adbg_debugger_spawn(globals.file,
-		AdbgSpawnOpt.argv, globals.args,
-		0);
-	if (process == null) {
-		serror("Could not spawn process.");
-		return ShellError.alicedbg;
-	}
-	dis = adbg_dis_open(adbg_process_get_machine(process));
-	if (dis == null) {
-		printf("warning: Disassembler not available (%s)\n",
-			adbg_error_msg());
-	}
-	
-	return 0;
+	return shell_proc_spawn(argv[1], argc > 2 ? argv + 2: null);
 }
 
 //TODO: int shell_postload(
@@ -670,28 +720,14 @@ int command_spawn(int argc, const(char) **argv) {
 
 int command_attach(int argc, const(char) **argv) {
 	if (argc < 2) {
-		serror("Missing pid argument");
 		return ShellError.invalidParameter;
 	}
 	
-	int pid = atoi(argv[1]);
-	process = adbg_debugger_attach(pid, 0);
-	if (process == null) {
-		serror("Could not attach to process.");
-		return ShellError.alicedbg;
-	}
-	dis = adbg_dis_open(adbg_process_get_machine(process));
-	if (dis == null) {
-		printf("warning: Disassembler not available (%s)\n",
-			adbg_error_msg());
-	}
-	
-	return 0;
+	return shell_proc_attach(atoi(argv[1]));
 }
 
 int command_detach(int argc, const(char) **argv) {
 	if (adbg_debugger_detach(process)) {
-		serror("Could not detach process.");
 		return ShellError.alicedbg;
 	}
 	adbg_dis_close(dis);
@@ -701,43 +737,38 @@ int command_detach(int argc, const(char) **argv) {
 
 int command_restart(int argc, const(char) **argv) {
 	switch (process.creation) with (AdbgCreation) {
-	case attached:
-		int pid = adbg_process_get_pid(process);
-		if (adbg_debugger_detach(process)) {
-			serror("Could not detach process.");
-			return ShellError.alicedbg;
-		}
-		process = adbg_debugger_attach(pid, 0);
-		if (process == null) {
-			serror("Could not attach process.");
-			return ShellError.alicedbg;
-		}
-		puts("Debugger re-attached");
-		break;
 	case spawned:
+		// Terminate first
 		if (adbg_debugger_terminate(process)) {
-			serror("Could not terminate process.");
 			return ShellError.alicedbg;
 		}
-		process = adbg_debugger_spawn(globals.file,
-			AdbgSpawnOpt.argv, globals.args,
-			0);
-		if (process == null) {
-			serror("Could not spawn process.");
-			return ShellError.alicedbg;
+		
+		// Spawn
+		int e = shell_proc_spawn(globals.file, globals.args);
+		if (e) {
+			return e;
 		}
+		
 		puts("Process respawned");
 		break;
+	case attached:
+		// Detach first
+		if (adbg_debugger_detach(process)) {
+			return ShellError.alicedbg;
+		}
+		free(process);
+		
+		// Attach
+		int e = shell_proc_attach(globals.pid);
+		if (e) {
+			return e;
+		}
+		
+		puts("Debugger re-attached");
+		break;
 	default:
-		serror("No process attached or spawned.");
+		logerror("No process attached or spawned.");
 		return 0;
-	}
-	
-	adbg_dis_close(dis);
-	dis = adbg_dis_open(adbg_process_get_machine(process));
-	if (dis == null) {
-		printf("warning: Disassembler not available (%s)\n",
-			adbg_error_msg());
 	}
 	
 	return 0;
@@ -781,7 +812,7 @@ int command_regs(int argc, const(char) **argv) {
 	adbg_registers_fill(registers, process);
 	
 	if (registers.count == 0) {
-		serror("No registers available");
+		logerror("No registers available");
 		return ShellError.unavailable;
 	}
 	
@@ -798,7 +829,7 @@ int command_regs(int argc, const(char) **argv) {
 		found = true;
 	}
 	if (rselect && found == false) {
-		serror("Register not found");
+		logerror("Register not found");
 		return ShellError.invalidParameter;
 	}
 	return 0;

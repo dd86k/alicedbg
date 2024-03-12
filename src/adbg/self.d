@@ -138,6 +138,11 @@ else
 }
 
 /// Set a custom crash handler.
+///
+/// This is useful for catching critical exceptions gracefully before
+/// closing the application, such as writing a crash log or minidump.
+///
+/// Note: Not respected by buffer overruns.
 /// Params: func = User handler function.
 /// Returns: Zero on success; Non-zero on error.
 int adbg_self_set_crashhandler(void function(adbg_exception_t*) func) {
@@ -161,7 +166,7 @@ version (Windows) {
 		if (sigaction(sig, &sa, NO_SIGACTION) < 0)
 			return adbg_oops(AdbgError.os);
 	}
-}
+} // version (Posix)
 	
 	__ufunction = func;
 	return 0;
