@@ -569,14 +569,13 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 		return;
 	
 	for (int i; i < count; ++i) {
-		enum RDSZ = 16;
-		ubyte[RDSZ] data = void;
-		if (adbg_memory_read(process, address, data.ptr, RDSZ)) {
+		ubyte[MAX_INSTR_SIZE] data = void;
+		if (adbg_memory_read(process, address, data.ptr, MAX_INSTR_SIZE)) {
 			oops;
 			return;
 		}
 		adbg_opcode_t op = void;
-		if (adbg_dis_once(dis, &op, data.ptr, RDSZ)) {
+		if (adbg_dis_once(dis, &op, data.ptr, MAX_INSTR_SIZE)) {
 			printf("%8llx (error:%s)\n", cast(ulong)address, adbg_error_msg);
 			return;
 		}
@@ -603,15 +602,42 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 }
 
 void shell_event_exception(adbg_exception_t *ex) {
-	printf("*	Process %d thread %d stopped\n"~
-		"	Reason: %s ("~ADBG_OS_ERROR_FORMAT~")\n",
+	printf("*	Process %d (thread %d) stopped\n"~
+		"	Reason  : %s ("~ADBG_OS_ERROR_FORMAT~")\n",
 		ex.pid, ex.tid,
 		adbg_exception_name(ex), ex.oscode);
 	
 	if (ex.faultz) {
-		printf("	Fault address: %llx\n", ex.fault_address);
-		printf("	Faulting instruction: ");
-		shell_event_disassemble(ex.faultz, 1, false);
+		printf("	Address : 0x%llx\n", ex.fault_address);
+		
+		if (dis) {
+			printf("	Machine :");
+			
+			// Print machine bytes
+			ubyte[MAX_INSTR_SIZE] data = void;
+			if (adbg_memory_read(process, ex.faultz, data.ptr, MAX_INSTR_SIZE)) {
+				printf(" read error (%s)\n", adbg_error_msg());
+				return; // Nothing else to do
+			}
+			
+			adbg_opcode_t op = void;
+			if (adbg_dis_once(dis, &op, data.ptr, MAX_INSTR_SIZE)) {
+				printf(" disassembly error (%s)\n", adbg_error_msg());
+				return;
+			}
+			
+			// Print machine bytes
+			for (size_t bi; bi < op.size; ++bi) {
+				printf(" %02x", op.machine[bi]);
+			}
+			putchar('\n');
+			
+			// Print mnemonic
+			printf("	Mnemonic: %s", op.mnemonic);
+			if (op.operands)
+				printf(" %s", op.operands);
+			putchar('\n');
+		}
 	}
 }
 
@@ -714,9 +740,6 @@ int command_spawn(int argc, const(char) **argv) {
 	
 	return shell_proc_spawn(argv[1], argc > 2 ? argv + 2: null);
 }
-
-//TODO: int shell_postload(
-//      Load disassembler, etc.
 
 int command_attach(int argc, const(char) **argv) {
 	if (argc < 2) {
@@ -955,9 +978,9 @@ int command_disassemble(int argc, const(char) **argv) {
 	return 0;
 }
 
-__gshared size_t last_scan_size;
-__gshared ulong last_scan_data;
-__gshared adbg_scan_t *last_scan;
+size_t last_scan_size;
+ulong last_scan_data;
+adbg_scan_t *last_scan;
 
 void shell_event_list_scan_results() {
 	// super lazy hack
