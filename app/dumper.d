@@ -153,8 +153,8 @@ int app_dump() {
 	case archive:	return dump_archive(dump, o);
 	case mdmp:	return dump_minidump(dump, o);
 	case dmp:	return dump_dmp(dump, o);
+	case coff:	return dump_coff(dump, o);
 	case mscoff:	return dump_mscoff(dump, o);
-	case coff:
 	case unknown:	assert(0, "Unknown object type"); // Raw/unknown
 	}
 }
@@ -163,7 +163,7 @@ private immutable {
 	/// Padding spacing to use in characters
 	// PE32 has fields like MinorOperatingSystemVersion (27 chars)
 	int __field_padding = -28;
-	/// 
+	/// Number of columns to produce in hexdumps.
 	int __columns = 16;
 }
 

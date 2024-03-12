@@ -1,9 +1,11 @@
-/// MS-COFF format.
+/// MS-COFF anonymous object format.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause
 module adbg.object.format.mscoff;
+
+// NOTE: PE32/PE-COFF is an extension of COFF and MZ
 
 import adbg.object.server : AdbgObject, adbg_object_t;
 import adbg.utils.uid;

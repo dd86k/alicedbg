@@ -683,18 +683,35 @@ L_ARG:
 		
 		// If nothing matches, assume MZ
 		return adbg_object_mz_load(o);
-	case MAGIC_ZM: // Also known as old magic, but more likely just inverted
+	// Old MZ magic or swapped
+	case MAGIC_ZM:
 		if (o.file_size < mz_hdr.sizeof)
 			return adbg_oops(AdbgError.unknownObjFormat);
 		
 		goto case MAGIC_MZ;
-	case 0: // MS-COFF
+	// Anonymous MSCOFF
+	case 0:
 		if (o.file_size < mscoff_anon_header_bigobj.sizeof)
 			return adbg_oops(AdbgError.unknownObjFormat);
 		if (o.i.mscoff.import_header.Sig2 != 0xffff)
 			return adbg_oops(AdbgError.unknownObjFormat);
 		
 		return adbg_object_mscoff_load(o);
+	// COFF magics
+	case COFF_MAGIC_I386:
+	case COFF_MAGIC_I386_AIX:
+	case COFF_MAGIC_AMD64:
+	case COFF_MAGIC_IA64:
+	case COFF_MAGIC_Z80:
+	case COFF_MAGIC_TMS470:
+	case COFF_MAGIC_TMS320C5400:
+	case COFF_MAGIC_TMS320C6000:
+	case COFF_MAGIC_TMS320C5500:
+	case COFF_MAGIC_TMS320C2800:
+	case COFF_MAGIC_MSP430:
+	case COFF_MAGIC_TMS320C5500P:
+	case COFF_MAGIC_MIPSEL:
+		return adbg_object_coff_load(o);
 	default:
 		return adbg_oops(AdbgError.unknownObjFormat);
 	}

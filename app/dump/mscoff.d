@@ -10,11 +10,8 @@ import adbg.object.server;
 import adbg.object.machines;
 import adbg.object.format.mscoff;
 import adbg.object.format.pe : adbg_object_pe_machine_string;
-import adbg.utils.bit : adbg_bswap32;
 import adbg.utils.uid;
-import core.stdc.ctype : isdigit;
 import dumper;
-import utils : realstring;
 
 int dump_mscoff(ref Dumper dump, adbg_object_t *o) {
 	if (dump.selected_headers())
@@ -26,6 +23,8 @@ int dump_mscoff(ref Dumper dump, adbg_object_t *o) {
 private:
 
 void dump_mscoff_hdr(ref Dumper dump, adbg_object_t *o) {
+	print_header("Header");
+	
 	switch (o.i.mscoff.import_header.Version) {
 	case MSCOFF_VERSION_IMPORT: // 0
 		with (o.i.mscoff.import_header) {

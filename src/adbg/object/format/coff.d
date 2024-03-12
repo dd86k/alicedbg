@@ -5,7 +5,10 @@
 /// License: BSD-3-Clause
 module adbg.object.format.coff;
 
+import adbg.object.server : AdbgObject, adbg_object_t;
 import adbg.utils.bit;
+
+// NOTE: ECOFF (MIPS) and XCOFF (AIX) aren't supported
 
 // Sources:
 // - https://delorie.com/djgpp/doc/coff/
@@ -17,7 +20,7 @@ enum : ushort {
 	/// i386 AIX COFF magic
 	COFF_MAGIC_I386_AIX	= I16!(0x75, 0x01),	// 0x175
 	/// amd64 COFF magic
-	COFF_MAGIC_AMD64	= I16!(0x64, 0x86),
+	COFF_MAGIC_AMD64	= I16!(0x64, 0x86),	// 0x8664
 	/// Itanium COFF magic
 	COFF_MAGIC_IA64	= I16!(0x00, 0x02),
 	/// Z80
@@ -64,6 +67,7 @@ enum : ushort {
 	COFF_F_MSB	= I16!(0x02, 0x00),
 }
 
+// NOTE: PE32 shares this header
 struct coff_header {
 	/// Magic
 	ushort f_magic;
@@ -79,5 +83,34 @@ struct coff_header {
 	ushort f_opthdr;
 	/// 
 	ushort f_flags;
-	// NOTE: TI COFF has another signature
+	
+	// NOTE: Some COFF extensions have an additional magic and/or targetID
+	//       TI: extends this with ushort TargetID;
+}
+
+int adbg_object_coff_load(adbg_object_t *o) {
+	o.format = AdbgObject.coff;
+	
+	// NOTE: No swapping is done because I'm lazy and this is one a per-machine basis
+	
+	return 0;
+}
+
+const(char)* adbg_object_coff_magic_string(ushort mach) {
+	switch (mach) {
+	case COFF_MAGIC_I386:	return "I386";
+	case COFF_MAGIC_I386_AIX:	return "I386_AIX";
+	case COFF_MAGIC_AMD64:	return "AMD64";
+	case COFF_MAGIC_IA64:	return "IA64";
+	case COFF_MAGIC_Z80:	return "Z80";
+	case COFF_MAGIC_TMS470:	return "TMS470";
+	case COFF_MAGIC_TMS320C5400:	return "TMS320C5400";
+	case COFF_MAGIC_TMS320C6000:	return "TMS320C6000";
+	case COFF_MAGIC_TMS320C5500:	return "TMS320C5500";
+	case COFF_MAGIC_TMS320C2800:	return "TMS320C2800";
+	case COFF_MAGIC_MSP430:	return "MSP430";
+	case COFF_MAGIC_TMS320C5500P:	return "TMS320C5500P";
+	case COFF_MAGIC_MIPSEL:	return "MIPSEL";
+	default:	return "Unknown";
+	}
 }

@@ -19,4 +19,5 @@ public import
 	dump.mdmp,
 	dump.dmp,
 	dump.ar,
+	dump.coff,
 	dump.mscoff;
