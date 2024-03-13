@@ -743,21 +743,21 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	}
 	
 	if (o.i.pe.header.NumberOfSections > MAXIMUM_SECTIONS)
-		return adbg_oops(AdbgError.assertion);
+		return adbg_oops(AdbgError.objectMalformed);
 	
 	switch (o.i.pe.opt_header.Magic) {
 	case PE_FMT_32:
 		if (adbg_object_outboundpl(o, o.i.pe.opt_header, PE_OPTIONAL_HEADER.sizeof))
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.objectOutsideBounds);
 		
 		o.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR32);
 		if (adbg_object_outboundpl(o, o.i.pe.directory, PE_IMAGE_DATA_DIRECTORY.sizeof))
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.objectOutsideBounds);
 		
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR32);
 		if (adbg_object_outboundpl(o, o.i.pe.sections,
 			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.objectOutsideBounds);
 		
 		if (o.p.reversed) {
 			PE_OPTIONAL_HEADER *hdr = o.i.pe.opt_header;
@@ -792,16 +792,16 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		break;
 	case PE_FMT_64:
 		if (adbg_object_outboundpl(o, o.i.pe.opt_header, PE_OPTIONAL_HEADER64.sizeof))
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.objectOutsideBounds);
 		
 		o.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR64);
 		if (adbg_object_outboundpl(o, o.i.pe.directory, PE_IMAGE_DATA_DIRECTORY.sizeof))
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.objectOutsideBounds);
 		
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR64);
 		if (adbg_object_outboundpl(o, o.i.pe.sections,
 			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.objectOutsideBounds);
 		
 		if (o.p.reversed) {
 			PE_OPTIONAL_HEADER64 *hdr = o.i.pe.opt_header64;
@@ -838,7 +838,7 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDRROM);
 		if (adbg_object_outboundpl(o, o.i.pe.sections,
 			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.objectOutsideBounds);
 		
 		if (o.p.reversed) {
 			PE_OPTIONAL_HEADERROM *hdr = o.i.pe.opt_headerrom;
@@ -946,7 +946,11 @@ void* adbg_object_pe_locate(adbg_object_t *o, uint rva) {
 			continue;
 		
 		void* a = o.buffer + (s.PointerToRawData + (rva - va));
-		return adbg_object_outboundp(o, a) ? null : a;
+		if (adbg_object_outboundp(o, a)) {
+			adbg_oops(AdbgError.objectOutsideBounds);
+			return null;
+		}
+		return a;
 	}
 	
 	version (Trace) trace("null");
@@ -1069,8 +1073,10 @@ const(char)* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *
 		- o.i.pe.directory.ExportTable.rva
 		+ export_.Name;
 	
-	if (adbg_object_outboundp(o, cast(void*)name))
+	if (adbg_object_outboundp(o, cast(void*)name)) {
+		adbg_oops(AdbgError.objectOutsideBounds);
 		return null;
+	}
 	
 	return name;
 }
@@ -1085,13 +1091,17 @@ PE_EXPORT_ENTRY* adbg_object_pe_export_name_entry(adbg_object_t *o, PE_EXPORT_DE
 	void *base = cast(void*)o.i.pe.directory_exports
 		- o.i.pe.directory.ExportTable.rva
 		+ export_.NamePointer;
-	if (adbg_object_outboundp(o, base))
+	if (adbg_object_outboundp(o, base)) {
+		adbg_oops(AdbgError.objectOutsideBounds);
 		return null;
+	}
 	
 	// Check bounds with name pointer and requested index
 	PE_EXPORT_ENTRY *entry = cast(PE_EXPORT_ENTRY*)base + index;
-	if (adbg_object_outboundp(o, entry))
+	if (adbg_object_outboundp(o, entry)) {
+		adbg_oops(AdbgError.objectOutsideBounds);
 		return null;
+	}
 	
 	if (o.p.reversed && o.i.pe.reversed_dir_export_entries[index] == false) with (entry) {
 		entry.Export = adbg_bswap32(entry.Export);
@@ -1119,7 +1129,11 @@ const(char)* adbg_object_pe_export_name_string(adbg_object_t *o, PE_EXPORT_DESCR
 	// Check bounds with table RVA
 	void *base = cast(void*)o.i.pe.directory_exports -
 		o.i.pe.directory.ExportTable.rva + entry.Export;
-	return adbg_object_outboundp(o, base) ? null : cast(const(char)*)base;
+	if (adbg_object_outboundp(o, base)) {
+		adbg_oops(AdbgError.objectOutsideBounds);
+		return null;
+	}
+	return cast(const(char)*)base;
 }
 
 //
@@ -1159,8 +1173,10 @@ char* adbg_object_pe_import_name(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_
 	
 	char *s = cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva + import_.Name;
 	
-	if (adbg_object_outboundp(o, s))
+	if (adbg_object_outboundp(o, s)) {
+		adbg_oops(AdbgError.objectOutsideBounds);
 		return null;
+	}
 	
 	return s;
 }
@@ -1175,8 +1191,10 @@ PE_IMPORT_ENTRY32* adbg_object_pe_import_entry32(adbg_object_t *o, PE_IMPORT_DES
 		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
 		+ index;
 	
-	if (adbg_object_outboundp(o, lte32) || lte32.ordinal == 0)
+	if (adbg_object_outboundp(o, lte32) || lte32.ordinal == 0) {
+		adbg_oops(AdbgError.objectOutsideBounds);
 		return null;
+	}
 	
 	return lte32;
 }
@@ -1187,8 +1205,10 @@ ushort* adbg_object_pe_import_entry32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTO
 	
 	ushort* base = cast(ushort*)
 		((cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva) + im32.rva);
-	if (adbg_object_outboundp(o, base))
+	if (adbg_object_outboundp(o, base)) {
+		adbg_oops(AdbgError.objectOutsideBounds);
 		return null;
+	}
 	
 	return base;
 }
@@ -1203,8 +1223,10 @@ PE_IMPORT_ENTRY64* adbg_object_pe_import_entry64(adbg_object_t *o, PE_IMPORT_DES
 	
 	version (Trace) trace("imports=%p lte64=%p fs=%zx", o.i.pe.directory_imports, lte64, o.file_size);
 	
-	if (adbg_object_outboundp(o, lte64) || lte64.ordinal == 0)
+	if (adbg_object_outboundp(o, lte64) || lte64.ordinal == 0) {
+		adbg_oops(AdbgError.objectOutsideBounds);
 		return null;
+	}
 	
 	return lte64;
 }
@@ -1218,8 +1240,10 @@ ushort* adbg_object_pe_import_entry64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTO
 	
 	version (Trace) trace("base=%p fs=%zx", base, o.file_size);
 	
-	if (adbg_object_outboundp(o, base))
+	if (adbg_object_outboundp(o, base)) {
+		adbg_oops(AdbgError.objectOutsideBounds);
 		return null;
+	}
 	
 	return base;
 }

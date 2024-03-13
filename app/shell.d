@@ -16,8 +16,6 @@ import term;
 // Enable new process name, although it is currently broken on Windows
 //version = UseNewProcessName
 
-//TODO: Print process exit code
-
 extern (C):
 
 /// Application error

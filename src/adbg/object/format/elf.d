@@ -1043,12 +1043,12 @@ int adbg_object_elf_load(adbg_object_t *o) {
 		}
 		
 		if (ehdr.e_version != ELF_EV_CURRENT)
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.objectInvalidVersion);
 		
 		if (ehdr.e_phoff && ehdr.e_phnum) {
 			if (adbg_object_offsetl(o, cast(void**)&phdr,
 				ehdr.e_phoff, Elf32_Phdr.sizeof * ehdr.e_phnum))
-				return adbg_oops(AdbgError.assertion);
+				return adbg_oops(AdbgError.objectMalformed);
 			reversed_phdr = cast(bool*)calloc(ehdr.e_phnum, bool.sizeof);
 			if (reversed_phdr == null)
 				return adbg_oops(AdbgError.crt);
@@ -1059,7 +1059,7 @@ int adbg_object_elf_load(adbg_object_t *o) {
 		if (ehdr.e_shoff && ehdr.e_shnum) {
 			if (adbg_object_offsetl(o, cast(void**)&shdr,
 				ehdr.e_shoff, Elf32_Shdr.sizeof * ehdr.e_shnum))
-				return adbg_oops(AdbgError.assertion);
+				return adbg_oops(AdbgError.objectMalformed);
 			reversed_shdr = cast(bool*)calloc(ehdr.e_shnum, bool.sizeof);
 			if (reversed_shdr == null)
 				return adbg_oops(AdbgError.crt);
@@ -1088,12 +1088,12 @@ int adbg_object_elf_load(adbg_object_t *o) {
 		}
 		
 		if (ehdr.e_version != ELF_EV_CURRENT)
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.objectInvalidVersion);
 		
 		if (ehdr.e_phoff && ehdr.e_phnum) {
 			if (adbg_object_offsetl(o, cast(void**)&phdr,
 				ehdr.e_phoff, Elf64_Phdr.sizeof * ehdr.e_phnum))
-				return adbg_oops(AdbgError.assertion);
+				return adbg_oops(AdbgError.objectMalformed);
 			reversed_phdr = cast(bool*)calloc(ehdr.e_phnum, bool.sizeof);
 			if (reversed_phdr == null)
 				return adbg_oops(AdbgError.crt);
@@ -1105,7 +1105,7 @@ int adbg_object_elf_load(adbg_object_t *o) {
 		if (ehdr.e_shoff && ehdr.e_shnum) {
 			if (adbg_object_offsetl(o, cast(void**)&shdr,
 				ehdr.e_shoff, Elf64_Shdr.sizeof * ehdr.e_shnum))
-				return adbg_oops(AdbgError.assertion);
+				return adbg_oops(AdbgError.objectMalformed);
 			reversed_shdr = cast(bool*)calloc(ehdr.e_shnum, bool.sizeof);
 			if (reversed_shdr == null)
 				return adbg_oops(AdbgError.crt);

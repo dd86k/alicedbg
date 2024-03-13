@@ -117,7 +117,7 @@ adbg_shared_lib_t* adbg_symbols_load(const(char)*[] libraries...) {
 	
 	// No libraries could be loaded
 	free(lib);
-	adbg_oops(AdbgError.symbolLibraryError);
+	adbg_oops(AdbgError.symbolLoadError);
 	return null;
 }
 
@@ -142,7 +142,7 @@ int adbg_symbols_bind(adbg_shared_lib_t *lib, void** proc, const(char) *symbol,
 	if (*proc == null) {
 		// Add symbol to count of missed symbols.
 		adbg_symbols_addmissing(lib, symbol);
-		return adbg_oops(AdbgError.symbolLoadError);
+		return adbg_oops(AdbgError.symbolBindError);
 	}
 	
 	return 0;

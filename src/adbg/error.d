@@ -24,7 +24,10 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 //TODO: adbg_error_source -> alicedbg/crt/os/capstone, etc.
 //      adbg_error_is_external -> bool
 //TODO: Maybe redo error code functions to reduce confusion between errno/external/system/current
-//TODO: objectMalformed (Object might be corrupted)
+//TODO: Error utils
+//      adbg_ensure_params(lvalue, "name")
+//      - returns string if null found
+//      - automatically set error code
 
 extern (C):
 
@@ -69,6 +72,8 @@ enum AdbgError {
 	objectUnknownFormat	= 301,
 	objectUnsupportedFormat	= 302,
 	objectTooSmall	= 303,
+	objectMalformed	= 304,
+	objectItemNotFound	= 305,
 	objectInvalidVersion	= 310,
 	objectInvalidMachine	= 311,
 	objectInvalidClass	= 312,
@@ -88,8 +93,8 @@ enum AdbgError {
 	//
 	// 400-499: Symbols
 	//
-	symbolLibraryError	= 401,
 	symbolLoadError	= 402,
+	symbolBindError	= 403,
 	//
 	// 800-899: Memory scanner
 	//
@@ -110,7 +115,6 @@ enum AdbgError {
 	//
 	// 3000-3999: External libraries
 	//
-	libLoader	= 3001,	/// BindBC
 	libCapstone	= 3002,	/// Capstone
 }
 
@@ -134,11 +138,11 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	// Generics
 	//
-	{ AdbgError.invalidArgument,	"Invalid parameter value." },
+	{ AdbgError.invalidArgument,	"Invalid or missing parameter value." },
 	{ AdbgError.emptyArgument,	"Parameter is empty." },
 	{ AdbgError.uninitiated,	"Object or structure is uninitiated." },
-	{ AdbgError.invalidOption,	"Invalid option." },
-	{ AdbgError.invalidOptionValue,	"Invalid value for given option." },
+	{ AdbgError.invalidOption,	"Option unknown." },
+	{ AdbgError.invalidOptionValue,	"Option received invalid value." },
 	//
 	// Debugger
 	//
@@ -159,13 +163,20 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.objectUnknownFormat,	"Unknown object format." },
 	{ AdbgError.objectUnsupportedFormat,	"Unsupported object format." },
 	{ AdbgError.objectTooSmall,	"Object is too small to be valid." },
+	{ AdbgError.objectMalformed,	"Object potentially corrupted." },
+	{ AdbgError.objectItemNotFound,	"Item was not found in object." },
 	{ AdbgError.objectInvalidVersion,	"Invalid version for object." },
 	{ AdbgError.objectInvalidMachine,	"Invalid machine/platform value for object." },
 	{ AdbgError.objectInvalidClass,	"Invalid class/bitness value for object." },
 	{ AdbgError.objectInvalidEndian,	"Invalid endianess value for object." },
 	{ AdbgError.objectInvalidType,	"Invalid object type." },
 	{ AdbgError.objectInvalidABI,	"Invalid ABI value for object." },
-	{ AdbgError.objectOutsideBounds,	"Access outside bounds." },
+	{ AdbgError.objectOutsideBounds,	"Access outside file or module bounds." },
+	//
+	// Symbols
+	//
+	{ AdbgError.symbolLoadError,	"Could not load any dynamic libraries." },
+	{ AdbgError.symbolBindError,	"Could not bind the symbol." },
 	//
 	// Memory module
 	//
@@ -175,7 +186,7 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	// Misc.
 	//
 	{ AdbgError.assertion,	"A soft debugging assertion was hit." },
-	{ AdbgError.unimplemented,	"Feature is not currently implemented." },
+	{ AdbgError.unimplemented,	"Feature is not implemented." },
 	{ AdbgError.success,	"No errors occured." },
 ];
 
@@ -257,7 +268,9 @@ int adbg_errno_extern() {
 	switch (error.code) with (AdbgError) {
 	case crt:	return errno;
 	case os:	return adbg_error_system;
-	case libCapstone:	return cs_errno(*cast(csh*)error.res);
+	case libCapstone:
+		if (error.res == null) return 0;
+		return cs_errno(*cast(csh*)error.res);
 	default:	return error.code;
 	}
 }
@@ -271,13 +284,15 @@ const(char)* adbg_error_msg(int code = error.code) {
 	case os:
 		return adbg_sys_error(adbg_error_system());
 	case libCapstone:
+		if (error.res == null)
+			break;
 		return cs_strerror(cs_errno(*cast(csh*)error.res));
 	default:
 		foreach (ref e; errors_msg)
 			if (code == e.code)
 				return e.msg;
-		return defaultMsg;
 	}
+	return defaultMsg;
 }
 
 version (Trace) {

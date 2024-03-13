@@ -124,16 +124,20 @@ ar_member_header* adbg_object_ar_header(adbg_object_t *o, size_t index) {
 		p = cast(ar_member_header*)(cast(void*)p + offset);
 		
 		// Outside bounds
-		if (adbg_object_outboundpl(o, p, ar_member_header.sizeof))
+		if (adbg_object_outboundpl(o, p, ar_member_header.sizeof)) {
+			adbg_oops(AdbgError.objectOutsideBounds);
 			return null;
+		}
 	}
 	
 	return null;
 }
 
 int adbg_object_ar_header_size(adbg_object_t *o, ar_member_header *mhdr) {
-	if (o == null || mhdr == null)
+	if (o == null || mhdr == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return -1;
+	}
 	
 	char[12] str = void;
 	memcpy(str.ptr, mhdr.Size.ptr, mhdr.Size.sizeof);
@@ -142,14 +146,20 @@ int adbg_object_ar_header_size(adbg_object_t *o, ar_member_header *mhdr) {
 }
 
 void* adbg_object_ar_data(adbg_object_t *o, ar_member_header *mhdr) {
-	if (o == null || mhdr == null)
+	if (o == null || mhdr == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return null;
+	}
 	
 	void *p = cast(void*)mhdr + ar_member_header.sizeof;
 	int size = adbg_object_ar_header_size(o, mhdr);
-	if (size < 0)
+	if (size < 0) {
+		adbg_oops(AdbgError.objectMalformed);
 		return null;
-	if (adbg_object_outboundpl(o, p, size))
+	}
+	if (adbg_object_outboundpl(o, p, size)) {
+		adbg_oops(AdbgError.objectOutsideBounds);
 		return null;
+	}
 	return p;
 }
