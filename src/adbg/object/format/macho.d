@@ -15,12 +15,9 @@ import core.stdc.stdlib : calloc;
 // - https://github.com/opensource-apple/cctools/blob/master/include/mach/machine.h
 // - https://github.com/opensource-apple/cctools/blob/master/include/mach-o/loader.h
 
-// Self-imposed limits
-
 /// Smallest Mach-O size.
 // https://codegolf.stackexchange.com/a/154685
 private enum MINIMUM_SIZE = 0x1000; // Due to paging
-//TODO: Apply limits (with logging?)
 private enum LIMIT_FAT_ARCH = 200;
 private enum LIMIT_COMMANDS = 2000;
 
@@ -168,7 +165,7 @@ enum { // SUBTYPE_I386
 	MACHO_SUBTYPE_X86_64_ALL = MACHO_SUBTYPE_I386_ALL,
 	MACHO_SUBTYPE_i386 = 3,
 	MACHO_SUBTYPE_i486 = 4,
-	MACHO_SUBTYPE_i486SX = 132, // "4 + 128"
+	MACHO_SUBTYPE_i486SX = 4 + 128, // "4 + 128"
 	MACHO_SUBTYPE_i586 = 5,
 	MACHO_SUBTYPE_PENT = SUBTYPE_INTEL!(5, 0),
 	MACHO_SUBTYPE_PENPRO = SUBTYPE_INTEL!(6, 1),
@@ -354,9 +351,9 @@ enum {
 	MACHO_LC_ID_DYLIB	= 0xd,	/// Dynamically linked shared lib ident
 	MACHO_LC_LOAD_DYLINKER	= 0xe,	/// Load a dynamic linker
 	MACHO_LC_ID_DYLINKER	= 0xf,	/// Dynamic linker identification
-	MACHO_LC_PREBOUND_DYLIB = 0x10,	/// Modules prebound for a dynamically linked shared library
+	MACHO_LC_PREBOUND_DYLIB	= 0x10,	/// Modules prebound for a dynamically linked shared library
 	MACHO_LC_ROUTINES	= 0x11,	/// Image routines
-	MACHO_LC_SUB_FRAMEWORK = 0x12,	/// Sub framework
+	MACHO_LC_SUB_FRAMEWORK	= 0x12,	/// Sub framework
 	MACHO_LC_SUB_UMBRELLA	= 0x13,	/// Sub umbrella
 	MACHO_LC_SUB_CLIENT	= 0x14,	/// Sub client
 	MACHO_LC_SUB_LIBRARY	= 0x15,	/// Sub library
@@ -464,22 +461,44 @@ int adbg_object_macho_load(adbg_object_t *o) {
 //TODO: Consider adbg_object_macho_isfat
 
 macho_header* adbg_object_macho_header(adbg_object_t *o) {
-	if (o == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	// NOTE: pre-swapped
 	return o.i.macho.header;
 }
 
 macho_fatmach_header* adbg_object_macho_header_fat(adbg_object_t *o) {
-	if (o == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	// NOTE: pre-swapped
 	return o.i.macho.fat_header;
 }
 
 macho_fat_arch* adbg_object_macho_fat_arch(adbg_object_t *o, size_t index) {
-	if (o == null) return null;
-	if (o.i.macho.fat_header == null) return null; // not loaded
-	if (o.i.macho.fat == false) return null;
-	if (index >= o.i.macho.fat_header.nfat_arch) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.macho.fat_header == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null; // not loaded
+	}
+	if (o.i.macho.fat == false) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (index >= LIMIT_FAT_ARCH) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	if (index >= o.i.macho.fat_header.nfat_arch) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
 	
 	macho_fat_arch* fat_arch = &o.i.macho.fat_arch[index];
 	if (o.p.reversed && o.i.macho.reversed_fat_arch[index] == false) {
@@ -497,11 +516,28 @@ macho_fat_arch* adbg_object_macho_fat_arch(adbg_object_t *o, size_t index) {
 // Size includes type (4 bytes), size (4 bytes), and anything that follows it
 // until next command.
 macho_load_command* adbg_object_macho_load_command(adbg_object_t *o, size_t index) {
-	if (o == null) return null;
-	if (o.i.macho.header == null) return null; // not loaded
-	if (o.i.macho.fat) return null;
-	if (index >= o.i.macho.header.ncmds) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.macho.header == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null; // not loaded
+	}
+	if (o.i.macho.fat) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (index >= LIMIT_COMMANDS) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	if (index >= o.i.macho.header.ncmds) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
 	
+	//TODO: Consider "caching" positions (calloc array) for faster lookup
 	macho_load_command* command = void;
 	size_t next;
 	for (size_t i; i <= index; ++i) {
@@ -528,7 +564,7 @@ const(char) *adbg_object_macho_magic_string(uint signature) {
 	case MACHO_CIGAM64:	return "MACHO_CIGAM_64";
 	case MACHO_FATMAGIC:	return "MACHO_FAT_MAGIC";
 	case MACHO_FATCIGAM:	return "MACHO_FAT_CIGAM";
-	default:	return null;
+	default:	return "?";
 	}
 }
 

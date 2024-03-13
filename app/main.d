@@ -450,7 +450,6 @@ int cli_meow() {
 //
 
 //TODO: Support --option=value syntax
-//TODO: Support stdin (-) for -A, -D
 
 void crash_handler(adbg_exception_t *ex) {
 	scope(exit) exit(ex.oscode);

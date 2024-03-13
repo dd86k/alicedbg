@@ -574,7 +574,7 @@ version (Windows) {
 	return 0;
 }
 
-//TODO: Check process debugged
+//TODO: Check process debugged remotely
 //bool adbg_process_debugged(adbg_process_t *tracee) {
 
 /// Get the debugger's current state.
@@ -840,6 +840,11 @@ int adbg_process_get_pid(adbg_process_t *tracee) {
 	return tracee.pid;
 }
 
+//TODO: Last parameter could be an enum
+//      AdbgProcNameInclude
+//      - program basename (only)
+//      - program full path
+//      - program full path and command-line arguments
 /// Get the process file path.
 ///
 /// The string is null-terminated.
@@ -905,14 +910,12 @@ version (Windows) {
 	if (r == 0) adbg_oops(AdbgError.os);
 	return r;
 } else version (linux) {
-	//TODO: Could use /proc/pid/exe? (symbolic path)
-	enum PATHBFSZ = 32;
+	enum PATHBFSZ = 32; // int.min is "-2147483648", 11 chars
 	char[PATHBFSZ] pathbuf = void; // Path buffer
-	ssize_t r;
 	
-	// NOTE: readlink does not appent null
+	// NOTE: readlink does not append null, this is done later
 	snprintf(pathbuf.ptr, PATHBFSZ, "/proc/%d/exe", pid);
-	r = readlink(pathbuf.ptr, buffer, bufsize);
+	ssize_t r = readlink(pathbuf.ptr, buffer, bufsize);
 	
 	// NOTE: cmdline arguments end with one null byte, and an extra null byte at the very end
 	/*snprintf(pathbuf.ptr, PATHBFSZ, "/proc/%d/cmdline", pid);

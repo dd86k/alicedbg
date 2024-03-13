@@ -12,10 +12,6 @@ import core.stdc.string : memset, strncmp;
 import adbg.error;
 import adbg.object.machines;
 
-//TODO: Register registers statically
-//      adbg_register_t { string name; int type; etc. }
-//      adbg_register_t[18] registers = [ ... ]
-//      - Remove usage of REG_COUNT
 //TODO: Support FPU registers
 
 version (Windows) {

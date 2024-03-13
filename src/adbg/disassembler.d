@@ -359,6 +359,7 @@ int adbg_dis_step(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	//        returns CS_ERR_OK, this could mean that an invalid
 	//        machine type was specified when opening the instance.
 	//TODO: Consider replacing mnemonic by "error"
+	//      Needs to be something specific (e.g. .bytes 0x11 0x22)
 	
 	// NOTE: CS modifies buffer, buffer_size, and address_base.
 	if (cs_disasm_iter(dasm.cs_handle,

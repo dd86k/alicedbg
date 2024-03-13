@@ -584,7 +584,7 @@ LRETRY:
 			continue;
 		}
 		
-		// Skip regions with empty permissions as they are irrelevent
+		// Skip regions with empty permissions as they seem unallocated
 		if (perms[0] == '-' && perms[1] == '-' && perms[2] == '-')
 			continue;
 		

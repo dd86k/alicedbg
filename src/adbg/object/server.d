@@ -92,7 +92,7 @@ enum AdbgObjectOrigin {
 	disk,
 	/// Object was loaded from the debugger into memory.
 	debugger,
-	//TODO: memory (raw)
+	//TODO: user buffer (memory)
 }
 
 /// Object server options.
@@ -578,8 +578,6 @@ L_ARG:
 	enum TEMP_LIMIT = MiB!100;
 	if (o.file_size > TEMP_LIMIT)
 		o.file_size = TEMP_LIMIT;
-	
-	//TODO: Determine absolute minimum before proceeding
 	
 	// Allocate
 	enum PARTIAL_SIZE = 4096;

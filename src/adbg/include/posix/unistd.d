@@ -9,20 +9,19 @@ version (Posix):
 
 public import core.sys.posix.unistd;
 
+extern (C):
+
 // Missing XOpen (XSI) definitions for Musl
 version (CRuntime_Musl) {
 	public import core.sys.posix.stdlib : ssize_t, off_t;
-	public extern (C) ssize_t pread(int, void *, size_t, off_t);
-	public extern (C) ssize_t pwrite(int, const(void)*, size_t, off_t);
+	public ssize_t pread(int, void *, size_t, off_t);
+	public ssize_t pwrite(int, const(void)*, size_t, off_t);
 }
 
-extern (C):
+// Only Linux has clone(2), BSDs still have fork(2)
+version (linux):
 
-//TODO: Check if BSDs have clone(2)...
-
-/*
- * cloning flags:
- */
+// Cloning flags
 enum CSIGNAL	= 0x000000ff;	/// signal mask to be sent at exit
 enum CLONE_VM	= 0x00000100;	/// set if VM shared between processes
 enum CLONE_FS	= 0x00000200;	/// set if fs info shared between processes
