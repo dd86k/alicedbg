@@ -441,7 +441,6 @@ enum AdbgAttachOpt {
 /// Attach the debugger to a process ID.
 ///
 /// Params:
-/// 	tracee = Tracee reference.
 /// 	pid = Process ID.
 /// 	... = Options. Pass 0 for none or to end list.
 /// Returns: Error code.

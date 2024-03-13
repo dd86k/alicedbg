@@ -226,10 +226,11 @@ int adbg_error_system() {
 /// Sets the last error code. The module path and line are automatically
 /// populated.
 /// Params:
-/// 	e = Error code
-/// 	res = External resource (handle, etc.)
-/// 	m = Automatically set to `__MODULE__`
-/// 	l = Automatically set to `__LINE__`
+/// 	e = Error code.
+/// 	res = External resource (handle, etc.).
+/// 	m = Automatically set to `__MODULE__`.
+/// 	l = Automatically set to `__LINE__`.
+/// 	f = Automatically set to `__FUNCTION__`.
 /// Returns: Error code
 int adbg_oops(AdbgError e, void *res = null,
 	string m = __MODULE__, int l = __LINE__, const(char)* f = __FUNCTION__.ptr) {

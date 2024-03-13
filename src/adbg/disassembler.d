@@ -218,7 +218,6 @@ int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 
 /// Open a disassembler instance.
 /// Params:
-///   dasm = Reference to disassembler instance.
 ///   machine = Machine architecture.
 /// Returns: Error code.
 adbg_disassembler_t* adbg_dis_open(AdbgMachine machine = AdbgMachine.native) {
@@ -396,6 +395,7 @@ int adbg_dis_step(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 ///   opcode = Opcode instance.
 ///   data = Pointer to user buffer.
 ///   size = Size of user buffer.
+///   base_address = Base address.
 /// Returns: Error code.
 int adbg_dis_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, void *data, size_t size,
 	ulong base_address = 0) {

@@ -126,6 +126,7 @@ adbg_shared_lib_t* adbg_symbols_load(const(char)*[] libraries...) {
 /// 	lib = Shared library instance.
 /// 	proc = Function pointer instance.
 /// 	symbol = Name of the function to bind.
+/// 	mangling = Symbol mangling (TODO).
 /// Returns: Error code.
 int adbg_symbols_bind(adbg_shared_lib_t *lib, void** proc, const(char) *symbol,
 	AdbgSymbolMangling mangling = AdbgSymbolMangling.exact) {

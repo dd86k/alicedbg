@@ -15,8 +15,8 @@ extern (C):
 
 /// Print MZ object.
 /// Params:
-///   o = Object.
-///   flags = Dump settings.
+///   dump = Dumper instance.
+///   o = Object instance.
 /// Returns: Non-zero on error.
 int dump_mz(ref Dumper dump, adbg_object_t *o) {
 	if (dump.selected_headers())

@@ -18,8 +18,8 @@ extern (C):
 
 /// Print PE object.
 /// Params:
-///   o = Object.
-///   flags = Dump settings.
+///   dump = Dumper instance.
+///   o = Object instance.
 /// Returns: Non-zero on error.
 int dump_pe(ref Dumper dump, adbg_object_t *o) {
 	if (dump.selected_headers())

@@ -339,7 +339,7 @@ bool adbg_object_outboundpl(adbg_object_t *o, void *p, size_t size) {
 /// Check if offset is within file boundaries
 /// Params:
 /// 	o = Object instance.
-/// 	pos = File offset.
+/// 	off = File offset.
 /// Returns: True if in bounds.
 bool adbg_object_outbound(adbg_object_t *o, ulong off) {
 	version (Trace) trace("offset=%llx", off);
@@ -350,7 +350,7 @@ bool adbg_object_outbound(adbg_object_t *o, ulong off) {
 /// Check if offset with size is within file boundaries
 /// Params:
 /// 	o = Object instance.
-/// 	pos = File offset.
+/// 	off = File offset.
 /// 	size = Data size.
 /// Returns: True if in bounds.
 bool adbg_object_outboundl(adbg_object_t *o, ulong off, size_t size) {

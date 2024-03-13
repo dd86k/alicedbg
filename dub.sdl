@@ -145,6 +145,21 @@ buildType "readln" {
 }
 
 #
+# ANCHOR Documentation build types
+#
+
+buildType "docs" {
+	buildRequirements "allowWarnings"
+	buildOptions "syntaxOnly"
+	dflags "-Dddocs"
+}
+buildType "ddox" {
+	buildRequirements "allowWarnings"
+	buildOptions "syntaxOnly"
+	dflags "-Dddocs" "-Df__dummy.html" "-Xfdocs.json"
+}
+
+#
 # ANCHOR Examples
 #
 
