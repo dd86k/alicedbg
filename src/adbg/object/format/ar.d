@@ -26,9 +26,9 @@ import core.stdc.string : memcpy;
 
 // NOTE: MSVC linker can only process libraries under 4 GiB in size.
 
-/// COFF archive magic.
+/// COFF library archive magic.
 enum AR_MAGIC = CHAR64!"!<arch>\n";
-/// Thin COFF archive magic.
+/// Thin COFF library archive magic.
 enum AR_THIN_MAGIC = CHAR64!"!<thin>\n";
 /// 
 private enum AR_EOL = CHAR16!"`\n";

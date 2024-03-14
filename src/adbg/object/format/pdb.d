@@ -15,6 +15,7 @@ import core.stdc.string : memcpy;
 // Sources:
 // - https://llvm.org/docs/PDB/MsfFile.html
 // - llvm/include/llvm/DebugInfo/PDB/ and llvm-pdbutil(1)
+//   llvm-pdbutil dump --summary PDBFILE
 // - https://github.com/microsoft/microsoft-pdb
 // - https://github.com/ziglang/zig/blob/master/lib/std/pdb.zig
 // - https://github.com/MolecularMatters/raw_pdb
@@ -25,19 +26,28 @@ import core.stdc.string : memcpy;
 //      it could make sense to move blocks and modify the indexes,
 //      but would require a *lot* of maintenance...
 
-//
-// Windows PDB
-//
-
-/// 
+/// Default (smallest?) size of a PDB 2.0 and 7.0 page.
 enum PDB_DEFAULT_PAGESIZE = 0x400;
+
+//
+// Microsoft PDB 2.0
+//
+// Similar to PDB 7.0, but the root stream contains:
+// - ushort streamCount
+// - ushort reserved
+// - { uint Size; uint Reserved }[StreamCount] stream1;
+// - ushort[StreamCount] pageNumber;
 
 immutable string PDB20_MAGIC = "Microsoft C/C++ program database 2.00\r\n\x1aJG\0\0";
 
-// Speculation
 struct pdb20_file_header {
 	char[44] Magic;
 	uint PageSize;	// Usually 0x400
+	ushort StartPage;	// 
+	ushort PageCount;	// Number of file pages
+	uint RootSize;	// Root stream size
+	uint Reserved;
+	ushort RootNumber;	// Root stream page number list
 }
 
 int adbg_object_pdb20_load(adbg_object_t *o, size_t offset = 0) {
@@ -59,7 +69,6 @@ pdb20_file_header* adbg_object_pdb20_header(adbg_object_t *o) {
 //
 // Microsoft PDB 7.0
 //
-
 // # Glossary
 //
 // Block
