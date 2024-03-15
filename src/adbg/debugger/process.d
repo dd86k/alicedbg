@@ -526,6 +526,8 @@ version (Windows) {
 	}
 	
 	// DebugActiveProcess, by default, kills the process on exit.
+	// Set exitkill unconditionalled
+	// Default: on
 	if (DebugSetProcessKillOnExit(options & OPT_EXITKILL) == FALSE) {
 		free(proc);
 		adbg_oops(AdbgError.os);
@@ -539,13 +541,15 @@ version (Windows) {
 		return null;
 	}
 	
-	proc.pid = cast(pid_t)pid;
-	
+	// Set exitkill on if specified
+	// Default: off
 	if (options & OPT_EXITKILL && ptrace(PT_SETOPTIONS, pid, null, PT_O_EXITKILL) < 0) {
 		free(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
+	
+	proc.pid = cast(pid_t)pid;
 } // version (Posix)
 	
 	proc.creation = AdbgCreation.attached;
@@ -561,7 +565,8 @@ int adbg_debugger_detach(adbg_process_t *tracee) {
 		return adbg_oops(AdbgError.debuggerInvalidAction);
 	
 	tracee.creation = AdbgCreation.unloaded;
-	tracee.status = AdbgProcStatus.idle;
+	tracee.status = AdbgProcStatus.unloaded;
+	scope(exit) free(tracee);
 	
 version (Windows) {
 	if (DebugActiveProcessStop(tracee.pid) == FALSE)
@@ -570,12 +575,11 @@ version (Windows) {
 	if (ptrace(PT_DETACH, tracee.pid, null, null) < 0)
 		return adbg_oops(AdbgError.os);
 }
-	
 	return 0;
 }
 
 //TODO: Check process debugged remotely
-//bool adbg_process_debugged(adbg_process_t *tracee) {
+//bool adbg_process_debugged(int pid) {
 
 /// Get the debugger's current state.
 /// Returns: Debugger status.
@@ -750,6 +754,7 @@ int adbg_debugger_terminate(adbg_process_t *tracee) {
 	
 	tracee.status = AdbgProcStatus.unloaded; // exited in any case
 	tracee.creation = AdbgCreation.unloaded;
+	scope(exit) free(tracee);
 	
 version (Windows) {
 	if (ContinueDebugEvent(tracee.pid, tracee.tid, DBG_TERMINATE_PROCESS) == FALSE)

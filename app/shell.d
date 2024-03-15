@@ -527,8 +527,9 @@ int shell_proc_spawn(const(char) *exec, const(char) **argv) {
 		0);
 	if (process == null) {
 		return ShellError.alicedbg;
-	} else
-		puts("Process created.");
+	}
+	
+	puts("Process created.");
 	
 	// Open disassembler for process machine type
 	dis = adbg_dis_open(adbg_process_get_machine(process));
@@ -549,6 +550,8 @@ int shell_proc_attach(int pid) {
 		return ShellError.alicedbg;
 	}
 	
+	puts("Debugger attached.");
+	
 	// Open disassembler for process machine type
 	dis = adbg_dis_open(adbg_process_get_machine(process));
 	if (dis) {
@@ -566,8 +569,11 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 	if (dis == null)
 		return;
 	
+	enum MBUFSZ = 64; /// Machine string buffer size
+	
+	ubyte[MAX_INSTR_SIZE] data = void;
+	char[MBUFSZ] machbuf = void;
 	for (int i; i < count; ++i) {
-		ubyte[MAX_INSTR_SIZE] data = void;
 		if (adbg_memory_read(process, address, data.ptr, MAX_INSTR_SIZE)) {
 			oops;
 			return;
@@ -580,15 +586,18 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 		
 		// Print address
 		if (showAddress)
-			printf("%8llx ", op.address);
+			printf("%8zx ", address);
 		
 		// Print machine bytes
+		//TODO: Print into a dedicated buffer before printing
+		size_t bo;
 		for (size_t bi; bi < op.size; ++bi) {
-			printf(" %02x", op.machine[bi]);
+			bo += snprintf(machbuf.ptr + bo, MBUFSZ - bo, " %02x", op.machine[bi]);
+			//printf(" %02x", op.machine[bi]);
 		}
 		
 		// Print mnemonic & operands
-		printf("\t%s", op.mnemonic);
+		printf("%s  \t%s", machbuf.ptr, op.mnemonic);
 		if (op.operands)
 			printf(" %s", op.operands);
 		
@@ -757,42 +766,28 @@ int command_detach(int argc, const(char) **argv) {
 }
 
 int command_restart(int argc, const(char) **argv) {
+	int e;
+	
 	switch (process.creation) with (AdbgCreation) {
 	case spawned:
-		// Terminate first
-		if (adbg_debugger_terminate(process)) {
-			return ShellError.alicedbg;
-		}
+		// Terminate first, ignore on error (e.g., already gone)
+		adbg_debugger_terminate(process);
 		
-		// Spawn
-		int e = shell_proc_spawn(globals.file, globals.args);
-		if (e) {
-			return e;
-		}
-		
-		puts("Process respawned");
+		// Spawn, shell still messages status
+		e = shell_proc_spawn(globals.file, globals.args);
 		break;
 	case attached:
-		// Detach first
-		if (adbg_debugger_detach(process)) {
-			return ShellError.alicedbg;
-		}
-		free(process);
+		// Detach first, ignore on error (e.g., already detached)
+		adbg_debugger_detach(process);
 		
-		// Attach
-		int e = shell_proc_attach(globals.pid);
-		if (e) {
-			return e;
-		}
-		
-		puts("Debugger re-attached");
+		// Attach, shell still messages status
+		e = shell_proc_attach(globals.pid);
 		break;
 	default:
-		logerror("No process attached or spawned.");
-		return 0;
+		return ShellError.unattached;
 	}
 	
-	return 0;
+	return e;
 }
 
 int command_go(int argc, const(char) **argv) {
@@ -809,6 +804,7 @@ int command_go(int argc, const(char) **argv) {
 int command_kill(int argc, const(char) **argv) {
 	if (adbg_debugger_terminate(process))
 		return ShellError.alicedbg;
+	puts("Process killed");
 	return 0;
 }
 
