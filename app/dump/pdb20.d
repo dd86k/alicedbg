@@ -29,11 +29,11 @@ void dump_pdb20_header(ref Dumper dump, adbg_object_t *o) {
 	
 	with (header) {
 	print_stringl("Magic", header.Magic.ptr, 37);
-	print_x32("PageSize", PageSize);
-	print_x16("StartPage", StartPage);
-	print_x16("PageCount", PageCount);
-	print_x32("RootSize", RootSize);
+	print_u32("PageSize", PageSize);
+	print_u16("StartPage", StartPage);
+	print_u16("PageCount", PageCount);
+	print_u32("RootSize", RootSize);
 	print_x32("Reserved", Reserved);
-	print_x16("RootNumber", RootNumber);
+	print_u16("RootNumber", RootNumber);
 	}
 }

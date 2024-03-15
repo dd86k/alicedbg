@@ -50,16 +50,15 @@ struct pdb20_file_header {
 	ushort RootNumber;	// Root stream page number list
 }
 
-int adbg_object_pdb20_load(adbg_object_t *o, size_t offset = 0) {
-	
-	//o.format = AdbgObject.pdb20;
+int adbg_object_pdb20_load(adbg_object_t *o) {
+	o.format = AdbgObject.pdb20;
 	//o.p.debug_offset = offset;
 	//
 	//with (o.i.pdb20.header)
 	//if (PageCount * PageSize != o.file_size)
 	//	return adbg_oops(AdbgError.assertion);
 	
-	return adbg_oops(AdbgError.unimplemented);
+	return 0;
 }
 
 pdb20_file_header* adbg_object_pdb20_header(adbg_object_t *o) {

@@ -35,10 +35,10 @@ void dump_pdb70_header(ref Dumper dump, adbg_object_t *o) {
 	pdb70_file_header *header = adbg_object_pdb70_header(o);
 	
 	print_stringl("Magic", header.Magic.ptr, 24);
-	print_x32("PageSize", header.PageSize);
-	print_x32("FreeIndex", header.FreeIndex);
-	print_x32("PageCount", header.PageCount);
-	print_x32("DirectorySize", header.DirectorySize);
+	print_u32("PageSize", header.PageSize);
+	print_u32("FreeIndex", header.FreeIndex);
+	print_u32("PageCount", header.PageCount);
+	print_u32("DirectorySize", header.DirectorySize);
 	print_x32("Unknown", header.Unknown);
 	print_x32("DirectoryOffset", header.DirectoryOffset);
 	
