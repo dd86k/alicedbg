@@ -13,6 +13,8 @@ import adbg.error;
 import adbg.object.machines;
 
 //TODO: Support FPU registers
+//TODO: Thread struct type, to hold its context, and other info
+//TODO: Support f80 (x87)
 
 version (Windows) {
 	import adbg.include.windows.wow64apiset;
@@ -29,7 +31,6 @@ private enum REG_COUNT = 18; // Currently, x86-64 has highest number
 
 extern (C):
 
-//TODO: Support f80 (x87)
 /// Register size
 enum AdbgRegType : ubyte {
 	u8, u16, u32, u64,
@@ -135,9 +136,11 @@ int adbg_registers_config(adbg_registers_t *ctx, AdbgMachine mach) {
 		return adbg_oops(AdbgError.objectInvalidMachine);
 	}
 	
-	for (size_t i; i < regs.length; ++i) {
+	version (Trace) trace("regs.length=%d", cast(int)regs.length);
+	
+	for (size_t i; i < regs.length; ++i)
 		ctx.items[i].info = regs[i];
-	}
+	ctx.count = cast(ushort)regs.length;
 	
 	return 0;
 }
@@ -164,7 +167,6 @@ void adbg_registers_init(adbg_registers_t *ctx, adbg_process_t *tracee) {
 		ctx.count = 0;
 }
 
-//TODO: Thread type, to hold its context
 int adbg_registers_fill(adbg_registers_t *ctx, adbg_process_t *tracee) {
 	import adbg.debugger.process : AdbgCreation;
 	
@@ -173,12 +175,8 @@ int adbg_registers_fill(adbg_registers_t *ctx, adbg_process_t *tracee) {
 	if (tracee == null || ctx == null)
 		return adbg_oops(AdbgError.nullArgument);
 	
-	ctx.count = 0;
-	
 	if (tracee.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
-	
-	memset(ctx, 0, adbg_registers_t.sizeof);
 	
 version (Windows) {
 	CONTEXT winctx = void;

@@ -10,6 +10,7 @@ import adbg.include.c.stdlib : exit;
 import adbg.include.d.config : GDC_VERSION, GDC_EXCEPTION_MODE, LLVM_VERSION;
 import adbg.debugger.exception : adbg_exception_t, adbg_exception_name;
 import adbg.self;
+import adbg.object.machines : adbg_machine_default;
 import adbg.disassembler;
 import adbg.error;
 import adbg.debugger.process;
@@ -477,7 +478,7 @@ r"
 		printf("Address    : %#zx\n", ex.faultz);
 		
 		adbg_opcode_t op = void;
-		adbg_disassembler_t *dis = adbg_dis_open(adbg_self_machine());
+		adbg_disassembler_t *dis = adbg_dis_open(adbg_machine_default());
 		if (dis && adbg_dis_process_once(dis, &op, self, ex.fault_address) == 0) {
 			// Print address
 			printf("Instruction:");

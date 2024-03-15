@@ -24,7 +24,7 @@ import adbg.platform : ADBG_CHILD_STACK_SIZE;
 import adbg.error;
 import adbg.utils.strings : adbg_util_argv_flatten;
 import adbg.debugger.exception : adbg_exception_t, adbg_exception_translate;
-import adbg.object.machines : AdbgMachine;
+import adbg.object.machines;
 import core.stdc.string;
 
 version (Windows) {
@@ -84,7 +84,8 @@ struct adbg_debugger_event_t {
 //TODO: Rename to AdbgDebuggerRelation
 /// Process creation source.
 enum AdbgCreation : ubyte {
-	unloaded,
+	unattached,
+	unloaded = unattached, // Older alias
 	attached,
 	spawned,
 }
@@ -999,14 +1000,15 @@ unittest {
 /// Returns: Machine platform.
 AdbgMachine adbg_process_get_machine(adbg_process_t *tracee) {
 	if (tracee == null)
-		return AdbgMachine.native;
+		return AdbgMachine.unknown;
 	
-	//TODO: There's probably a way to remotely check this
-	//      Windows: IsWow64Process/IsWow64Process2 with process handle
-	version (Win64) version (X86_64) // Windows + x86-64
+		//TODO: There's probably a way to remotely check this
+		//      Windows: IsWow64Process/IsWow64Process2 with process handle
+	version (Win64) {
 		if (tracee.wow64) return AdbgMachine.x86;
+	}
 	
-	return AdbgMachine.native;
+	return adbg_machine_default();
 }
 
 /// Get a list of process IDs running.

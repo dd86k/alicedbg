@@ -122,21 +122,6 @@ version (Windows) {
 	static assert(0, "Implement me");
 }
 
-/// Get the current machine architecture process is running in.
-/// Returns: Current machine.
-AdbgMachine adbg_self_machine() {
-version (X86)
-	return AdbgMachine.x86;
-else version (X86_64)
-	return AdbgMachine.amd64;
-else version (Arm)
-	return AdbgMachine.arm;
-else version (AArch64)
-	return AdbgMachine.aarch64;
-else
-	static assert(false, "adbg_self_machine");
-}
-
 /// Set a custom crash handler.
 ///
 /// This is useful for catching critical exceptions gracefully before
@@ -220,8 +205,8 @@ void adbg_internal_handler(int sig, siginfo_t *si, void *p) {
 	}
 	
 	// Setup register info
-	adbg_registers_t regs = void;
-	adbg_registers_config(&regs, adbg_self_machine());
+	//adbg_registers_t regs = void;
+	//adbg_registers_config(&regs, adbg_machine_default());
 	
 	__ufunction(&ex);
 	

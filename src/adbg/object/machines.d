@@ -11,6 +11,10 @@ module adbg.object.machines;
 // NOTE: Machine enum names are the same as their alias name.
 //       This avoids (mostly) possible collisions.
 
+//TODO: Consider removing "native" as it just confused me with a process function.
+//      There are now a function to get the default machine.
+//TODO: Consider renaming from "adbg_object_machine_" to only "adbg_machine_".
+
 /// Object machine type.
 enum AdbgMachine {
 	/// Unknown.
@@ -740,6 +744,30 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.veo,	"veo", null, "VEO" },
 ];
 
+//
+// Target default machine
+//
+
+version (X86) {
+	private enum DEFAULT_MACHINE = AdbgMachine.x86;
+} else version (X86_64) {
+	private enum DEFAULT_MACHINE = AdbgMachine.amd64;
+} else version (Arm) {
+	private enum DEFAULT_MACHINE = AdbgMachine.arm;
+} else version (AArch64) {
+	private enum DEFAULT_MACHINE = AdbgMachine.aarch64;
+} else
+	static assert(false, "Add default machine for target");
+
+/// Return the target machine default.
+///
+/// For example, if this binary was compiled on and AMD64 machine,
+/// then this function returns the amd64 value.
+/// Returns: Machine value.
+AdbgMachine adbg_machine_default() {
+	return DEFAULT_MACHINE;
+}
+
 /// Get the number of registered machine platforms.
 /// Returns: Count.
 size_t adbg_object_machine_count() {
@@ -750,9 +778,10 @@ size_t adbg_object_machine_count() {
 /// Params: mach = Machine enumeration value.
 /// Returns: Machine pointer or null.
 immutable(adbg_machine_t)* adbg_object_machine(AdbgMachine mach) {
-	if (mach <= 0 || mach - 1 >= machines.length)
+	size_t i = cast(size_t)(mach - 1);
+	if (i >= machines.length)
 		return null;
-	return &machines[mach - 1];
+	return &machines[i];
 }
 @system unittest {
 	assert(adbg_object_machine(cast(AdbgMachine)-1) == null);

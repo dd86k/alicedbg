@@ -51,7 +51,7 @@ const(char) *shell_error_string(int code) {
 	case invalidCommand:
 		return "Invalid command.";
 	case unavailable:
-		return "Debugger unavailable.";
+		return "Feature unavailable.";
 	case loadFailed:
 		return "Failed to load file.";
 	case pauseRequired:
@@ -761,6 +761,7 @@ int command_detach(int argc, const(char) **argv) {
 		return ShellError.alicedbg;
 	}
 	adbg_dis_close(dis);
+	free(registers);
 	
 	return 0;
 }
@@ -805,6 +806,8 @@ int command_kill(int argc, const(char) **argv) {
 	if (adbg_debugger_terminate(process))
 		return ShellError.alicedbg;
 	puts("Process killed");
+	adbg_dis_close(dis);
+	free(registers);
 	return 0;
 }
 
