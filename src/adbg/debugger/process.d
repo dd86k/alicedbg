@@ -628,8 +628,6 @@ L_DEBUG_LOOP:
 		return adbg_oops(AdbgError.os);
 	}
 	
-	//TODO: Assign pid from event?
-	
 	// Filter events
 	switch (de.dwDebugEventCode) {
 	case EXCEPTION_DEBUG_EVENT: break;
@@ -649,6 +647,12 @@ L_DEBUG_LOOP:
 		goto L_DEBUG_LOOP;
 	}
 	
+	// Fixes access to debugger, thread context functions.
+	// Especially when attaching, but should be standard with spawned-in processes too.
+	tracee.tid  = de.dwThreadId;
+	tracee.htid = OpenThread(
+		THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME,
+		FALSE, de.dwThreadId);
 	tracee.status = AdbgProcStatus.paused;
 	adbg_exception_translate(&exception, &de, null);
 } else version (Posix) {
