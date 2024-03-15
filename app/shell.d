@@ -461,12 +461,12 @@ immutable command2_t[] shell_commands = [
 	//
 	{
 		[ "plist" ],
-		"",
+		"List running programs.",
 		[],
 		MODULE_DEBUGGER, CATEGORY_PROCESS,
 		[
 			{ SECTION_DESCRIPTION,
-			[ "List active processes" ]
+			[ "List active processes." ]
 			}
 		],
 		&command_plist,
