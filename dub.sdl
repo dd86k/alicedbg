@@ -29,7 +29,8 @@ license "BSD-3-Clause"
 #       Yes, it works with -fno-druntime, so it can be possible to add
 #       -gdc-betterc build types in the future.
 
-#TODO: Make docs/ddox builds only peek in src/ and not in app/
+#TODO: Make docs/ddox builds only peek in src/
+#      Works with -c library
 
 #
 # ANCHOR Configurations
@@ -49,6 +50,8 @@ configuration "library" {
 #
 # ANCHOR Build types
 #
+
+## Debug builds
 
 # Debug build with tracing enabled. This will be extremely verbose and the
 # output will be cryptid.
@@ -97,6 +100,8 @@ buildType "debug" {
 	dflags "-betterC" platform="ldc"
 }
 
+## Release builds
+
 # Compile in release mode.
 buildType "release" {
 	versions "Release"
@@ -113,12 +118,26 @@ buildType "release-nobounds" {
 	dflags "-betterC" platform="ldc"
 }
 
-# Compile in release mode with no bound checking as statically link.
+## Release-Static builds
+
+# NOTE: DMD and GDC static builds tend to work better under glibc environments.
+
+# Compile in release mode as statically linked.
+buildType "release-static" {
+	versions "Release" "ReleaseNobounds"
+	buildOptions "releaseMode" "optimize"
+	dflags "-betterC" "-L=-static" platform="dmd"
+	dflags "-fno-druntime" "-Wl,-static" platform="gdc"
+	dflags "-betterC" "--static" platform="ldc"
+}
+
+# Compile in release mode with no bound checking as statically linked.
 buildType "release-nobounds-static" {
 	versions "Release" "ReleaseNobounds"
 	buildOptions "releaseMode" "optimize" "noBoundsCheck"
+	dflags "-betterC" "-L=-static" platform="dmd"
+	dflags "-fno-druntime" "-Wl,-static" platform="gdc"
 	dflags "-betterC" "--static" platform="ldc"
-	dflags "-betterC" "-Wl,-static" platform="gdc"
 }
 
 #
