@@ -3,7 +3,7 @@
 /// NOTE: Every thing that could go wrong should have an error code.
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
-/// License: BSD-3-Clause
+/// License: BSD-3-Clause-Clear
 module adbg.error;
 
 version (Windows) {

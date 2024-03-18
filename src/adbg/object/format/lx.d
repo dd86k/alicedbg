@@ -2,7 +2,7 @@
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
-/// License: BSD-3-Clause
+/// License: BSD-3-Clause-Clear
 module adbg.object.format.lx;
 
 // NOTE: LX is mainly 16-bit only and LE mixed 16/32-bit

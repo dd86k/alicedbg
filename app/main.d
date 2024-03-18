@@ -2,7 +2,7 @@
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
-/// License: BSD-3-Clause
+/// License: BSD-3-Clause-Clear
 module main;
 
 import adbg.platform;
@@ -405,8 +405,8 @@ int cli_version() {
 	"alicedbg    "~FULL_VERSION~"\n"~
 	"            Built "~__TIMESTAMP__~"\n"~
 	"            "~COPYRIGHT~"\n"~
-	"License     BSD-3-Clause\n"~
-	"            <https://opensource.org/licenses/BSD-3-Clause>\n"~
+	"License     BSD-3-Clause-Clear\n"~
+	"            <https://opensource.org/licenses/BSD-3-Clause-Clear>\n"~
 	"Homepage    https://git.dd86k.space/dd86k/alicedbg";
 	
 	puts(page_version);

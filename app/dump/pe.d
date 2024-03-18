@@ -2,7 +2,7 @@
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
-/// License: BSD-3-Clause
+/// License: BSD-3-Clause-Clear
 module dump.pe;
 
 import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE;

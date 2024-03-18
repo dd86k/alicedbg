@@ -74,4 +74,4 @@ regarding contributor management.
 
 # License
 
-This project is licensed under the BSD 3-Clause license.
+This project is licensed under the BSD 3-Clause Clear license.

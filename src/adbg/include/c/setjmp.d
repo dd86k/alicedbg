@@ -5,7 +5,7 @@
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
-/// License: BSD-3-Clause
+/// License: BSD-3-Clause-Clear
 module adbg.include.c.setjmp;
 
 import adbg.include.c.config : c_long, c_ulong, c_longint, c_ulongint;
