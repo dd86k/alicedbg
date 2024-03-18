@@ -742,9 +742,6 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		with (o.i.pe.opt_header) Magic = adbg_bswap16(Magic);
 	}
 	
-	if (o.i.pe.header.NumberOfSections > MAXIMUM_SECTIONS)
-		return adbg_oops(AdbgError.objectMalformed);
-	
 	switch (o.i.pe.opt_header.Magic) {
 	case PE_FMT_32:
 		if (adbg_object_outboundpl(o, o.i.pe.opt_header, PE_OPTIONAL_HEADER.sizeof))
@@ -982,6 +979,7 @@ PE_SECTION_ENTRY* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 	
 	if (o == null) return null;
 	if (o.i.pe.sections == null) return null;
+	if (index > MAXIMUM_SECTIONS) return null;
 	if (index >= o.i.pe.header.NumberOfSections) return null;
 	
 	PE_SECTION_ENTRY *section = &o.i.pe.sections[index];
