@@ -112,7 +112,7 @@ immutable option_t[] options = [
 	// pages
 	{ 'h', "help",	"Show this help screen and exit", false, &cli_help },
 	{ 0,   "version",	"Show the version screen and exit", false, &cli_version },
-	{ 0,   "debug-version",	"Show the build and debug information and exit", false, &cli_debug_version },
+	{ 0,   "build-info",	"Show the build and debug information and exit", false, &cli_debug_version },
 	{ 0,   "ver",	"Show only the version string and exit", false, &cli_ver },
 	{ 0,   "license",	"Show the license page and exit", false, &cli_license },
 	// secrets
