@@ -20,7 +20,7 @@ import adbg.error;
 import adbg.utils.bit;
 import adbg.utils.math;
 import adbg.object.formats;
-import adbg.object.machines : AdbgMachine;
+import adbg.machines : AdbgMachine;
 import adbg.debugger.process : adbg_process_t;
 import adbg.debugger.memory : adbg_memory_map_t, adbg_memory_read;
 import core.stdc.string;

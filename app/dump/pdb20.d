@@ -7,7 +7,7 @@ module dump.pdb20;
 
 import adbg.disassembler;
 import adbg.object.server;
-import adbg.object.machines;
+import adbg.machines;
 import adbg.object.format.pdb;
 import dumper;
 

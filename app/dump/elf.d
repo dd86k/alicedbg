@@ -8,7 +8,7 @@ module dump.elf;
 import adbg.utils.bit : adbg_align4up;
 import adbg.disassembler;
 import adbg.object.server;
-import adbg.object.machines;
+import adbg.machines;
 import adbg.object.format.elf;
 import core.stdc.string : memcmp;
 import dumper;

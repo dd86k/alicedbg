@@ -6,7 +6,10 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module adbg.object.machines;
+module adbg.machines;
+
+import core.stdc.string : strcmp;
+import adbg.error;
 
 // NOTE: Machine enum names are the same as their alias name.
 //       This avoids (mostly) possible collisions.
@@ -770,47 +773,56 @@ AdbgMachine adbg_machine_default() {
 
 /// Get the number of registered machine platforms.
 /// Returns: Count.
-size_t adbg_object_machine_count() {
+size_t adbg_machine_count() {
 	return machines.length;
 }
 
 /// Select a machine architecture from an machine enum value.
 /// Params: mach = Machine enumeration value.
 /// Returns: Machine pointer or null.
-immutable(adbg_machine_t)* adbg_object_machine(AdbgMachine mach) {
+immutable(adbg_machine_t)* adbg_machine(AdbgMachine mach) {
 	size_t i = cast(size_t)(mach - 1);
-	if (i >= machines.length)
+	if (i >= machines.length) {
+		adbg_oops(AdbgError.indexBounds);
 		return null;
+	}
 	return &machines[i];
 }
 @system unittest {
-	assert(adbg_object_machine(cast(AdbgMachine)-1) == null);
-	assert(adbg_object_machine(cast(AdbgMachine)0)  == null);
+	assert(adbg_machine(cast(AdbgMachine)-1) == null);
+	assert(adbg_machine(cast(AdbgMachine)0)  == null);
 	for (size_t i = 1; i < machines.length; ++i) {
 		immutable(adbg_machine_t)* m =
-			adbg_object_machine(cast(AdbgMachine)i);
+			adbg_machine(cast(AdbgMachine)i);
 		assert(m);
 		assert(m.machine == cast(AdbgMachine)i);
 	}
 }
+
 /// Get machine alias from enumeration value.
 /// Params: mach = Machine value.
 /// Returns: Machine name, or null if invalid.
 const(char)* adbg_object_machine_alias(AdbgMachine mach) {
-	return adbg_object_machine(mach).alias1;
+	immutable(adbg_machine_t)* m = adbg_machine(mach);
+	if (m == null) // Error already set.
+		return null;
+	return m.alias1;
 }
+
 /// Get machine name from enumeration value.
 /// Params: mach = Machine value.
 /// Returns: Machine name, or null if invalid.
-const(char)* adbg_object_machine_name(AdbgMachine mach) {
-	return adbg_object_machine(mach).name;
+const(char)* adbg_machine_name(AdbgMachine mach) {
+	immutable(adbg_machine_t)* m = adbg_machine(mach);
+	if (m == null) // Error already set.
+		return null;
+	return m.name;
 }
 
 /// Select a machine architecture from an alias name.
 /// Params: alias_ = Alias string.
 /// Returns: Machine pointer or null.
-immutable(adbg_machine_t)* adbg_object_machine_select(const(char) *alias_) {
-	import core.stdc.string : strcmp;
+immutable(adbg_machine_t)* adbg_machine_select(const(char) *alias_) {
 	// NOTE: strcmp is unlikely to check for null pointers.
 	//       Checked under musl 1.20.
 	for (size_t i = 1; i < machines.length; ++i) {
@@ -824,9 +836,11 @@ immutable(adbg_machine_t)* adbg_object_machine_select(const(char) *alias_) {
 		if (strcmp(machine.alias2, alias_) == 0)
 			return machine;
 	}
+	
+	adbg_oops(AdbgError.unfindable);
 	return null;
 }
 @system unittest {
-	assert(adbg_object_machine_select("I do not exist") == null);
-	assert(adbg_object_machine_select("x86").machine == AdbgMachine.x86);
+	assert(adbg_machine_select("I do not exist") == null);
+	assert(adbg_machine_select("x86").machine == AdbgMachine.x86);
 }

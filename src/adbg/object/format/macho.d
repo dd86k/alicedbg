@@ -7,7 +7,7 @@ module adbg.object.format.macho;
 
 import adbg.error;
 import adbg.object.server : adbg_object_t, AdbgObject;
-import adbg.object.machines : AdbgMachine;
+import adbg.machines : AdbgMachine;
 import adbg.utils.bit;
 import core.stdc.stdlib : calloc;
 

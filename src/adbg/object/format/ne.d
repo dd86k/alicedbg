@@ -6,7 +6,7 @@
 module adbg.object.format.ne;
 
 import adbg.object.server;
-import adbg.object.machines : AdbgMachine;
+import adbg.machines : AdbgMachine;
 import adbg.error;
 import adbg.utils.bit;
 import adbg.include.c.stdlib : calloc, free;

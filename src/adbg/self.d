@@ -12,7 +12,7 @@ import adbg.error;
 import adbg.debugger.exception;
 import adbg.debugger.thread;
 import adbg.debugger.process;
-import adbg.object.machines;
+import adbg.machines;
 
 version (Windows) {
 	import adbg.include.windows.winnt;

@@ -9,7 +9,7 @@ module adbg.object.format.lx;
 
 import adbg.error;
 import adbg.object.server : adbg_object_t, AdbgObject;
-import adbg.object.machines;
+import adbg.machines;
 import adbg.utils.bit;
 
 extern (C):

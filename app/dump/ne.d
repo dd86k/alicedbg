@@ -7,7 +7,7 @@ module dump.ne;
 
 import adbg.disassembler;
 import adbg.object.server;
-import adbg.object.machines : AdbgMachine;
+import adbg.machines : AdbgMachine;
 import adbg.object.format.ne;
 import dumper;
 

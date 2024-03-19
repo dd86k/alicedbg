@@ -19,7 +19,7 @@ import core.stdc.inttypes;
 import core.stdc.stdlib;
 import adbg.error;
 import adbg.object.server;
-import adbg.object.machines : AdbgMachine;
+import adbg.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit;
 

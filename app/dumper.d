@@ -9,7 +9,7 @@ import adbg.error, adbg.disassembler, adbg.object;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, free;
 import adbg.include.c.stdarg;
-import adbg.object.machines;
+import adbg.machines;
 import adbg.utils.bit : BIT;
 import core.stdc.string;
 import core.stdc.ctype : isprint;

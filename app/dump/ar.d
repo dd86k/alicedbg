@@ -7,7 +7,7 @@ module dump.ar;
 
 import adbg.disassembler;
 import adbg.object.server;
-import adbg.object.machines;
+import adbg.machines;
 import adbg.object.format.ar;
 import adbg.utils.bit : adbg_bswap32;
 import core.stdc.ctype : isdigit;

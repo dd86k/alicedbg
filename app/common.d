@@ -13,7 +13,7 @@ import core.stdc.errno : errno;
 import adbg.error;
 import adbg.disassembler;
 import adbg.debugger.exception;
-import adbg.object.machines : AdbgMachine;
+import adbg.machines : AdbgMachine;
 import core.stdc.stdio : FILE;
 import core.stdc.stdlib : malloc;
 

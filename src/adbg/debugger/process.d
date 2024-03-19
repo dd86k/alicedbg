@@ -24,7 +24,7 @@ import adbg.platform : ADBG_CHILD_STACK_SIZE;
 import adbg.error;
 import adbg.utils.strings : adbg_util_argv_flatten;
 import adbg.debugger.exception : adbg_exception_t, adbg_exception_translate;
-import adbg.object.machines;
+import adbg.machines;
 import core.stdc.string;
 
 version (Windows) {

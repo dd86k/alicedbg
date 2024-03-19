@@ -7,7 +7,7 @@ module dump.pdb70;
 
 import adbg.disassembler;
 import adbg.object.server;
-import adbg.object.machines;
+import adbg.machines;
 import adbg.object.format.pdb;
 import adbg.object.format.pe : adbg_object_pe_machine_string;
 import adbg.utils.uid;

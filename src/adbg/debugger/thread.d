@@ -10,7 +10,7 @@ import adbg.include.c.stdio : snprintf;
 import adbg.include.c.stdlib;
 import core.stdc.string : memset, strncmp;
 import adbg.error;
-import adbg.object.machines;
+import adbg.machines;
 
 //TODO: Support FPU registers
 //TODO: Thread struct type, to hold its context, and other info
