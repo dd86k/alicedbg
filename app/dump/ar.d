@@ -39,7 +39,7 @@ void dump_archive_headers(ref Dumper dump, adbg_object_t *o) {
 		print_stringl("Size", rhdr.Size.ptr, rhdr.Size.sizeof);
 		
 		char[10] b = void;
-		int l = realstring(b.ptr, 10, rhdr.End.ptr, 2, '"', '"');
+		int l = realstring(b.ptr, 10, rhdr.End.ptr, 2);
 		print_x16l("End", rhdr.EndMarker, b.ptr, l);
 		
 		/+void *data = adbg_object_ar_data(o, rhdr);
