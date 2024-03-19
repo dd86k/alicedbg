@@ -22,6 +22,8 @@ import core.stdc.stdlib : malloc, free;
 //TODO: Capstone CS_MODE_BIG_ENDIAN
 //      Depending on target endianness, Capstone may need this bit
 //TODO: Function to format machine code
+//TODO: Close function should close CS lib too
+//      Make sure we have a function to reconfigure machine
 
 version (X86) { // CS_OPT_SYNTAX_DEFAULT
 	private enum {

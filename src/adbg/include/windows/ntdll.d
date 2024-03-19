@@ -10,7 +10,7 @@ version (Windows):
 import core.sys.windows.windef;
 import core.sys.windows.ntdef;  // NTSTATUS
 import core.sys.windows.ntdll;
-import adbg.object.symbols;
+import adbg.system;
 import adbg.error;
 
 extern(C):
@@ -301,24 +301,24 @@ bool __dynlib_ntdll_load()
     if (__lib_ntdll_loaded)
         return false;
     
-    adbg_shared_lib_t *lib = adbg_symbols_load("ntdll.dll");
+    adbg_system_library_t *lib = adbg_system_library_load("ntdll.dll");
     if (lib == null)
         return true;
     
-    adbg_symbols_bind(lib, cast(void**)&NtQueryVirtualMemory, "NtQueryVirtualMemory");
-    adbg_symbols_bind(lib, cast(void**)&NtQuerySystemInformation, "NtQuerySystemInformation");
+    adbg_system_library_bind(lib, cast(void**)&NtQueryVirtualMemory, "NtQueryVirtualMemory");
+    adbg_system_library_bind(lib, cast(void**)&NtQuerySystemInformation, "NtQuerySystemInformation");
     
-    size_t missingcnt = adbg_symbols_missingcnt(lib);
+    size_t missingcnt = adbg_system_library_missingcnt(lib);
     if (missingcnt)
     {
         version (Trace)
         {
             for (size_t i; i < missingcnt; ++i)
             {
-                trace("missing symbol: %s", adbg_symbols_missing(lib, i));
+                trace("missing symbol: %s", adbg_system_library_missing(lib, i));
             }
         }
-        adbg_symbols_close(lib);
+        adbg_system_library_close(lib);
         return true;
     }
     

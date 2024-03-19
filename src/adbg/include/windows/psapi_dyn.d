@@ -12,7 +12,7 @@ version (ANSI) {} else version = Unicode;
 import core.sys.windows.windef;
 public import core.sys.windows.psapi;
 
-import adbg.object.symbols;
+import adbg.system;
 
 extern (Windows):
 
@@ -177,49 +177,49 @@ bool __dynlib_psapi_load()
     if (__dynlib_psapi_loaded)
         return false;
     
-    adbg_shared_lib_t *lib = adbg_symbols_load("psapi.dll");
+    adbg_system_library_t *lib = adbg_system_library_load("psapi.dll");
     if (lib == null)
         return true;
     
-    adbg_symbols_bind(lib, cast(void**)&EnumProcesses, "EnumProcesses");
-    adbg_symbols_bind(lib, cast(void**)&GetProcessImageFileNameA, "GetProcessImageFileNameA");
-    adbg_symbols_bind(lib, cast(void**)&GetProcessImageFileNameW, "GetProcessImageFileNameW");
-    adbg_symbols_bind(lib, cast(void**)&EnumProcessModules, "EnumProcessModules");
-    adbg_symbols_bind(lib, cast(void**)&EnumProcessModulesEx, "EnumProcessModulesEx");
-    adbg_symbols_bind(lib, cast(void**)&GetModuleBaseNameA, "GetModuleBaseNameA");
-    adbg_symbols_bind(lib, cast(void**)&GetModuleBaseNameW, "GetModuleBaseNameW");
-    adbg_symbols_bind(lib, cast(void**)&GetModuleFileNameExA, "GetModuleFileNameExA");
-    adbg_symbols_bind(lib, cast(void**)&GetModuleFileNameExW, "GetModuleFileNameExW");
-    adbg_symbols_bind(lib, cast(void**)&GetModuleInformation, "GetModuleInformation");
-    adbg_symbols_bind(lib, cast(void**)&EnumDeviceDrivers, "EnumDeviceDrivers");
-    adbg_symbols_bind(lib, cast(void**)&GetDeviceDriverBaseNameA, "GetDeviceDriverBaseNameA");
-    adbg_symbols_bind(lib, cast(void**)&GetDeviceDriverBaseNameW, "GetDeviceDriverBaseNameW");
-    adbg_symbols_bind(lib, cast(void**)&GetDeviceDriverFileNameA, "GetDeviceDriverFileNameA");
-    adbg_symbols_bind(lib, cast(void**)&GetDeviceDriverFileNameW, "GetDeviceDriverFileNameW");
-    adbg_symbols_bind(lib, cast(void**)&GetProcessMemoryInfo, "GetProcessMemoryInfo");
-    adbg_symbols_bind(lib, cast(void**)&EmptyWorkingSet, "EmptyWorkingSet");
-    adbg_symbols_bind(lib, cast(void**)&GetWsChanges, "GetWsChanges");
-    adbg_symbols_bind(lib, cast(void**)&GetWsChangesEx, "GetWsChangesEx");
-    adbg_symbols_bind(lib, cast(void**)&InitializeProcessForWsWatch, "InitializeProcessForWsWatch");
-    adbg_symbols_bind(lib, cast(void**)&QueryWorkingSet, "QueryWorkingSet");
-    adbg_symbols_bind(lib, cast(void**)&QueryWorkingSetEx, "QueryWorkingSetEx");
-    adbg_symbols_bind(lib, cast(void**)&GetMappedFileNameW, "GetMappedFileNameW");
-    adbg_symbols_bind(lib, cast(void**)&GetMappedFileNameA, "GetMappedFileNameA");
-    adbg_symbols_bind(lib, cast(void**)&GetPerformanceInfo, "GetPerformanceInfo");
-    adbg_symbols_bind(lib, cast(void**)&EnumPageFilesW, "EnumPageFilesW");
-    adbg_symbols_bind(lib, cast(void**)&EnumPageFilesA, "EnumPageFilesA");
+    adbg_system_library_bind(lib, cast(void**)&EnumProcesses, "EnumProcesses");
+    adbg_system_library_bind(lib, cast(void**)&GetProcessImageFileNameA, "GetProcessImageFileNameA");
+    adbg_system_library_bind(lib, cast(void**)&GetProcessImageFileNameW, "GetProcessImageFileNameW");
+    adbg_system_library_bind(lib, cast(void**)&EnumProcessModules, "EnumProcessModules");
+    adbg_system_library_bind(lib, cast(void**)&EnumProcessModulesEx, "EnumProcessModulesEx");
+    adbg_system_library_bind(lib, cast(void**)&GetModuleBaseNameA, "GetModuleBaseNameA");
+    adbg_system_library_bind(lib, cast(void**)&GetModuleBaseNameW, "GetModuleBaseNameW");
+    adbg_system_library_bind(lib, cast(void**)&GetModuleFileNameExA, "GetModuleFileNameExA");
+    adbg_system_library_bind(lib, cast(void**)&GetModuleFileNameExW, "GetModuleFileNameExW");
+    adbg_system_library_bind(lib, cast(void**)&GetModuleInformation, "GetModuleInformation");
+    adbg_system_library_bind(lib, cast(void**)&EnumDeviceDrivers, "EnumDeviceDrivers");
+    adbg_system_library_bind(lib, cast(void**)&GetDeviceDriverBaseNameA, "GetDeviceDriverBaseNameA");
+    adbg_system_library_bind(lib, cast(void**)&GetDeviceDriverBaseNameW, "GetDeviceDriverBaseNameW");
+    adbg_system_library_bind(lib, cast(void**)&GetDeviceDriverFileNameA, "GetDeviceDriverFileNameA");
+    adbg_system_library_bind(lib, cast(void**)&GetDeviceDriverFileNameW, "GetDeviceDriverFileNameW");
+    adbg_system_library_bind(lib, cast(void**)&GetProcessMemoryInfo, "GetProcessMemoryInfo");
+    adbg_system_library_bind(lib, cast(void**)&EmptyWorkingSet, "EmptyWorkingSet");
+    adbg_system_library_bind(lib, cast(void**)&GetWsChanges, "GetWsChanges");
+    adbg_system_library_bind(lib, cast(void**)&GetWsChangesEx, "GetWsChangesEx");
+    adbg_system_library_bind(lib, cast(void**)&InitializeProcessForWsWatch, "InitializeProcessForWsWatch");
+    adbg_system_library_bind(lib, cast(void**)&QueryWorkingSet, "QueryWorkingSet");
+    adbg_system_library_bind(lib, cast(void**)&QueryWorkingSetEx, "QueryWorkingSetEx");
+    adbg_system_library_bind(lib, cast(void**)&GetMappedFileNameW, "GetMappedFileNameW");
+    adbg_system_library_bind(lib, cast(void**)&GetMappedFileNameA, "GetMappedFileNameA");
+    adbg_system_library_bind(lib, cast(void**)&GetPerformanceInfo, "GetPerformanceInfo");
+    adbg_system_library_bind(lib, cast(void**)&EnumPageFilesW, "EnumPageFilesW");
+    adbg_system_library_bind(lib, cast(void**)&EnumPageFilesA, "EnumPageFilesA");
     
-    size_t missingcnt = adbg_symbols_missingcnt(lib);
+    size_t missingcnt = adbg_system_library_missingcnt(lib);
     if (missingcnt)
     {
         version (Trace)
         {
             for (size_t i; i < missingcnt; ++i)
             {
-                trace("missing symbol: %s", adbg_symbols_missing(lib, i));
+                trace("missing symbol: %s", adbg_system_library_missing(lib, i));
             }
         }
-        adbg_symbols_close(lib);
+        adbg_system_library_close(lib);
         return true;
     }
     

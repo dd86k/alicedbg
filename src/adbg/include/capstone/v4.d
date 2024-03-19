@@ -742,7 +742,8 @@ cs_err cs_regs_access (
 // ANCHOR: Dynamic library
 //
 
-import adbg.object.symbols;
+import adbg.system;
+version (Trace) import adbg.error;
 
 private {
     alias pcs_version = uint function(int* major, int* minor);
@@ -821,8 +822,6 @@ __gshared
 //private __gshared int libcapstone_major;
 private __gshared bool libcapstone_loaded;
 
-version (Trace) import adbg.error;
-
 // Returns true on error
 bool libcapstone_dynload()
 {
@@ -830,54 +829,54 @@ bool libcapstone_dynload()
         return false;
     
     version (Windows)
-        adbg_shared_lib_t *lib = adbg_symbols_load("capstone.dll");
+        adbg_system_library_t *lib = adbg_system_library_load("capstone.dll");
     else version (OSX)
-        adbg_shared_lib_t *lib = adbg_symbols_load("libcapstone.dylib");
+        adbg_system_library_t *lib = adbg_system_library_load("libcapstone.dylib");
     else version (Posix)
-        adbg_shared_lib_t *lib = adbg_symbols_load("libcapstone.so.4", "libcapstone.so");
+        adbg_system_library_t *lib = adbg_system_library_load("libcapstone.so.4", "libcapstone.so");
     else
         static assert(0, "capstone: Implement dynamic config");
     
     if (lib == null)
         return true;
     
-    adbg_symbols_bind(lib, cast(void**)&cs_version, "cs_version");
+    adbg_system_library_bind(lib, cast(void**)&cs_version, "cs_version");
     
     //TODO: Check version and decide what to do with it
     //cs_version(&libcapstone_major, null);
     
-    adbg_symbols_bind(lib, cast(void**)&cs_support, "cs_support");
-    adbg_symbols_bind(lib, cast(void**)&cs_open, "cs_open");
-    adbg_symbols_bind(lib, cast(void**)&cs_close, "cs_close");
-    adbg_symbols_bind(lib, cast(void**)&cs_option, "cs_option");
-    adbg_symbols_bind(lib, cast(void**)&cs_errno, "cs_errno");
-    adbg_symbols_bind(lib, cast(void**)&cs_strerror, "cs_strerror");
-    adbg_symbols_bind(lib, cast(void**)&cs_disasm, "cs_disasm");
-    adbg_symbols_bind(lib, cast(void**)&cs_disasm_ex, "cs_disasm_ex");
-    adbg_symbols_bind(lib, cast(void**)&cs_free, "cs_free");
-    adbg_symbols_bind(lib, cast(void**)&cs_malloc, "cs_malloc");
-    adbg_symbols_bind(lib, cast(void**)&cs_disasm_iter, "cs_disasm_iter");
-    adbg_symbols_bind(lib, cast(void**)&cs_reg_name, "cs_reg_name");
-    adbg_symbols_bind(lib, cast(void**)&cs_insn_name, "cs_insn_name");
-    adbg_symbols_bind(lib, cast(void**)&cs_group_name, "cs_group_name");
-    adbg_symbols_bind(lib, cast(void**)&cs_insn_group, "cs_insn_group");
-    adbg_symbols_bind(lib, cast(void**)&cs_reg_read, "cs_reg_read");
-    adbg_symbols_bind(lib, cast(void**)&cs_reg_write, "cs_reg_write");
-    adbg_symbols_bind(lib, cast(void**)&cs_op_count, "cs_op_count");
-    adbg_symbols_bind(lib, cast(void**)&cs_op_index, "cs_op_index");
-    adbg_symbols_bind(lib, cast(void**)&cs_regs_access, "cs_regs_access");
+    adbg_system_library_bind(lib, cast(void**)&cs_support, "cs_support");
+    adbg_system_library_bind(lib, cast(void**)&cs_open, "cs_open");
+    adbg_system_library_bind(lib, cast(void**)&cs_close, "cs_close");
+    adbg_system_library_bind(lib, cast(void**)&cs_option, "cs_option");
+    adbg_system_library_bind(lib, cast(void**)&cs_errno, "cs_errno");
+    adbg_system_library_bind(lib, cast(void**)&cs_strerror, "cs_strerror");
+    adbg_system_library_bind(lib, cast(void**)&cs_disasm, "cs_disasm");
+    adbg_system_library_bind(lib, cast(void**)&cs_disasm_ex, "cs_disasm_ex");
+    adbg_system_library_bind(lib, cast(void**)&cs_free, "cs_free");
+    adbg_system_library_bind(lib, cast(void**)&cs_malloc, "cs_malloc");
+    adbg_system_library_bind(lib, cast(void**)&cs_disasm_iter, "cs_disasm_iter");
+    adbg_system_library_bind(lib, cast(void**)&cs_reg_name, "cs_reg_name");
+    adbg_system_library_bind(lib, cast(void**)&cs_insn_name, "cs_insn_name");
+    adbg_system_library_bind(lib, cast(void**)&cs_group_name, "cs_group_name");
+    adbg_system_library_bind(lib, cast(void**)&cs_insn_group, "cs_insn_group");
+    adbg_system_library_bind(lib, cast(void**)&cs_reg_read, "cs_reg_read");
+    adbg_system_library_bind(lib, cast(void**)&cs_reg_write, "cs_reg_write");
+    adbg_system_library_bind(lib, cast(void**)&cs_op_count, "cs_op_count");
+    adbg_system_library_bind(lib, cast(void**)&cs_op_index, "cs_op_index");
+    adbg_system_library_bind(lib, cast(void**)&cs_regs_access, "cs_regs_access");
     
-    size_t missingcnt = adbg_symbols_missingcnt(lib);
+    size_t missingcnt = adbg_system_library_missingcnt(lib);
     if (missingcnt)
     {
         version (Trace)
         {
             for (size_t i; i < missingcnt; ++i)
             {
-                trace("missing symbol: %s", adbg_symbols_missing(lib, i));
+                trace("missing symbol: %s", adbg_system_library_missing(lib, i));
             }
         }
-        adbg_symbols_close(lib);
+        adbg_system_library_close(lib);
         return true;
     }
     
