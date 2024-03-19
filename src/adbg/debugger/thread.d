@@ -173,7 +173,7 @@ int adbg_registers_fill(adbg_registers_t *ctx, adbg_process_t *tracee) {
 	version (Trace) trace("tracee=%p ctx=%p", ctx, tracee);
 	
 	if (tracee == null || ctx == null)
-		return adbg_oops(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.invalidArgument);
 	
 	if (tracee.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);

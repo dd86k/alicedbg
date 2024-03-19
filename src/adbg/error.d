@@ -40,12 +40,10 @@ enum AdbgError {
 	//
 	success	= 0,
 	invalidArgument	= 1,	/// Argument is null or zero
-	nullArgument	= invalidArgument,	// Old alias for invalidArgument
 	emptyArgument	= 2,	/// Argument contains an empty dataset
 	uninitiated	= 4,	/// Instance was not initiated
 	invalidOption	= 5,	/// Invalid option
 	invalidValue	= 6,	/// Invalid value for option
-	invalidOptionValue	= invalidValue,
 	offsetBounds	= 7,	/// File offset is outside of file size
 	indexBounds	= 8,	/// Index is outside of bounds of list
 	unavailable	= 9,	/// Feature or item is unavailable
@@ -57,10 +55,6 @@ enum AdbgError {
 	debuggerUnpaused	= 101,
 	debuggerInvalidAction	= 102,	/// Wrong action from creation method.
 	debuggerPresent	= 103,	/// Debugger already present in remote process
-	// Old meanings
-	notAttached = debuggerUnattached,	/// Old value for debuggerUnattached
-	notPaused = debuggerUnpaused,	/// Old value for debuggerUnpaused
-	invalidAction = debuggerInvalidAction,	/// 
 	//
 	// 200-299: Disasembler
 	//
@@ -68,11 +62,6 @@ enum AdbgError {
 	disasmIllegalInstruction	= 220,
 	disasmEndOfData	= 221,
 	disasmOpcodeLimit	= 221,
-	// Old meanings
-	unsupportedPlatform	= disasmUnsupportedMachine,
-	illegalInstruction	= disasmIllegalInstruction,
-	outOfData	= disasmEndOfData,
-	opcodeLimit	= disasmOpcodeLimit,
 	//
 	// 300-399: Object server
 	//
@@ -87,16 +76,6 @@ enum AdbgError {
 	objectInvalidEndian	= 313,
 	objectInvalidType	= 314,
 	objectInvalidABI	= 315,
-	objectOutsideBounds	= offsetBounds,
-	// Old meanings
-	unknownObjFormat	= objectUnknownFormat,
-	unsupportedObjFormat	= objectUnsupportedFormat,
-	invalidObjVersion	= objectInvalidVersion,
-	invalidObjMachine	= objectInvalidMachine,
-	invalidObjClass	= objectInvalidClass,
-	invalidObjEndian	= objectInvalidEndian,
-	invalidObjType	= objectInvalidType,
-	invalidObjABI	= objectInvalidABI,
 	//
 	// 400-499: Symbols
 	//
@@ -112,8 +91,6 @@ enum AdbgError {
 	//
 	assertion	= 1000,	/// Soft assert
 	unimplemented	= 1001,	/// Not implemented
-	todo	= unimplemented,	/// Ditto
-	notImplemented	= unimplemented,	/// Old alias to unimplemented
 	//
 	// 2000-2999: External resources
 	//
@@ -149,7 +126,7 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.emptyArgument,	"Parameter is empty." },
 	{ AdbgError.uninitiated,	"Object or structure is uninitiated." },
 	{ AdbgError.invalidOption,	"Option unknown." },
-	{ AdbgError.invalidOptionValue,	"Option received invalid value." },
+	{ AdbgError.invalidValue,	"Option received invalid value." },
 	{ AdbgError.offsetBounds,	"File offset outside file size." },
 	{ AdbgError.indexBounds,	"Index outside of list." },
 	{ AdbgError.unavailable,	"Feature or item is unavailable." },
@@ -157,41 +134,41 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	// Debugger
 	//
-	{ AdbgError.debuggerUnattached,	"No processes are attached to debugger." },
-	{ AdbgError.debuggerUnpaused,	"Process must be paused for this feature." },
-	{ AdbgError.debuggerInvalidAction,	"Wrong action given to process." },
-	{ AdbgError.debuggerPresent,	"Debugger already present to remote process." },
+	{ AdbgError.debuggerUnattached,	"Debugger needs to be attached for this feature." },
+	{ AdbgError.debuggerUnpaused,	"Debugger needs the process to be paused for this feature." },
+	{ AdbgError.debuggerInvalidAction,	"Debugger was given a wrong action for this process." },
+	{ AdbgError.debuggerPresent,	"Debugger already present on remote process." },
 	//
 	// Disassembler
 	//
-	{ AdbgError.disasmUnsupportedMachine,	"Platform target not supported for disassembler." },
-	{ AdbgError.disasmIllegalInstruction,	"An illegal instruction was met." },
-	{ AdbgError.disasmEndOfData,	"Disassembler input buffer ran out." },
-	{ AdbgError.disasmOpcodeLimit,	"Architectural opcode limit reached." },
+	{ AdbgError.disasmUnsupportedMachine,	"Disassembler does not support this platform." },
+	{ AdbgError.disasmIllegalInstruction,	"Disassembler met an illegal instruction." },
+	{ AdbgError.disasmEndOfData,	"Disassembler reached end of data." },
+	{ AdbgError.disasmOpcodeLimit,	"Disassembler reached architectural opcode limit." },
 	//
 	// Object server
 	//
-	{ AdbgError.objectUnknownFormat,	"Unknown object format." },
-	{ AdbgError.objectUnsupportedFormat,	"Unsupported object format." },
+	{ AdbgError.objectUnknownFormat,	"Object format unknown." },
+	{ AdbgError.objectUnsupportedFormat,	"Object format unsupported." },
 	{ AdbgError.objectTooSmall,	"Object is too small to be valid." },
 	{ AdbgError.objectMalformed,	"Object potentially corrupted." },
-	{ AdbgError.objectItemNotFound,	"Item was not found in object." },
-	{ AdbgError.objectInvalidVersion,	"Invalid version for object." },
-	{ AdbgError.objectInvalidMachine,	"Invalid machine/platform value for object." },
-	{ AdbgError.objectInvalidClass,	"Invalid class/bitness value for object." },
-	{ AdbgError.objectInvalidEndian,	"Invalid endianess value for object." },
-	{ AdbgError.objectInvalidType,	"Invalid object type." },
-	{ AdbgError.objectInvalidABI,	"Invalid ABI value for object." },
+	{ AdbgError.objectItemNotFound,	"Object item was not found." },
+	{ AdbgError.objectInvalidVersion,	"Object has invalid version." },
+	{ AdbgError.objectInvalidMachine,	"Object has invalid machine or platform value." },
+	{ AdbgError.objectInvalidClass,	"Object has invalid class or bitness value." },
+	{ AdbgError.objectInvalidEndian,	"Object has invalid endian value." },
+	{ AdbgError.objectInvalidType,	"Object type invalid." },
+	{ AdbgError.objectInvalidABI,	"Object has Invalid ABI value." },
 	//
 	// Symbols
 	//
-	{ AdbgError.symbolLoadError,	"Could not load any dynamic libraries." },
-	{ AdbgError.symbolBindError,	"Could not bind the symbol." },
+	{ AdbgError.symbolLoadError,	"Dynamic library could not be loaded." },
+	{ AdbgError.symbolBindError,	"Symbol could not be binded." },
 	//
 	// Memory module
 	//
-	{ AdbgError.scannerDataEmpty,	"Size of data given to memory scanner is empty." },
-	{ AdbgError.scannerDataLimit,	"Size of data given to memory scanner is too large." },
+	{ AdbgError.scannerDataEmpty,	"Memory scanner received empty data." },
+	{ AdbgError.scannerDataLimit,	"Memory scanner received too much data." },
 	//
 	// Misc.
 	//

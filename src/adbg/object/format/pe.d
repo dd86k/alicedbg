@@ -745,16 +745,16 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	switch (o.i.pe.opt_header.Magic) {
 	case PE_FMT_32:
 		if (adbg_object_outboundpl(o, o.i.pe.opt_header, PE_OPTIONAL_HEADER.sizeof))
-			return adbg_oops(AdbgError.objectOutsideBounds);
+			return adbg_oops(AdbgError.offsetBounds);
 		
 		o.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR32);
 		if (adbg_object_outboundpl(o, o.i.pe.directory, PE_IMAGE_DATA_DIRECTORY.sizeof))
-			return adbg_oops(AdbgError.objectOutsideBounds);
+			return adbg_oops(AdbgError.offsetBounds);
 		
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR32);
 		if (adbg_object_outboundpl(o, o.i.pe.sections,
 			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
-			return adbg_oops(AdbgError.objectOutsideBounds);
+			return adbg_oops(AdbgError.offsetBounds);
 		
 		if (o.p.reversed) {
 			PE_OPTIONAL_HEADER *hdr = o.i.pe.opt_header;
@@ -789,16 +789,16 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		break;
 	case PE_FMT_64:
 		if (adbg_object_outboundpl(o, o.i.pe.opt_header, PE_OPTIONAL_HEADER64.sizeof))
-			return adbg_oops(AdbgError.objectOutsideBounds);
+			return adbg_oops(AdbgError.offsetBounds);
 		
 		o.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR64);
 		if (adbg_object_outboundpl(o, o.i.pe.directory, PE_IMAGE_DATA_DIRECTORY.sizeof))
-			return adbg_oops(AdbgError.objectOutsideBounds);
+			return adbg_oops(AdbgError.offsetBounds);
 		
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR64);
 		if (adbg_object_outboundpl(o, o.i.pe.sections,
 			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
-			return adbg_oops(AdbgError.objectOutsideBounds);
+			return adbg_oops(AdbgError.offsetBounds);
 		
 		if (o.p.reversed) {
 			PE_OPTIONAL_HEADER64 *hdr = o.i.pe.opt_header64;
@@ -835,7 +835,7 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDRROM);
 		if (adbg_object_outboundpl(o, o.i.pe.sections,
 			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
-			return adbg_oops(AdbgError.objectOutsideBounds);
+			return adbg_oops(AdbgError.offsetBounds);
 		
 		if (o.p.reversed) {
 			PE_OPTIONAL_HEADERROM *hdr = o.i.pe.opt_headerrom;
@@ -855,7 +855,7 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		}
 		return 0;
 	default:
-		return adbg_oops(AdbgError.unsupportedObjFormat);
+		return adbg_oops(AdbgError.objectInvalidClass);
 	}
 	
 	if (o.p.reversed && o.i.pe.directory) with (o.i.pe.directory) {

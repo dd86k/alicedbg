@@ -633,9 +633,17 @@ L_ARG:
 	
 	// 16-bit signature detection
 	switch (*o.buffer16) {
+	// Anonymous MSCOFF
+	case 0:
+		if (o.file_size < mscoff_anon_header_bigobj.sizeof)
+			return adbg_oops(AdbgError.objectUnknownFormat);
+		if (o.i.mscoff.import_header.Sig2 != 0xffff)
+			return adbg_oops(AdbgError.objectUnknownFormat);
+		
+		return adbg_object_mscoff_load(o);
 	case MAGIC_MZ:
 		if (o.file_size < mz_hdr.sizeof)
-			return adbg_oops(AdbgError.unknownObjFormat);
+			return adbg_oops(AdbgError.objectUnknownFormat);
 		
 		version (Trace) trace("e_lfarlc=%#x", o.i.mz.header.e_lfarlc);
 		
@@ -684,17 +692,9 @@ L_ARG:
 	// Old MZ magic or swapped
 	case MAGIC_ZM:
 		if (o.file_size < mz_hdr.sizeof)
-			return adbg_oops(AdbgError.unknownObjFormat);
+			return adbg_oops(AdbgError.objectUnknownFormat);
 		
 		goto case MAGIC_MZ;
-	// Anonymous MSCOFF
-	case 0:
-		if (o.file_size < mscoff_anon_header_bigobj.sizeof)
-			return adbg_oops(AdbgError.unknownObjFormat);
-		if (o.i.mscoff.import_header.Sig2 != 0xffff)
-			return adbg_oops(AdbgError.unknownObjFormat);
-		
-		return adbg_object_mscoff_load(o);
 	// COFF magics
 	case COFF_MAGIC_I386:
 	case COFF_MAGIC_I386_AIX:
@@ -711,7 +711,7 @@ L_ARG:
 	case COFF_MAGIC_MIPSEL:
 		return adbg_object_coff_load(o);
 	default:
-		return adbg_oops(AdbgError.unknownObjFormat);
+		return adbg_oops(AdbgError.objectUnknownFormat);
 	}
 }
 

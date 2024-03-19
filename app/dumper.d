@@ -430,6 +430,7 @@ int dump_disassemble(ref Dumper dump, AdbgMachine machine,
 	adbg_dis_start(dis, data, cast(size_t)size, base_address);
 	
 	// stats mode
+	//TODO: attach shortest and longuest instructions found
 	if (dump.selected_disasm_stats()) {
 		uint stat_avg;	/// instruction average size
 		uint stat_min = uint.max;	/// smallest instruction size
@@ -444,12 +445,12 @@ L_STAT:
 			if (op.size > stat_max) stat_max = op.size;
 			if (op.size < stat_min) stat_min = op.size;
 			goto L_STAT;
-		case illegalInstruction:
+		case disasmIllegalInstruction:
 			stat_avg += op.size;
 			++stat_total;
 			++stat_illegal;
 			goto L_STAT;
-		case outOfData: break;
+		case disasmEndOfData: break;
 		default:
 			quitext(ErrSource.adbg);
 		}
@@ -469,10 +470,10 @@ L_DISASM:
 	case success:
 		print_disasm_line(&op);
 		goto L_DISASM;
-	case illegalInstruction:
+	case disasmIllegalInstruction:
 		print_disasm_line(&op, "illegal");
 		goto L_DISASM;
-	case outOfData:
+	case disasmEndOfData:
 		return 0;
 	default:
 		print_string("error", adbg_error_msg());

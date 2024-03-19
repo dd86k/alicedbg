@@ -133,7 +133,7 @@ ar_member_header* adbg_object_ar_header(adbg_object_t *o, size_t index) {
 		
 		// Outside bounds
 		if (adbg_object_outboundpl(o, p, ar_member_header.sizeof)) {
-			adbg_oops(AdbgError.objectOutsideBounds);
+			adbg_oops(AdbgError.offsetBounds);
 			return null;
 		}
 	}

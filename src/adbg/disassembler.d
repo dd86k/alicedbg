@@ -211,7 +211,7 @@ int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 	// Others
 	//
 	default:
-		return adbg_oops(AdbgError.unsupportedPlatform);
+		return adbg_oops(AdbgError.disasmUnsupportedMachine);
 	}
 	return 0;
 }
@@ -307,7 +307,7 @@ L_OPTION:
 			cs_syntax = CS_OPT_SYNTAX_ATT;
 			break;
 		default:
-			return adbg_oops(AdbgError.invalidOptionValue);
+			return adbg_oops(AdbgError.invalidValue);
 		}
 		if (cs_option(dasm.cs_handle, CS_OPT_SYNTAX, cs_syntax))
 			return adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
@@ -375,9 +375,9 @@ int adbg_dis_step(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 		// Can't decode instruction but no errors happened?
 		// If there were no other instructions decoded, must be illegal
 		if (dasm.decoded_count == 0)
-			return adbg_oops(AdbgError.illegalInstruction);
+			return adbg_oops(AdbgError.disasmIllegalInstruction);
 		
-		return adbg_oops(AdbgError.outOfData);
+		return adbg_oops(AdbgError.disasmEndOfData);
 	}
 	
 	++dasm.decoded_count;
@@ -410,7 +410,7 @@ int adbg_dis_once(adbg_disassembler_t *dasm, adbg_opcode_t *opcode, void *data, 
 
 int adbg_dis_process_start(adbg_disassembler_t *dasm, adbg_process_t *process, ulong location) {
 	if (dasm == null || process == null)
-		return adbg_oops(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.invalidArgument);
 	dasm.address_base = location;
 	dasm.process = process;
 	return 0;

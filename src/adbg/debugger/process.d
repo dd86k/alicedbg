@@ -1183,7 +1183,7 @@ L_OPTION:
 	case AdbgProcessEnumerateOption.capcity:
 		capacity = va_arg!uint(options);
 		if (capacity <= 0)
-			return adbg_oops(AdbgError.invalidOptionValue);
+			return adbg_oops(AdbgError.invalidValue);
 		goto L_OPTION;
 	default:
 		return adbg_oops(AdbgError.invalidOption);

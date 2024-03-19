@@ -132,7 +132,7 @@ version (Windows) {
 /// Returns: Zero on success; Non-zero on error.
 int adbg_self_set_crashhandler(void function(adbg_exception_t*) func) {
 	if (func == null)
-		return adbg_oops(AdbgError.nullArgument);
+		return adbg_oops(AdbgError.invalidArgument);
 	
 version (Windows) {
 	if (SetThreadErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX, null) == 0 ||

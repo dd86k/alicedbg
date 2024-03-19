@@ -1117,7 +1117,7 @@ int adbg_object_elf_load(adbg_object_t *o) {
 		}
 		break;
 	default:
-		return adbg_oops(AdbgError.invalidObjClass);
+		return adbg_oops(AdbgError.objectInvalidClass);
 	}
 	
 	return 0;
