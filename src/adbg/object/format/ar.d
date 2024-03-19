@@ -106,17 +106,25 @@ int adbg_object_ar_load(adbg_object_t *o) {
 	return 0;
 }
 
+//TODO: Can this be transformed into functions with _start & _next?
 ar_member_header* adbg_object_ar_header(adbg_object_t *o, size_t index) {
-	if (o == null)
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return null;
+	}
 	
 	version (Trace) trace("index=%zu", index);
 	
 	ar_member_header *p = cast(ar_member_header*)(o.buffer + ar_file_header.sizeof);
 	void *max = o.buffer + 0x8000_0000; // 2 GiB limit
 	for (size_t i; p < max; ++i) {
-		if (i == index)
-			return p.EndMarker == AR_EOL ? p : null;
+		if (i == index) {
+			if (p.EndMarker != AR_EOL) {
+				adbg_oops(AdbgError.offsetBounds);
+				return null;
+			}
+			return p;
+		}
 		
 		// Adjust pointer
 		size_t offset = atoi(p.Size.ptr) + ar_member_header.sizeof;
@@ -130,6 +138,7 @@ ar_member_header* adbg_object_ar_header(adbg_object_t *o, size_t index) {
 		}
 	}
 	
+	adbg_oops(AdbgError.unfindable);
 	return null;
 }
 
@@ -158,7 +167,7 @@ void* adbg_object_ar_data(adbg_object_t *o, ar_member_header *mhdr) {
 		return null;
 	}
 	if (adbg_object_outboundpl(o, p, size)) {
-		adbg_oops(AdbgError.objectOutsideBounds);
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	return p;

@@ -893,32 +893,33 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		Reserved.size	= adbg_bswap32(Reserved.size);
 	}
 	
-	if (o.p.reversed) {
-		if (o.i.pe.header.NumberOfSections) {
-			o.i.pe.reversed_sections = cast(bool*)
-				calloc(o.i.pe.header.NumberOfSections, bool.sizeof);
-			if (o.i.pe.reversed_sections == null)
-				return adbg_oops(AdbgError.crt);
-		}
-		with (o.i.pe.directory.ExportTable) if (size && rva) {
-			size_t count = size / PE_EXPORT_DESCRIPTOR.sizeof;
-			o.i.pe.reversed_dir_exports = false;
-			o.i.pe.reversed_dir_export_entries = cast(bool*)calloc(count, bool.sizeof);
-			if (o.i.pe.reversed_dir_export_entries == null)
-				return adbg_oops(AdbgError.crt);
-		}
-		with (o.i.pe.directory.ImportTable) if (size && rva) {
-			size_t count = size / PE_IMPORT_DESCRIPTOR.sizeof;
-			o.i.pe.reversed_dir_imports = cast(bool*)calloc(count, bool.sizeof);
-			if (o.i.pe.reversed_dir_imports == null)
-				return adbg_oops(AdbgError.crt);
-		}
-		with (o.i.pe.directory.DebugDirectory) if (size && rva) {
-			size_t count = size / PE_DEBUG_DIRECTORY.sizeof;
-			o.i.pe.reversed_dir_debug = cast(bool*)calloc(count, bool.sizeof);
-			if (o.i.pe.reversed_dir_debug == null)
-				return adbg_oops(AdbgError.crt);
-		}
+	if (o.p.reversed == false)
+		return 0;
+	
+	if (o.i.pe.header.NumberOfSections) {
+		o.i.pe.reversed_sections = cast(bool*)
+			calloc(o.i.pe.header.NumberOfSections, bool.sizeof);
+		if (o.i.pe.reversed_sections == null)
+			return adbg_oops(AdbgError.crt);
+	}
+	with (o.i.pe.directory.ExportTable) if (size && rva) {
+		size_t count = size / PE_EXPORT_DESCRIPTOR.sizeof;
+		o.i.pe.reversed_dir_exports = false;
+		o.i.pe.reversed_dir_export_entries = cast(bool*)calloc(count, bool.sizeof);
+		if (o.i.pe.reversed_dir_export_entries == null)
+			return adbg_oops(AdbgError.crt);
+	}
+	with (o.i.pe.directory.ImportTable) if (size && rva) {
+		size_t count = size / PE_IMPORT_DESCRIPTOR.sizeof;
+		o.i.pe.reversed_dir_imports = cast(bool*)calloc(count, bool.sizeof);
+		if (o.i.pe.reversed_dir_imports == null)
+			return adbg_oops(AdbgError.crt);
+	}
+	with (o.i.pe.directory.DebugDirectory) if (size && rva) {
+		size_t count = size / PE_DEBUG_DIRECTORY.sizeof;
+		o.i.pe.reversed_dir_debug = cast(bool*)calloc(count, bool.sizeof);
+		if (o.i.pe.reversed_dir_debug == null)
+			return adbg_oops(AdbgError.crt);
 	}
 	
 	return 0;
@@ -929,7 +930,10 @@ int adbg_object_pe_load(adbg_object_t *o) {
 
 // maps rva to section if found
 void* adbg_object_pe_locate(adbg_object_t *o, uint rva) {
-	if (o == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	
 	uint sections = o.i.pe.header.NumberOfSections;
 	for (uint si; si < sections; ++si) {
@@ -944,43 +948,68 @@ void* adbg_object_pe_locate(adbg_object_t *o, uint rva) {
 		
 		void* a = o.buffer + (s.PointerToRawData + (rva - va));
 		if (adbg_object_outboundp(o, a)) {
-			adbg_oops(AdbgError.objectOutsideBounds);
+			adbg_oops(AdbgError.offsetBounds);
 			return null;
 		}
 		return a;
 	}
 	
 	version (Trace) trace("null");
+	adbg_oops(AdbgError.unfindable);
 	return null;
 }
 
 PE_HEADER* adbg_object_pe_header(adbg_object_t *o) {
-	if (o == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	return o.i.pe.header;
 }
 
 PE_OPTIONAL_HEADER* adbg_object_pe_optheader(adbg_object_t *o) {
-	if (o == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	return o.i.pe.opt_header;
 }
 
 PE_OPTIONAL_HEADER64* adbg_object_pe_optheader64(adbg_object_t *o) {
-	if (o == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	return o.i.pe.opt_header64;
 }
 
 PE_OPTIONAL_HEADERROM* adbg_object_pe_optheaderrom(adbg_object_t *o) {
-	if (o == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	return o.i.pe.opt_headerrom;
 }
 
 PE_SECTION_ENTRY* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 	version (Trace) trace("o=%p index=%u", o, cast(uint)index);
 	
-	if (o == null) return null;
-	if (o.i.pe.sections == null) return null;
-	if (index > MAXIMUM_SECTIONS) return null;
-	if (index >= o.i.pe.header.NumberOfSections) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.sections == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	if (index >= MAXIMUM_SECTIONS) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
+	if (index >= o.i.pe.header.NumberOfSections) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
 	
 	PE_SECTION_ENTRY *section = &o.i.pe.sections[index];
 	if (o.p.reversed && o.i.pe.reversed_sections[index] == false) with (section) {
@@ -1025,23 +1054,34 @@ PE_SECTION_ENTRY* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 //     RVA -> hint + entry
 
 PE_EXPORT_DESCRIPTOR* adbg_object_pe_export(adbg_object_t *o) {
-	if (o == null) return null;
-	if (o.i.pe.directory == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.directory == null) {
+		adbg_oops(AdbgError.unavailable); // Due to PE-ROM
+		return null;
+	}
 	
 	// Set base
-	with (o.i.pe)
-	if (directory_exports == null) {
+	with (o.i.pe) if (directory_exports == null) {
 		directory_exports = cast(PE_EXPORT_DESCRIPTOR*)
 			adbg_object_pe_locate(o, directory.ExportTable.rva);
 		// Not found
-		if (directory_exports == null) return null;
+		if (directory_exports == null) {
+			adbg_oops(AdbgError.unavailable);
+			return null;
+		}
 	}
 	
 	// adbg_object_pe_locate checked pointer bounds
 	PE_EXPORT_DESCRIPTOR* exportdir = o.i.pe.directory_exports;
 	
 	// ExportFlags must be zero
-	if (exportdir.ExportFlags != 0) return null;
+	if (exportdir.ExportFlags != 0) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 	
 	if (o.p.reversed && o.i.pe.reversed_dir_exports == false) with (exportdir) {
 		ExportFlags	= adbg_bswap32(ExportFlags);
@@ -1062,9 +1102,14 @@ PE_EXPORT_DESCRIPTOR* adbg_object_pe_export(adbg_object_t *o) {
 }
 
 const(char)* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_) {
-	if (o == null || export_ == null) return null;
-	if (o.i.pe.directory == null) return null;
-	if (o.i.pe.directory_exports == null) return null;
+	if (o == null || export_ == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.directory == null || o.i.pe.directory_exports == null) {
+		adbg_oops(AdbgError.unavailable); // Due to PE-ROM
+		return null;
+	}
 	
 	const(char) *name =
 		cast(const(char)*)o.i.pe.directory_exports
@@ -1072,7 +1117,7 @@ const(char)* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *
 		+ export_.Name;
 	
 	if (adbg_object_outboundp(o, cast(void*)name)) {
-		adbg_oops(AdbgError.objectOutsideBounds);
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
@@ -1080,24 +1125,32 @@ const(char)* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *
 }
 
 PE_EXPORT_ENTRY* adbg_object_pe_export_name_entry(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, size_t index) {
-	if (o == null || export_ == null) return null;
-	if (o.i.pe.directory == null) return null;
-	if (o.i.pe.directory_exports == null) return null;
-	if (index >= export_.NumberOfNamePointers) return null;
+	if (o == null || export_ == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.directory == null || o.i.pe.directory_exports == null) {
+		adbg_oops(AdbgError.unavailable); // Due to PE-ROM
+		return null;
+	}
+	if (index >= export_.NumberOfNamePointers) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
 	
 	// Check bounds with table RVA
 	void *base = cast(void*)o.i.pe.directory_exports
 		- o.i.pe.directory.ExportTable.rva
 		+ export_.NamePointer;
 	if (adbg_object_outboundp(o, base)) {
-		adbg_oops(AdbgError.objectOutsideBounds);
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
 	// Check bounds with name pointer and requested index
 	PE_EXPORT_ENTRY *entry = cast(PE_EXPORT_ENTRY*)base + index;
 	if (adbg_object_outboundp(o, entry)) {
-		adbg_oops(AdbgError.objectOutsideBounds);
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
@@ -1110,8 +1163,10 @@ PE_EXPORT_ENTRY* adbg_object_pe_export_name_entry(adbg_object_t *o, PE_EXPORT_DE
 }
 
 const(char)* adbg_object_pe_export_name_string(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, PE_EXPORT_ENTRY *entry) {
-	if (o == null || export_ == null || entry == null)
+	if (o == null || export_ == null || entry == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return null;
+	}
 	
 	// NOTE: Export Table bounds
 	//       If the address specified is not within the export section (as
@@ -1128,7 +1183,7 @@ const(char)* adbg_object_pe_export_name_string(adbg_object_t *o, PE_EXPORT_DESCR
 	void *base = cast(void*)o.i.pe.directory_exports -
 		o.i.pe.directory.ExportTable.rva + entry.Export;
 	if (adbg_object_outboundp(o, base)) {
-		adbg_oops(AdbgError.objectOutsideBounds);
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	return cast(const(char)*)base;
@@ -1139,20 +1194,36 @@ const(char)* adbg_object_pe_export_name_string(adbg_object_t *o, PE_EXPORT_DESCR
 //
 
 PE_IMPORT_DESCRIPTOR* adbg_object_pe_import(adbg_object_t *o, size_t index) {
-	if (o == null) return null;
-	if (o.i.pe.directory == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.directory == null) {
+		adbg_oops(AdbgError.unavailable); // Due to PE-ROM
+		return null;
+	}
 	size_t count = o.i.pe.directory.ImportTable.size / PE_IMPORT_DESCRIPTOR.sizeof;
-	if (index >= count) return null;
+	if (index >= count) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
 	
 	// Set base
 	if (o.i.pe.directory_imports == null) {
 		o.i.pe.directory_imports = cast(PE_IMPORT_DESCRIPTOR*)
 			adbg_object_pe_locate(o, o.i.pe.directory.ImportTable.rva);
 		// Not found
-		if (o.i.pe.directory_imports == null) return null;
+		if (o.i.pe.directory_imports == null) {
+			adbg_oops(AdbgError.unavailable);
+			return null;
+		}
 	}
 	
 	PE_IMPORT_DESCRIPTOR* import_ = o.i.pe.directory_imports + index;
+	if (import_.Characteristics == 0) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 	if (o.p.reversed && o.i.pe.reversed_dir_imports[index] == false) with (import_) {
 		Characteristics	= adbg_bswap32(Characteristics);
 		TimeDateStamp	= adbg_bswap32(TimeDateStamp);
@@ -1161,18 +1232,23 @@ PE_IMPORT_DESCRIPTOR* adbg_object_pe_import(adbg_object_t *o, size_t index) {
 		FirstThunk	= adbg_bswap32(FirstThunk);
 		o.i.pe.reversed_dir_imports[index] = true;
 	}
-	if (import_.Characteristics == 0) return null;
 	return import_;
 }
 
 char* adbg_object_pe_import_name(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_) {
-	if (o == null || import_ == null) return null;
-	if (o.i.pe.directory == null) return null;
+	if (o == null || import_ == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.directory == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 	
-	char *s = cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva + import_.Name;
-	
+	char *s = cast(char*)o.i.pe.directory_imports -
+		o.i.pe.directory.ImportTable.rva + import_.Name;
 	if (adbg_object_outboundp(o, s)) {
-		adbg_oops(AdbgError.objectOutsideBounds);
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
@@ -1182,15 +1258,20 @@ char* adbg_object_pe_import_name(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_
 //TODO: Byte-swap import look-up table entries
 
 PE_IMPORT_ENTRY32* adbg_object_pe_import_entry32(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
-	if (o == null || import_ == null) return null;
-	if (o.i.pe.directory_imports == null) return null;
+	if (o == null || import_ == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.directory_imports == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 	
 	PE_IMPORT_ENTRY32* lte32 = cast(PE_IMPORT_ENTRY32*)
 		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
 		+ index;
-	
 	if (adbg_object_outboundp(o, lte32) || lte32.ordinal == 0) {
-		adbg_oops(AdbgError.objectOutsideBounds);
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
@@ -1198,13 +1279,19 @@ PE_IMPORT_ENTRY32* adbg_object_pe_import_entry32(adbg_object_t *o, PE_IMPORT_DES
 }
 
 ushort* adbg_object_pe_import_entry32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_ENTRY32 *im32) {
-	if (o == null || import_ == null) return null;
-	if (o.i.pe.directory_imports == null) return null;
+	if (o == null || import_ == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.directory_imports == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 	
 	ushort* base = cast(ushort*)
 		((cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva) + im32.rva);
 	if (adbg_object_outboundp(o, base)) {
-		adbg_oops(AdbgError.objectOutsideBounds);
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
@@ -1212,8 +1299,14 @@ ushort* adbg_object_pe_import_entry32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTO
 }
 
 PE_IMPORT_ENTRY64* adbg_object_pe_import_entry64(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
-	if (o == null || import_ == null) return null;
-	if (o.i.pe.directory_imports == null) return null;
+	if (o == null || import_ == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.directory_imports == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 	
 	PE_IMPORT_ENTRY64* lte64 = cast(PE_IMPORT_ENTRY64*)
 		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
@@ -1222,7 +1315,7 @@ PE_IMPORT_ENTRY64* adbg_object_pe_import_entry64(adbg_object_t *o, PE_IMPORT_DES
 	version (Trace) trace("imports=%p lte64=%p fs=%zx", o.i.pe.directory_imports, lte64, o.file_size);
 	
 	if (adbg_object_outboundp(o, lte64) || lte64.ordinal == 0) {
-		adbg_oops(AdbgError.objectOutsideBounds);
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
@@ -1230,8 +1323,14 @@ PE_IMPORT_ENTRY64* adbg_object_pe_import_entry64(adbg_object_t *o, PE_IMPORT_DES
 }
 
 ushort* adbg_object_pe_import_entry64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_ENTRY64 *im64) {
-	if (o == null || import_ == null) return null;
-	if (o.i.pe.directory_imports == null) return null;
+	if (o == null || import_ == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.directory_imports == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 	
 	ushort* base = cast(ushort*)
 		((cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva) + im64.rva);
@@ -1239,7 +1338,7 @@ ushort* adbg_object_pe_import_entry64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTO
 	version (Trace) trace("base=%p fs=%zx", base, o.file_size);
 	
 	if (adbg_object_outboundp(o, base)) {
-		adbg_oops(AdbgError.objectOutsideBounds);
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
@@ -1270,17 +1369,29 @@ ushort* adbg_object_pe_import_entry64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTO
 //
 
 PE_DEBUG_DIRECTORY* adbg_object_pe_debug_directory(adbg_object_t *o, size_t index) {
-	if (o == null) return null;
-	if (o.i.pe.directory == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.pe.directory == null) {
+		adbg_oops(AdbgError.unavailable); // Due to PE-ROM
+		return null;
+	}
 	size_t count = o.i.pe.directory.DebugDirectory.size / PE_DEBUG_DIRECTORY.sizeof;
-	if (index >= count) return null;
+	if (index >= count) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
 	
 	// Set base
 	if (o.i.pe.directory_debug == null) {
 		o.i.pe.directory_debug = cast(PE_DEBUG_DIRECTORY*)
 			adbg_object_pe_locate(o, o.i.pe.directory.DebugDirectory.rva);
 		// Not found
-		if (o.i.pe.directory_debug == null) return null;
+		if (o.i.pe.directory_debug == null) {
+			adbg_oops(AdbgError.unavailable);
+			return null;
+		}
 	}
 	
 	PE_DEBUG_DIRECTORY* debug_ = o.i.pe.directory_debug + index;

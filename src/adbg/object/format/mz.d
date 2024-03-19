@@ -112,14 +112,26 @@ int adbg_object_mz_load(adbg_object_t *o) {
 }
 
 mz_hdr* adbg_object_mz_header(adbg_object_t *o) {
-	if (o == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	return o.i.mz.header;
 }
 
 mz_reloc* adbg_object_mz_reloc(adbg_object_t *o, size_t index) {
-	if (o == null) return null;
-	if (o.i.mz.relocs == null) return null; // no relocations available
-	if (index >= o.i.mz.header.e_crlc) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.mz.relocs == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null; // no relocations available
+	}
+	if (index >= o.i.mz.header.e_crlc) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
 	
 	mz_reloc *reloc = &o.i.mz.relocs[index];
 	if (o.p.reversed && o.i.mz.reversed_relocs[index] == false) {

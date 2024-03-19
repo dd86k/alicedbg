@@ -28,6 +28,8 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 //      adbg_ensure_params(lvalue, "name")
 //      - returns string if null found
 //      - automatically set error code
+//      adbg_errorn(AdbgError)
+//      - returns null
 
 extern (C):
 
@@ -37,19 +39,24 @@ enum AdbgError {
 	// 0-99: Generic
 	//
 	success	= 0,
-	invalidArgument	= 1,
-	emptyArgument	= 2,
-	uninitiated	= 4,	// Only when user value is important like for fopen
-	invalidOption	= 5,
-	invalidOptionValue	= 6,
+	invalidArgument	= 1,	/// Argument is null or zero
 	nullArgument	= invalidArgument,	// Old alias for invalidArgument
+	emptyArgument	= 2,	/// Argument contains an empty dataset
+	uninitiated	= 4,	/// Instance was not initiated
+	invalidOption	= 5,	/// Invalid option
+	invalidValue	= 6,	/// Invalid value for option
+	invalidOptionValue	= invalidValue,
+	offsetBounds	= 7,	/// File offset is outside of file size
+	indexBounds	= 8,	/// Index is outside of bounds of list
+	unavailable	= 9,	/// Feature or item is unavailable
+	unfindable	= 10,	/// Item cannot be found in list
 	//
 	// 100-199: Debugger
 	//
-	debuggerUnattached = 100,
-	debuggerUnpaused = 101,
-	debuggerInvalidAction = 102,	/// Wrong action from creation method.
-	debuggerPresent = 103,	/// Debugger already present in remote process
+	debuggerUnattached	= 100,
+	debuggerUnpaused	= 101,
+	debuggerInvalidAction	= 102,	/// Wrong action from creation method.
+	debuggerPresent	= 103,	/// Debugger already present in remote process
 	// Old meanings
 	notAttached = debuggerUnattached,	/// Old value for debuggerUnattached
 	notPaused = debuggerUnpaused,	/// Old value for debuggerUnpaused
@@ -57,10 +64,10 @@ enum AdbgError {
 	//
 	// 200-299: Disasembler
 	//
-	disasmUnsupportedMachine = 202,
-	disasmIllegalInstruction = 220,
-	disasmEndOfData = 221,
-	disasmOpcodeLimit = 221,
+	disasmUnsupportedMachine	= 202,
+	disasmIllegalInstruction	= 220,
+	disasmEndOfData	= 221,
+	disasmOpcodeLimit	= 221,
 	// Old meanings
 	unsupportedPlatform	= disasmUnsupportedMachine,
 	illegalInstruction	= disasmIllegalInstruction,
@@ -80,7 +87,7 @@ enum AdbgError {
 	objectInvalidEndian	= 313,
 	objectInvalidType	= 314,
 	objectInvalidABI	= 315,
-	objectOutsideBounds	= 320,
+	objectOutsideBounds	= offsetBounds,
 	// Old meanings
 	unknownObjFormat	= objectUnknownFormat,
 	unsupportedObjFormat	= objectUnsupportedFormat,
@@ -130,7 +137,7 @@ private __gshared adbg_error_t error;
 
 //TODO: Strongly consider string, provides .ptr and .length
 private struct adbg_error_msg_t {
-	uint code;
+	int code;
 	const(char) *msg;
 }
 private immutable const(char) *defaultMsg = "Unknown error occured.";
@@ -143,6 +150,10 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.uninitiated,	"Object or structure is uninitiated." },
 	{ AdbgError.invalidOption,	"Option unknown." },
 	{ AdbgError.invalidOptionValue,	"Option received invalid value." },
+	{ AdbgError.offsetBounds,	"File offset outside file size." },
+	{ AdbgError.indexBounds,	"Index outside of list." },
+	{ AdbgError.unavailable,	"Feature or item is unavailable." },
+	{ AdbgError.unfindable,	"Index outside of list." },
 	//
 	// Debugger
 	//
@@ -171,7 +182,6 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.objectInvalidEndian,	"Invalid endianess value for object." },
 	{ AdbgError.objectInvalidType,	"Invalid object type." },
 	{ AdbgError.objectInvalidABI,	"Invalid ABI value for object." },
-	{ AdbgError.objectOutsideBounds,	"Access outside file or module bounds." },
 	//
 	// Symbols
 	//

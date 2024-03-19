@@ -462,7 +462,7 @@ int adbg_object_pdb70_load(adbg_object_t *o, size_t offset = 0) {
 	uint *dirblk = void;
 	if (adbg_object_offsetl(o, cast(void**)&dirblk, diroff, header.PageSize)) {
 		free(dir);
-		return adbg_oops(AdbgError.assertion);
+		return adbg_oops(AdbgError.offsetBounds);
 	}
 	
 	// Load stream directory blocks into the memory buffer
@@ -472,7 +472,7 @@ int adbg_object_pdb70_load(adbg_object_t *o, size_t offset = 0) {
 		void *block = void;
 		if (adbg_object_offsetl(o, &block, blockoff, header.PageSize)) {
 			free(dir);
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.offsetBounds);
 		}
 		
 		memcpy(dir + (dirblkidx * header.PageSize), block, header.PageSize);
@@ -538,20 +538,26 @@ bool adbg_object_pdb70_block_free(adbg_object_t *o, uint num) {
 }
 
 ubyte* adbg_object_pdb70_get_block(adbg_object_t *o, uint num) {
-	if (o == null)
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return null;
+	}
 	
 	pdb70_file_header *header = o.i.pdb70.header;
 	
 	// Check with selected FPM if block is allocated
-	if (adbg_object_pdb70_block_free(o, num))
+	if (adbg_object_pdb70_block_free(o, num)) {
+		adbg_oops(AdbgError.unavailable);
 		return null;
+	}
 	
 	// Get block
 	ubyte *block = void;
 	if (adbg_object_offsetl(o, cast(void**)&block,
-		num * header.PageSize, header.PageSize))
+		num * header.PageSize, header.PageSize)) {
+		adbg_oops(AdbgError.offsetBounds);
 		return null;
+	}
 	
 	return block;
 }
@@ -590,7 +596,7 @@ int adbg_object_pdb70_stream_open(adbg_object_t *o, void **ubuffer, uint *usize,
 		if (adbg_object_offsetl(o, &block, fileoff, readsz)) {
 			free(sbuffer);
 			*ubuffer = null;
-			return adbg_oops(AdbgError.assertion);
+			return adbg_oops(AdbgError.offsetBounds);
 		}
 		
 		// Adjust read size on last block
@@ -605,8 +611,10 @@ int adbg_object_pdb70_stream_open(adbg_object_t *o, void **ubuffer, uint *usize,
 	return 0;
 }
 void adbg_object_pdb70_stream_close(adbg_object_t *o, void **ubuffer) {
-	if (o == null || ubuffer == null)
+	if (o == null || ubuffer == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return;
+	}
 	
 	if (*ubuffer) {
 		free(*ubuffer);

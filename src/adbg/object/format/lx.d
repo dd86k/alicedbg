@@ -267,35 +267,35 @@ enum {
 }
 
 struct lx_flat_bundle_prefix {
-    ubyte  b32_cnt;
-    ubyte  b32_type;
-    ushort b32_obj;
+	ubyte  b32_cnt;
+	ubyte  b32_type;
+	ushort b32_obj;
 }
 
 struct flat_null_prefix {
-    ubyte b32_cnt;
-    ubyte b32_type;
+	ubyte b32_cnt;
+	ubyte b32_type;
 }
 
 /* values for the b32_type field */
 alias bundle_types = int;
 enum {
-    FLT_BNDL_EMPTY  = 0,
-    FLT_BNDL_ENTRY16,
-    FLT_BNDL_GATE16,
-    FLT_BNDL_ENTRY32,
-    FLT_BNDL_ENTRYFWD
+	FLT_BNDL_EMPTY  = 0,
+	FLT_BNDL_ENTRY16,
+	FLT_BNDL_GATE16,
+	FLT_BNDL_ENTRY32,
+	FLT_BNDL_ENTRYFWD
 }
 
 struct lx_flat_bundle_entry32 {
-    ubyte e32_flags;      /* flag bits are same as in OS/2 1.x */
-    uint  e32_offset;
+	ubyte e32_flags;      /* flag bits are same as in OS/2 1.x */
+	uint  e32_offset;
 }
 
 struct lx_flat_bundle_gate16 {
-    ubyte  e32_flags;      /* flag bits are same as in OS/2 1.x */
-    ushort offset;
-    ushort callgate;
+	ubyte  e32_flags;      /* flag bits are same as in OS/2 1.x */
+	ushort offset;
+	ushort callgate;
 }
 
 /*
@@ -303,22 +303,22 @@ struct lx_flat_bundle_gate16 {
  */
 
 struct lx_flat_bundle_entry16 {
-    ubyte  e32_flags;      /* flag bits are same as in OS/2 1.x */
-    ushort e32_offset;
+	ubyte  e32_flags;      /* flag bits are same as in OS/2 1.x */
+	ushort e32_offset;
 }
 
 struct lx_flat_bundle_entryfwd {
-    ubyte  e32_flags;      /* flag bits are same as in OS/2 1.x */
-    ushort modord;
-    uint   value;
+	ubyte  e32_flags;      /* flag bits are same as in OS/2 1.x */
+	ushort modord;
+	uint   value;
 }
 
 struct lx_flat_res_table {
-    ushort type_id;
-    ushort name_id;
-    uint   res_size;
-    ushort object;
-    uint   offset;
+	ushort type_id;
+	ushort name_id;
+	uint   res_size;
+	ushort object;
+	uint   offset;
 }
 
 /* fixup record source flags */

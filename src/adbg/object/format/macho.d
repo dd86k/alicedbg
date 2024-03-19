@@ -60,59 +60,59 @@ struct macho_load_command {
 alias int vm_prot_t;
 
 struct macho_segment_command { /* for 32-bit architectures */
-	uint	cmd;	/// LC_SEGMENT
-	uint	cmdsize;	/// includes sizeof section structs
-	char[16]	segname;	/// segment name
-	uint	vmaddr;	/// memory address of this segment
-	uint	vmsize;	/// memory size of this segment
-	uint	fileoff;	/// file offset of this segment
-	uint	filesize;	/// amount to map from the file
-	vm_prot_t	maxprot;	/// maximum VM protection
-	vm_prot_t	initprot;	/// initial VM protection
-	uint	nsects;	/// number of sections in segment
-	uint	flags;	/// flags
+	uint      cmd;	/// LC_SEGMENT
+	uint      cmdsize;	/// includes sizeof section structs
+	char[16]  segname;	/// segment name
+	uint      vmaddr;	/// memory address of this segment
+	uint      vmsize;	/// memory size of this segment
+	uint      fileoff;	/// file offset of this segment
+	uint      filesize;	/// amount to map from the file
+	vm_prot_t maxprot;	/// maximum VM protection
+	vm_prot_t initprot;	/// initial VM protection
+	uint      nsects;	/// number of sections in segment
+	uint      flags;	/// flags
 }
 
 struct macho_segment_command_64 { /* for 64-bit architectures */
-	uint	cmd;	/// LC_SEGMENT_64
-	uint	cmdsize;	/// includes sizeof section_64 structs
-	char[16]	segname;	/// segment name
-	ulong	vmaddr;	/// memory address of this segment
-	ulong	vmsize;	/// memory size of this segment
-	ulong	fileoff;	/// file offset of this segment
-	ulong	filesize;	/// amount to map from the file
-	vm_prot_t	maxprot;	/// maximum VM protection
-	vm_prot_t	initprot;	/// initial VM protection
-	uint	nsects;	/// number of sections in segment
-	uint	flags;	/// flags
+	uint      cmd;	/// LC_SEGMENT_64
+	uint      cmdsize;	/// includes sizeof section_64 structs
+	char[16]  segname;	/// segment name
+	ulong     vmaddr;	/// memory address of this segment
+	ulong     vmsize;	/// memory size of this segment
+	ulong     fileoff;	/// file offset of this segment
+	ulong     filesize;	/// amount to map from the file
+	vm_prot_t maxprot;	/// maximum VM protection
+	vm_prot_t initprot;	/// initial VM protection
+	uint      nsects;	/// number of sections in segment
+	uint      flags;	/// flags
 }
 
 alias cpu_type_t = int;
 enum {
-	MACHO_CPUTYPE_ANY = -1,
+	MACHO_CPUTYPE_ANY	= -1,
 	/// Used as a bitmask to mark cputype as 64-bit
-	MACHO_CPUTYPE_ABI64 = 0x1000000,
-	MACHO_CPUTYPE_VAX = 1,
-	MACHO_CPUTYPE_ROMP = 2,
-	MACHO_CPUTYPE_NS32032 = 4,
-	MACHO_CPUTYPE_NS32332 = 5,
-	MACHO_CPUTYPE_MC680x0 = 6,
-	MACHO_CPUTYPE_I386 = 7,
-	MACHO_CPUTYPE_X86_64 = MACHO_CPUTYPE_I386 | MACHO_CPUTYPE_ABI64,
-	MACHO_CPUTYPE_MIPS = 8,
-	MACHO_CPUTYPE_NS32532 = 9,
-	MACHO_CPUTYPE_HPPA = 11,
-	MACHO_CPUTYPE_ARM = 12,
-	MACHO_CPUTYPE_ARM64 = MACHO_CPUTYPE_ARM | MACHO_CPUTYPE_ABI64,
-	MACHO_CPUTYPE_MC88000 = 13,
-	MACHO_CPUTYPE_SPARC = 14,
-	MACHO_CPUTYPE_I860 = 15, // big-endian
-	MACHO_CPUTYPE_I860_LITTLE = 16, // little-endian
-	MACHO_CPUTYPE_RS6000 = 17,
-	MACHO_CPUTYPE_MC98000 = 18,
-	MACHO_CPUTYPE_POWERPC = 18,
-	MACHO_CPUTYPE_POWERPC64 = MACHO_CPUTYPE_POWERPC | MACHO_CPUTYPE_ABI64,
-	MACHO_CPUTYPE_VEO = 255
+	MACHO_CPUTYPE_ABI64	= 0x100_0000,
+	MACHO_CPUTYPE_VAX	= 1,
+	MACHO_CPUTYPE_ROMP	= 2,
+	MACHO_CPUTYPE_NS32032	= 4,
+	MACHO_CPUTYPE_NS32332	= 5,
+	MACHO_CPUTYPE_MC680x0	= 6,
+	MACHO_CPUTYPE_I386	= 7,
+	MACHO_CPUTYPE_X86_64	= MACHO_CPUTYPE_I386 | MACHO_CPUTYPE_ABI64,
+	MACHO_CPUTYPE_MIPS	= 8,
+	MACHO_CPUTYPE_NS32532	= 9,
+	MACHO_CPUTYPE_HPPA	= 11,
+	MACHO_CPUTYPE_ARM	= 12,
+	MACHO_CPUTYPE_ARM64	= MACHO_CPUTYPE_ARM | MACHO_CPUTYPE_ABI64,
+	MACHO_CPUTYPE_MC88000	= 13,
+	MACHO_CPUTYPE_SPARC	= 14,
+	MACHO_CPUTYPE_I860	= 15, // big-endian
+	MACHO_CPUTYPE_I860_LITTLE	= 16, // little-endian
+	MACHO_CPUTYPE_RS6000	= 17,
+	MACHO_CPUTYPE_MC98000	= 18,
+	MACHO_CPUTYPE_POWERPC	= 18,
+	MACHO_CPUTYPE_POWERPC64	= MACHO_CPUTYPE_POWERPC | MACHO_CPUTYPE_ABI64,
+	MACHO_CPUTYPE_VEO	= 255
 }
 
 // =============================
@@ -121,37 +121,37 @@ enum {
 
 // VAX subtypes
 enum { // SUBTYPE_VAX
-	MACHO_SUBTYPE_VAX_ALL = 0,
-	MACHO_SUBTYPE_VAX780 = 1,
-	MACHO_SUBTYPE_VAX785 = 2,
-	MACHO_SUBTYPE_VAX750 = 3,
-	MACHO_SUBTYPE_VAX730 = 4,
-	MACHO_SUBTYPE_UVAXI = 5,
-	MACHO_SUBTYPE_UVAXII = 6,
-	MACHO_SUBTYPE_VAX8200 = 7,
-	MACHO_SUBTYPE_VAX8500 = 8,
-	MACHO_SUBTYPE_VAX8600 = 9,
-	MACHO_SUBTYPE_VAX8650 = 10,
-	MACHO_SUBTYPE_VAX8800 = 11,
-	MACHO_SUBTYPE_UVAXIII = 12
+	MACHO_SUBTYPE_VAX_ALL	= 0,
+	MACHO_SUBTYPE_VAX780	= 1,
+	MACHO_SUBTYPE_VAX785	= 2,
+	MACHO_SUBTYPE_VAX750	= 3,
+	MACHO_SUBTYPE_VAX730	= 4,
+	MACHO_SUBTYPE_UVAXI	= 5,
+	MACHO_SUBTYPE_UVAXII	= 6,
+	MACHO_SUBTYPE_VAX8200	= 7,
+	MACHO_SUBTYPE_VAX8500	= 8,
+	MACHO_SUBTYPE_VAX8600	= 9,
+	MACHO_SUBTYPE_VAX8650	= 10,
+	MACHO_SUBTYPE_VAX8800	= 11,
+	MACHO_SUBTYPE_UVAXIII	= 12
 }
 
 // ROMP subtypes
 enum { // SUBTYPE_ROMP
-	MACHO_SUBTYPE_RT_ALL = 0,
-	MACHO_SUBTYPE_RT_PC = 1,
-	MACHO_SUBTYPE_RT_APC = 2,
-	MACHO_SUBTYPE_RT_135 = 3
+	MACHO_SUBTYPE_RT_ALL	= 0,
+	MACHO_SUBTYPE_RT_PC	= 1,
+	MACHO_SUBTYPE_RT_APC	= 2,
+	MACHO_SUBTYPE_RT_135	= 3
 }
 
 // 32032/32332/32532 subtypes
 enum { // SUBTYPE_32032
-	MACHO_SUBTYPE_MMAX_ALL = 0,
-	MACHO_SUBTYPE_MMAX_DPC = 1, /* 032 CPU */
-	MACHO_SUBTYPE_SQT = 2,
-	MACHO_SUBTYPE_MMAX_APC_FPU = 3, /* 32081 FPU */
-	MACHO_SUBTYPE_MMAX_APC_FPA = 4, /* Weitek FPA */
-	MACHO_SUBTYPE_MMAX_XPC = 5, /* 532 CPU */
+	MACHO_SUBTYPE_MMAX_ALL	= 0,
+	MACHO_SUBTYPE_MMAX_DPC	= 1, /* 032 CPU */
+	MACHO_SUBTYPE_SQT	= 2,
+	MACHO_SUBTYPE_MMAX_APC_FPU	= 3, /* 32081 FPU */
+	MACHO_SUBTYPE_MMAX_APC_FPA	= 4, /* Weitek FPA */
+	MACHO_SUBTYPE_MMAX_XPC	= 5, /* 532 CPU */
 }
 
 private
@@ -161,95 +161,95 @@ template SUBTYPE_INTEL(short f, short m) {
 
 // x86 subtypes
 enum { // SUBTYPE_I386
-	MACHO_SUBTYPE_I386_ALL = 3,
-	MACHO_SUBTYPE_X86_64_ALL = MACHO_SUBTYPE_I386_ALL,
-	MACHO_SUBTYPE_i386 = 3,
-	MACHO_SUBTYPE_i486 = 4,
-	MACHO_SUBTYPE_i486SX = 4 + 128, // "4 + 128"
-	MACHO_SUBTYPE_i586 = 5,
-	MACHO_SUBTYPE_PENT = SUBTYPE_INTEL!(5, 0),
-	MACHO_SUBTYPE_PENPRO = SUBTYPE_INTEL!(6, 1),
-	MACHO_SUBTYPE_PENTII_M3 = SUBTYPE_INTEL!(6, 3),
-	MACHO_SUBTYPE_PENTII_M5 = SUBTYPE_INTEL!(6, 5),
-	MACHO_SUBTYPE_PENTIUM_4 = SUBTYPE_INTEL!(10, 0),
+	MACHO_SUBTYPE_I386_ALL	= 3,
+	MACHO_SUBTYPE_X86_64_ALL	= MACHO_SUBTYPE_I386_ALL,
+	MACHO_SUBTYPE_i386	= 3,
+	MACHO_SUBTYPE_i486	= 4,
+	MACHO_SUBTYPE_i486SX	= 4 + 128, // "4 + 128"
+	MACHO_SUBTYPE_i586	= 5,
+	MACHO_SUBTYPE_PENT	= SUBTYPE_INTEL!(5, 0),
+	MACHO_SUBTYPE_PENPRO	= SUBTYPE_INTEL!(6, 1),
+	MACHO_SUBTYPE_PENTII_M3	= SUBTYPE_INTEL!(6, 3),
+	MACHO_SUBTYPE_PENTII_M5	= SUBTYPE_INTEL!(6, 5),
+	MACHO_SUBTYPE_PENTIUM_4	= SUBTYPE_INTEL!(10, 0),
 }
 
 // MIPS subty
 enum { // SUBTYPE_MIPS
-	MACHO_SUBTYPE_MIPS_ALL = 0,
-	MACHO_SUBTYPE_R2300 = 1,
-	MACHO_SUBTYPE_R2600 = 2,
-	MACHO_SUBTYPE_R2800 = 3,
-	MACHO_SUBTYPE_R2800a = 4
+	MACHO_SUBTYPE_MIPS_ALL	= 0,
+	MACHO_SUBTYPE_R2300	= 1,
+	MACHO_SUBTYPE_R2600	= 2,
+	MACHO_SUBTYPE_R2800	= 3,
+	MACHO_SUBTYPE_R2800a	= 4
 }
 
 // 680x0 subtypes (m68k)
 enum { // SUBTYPE_680x0
-	MACHO_SUBTYPE_MC680x0_ALL = 1,
-	MACHO_SUBTYPE_MC68030 = 1,
-	MACHO_SUBTYPE_MC68040 = 2,
-	MACHO_SUBTYPE_MC68030_ONLY = 3,
+	MACHO_SUBTYPE_MC680x0_ALL	= 1,
+	MACHO_SUBTYPE_MC68030	= 1,
+	MACHO_SUBTYPE_MC68040	= 2,
+	MACHO_SUBTYPE_MC68030_ONLY	= 3,
 }
 
 // HPPA subtypes
 enum { // SUBTYPE_HPPA
-	MACHO_SUBTYPE_HPPA7100 = 0,
-	MACHO_SUBTYPE_HPPA7100LC = 1,
-	MACHO_SUBTYPE_HPPA_ALL = 0,
+	MACHO_SUBTYPE_HPPA7100	= 0,
+	MACHO_SUBTYPE_HPPA7100LC	= 1,
+	MACHO_SUBTYPE_HPPA_ALL	= 0,
 }
 
 // Acorn subtypes
 enum { // SUBTYPE_ARM
-	MACHO_SUBTYPE_ACORN_ALL = 0,
-	MACHO_SUBTYPE_A500_ARCH = 1,
-	MACHO_SUBTYPE_A500 = 2,
-	MACHO_SUBTYPE_A440 = 3,
-	MACHO_SUBTYPE_M4 = 4,
-	MACHO_SUBTYPE_V4T = 5,
-	MACHO_SUBTYPE_V6 = 6,
-	MACHO_SUBTYPE_V5TEJ = 7,
-	MACHO_SUBTYPE_XSCALE = 8,
-	MACHO_SUBTYPE_V7 = 9,
-	MACHO_SUBTYPE_V8 = 13,
+	MACHO_SUBTYPE_ACORN_ALL	= 0,
+	MACHO_SUBTYPE_A500_ARCH	= 1,
+	MACHO_SUBTYPE_A500	= 2,
+	MACHO_SUBTYPE_A440	= 3,
+	MACHO_SUBTYPE_M4	= 4,
+	MACHO_SUBTYPE_V4T	= 5,
+	MACHO_SUBTYPE_V6	= 6,
+	MACHO_SUBTYPE_V5TEJ	= 7,
+	MACHO_SUBTYPE_XSCALE	= 8,
+	MACHO_SUBTYPE_V7	= 9,
+	MACHO_SUBTYPE_V8	= 13,
 }
 
 // MC88000 subtypes
 enum { // SUBTYPE_MC88000
-	MACHO_SUBTYPE_MC88000_ALL = 0,
-	MACHO_SUBTYPE_MMAX_JPC = 1,
-	MACHO_SUBTYPE_MC88100 = 1,
-	MACHO_SUBTYPE_MC88110 = 2,
+	MACHO_SUBTYPE_MC88000_ALL	= 0,
+	MACHO_SUBTYPE_MMAX_JPC	= 1,
+	MACHO_SUBTYPE_MC88100	= 1,
+	MACHO_SUBTYPE_MC88110	= 2,
 }
 
 // MC98000 (PowerPC) subtypes
 enum { // SUBTYPE_MC98000
-	MACHO_SUBTYPE_MC98000_ALL = 0,
-	MACHO_SUBTYPE_MC98601 = 1,
+	MACHO_SUBTYPE_MC98000_ALL	= 0,
+	MACHO_SUBTYPE_MC98601	= 1,
 }
 
 // I860 subtypes
 enum { // SUBTYPE_I860
-	MACHO_SUBTYPE_I860_ALL = 0,
-	MACHO_SUBTYPE_I860 = 1,
+	MACHO_SUBTYPE_I860_ALL	= 0,
+	MACHO_SUBTYPE_I860	= 1,
 }
 
 // I860_LITTLE subtypes
 enum { // SUBTYPE_I860_LITTLE
-	MACHO_SUBTYPE_I860_LITTLE_ALL = 0,
-	MACHO_SUBTYPE_I860_LITTLE = 1
+	MACHO_SUBTYPE_I860_LITTLE_ALL	= 0,
+	MACHO_SUBTYPE_I860_LITTLE	= 1
 }
 
 // RS6000 subtypes
 enum { // SUBTYPE_RS6000
-	MACHO_SUBTYPE_RS6000_ALL = 0,
-	MACHO_SUBTYPE_RS6000 = 1,
+	MACHO_SUBTYPE_RS6000_ALL	= 0,
+	MACHO_SUBTYPE_RS6000	= 1,
 }
 
 // Sun4 subtypes (port done at CMU (?))
 enum { // SUBTYPE_Sun4
-	MACHO_SUBTYPE_SUN4_ALL = 0,
-	MACHO_SUBTYPE_SUN4_260 = 1,
-	MACHO_SUBTYPE_SUN4_110 = 2,
+	MACHO_SUBTYPE_SUN4_ALL	= 0,
+	MACHO_SUBTYPE_SUN4_260	= 1,
+	MACHO_SUBTYPE_SUN4_110	= 2,
 }
 
 // SPARC subtypes
@@ -259,27 +259,27 @@ enum { // SUBTYPE_Sun4
 
 // PowerPC subtypes
 enum { // SUBTYPE_PowerPC
-	MACHO_SUBTYPE_POWERPC_ALL = 0,
-	MACHO_SUBTYPE_POWERPC_601 = 1,
-	MACHO_SUBTYPE_POWERPC_602 = 2,
-	MACHO_SUBTYPE_POWERPC_603 = 3,
-	MACHO_SUBTYPE_POWERPC_603e = 4,
-	MACHO_SUBTYPE_POWERPC_603ev = 5,
-	MACHO_SUBTYPE_POWERPC_604 = 6,
-	MACHO_SUBTYPE_POWERPC_604e = 7,
-	MACHO_SUBTYPE_POWERPC_620 = 8,
-	MACHO_SUBTYPE_POWERPC_750 = 9,
-	MACHO_SUBTYPE_POWERPC_7400 = 10,
-	MACHO_SUBTYPE_POWERPC_7450 = 11,
-	MACHO_SUBTYPE_POWERPC_970 = 100,
+	MACHO_SUBTYPE_POWERPC_ALL	= 0,
+	MACHO_SUBTYPE_POWERPC_601	= 1,
+	MACHO_SUBTYPE_POWERPC_602	= 2,
+	MACHO_SUBTYPE_POWERPC_603	= 3,
+	MACHO_SUBTYPE_POWERPC_603e	= 4,
+	MACHO_SUBTYPE_POWERPC_603ev	= 5,
+	MACHO_SUBTYPE_POWERPC_604	= 6,
+	MACHO_SUBTYPE_POWERPC_604e	= 7,
+	MACHO_SUBTYPE_POWERPC_620	= 8,
+	MACHO_SUBTYPE_POWERPC_750	= 9,
+	MACHO_SUBTYPE_POWERPC_7400	= 10,
+	MACHO_SUBTYPE_POWERPC_7450	= 11,
+	MACHO_SUBTYPE_POWERPC_970	= 100,
 }
 
 // VEO subtypes
 enum { // SUBTYPE_VEO
-	MACHO_SUBTYPE_VEO_1 = 1,
-	MACHO_SUBTYPE_VEO_2 = 2,
-	MACHO_SUBTYPE_VEO_3 = 3,
-	MACHO_SUBTYPE_VEO_4 = 4,
+	MACHO_SUBTYPE_VEO_1	= 1,
+	MACHO_SUBTYPE_VEO_2	= 2,
+	MACHO_SUBTYPE_VEO_3	= 3,
+	MACHO_SUBTYPE_VEO_4	= 4,
 	//VEO_ALL = VEO_2,
 }
 
@@ -488,15 +488,15 @@ macho_fat_arch* adbg_object_macho_fat_arch(adbg_object_t *o, size_t index) {
 		return null; // not loaded
 	}
 	if (o.i.macho.fat == false) {
-		adbg_oops(AdbgError.invalidArgument);
+		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	if (index >= LIMIT_FAT_ARCH) {
-		adbg_oops(AdbgError.objectMalformed);
+		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	if (index >= o.i.macho.fat_header.nfat_arch) {
-		adbg_oops(AdbgError.objectMalformed);
+		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
@@ -525,15 +525,15 @@ macho_load_command* adbg_object_macho_load_command(adbg_object_t *o, size_t inde
 		return null; // not loaded
 	}
 	if (o.i.macho.fat) {
-		adbg_oops(AdbgError.invalidArgument);
+		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	if (index >= LIMIT_COMMANDS) {
-		adbg_oops(AdbgError.objectMalformed);
+		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	if (index >= o.i.macho.header.ncmds) {
-		adbg_oops(AdbgError.objectMalformed);
+		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	

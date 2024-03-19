@@ -416,7 +416,7 @@ enum ELF_SHT_HIPROC	= 0x7fffffff;	/// Processor specific
 enum ELF_SHT_LOUSER	= 0x80000000;	/// Application specific
 enum ELF_SHT_HIUSER	= 0xffffffff;	/// Application specific
 /// This section contains unwind function table entries for stack unwinding
-enum ELF_SHT_X86_64_UNWIND	= 0x70000001;
+enum ELF_SHT_X86_64_UNWIND	= 0x70000001; // ELF_SHT_LOPROC + 1?
 
 // Section flags
 
@@ -701,6 +701,7 @@ struct Elf64_Chdr {
 
 
 //TODO: Move them to some include folder
+//      There's adbg.include.linux.user
 
 struct elf_prstatus32_timeval {
 	uint tv_sec;
@@ -1123,15 +1124,27 @@ int adbg_object_elf_load(adbg_object_t *o) {
 }
 
 Elf32_Ehdr* adbg_object_elf_ehdr32(adbg_object_t *o) {
-	if (o == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	// Return as-is, already swapped
 	return o.i.elf32.ehdr;
 }
 
 Elf32_Phdr* adbg_object_elf_phdr32(adbg_object_t *o, size_t index) {
-	if (o == null) return null;
-	if (o.i.elf32.phdr == null) return null;
-	if (index >= o.i.elf32.ehdr.e_phnum) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.elf32.phdr == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	if (index >= o.i.elf32.ehdr.e_phnum) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
 	
 	Elf32_Phdr *phdr = &o.i.elf32.phdr[index];
 	if (o.p.reversed && o.i.elf32.reversed_phdr[index] == false) {
@@ -1149,9 +1162,18 @@ Elf32_Phdr* adbg_object_elf_phdr32(adbg_object_t *o, size_t index) {
 }
 
 Elf32_Shdr* adbg_object_elf_shdr32(adbg_object_t *o, size_t index) {
-	if (o == null) return null;
-	if (o.i.elf32.shdr == null) return null;
-	if (index >= o.i.elf32.ehdr.e_shnum) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.elf32.shdr == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	if (index >= o.i.elf32.ehdr.e_shnum) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
 	
 	Elf32_Shdr *shdr = &o.i.elf32.shdr[index];
 	if (o.p.reversed && o.i.elf32.reversed_phdr[index] == false) {
@@ -1171,15 +1193,27 @@ Elf32_Shdr* adbg_object_elf_shdr32(adbg_object_t *o, size_t index) {
 }
 
 Elf64_Ehdr* adbg_object_elf_ehdr64(adbg_object_t *o) {
-	if (o == null) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	// Return as-is, already swapped
 	return o.i.elf64.ehdr;
 }
 
 Elf64_Phdr* adbg_object_elf_phdr64(adbg_object_t *o, size_t index) {
-	if (o == null) return null;
-	if (o.i.elf64.phdr == null) return null;
-	if (index >= o.i.elf64.ehdr.e_phnum) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.elf64.phdr == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	if (index >= o.i.elf64.ehdr.e_phnum) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
 	
 	Elf64_Phdr *phdr = &o.i.elf64.phdr[index];
 	if (o.p.reversed && o.i.elf64.reversed_phdr[index] == false) {
@@ -1197,9 +1231,18 @@ Elf64_Phdr* adbg_object_elf_phdr64(adbg_object_t *o, size_t index) {
 }
 
 Elf64_Shdr* adbg_object_elf_shdr64(adbg_object_t *o, size_t index) {
-	if (o == null) return null;
-	if (o.i.elf64.shdr == null) return null;
-	if (index >= o.i.elf64.ehdr.e_shnum) return null;
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.elf64.shdr == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	if (index >= o.i.elf64.ehdr.e_shnum) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
 	
 	Elf64_Shdr *shdr = &o.i.elf64.shdr[index];
 	if (o.p.reversed && o.i.elf64.reversed_phdr[index] == false) {
