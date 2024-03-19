@@ -28,7 +28,7 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 //      adbg_ensure_params(lvalue, "name")
 //      - returns string if null found
 //      - automatically set error code
-//      adbg_errorn(AdbgError)
+//      adbg_oopsn(AdbgError)
 //      - returns null
 
 extern (C):
@@ -124,13 +124,13 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	{ AdbgError.invalidArgument,	"Invalid or missing parameter value." },
 	{ AdbgError.emptyArgument,	"Parameter is empty." },
-	{ AdbgError.uninitiated,	"Object or structure is uninitiated." },
+	{ AdbgError.uninitiated,	"Object or structure requires to be initialized first." },
 	{ AdbgError.invalidOption,	"Option unknown." },
 	{ AdbgError.invalidValue,	"Option received invalid value." },
 	{ AdbgError.offsetBounds,	"File offset outside file size." },
 	{ AdbgError.indexBounds,	"Index outside of list." },
 	{ AdbgError.unavailable,	"Feature or item is unavailable." },
-	{ AdbgError.unfindable,	"Index outside of list." },
+	{ AdbgError.unfindable,	"Item was not found." },
 	//
 	// Debugger
 	//
