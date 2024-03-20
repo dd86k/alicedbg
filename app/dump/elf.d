@@ -10,8 +10,8 @@ import adbg.disassembler;
 import adbg.object.server;
 import adbg.machines;
 import adbg.object.format.elf;
-import core.stdc.string : memcmp;
-import dumper;
+import core.stdc.string : memcmp, strncmp;
+import common, dumper;
 import utils : realchar, hexstr;
 
 extern (C):
@@ -399,6 +399,8 @@ void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
 	
 	//TODO: Functions to get section + section name safely
 	
+	/// Arbritrary maximum section name length
+	enum SNMLEN = 32;
 	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:
 		if (o.i.elf32.ehdr == null)
@@ -424,8 +426,19 @@ void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
 		char *table = o.bufferc + offset; // string table
 		for (uint i; i < section_count; ++i) {
 			Elf32_Shdr *shdr = adbg_object_elf_shdr32(o, i);
+
+			// If we're searching sections, don't print anything
+			if (globals.dump_section) {
+				if (strncmp(table + shdr.sh_name, globals.dump_section, SNMLEN) == 0) {
+					print_raw(globals.dump_section, // Lazy as fuck
+						o.buffer + shdr.sh_offset, shdr.sh_size, o);
+					return;
+				}
+				continue;
+			}
+
 			with (shdr) {
-			print_section(i, table + sh_name, 32);
+			print_section(i, table + sh_name, SNMLEN);
 			print_x32("sh_name", sh_name);
 			print_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
 			print_x32("sh_flags", sh_flags);
@@ -476,8 +489,19 @@ void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
 		char *table = o.bufferc + offset; // string table
 		for (uint i; i < section_count; ++i) {
 			Elf64_Shdr *shdr = adbg_object_elf_shdr64(o, i);
+
+			// If we're searching sections, don't print anything
+			if (globals.dump_section) {
+				if (strncmp(table + shdr.sh_name, globals.dump_section, SNMLEN) == 0) {
+					print_raw(globals.dump_section, // Lazy as fuck
+						o.buffer + shdr.sh_offset, shdr.sh_size, o);
+					return;
+				}
+				continue;
+			}
+
 			with (shdr) {
-			print_section(i, table + sh_name, 32);
+			print_section(i, table + sh_name, SNMLEN);
 			print_x32("sh_name", sh_name);
 			print_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
 			print_flags64("sh_flags", sh_flags,

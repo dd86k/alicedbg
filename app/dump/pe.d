@@ -5,13 +5,13 @@
 /// License: BSD-3-Clause-Clear
 module dump.pe;
 
-import core.stdc.stdlib : EXIT_SUCCESS, EXIT_FAILURE;
 import adbg.disassembler;
 import adbg.object.server;
 import adbg.machines : AdbgMachine;
 import adbg.object.format.pe;
 import adbg.utils.date : ctime32;
 import adbg.utils.uid, adbg.utils.bit;
+import core.stdc.string : strncmp;
 import common, dumper;
 
 extern (C):
@@ -40,7 +40,7 @@ int dump_pe(ref Dumper dump, adbg_object_t *o) {
 	if (dump.selected_disasm_any())
 		dump_pe_disasm(dump, o);
 	
-	return EXIT_SUCCESS;
+	return 0;
 }
 
 private:
@@ -231,6 +231,16 @@ void dump_pe_sections(ref Dumper dump, adbg_object_t *o) {
 	PE_SECTION_ENTRY *section = void;
 	size_t i;
 	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
+		// If we're searching sections, don't print anything
+		if (globals.dump_section) {
+			if (strncmp(Name.ptr, globals.dump_section, Name.sizeof) == 0) {
+				print_raw(globals.dump_section, // Lazy as fuck
+					o.buffer + PointerToRawData, SizeOfRawData, o);
+				return;
+			}
+			continue;
+		}
+		
 		print_section(cast(uint)i, Name.ptr, 8);
 		print_x32("VirtualAddress", VirtualAddress);
 		print_x32("VirtualSize", VirtualSize);

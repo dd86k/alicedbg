@@ -67,6 +67,7 @@ struct settings_t {
 	int pid;	/// Debuggee: PID
 	int dump_selections;	/// Dumper selections
 	int dump_options;	/// Dumper options
+	const(char) *dump_section;	/// Section name to dump
 	long dump_base_address;	/// Dumper base address (org)
 	AdbgMachine machine;	/// Disassembler: Target machine
 	AdbgDisSyntax syntax;	/// Disassembler: Syntax

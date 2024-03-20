@@ -84,6 +84,7 @@ struct option_t {
 //TODO: --dump-section=name: Hex or raw dump section
 //TODO: --dump-stats: File statistics?
 //                    pdb: stream count, positions, etc.
+//TODO: --demangle
 immutable option_t[] options = [
 	// general
 	{ 'a', "arch",   "Select architecture for disassembler (default=platform)", true, fa: &cli_march },
@@ -96,6 +97,7 @@ immutable option_t[] options = [
 	// dumper
 	{ 'D', "dump",              "Aliased to --dump-headers", false, &cli_dump_headers },
 	{ 0,   "dump-headers",      "Dump object's headers", false, &cli_dump_headers },
+	{ 0,   "dump-section",      "Dump object's section by name", true, fa: &cli_dump_section },
 	{ 0,   "dump-sections",     "Dump object's sections", false, &cli_dump_sections },
 	{ 0,   "dump-imports",      "Dump object's import information", false, &cli_dump_imports },
 	{ 0,   "dump-exports",      "Dump object's export information", false, &cli_dump_exports },
@@ -253,6 +255,12 @@ int cli_analyze() {
 int cli_dump_headers() {
 	globals.mode = SettingMode.dump;
 	globals.dump_selections |= DumpSelect.headers;
+	return 0;
+}
+int cli_dump_section(const(char) *val) {
+	globals.mode = SettingMode.dump;
+	globals.dump_selections |= DumpSelect.sections;
+	globals.dump_section = val;
 	return 0;
 }
 int cli_dump_sections() {
