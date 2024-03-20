@@ -503,6 +503,19 @@ immutable command2_t[] shell_commands = [
 ];
 
 immutable(command2_t)* shell_findcommand(const(char) *ucommand) {
+debug { // Crash command
+	static immutable(command2_t) ucommand_crash = {
+		[ "crash" ],
+		null,
+		[],
+		null, null,
+		[],
+		&command_crash
+	};
+	
+	if (strcmp(ucommand, ucommand_crash.names[0].ptr) == 0)
+		return &ucommand_crash;
+}
 	// NOTE: Can't use foreach for local var escape
 	for (size_t i; i < shell_commands.length; ++i) {
 		immutable(command2_t) *cmd = &shell_commands[i];
@@ -588,8 +601,7 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 		if (showAddress)
 			printf("%8zx ", address);
 		
-		// Print machine bytes
-		//TODO: Print into a dedicated buffer before printing
+		// Print machine bytes into a dedicated buffer
 		size_t bo;
 		for (size_t bi; bi < op.size; ++bi) {
 			bo += snprintf(machbuf.ptr + bo, MBUFSZ - bo, " %02x", op.machine[bi]);
@@ -692,6 +704,13 @@ void shell_event_help(immutable(command2_t) *command) {
 	}
 	
 	putchar('\n');
+}
+
+debug
+int command_crash(int, const(char) **) {
+	void function() fnull;
+	fnull();
+	return 0;
 }
 
 int command_status(int argc, const(char) **argv) {
