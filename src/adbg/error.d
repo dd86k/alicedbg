@@ -77,10 +77,10 @@ enum AdbgError {
 	objectInvalidType	= 314,
 	objectInvalidABI	= 315,
 	//
-	// 400-499: Symbols
+	// 400-499: System
 	//
-	symbolLoadError	= 402,
-	symbolBindError	= 403,
+	systemLoadError	= 402,
+	systemBindError	= 403,
 	//
 	// 800-899: Memory scanner
 	//
@@ -162,8 +162,8 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	// Symbols
 	//
-	{ AdbgError.symbolLoadError,	"Dynamic library could not be loaded." },
-	{ AdbgError.symbolBindError,	"Symbol could not be binded." },
+	{ AdbgError.systemLoadError,	"Dynamic library could not be loaded." },
+	{ AdbgError.systemBindError,	"Symbol could not be binded." },
 	//
 	// Memory module
 	//
