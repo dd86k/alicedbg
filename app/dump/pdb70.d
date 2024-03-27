@@ -85,14 +85,36 @@ void dump_pdb70_header(ref Dumper dump, adbg_object_t *o) {
 void dump_pdb70_debug(ref Dumper dump, adbg_object_t *o) {
 	print_header("Debug");
 	
-	print_section(1, "PDB Stream", 10);
-	pdb70_pdb_header *pdb = void;
-	uint s1sz = void;
-	if (adbg_object_pdb70_stream_open(o, cast(void**)&pdb, &s1sz, PdbStream.pdb)) {
+	static immutable string[] StreamNames = [
+		"Old MSF Directory",
+		"PDB Stream",
+		"TPI Stream",
+		"DBI Stream",
+		"IPI Stream",
+	];
+	
+	void *buffer;
+	uint  strsize;
+	
+	print_section(0, StreamNames[0].ptr, cast(int)StreamNames[0].length);
+	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.pdb)) {
+		print_string("error", "Couldn't read Stream 0");
+		return;
+	}
+	if (strsize) {
+		print_raw("Stream 0 Data", buffer, strsize);
+	}
+	adbg_object_pdb70_stream_close(o, &buffer);
+	
+	// Stream 1
+	
+	print_section(1, StreamNames[1].ptr, cast(int)StreamNames[1].length);
+	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.pdb)) {
 		print_string("error", "Couldn't read Stream 1");
 		return;
 	}
-	if (s1sz) {
+	if (strsize >= pdb70_pdb_header.sizeof) {
+		pdb70_pdb_header *pdb = cast(pdb70_pdb_header*)buffer;
 		const(char) *vcver = void;
 		switch (pdb.Version) with (PdbRaw_PdbVersion) {
 		case vc2:	vcver = "VC2"; break;
@@ -114,17 +136,23 @@ void dump_pdb70_debug(ref Dumper dump, adbg_object_t *o) {
 		print_x32("Signature", pdb.Signature);
 		print_u32("Age", pdb.Age);
 		print_stringl("UniqueID", uidstr.ptr, uidlen);
+		
+		/*void *leftover = buffer + pdb70_pdb_header.sizeof;
+		size_t leftlen = strsize - pdb70_pdb_header.sizeof;
+		
+		print_raw("Stream 1 Data", leftover, leftlen);*/
 	}
-	adbg_object_pdb70_stream_close(o, cast(void**)&pdb);
+	adbg_object_pdb70_stream_close(o, &buffer);
 	
-	print_section(2, "TPI Stream", 10);
-	pdb70_tpi_header *tpi = void;
-	uint s2sz = void;
-	if (adbg_object_pdb70_stream_open(o, cast(void**)&tpi, &s2sz, PdbStream.tpi)) {
+	// Stream 2
+	
+	print_section(2, StreamNames[2].ptr, cast(int)StreamNames[2].length);
+	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.tpi)) {
 		print_string("error", "Couldn't read Stream 2");
 		return;
 	}
-	if (s2sz) {
+	if (strsize >= pdb70_tpi_header.sizeof) {
+		pdb70_tpi_header *tpi = cast(pdb70_tpi_header*)buffer;
 		const(char) *vcver = void;
 		switch (tpi.Version) with (PdbRaw_TpiVer) {
 		case v40:	vcver = "v40"; break;
@@ -154,17 +182,24 @@ void dump_pdb70_debug(ref Dumper dump, adbg_object_t *o) {
 		
 		print_u32("HashAdjBufferOffset", tpi.HashAdjBufferOffset);
 		print_u32("HashAdjBufferLength", tpi.HashAdjBufferLength);
+		
+		/*void *leftover = buffer + pdb70_tpi_header.sizeof;
+		size_t leftlen = strsize - pdb70_tpi_header.sizeof;
+		
+		print_raw("Stream 2 Data", leftover, leftlen);*/
 	}
-	adbg_object_pdb70_stream_close(o, cast(void**)&tpi);
+	adbg_object_pdb70_stream_close(o, &buffer);
 	
-	print_section(3, "DBI Stream", 10);
-	pdb70_dbi_header *dbi = void;
-	uint s3sz = void;
-	if (adbg_object_pdb70_stream_open(o, cast(void**)&dbi, &s3sz, PdbStream.dbi)) {
+	// Stream 3
+	
+	print_section(3, StreamNames[3].ptr, cast(int)StreamNames[3].length);
+	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.dbi)) {
 		print_string("error", "Couldn't read Stream 3");
 		return;
 	}
-	if (s3sz) {
+	if (strsize >= pdb70_dbi_header.sizeof) {
+		pdb70_dbi_header *dbi = cast(pdb70_dbi_header*)buffer;
+		
 		const(char) *vcver = void;
 		switch (dbi.VersionHeader) with (PdbRaw_DbiVer) {
 		case v41:	vcver = "v41"; break;
@@ -206,8 +241,34 @@ void dump_pdb70_debug(ref Dumper dump, adbg_object_t *o) {
 			null);
 		print_x16("Machine", dbi.Machine, adbg_object_pe_machine_string(dbi.Machine));
 		print_u32("Padding", dbi.Padding);
+		
+		/*void *leftover = buffer + pdb70_dbi_header.sizeof;
+		size_t leftlen = strsize - pdb70_dbi_header.sizeof;
+		
+		print_raw("Stream 3 Data", leftover, leftlen);*/
 	}
-	adbg_object_pdb70_stream_close(o, cast(void**)&dbi);
+	adbg_object_pdb70_stream_close(o, &buffer);
+	
+	// Stream 4
+	/+print_section(4, StreamNames[4].ptr, cast(int)StreamNames[4].length);
+	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.dbi)) {
+		print_string("error", "Couldn't read Stream 3");
+		return;
+	}
+	if (strsize >= pdb70_subsection_header.sizeof) {
+		pdb70_subsection_header *ipi = cast(pdb70_subsection_header*)buffer;
+		
+		enum LIMIT = 200; // Arbitrary
+		
+		size_t i;
+	Lr:
+		print_x32("Kind", ipi.Kind);
+		print_x32("Length", ipi.Length);
+		
+		ipi = cast(pdb70_subsection_header*)((cast(void*)ipi) + ipi.Length);
+		if (ipi.Kind && ipi.Length && ++i < LIMIT) goto Lr;
+	}
+	adbg_object_pdb70_stream_close(o, &buffer);+/
 	
 	/*uint strcnt = o.i.pdb70.strcnt;
 	for (uint stridx = 5; stridx < strcnt; ++stridx) {

@@ -380,7 +380,8 @@ LNEWNHDR:
 		print_stringl("xmm_space[15]", fpbuf.ptr, fplen);
 		break;
 	default:
-		print_raw("Dump", data, nhdr.n_descsz, o);
+		print_raw("Dump", data, nhdr.n_descsz,
+			noffset + Elf64_Nhdr.sizeof + nnamesz);
 	}
 	
 	// Adjust to next sub header
@@ -431,7 +432,7 @@ void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
 			if (globals.dump_section) {
 				if (strncmp(table + shdr.sh_name, globals.dump_section, SNMLEN) == 0) {
 					print_raw(globals.dump_section, // Lazy as fuck
-						o.buffer + shdr.sh_offset, shdr.sh_size, o);
+						o.buffer + shdr.sh_offset, shdr.sh_size, shdr.sh_offset);
 					return;
 				}
 				continue;
@@ -494,7 +495,7 @@ void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
 			if (globals.dump_section) {
 				if (strncmp(table + shdr.sh_name, globals.dump_section, SNMLEN) == 0) {
 					print_raw(globals.dump_section, // Lazy as fuck
-						o.buffer + shdr.sh_offset, shdr.sh_size, o);
+						o.buffer + shdr.sh_offset, shdr.sh_size, shdr.sh_offset);
 					return;
 				}
 				continue;

@@ -90,7 +90,7 @@ pdb20_file_header* adbg_object_pdb20_header(adbg_object_t *o) {
 //         vvv
 // 1      +---+ -+
 // +----- |   |  +- B[0]: Superblock
-// |      +---+ -+        Contains FPM index used, BlockSize, and directory offset (by page)
+// |      +---+ -+        Contains FPM index used, BlockSize, and directory page offset
 // |      |   |  |
 // |      +---+  +- B[1..2]: Two FPM blocks, acts as a huge array of bitfields
 // |      |   |  |           1-bit/block: 0=unallocated/unused, 1=allocated/used
@@ -156,7 +156,7 @@ enum PdbStream : uint {
 	///
 	/// Contains: Module info and streams, section contribs, source, FPO/PGO
 	dbi	= 3,
-	/// PIP fixed stream 4
+	/// IPI fixed stream 4
 	///
 	/// Contains: CodeView type records, index of ipi hash stream
 	ipi	= 4,
@@ -566,7 +566,7 @@ int adbg_object_pdb70_stream_open(adbg_object_t *o, void **ubuffer, uint *usize,
 	if (o == null || ubuffer == null || usize == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (num >= o.i.pdb70.strcnt)
-		return adbg_oops(AdbgError.assertion);
+		return adbg_oops(AdbgError.indexBounds);
 	
 	// Get stream size and availability
 	uint ssize = *usize = o.i.pdb70.strsize[num];

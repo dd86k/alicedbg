@@ -336,16 +336,8 @@ L_START:
 	goto L_START;
 }
 
-void print_raw(const(char)* name, void *data, size_t dsize, adbg_object_t *o) {
-	// Is size fitting within file?
-	if (adbg_object_outboundpl(o, data, dsize)) {
-		print_string("warning", "Data goes beyond file bounds.");
-		return;
-	}
-	
+void print_raw(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0) {
 	print_header(name);
-	
-	size_t offset = data - o.buffer;
 	
 	// Print header
 	static immutable string _soff = "Offset    ";
@@ -357,8 +349,8 @@ void print_raw(const(char)* name, void *data, size_t dsize, adbg_object_t *o) {
 	// Print data
 	ubyte *d = cast(ubyte*)data;
 	size_t afo; // Absolute file offset
-	for (size_t id; id < dsize; id += __columns, offset += __columns) {
-		printf("%8zx  ", offset);
+	for (size_t id; id < dsize; id += __columns, baseaddress += __columns) {
+		printf("%8llx  ", baseaddress);
 		
 		// Adjust column for row
 		size_t col = __columns;//id + __columns >= dsize ? dsize - __columns : __columns;

@@ -14,6 +14,8 @@ import adbg.debugger.thread;
 import adbg.debugger.process;
 import adbg.machines;
 
+//TODO: (Windows) Consider using RtlInstallFunctionTableCallback and RtlAddFunctionTable
+
 version (Windows) {
 	import adbg.include.windows.winnt;
 	import core.sys.windows.winbase;

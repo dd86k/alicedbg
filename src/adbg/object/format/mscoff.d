@@ -7,6 +7,10 @@ module adbg.object.format.mscoff;
 
 // NOTE: PE32/PE-COFF is an extension of COFF and MZ
 
+// Sources:
+// - Microsoft documentation
+// - https://github.com/dlang/dmd/blob/master/compiler/src/dmd/backend/mscoff.d
+
 import adbg.object.server : AdbgObject, adbg_object_t;
 import adbg.utils.uid;
 
@@ -45,8 +49,11 @@ struct mscoff_import_header { // IMPORT_OBJECT_HEADER
 	ushort Sig1;
 	/// Must be 0xFFFF.
 	ushort Sig2;
+	/// Must be 0.
 	ushort Version;
+	/// PE32 machine.
 	ushort Machine;
+	/// Seconds since 1970.
 	uint TimeStamp;
 	
 	uint Size;
@@ -91,7 +98,7 @@ struct mscoff_anon_header_bigobj { // ANON_OBJECT_HEADER_BIGOBJ
 	uint   TimeDateStamp;
 	
 	/* CLSID */ UID   ClassID;         // {D1BAA1C7-BAEE-4ba9-AF20-FAF66AA4DCB8}
-	uint   SizeOfData;      // Size of data that follows the header
+	uint   SizeOfData;      // Size of data that follows the header, could be zero
 	uint   Flags;           // 0x1 -> contains metadata
 	uint   MetaDataSize;    // Size of CLR metadata
 	uint   MetaDataOffset;  // Offset of CLR metadata
@@ -101,6 +108,35 @@ struct mscoff_anon_header_bigobj { // ANON_OBJECT_HEADER_BIGOBJ
 	uint   PointerToSymbolTable;
 	uint   NumberOfSymbols;
 }
+
+// Same as PE32
+enum SYMNMLEN = 8;
+
+struct mscoff_anon_symbol_table32 {
+	union {
+		ubyte[SYMNMLEN] Name;
+		struct {
+			uint Zeros;
+			uint Offset;
+		}
+	}
+	uint Value;
+	int SectionNumber;
+	ushort Type;
+	ubyte StorageClass;
+	ubyte NumberOfAuxSymbols;
+}
+static assert(mscoff_anon_symbol_table32.sizeof == 20);
+
+struct mscoff_anon_symbol_table { align(1):
+	ubyte[SYMNMLEN] Name;
+	uint Value;
+	short SectionNumber;
+	ushort Type;
+	ubyte StorageClass;
+	ubyte NumberOfAuxSymbols;
+}
+static assert(mscoff_anon_symbol_table.sizeof == 18);
 
 int adbg_object_mscoff_load(adbg_object_t *o) {
 	o.format = AdbgObject.mscoff;

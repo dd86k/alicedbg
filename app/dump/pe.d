@@ -235,7 +235,7 @@ void dump_pe_sections(ref Dumper dump, adbg_object_t *o) {
 		if (globals.dump_section) {
 			if (strncmp(Name.ptr, globals.dump_section, Name.sizeof) == 0) {
 				print_raw(globals.dump_section, // Lazy as fuck
-					o.buffer + PointerToRawData, SizeOfRawData, o);
+					o.buffer + PointerToRawData, SizeOfRawData, PointerToRawData);
 				return;
 			}
 			continue;
