@@ -7,16 +7,24 @@ on:
     branches: [ master ]
 
 jobs:
-  build:
+  Alicedbg:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: dlang-community/setup-dlang@v1
+    - name: 'Test'
+      run: dub test -c debugger --compiler=dmd
+  Alicedump:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: dlang-community/setup-dlang@v1
+    - name: 'Test'
+      run: dub test -c dumper --compiler=dmd
+  Simple:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
     - uses: dlang-community/setup-dlang@v1
     - name: 'Build'
-      run: dub build --compiler=dmd
-    - name: 'Test'
-      run: dub test --compiler=dmd
-    - name: 'Trace'
-      run: dub build --compiler=dmd -b trace
-    - name: 'Example'
-      run: dub build --compiler=dmd :simple
+      run: dub build -c simple --compiler=dmd
