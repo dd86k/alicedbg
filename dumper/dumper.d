@@ -66,7 +66,6 @@ enum Setting {
 	disasmAny = disasm | disasmAll | disasmStats,
 }
 
-const(char)* opt_file;
 int opt_selected;
 int opt_settings;
 const(char)* opt_section;
@@ -93,18 +92,18 @@ int setting_disasm_any()	{ return opt_settings & Setting.disasmAny; }
 
 /// Dump given file to stdout.
 /// Returns: Error code if non-zero
-int app_dump() {
+int app_dump(const(char)* path) {
 	if (setting_blob()) {
 		// NOTE: Program exits and memory is free'd
 		size_t size = void;
-		ubyte *buffer = readall(opt_file, &size);
+		ubyte *buffer = readall(path, &size);
 		if (buffer == null)
 			panic_crt();
 		
 		if (size == 0)
 			panic(0, "File is empty");
 	
-		print_string("filename", opt_file);
+		print_string("filename", path);
 		print_u64("filesize", size);
 		print_string("format", "Blob");
 		print_string("short_name", "blob");
@@ -112,13 +111,13 @@ int app_dump() {
 		return dump_disassemble(opt_machine, buffer, size, opt_baseaddress);
 	}
 	
-	adbg_object_t *o = adbg_object_open_file(opt_file, 0);
+	adbg_object_t *o = adbg_object_open_file(path, 0);
 	if (o == null)
 		panic_adbg();
 	
 	// If anything was selected to dump specifically
 	if (opt_selected) {
-		print_string("filename", opt_file);
+		print_string("filename", path);
 		print_u64("filesize", o.file_size);
 		print_string("format", adbg_object_name(o));
 		print_string("short_name", adbg_object_short_name(o));
@@ -141,7 +140,7 @@ int app_dump() {
 	}
 	
 	// Otherwise, make a basic summary
-	printf("%s: %s\n", opt_file, adbg_object_name(o));
+	printf("%s: %s\n", path, adbg_object_name(o));
 	return 0;
 }
 

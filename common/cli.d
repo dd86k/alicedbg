@@ -115,7 +115,6 @@ enum option_license    = option_t(0,   "license",	"Show the license page and exi
 //  0 -> no args left
 // >0 -> args left
 //TODO: Make option functions return <0=error >0=ok, consumed arg(s)
-//TODO: !! move arguments around, adjust and return argc
 int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 	const(char) *arg = void;
 	const(char) *val = void;
@@ -128,7 +127,7 @@ int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 			// test for "--" (extra args)
 			/*if (argLong[0] == 0) {
 				if (cli_args_stop(++argi, argc, argv))
-					return EXIT_FAILURE;
+					return -1;
 				break CLI;
 			}*/
 			
@@ -143,28 +142,31 @@ int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 				// no argument expected
 				if (opt.argtype == ARG_NONE) {
 					if (opt.f())
-						return EXIT_FAILURE;
+						return -1;
 					continue CLI;
 				}
 				
 				// with argument
 				if (++argi >= argc) {
-					getopt_err_missl(opt.longname.ptr);
-					return EXIT_FAILURE;
+					getoptEmissingLong(opt.longname.ptr);
+					return -1;
 				}
 				val = argv[argi];
 				if (opt.fa(val)) {
-					getopt_err_invl(opt.longname.ptr, val);
-					return EXIT_FAILURE;
+					getoptEinvValLong(opt.longname.ptr, val);
+					return -1;
 				}
 				continue CLI;
 			}
+			
+			getoptEunknown(arg);
+			return -1;
 		} else if (arg[0] == '-') { // Short options
 			// test for "-" (stdin)
 			char argShort = arg[1];
 			if (argShort == 0) { // "-"
-				puts("main: standard input not supported");
-				return EXIT_FAILURE;
+				getopterrbuf = cast(char*)"main: standard input not supported";
+				return -1;
 			}
 			
 			L_SHORT: foreach (ref opt; options) {
@@ -174,32 +176,33 @@ int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 				// no argument
 				if (opt.argtype == ARG_NONE) {
 					if (opt.f())
-						return EXIT_FAILURE;
+						return -1;
 					continue CLI;
 				}
 				
 				// with argument
 				if (++argi >= argc) {
-					getopt_err_misss(argShort);
-					return EXIT_FAILURE;
+					getoptEmissingShort(argShort);
+					return -1;
 				}
 				val = argv[argi];
 				if (opt.fa(val)) {
-					getopt_err_invs(opt.shortname, val);
-					return EXIT_FAILURE;
+					getoptEinvValShort(opt.shortname, val);
+					return -1;
 				}
 				continue CLI;
 			}
-		} /*else if (entry) { // Default option value
+			
+			getoptEunknown(arg);
+			return -1;
+		} else {
+			getoptaddextra(argc, arg);
 			//*entry = arg;
 			continue CLI;
-		}*/
-		
-		getopt_err_unkn(arg);
-		return EXIT_FAILURE;
+		}
 	}
 	
-	return getopterrno;
+	return 0;
 }
 //TODO: These unittests!
 unittest {
@@ -215,55 +218,72 @@ void getoptprinter(immutable(option_t)[] options, int skip = 0) {
 	}
 }
 
+// CLI "extra" argument handling
+
+private __gshared const(char)** getoptextras;
+private __gshared int getoptextrascnt;
+private void getoptaddextra(int argc, const(char)* extra) {
+	if (getoptextrascnt >= argc)
+		return;
+	if (getoptextras == null) {
+		getoptextras = cast(const(char)**)malloc(argc * size_t.sizeof);
+		if (getoptextras == null)
+			return;
+	}
+	getoptextras[getoptextrascnt++] = extra;
+}
+const(char)** getoptrem() {
+	return getoptextras;
+}
+int getoptremcnt() {
+	return getoptextrascnt;
+}
+
+// CLI error handling
+
 private enum GETOPTBFSZ = 2048;
 private __gshared char* getopterrbuf;
-private __gshared int   getopterrno;
 
-const(char)* getopt_errmsg() {
-	return getopterrbuf;
-}
-int getopt_errno() {
-	return getopterrno;
+const(char)* getopterrstring() {
+	return getopterrbuf ? getopterrbuf : "No errors occured";
 }
 
 private int getopt_prepbuf() {
-	getopterrno = -1;
 	if (getopterrbuf == null) {
 		getopterrbuf = cast(char*)malloc(GETOPTBFSZ);
-		if (getopterrbuf == null)
+		if (getopterrbuf == null) {
+			getopterrbuf = cast(char*)"why";
 			return 1;
+		}
 	}
 	return 0;
 }
-private void getopt_err_unkn(const(char)* opt) {
+private void getoptEunknown(const(char)* opt) {
 	if (getopt_prepbuf()) return;
 	snprintf(getopterrbuf, GETOPTBFSZ,
 		"main: unknown option '%s'\n", opt);
 }
-private void getopt_err_invl(const(char)* opt, const(char)* val) {
+private void getoptEinvValLong(const(char)* opt, const(char)* val) {
 	if (getopt_prepbuf()) return;
 	snprintf(getopterrbuf, GETOPTBFSZ,
 		"main: '%s' is an invalid value for --%s\n", val, opt);
 }
-private void getopt_err_invs(char opt, const(char)* val) {
+private void getoptEinvValShort(char opt, const(char)* val) {
 	if (getopt_prepbuf()) return;
 	snprintf(getopterrbuf, GETOPTBFSZ,
 		"main: '%s' is an invalid value for -%c\n", val, opt);
 }
-private void getopt_err_missl(const(char)* opt) {
+private void getoptEmissingLong(const(char)* opt) {
 	if (getopt_prepbuf()) return;
 	snprintf(getopterrbuf, GETOPTBFSZ,
 		"main: missing argument for --%s\n", opt);
 }
-private void getopt_err_misss(char opt) {
+private void getoptEmissingShort(char opt) {
 	if (getopt_prepbuf()) return;
 	snprintf(getopterrbuf, GETOPTBFSZ,
 		"main: missing argument for -%c\n", opt);
 }
 
-const(char)* getopterr() {
-	return getopterrbuf;
-}
 
 bool wantsHelp(const(char) *query) {
 	return (query[0] == 'h' && query[1] == 0) ||

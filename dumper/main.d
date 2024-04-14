@@ -194,14 +194,17 @@ int main(int argc, const(char)** argv) {
 	// Could do a warning, but it might be a little confusing
 	adbg_self_set_crashhandler(&crash_handler);
 	
-	int e = getopt(argc, argv, options);
-	if (e < 0) {
-		puts(getopterr());
+	if (getopt(argc, argv, options) < 0) {
+		puts(getopterrstring());
 		return EXIT_FAILURE;
 	}
-	/*if (e >= 1) {
-		opt_file = argv[0];
-	}*/
 	
-	return app_dump();
+	if (getoptremcnt() < 1) {
+		puts("error: No file specified");
+		return EXIT_FAILURE;
+	}
+	
+	const(char)** args = getoptrem();
+	
+	return app_dump(*args);
 }
