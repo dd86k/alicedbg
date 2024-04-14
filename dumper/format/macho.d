@@ -3,23 +3,23 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.macho;
+module format.macho;
 
 import adbg.disassembler;
 import adbg.object.server;
 import adbg.object.format.macho;
 import dumper;
 
-int dump_macho(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers)
-		dump_macho_hdr(dump, o);
+int dump_macho(adbg_object_t *o) {
+	if (selected_headers)
+		dump_macho_hdr(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_macho_hdr(ref Dumper dump, adbg_object_t *o) {
+void dump_macho_hdr(adbg_object_t *o) {
 	if (o.i.macho.fat) {
 		print_header("FAT Header");
 		

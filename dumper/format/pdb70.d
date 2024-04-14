@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.pdb70;
+module format.pdb70;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -17,19 +17,19 @@ import dumper;
 
 extern (C):
 
-int dump_pdb70(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_pdb70_header(dump, o);
+int dump_pdb70(adbg_object_t *o) {
+	if (selected_headers())
+		dump_pdb70_header(o);
 	
-	if (dump.selected_debug())
-		dump_pdb70_debug(dump, o);
+	if (selected_debug())
+		dump_pdb70_debug(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_pdb70_header(ref Dumper dump, adbg_object_t *o) {
+void dump_pdb70_header(adbg_object_t *o) {
 	print_header("Header");
 	
 	pdb70_file_header *header = adbg_object_pdb70_header(o);
@@ -82,7 +82,7 @@ void dump_pdb70_header(ref Dumper dump, adbg_object_t *o) {
 	}
 }
 
-void dump_pdb70_debug(ref Dumper dump, adbg_object_t *o) {
+void dump_pdb70_debug(adbg_object_t *o) {
 	print_header("Debug");
 	
 	static immutable string[] StreamNames = [
@@ -96,13 +96,15 @@ void dump_pdb70_debug(ref Dumper dump, adbg_object_t *o) {
 	void *buffer;
 	uint  strsize;
 	
+	// Stream 0 - Old MSF directory
+	
 	print_section(0, StreamNames[0].ptr, cast(int)StreamNames[0].length);
 	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.pdb)) {
 		print_string("error", "Couldn't read Stream 0");
 		return;
 	}
 	if (strsize) {
-		print_raw("Stream 0 Data", buffer, strsize);
+		print_hexdump("Stream 0 Data", buffer, strsize);
 	}
 	adbg_object_pdb70_stream_close(o, &buffer);
 	

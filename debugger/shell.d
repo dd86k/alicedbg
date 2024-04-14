@@ -10,7 +10,10 @@ import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import core.stdc.string;
-import common, utils;
+import debugger;
+import common.error;
+import common.cli : opt_syntax;
+import common.utils;
 import term;
 
 // Enable new process name, although it is currently broken on Windows
@@ -99,14 +102,14 @@ int shell_loop() {
 		return 1337;
 	
 	// Load or attach process if CLI specified it
-	if (globals.file) {
-		ecode = shell_proc_spawn(globals.file, globals.args);
+	if (opt_file) {
+		ecode = shell_proc_spawn(opt_file, opt_file_argv);
 		if (ecode) {
 			printf("Error: %s\n", adbg_error_msg());
 			return ecode;
 		}
-	} else if (globals.pid) {
-		ecode = shell_proc_attach(globals.pid);
+	} else if (opt_pid) {
+		ecode = shell_proc_attach(opt_pid);
 		if (ecode) {
 			printf("Error: %s\n", adbg_error_msg());
 			return ecode;
@@ -531,11 +534,11 @@ debug { // Crash command
 
 int shell_proc_spawn(const(char) *exec, const(char) **argv) {
 	// Save for restart
-	globals.file = exec;
-	globals.args = argv;
+	opt_file = exec;
+	opt_file_argv = argv;
 	
 	// Spawn process
-	process = adbg_debugger_spawn(globals.file,
+	process = adbg_debugger_spawn(opt_file,
 		AdbgSpawnOpt.argv, argv,
 		0);
 	if (process == null) {
@@ -555,7 +558,7 @@ int shell_proc_spawn(const(char) *exec, const(char) **argv) {
 
 int shell_proc_attach(int pid) {
 	// Save for restart
-	globals.pid = pid;
+	opt_pid = pid;
 	
 	// Attach to process
 	process = adbg_debugger_attach(pid, 0);
@@ -568,8 +571,8 @@ int shell_proc_attach(int pid) {
 	// Open disassembler for process machine type
 	dis = adbg_dis_open(adbg_process_get_machine(process));
 	if (dis) {
-		if (globals.syntax)
-			adbg_dis_options(dis, AdbgDisOpt.syntax, globals.syntax, 0);
+		if (opt_syntax)
+			adbg_dis_options(dis, AdbgDisOpt.syntax, opt_syntax, 0);
 	} else {
 		printf("warning: Disassembler not available (%s)\n",
 			adbg_error_msg());
@@ -588,7 +591,7 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 	char[MBUFSZ] machbuf = void;
 	for (int i; i < count; ++i) {
 		if (adbg_memory_read(process, address, data.ptr, MAX_INSTR_SIZE)) {
-			oops;
+			print_adbg_error();
 			return;
 		}
 		adbg_opcode_t op = void;
@@ -794,14 +797,14 @@ int command_restart(int argc, const(char) **argv) {
 		adbg_debugger_terminate(process);
 		
 		// Spawn, shell still messages status
-		e = shell_proc_spawn(globals.file, globals.args);
+		e = shell_proc_spawn(opt_file, opt_file_argv);
 		break;
 	case attached:
 		// Detach first, ignore on error (e.g., already detached)
 		adbg_debugger_detach(process);
 		
 		// Attach, shell still messages status
-		e = shell_proc_attach(globals.pid);
+		e = shell_proc_attach(opt_pid);
 		break;
 	default:
 		return ShellError.unattached;

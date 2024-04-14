@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.mdmp;
+module format.mdmp;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -12,21 +12,21 @@ import adbg.object.format.mdmp;
 import adbg.utils.date : ctime32;
 import adbg.include.windows.winnt;
 import dumper;
-import utils : realstring;
+import common.utils : realstring;
 
-int dump_minidump(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_minidump_headers(dump, o);
+int dump_minidump(adbg_object_t *o) {
+	if (selected_headers())
+		dump_minidump_headers(o);
 	
-	//if (dump.selected_debug())
-	//	dump_minidump_debug(dump, o);
+	//if (selected_debug())
+	//	dump_minidump_debug(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_minidump_headers(ref Dumper dump, adbg_object_t *o) {
+void dump_minidump_headers(adbg_object_t *o) {
 	print_header("Header");
 	with (o.i.mdmp.header) {
 	print_x32("Signature", Signature);
@@ -66,7 +66,7 @@ void dump_minidump_headers(ref Dumper dump, adbg_object_t *o) {
 	}
 }
 
-void dump_minidump_debug(ref Dumper dump, adbg_object_t *o) {
+void dump_minidump_debug(adbg_object_t *o) {
 	print_header("Debug");
 	
 	uint cnt = o.i.mdmp.header.StreamCount;

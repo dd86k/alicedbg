@@ -5,13 +5,17 @@ dub*.s
 __dummy.html
 /bin/
 /docs/
-/alicedbg
-alicedbg-test-*
 *.json
 *.log
 *.lst
 
 # Executable objects
+/alicedbg
+alicedbg-test-*
+/alicedump
+alicedump-test-*
+/simple
+simple-test-*
 *.dll
 *.dylib
 *.so

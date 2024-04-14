@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.dmp;
+module format.dmp;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -14,16 +14,16 @@ import dumper;
 
 extern (C):
 
-int dump_dmp(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_dmp_header(dump, o);
+int dump_dmp(adbg_object_t *o) {
+	if (selected_headers())
+		dump_dmp_header(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_dmp_header(ref Dumper dump, adbg_object_t *o) {
+void dump_dmp_header(adbg_object_t *o) {
 	print_header("Header");
 	
 	bool is64 = o.i.dmp.header.ValidDumpInt == PAGEDUMP64_VALID;

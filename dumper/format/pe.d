@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.pe;
+module format.pe;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -12,7 +12,7 @@ import adbg.object.format.pe;
 import adbg.utils.date : ctime32;
 import adbg.utils.uid, adbg.utils.bit;
 import core.stdc.string : strncmp;
-import common, dumper;
+import dumper;
 
 extern (C):
 
@@ -21,24 +21,24 @@ extern (C):
 ///   dump = Dumper instance.
 ///   o = Object instance.
 /// Returns: Non-zero on error.
-int dump_pe(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_pe_hdr(dump, o);
+int dump_pe(adbg_object_t *o) {
+	if (selected_headers())
+		dump_pe_hdr(o);
 	
-	if (dump.selected_sections())
-		dump_pe_sections(dump, o);
+	if (selected_sections())
+		dump_pe_sections(o);
 	
-	if (dump.selected_exports())
-		dump_pe_exports(dump, o);
+	if (selected_exports())
+		dump_pe_exports(o);
 	
-	if (dump.selected_imports())
-		dump_pe_imports(dump, o);
+	if (selected_imports())
+		dump_pe_imports(o);
 	
-	if (dump.selected_debug())
-		dump_pe_debug(dump, o);
+	if (selected_debug())
+		dump_pe_debug(o);
 	
-	if (dump.selected_disasm_any())
-		dump_pe_disasm(dump, o);
+	if (setting_disasm_any())
+		dump_pe_disasm(o);
 	
 	return 0;
 }
@@ -46,7 +46,7 @@ int dump_pe(ref Dumper dump, adbg_object_t *o) {
 private:
 
 // Returns true if the machine value is unknown
-void dump_pe_hdr(ref Dumper dump, adbg_object_t *o) {
+void dump_pe_hdr(adbg_object_t *o) {
 	print_header("Header");
 	
 	const(char) *str_mach = adbg_object_pe_machine_string(o.i.pe.header.Machine);
@@ -87,10 +87,10 @@ void dump_pe_hdr(ref Dumper dump, adbg_object_t *o) {
 	if (o.i.pe.header.SizeOfOptionalHeader == 0)
 		return;
 	
-	dump_pe_opthdr(dump, o);
+	dump_pe_opthdr(o);
 }
 
-void dump_pe_opthdr(ref Dumper dump, adbg_object_t *o) {
+void dump_pe_opthdr(adbg_object_t *o) {
 	print_header("Optional Header");
 	
 	// NOTE: Server already checks magic format
@@ -178,7 +178,7 @@ void dump_pe_opthdr(ref Dumper dump, adbg_object_t *o) {
 	default:
 	}
 	
-	dump_pe_dirs(dump, o);
+	dump_pe_dirs(o);
 }
 
 void dump_pe_dllcharactiristics(ushort dllchars) {
@@ -197,7 +197,7 @@ void dump_pe_dllcharactiristics(ushort dllchars) {
 		null);
 }
 
-void dump_pe_dirs(ref Dumper dump, adbg_object_t *o) {
+void dump_pe_dirs(adbg_object_t *o) {
 	// ROM check
 	//TODO: Make this a server check
 	if (o.i.pe.directory == null)
@@ -225,20 +225,24 @@ void dump_pe_dirs(ref Dumper dump, adbg_object_t *o) {
 	}
 }
 
-void dump_pe_sections(ref Dumper dump, adbg_object_t *o) {
+void dump_pe_sections(adbg_object_t *o) {
 	print_header("Sections");
 	
 	PE_SECTION_ENTRY *section = void;
 	size_t i;
 	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
-		// If we're searching sections, don't print anything
-		if (globals.dump_section) {
-			if (strncmp(Name.ptr, globals.dump_section, Name.sizeof) == 0) {
-				print_raw(globals.dump_section, // Lazy as fuck
-					o.buffer + PointerToRawData, SizeOfRawData, PointerToRawData);
-				return;
-			}
-			continue;
+		// If we're searching sections, match and don't print yet
+		if (opt_section) {
+			if (strncmp(Name.ptr, opt_section, Name.sizeof))
+				continue;
+			
+			void *data = o.buffer + PointerToRawData;
+			
+			if (setting_hexdump())
+				print_hexdump(opt_section, data, SizeOfRawData, PointerToRawData);
+			
+			if (setting_extract())
+				print_rawdump(data, SizeOfRawData);
 		}
 		
 		print_section(cast(uint)i, Name.ptr, 8);
@@ -543,7 +547,7 @@ void dump_pe_sections(ref Dumper dump, adbg_object_t *o) {
 	}
 }*/
 
-void dump_pe_exports(ref Dumper dump, adbg_object_t *o) {
+void dump_pe_exports(adbg_object_t *o) {
 	print_header("Exports");
 	
 	PE_EXPORT_DESCRIPTOR *export_ = adbg_object_pe_export(o);
@@ -571,7 +575,7 @@ void dump_pe_exports(ref Dumper dump, adbg_object_t *o) {
 	}
 }
 
-void dump_pe_imports(ref Dumper dump, adbg_object_t *o) {
+void dump_pe_imports(adbg_object_t *o) {
 	print_header("Imports");
 	PE_IMPORT_DESCRIPTOR *import_ = void;
 	size_t i;
@@ -639,7 +643,7 @@ void dump_pe_imports(ref Dumper dump, adbg_object_t *o) {
 	}
 }
 
-void dump_pe_debug(ref Dumper dump, adbg_object_t *o) {
+void dump_pe_debug(adbg_object_t *o) {
 	print_header("Debug");
 	
 	PE_DEBUG_DIRECTORY *debug_ = void;
@@ -786,15 +790,15 @@ void dump_pe_debug(ref Dumper dump, adbg_object_t *o) {
 	}
 }
 
-void dump_pe_disasm(ref Dumper dump, adbg_object_t *o) {
+void dump_pe_disasm(adbg_object_t *o) {
 	print_header("Disassembly");
 	
-	bool all = dump.selected_disasm_all();
+	int all = setting_disasm_all();
 	PE_SECTION_ENTRY *section = void;
 	size_t i;
 	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
 		if (all || Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE) {
-			dump_disassemble_object(dump, o, Name.ptr, 8,
+			dump_disassemble_object(o, Name.ptr, 8,
 				o.buffer + PointerToRawData, SizeOfRawData, 0);
 		}
 	}

@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module utils;
+module common.utils;
 
 import core.stdc.stdio : sscanf;
 import core.stdc.ctype : isprint;
@@ -62,6 +62,7 @@ int hexstr(char *buffer, size_t bsize, ubyte *data, size_t dsize, char sep = 0) 
 		
 		if (sep && len) buffer[len++] = sep;
 		ubyte b = data[i];
+		//TODO: handle buffer length
 		buffer[len++] = hexc0(b);
 		buffer[len++] = hexc1(b);
 	}

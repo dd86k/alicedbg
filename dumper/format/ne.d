@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.ne;
+module format.ne;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -13,15 +13,15 @@ import dumper;
 
 extern (C):
 
-int dump_ne(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_ne_hdr(dump, o);
+int dump_ne(adbg_object_t *o) {
+	if (selected_headers())
+		dump_ne_hdr(o);
 	return 0;
 }
 
 private:
 
-void dump_ne_hdr(ref Dumper dump, adbg_object_t *o) {
+void dump_ne_hdr(adbg_object_t *o) {
 	print_header("Header");
 	
 	with (o.i.ne.header) {

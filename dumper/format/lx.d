@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.lx;
+module format.lx;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -13,15 +13,15 @@ import dumper;
 
 extern (C):
 
-int dump_lx(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_lx_hdr(dump, o);
+int dump_lx(adbg_object_t *o) {
+	if (selected_headers())
+		dump_lx_hdr(o);
 	return 0;
 }
 
 private:
 
-void dump_lx_hdr(ref Dumper dump, adbg_object_t *o) {
+void dump_lx_hdr(adbg_object_t *o) {
 	print_header("Header");
 	
 	with (o.i.lx.header) {

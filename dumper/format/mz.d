@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.mz;
+module format.mz;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -18,22 +18,22 @@ extern (C):
 ///   dump = Dumper instance.
 ///   o = Object instance.
 /// Returns: Non-zero on error.
-int dump_mz(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_mz_hdr(dump, o);
+int dump_mz(adbg_object_t *o) {
+	if (selected_headers())
+		dump_mz_hdr(o);
 	
-	if (dump.selected_relocations())
-		dump_mz_relocs(dump, o);
+	if (selected_relocs())
+		dump_mz_relocs(o);
 	
-	if (dump.selected_disasm_any())
-		dump_mz_disasm(dump, o);
+	if (setting_disasm_any())
+		dump_mz_disasm(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_mz_hdr(ref Dumper dump, adbg_object_t *o) {
+void dump_mz_hdr(adbg_object_t *o) {
 	print_header("Header");
 	
 	with (o.i.mz.header) {
@@ -53,7 +53,7 @@ void dump_mz_hdr(ref Dumper dump, adbg_object_t *o) {
 	}
 }
 
-void dump_mz_relocs(ref Dumper dump, adbg_object_t *o) {
+void dump_mz_relocs(adbg_object_t *o) {
 	print_header("Relocations");
 	
 	mz_reloc *reloc = void;
@@ -62,7 +62,7 @@ void dump_mz_relocs(ref Dumper dump, adbg_object_t *o) {
 		print_reloc16(cast(uint)i, segment, offset);
 }
 
-void dump_mz_disasm(ref Dumper dump, adbg_object_t *o) {
+void dump_mz_disasm(adbg_object_t *o) {
 	// Get start of data
 	uint start = (o.i.mz.header.e_cparh << 4) + o.i.mz.header.e_cblp; // paragraphs * 16
 	if (start < mz_hdr.sizeof || start >= o.file_size) {
@@ -81,5 +81,5 @@ void dump_mz_disasm(ref Dumper dump, adbg_object_t *o) {
 		return;
 	}
 	
-	dump_disassemble_object(dump, o, null, 0, o.buffer + start, len, 0);
+	dump_disassemble_object(o, null, 0, o.buffer + start, len, 0);
 }

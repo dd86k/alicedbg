@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.mscoff;
+module format.mscoff;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -13,16 +13,16 @@ import adbg.object.format.pe : adbg_object_pe_machine_string;
 import adbg.utils.uid;
 import dumper;
 
-int dump_mscoff(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_mscoff_hdr(dump, o);
+int dump_mscoff(adbg_object_t *o) {
+	if (selected_headers())
+		dump_mscoff_hdr(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_mscoff_hdr(ref Dumper dump, adbg_object_t *o) {
+void dump_mscoff_hdr(adbg_object_t *o) {
 	print_header("Header");
 	
 	switch (o.i.mscoff.import_header.Version) {

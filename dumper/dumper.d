@@ -13,150 +13,136 @@ import adbg.machines;
 import adbg.utils.bit : BIT;
 import core.stdc.string;
 import core.stdc.ctype : isprint;
-import common, utils, dump;
+import core.stdc.errno;
+import format;
+import common.error;
+import common.cli : opt_machine, opt_syntax;
+import common.utils;
 
 extern (C):
+__gshared:
 
-/// Bitfield. Selects which information to display.
-enum DumpSelect {
-	/// 'h' - Dump headers
+enum Select {
 	headers	= BIT!0,
-	/// 'd' - Dump directories (PE32)
-	dirs	= BIT!1,
-	/// 'e' - Exports
-	exports	= BIT!2,
-	/// 'i' - Imports
-	imports	= BIT!3,
-	/// 'c' - Images, certificates, etc.
-	resources	= BIT!4,
-	/// 't' - Structured Exception Handler
-	seh	= BIT!5,
-	/// 't' - Symbol table(s)
-	symbols	= BIT!6,
-	/// 'T' - Dynamic symbol table
-	dynsymbols	= BIT!7,
-	/// 'g' - Debugging material
-	debug_	= BIT!8,
-	/// 'o' - Thread Local Storage
-	tls	= BIT!9,
-	/// 'l' - Load configuration
-	loadcfg	= BIT!10,
-	/// 's' - Sections
-	sections	= BIT!11,
-	/// 'r' - Relocations
-	relocs	= BIT!12,
-	/// 'R' - Dynamic relocations
-	dynrelocs	= BIT!13,
+	/// Sections
+	sections	= BIT!1,
+	/// Relocations
+	relocs	= BIT!2,
+	/// Exported/dynamic symbols
+	exports	= BIT!3,
+	/// Import symbols
+	imports	= BIT!4,
+	/// Resources
+	rsrc	= BIT!5,
+	/// Debug info
+	debug_	= BIT!6,
 	
-	// Bits 31-24: Disassembly
+	// Source
+//	source	= 
 	
-	/// Disassemble executable sections
-	disasm	= BIT!24,
-	/// Disassembly statistics
-	disasm_stats	= BIT!25,
-	/// Disassemble all sections
-	disasm_all	= BIT!26,
+	/// PE32 directories
+	dirs	= BIT!24,
+	/// PE32 load configuration
+	loadcfg	= BIT!25,
 	
 	/// 
-	all_but_disasm = 0xff_ffff,
-	/// Any form of dissasembler is requested
-	disasm_any = disasm | disasm_stats | disasm_all,
+	all = 0xffff_ffff,
 }
-enum DumpOptions {
-	/// File is raw, do not auto-detect
-	raw	= BIT!0,
+enum Setting {
+	/// Input file or data is blob
+	blob	= BIT!0,
+	/// Dump binary information as hex dump
+	hexdump	= BIT!1,
+	/// Extract binary information into stdout
+	extract	= BIT!2,
+	/// Disassemble selections (executable sections)
+	disasm	= BIT!24,
+	/// Disassemble selections (all sections)
+	disasmAll	= BIT!25,
+	/// Output disassembly statistics (sections)
+	disasmStats	= BIT!26,
+	
+	/// Any disassembly is requested
+	disasmAny = disasm | disasmAll | disasmStats,
 }
 
-struct Dumper {
-	extern (C):
-	
-	int selections;
-	int options;
-	
-	this(int selects, int opts) {
-		// Default selections
-		if (selects == 0)
-			selects = DumpSelect.headers;
-		
-		selections = selects;
-		options = opts;
-	}
-	
-	pragma(inline, true):
-	
-	//
-	// Selections
-	//
-	
-	bool selected_headers() { return (selections & DumpSelect.headers) != 0; }
-	bool selected_sections() { return (selections & DumpSelect.sections) != 0; }
-	bool selected_relocations() { return (selections & DumpSelect.relocs) != 0; }
-	bool selected_exports() { return (selections & DumpSelect.exports) != 0; }
-	bool selected_imports() { return (selections & DumpSelect.imports) != 0; }
-	bool selected_debug() { return (selections & DumpSelect.debug_) != 0; }
-	
-	bool selected_disasm() { return (selections & DumpSelect.disasm) != 0; }
-	bool selected_disasm_stats() { return (selections & DumpSelect.disasm_stats) != 0; }
-	bool selected_disasm_all() { return (selections & DumpSelect.disasm_all) != 0; }
-	bool selected_disasm_any() { return (selections & DumpSelect.disasm_any) != 0; }
-	
-	//
-	// Options
-	//
-	
-	bool option_blob() { return (options & DumpOptions.raw) != 0; }
-}
+const(char)* opt_file;
+int opt_selected;
+int opt_settings;
+const(char)* opt_section;
+long opt_baseaddress;
+
+int selected_headers()	{ return opt_selected & Select.headers; }
+int selected_sections()	{ return opt_selected & Select.sections; }
+int selected_relocs()	{ return opt_selected & Select.relocs; }
+int selected_exports()	{ return opt_selected & Select.exports; }
+int selected_imports()	{ return opt_selected & Select.imports; }
+int selected_rsrc()	{ return opt_selected & Select.rsrc; }
+int selected_debug()	{ return opt_selected & Select.debug_; }
+int selected_dirs()	{ return opt_selected & Select.dirs; }
+int selected_loadcfg()	{ return opt_selected & Select.loadcfg; }
+
+int setting_blob()	{ return opt_settings & Setting.blob; }
+int setting_hexdump()	{ return opt_settings & Setting.hexdump; }
+int setting_extract()	{ return opt_settings & Setting.extract; }
+
+int setting_disasm()	{ return opt_settings & Setting.disasm; }
+int setting_disasm_all()	{ return opt_settings & Setting.disasmAll; }
+int setting_disasm_stats()	{ return opt_settings & Setting.disasmStats; }
+int setting_disasm_any()	{ return opt_settings & Setting.disasmAny; }
 
 /// Dump given file to stdout.
 /// Returns: Error code if non-zero
 int app_dump() {
-	Dumper dump = Dumper(globals.dump_selections, globals.dump_options);
-	
-	if (dump.option_blob()) {
+	if (setting_blob()) {
 		// NOTE: Program exits and memory is free'd
 		size_t size = void;
-		ubyte *buffer = readall(globals.file, &size);
+		ubyte *buffer = readall(opt_file, &size);
 		if (buffer == null)
-			quitext(ErrSource.crt);
+			panic_crt();
 		
-		if (size == 0) {
-			puts("Warning: File is empty");
-			return 0;
-		}
+		if (size == 0)
+			panic(0, "File is empty");
 	
-		print_string("filename", basename(globals.file));
+		print_string("filename", opt_file);
 		print_u64("filesize", size);
 		print_string("format", "Blob");
 		print_string("short_name", "blob");
 		
-		return dump_disassemble(dump, globals.machine, buffer, size, globals.dump_base_address);
+		return dump_disassemble(opt_machine, buffer, size, opt_baseaddress);
 	}
 	
-	adbg_object_t *o = adbg_object_open_file(globals.file, 0);
+	adbg_object_t *o = adbg_object_open_file(opt_file, 0);
 	if (o == null)
-		return show_error();
+		panic_adbg();
 	
-	print_string("filename", basename(globals.file));
-	print_u64("filesize", o.file_size);
-	print_string("format", adbg_object_name(o));
-	print_string("short_name", adbg_object_short_name(o));
-	
-	final switch (o.format) with (AdbgObject) {
-	case mz:	return dump_mz(dump, o);
-	case ne:	return dump_ne(dump, o);
-	case pe:	return dump_pe(dump, o);
-	case lx:	return dump_lx(dump, o);
-	case elf:	return dump_elf(dump, o);
-	case macho:	return dump_macho(dump, o);
-	case pdb20:	return dump_pdb20(dump, o);
-	case pdb70:	return dump_pdb70(dump, o);
-	case archive:	return dump_archive(dump, o);
-	case mdmp:	return dump_minidump(dump, o);
-	case dmp:	return dump_dmp(dump, o);
-	case coff:	return dump_coff(dump, o);
-	case mscoff:	return dump_mscoff(dump, o);
-	case unknown:	assert(0, "Unknown object type"); // Raw/unknown
+	// If anything was selected to dump specifically
+	if (opt_selected) {
+		print_string("filename", opt_file);
+		print_u64("filesize", o.file_size);
+		print_string("format", adbg_object_name(o));
+		print_string("short_name", adbg_object_short_name(o));
+		final switch (o.format) with (AdbgObject) {
+		case mz:	return dump_mz(o);
+		case ne:	return dump_ne(o);
+		case pe:	return dump_pe(o);
+		case lx:	return dump_lx(o);
+		case elf:	return dump_elf(o);
+		case macho:	return dump_macho(o);
+		case pdb20:	return dump_pdb20(o);
+		case pdb70:	return dump_pdb70(o);
+		case archive:	return dump_archive(o);
+		case mdmp:	return dump_minidump(o);
+		case dmp:	return dump_dmp(o);
+		case coff:	return dump_coff(o);
+		case mscoff:	return dump_mscoff(o);
+		case unknown:	assert(0, "Unknown object type"); // Raw/unknown
+		}
 	}
+	
+	// Otherwise, make a basic summary
+	printf("%s: %s\n", opt_file, adbg_object_name(o));
+	return 0;
 }
 
 private immutable {
@@ -336,7 +322,16 @@ L_START:
 	goto L_START;
 }
 
-void print_raw(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0) {
+//TODO: if opt_extract_to defined, save to it
+// dump binary data to stdout, unformatted
+void print_rawdump(void* data, size_t size) {
+	while (size > 0) {
+		
+	}
+}
+
+// pretty hex dump to stdout
+void print_hexdump(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0) {
 	print_header(name);
 	
 	// Print header
@@ -386,7 +381,7 @@ void print_reloc16(uint index, ushort seg, ushort off) {
 }
 
 // name is typically section name or filename if raw
-int dump_disassemble_object(ref Dumper dump, adbg_object_t *o,
+int dump_disassemble_object(adbg_object_t *o,
 	const(char) *name, int namemax,
 	void* data, ulong size, ulong base_address) {
 	
@@ -405,25 +400,24 @@ int dump_disassemble_object(ref Dumper dump, adbg_object_t *o,
 		return 0;
 	}
 	
-	return dump_disassemble(dump, adbg_object_machine(o), data, size, base_address);
+	return dump_disassemble(adbg_object_machine(o), data, size, base_address);
 }
 
-int dump_disassemble(ref Dumper dump, AdbgMachine machine,
-	void* data, ulong size, ulong base_address) {
+int dump_disassemble(AdbgMachine machine, void* data, ulong size, ulong base_address) {
 	adbg_disassembler_t *dis = adbg_dis_open(machine);
 	if (dis == null)
-		quitext(ErrSource.adbg);
+		panic_adbg();
 	scope(exit) adbg_dis_close(dis);
 	
-	if (globals.syntax)
-		adbg_dis_options(dis, AdbgDisOpt.syntax, globals.syntax, 0);
+	if (opt_syntax)
+		adbg_dis_options(dis, AdbgDisOpt.syntax, opt_syntax, 0);
 	
 	adbg_opcode_t op = void;
 	adbg_dis_start(dis, data, cast(size_t)size, base_address);
 	
 	// stats mode
 	//TODO: attach shortest and longuest instructions found
-	if (dump.selected_disasm_stats()) {
+	if (setting_disasm_stats()) {
 		uint stat_avg;	/// instruction average size
 		uint stat_min = uint.max;	/// smallest instruction size
 		uint stat_max;	/// longest instruction size
@@ -444,7 +438,7 @@ L_STAT:
 			goto L_STAT;
 		case disasmEndOfData: break;
 		default:
-			quitext(ErrSource.adbg);
+			panic_adbg();
 		}
 		
 		print_f32("average", cast(float)stat_avg / stat_total, 2);

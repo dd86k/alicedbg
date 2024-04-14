@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.elf;
+module format.elf;
 
 import adbg.utils.bit : adbg_align4up;
 import adbg.disassembler;
@@ -11,22 +11,22 @@ import adbg.object.server;
 import adbg.machines;
 import adbg.object.format.elf;
 import core.stdc.string : memcmp, strncmp;
-import common, dumper;
-import utils : realchar, hexstr;
+import dumper;
+import common.utils : realchar, hexstr;
 
 extern (C):
 
-int dump_elf(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers()) {
-		dump_elf_ehdr(dump, o);
-		dump_elf_phdr(dump, o);
+int dump_elf(adbg_object_t *o) {
+	if (selected_headers()) {
+		dump_elf_ehdr(o);
+		dump_elf_phdr(o);
 	}
 	
-	if (dump.selected_sections())
-		dump_elf_sections(dump, o);
+	if (selected_sections())
+		dump_elf_sections(o);
 	
-	if (dump.selected_disasm_any())
-		dump_elf_disasm(dump, o);
+	if (setting_disasm_any())
+		dump_elf_disasm(o);
 	
 	return 0;
 }
@@ -35,7 +35,7 @@ private:
 
 __gshared immutable(char)[] SIG_CORE = "CORE\0\0\0";
 
-void dump_elf_ehdr(ref Dumper dump, adbg_object_t *o) {
+void dump_elf_ehdr(adbg_object_t *o) {
 	print_header("Header");
 	
 	ubyte ei_class	= o.i.elf32.ehdr.e_ident[ELF_EI_CLASS];
@@ -136,7 +136,7 @@ void dump_elf_e_flags(ushort e_machine, uint e_flags) {
 	}
 }
 
-void dump_elf_phdr(ref Dumper dump, adbg_object_t *o) {
+void dump_elf_phdr(adbg_object_t *o) {
 	print_header("Program Headers");
 	
 	//TODO: Warn and set an upper number limit (e.g. 1000)
@@ -380,7 +380,7 @@ LNEWNHDR:
 		print_stringl("xmm_space[15]", fpbuf.ptr, fplen);
 		break;
 	default:
-		print_raw("Dump", data, nhdr.n_descsz,
+		print_hexdump("Dump", data, nhdr.n_descsz,
 			noffset + Elf64_Nhdr.sizeof + nnamesz);
 	}
 	
@@ -395,7 +395,7 @@ LNEWNHDR:
 	goto LNEWNHDR;
 }
 
-void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
+void dump_elf_sections(adbg_object_t *o) {
 	print_header("Sections");
 	
 	//TODO: Functions to get section + section name safely
@@ -428,18 +428,24 @@ void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
 		for (uint i; i < section_count; ++i) {
 			Elf32_Shdr *shdr = adbg_object_elf_shdr32(o, i);
 
-			// If we're searching sections, don't print anything
-			if (globals.dump_section) {
-				if (strncmp(table + shdr.sh_name, globals.dump_section, SNMLEN) == 0) {
-					print_raw(globals.dump_section, // Lazy as fuck
-						o.buffer + shdr.sh_offset, shdr.sh_size, shdr.sh_offset);
-					return;
-				}
-				continue;
+			const(char) *sname = table + shdr.sh_name;
+
+			// If we're searching sections, match and don't print yet
+			if (opt_section) {
+				if (strncmp(sname, opt_section, SNMLEN))
+					continue;
+				
+				void *data = o.buffer + shdr.sh_offset;
+				
+				if (setting_hexdump())
+					print_hexdump(opt_section, data, shdr.sh_size, shdr.sh_offset);
+				
+				if (setting_extract())
+					print_rawdump(data, shdr.sh_size);
 			}
 
 			with (shdr) {
-			print_section(i, table + sh_name, SNMLEN);
+			print_section(i, sname, SNMLEN);
 			print_x32("sh_name", sh_name);
 			print_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
 			print_x32("sh_flags", sh_flags);
@@ -491,14 +497,20 @@ void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
 		for (uint i; i < section_count; ++i) {
 			Elf64_Shdr *shdr = adbg_object_elf_shdr64(o, i);
 
-			// If we're searching sections, don't print anything
-			if (globals.dump_section) {
-				if (strncmp(table + shdr.sh_name, globals.dump_section, SNMLEN) == 0) {
-					print_raw(globals.dump_section, // Lazy as fuck
-						o.buffer + shdr.sh_offset, shdr.sh_size, shdr.sh_offset);
-					return;
-				}
-				continue;
+			const(char) *sname = table + shdr.sh_name;
+
+			// If we're searching sections, match and don't print yet
+			if (opt_section) {
+				if (strncmp(sname, opt_section, SNMLEN))
+					continue;
+				
+				void *data = o.buffer + shdr.sh_offset;
+				
+				if (setting_hexdump())
+					print_hexdump(opt_section, data, shdr.sh_size, shdr.sh_offset);
+				
+				if (setting_extract())
+					print_rawdump(data, shdr.sh_size);
 			}
 
 			with (shdr) {
@@ -534,10 +546,10 @@ void dump_elf_sections(ref Dumper dump, adbg_object_t *o) {
 
 //TODO: Section machine-specific flags (like SHF_X86_64_LARGE)
 
-void dump_elf_disasm(ref Dumper dump, adbg_object_t *o) {
+void dump_elf_disasm(adbg_object_t *o) {
 	print_header("Disassembly");
 	
-	bool all = dump.selected_disasm_all();
+	int all = setting_disasm_all(); /// dump all
 	
 	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:
@@ -564,7 +576,7 @@ void dump_elf_disasm(ref Dumper dump, adbg_object_t *o) {
 		char *table = o.bufferc + offset; // string table
 		while (shdr++ < max) with (shdr) {
 			if (all || sh_flags & ELF_SHF_EXECINSTR)
-				dump_disassemble_object(dump, o,
+				dump_disassemble_object(o,
 					table + sh_name, 32,
 					o.buffer8 + sh_offset, sh_size, 0);
 		}
@@ -593,7 +605,7 @@ void dump_elf_disasm(ref Dumper dump, adbg_object_t *o) {
 		char *table = o.bufferc + offset; // string table
 		while (shdr++ < max) with (shdr) {
 			if (all || sh_flags & ELF_SHF_EXECINSTR)
-				dump_disassemble_object(dump, o,
+				dump_disassemble_object(o,
 					table + sh_name, 32,
 					o.buffer8 + sh_offset, sh_size, 0);
 		}

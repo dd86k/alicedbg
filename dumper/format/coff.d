@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.coff;
+module format.coff;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -14,18 +14,18 @@ import adbg.utils.bit : adbg_bswap32;
 import adbg.utils.uid;
 import core.stdc.ctype : isdigit;
 import dumper;
-import utils : realstring;
+import common.utils : realstring;
 
-int dump_coff(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_coff_hdr(dump, o);
+int dump_coff(adbg_object_t *o) {
+	if (selected_headers())
+		dump_coff_hdr(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_coff_hdr(ref Dumper dump, adbg_object_t *o) {
+void dump_coff_hdr(adbg_object_t *o) {
 	print_header("Header");
 	
 	with (o.i.coff.header) {

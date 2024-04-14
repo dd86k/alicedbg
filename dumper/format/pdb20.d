@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.pdb20;
+module format.pdb20;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -13,16 +13,16 @@ import dumper;
 
 extern (C):
 
-int dump_pdb20(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_pdb20_header(dump, o);
+int dump_pdb20(adbg_object_t *o) {
+	if (selected_headers())
+		dump_pdb20_header(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_pdb20_header(ref Dumper dump, adbg_object_t *o) {
+void dump_pdb20_header(adbg_object_t *o) {
 	print_header("Header");
 	
 	pdb20_file_header *header = adbg_object_pdb20_header(o);

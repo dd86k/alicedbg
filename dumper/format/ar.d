@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module dump.ar;
+module format.ar;
 
 import adbg.disassembler;
 import adbg.object.server;
@@ -12,20 +12,20 @@ import adbg.object.format.ar;
 import adbg.utils.bit : adbg_bswap32;
 import core.stdc.ctype : isdigit;
 import dumper;
-import utils : realstring;
+import common.utils : realstring;
 
 extern (C):
 
-int dump_archive(ref Dumper dump, adbg_object_t *o) {
-	if (dump.selected_headers())
-		dump_archive_headers(dump, o);
+int dump_archive(adbg_object_t *o) {
+	if (selected_headers())
+		dump_archive_headers(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_archive_headers(ref Dumper dump, adbg_object_t *o) {
+void dump_archive_headers(adbg_object_t *o) {
 	print_header("Header");
 	
 	ar_member_header *rhdr = void; // Root headers
