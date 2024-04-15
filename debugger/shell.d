@@ -95,15 +95,15 @@ void registerHelp(void function(ref command2_help_t help)) {
 	
 }*/
 
-int shell_loop() {
+int shell_loop(const(char)* entry) {
 	int ecode = void;
 	
 	if (loginit(null))
 		return 1337;
 	
 	// Load or attach process if CLI specified it
-	if (opt_file) {
-		ecode = shell_proc_spawn(opt_file, opt_file_argv);
+	if (entry) {
+		ecode = shell_proc_spawn(entry, opt_file_argv);
 		if (ecode) {
 			printf("Error: %s\n", adbg_error_msg());
 			return ecode;
@@ -158,6 +158,7 @@ int shell_execv(int argc, const(char) **argv) {
 private:
 __gshared:
 
+const(char)* last_file;
 adbg_process_t *process;
 adbg_disassembler_t *dis;
 adbg_registers_t *registers;
@@ -534,11 +535,11 @@ debug { // Crash command
 
 int shell_proc_spawn(const(char) *exec, const(char) **argv) {
 	// Save for restart
-	opt_file = exec;
+	last_file = exec;
 	opt_file_argv = argv;
 	
 	// Spawn process
-	process = adbg_debugger_spawn(opt_file,
+	process = adbg_debugger_spawn(exec,
 		AdbgSpawnOpt.argv, argv,
 		0);
 	if (process == null) {
@@ -797,7 +798,7 @@ int command_restart(int argc, const(char) **argv) {
 		adbg_debugger_terminate(process);
 		
 		// Spawn, shell still messages status
-		e = shell_proc_spawn(opt_file, opt_file_argv);
+		e = shell_proc_spawn(last_file, opt_file_argv);
 		break;
 	case attached:
 		// Detach first, ignore on error (e.g., already detached)

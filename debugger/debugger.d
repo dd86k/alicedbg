@@ -24,6 +24,4 @@ __gshared:
 /// 
 int opt_pid;
 /// 
-const(char) *opt_file;
-/// 
 const(char) **opt_file_argv;

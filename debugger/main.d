@@ -30,7 +30,6 @@ immutable option_t[] options = [
 	cast(immutable)option_arch,
 	cast(immutable)option_syntax,
 	// debugger options
-	cast(immutable)option_t(0,   "file",   "Debugger: Spawn FILE for debugging", &cli_file),
 	cast(immutable)option_t(0,   "args",   "Debugger: Supply arguments to executable", &cli_args),
 //	option_t('E', "env",    "Debugger: Supply environment variables to executable", &cli_env),
 	cast(immutable)option_t('p', "attach", "Debugger: Attach to Process ID", &cli_pid),
@@ -42,15 +41,6 @@ immutable option_t[] options = [
 	cast(immutable)option_license,
 ];
 enum NUMBER_OF_SECRETS = 1;
-
-//
-// ANCHOR --file
-//
-
-int cli_file(const(char) *val) {
-	opt_file = val;
-	return EXIT_SUCCESS;
-}
 
 //
 // ANCHOR --args/--
@@ -210,14 +200,17 @@ int main(int argc, const(char)** argv) {
 	// Could do a warning, but it might be a little confusing
 	adbg_self_set_crashhandler(&crash_handler);
 	
-	int e = getopt(argc, argv, options);
-	if (e < 0) {
-		puts(getopterr());
+	if (getopt(argc, argv, options) < 0) {
+		puts(getopterrstring());
 		return EXIT_FAILURE;
 	}
-	/*if (e >= 1) {
-		opt_file = argv[0];
-	}*/
 	
-	return shell_loop();
+	if (getoptremcnt() < 1) {
+		puts("error: No file specified");
+		return EXIT_FAILURE;
+	}
+	
+	const(char)** args = getoptrem();
+	
+	return shell_loop(*args);
 }
