@@ -83,62 +83,6 @@ template CHAR64(char[8] s) {
 	version (BigEndian)    assert(CHAR64!"ABCDabcd" == 0x4142434461626364);
 }
 
-/// Ensure endianness on 16-bit number.
-/// Params:
-///   v = Value.
-///   little = Little-endianness desired.
-/// Returns: Potentially swapped value.
-deprecated
-ushort adbg_util_ensure16(ushort v, bool little) pure {
-	return little == PLATFORM_LSB ? v : adbg_util_bswap16(v);
-}
-/// Ensure endianness on 32-bit number.
-/// Params:
-///   v = Value.
-///   little = Little-endianness desired.
-/// Returns: Potentially swapped value.
-deprecated
-uint adbg_util_ensure32(uint v, bool little) pure {
-	return little == PLATFORM_LSB ? v : adbg_bswap32(v);
-}
-/// Ensure endianness on 64-bit number.
-/// Params:
-///   v = Value.
-///   little = Little-endianness desired.
-/// Returns: Potentially swapped value.
-deprecated
-ulong adbg_util_ensure64(ulong v, bool little) pure {
-	return little == PLATFORM_LSB ? v : adbg_util_bswap64(v);
-}
-
-struct adbg_swapper_t {
-	swapfunc16 swap16;
-	swapfunc32 swap32;
-	swapfunc64 swap64;
-}
-
-adbg_swapper_t adbg_util_swapper(bool little) {
-	adbg_swapper_t swapper = void;
-	if (little == PLATFORM_LSB) {
-		swapper.swap16 = &adbg_nop16;
-		swapper.swap32 = &adbg_nop32;
-		swapper.swap64 = &adbg_nop64;
-	} else {
-		swapper.swap16 = &adbg_bswap16;
-		swapper.swap32 = &adbg_bswap32;
-		swapper.swap64 = &adbg_bswap64;
-	}
-	return swapper;
-}
-
-alias swapfunc16 = ushort function(ushort);
-alias swapfunc32 = uint function(uint);
-alias swapfunc64 = ulong function(ulong);
-
-private ushort adbg_nop16(ushort v) pure { return v; }
-private uint   adbg_nop32(uint v)   pure { return v; }
-private ulong  adbg_nop64(ulong v)  pure { return v; }
-
 /// Byte-swap an 16-bit value.
 /// Params: v = 16-bit value
 /// Returns: Byte-swapped value
@@ -172,16 +116,6 @@ ulong adbg_bswap64(ulong v) pure {
 	}
 }
 
-// Old names
-//TODO: Deprecate old names
-deprecated public alias adbg_util_bswap16 = adbg_bswap16;
-deprecated public alias adbg_util_bswap32 = adbg_bswap32;
-deprecated public alias adbg_util_bswap64 = adbg_bswap64;
-
-deprecated public alias adbg_nop_bswap16 = adbg_nop16;
-deprecated public alias adbg_nop_bswap32 = adbg_nop32;
-deprecated public alias adbg_nop_bswap64 = adbg_nop64;
-
 /// 
 unittest {
 	enum N16 = 0xAABB; enum R16 = 0xBBAA;
@@ -205,36 +139,29 @@ unittest {
 	assert(adbg_bits_extract32(flags, 4, 16) == 0b1010);
 }
 
-size_t adbg_align4up(size_t x) {
-	enum mask = uint.sizeof - 1;
+size_t adbg_alignup(size_t x, int s) {
+	size_t mask = s - 1;
 	return (x + mask) & (~mask);
 }
 unittest {
-	assert(adbg_align4up(0) == 0);
-	assert(adbg_align4up(1) == 4);
-	assert(adbg_align4up(2) == 4);
-	assert(adbg_align4up(3) == 4);
-	assert(adbg_align4up(4) == 4);
-	assert(adbg_align4up(5) == 8);
-	assert(adbg_align4up(6) == 8);
-	assert(adbg_align4up(7) == 8);
-	assert(adbg_align4up(8) == 8);
-	assert(adbg_align4up(9) == 12);
-}
-
-size_t adbg_align8up(size_t x) {
-	enum mask = ulong.sizeof - 1;
-	return (x + mask) & (~mask);
-}
-unittest {
-	assert(adbg_align8up(0) == 0);
-	assert(adbg_align8up(1) == 8);
-	assert(adbg_align8up(2) == 8);
-	assert(adbg_align8up(3) == 8);
-	assert(adbg_align8up(4) == 8);
-	assert(adbg_align8up(5) == 8);
-	assert(adbg_align8up(6) == 8);
-	assert(adbg_align8up(7) == 8);
-	assert(adbg_align8up(8) == 8);
-	assert(adbg_align8up(9) == 16);
+	assert(adbg_alignup(0, uint.sizeof) == 0);
+	assert(adbg_alignup(1, uint.sizeof) == 4);
+	assert(adbg_alignup(2, uint.sizeof) == 4);
+	assert(adbg_alignup(3, uint.sizeof) == 4);
+	assert(adbg_alignup(4, uint.sizeof) == 4);
+	assert(adbg_alignup(5, uint.sizeof) == 8);
+	assert(adbg_alignup(6, uint.sizeof) == 8);
+	assert(adbg_alignup(7, uint.sizeof) == 8);
+	assert(adbg_alignup(8, uint.sizeof) == 8);
+	assert(adbg_alignup(9, uint.sizeof) == 12);
+	assert(adbg_alignup(0, ulong.sizeof) == 0);
+	assert(adbg_alignup(1, ulong.sizeof) == 8);
+	assert(adbg_alignup(2, ulong.sizeof) == 8);
+	assert(adbg_alignup(3, ulong.sizeof) == 8);
+	assert(adbg_alignup(4, ulong.sizeof) == 8);
+	assert(adbg_alignup(5, ulong.sizeof) == 8);
+	assert(adbg_alignup(6, ulong.sizeof) == 8);
+	assert(adbg_alignup(7, ulong.sizeof) == 8);
+	assert(adbg_alignup(8, ulong.sizeof) == 8);
+	assert(adbg_alignup(9, ulong.sizeof) == 16);
 }
