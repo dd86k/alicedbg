@@ -103,7 +103,7 @@ struct option_t { align(1):
 
 //NOTE: Can't make a template and pass a function pointer
 
-enum option_arch       = option_t('a', "arch",	"Select machine for disassembler (default=platform)", &cli_march);
+enum option_arch       = option_t('m', "machine",	"Select machine for disassembler (default=platform)", &cli_march);
 enum option_syntax     = option_t('s', "syntax",	"Select syntax for disassembler (default=platform)", &cli_syntax);
 enum option_version    = option_t(0,   "version",	"Show the version screen and exit", &cli_version);
 enum option_build_info = option_t(0,   "build-info",	"Show the build and debug information and exit", &cli_build_info);
@@ -294,6 +294,8 @@ bool wantsHelp(const(char) *query) {
 // --march
 //
 
+//TODO: Interface with machine module instead
+
 struct setting_platform_t {
 	AdbgMachine val;
 	const(char)* opt, alt, desc;
@@ -302,6 +304,10 @@ immutable setting_platform_t[] platforms = [
 	{ AdbgMachine.i8086,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
 	{ AdbgMachine.x86,	"x86",     "i386",  "x86 32-bit (extended mode)" },
 	{ AdbgMachine.amd64,	"x86_64",  "amd64", "x86 64-bit (long mode)" },
+	{ AdbgMachine.thumb,	"t16",  "thumb",    "Thumb" },
+	{ AdbgMachine.thumb32,	"t32",  "thumb32",  "Thumb (32-bit)" },
+	{ AdbgMachine.arm,	"a32",  "arm",      "Armv8 (32-bit)" },
+	{ AdbgMachine.aarch64,	"a64",  "aarch64",  "Armv8 (64-bit)" },
 ];
 
 int cli_march(const(char) *val) {

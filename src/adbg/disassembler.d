@@ -207,7 +207,7 @@ int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 		break;
 	case aarch64:
 		cs_arch = CS_ARCH_ARM64;
-		cs_mode = CS_MODE_ARM;
+		cs_mode = CS_MODE_ARM | CS_MODE_V8;
 		break;
 	//
 	// Others

@@ -275,7 +275,7 @@ void dump_pe_sections(adbg_object_t *o) {
 			"ALIGN_RESERVED",
 		];
 		uint alignment = Characteristics & PE_SECTION_CHARACTERISTIC_ALIGN_MASK;
-		print_x32("Alignment", alignment, pe32alignments[alignment >> 20]);
+		print_x32("Alignment", alignment, pe32alignments[(alignment >> 20) & 15]);
 		print_flags32("Characteristics", Characteristics,
 			"TYPE_DSECT".ptr,	PE_SECTION_CHARACTERISTIC_TYPE_DSECT,
 			"TYPE_NOLOAD".ptr,	PE_SECTION_CHARACTERISTIC_TYPE_NOLOAD,

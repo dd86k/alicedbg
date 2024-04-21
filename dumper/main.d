@@ -7,15 +7,13 @@ module main;
 
 import adbg.platform;
 import adbg.include.c.stdlib : exit;
-import adbg.include.d.config : GDC_VERSION, GDC_EXCEPTION_MODE, LLVM_VERSION;
 import adbg.debugger.exception : adbg_exception_t, adbg_exception_name;
 import adbg.self;
 import adbg.machines : adbg_machine_default;
 import adbg.disassembler;
 import adbg.error;
-import adbg.debugger.process;
-import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
-import core.stdc.string : strcmp;
+import adbg.debugger.process : adbg_process_t;
+import core.stdc.stdlib : EXIT_FAILURE;
 import core.stdc.stdio;
 import dumper;
 import common.cli;
@@ -26,11 +24,10 @@ private:
 //TODO: --dump-blob-offset/--dump-blob-seek/--dump-blob-start: Starting offset for raw blob
 //TODO: --dump-length/--dump-end: Length or end
 //TODO: --dump-imports-all: Dependency walker
-//TODO: --dump-section=name: Hex or raw dump section
 //TODO: --dump-stats: File statistics?
 //                    pdb: stream count, positions, etc.
-//TODO: --demangle
 //TODO: --type-only: Returns short-name only for identification purposes
+//TODO: --name: Extract by section, import, export name (will replace --section?)
 immutable option_t[] options = [
 	// common options
 	option_arch,
