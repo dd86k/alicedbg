@@ -17,8 +17,10 @@ import core.stdc.stdlib;
 import core.stdc.string;
 import core.stdc.errno;
 
+/// Copyright string
 enum COPYRIGHT = "Copyright (c) 2019-2024 dd86k <dd@dax.moe>";
 
+/// License string
 immutable(char) *page_license =
 COPYRIGHT~`
 All rights reserved.
@@ -48,8 +50,8 @@ CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.`;
 
-debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__;
-else  enum FULL_VERSION = ADBG_VERSION;
+debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__; /// Full version string
+else  enum FULL_VERSION = ADBG_VERSION; /// Ditto
 
 /// Turns a __VERSION__ number into a string constant
 template DSTRVER(uint ver) {
@@ -76,7 +78,9 @@ private enum : ubyte {
 	//ARG_LARGENUMBER, // %lli
 }
 
+/// Represents one command-line option switch
 struct option_t { align(1):
+	/// Make an option without arguments
 	this (char oshort, string olong, string desc, int function() ufunc) {
 		shortname = oshort;
 		longname = olong;
@@ -84,6 +88,7 @@ struct option_t { align(1):
 		argtype = ARG_NONE;
 		f = ufunc;
 	}
+	/// Make an option with string argument
 	this (char oshort, string olong, string desc, int function(const(char)*) ufunc) {
 		shortname = oshort;
 		longname = olong;
@@ -96,18 +101,22 @@ struct option_t { align(1):
 	char shortname;	/// Short switch name
 	ubyte argtype;	/// Argument type
 	union {
-		int function() f;
-		int function(const(char)*) fa;
+		int function() f; /// User callback
+		int function(const(char)*) fa; /// Ditto
 	}
 }
 
-//NOTE: Can't make a template and pass a function pointer
-
+/// Default option for --machine
 enum option_arch       = option_t('m', "machine",	"Select machine for disassembler (default=platform)", &cli_march);
+/// Default option for --syntax
 enum option_syntax     = option_t('s', "syntax",	"Select syntax for disassembler (default=platform)", &cli_syntax);
+/// Default option for --version
 enum option_version    = option_t(0,   "version",	"Show the version screen and exit", &cli_version);
+/// Default option for --build-info
 enum option_build_info = option_t(0,   "build-info",	"Show the build and debug information and exit", &cli_build_info);
+/// Default option for --ver
 enum option_ver        = option_t(0,   "ver",	"Show only the version string and exit", &cli_ver);
+/// Default option for --license
 enum option_license    = option_t(0,   "license",	"Show the license page and exit", &cli_license);
 
 //TODO: Return error
@@ -115,6 +124,7 @@ enum option_license    = option_t(0,   "license",	"Show the license page and exi
 //  0 -> no args left
 // >0 -> args left
 //TODO: Make option functions return <0=error >0=ok, consumed arg(s)
+/// Interpret options
 int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 	const(char) *arg = void;
 	const(char) *val = void;
@@ -208,6 +218,7 @@ int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 unittest {
 }
 
+/// Print options
 void getoptprinter(immutable(option_t)[] options, int skip = 0) {
 	static immutable int padding = -17;
 	foreach (ref option; options[skip..$]) { with (option)
@@ -232,9 +243,11 @@ private void getoptaddextra(int argc, const(char)* extra) {
 	}
 	getoptextras[getoptextrascnt++] = extra;
 }
+/// Get remaining arguments
 const(char)** getoptrem() {
 	return getoptextras;
 }
+/// Get remaining argument count
 int getoptremcnt() {
 	return getoptextrascnt;
 }
@@ -244,6 +257,7 @@ int getoptremcnt() {
 private enum GETOPTBFSZ = 2048;
 private __gshared char* getopterrbuf;
 
+/// Get getopt error message
 const(char)* getopterrstring() {
 	return getopterrbuf ? getopterrbuf : "No errors occured";
 }
@@ -284,11 +298,12 @@ private void getoptEmissingShort(char opt) {
 		"main: missing argument for -%c\n", opt);
 }
 
-
+/// Is user asking for help with this option?
 bool wantsHelp(const(char) *query) {
-	return (query[0] == 'h' && query[1] == 0) ||
-		strcmp(query, "help") == 0;
+	return strcmp(query, "help") == 0;
 }
+
+private:
 
 //
 // --march

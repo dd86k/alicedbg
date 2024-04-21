@@ -624,7 +624,12 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 	}
 }
 
-void shell_event_exception(adbg_exception_t *ex) {
+void shell_event_exception(adbg_process_t *proc, int event, void* evdata) {
+	if (event != AdbgEvent.exception)
+		return;
+	
+	adbg_exception_t *ex = cast(adbg_exception_t*)evdata;
+	
 	printf("*	Process %d (thread %d) stopped\n"~
 		"	Reason  : %s ("~ADBG_OS_ERROR_FORMAT~")\n",
 		ex.pid, ex.tid,

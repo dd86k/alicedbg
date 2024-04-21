@@ -51,6 +51,11 @@ version (linux)
 
 extern (C):
 
+/// Debugging events
+enum AdbgEvent {
+	exception,
+}
+
 /// Process status
 enum AdbgProcStatus : ubyte {
 	unknown,	/// Process status is not known.
@@ -58,28 +63,7 @@ enum AdbgProcStatus : ubyte {
 	standby,	/// Process is loaded and waiting to run.
 	running,	/// Process is running.
 	paused,	/// Process is paused due to an exception or by the debugger.
-	idle = unloaded,	/// Old v1 alias for unloaded.
-	ready = standby,	/// Old v1 alias for standby.
 }
-
-/// Debugger event
-/+public
-enum AdbgEvent {
-	exception,
-	processCreated,
-	processExit,
-	threadCreated,
-	threadExit,
-}
-
-/// Debugger event structure
-public
-struct adbg_debugger_event_t {
-	AdbgEvent event;
-	public union {
-		exception_t exception;
-	}
-}+/
 
 //TODO: Rename to AdbgDebuggerRelation
 /// Process creation source.
@@ -603,7 +587,8 @@ AdbgProcStatus adbg_process_status(adbg_process_t *tracee) pure {
 /// 	tracee = Tracee instance.
 /// 	userfunc = User function callback.
 /// Returns: Error code.
-int adbg_debugger_wait(adbg_process_t *tracee, void function(adbg_exception_t*) userfunc) {
+int adbg_debugger_wait(adbg_process_t *tracee,
+	void function(adbg_process_t*, int, void*) userfunc) {
 	if (tracee == null || userfunc == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (tracee.creation == AdbgCreation.unloaded)
@@ -730,7 +715,7 @@ L_DEBUG_LOOP:
 	adbg_exception_translate(&exception, &tracee.pid, &stopsig);
 }
 	
-	userfunc(&exception);
+	userfunc(tracee, AdbgEvent.exception, &exception);
 	return 0;
 
 L_UNLOADED:
@@ -785,12 +770,12 @@ int adbg_debugger_continue(adbg_process_t *tracee) {
 	
 version (Windows) {
 	if (ContinueDebugEvent(tracee.pid, tracee.tid, DBG_CONTINUE) == FALSE) {
-		tracee.status = AdbgProcStatus.idle;
+		tracee.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 } else {
 	if (ptrace(PT_CONT, tracee.pid, null, null) < 0) {
-		tracee.status = AdbgProcStatus.idle;
+		tracee.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 }

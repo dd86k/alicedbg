@@ -5,7 +5,7 @@
 /// License: BSD-3-Clause-Clear
 module format.elf;
 
-import adbg.utils.bit : adbg_align4up;
+import adbg.utils.bit : adbg_alignup;
 import adbg.disassembler;
 import adbg.object.server;
 import adbg.machines;
@@ -241,7 +241,7 @@ LNEWNHDR:
 	print_u32("n_descsz", nhdr.n_descsz);
 	print_u32("n_type", nhdr.n_type, adbg_object_elf_nt_type_string(nhdr.n_type));
 	
-	size_t nnamesz = adbg_align4up(nhdr.n_namesz);
+	size_t nnamesz = adbg_alignup(nhdr.n_namesz, ulong.sizeof);
 	void *data = note + Elf64_Nhdr.sizeof + nnamesz;
 	
 	// NOTE: Only for x86-64, for now
@@ -388,7 +388,7 @@ LNEWNHDR:
 	ulong nsize =
 		Elf64_Nhdr.sizeof +
 		nnamesz +
-		adbg_align4up(nhdr.n_descsz);
+		adbg_alignup(nhdr.n_descsz, uint.sizeof);
 	noffset += nsize;
 	nleft -= nsize;
 	
