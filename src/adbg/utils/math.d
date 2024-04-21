@@ -13,7 +13,6 @@ template MAX(size_t a, size_t b) {
 template MIN(size_t a, size_t b) {
 	enum MIN = a <= b ? a : b;
 }
-
 @system unittest {
 	static assert(MAX!(1, 2) == 2);
 	static assert(MAX!(2, 2) == 2);
@@ -24,8 +23,20 @@ template MIN(size_t a, size_t b) {
 size_t max(size_t a, size_t b) {
 	return a >= b ? a : b;
 }
+@system unittest {
+	assert(max(1, 3) == 3);
+	assert(max(2, 3) == 3);
+	assert(max(3, 3) == 3);
+	assert(max(4, 3) == 4);
+}
 size_t min(size_t a, size_t b) {
 	return a <= b ? a : b;
+}
+@system unittest {
+	assert(min(1, 3) == 1);
+	assert(min(2, 3) == 2);
+	assert(min(3, 3) == 3);
+	assert(min(4, 3) == 3);
 }
 
 /// Make a constant binary size (base 1024^3).

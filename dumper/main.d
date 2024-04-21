@@ -22,6 +22,7 @@ import common.cli;
 import common.utils : unformat64;
 
 private:
+
 //TODO: --dump-blob-offset/--dump-blob-seek/--dump-blob-start: Starting offset for raw blob
 //TODO: --dump-length/--dump-end: Length or end
 //TODO: --dump-imports-all: Dependency walker
@@ -31,25 +32,29 @@ private:
 //TODO: --demangle
 //TODO: --type-only: Returns short-name only for identification purposes
 immutable option_t[] options = [
-	// general
+	// common options
 	option_arch,
 	option_syntax,
-	// dumper
-	option_t('H', "headers",      "Dump object's headers", &cli_dump_headers),
-	option_t(0,   "section",      "Dump object's section by name", &cli_dump_section),
-	option_t('S', "sections",     "Dump object's sections", &cli_dump_sections),
-	option_t('I', "imports",      "Dump object's import information", &cli_dump_imports),
-	option_t('E', "exports",      "Dump object's export information", &cli_dump_exports),
-//	option_t(0,   "loadcfg",      "Dump object's load configuration", &cli_dump_loadcfg),
-//	option_t(0,   "source",       "Dump object's source with disassembly", &cli_dump_source),
-	option_t(0,   "relocs",       "Dump object's relocations", &cli_dump_reloc),
-	option_t(0,   "debug",        "Dump object's debug information", &cli_dump_debug),
-	option_t(0,   "everything",        "Dump everything except disassembly", &cli_dump_everything),
-	option_t(0,   "disassembly",       "Dump object's disassembly", &cli_dump_disasm),
-	option_t(0,   "disassembly-all",   "Dump object's disassembly for all sections", &cli_dump_disasm_all),
-	option_t(0,   "disassembly-stats", "Dump object's disassembly statistics for executable sections", &cli_dump_disasm_stats),
-	option_t(0,   "as-blob",      "Dump as raw binary blob", &cli_dump_blob),
-	option_t(0,   "origin",       "Mark base address for disassembly", &cli_dump_disasm_org),
+	// selections
+	option_t('H', "headers",      "Dump object's headers", &cliopt_headers),
+	option_t(0,   "section",      "Dump object's section by name", &cliopt_section),
+	option_t('S', "sections",     "Dump object's sections", &cliopt_sections),
+	option_t('I', "imports",      "Dump object's import information", &cliopt_imports),
+	option_t('E', "exports",      "Dump object's export information", &cliopt_exports),
+//	option_t(0,   "loadcfg",      "Dump object's load configuration", &cliopt_loadcfg),
+//	option_t(0,   "source",       "Dump object's source with disassembly", &cliopt_source),
+	option_t(0,   "relocs",       "Dump object's relocations", &cliopt_relocs),
+	option_t(0,   "debug",        "Dump object's debug information", &cliopt_debug),
+	option_t(0,   "everything",   "Dump everything except disassembly", &cliopt_everything),
+	// settings
+	option_t(0,   "as-blob",           "Setting: Input is headless binary blob", &cliopt_as_blob),
+	option_t(0,   "disassemble",       "Setting: Disassemble executable sections", &cliopt_disasm),
+	option_t(0,   "disassemble-all",   "Setting: Disassemble all sections", &cliopt_disasm_all),
+	option_t(0,   "disassemble-stats", "Setting: Provide disassembly statistics", &cliopt_disasm_stats),
+	option_t(0,   "origin",            "Setting: Mark base address for disassembly", &cliopt_origin),
+	option_t(0,   "extract",           "Setting: Output selected portion to stdout", &cliopt_extract),
+	option_t(0,   "extract-to",        "Setting: Output selected portion to file", &cliopt_extract_to),
+	option_t(0,   "hexdump",           "Setting: Output selected portion to stdout as hexdump", &cliopt_hexdump),
 	// pages
 	option_t('h', "help", "Show this help screen and exit", &cli_help),
 	option_version,
@@ -58,65 +63,85 @@ immutable option_t[] options = [
 	option_license,
 ];
 
-int cli_dump_headers() {
+//
+// Selections
+//
+
+int cliopt_headers() {
 	opt_selected |= Select.headers;
 	return 0;
 }
-int cli_dump_section(const(char) *val) {
+int cliopt_section(const(char) *val) {
 	opt_selected |= Select.sections;
-	opt_section = val;
+	opt_section_name = val;
 	return 0;
 }
-int cli_dump_sections() {
+int cliopt_sections() {
 	opt_selected |= Select.sections;
 	return 0;
 }
-int cli_dump_imports() {
+int cliopt_imports() {
 	opt_selected |= Select.imports;
 	return 0;
 }
-int cli_dump_exports() {
+int cliopt_exports() {
 	opt_selected |= Select.exports;
 	return 0;
 }
-int cli_dump_loadcfg() {
+int cliopt_loadcfg() {
 	opt_selected |= Select.loadcfg;
 	return 0;
 }
-int cli_dump_reloc() {
+int cliopt_relocs() {
 	opt_selected |= Select.relocs;
 	return 0;
 }
-int cli_dump_debug() {
+int cliopt_debug() {
 	opt_selected |= Select.debug_;
 	return 0;
 }
-int cli_dump_disasm() {
-	opt_settings |= Setting.disasm;
-	return 0;
-}
-int cli_dump_disasm_all() {
-	opt_settings |= Setting.disasmAll;
-	return 0;
-}
-int cli_dump_disasm_stats() {
-	opt_settings |= Setting.disasmStats;
-	return 0;
-}
 
-int cli_dump_everything() {
+int cliopt_everything() {
 	opt_selected |= Select.all;
 	return 0;
 }
 
-// Dump options
+//
+// Settings
+//
 
-int cli_dump_blob() {
+int cliopt_as_blob() {
 	opt_settings |= Setting.blob;
 	return 0;
 }
-int cli_dump_disasm_org(const(char) *val) {
+int cliopt_disasm() {
+	opt_settings |= Setting.disasm;
+	return 0;
+}
+int cliopt_disasm_all() {
+	opt_settings |= Setting.disasmAll;
+	return 0;
+}
+int cliopt_disasm_stats() {
+	opt_settings |= Setting.disasmStats;
+	return 0;
+}
+int cliopt_origin(const(char) *val) {
 	return unformat64(&opt_baseaddress, val);
+}
+
+int cliopt_extract() {
+	opt_settings |= Setting.extract;
+	return 0;
+}
+int cliopt_extract_to(const(char)* fname) {
+	opt_settings |= Setting.extract;
+	opt_extractfile = fname;
+	return 0;
+}
+int cliopt_hexdump() {
+	opt_settings |= Setting.hexdump;
+	return 0;
 }
 
 //
@@ -128,10 +153,10 @@ int cli_help() {
 	"alicedump: Binary object dumper.\n"~
 	"\n"~
 	"USAGE\n"~
-	"  Dump and summarize:\n"~
+	"  Summarize object file:\n"~
 	"    alicedbg [OPTIONS...] FILE\n"~
 	"  Dump headers:\n"~
-	"    alicedbg --headers [OPTIONS...] FILE\n"~
+	"    alicedbg {-H|--headers} [OPTIONS...] FILE\n"~
 	"  Show information page and exit:\n"~
 	"    alicedbg {-h|--help|--version|--ver|--license}\n"~
 	"\n"~
@@ -144,8 +169,6 @@ int cli_help() {
 
 extern (C)
 void crash_handler(adbg_exception_t *ex) {
-	scope(exit) exit(ex.oscode);
-	
 	adbg_process_t *self = adbg_self_process();
 	
 	puts(
@@ -186,6 +209,8 @@ r"
 			printf(" Unavailable (%s)\n", adbg_error_msg());
 		}
 	}
+	
+	exit(ex.oscode);
 }
 
 extern (C)
@@ -204,7 +229,5 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
-	const(char)** args = getoptrem();
-	
-	return app_dump(*args);
+	return dump(*getoptrem()); // First argument as file
 }

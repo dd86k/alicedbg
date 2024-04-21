@@ -103,9 +103,8 @@ void dump_pdb70_debug(adbg_object_t *o) {
 		print_string("error", "Couldn't read Stream 0");
 		return;
 	}
-	if (strsize) {
-		print_hexdump("Stream 0 Data", buffer, strsize);
-	}
+	/*if (strsize)
+		print_hexdump("Stream 0 Data", buffer, strsize);*/
 	adbg_object_pdb70_stream_close(o, &buffer);
 	
 	// Stream 1

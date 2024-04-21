@@ -11,6 +11,7 @@ import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, free;
 import adbg.include.c.stdarg;
 import adbg.machines;
 import adbg.utils.bit : BIT;
+import adbg.utils.math : min;
 import core.stdc.string;
 import core.stdc.ctype : isprint;
 import core.stdc.errno;
@@ -51,25 +52,31 @@ enum Select {
 enum Setting {
 	/// Input file or data is blob
 	blob	= BIT!0,
-	/// Dump binary information as hex dump
-	hexdump	= BIT!1,
+	
+	// bits 17-16: Extraction type
+	
 	/// Extract binary information into stdout
-	extract	= BIT!2,
+	extract	= BIT!16,
+	/// Dump binary information as hex dump
+	hexdump	= BIT!17,
+	/// Any sort of extracted is requested
+	extractAny = extract | hexdump,
+	
 	/// Disassemble selections (executable sections)
 	disasm	= BIT!24,
 	/// Disassemble selections (all sections)
 	disasmAll	= BIT!25,
 	/// Output disassembly statistics (sections)
 	disasmStats	= BIT!26,
-	
 	/// Any disassembly is requested
 	disasmAny = disasm | disasmAll | disasmStats,
 }
 
 int opt_selected;
 int opt_settings;
-const(char)* opt_section;
+const(char)* opt_section_name;
 long opt_baseaddress;
+const(char)* opt_extractfile;
 
 int selected_headers()	{ return opt_selected & Select.headers; }
 int selected_sections()	{ return opt_selected & Select.sections; }
@@ -84,6 +91,7 @@ int selected_loadcfg()	{ return opt_selected & Select.loadcfg; }
 int setting_blob()	{ return opt_settings & Setting.blob; }
 int setting_hexdump()	{ return opt_settings & Setting.hexdump; }
 int setting_extract()	{ return opt_settings & Setting.extract; }
+int setting_extract_any()	{ return opt_settings & Setting.extractAny; }
 
 int setting_disasm()	{ return opt_settings & Setting.disasm; }
 int setting_disasm_all()	{ return opt_settings & Setting.disasmAll; }
@@ -92,7 +100,7 @@ int setting_disasm_any()	{ return opt_settings & Setting.disasmAny; }
 
 /// Dump given file to stdout.
 /// Returns: Error code if non-zero
-int app_dump(const(char)* path) {
+int dump(const(char)* path) {
 	if (setting_blob()) {
 		// NOTE: Program exits and memory is free'd
 		size_t size = void;
@@ -117,10 +125,12 @@ int app_dump(const(char)* path) {
 	
 	// If anything was selected to dump specifically
 	if (opt_selected) {
-		print_string("filename", path);
-		print_u64("filesize", o.file_size);
-		print_string("format", adbg_object_name(o));
-		print_string("short_name", adbg_object_short_name(o));
+		if (setting_extract_any() == 0) {
+			print_string("filename", path);
+			print_u64("filesize", o.file_size);
+			print_string("format", adbg_object_name(o));
+			print_string("short_name", adbg_object_short_name(o));
+		}
 		final switch (o.format) with (AdbgObject) {
 		case mz:	return dump_mz(o);
 		case ne:	return dump_ne(o);
@@ -321,16 +331,44 @@ L_START:
 	goto L_START;
 }
 
+void print_directory_entry(const(char)* name, uint rva, uint size) {
+	printf("%*s: 0x%08x  %u\n", __field_padding, name, rva, size);
+}
+
+void print_reloc16(uint index, ushort seg, ushort off) {
+	printf("%4u. 0x%04x:0x%04x\n", index, seg, off);
+}
+
 //TODO: if opt_extract_to defined, save to it
+//      needs a unified "data out" function
+
+void print_data(const(char)* name, void *data, size_t size, ulong baseaddress = 0) {
+	if (setting_hexdump())
+		hexdump(name, data, size, baseaddress);
+
+	if (setting_extract())
+		rawdump(opt_extractfile, data, size, baseaddress);
+}
+
 // dump binary data to stdout, unformatted
-void print_rawdump(void* data, size_t size) {
-	while (size > 0) {
-		
+// if rawdump to file specified, write to file, otherwise stdout
+void rawdump(const(char)* fname, void* data, size_t tsize, ulong baseaddress = 0) {
+	FILE* fd = fname ? fopen(fname, "wb") : stdout;
+	if (fd == null) {
+		perror("fopen");
+		return;
+	}
+	scope(exit) fclose(fd);
+	
+	size_t r = fwrite(data, tsize, 1, fd);
+	if (r == 0) {
+		perror("fwrite");
+		return;
 	}
 }
 
 // pretty hex dump to stdout
-void print_hexdump(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0) {
+void hexdump(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0) {
 	print_header(name);
 	
 	// Print header
@@ -341,44 +379,33 @@ void print_hexdump(const(char)* name, void *data, size_t dsize, ulong baseaddres
 	putchar('\n');
 	
 	// Print data
-	ubyte *d = cast(ubyte*)data;
-	size_t afo; // Absolute file offset
+	ubyte *ptr = cast(ubyte*)data;
+	size_t offset; // Absolute file offset
 	for (size_t id; id < dsize; id += __columns, baseaddress += __columns) {
 		printf("%8llx  ", baseaddress);
 		
 		// Adjust column for row
-		size_t col = __columns;//id + __columns >= dsize ? dsize - __columns : __columns;
-		size_t off = afo;
+		bool eof = offset + __columns >= dsize;
+		int col = eof ? cast(int)(__columns - (dsize - offset)) : __columns;
 		
 		// Print data bytes
-		for (size_t ib; ib < col; ++ib, ++off)
-			printf("%02x ", d[off]);
+		for (size_t ib, oi = offset; ib < col; ++ib, ++oi)
+			printf("%02x ", ptr[oi]);
 		
-		// Adjust spacing between the two
-		if (col < __columns) {
-			
-		} else
+		// Adjust spacing between the two sections
+		int spcrem = ((__columns - col) * 3) + 1;
+		for (int s; s < spcrem; ++s)
 			putchar(' ');
 		
 		// Print printable characters
-		off = afo;
-		for (size_t ib; ib < col; ++ib, ++off)
-			putchar(isprint(d[off]) ? d[off] : '.');
+		for (size_t ib, oi = offset; ib < col; ++ib, ++oi)
+			putchar(isprint(ptr[oi]) ? ptr[oi] : '.');
 		
 		// New row
-		afo += col;
+		offset += col;
 		putchar('\n');
 	}
 }
-
-void print_directory_entry(const(char)* name, uint rva, uint size) {
-	printf("%*s: 0x%08x  %u\n", __field_padding, name, rva, size);
-}
-
-void print_reloc16(uint index, ushort seg, ushort off) {
-	printf("%4u. 0x%04x:0x%04x\n", index, seg, off);
-}
-
 // name is typically section name or filename if raw
 int dump_disassemble_object(adbg_object_t *o,
 	const(char) *name, int namemax,

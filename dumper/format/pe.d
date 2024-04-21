@@ -9,6 +9,7 @@ import adbg.disassembler;
 import adbg.object.server;
 import adbg.machines : AdbgMachine;
 import adbg.object.format.pe;
+import adbg.object.format.mz : mz_hdr_ext;
 import adbg.utils.date : ctime32;
 import adbg.utils.uid, adbg.utils.bit;
 import core.stdc.string : strncmp;
@@ -47,6 +48,11 @@ private:
 
 // Returns true if the machine value is unknown
 void dump_pe_hdr(adbg_object_t *o) {
+	if (setting_extract_any()) {
+		print_data("Header", o.i.pe.header, PE_HEADER.sizeof, mz_hdr_ext.sizeof);
+		return;
+	}
+	
 	print_header("Header");
 	
 	const(char) *str_mach = adbg_object_pe_machine_string(o.i.pe.header.Machine);
@@ -232,17 +238,12 @@ void dump_pe_sections(adbg_object_t *o) {
 	size_t i;
 	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
 		// If we're searching sections, match and don't print yet
-		if (opt_section) {
-			if (strncmp(Name.ptr, opt_section, Name.sizeof))
-				continue;
-			
+		if (opt_section_name && strncmp(Name.ptr, opt_section_name, Name.sizeof))
+			continue;
+		
+		if (setting_extract_any()) {
 			void *data = o.buffer + PointerToRawData;
-			
-			if (setting_hexdump())
-				print_hexdump(opt_section, data, SizeOfRawData, PointerToRawData);
-			
-			if (setting_extract())
-				print_rawdump(data, SizeOfRawData);
+			print_data(opt_section_name, data, SizeOfRawData, PointerToRawData);
 		}
 		
 		print_section(cast(uint)i, Name.ptr, 8);
@@ -304,6 +305,7 @@ void dump_pe_sections(adbg_object_t *o) {
 			"MEM_WRITE".ptr,	PE_SECTION_CHARACTERISTIC_MEM_WRITE,
 			null);
 		
+		if (opt_section_name) break;
 	}
 }
 

@@ -318,7 +318,8 @@ LNEWNHDR:
 		goto default;
 	case ELF_NT_FPREGSET:
 		user_i387_struct64 *fregset = cast(user_i387_struct64*)data;
-		char[2*16] fpbuf = void;
+		enum FPBSZ = 2 * 16; // cell * bytes
+		char[FPBSZ] fpbuf = void;
 		int fplen = void;
 		print_x16("cwd", fregset.cwd);
 		print_x16("swd", fregset.swd);
@@ -329,59 +330,58 @@ LNEWNHDR:
 		print_x32("mxcsr", fregset.mxcsr);
 		print_x32("mxcsr_mask", fregset.mxcsr_mask);
 		// x87
-		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[0].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.st_space128[0].data.ptr, 16);
 		print_stringl("st_space[0]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[1].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.st_space128[1].data.ptr, 16);
 		print_stringl("st_space[1]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[2].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.st_space128[2].data.ptr, 16);
 		print_stringl("st_space[2]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[3].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.st_space128[3].data.ptr, 16);
 		print_stringl("st_space[3]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[4].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.st_space128[4].data.ptr, 16);
 		print_stringl("st_space[4]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[5].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.st_space128[5].data.ptr, 16);
 		print_stringl("st_space[5]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[6].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.st_space128[6].data.ptr, 16);
 		print_stringl("st_space[6]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.st_space128[7].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.st_space128[7].data.ptr, 16);
 		print_stringl("st_space[7]", fpbuf.ptr, fplen);
 		// sse
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[0].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[0].data.ptr, 16);
 		print_stringl("xmm_space[0]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[1].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[1].data.ptr, 16);
 		print_stringl("xmm_space[1]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[2].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[2].data.ptr, 16);
 		print_stringl("xmm_space[2]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[3].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[3].data.ptr, 16);
 		print_stringl("xmm_space[3]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[4].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[4].data.ptr, 16);
 		print_stringl("xmm_space[4]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[5].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[5].data.ptr, 16);
 		print_stringl("xmm_space[5]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[6].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[6].data.ptr, 16);
 		print_stringl("xmm_space[6]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[7].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[7].data.ptr, 16);
 		print_stringl("xmm_space[7]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[8].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[8].data.ptr, 16);
 		print_stringl("xmm_space[8]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[9].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[9].data.ptr, 16);
 		print_stringl("xmm_space[9]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[10].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[10].data.ptr, 16);
 		print_stringl("xmm_space[10]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[11].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[11].data.ptr, 16);
 		print_stringl("xmm_space[11]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[12].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[12].data.ptr, 16);
 		print_stringl("xmm_space[12]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[13].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[13].data.ptr, 16);
 		print_stringl("xmm_space[13]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[14].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[14].data.ptr, 16);
 		print_stringl("xmm_space[14]", fpbuf.ptr, fplen);
-		fplen = hexstr(fpbuf.ptr, 32, fregset.xmm_space128[15].data.ptr, 16);
+		fplen = hexstr(fpbuf.ptr, FPBSZ, fregset.xmm_space128[15].data.ptr, 16);
 		print_stringl("xmm_space[15]", fpbuf.ptr, fplen);
 		break;
 	default:
-		print_hexdump("Dump", data, nhdr.n_descsz,
-			noffset + Elf64_Nhdr.sizeof + nnamesz);
+		print_u32("Error, unknown n_type", nhdr.n_type);
 	}
 	
 	// Adjust to next sub header
@@ -397,6 +397,8 @@ LNEWNHDR:
 
 void dump_elf_sections(adbg_object_t *o) {
 	print_header("Sections");
+	
+	//TODO: Get section by name here if opt_section_name is specified
 	
 	//TODO: Functions to get section + section name safely
 	
@@ -431,45 +433,18 @@ void dump_elf_sections(adbg_object_t *o) {
 			const(char) *sname = table + shdr.sh_name;
 
 			// If we're searching sections, match and don't print yet
-			if (opt_section) {
-				if (strncmp(sname, opt_section, SNMLEN))
-					continue;
-				
+			if (opt_section_name && strncmp(sname, opt_section_name, SNMLEN))
+				continue;
+			
+			if (setting_extract_any()) {
 				void *data = o.buffer + shdr.sh_offset;
-				
-				if (setting_hexdump())
-					print_hexdump(opt_section, data, shdr.sh_size, shdr.sh_offset);
-				
-				if (setting_extract())
-					print_rawdump(data, shdr.sh_size);
+				print_data(opt_section_name, data, shdr.sh_size, shdr.sh_offset);
+				return;
 			}
-
-			with (shdr) {
-			print_section(i, sname, SNMLEN);
-			print_x32("sh_name", sh_name);
-			print_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
-			print_x32("sh_flags", sh_flags);
-			print_flags32("sh_flags", sh_flags,
-				"SHF_WRITE".ptr,	ELF_SHF_WRITE,
-				"SHF_ALLOC".ptr,	ELF_SHF_ALLOC,
-				"SHF_EXECINSTR".ptr,	ELF_SHF_EXECINSTR,
-				"SHF_MERGE".ptr,	ELF_SHF_MERGE,
-				"SHF_STRINGS".ptr,	ELF_SHF_STRINGS,
-				"SHF_INFO_LINK".ptr,	ELF_SHF_INFO_LINK,
-				"SHF_LINK_ORDER".ptr,	ELF_SHF_LINK_ORDER,
-				"SHF_OS_NONCONFORMING".ptr,	ELF_SHF_OS_NONCONFORMING,
-				"SHF_GROUP".ptr,	ELF_SHF_GROUP,
-				"SHF_TLS".ptr,	ELF_SHF_TLS,
-				"SHF_COMPRESSED".ptr,	ELF_SHF_COMPRESSED,
-				null);
-			print_x32("sh_addr", sh_addr);
-			print_x32("sh_offset", sh_offset);
-			print_x32("sh_size", sh_size);
-			print_x32("sh_link", sh_link);
-			print_x32("sh_info", sh_info);
-			print_x32("sh_addralign", sh_addralign);
-			print_x32("sh_entsize", sh_entsize);
-			}
+			
+			dump_elf_section32(shdr, i, sname, SNMLEN);
+			
+			if (opt_section_name) break;
 		}
 		break;
 	case ELF_CLASS_64:
@@ -498,49 +473,79 @@ void dump_elf_sections(adbg_object_t *o) {
 			Elf64_Shdr *shdr = adbg_object_elf_shdr64(o, i);
 
 			const(char) *sname = table + shdr.sh_name;
-
+			
 			// If we're searching sections, match and don't print yet
-			if (opt_section) {
-				if (strncmp(sname, opt_section, SNMLEN))
-					continue;
-				
+			if (opt_section_name && strncmp(sname, opt_section_name, SNMLEN))
+				continue;
+			
+			if (setting_extract_any()) {
 				void *data = o.buffer + shdr.sh_offset;
-				
-				if (setting_hexdump())
-					print_hexdump(opt_section, data, shdr.sh_size, shdr.sh_offset);
-				
-				if (setting_extract())
-					print_rawdump(data, shdr.sh_size);
+				print_data(opt_section_name, data, shdr.sh_size, shdr.sh_offset);
+				return;
 			}
 
-			with (shdr) {
-			print_section(i, table + sh_name, SNMLEN);
-			print_x32("sh_name", sh_name);
-			print_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
-			print_flags64("sh_flags", sh_flags,
-				"SHF_WRITE".ptr,	ELF_SHF_WRITE,
-				"SHF_ALLOC".ptr,	ELF_SHF_ALLOC,
-				"SHF_EXECINSTR".ptr,	ELF_SHF_EXECINSTR,
-				"SHF_MERGE".ptr,	ELF_SHF_MERGE,
-				"SHF_STRINGS".ptr,	ELF_SHF_STRINGS,
-				"SHF_INFO_LINK".ptr,	ELF_SHF_INFO_LINK,
-				"SHF_LINK_ORDER".ptr,	ELF_SHF_LINK_ORDER,
-				"SHF_OS_NONCONFORMING".ptr,	ELF_SHF_OS_NONCONFORMING,
-				"SHF_GROUP".ptr,	ELF_SHF_GROUP,
-				"SHF_TLS".ptr,	ELF_SHF_TLS,
-				"SHF_COMPRESSED".ptr,	ELF_SHF_COMPRESSED,
-				null);
-			print_x64("sh_addr", sh_addr);
-			print_x64("sh_offset", sh_offset);
-			print_x64("sh_size", sh_size);
-			print_x32("sh_link", sh_link);
-			print_x32("sh_info", sh_info);
-			print_x64("sh_addralign", sh_addralign);
-			print_x64("sh_entsize", sh_entsize);
-			}
+			dump_elf_section64(shdr, i, sname, SNMLEN);
+			
+			if (opt_section_name) break;
 		}
 		break;
 	default:
+	}
+}
+
+void dump_elf_section32(Elf32_Shdr *shdr, uint idx, const(char)* name, int nmax) {
+	with (shdr) {
+	print_section(idx, name, nmax);
+	print_x32("sh_name", sh_name);
+	print_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
+	print_x32("sh_flags", sh_flags);
+	print_flags32("sh_flags", sh_flags,
+		"SHF_WRITE".ptr,	ELF_SHF_WRITE,
+		"SHF_ALLOC".ptr,	ELF_SHF_ALLOC,
+		"SHF_EXECINSTR".ptr,	ELF_SHF_EXECINSTR,
+		"SHF_MERGE".ptr,	ELF_SHF_MERGE,
+		"SHF_STRINGS".ptr,	ELF_SHF_STRINGS,
+		"SHF_INFO_LINK".ptr,	ELF_SHF_INFO_LINK,
+		"SHF_LINK_ORDER".ptr,	ELF_SHF_LINK_ORDER,
+		"SHF_OS_NONCONFORMING".ptr,	ELF_SHF_OS_NONCONFORMING,
+		"SHF_GROUP".ptr,	ELF_SHF_GROUP,
+		"SHF_TLS".ptr,	ELF_SHF_TLS,
+		"SHF_COMPRESSED".ptr,	ELF_SHF_COMPRESSED,
+		null);
+	print_x32("sh_addr", sh_addr);
+	print_x32("sh_offset", sh_offset);
+	print_x32("sh_size", sh_size);
+	print_x32("sh_link", sh_link);
+	print_x32("sh_info", sh_info);
+	print_x32("sh_addralign", sh_addralign);
+	print_x32("sh_entsize", sh_entsize);
+	}
+}
+void dump_elf_section64(Elf64_Shdr *shdr, uint idx, const(char)* name, int nmax) {
+	with (shdr) {
+	print_section(idx, name, nmax);
+	print_x32("sh_name", sh_name);
+	print_x32("sh_type", sh_type, adbg_object_elf_sht_string(sh_type));
+	print_flags64("sh_flags", sh_flags,
+		"SHF_WRITE".ptr,	ELF_SHF_WRITE,
+		"SHF_ALLOC".ptr,	ELF_SHF_ALLOC,
+		"SHF_EXECINSTR".ptr,	ELF_SHF_EXECINSTR,
+		"SHF_MERGE".ptr,	ELF_SHF_MERGE,
+		"SHF_STRINGS".ptr,	ELF_SHF_STRINGS,
+		"SHF_INFO_LINK".ptr,	ELF_SHF_INFO_LINK,
+		"SHF_LINK_ORDER".ptr,	ELF_SHF_LINK_ORDER,
+		"SHF_OS_NONCONFORMING".ptr,	ELF_SHF_OS_NONCONFORMING,
+		"SHF_GROUP".ptr,	ELF_SHF_GROUP,
+		"SHF_TLS".ptr,	ELF_SHF_TLS,
+		"SHF_COMPRESSED".ptr,	ELF_SHF_COMPRESSED,
+		null);
+	print_x64("sh_addr", sh_addr);
+	print_x64("sh_offset", sh_offset);
+	print_x64("sh_size", sh_size);
+	print_x32("sh_link", sh_link);
+	print_x32("sh_info", sh_info);
+	print_x64("sh_addralign", sh_addralign);
+	print_x64("sh_entsize", sh_entsize);
 	}
 }
 
