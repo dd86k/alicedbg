@@ -819,7 +819,7 @@ version (Windows) {
 	return adbg_debugger_continue(tracee);
 } else {
 	if (ptrace(PT_SINGLESTEP, tracee.pid, null, null) < 0) {
-		tracee.status = AdbgProcStatus.idle;
+		tracee.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 	
