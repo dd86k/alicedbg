@@ -1,30 +1,42 @@
 name: D-dmd
 
-on:
-  push:
-    branches: [ master ]
-  pull_request:
-    branches: [ master ]
+on: [ push, pull_request ]
 
+# Tests ensures the project builds and executes unittest.
+# The entry points are rather minimal.
 jobs:
   Alicedbg:
-    runs-on: [ ubuntu-latest, windows-latest ]
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022 ]
+        dc: [ dmd-latest, ldc-latest ]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
-    - uses: dlang-community/setup-dlang@v1
-    - name: 'Test'
-      run: dub test -c debugger --compiler=dmd
+    - name: Setup D compiler
+      uses: dlang-community/setup-dlang@v1
+      with:
+        compiler: ${{ matrix.dc }}
+    - name: Test
+      run: dub test -c debugger
   Alicedump:
-    runs-on: [ ubuntu-latest, windows-latest ]
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022 ]
+        dc: [ dmd-latest, ldc-latest ]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
     - uses: dlang-community/setup-dlang@v1
-    - name: 'Test'
+    - name: Test
       run: dub test -c dumper --compiler=dmd
   Simple:
-    runs-on: [ ubuntu-latest, windows-latest ]
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v2
     - uses: dlang-community/setup-dlang@v1
-    - name: 'Test'
+    - name: Test
       run: dub build -c simple --compiler=dmd
