@@ -8,23 +8,23 @@ on:
 
 jobs:
   Alicedbg:
-    runs-on: ubuntu-latest
+    runs-on: [ ubuntu-latest, windows-latest ]
     steps:
     - uses: actions/checkout@v2
     - uses: dlang-community/setup-dlang@v1
     - name: 'Test'
       run: dub test -c debugger --compiler=dmd
   Alicedump:
-    runs-on: ubuntu-latest
+    runs-on: [ ubuntu-latest, windows-latest ]
     steps:
     - uses: actions/checkout@v2
     - uses: dlang-community/setup-dlang@v1
     - name: 'Test'
       run: dub test -c dumper --compiler=dmd
   Simple:
-    runs-on: ubuntu-latest
+    runs-on: [ ubuntu-latest, windows-latest ]
     steps:
     - uses: actions/checkout@v2
     - uses: dlang-community/setup-dlang@v1
-    - name: 'Build'
+    - name: 'Test'
       run: dub build -c simple --compiler=dmd
