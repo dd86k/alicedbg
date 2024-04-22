@@ -6,7 +6,6 @@
 module common.cli;
 
 import adbg.platform;
-import adbg.debugger.exception : adbg_exception_t, adbg_exception_name;
 import adbg.machines : AdbgMachine;
 import adbg.disassembler : AdbgDisSyntax;
 import adbg.include.capstone : libcapstone_dynload, cs_version;
@@ -15,7 +14,6 @@ import adbg.include.d.config : GDC_VERSION, GDC_EXCEPTION_MODE, LLVM_VERSION;
 import core.stdc.stdio;
 import core.stdc.stdlib;
 import core.stdc.string;
-import core.stdc.errno;
 
 /// Copyright string
 enum COPYRIGHT = "Copyright (c) 2019-2024 dd86k <dd@dax.moe>";
@@ -126,6 +124,16 @@ enum option_license    = option_t(0,   "license",	"Show the license page and exi
 //TODO: Make option functions return <0=error >0=ok, consumed arg(s)
 /// Interpret options
 int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
+	// On re-entry, clear extras and error buffers
+	if (getoptextras) {
+		free(getoptextras);
+		getoptextras = null;
+	}
+	if (getopterrbuf) {
+		free(getopterrbuf);
+		getopterrbuf = null;
+	}
+	
 	const(char) *arg = void;
 	const(char) *val = void;
 	CLI: for (int argi = 1; argi < argc; ++argi) {
@@ -207,14 +215,12 @@ int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 			return -1;
 		} else {
 			getoptaddextra(argc, arg);
-			//*entry = arg;
 			continue CLI;
 		}
 	}
 	
 	return 0;
 }
-//TODO: These unittests!
 unittest {
 }
 
@@ -310,6 +316,7 @@ private:
 //
 
 //TODO: Interface with machine module instead
+//      Needs a filter at the disassembler level: adbg_dasm_machine_available()
 
 struct setting_platform_t {
 	AdbgMachine val;
@@ -375,7 +382,7 @@ int cli_syntax(const(char) *val) {
 }
 
 int cli_build_info() {
-	__gshared immutable(char) *page =
+	static immutable char *page =
 	"Compiler    "~__VENDOR__~" "~__D_VERSION__~"\n"~
 	"Target      "~TARGET_TRIPLE~"\n"~
 	"Object      "~TARGET_OBJFMT~"\n"~
