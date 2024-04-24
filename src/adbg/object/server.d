@@ -32,11 +32,15 @@ extern (C):
 //       (e.g., pe, elf, etc.) to make things consistent. This is why
 //       auxiliary names are simply "adbg_object_offset", for example.
 
-//TODO: Object type and format enums
-//      Either:
-//      - extent formats to include everyting else, have functions to say type (_is_dump)
-//      - keep format and add a "type/purpose" enum (exec/dump/symbols/etc.)
-//TODO: Consider loading first 4 KiB for detection before loading rest
+//TODO: (Important) Redo I/O handling
+//      To reduce memory usage (will require better internal APIs):
+//      - Load 4 KiB chunk in memory for header(s)
+//      - Allocate and load data on-demand (e.g., section headers, etc.)
+//      - Require each object implementation have its own closing function.
+//      This is a big endeavour because of the reliance on the internal buffer pointers.
+//      Naturally, more internal pointers will need to be created, and only accessible
+//      using the newer API.
+
 //TODO: const(ubyte)* adbg_obj_section(obj, ".abc");
 //TODO: const(ubyte)* adbg_obj_section_i(obj, index);
 //TODO: const(ubyte)* adbg_object_get_section_by_type(obj, type);
@@ -747,7 +751,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 /// Get the short name of the loaded object format.
 /// Params: o = Object instance.
 /// Returns: Object format name.
-const(char)* adbg_object_short_name(adbg_object_t *o) {
+const(char)* adbg_object_format_shortname(adbg_object_t *o) {
 	if (o == null)
 		goto L_UNKNOWN;
 	final switch (o.format) with (AdbgObject) {
@@ -772,7 +776,7 @@ const(char)* adbg_object_short_name(adbg_object_t *o) {
 /// Get the full name of the loaded object format.
 /// Params: o = Object instance.
 /// Returns: Object format name.
-const(char)* adbg_object_name(adbg_object_t *o) {
+const(char)* adbg_object_format_name(adbg_object_t *o) {
 	if (o == null)
 		goto L_UNKNOWN;
 	final switch (o.format) with (AdbgObject) {
