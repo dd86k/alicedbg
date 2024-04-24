@@ -132,7 +132,7 @@ version (Windows) {
 /// Note: Not respected by some exceptions, like buffer overruns.
 /// Params: func = User handler function.
 /// Returns: Zero on success; Non-zero on error.
-int adbg_self_set_crashhandler(void function(adbg_exception_t*) func) {
+int adbg_self_set_crashhandler(void function(adbg_process_t*, adbg_exception_t*) func) {
 	if (func == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
@@ -161,7 +161,7 @@ version (Windows) {
 
 private:
 
-__gshared void function(adbg_exception_t*) __ufunction;
+__gshared void function(adbg_process_t*, adbg_exception_t*) __ufunction;
 
 version (Windows)
 extern (Windows)
@@ -182,7 +182,7 @@ uint adbg_internal_handler(EXCEPTION_POINTERS *e) {
 	}
 	
 	// Call user function
-	__ufunction(&ex);
+	__ufunction(adbg_self_process(), &ex);
 	return EXCEPTION_EXECUTE_HANDLER;
 }
 
@@ -210,7 +210,7 @@ void adbg_internal_handler(int sig, siginfo_t *si, void *p) {
 	//adbg_registers_t regs = void;
 	//adbg_registers_config(&regs, adbg_machine_default());
 	
-	__ufunction(&ex);
+	__ufunction(adbg_self_process(), &ex);
 	
 	/+adbg_ctx_init(&mexception.registers);
 	version (X86) {

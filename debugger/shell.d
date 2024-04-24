@@ -31,9 +31,10 @@ enum ShellError {
 	pauseRequired	= -5,
 	alreadyLoaded	= -6,
 	missingOption	= -7,
-	unformat	= -8,
-	invalidCount	= -9,
-	unattached	= -10,
+	missingArgument	= -8,
+	unformat	= -9,
+	invalidCount	= -10,
+	unattached	= -11,
 	
 	scanMissingType	= -20,
 	scanMissingValue	= -21,
@@ -63,6 +64,8 @@ const(char) *shell_error_string(int code) {
 		return "File already loaded.";
 	case missingOption:
 		return "Missing option for command.";
+	case missingArgument:
+		return "Missing argument.";
 	case unformat:
 		return "Input is not a number.";
 	case invalidCount:
@@ -88,27 +91,23 @@ const(char) *shell_error_string(int code) {
 	}
 }
 
-/*void registerError(void function(ref command2_help_t help)) {
-	
-}
-void registerHelp(void function(ref command2_help_t help)) {
-	
-}*/
-
-int shell_loop(const(char)* entry) {
+//TODO: Turn into character array (like gdb --args)
+int shellinit(int argc, const(char)** argv) {
 	int ecode = void;
 	
 	if (loginit(null))
 		return 1337;
 	
-	// Load or attach process if CLI specified it
-	if (entry) {
-		ecode = shell_proc_spawn(entry, opt_file_argv);
+	// Start process if specified
+	if (argc > 0 && argv) {
+		ecode = argc > 1 ?
+			shell_proc_spawn(*argv, argc - 1, argv + 1) :
+			shell_proc_spawn(*argv, 0, null);
 		if (ecode) {
 			printf("Error: %s\n", adbg_error_msg());
 			return ecode;
 		}
-	} else if (opt_pid) {
+	} else if (opt_pid) { // Or attach to process if specified
 		ecode = shell_proc_attach(opt_pid);
 		if (ecode) {
 			printf("Error: %s\n", adbg_error_msg());
@@ -118,7 +117,7 @@ int shell_loop(const(char)* entry) {
 	
 	coninit();
 
-LINPUT:
+Lcommand:
 	printf("(adbg) ");
 	
 	// .ptr is temporary because a slice with a length of 0
@@ -132,7 +131,7 @@ LINPUT:
 	ecode = shell_exec(line);
 	if (ecode)
 		logerror(shell_error_string(ecode));
-	goto LINPUT;
+	goto Lcommand;
 }
 
 int shell_exec(const(char) *command) {
@@ -158,10 +157,13 @@ int shell_execv(int argc, const(char) **argv) {
 private:
 __gshared:
 
-const(char)* last_file;
 adbg_process_t *process;
 adbg_disassembler_t *dis;
 adbg_registers_t *registers;
+
+const(char)* last_spawn_exec;
+int last_spawn_argc;
+const(char)** last_spawn_argv;
 
 // NOTE: BetterC stderr bindings on Windows are broken
 //       And don't allow re-opening the streams, so screw it
@@ -533,26 +535,31 @@ debug { // Crash command
 	return null;
 }
 
-int shell_proc_spawn(const(char) *exec, const(char) **argv) {
+int shell_proc_spawn(const(char) *exec, int argc, const(char) **argv) {
 	// Save for restart
-	last_file = exec;
-	opt_file_argv = argv;
+	last_spawn_exec = exec;
+	last_spawn_argc = argc;
+	last_spawn_argv = argv;
 	
 	// Spawn process
 	process = adbg_debugger_spawn(exec,
-		AdbgSpawnOpt.argv, argv,
+		AdbgSpawnOpt.argv, argc, argv,
 		0);
-	if (process == null) {
+	if (process == null)
 		return ShellError.alicedbg;
-	}
 	
-	puts("Process created.");
+	printf("Process '%s' created", exec);
+	if (argc && argv) {
+		printf(" with %d arguments:", argc);
+		for (int i; i < argc; ++i)
+			printf(" '%s'", argv[i]);
+	}
+	putchar('\n');
 	
 	// Open disassembler for process machine type
 	dis = adbg_dis_open(adbg_process_get_machine(process));
-	if (dis == null) {
-		logwarn("Disassembler not available (%s).", adbg_error_msg());
-	}
+	if (dis == null)
+		logwarn("Disassembler not available (%s)", adbg_error_msg());
 	
 	return 0;
 }
@@ -769,17 +776,18 @@ int command_help(int argc, const(char) **argv) {
 }
 
 int command_spawn(int argc, const(char) **argv) {
-	if (argc < 2) {
-		return ShellError.invalidParameter;
-	}
+	if (argc < 2)
+		return ShellError.missingArgument;
 	
-	return shell_proc_spawn(argv[1], argc > 2 ? argv + 2: null);
+	if (argc < 3)
+		return shell_proc_spawn(argv[1], 0, null);
+	
+	return shell_proc_spawn(argv[1], argc - 2, argv + 2);
 }
 
 int command_attach(int argc, const(char) **argv) {
-	if (argc < 2) {
+	if (argc < 2)
 		return ShellError.invalidParameter;
-	}
 	
 	return shell_proc_attach(atoi(argv[1]));
 }
@@ -803,7 +811,7 @@ int command_restart(int argc, const(char) **argv) {
 		adbg_debugger_terminate(process);
 		
 		// Spawn, shell still messages status
-		e = shell_proc_spawn(last_file, opt_file_argv);
+		e = shell_proc_spawn(last_spawn_exec, last_spawn_argc, last_spawn_argv);
 		break;
 	case attached:
 		// Detach first, ignore on error (e.g., already detached)

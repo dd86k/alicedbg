@@ -16,6 +16,7 @@ import adbg.debugger.process : adbg_process_t;
 import core.stdc.stdlib : EXIT_FAILURE;
 import core.stdc.stdio;
 import dumper;
+import common.error;
 import common.cli;
 import common.utils : unformat64;
 
@@ -29,6 +30,8 @@ private:
 //TODO: --type-only: Returns short-name only for identification purposes
 //TODO: --name: Extract by section, import, export name (will replace --section?)
 immutable option_t[] options = [
+	// secrets
+	option_t(0,   "woof", null, &cliopt_woof),
 	// common options
 	option_arch,
 	option_syntax,
@@ -53,12 +56,13 @@ immutable option_t[] options = [
 	option_t(0,   "extract-to",        "Setting: Output selected portion to file", &cliopt_extract_to),
 	option_t(0,   "hexdump",           "Setting: Output selected portion to stdout as hexdump", &cliopt_hexdump),
 	// pages
-	option_t('h', "help", "Show this help screen and exit", &cli_help),
+	option_t('h', "help", "Show this help screen and exit", &cliopt_help),
 	option_version,
 	option_build_info,
 	option_ver,
 	option_license,
 ];
+enum NUMBER_OF_SECRETS = 1;
 
 //
 // Selections
@@ -145,7 +149,7 @@ int cliopt_hexdump() {
 // ANCHOR --help
 //
 
-int cli_help() {
+int cliopt_help() {
 	puts(
 	"alicedump: Binary object dumper.\n"~
 	"\n"~
@@ -159,72 +163,43 @@ int cli_help() {
 	"\n"~
 	"OPTIONS"
 	);
-	getoptprinter(options);
+	getoptprinter(options[NUMBER_OF_SECRETS..$]);
 	exit(0);
 	return 0;
 }
 
-extern (C)
-void crash_handler(adbg_exception_t *ex) {
-	adbg_process_t *self = adbg_self_process();
-	
+int cliopt_woof() {
 	puts(
 r"
-   _ _ _   _ _ _       _ _       _ _ _   _     _   _
- _|_|_|_| |_|_|_|_   _|_|_|_   _|_|_|_| |_|   |_| |_|
-|_|       |_|_ _|_| |_|_ _|_| |_|_ _    |_|_ _|_| |_|
-|_|       |_|_|_|_  |_|_|_|_|   |_|_|_  |_|_|_|_| |_|
-|_|_ _ _  |_|   |_| |_|   |_|  _ _ _|_| |_|   |_|  _
-  |_|_|_| |_|   |_| |_|   |_| |_|_|_|   |_|   |_| |_|
++---------------------+         ,
+| Are you SystemReady |   .__,-/|
+| compliant yet? Woof |    \_ ` \
++---------------------+      `====
+                              {   \
+                               \ / \
+                               ///  `\ /
+                              //_\   /`
 "
 	);
-	
-	printf(
-	"Exception  : %s\n"~
-	"PID        : %d\n",
-	adbg_exception_name(ex), cast(int)self.pid); // casting is temp
-	
-	// Fault address & disasm if available
-	if (ex.faultz) {
-		printf("Address    : %#zx\n", ex.faultz);
-		
-		adbg_opcode_t op = void;
-		adbg_disassembler_t *dis = adbg_dis_open(adbg_machine_default());
-		if (dis && adbg_dis_process_once(dis, &op, self, ex.fault_address) == 0) {
-			// Print address
-			printf("Instruction:");
-			// Print machine bytes
-			for (size_t bi; bi < op.size; ++bi)
-				printf(" %02x", op.machine[bi]);
-			// 
-			printf(" (%s", op.mnemonic);
-			if (op.operands)
-				printf(" %s", op.operands);
-			// 
-			puts(")");
-		} else {
-			printf(" Unavailable (%s)\n", adbg_error_msg());
-		}
-	}
-	
-	exit(ex.oscode);
+	exit(0);
+	return 0;
 }
 
 extern (C)
 int main(int argc, const(char)** argv) {
 	// Set crash handle, and ignore on error
 	// Could do a warning, but it might be a little confusing
-	adbg_self_set_crashhandler(&crash_handler);
+	adbg_self_set_crashhandler(&oopsie);
 	
-	if (getopt(argc, argv, options) < 0) {
-		puts(getopterrstring());
+	int e = getopt(argc, argv, options);
+	if (e < 0) {
+		puts(getopterror());
 		return EXIT_FAILURE;
 	}
-	
-	if (getoptremcnt() < 1) {
+	if (e == 0) {
 		puts("error: No file specified");
 		return EXIT_FAILURE;
 	}
 	
-	return dump(*getoptrem()); // First argument as file
+	return dump(*getoptleftovers()); // First argument as file
 }

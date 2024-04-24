@@ -128,8 +128,8 @@ int dump(const(char)* path) {
 		if (setting_extract_any() == 0) {
 			print_string("filename", path);
 			print_u64("filesize", o.file_size);
-			print_string("format", adbg_object_name(o));
-			print_string("short_name", adbg_object_short_name(o));
+			print_string("format", adbg_object_format_name(o));
+			print_string("short_name", adbg_object_format_shortname(o));
 		}
 		final switch (o.format) with (AdbgObject) {
 		case mz:	return dump_mz(o);
@@ -150,7 +150,8 @@ int dump(const(char)* path) {
 	}
 	
 	// Otherwise, make a basic summary
-	printf("%s: %s\n", path, adbg_object_name(o));
+	printf("%s: %s (%s)\n", path,
+		adbg_object_format_name(o), adbg_object_format_shortname(o));
 	return 0;
 }
 
