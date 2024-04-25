@@ -100,9 +100,8 @@ int shellinit(int argc, const(char)** argv) {
 	
 	// Start process if specified
 	if (argc > 0 && argv) {
-		ecode = argc > 1 ?
-			shell_proc_spawn(*argv, argc - 1, argv + 1) :
-			shell_proc_spawn(*argv, 0, null);
+		// Assume argv is null-terminated
+		ecode = shell_proc_spawn(*argv, argv + 1);
 		if (ecode) {
 			printf("Error: %s\n", adbg_error_msg());
 			return ecode;
@@ -162,7 +161,6 @@ adbg_disassembler_t *dis;
 adbg_registers_t *registers;
 
 const(char)* last_spawn_exec;
-int last_spawn_argc;
 const(char)** last_spawn_argv;
 
 // NOTE: BetterC stderr bindings on Windows are broken
@@ -535,23 +533,22 @@ debug { // Crash command
 	return null;
 }
 
-int shell_proc_spawn(const(char) *exec, int argc, const(char) **argv) {
+int shell_proc_spawn(const(char) *exec, const(char) **argv) {
 	// Save for restart
 	last_spawn_exec = exec;
-	last_spawn_argc = argc;
 	last_spawn_argv = argv;
 	
 	// Spawn process
 	process = adbg_debugger_spawn(exec,
-		AdbgSpawnOpt.argv, argc, argv,
+		AdbgSpawnOpt.argv, argv,
 		0);
 	if (process == null)
 		return ShellError.alicedbg;
 	
 	printf("Process '%s' created", exec);
-	if (argc && argv) {
-		printf(" with %d arguments:", argc);
-		for (int i; i < argc; ++i)
+	if (argv) {
+		printf(" with arguments:");
+		for (int i; argv[i]; ++i)
 			printf(" '%s'", argv[i]);
 	}
 	putchar('\n');
@@ -779,10 +776,8 @@ int command_spawn(int argc, const(char) **argv) {
 	if (argc < 2)
 		return ShellError.missingArgument;
 	
-	if (argc < 3)
-		return shell_proc_spawn(argv[1], 0, null);
-	
-	return shell_proc_spawn(argv[1], argc - 2, argv + 2);
+	// Assume argv is null-terminated
+	return shell_proc_spawn(argv[1], argv + 2);
 }
 
 int command_attach(int argc, const(char) **argv) {
@@ -811,7 +806,7 @@ int command_restart(int argc, const(char) **argv) {
 		adbg_debugger_terminate(process);
 		
 		// Spawn, shell still messages status
-		e = shell_proc_spawn(last_spawn_exec, last_spawn_argc, last_spawn_argv);
+		e = shell_proc_spawn(last_spawn_exec, last_spawn_argv);
 		break;
 	case attached:
 		// Detach first, ignore on error (e.g., already detached)

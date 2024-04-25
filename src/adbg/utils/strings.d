@@ -169,6 +169,7 @@ int adbg_util_hex_array(ubyte *dst, size_t sz, const(char) *src, ref size_t news
 	assert(buf[2] == 0xcc);
 }
 
+deprecated("Use safer adbg_strings_flatten")
 size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 	if (argv == null)
 		return 0;
@@ -183,6 +184,68 @@ size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
 	}
 
 	return bi;
+}
+
+/// Flatten a multi-vector string into a singular buffer. Like an Array.join() function.
+/// Params:
+/// 	buf = Destination buffer.
+/// 	buflen = Destination buffer size.
+/// 	argc = Number of input arguments.
+/// 	argv = Argument vector.
+/// 	spaces = Number of spaces in-between items.
+/// Returns: Number of characters written, excluding null.
+int adbg_strings_flatten(char *buf, int buflen, int argc, const(char) **argv, int spaces) {
+	if (argv == null)
+		return 0;
+
+	int bufidx;
+	for (int i; i < argc; ++i) {
+		const(char) *arg = argv[i];
+		int len = cast(int)strlen(arg);
+		
+		// Copy rest
+		if (bufidx + len >= buflen) {
+			size_t rem = buflen - bufidx;
+			if (rem == 0) return bufidx;
+			
+			memcpy(buf + bufidx, arg, rem);
+			bufidx += rem - 1;
+			buf[bufidx] = 0;
+			return bufidx;
+		}
+		
+		// Copy buffer
+		memcpy(buf + bufidx, arg, len);
+		bufidx += len;
+		
+		if (i + 1 >= argc) continue;
+		if (bufidx + spaces >= buflen)
+			spaces = buflen - bufidx;
+		
+		memset(buf + bufidx, ' ', spaces);
+		bufidx += spaces;
+	}
+
+	buf[bufidx] = 0;
+	return bufidx;
+}
+unittest {
+	static int argc = 3;
+	static const(char)** argv = ["one", "two", "three"];
+	
+	// Buffer OK
+	enum B1LEN = 128;
+	char[B1LEN] b1 = void;
+	int r1 = adbg_strings_flatten(b1.ptr, B1LEN, argc, argv, 1);
+	assert(r1 == 13); // Chars written
+	assert(b1[0..r1] == "one two three"); // Chars written
+	
+	// Buffer too small
+	enum B2LEN = 10;
+	char[B2LEN] b2 = void;
+	int r2 = adbg_strings_flatten(b2.ptr, B2LEN, argc, argv, 1);
+	assert(r2 == B2LEN - 1); // Chars written, excluding null
+	assert(b2[0..r2] == "one two t"); // Chars written
 }
 
 // NOTE: Kind would have preferred returning as int (argc)...

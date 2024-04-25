@@ -87,7 +87,6 @@ version (Windows) {
 	char *buffer = cast(char*)malloc(BUFFERSZ);
 	if (buffer == null)
 		return false;
-
 	scope(exit) free(buffer);
 
 	const int status_fd = open("/proc/self/status", O_RDONLY);

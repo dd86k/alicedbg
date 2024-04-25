@@ -22,7 +22,7 @@ import adbg.include.c.stdio;  // snprintf;
 import adbg.include.c.stdarg;
 import adbg.platform : ADBG_CHILD_STACK_SIZE;
 import adbg.error;
-import adbg.utils.strings : adbg_util_argv_flatten;
+import adbg.utils.strings;
 import adbg.debugger.exception : adbg_exception_t, adbg_exception_translate;
 import adbg.machines;
 import core.stdc.string;
@@ -40,14 +40,14 @@ version (Windows) {
 	import adbg.include.posix.sys.wait;
 	import adbg.utils.math;
 	import core.stdc.ctype : isdigit;
-	import core.sys.posix.fcntl : open, O_RDONLY, stat, stat_t;
+	import core.stdc.errno;
+	import core.sys.posix.fcntl;
 	import core.sys.posix.dirent;
 	import core.sys.posix.libgen : basename;
 }
 
 // I can't remember why, but problably Musl moment
-version (linux)
-	version = USE_CLONE;
+version = USE_CLONE;
 
 extern (C):
 
@@ -87,13 +87,15 @@ struct adbg_process_t {
 		//TODO: Deprecate and remove wow64 field
 		//      Promote AdbgMachine enum
 		version (Win64) int wow64; /// If running under WoW64
+		char *args;
 	}
 	version (Posix) {
 		pid_t pid;	/// Process ID // @suppress(dscanner.suspicious.label_var_same_name)
+		char **argv;
 	}
 	version (linux) {
-		int mhandle;	/// Internal memory file handle to /mem
-		int memfailed;	/// Set if we fail to open /mem
+		int mhandle;	/// Internal memory file handle to /proc/PID/mem
+		int memfailed;	/// Set if we fail to open /proc/PID/mem
 	}
 	/// Last known process status.
 	AdbgProcStatus status;
@@ -104,10 +106,8 @@ struct adbg_process_t {
 	char[ADBG_PROCESS_NAME_LENGTH] name;
 }
 
-version(USE_CLONE)
-private
-struct __adbg_child_t {
-	const(char) *dev;
+version (Posix)
+private struct __adbg_child_t {
 	const(char) **argv, envp;
 }
 
@@ -115,21 +115,23 @@ struct __adbg_child_t {
 //TODO: "start suspended" option
 //      Windows: CREATE_SUSPENDED
 //      Posix:
+//TODO: Stack size in KiB
+//      Default should still be 8 MiB (Windows and Linux)
 /// Options for adbg_spawn.
 enum AdbgSpawnOpt {
 	/// Pass args line to tracee.
 	/// Type: const(char)*
 	/// Default: null
 	args	= 1,
-	/// Pass argv lines to tracee.
+	/// Pass argv lines to tracee. Vector must terminate with NULL.
 	/// Type: const(char)**
 	/// Default: null
 	argv	= 2,
-	/// Set start directory.
+	/// Set start directory. String must terminate with NULL.
 	/// Type: const(char)*
 	/// Default: Current directory of debugger.
-	startDir	= 3,
-	/// Pass environment table to tracee.
+	directory	= 3,
+	/// Pass environment table to tracee. Vector must terminate with NULL.
 	/// Type: const(char)**
 	/// Default: null
 	environment	= 4,
@@ -178,18 +180,21 @@ adbg_process_t* adbg_debugger_spawn(const(char) *path, ...) {
 LOPT:
 	switch (va_arg!int(list)) {
 	case 0: break;
-	case AdbgSpawnOpt.args:
+	// Temporary until reworked
+	/*case AdbgSpawnOpt.args:
 		args = va_arg!(const(char)*)(list);
-		goto LOPT;
+		goto LOPT;*/
 	case AdbgSpawnOpt.argv:
 		argv = va_arg!(const(char)**)(list);
 		goto LOPT;
-	case AdbgSpawnOpt.startDir:
+	// Temporary until implemented
+	/*case AdbgSpawnOpt.directory:
 		dir = va_arg!(const(char)*)(list);
-		goto LOPT;
-	case AdbgSpawnOpt.environment:
+		goto LOPT;*/
+	// Temporary until reworked
+	/*case AdbgSpawnOpt.environment:
 		envp = va_arg!(const(char)**)(list);
-		goto LOPT;
+		goto LOPT;*/
 	case AdbgSpawnOpt.debugChildren:
 		if (va_arg!(int)(list)) options |= OPT_DEBUG_ALL;
 		goto LOPT;
@@ -206,37 +211,47 @@ LOPT:
 	
 version (Windows) {
 	// NOTE: CreateProcessW modifies lpCommandLine
+	// NOTE: lpCommandLine is maximum 32,767 bytes including null Unicode character
+	// NOTE: When given arguments, both lpApplicationName and lpCommandLine
+	//       need to be filled. If the former is null, this acts as a shell, and
+	//       Windows will search for the external command, which is unwanted.
 	
 	// Add argv is specified, we'll have to cram it into args
 	if (argv) {
-		// Make temporary buffer for lpCommandline
-		// NOTE: lpCommandLine is max 32,767 including null Unicode character
-		enum TBUFSZ = 8 * 1024; // temporary command buffer size
-		char *tbuf = cast(char*)malloc(TBUFSZ); /// flat buffer
-		if (tbuf == null) {
+		// Get minimum total buffer size required
+		int argc;
+		size_t commlen = strlen(path);
+		size_t argslen;
+		while (argv[argc])
+			argslen += strlen(argv[argc++]);
+		
+		size_t minlen = commlen + 2 + argslen + argc + 1; // + quotes and spaces
+		proc.args = cast(char*)malloc(minlen);
+		if (proc.args == null) {
 			free(proc);
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
-		//TODO: Verify CreateProcessA copies buffers.
-		scope(exit) free(tbuf);
+		size_t i;
+		proc.args[i++] = '"';
+		memcpy(proc.args + i, path, commlen); i += commlen;
+		proc.args[i++] = '"';
+		proc.args[i++] = ' ';
 		
-		// Flatten argv
-		size_t o = adbg_util_argv_flatten(tbuf, TBUFSZ, argv);
+		// Flatten
+		int cl = cast(int)(minlen - i); // Buffer space left
+		if (cl <= 0) {
+			free(proc);
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		size_t o = adbg_strings_flatten(proc.args + i, cl, argc, argv, 1);
 		if (o == 0) {
 			free(proc);
 			adbg_oops(AdbgError.assertion);
 			return null;
 		}
-		
-		// Fuse argv with args with a space in-between
-		if (args) {
-			strncpy(tbuf + o, " ", TBUFSZ - o);
-			++o;
-			strncpy(tbuf + o, args, TBUFSZ - o);
-		}
-		
-		args = tbuf;
+		version(Trace) trace("args='%s'", proc.args);
 	}
 	
 	//TODO: Parse envp
@@ -254,12 +269,12 @@ version (Windows) {
 	
 	if (CreateProcessA(
 		path,	// lpApplicationName
-		cast(char*)args,	// lpCommandLine
+		proc.args,	// lpCommandLine
 		null,	// lpProcessAttributes
 		null,	// lpThreadAttributes
 		FALSE,	// bInheritHandles
 		flags,	// dwCreationFlags
-		null,	// lpEnvironment
+		envp,	// lpEnvironment
 		null,	// lpCurrentDirectory
 		&si, &pi) == FALSE) {
 		free(proc);
@@ -289,7 +304,9 @@ version (Windows) {
 			return null;
 		}
 	}
-} else version (Posix) {
+} else version (linux) {
+	// NOTE: Don't remember this check, but I think it was because of
+	//       an ambiguous error message
 	// Verify if file exists and we has access to it
 	stat_t st = void;
 	if (stat(path, &st) == -1) {
@@ -298,114 +315,192 @@ version (Windows) {
 		return null;
 	}
 	
-	const(char)*[16] __argv = void;
-	const(char)*[1]  __envp = void;
+	// Allocate arguments, include space for program and null terminator
+	int argc;
+	while (argv[argc]) ++argc;
+	version(Trace) trace("argc=%d", argc);
+	proc.argv = cast(char**)malloc((argc + 2) * size_t.sizeof);
+	if (proc.argv == null) {
+		version(Trace) trace("mmap=%s", strerror(errno));
+		free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	}
+	proc.argv[0] = cast(char*)path;
+	if (argc && argv)
+		memcpy(proc.argv + 1, argv, argc * size_t.sizeof);
+	proc.argv[argc + 1] = null;
 	
-	// Proceed normally, execve performs executable checks
-	version (USE_CLONE) { // clone(2)
-		//TODO: get default stack size (glibc constant or function)
-		void *chld_stack = mmap(null, ADBG_CHILD_STACK_SIZE,
-			PROT_READ | PROT_WRITE,
-			MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
-			-1, 0);
-		if (chld_stack == MAP_FAILED) {
-			free(proc);
-			adbg_oops(AdbgError.os);
-			return null;
-		}
+version (USE_CLONE) { // clone(2)
+	//TODO: get default stack size (glibc constant or function)
+	void *stack = mmap(null, ADBG_CHILD_STACK_SIZE,
+		PROT_READ | PROT_WRITE,
+		MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
+		-1, 0);
+	if (stack == MAP_FAILED) {
+		free(proc.argv);
+		free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	}
+	// Assume stack grows downward
+	void *stacktop = stack + ADBG_CHILD_STACK_SIZE;
+	
+	// Clone
+	//TODO: Get default stack size
+	__adbg_child_t chld = void;
+	chld.argv = cast(const(char)**)proc.argv;
+	chld.envp = envp;
+	proc.pid = clone(&__adbg_exec_child, stacktop, CLONE_PTRACE | CLONE_VFORK, &chld);
+	if (proc.pid < 0) {
+		free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	}
 
-		// Adjust argv
-		if (argv) {
-			size_t i0, i1 = 1;
-			while (argv[i0] && i1 < 15)
-				__argv[i1++] = argv[i0++];
-			__argv[i1] = null;
-		} else {
-			__argv[1] = null;
-		}
-		__argv[0] = path;
-
-		// Adjust envp
-		//TODO: Is this still valid?
-		if (envp == null) {
-			envp = cast(const(char)**)&__envp;
-			envp[0] = null;
-		}
-
-		// Clone
-		//TODO: Get default stack size
+} else { // fork(2)
+	/*proc.argv = cast(char**)mmap(null,
+		(argc + 2) * size_t.sizeof,
+		PROT_READ | PROT_WRITE,
+		MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE,
+		-1, 0);
+	if (proc.argv == MAP_FAILED) {
+		version(Trace) trace("mmap=%s", strerror(errno));
+		free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	}*/
+	
+	// Setup pipes so we can communicate with child process
+	int[2] pipefds = void;
+	if (pipe(pipefds)) {
+		free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	}
+	if (fcntl(pipefds[1], F_SETFD, fcntl(pipefds[1], F_GETFD) | FD_CLOEXEC)) {
+		free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	}
+	
+	// NOTE: exec family
+	//         |            | PATH | argv | envp |
+	// POSIX   | execl(3)   | No   | No   | No   |
+	//         | execlp(3)  | Yes  | No   | No   |
+	//         | execle(3)  | No   | No   | Yes  |
+	//         | execv(3)   | No   | Yes  | No   |
+	//         | execvp(3)  | Yes  | Yes  | No   |
+	//         | execvpe(3) | Yes  | Yes  | Yes  |
+	// Linux   | execve(2)  | No   | Yes  | Yes  |
+	// FreeBSD | execvP(2)  | Yes  | Yes  | No   |
+	//         | exect(3)   | No   | Yes  | Yes  |
+	// OpenBSD | execve(2)  | No   | Yes  | Yes  |
+	// NetBSD  | exect(3)   | No   | Yes  | Yes  |
+	
+	// NOTE: Execution flow
+	//       1. Child is created with anonymous pipes
+	//       2. While parent waits for a signal, child inits ptrace
+	
+	switch (proc.pid = fork()) {
+	case -1: // Error
+		version(Trace) trace("fork=%s", strerror(errno));
+		//munmap(proc.argv,
+		free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	case 0: // New child process
+		close(pipefds[0]); // Close read
+		version(Trace) for (int i; i < argc + 2; ++i)
+			trace("argv[%d]=%s", i, proc.argv[i]);
+		
 		__adbg_child_t chld = void;
-		chld.envp = cast(const(char)**)&__envp;
-		chld.argv = cast(const(char)**)&__argv;
-		proc.pid = clone(&adbg_linux_child,
-			chld_stack + ADBG_CHILD_STACK_SIZE,
-			CLONE_PTRACE,
-			&chld); // tid
-		if (proc.pid < 0) {
-			free(proc);
+		chld.argv = cast(const(char)**)proc.argv;
+		chld.envp = envp;
+		int e = __adbg_exec_child(&chld) < 0 ? errno : 0;
+		
+		write(pipefds[1], &e, int.sizeof); // Write result to parent
+		close(pipefds[1]); // Close write
+		_exit(e);
+		return null; // Make compiler happy
+	default: // This parent process
+		close(pipefds[1]); // Close write
+		
+		int chlderr = void;
+		ssize_t count = void;
+		version(Trace) trace("read...", chlderr);
+		while ((count = read(pipefds[0], &chlderr, int.sizeof)) < 0)
+			if (errno != EAGAIN && errno != EINTR) break;
+		//ssize_t count = read(pipefds[0], &chlderr, int.sizeof);
+		version(Trace) trace("close...", chlderr);
+		close(pipefds[0]); // Close read
+		if (count < int.sizeof) { // Error
+			version(Trace) trace("read=%s", strerror(errno));
 			adbg_oops(AdbgError.os);
 			return null;
 		}
-	} else { // fork(2)
-		proc.pid = fork();
-		if (proc.pid < 0)
-			return adbg_oops(AdbgError.os);
-		if (proc.pid == 0) { // Child process
-			// Adjust argv
-			if (argv) {
-				size_t i0, i1 = 1;
-				while (argv[i0] && i1 < 15)
-					__argv[i1++] = argv[i0++];
-				__argv[i1] = null;
-			} else {
-				__argv[1] = null;
-			}
-			__argv[0] = path;
-			
-			// Adjust envp
-			if (envp == null) {
-				envp = cast(const(char)**)&__envp;
-				envp[0] = null;
-			}
-			
-			// Trace me
-			if (ptrace(PT_TRACEME, 0, 0, 0)) {
-				free(proc);
-				adbg_oops(AdbgError.os);
-				return null;
-			}
-			version (CRuntime_Musl) {
-				if (raise(SIGTRAP)) {
-					free(proc);
-					adbg_oops(AdbgError.os);
-					return null;
-				}
-			}
-			
-			// Execute
-			if (execve(path,
-				cast(const(char)**)__argv,
-				cast(const(char)**)__envp) == -1) {
-				free(proc);
-				adbg_oops(AdbgError.os);
-				return null;
-			}
+		if (chlderr) {
+			version(Trace) trace("childerr=%d (%s)", chlderr, strerror(chlderr));
+			errno = chlderr;
+			adbg_oops(AdbgError.os);
+			return null;
 		}
-	} // fork(2)
-} // version (Posix)
+		// Waiting for child
+		/*while (waitpid(proc.pid, &chlderr, 0) == -1)
+			if (errno != EINTR) {
+				version(Trace) trace("waitpid=%s", strerror(errno));
+				adbg_oops(AdbgError.os);
+				return null;
+			}
+		if (WIFEXITED(chlderr)) {
+			version(Trace) trace("child exited by %d", WEXITSTATUS(chlderr));
+			adbg_oops(AdbgError.os);
+			return null;
+		} else if (WIFSIGNALED(chlderr)) {
+			version(Trace) trace("child kill by %d", WTERMSIG(chlderr));
+			adbg_oops(AdbgError.os);
+			return null;
+		}*/
+	} // switch(fork(2))
+} // fork(2)
+} // version (linux)
 	
 	proc.status = AdbgProcStatus.standby;
 	proc.creation = AdbgCreation.spawned;
 	return proc;
 }
 
-version (USE_CLONE)
-private int adbg_linux_child(void* arg) {
-	__adbg_child_t *c = cast(__adbg_child_t*)arg;
-	if (ptrace(PT_TRACEME, 0, 0, 0))
-		return adbg_oops(AdbgError.os);
-	execve(c.argv[0], c.argv, c.envp);
-	return adbg_oops(AdbgError.os);
+version (Posix)
+private int __adbg_exec_child(void* arg) {
+	__adbg_child_t *chld = cast(__adbg_child_t*)arg;
+	
+	// Baby, Please Trace Me
+	version (Trace) trace("ptrace...");
+	if (ptrace(PT_TRACEME, 0, 0, 0) < 0) {
+		version (Trace) trace("ptrace=%s", strerror(errno));
+		return -1;
+	}
+	version (Trace) trace("done");
+	
+	version (CRuntime_Musl) {
+		version (Trace) trace("raise...");
+		if (raise(SIGTRAP)) {
+			version (Trace) trace("raise=%s", strerror(errno));
+			return -1;
+		}
+		version (Trace) trace("done");
+	}
+	
+	// NOTE: On Glibc, sends a SIGTRAP on success and doesn't return
+	version (Trace) trace("execve...");
+	if (execve(*chld.argv, chld.argv, chld.envp) < 0) {
+		version (Trace) trace("execve=%s", strerror(errno));
+		return -1;
+	}
+	version (Trace) trace("done");
+	
+Lexit:
+	_exit(errno);
 }
 
 /// Debugger process attachment options
@@ -585,7 +680,7 @@ AdbgProcStatus adbg_process_status(adbg_process_t *tracee) pure {
 ///
 /// Params:
 /// 	tracee = Tracee instance.
-/// 	userfunc = User function callback.
+/// 	userfunc = User function callback on event.
 /// Returns: Error code.
 int adbg_debugger_wait(adbg_process_t *tracee,
 	void function(adbg_process_t*, int, void*) userfunc) {
@@ -678,20 +773,19 @@ L_DEBUG_LOOP:
 	switch (stopsig) {
 	case SIGCONT: goto L_DEBUG_LOOP;
 	// NOTE: si_addr is NOT populated under ptrace for SIGTRAP
-	// 
-	// - linux does not fill si_addr on a SIGTRAP from a ptrace event
-	//   - see sigaction(2)
-	// - linux *only* fills user_regs_struct for "user area"
-	//   - see arch/x86/include/asm/user_64.h
-	//   - "ptrace does not yet supply these.  Someday...."
-	//   - So yeah, debug registers and "fault_address" not filled
-	//     - No access to ucontext_t from ptrace either
-	// - using EIP/RIP is NOT a good idea
-	//   - IP ALWAYS point to NEXT instruction
-	//   - First SIGTRAP does NOT contain int3
-	//     - Windows does, though, and points to it
-	// - gdbserver and lldb never attempt to do such thing anyway
-	// - RIP-1 (x86) could *maybe* point to int3 or similar.
+	//       - linux does not fill si_addr on a SIGTRAP from a ptrace event
+	//         - see sigaction(2)
+	//       - linux *only* fills user_regs_struct for "user area"
+	//         - see arch/x86/include/asm/user_64.h
+	//         - "ptrace does not yet supply these.  Someday...."
+	//         - So yeah, debug registers and "fault_address" not filled
+	//           - No access to ucontext_t from ptrace either
+	//       - using EIP/RIP is NOT a good idea
+	//         - IP ALWAYS point to NEXT instruction
+	//         - First SIGTRAP does NOT contain int3
+	//           - Windows does, though, and points to it
+	//       - gdbserver and lldb never attempt to do such thing anyway
+	//       - RIP-1 (x86) could *maybe* point to int3 or similar.
 	// NOTE: Newer D compilers fixed siginfo_t as a whole
 	//       for version (linux). Noticed on DMD 2.103.1.
 	//       Old glibc: ._sifields._sigfault.si_addr
@@ -724,18 +818,9 @@ L_UNLOADED:
 	return 0;
 }
 
-
-int adbg_debugger_stop(adbg_process_t *tracee) {
-	if (tracee == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	if (tracee.creation == AdbgCreation.unloaded)
-		return adbg_oops(AdbgError.debuggerUnattached);
-	
-	return tracee.creation == AdbgCreation.attached ?
-		adbg_debugger_detach(tracee) : adbg_debugger_terminate(tracee);
-}
-
-
+/// Disconnect and terminate the debuggee process.
+/// Params: tracee = Process.
+/// Returns: Error code.
 int adbg_debugger_terminate(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.invalidArgument);
@@ -744,7 +829,11 @@ int adbg_debugger_terminate(adbg_process_t *tracee) {
 	
 	tracee.status = AdbgProcStatus.unloaded; // exited in any case
 	tracee.creation = AdbgCreation.unloaded;
-	scope(exit) free(tracee);
+	scope(exit) {
+		version (Windows) if (tracee.args) free(tracee.args);
+		//version (Posix) if (tracee.argv) close(tracee.argv);
+		free(tracee);
+	}
 	
 version (Windows) {
 	if (ContinueDebugEvent(tracee.pid, tracee.tid, DBG_TERMINATE_PROCESS) == FALSE)
@@ -757,7 +846,9 @@ version (Windows) {
 	return 0;
 }
 
-
+/// Make the debuggee process continue from its currently stopped state.
+/// Params: tracee = Process.
+/// Returns: Error code.
 int adbg_debugger_continue(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.invalidArgument);
@@ -887,6 +978,7 @@ version (Windows) {
 		adbg_oops(AdbgError.os);
 		return 0;
 	}
+	//TODO: Check every PID to match?
 	HMODULE hmod = void;
 	if (absolute == false && EnumProcessModules(procHandle, &hmod, hmod.sizeof, &needed)) {
 		adbg_oops(AdbgError.os);
