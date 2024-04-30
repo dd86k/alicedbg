@@ -109,8 +109,21 @@ struct adbg_process_t {
 
 version (Posix)
 private struct __adbg_child_t {
-	int pid;
 	const(char) **argv, envp;
+	const(char) *dir;
+}
+
+private
+void adbg_process_destroy(adbg_process_t *proc) {
+	if (proc == null)
+		return;
+	version (Windows) {
+		if (proc.args) free(proc.args);
+	}
+	version (Posix) {
+		if (proc.argv) free(proc.argv);
+	}
+	free(proc);
 }
 
 //TODO: Stream redirection options (FILE* and os handle options)
@@ -190,9 +203,9 @@ LOPT:
 		argv = va_arg!(const(char)**)(list);
 		goto LOPT;
 	// Temporary until implemented
-	/*case AdbgSpawnOpt.directory:
+	case AdbgSpawnOpt.directory:
 		dir = va_arg!(const(char)*)(list);
-		goto LOPT;*/
+		goto LOPT;
 	// Temporary until reworked
 	/*case AdbgSpawnOpt.environment:
 		envp = va_arg!(const(char)**)(list);
@@ -231,7 +244,7 @@ version (Windows) {
 		size_t minlen = commlen + 2 + argslen + argc + 1; // + quotes and spaces
 		proc.args = cast(char*)malloc(minlen);
 		if (proc.args == null) {
-			free(proc);
+			adbg_process_destroy(proc);
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
@@ -246,13 +259,13 @@ version (Windows) {
 		// Flatten arguments
 		int cl = cast(int)minlen - cast(int)i; // Buffer space left
 		if (cl <= 0) {
-			free(proc);
+			adbg_process_destroy(proc);
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
 		size_t o = adbg_strings_flatten(proc.args + i, cl, argc, argv, 1);
 		if (o == 0) {
-			free(proc);
+			adbg_process_destroy(proc);
 			adbg_oops(AdbgError.assertion);
 			return null;
 		}
@@ -279,9 +292,9 @@ version (Windows) {
 		FALSE,	// bInheritHandles
 		flags,	// dwCreationFlags
 		envp,	// lpEnvironment
-		null,	// lpCurrentDirectory
+		dir,	// lpCurrentDirectory
 		&si, &pi) == FALSE) {
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
@@ -302,7 +315,7 @@ version (Windows) {
 	// NOTE: Could be moved to adbg_process_get_machine
 	version (Win64) {
 		if (IsWow64Process(proc.hpid, &proc.wow64) == FALSE) {
-			free(proc);
+			adbg_process_destroy(proc);
 			adbg_oops(AdbgError.os);
 			return null;
 		}
@@ -313,7 +326,7 @@ version (Windows) {
 	// Verify if file exists and we has access to it
 	stat_t st = void;
 	if (stat(path, &st) == -1) {
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
@@ -325,7 +338,7 @@ version (Windows) {
 	proc.argv = cast(char**)malloc((argc + 2) * size_t.sizeof);
 	if (proc.argv == null) {
 		version(Trace) trace("mmap=%s", strerror(errno));
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
@@ -341,8 +354,7 @@ version (USE_CLONE) { // clone(2)
 		MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
 		-1, 0);
 	if (stack == MAP_FAILED) {
-		free(proc.argv);
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
@@ -352,12 +364,12 @@ version (USE_CLONE) { // clone(2)
 	// Clone
 	//TODO: Get default stack size
 	__adbg_child_t chld = void;
-	chld.pid  = proc.pid;
 	chld.argv = cast(const(char)**)proc.argv;
 	chld.envp = envp;
+	chld.dir  = dir;
 	proc.pid = clone(&__adbg_exec_child, stacktop, CLONE_PTRACE | CLONE_VFORK, &chld);
 	if (proc.pid < 0) {
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
@@ -365,8 +377,7 @@ version (USE_CLONE) { // clone(2)
 	switch (proc.pid = fork()) {
 	case -1: // Error
 		version(Trace) trace("fork=%s", strerror(errno));
-		//munmap(proc.argv,
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	case 0: // New child process
@@ -374,14 +385,16 @@ version (USE_CLONE) { // clone(2)
 			trace("argv[%d]=%s", i, proc.argv[i]);
 		
 		__adbg_child_t chld = void;
-		chld.pid  = proc.pid;
 		chld.argv = cast(const(char)**)proc.argv;
 		chld.envp = envp;
-		__adbg_exec_child(&chld);
+		chld.dir  = dir;
+		__adbg_exec_child(&chld); // If returns at all, error
+		adbg_process_destroy(proc);
+		_exit(errno);
 		return null; // Make compiler happy
 	default: // This parent process
 	} // switch(fork(2))
-} // fork(2)
+} // clone(2)/fork(2)
 } // version (linux)
 	
 	proc.status = AdbgProcStatus.standby;
@@ -401,6 +414,12 @@ private int __adbg_exec_child(void* arg) {
 	}
 	version (Trace) trace("done");
 	
+	// If start directory requested, change to it
+	if (chld.dir && chdir(chld.dir) < 0) {
+		version (Trace) trace("ptrace=%s", strerror(errno));
+		goto Lexit;
+	}
+	
 	// Start specified process
 	version (Trace) trace("execve...");
 	if (execve(*chld.argv, chld.argv, chld.envp) < 0) {
@@ -410,8 +429,7 @@ private int __adbg_exec_child(void* arg) {
 	version (Trace) trace("done");
 	
 Lexit:
-	_exit(errno);
-	return 0;
+	return -1;
 }
 
 /// Debugger process attachment options
@@ -498,12 +516,12 @@ version (Windows) {
 	// Check if process already has an attached debugger
 	BOOL dbgpresent = void;
 	if (CheckRemoteDebuggerPresent(proc.hpid, &dbgpresent) == FALSE) {
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
 	if (dbgpresent) {
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.debuggerPresent);
 		return null;
 	}
@@ -511,7 +529,7 @@ version (Windows) {
 	// Breaks into remote process and initiates break-in
 	//TODO: try NtContinue for continue option
 	if (DebugActiveProcess(proc.pid) == FALSE) {
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
@@ -520,14 +538,14 @@ version (Windows) {
 	// Set exitkill unconditionalled
 	// Default: on
 	if (DebugSetProcessKillOnExit(options & OPT_EXITKILL) == FALSE) {
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
 } else version (Posix) {
 	version (Trace) if (options & OPT_STOP) trace("Sending break...");
 	if (ptrace(options & OPT_STOP ? PT_ATTACH : PT_SEIZE, pid, null, null) < 0) {
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
@@ -535,7 +553,7 @@ version (Windows) {
 	// Set exitkill on if specified
 	// Default: off
 	if (options & OPT_EXITKILL && ptrace(PT_SETOPTIONS, pid, null, PT_O_EXITKILL) < 0) {
-		free(proc);
+		adbg_process_destroy(proc);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
@@ -557,14 +575,17 @@ int adbg_debugger_detach(adbg_process_t *tracee) {
 	
 	tracee.creation = AdbgCreation.unloaded;
 	tracee.status = AdbgProcStatus.unloaded;
-	scope(exit) free(tracee);
 	
 version (Windows) {
-	if (DebugActiveProcessStop(tracee.pid) == FALSE)
+	if (DebugActiveProcessStop(tracee.pid) == FALSE) {
+		adbg_process_destroy(tracee);
 		return adbg_oops(AdbgError.os);
+	}
 } else version (Posix) {
-	if (ptrace(PT_DETACH, tracee.pid, null, null) < 0)
+	if (ptrace(PT_DETACH, tracee.pid, null, null) < 0) {
+		adbg_process_destroy(tracee);
 		return adbg_oops(AdbgError.os);
+	}
 }
 	return 0;
 }
