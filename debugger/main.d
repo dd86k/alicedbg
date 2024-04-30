@@ -120,5 +120,5 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
-	return shellinit(cnt, getoptleftovers());
+	return shell_start(cnt, getoptleftovers());
 }

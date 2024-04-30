@@ -92,7 +92,7 @@ const(char) *shell_error_string(int code) {
 }
 
 //TODO: Turn into character array (like gdb --args)
-int shellinit(int argc, const(char)** argv) {
+int shell_start(int argc, const(char)** argv) {
 	int ecode = void;
 	
 	if (loginit(null))
@@ -118,6 +118,7 @@ int shellinit(int argc, const(char)** argv) {
 
 Lcommand:
 	printf("(adbg) ");
+	fflush(stdout);
 	
 	// .ptr is temporary because a slice with a length of 0
 	// also make its pointer null.
@@ -727,16 +728,7 @@ int command_crash(int, const(char) **) {
 }
 
 int command_status(int argc, const(char) **argv) {
-	AdbgProcStatus state = adbg_process_status(process);
-	const(char) *m = void;
-	switch (state) with (AdbgProcStatus) {
-	case unloaded:	m = "unloaded"; break;
-	case standby:	m = "standby"; break;
-	case running:	m = "running"; break;
-	case paused:	m = "paused"; break;
-	default:	m = "(unknown)";
-	}
-	puts(m);
+	puts(adbg_process_status_string(process));
 	return 0;
 }
 

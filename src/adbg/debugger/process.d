@@ -46,8 +46,8 @@ version (Windows) {
 	import core.sys.posix.libgen : basename;
 }
 
-// I can't remember why, but problably Musl moment
-version = USE_CLONE;
+//version (CRuntime_Glibc)
+//	version = USE_CLONE;
 
 extern (C):
 
@@ -60,7 +60,8 @@ enum AdbgEvent {
 enum AdbgProcStatus : ubyte {
 	unknown,	/// Process status is not known.
 	unloaded = unknown,	/// Process is unloaded.
-	standby,	/// Process is loaded and waiting to run.
+	loaded,	/// Process is loaded and waiting to run.
+	standby = loaded,	/// Alias for loaded.
 	running,	/// Process is running.
 	paused,	/// Process is paused due to an exception or by the debugger.
 }
@@ -108,6 +109,7 @@ struct adbg_process_t {
 
 version (Posix)
 private struct __adbg_child_t {
+	int pid;
 	const(char) **argv, envp;
 }
 
@@ -225,6 +227,7 @@ version (Windows) {
 		while (argv[argc])
 			argslen += strlen(argv[argc++]);
 		
+		// Allocate argument line space
 		size_t minlen = commlen + 2 + argslen + argc + 1; // + quotes and spaces
 		proc.args = cast(char*)malloc(minlen);
 		if (proc.args == null) {
@@ -232,14 +235,16 @@ version (Windows) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
+		
+		// Place path into argv[0] with quotes
 		size_t i;
 		proc.args[i++] = '"';
 		memcpy(proc.args + i, path, commlen); i += commlen;
 		proc.args[i++] = '"';
 		proc.args[i++] = ' ';
 		
-		// Flatten
-		int cl = cast(int)(minlen - i); // Buffer space left
+		// Flatten arguments
+		int cl = cast(int)minlen - cast(int)i; // Buffer space left
 		if (cl <= 0) {
 			free(proc);
 			adbg_oops(AdbgError.crt);
@@ -262,11 +267,10 @@ version (Windows) {
 	memset(&si, 0, si.sizeof);
 	memset(&pi, 0, pi.sizeof);
 	si.cb = STARTUPINFOA.sizeof;
-	
 	DWORD flags = options & OPT_DEBUG_ALL ? DEBUG_PROCESS : DEBUG_PROCESS | DEBUG_ONLY_THIS_PROCESS;
-	
 	flags |= CREATE_DEFAULT_ERROR_MODE;
 	
+	// Create process
 	if (CreateProcessA(
 		path,	// lpApplicationName
 		proc.args,	// lpCommandLine
@@ -281,7 +285,6 @@ version (Windows) {
 		adbg_oops(AdbgError.os);
 		return null;
 	}
-	
 	proc.hpid = pi.hProcess;
 	proc.htid = pi.hThread;
 	proc.pid = pi.dwProcessId;
@@ -349,6 +352,7 @@ version (USE_CLONE) { // clone(2)
 	// Clone
 	//TODO: Get default stack size
 	__adbg_child_t chld = void;
+	chld.pid  = proc.pid;
 	chld.argv = cast(const(char)**)proc.argv;
 	chld.envp = envp;
 	proc.pid = clone(&__adbg_exec_child, stacktop, CLONE_PTRACE | CLONE_VFORK, &chld);
@@ -357,51 +361,7 @@ version (USE_CLONE) { // clone(2)
 		adbg_oops(AdbgError.os);
 		return null;
 	}
-
 } else { // fork(2)
-	/*proc.argv = cast(char**)mmap(null,
-		(argc + 2) * size_t.sizeof,
-		PROT_READ | PROT_WRITE,
-		MAP_PRIVATE | MAP_ANONYMOUS | MAP_POPULATE,
-		-1, 0);
-	if (proc.argv == MAP_FAILED) {
-		version(Trace) trace("mmap=%s", strerror(errno));
-		free(proc);
-		adbg_oops(AdbgError.os);
-		return null;
-	}*/
-	
-	// Setup pipes so we can communicate with child process
-	int[2] pipefds = void;
-	if (pipe(pipefds)) {
-		free(proc);
-		adbg_oops(AdbgError.os);
-		return null;
-	}
-	if (fcntl(pipefds[1], F_SETFD, fcntl(pipefds[1], F_GETFD) | FD_CLOEXEC)) {
-		free(proc);
-		adbg_oops(AdbgError.os);
-		return null;
-	}
-	
-	// NOTE: exec family
-	//         |            | PATH | argv | envp |
-	// POSIX   | execl(3)   | No   | No   | No   |
-	//         | execlp(3)  | Yes  | No   | No   |
-	//         | execle(3)  | No   | No   | Yes  |
-	//         | execv(3)   | No   | Yes  | No   |
-	//         | execvp(3)  | Yes  | Yes  | No   |
-	//         | execvpe(3) | Yes  | Yes  | Yes  |
-	// Linux   | execve(2)  | No   | Yes  | Yes  |
-	// FreeBSD | execvP(2)  | Yes  | Yes  | No   |
-	//         | exect(3)   | No   | Yes  | Yes  |
-	// OpenBSD | execve(2)  | No   | Yes  | Yes  |
-	// NetBSD  | exect(3)   | No   | Yes  | Yes  |
-	
-	// NOTE: Execution flow
-	//       1. Child is created with anonymous pipes
-	//       2. While parent waits for a signal, child inits ptrace
-	
 	switch (proc.pid = fork()) {
 	case -1: // Error
 		version(Trace) trace("fork=%s", strerror(errno));
@@ -410,57 +370,16 @@ version (USE_CLONE) { // clone(2)
 		adbg_oops(AdbgError.os);
 		return null;
 	case 0: // New child process
-		close(pipefds[0]); // Close read
 		version(Trace) for (int i; i < argc + 2; ++i)
 			trace("argv[%d]=%s", i, proc.argv[i]);
 		
 		__adbg_child_t chld = void;
+		chld.pid  = proc.pid;
 		chld.argv = cast(const(char)**)proc.argv;
 		chld.envp = envp;
-		int e = __adbg_exec_child(&chld) < 0 ? errno : 0;
-		
-		write(pipefds[1], &e, int.sizeof); // Write result to parent
-		close(pipefds[1]); // Close write
-		_exit(e);
+		__adbg_exec_child(&chld);
 		return null; // Make compiler happy
 	default: // This parent process
-		close(pipefds[1]); // Close write
-		
-		int chlderr = void;
-		ssize_t count = void;
-		version(Trace) trace("read...", chlderr);
-		while ((count = read(pipefds[0], &chlderr, int.sizeof)) < 0)
-			if (errno != EAGAIN && errno != EINTR) break;
-		//ssize_t count = read(pipefds[0], &chlderr, int.sizeof);
-		version(Trace) trace("close...", chlderr);
-		close(pipefds[0]); // Close read
-		if (count < int.sizeof) { // Error
-			version(Trace) trace("read=%s", strerror(errno));
-			adbg_oops(AdbgError.os);
-			return null;
-		}
-		if (chlderr) {
-			version(Trace) trace("childerr=%d (%s)", chlderr, strerror(chlderr));
-			errno = chlderr;
-			adbg_oops(AdbgError.os);
-			return null;
-		}
-		// Waiting for child
-		/*while (waitpid(proc.pid, &chlderr, 0) == -1)
-			if (errno != EINTR) {
-				version(Trace) trace("waitpid=%s", strerror(errno));
-				adbg_oops(AdbgError.os);
-				return null;
-			}
-		if (WIFEXITED(chlderr)) {
-			version(Trace) trace("child exited by %d", WEXITSTATUS(chlderr));
-			adbg_oops(AdbgError.os);
-			return null;
-		} else if (WIFSIGNALED(chlderr)) {
-			version(Trace) trace("child kill by %d", WTERMSIG(chlderr));
-			adbg_oops(AdbgError.os);
-			return null;
-		}*/
 	} // switch(fork(2))
 } // fork(2)
 } // version (linux)
@@ -475,32 +394,24 @@ private int __adbg_exec_child(void* arg) {
 	__adbg_child_t *chld = cast(__adbg_child_t*)arg;
 	
 	// Baby, Please Trace Me
-	version (Trace) trace("ptrace...");
-	if (ptrace(PT_TRACEME, 0, 0, 0) < 0) {
+	version (Trace) trace("PT_TRACEME...");
+	if (ptrace(PT_TRACEME, 0, null, null) < 0) {
 		version (Trace) trace("ptrace=%s", strerror(errno));
-		return -1;
+		goto Lexit;
 	}
 	version (Trace) trace("done");
 	
-	version (CRuntime_Musl) {
-		version (Trace) trace("raise...");
-		if (raise(SIGTRAP)) {
-			version (Trace) trace("raise=%s", strerror(errno));
-			return -1;
-		}
-		version (Trace) trace("done");
-	}
-	
-	// NOTE: On Glibc, sends a SIGTRAP on success and doesn't return
+	// Start specified process
 	version (Trace) trace("execve...");
 	if (execve(*chld.argv, chld.argv, chld.envp) < 0) {
 		version (Trace) trace("execve=%s", strerror(errno));
-		return -1;
+		goto Lexit;
 	}
 	version (Trace) trace("done");
 	
 Lexit:
 	_exit(errno);
+	return 0;
 }
 
 /// Debugger process attachment options
@@ -661,11 +572,28 @@ version (Windows) {
 //TODO: Check process debugged remotely
 //bool adbg_process_debugged(int pid) {
 
-/// Get the debugger's current state.
-/// Returns: Debugger status.
+/// Get the debuggee's current status.
+/// Returns: Debuggee status.
 AdbgProcStatus adbg_process_status(adbg_process_t *tracee) pure {
 	if (tracee == null) return AdbgProcStatus.unknown;
 	return tracee.status;
+}
+/// Get the debuggee current status as a string.
+/// Returns: Debuggee status string.
+const(char)* adbg_process_status_string(adbg_process_t *tracee) pure {
+	if (tracee == null) {
+	Ldefault:
+		return "unknown";
+	}
+	const(char) *m = void;
+	switch (tracee.status) with (AdbgProcStatus) {
+	case unloaded:	m = "unloaded"; break;
+	case loaded:	m = "loaded"; break;
+	case running:	m = "running"; break;
+	case paused:	m = "paused"; break;
+	default:	goto Ldefault;
+	}
+	return m;
 }
 
 /// Wait for a debug event.
@@ -741,14 +669,14 @@ L_DEBUG_LOOP:
 L_DEBUG_LOOP:
 	tracee.pid = waitpid(-1, &wstatus, 0);
 	
+	version (Trace) trace("wstatus=%#x", wstatus);
+	
 	// Something bad happened
 	if (tracee.pid < 0) {
 		tracee.status = AdbgProcStatus.unloaded;
 		tracee.creation = AdbgCreation.unloaded;
 		return adbg_oops(AdbgError.crt);
 	}
-	
-	version (Trace) trace("wstatus=%08x", wstatus);
 	
 	// If exited or killed by signal, it's gone.
 	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus))
