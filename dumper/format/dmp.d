@@ -26,10 +26,7 @@ private:
 void dump_dmp_header(adbg_object_t *o) {
 	print_header("Header");
 	
-	bool is64 = o.i.dmp.header.ValidDumpInt == PAGEDUMP64_VALID;
-	
-	dmp64_header *hdr64 = cast(dmp64_header*)o.i.dmp.header;
-	if (is64) with (hdr64) {
+	if (o.i.dmp.header.ValidDumpInt == PAGEDUMP64_VALID) with (o.i.dmp.header64) {
 		print_x32l("Signature", SignatureInt, Signature.ptr, 4);
 		print_x32l("ValidDump", ValidDumpInt, ValidDump.ptr, 4);
 		print_u32("MajorVersion", MajorVersion);

@@ -125,6 +125,7 @@ int dump(const(char)* path) {
 	
 	// If anything was selected to dump specifically
 	if (opt_selected) {
+		// If not in any "extract" mode, print file info
 		if (setting_extract_any() == 0) {
 			print_string("filename", path);
 			print_u64("filesize", o.file_size);
@@ -150,8 +151,16 @@ int dump(const(char)* path) {
 	}
 	
 	// Otherwise, make a basic summary
-	printf("%s: %s (%s)\n", path,
-		adbg_object_format_name(o), adbg_object_format_shortname(o));
+	printf("%s: %s (%s), %s\n", path,
+		adbg_object_format_name(o), adbg_object_format_shortname(o),
+		adbg_object_format_kind_string(o));
+	
+	AdbgMachine mach = adbg_object_machine(o);
+	if (mach)
+		printf(", for %s (%s) machines",
+			adbg_object_machine_string(o), adbg_machine_alias(mach));
+	
+	putchar('\n');
 	return 0;
 }
 
@@ -159,7 +168,7 @@ private immutable {
 	/// Padding spacing to use in characters
 	// PE32 has fields like MinorOperatingSystemVersion (27 chars)
 	int __field_padding = -28;
-	/// Number of columns to produce in hexdumps.
+	/// Number of columns to produce in hexdumps, in bytes.
 	int __columns = 16;
 }
 

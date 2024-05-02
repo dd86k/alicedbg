@@ -20,7 +20,7 @@ import adbg.error;
 import adbg.utils.bit;
 import adbg.utils.math;
 import adbg.object.formats;
-import adbg.machines : AdbgMachine;
+import adbg.machines : AdbgMachine, adbg_machine_name;
 import adbg.debugger.process : adbg_process_t;
 import adbg.debugger.memory : adbg_memory_map_t, adbg_memory_read;
 import core.stdc.string;
@@ -97,11 +97,6 @@ enum AdbgObjectOrigin {
 	/// Object was loaded from the debugger into memory.
 	debugger,
 	//TODO: user buffer (memory)
-}
-
-/// Object server options.
-enum AdbgObjectLoadOption {
-	partial = 1,
 }
 
 package
@@ -300,6 +295,7 @@ struct adbg_object_t {
 		
 		struct dmp_t {
 			dmp_header *header;
+			dmp64_header *header64;
 		}
 		dmp_t dmp;
 		
@@ -414,6 +410,11 @@ bool adbg_object_offsett(T)(adbg_object_t *o, T* dst, ulong offset) {
 	else
 		static assert(0, "adbg_object_offsett memcpy TODO");
 	return false;
+}
+
+/// Object server options.
+enum AdbgObjectLoadOption {
+	partial = 1,
 }
 
 /// Load an object from disk into memory.
@@ -747,13 +748,17 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	default:	return AdbgMachine.unknown;
 	}
 }
+const(char)* adbg_object_machine_string(adbg_object_t *o) {
+	AdbgMachine mach = adbg_object_machine(o);
+	return mach ? adbg_machine_name(mach) : `Unknown`;
+}
 
 /// Get the short name of the loaded object format.
 /// Params: o = Object instance.
 /// Returns: Object format name.
 const(char)* adbg_object_format_shortname(adbg_object_t *o) {
 	if (o == null)
-		goto L_UNKNOWN;
+		goto Lunknown;
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return "mz";
 	case ne:	return "ne";
@@ -768,7 +773,7 @@ const(char)* adbg_object_format_shortname(adbg_object_t *o) {
 	case archive:	return "archive";
 	case coff:	return "coff";
 	case mscoff:	return "mscoff";
-	L_UNKNOWN:
+	Lunknown:
 	case unknown:	return "unknown";
 	}
 }
@@ -778,7 +783,7 @@ const(char)* adbg_object_format_shortname(adbg_object_t *o) {
 /// Returns: Object format name.
 const(char)* adbg_object_format_name(adbg_object_t *o) {
 	if (o == null)
-		goto L_UNKNOWN;
+		goto Lunknown;
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return `Mark Zbikowski`;
 	case ne:	return `New Executable`;
@@ -793,8 +798,45 @@ const(char)* adbg_object_format_name(adbg_object_t *o) {
 	case archive:	return `Common Object File Format Library Archive`;
 	case coff:	return `Common Object File Format`;
 	case mscoff:	return `Microsoft Common Object File Format`;
-	L_UNKNOWN:
+	Lunknown:
 	case unknown:	return "Unknown";
 	}
+}
 
+/*enum AdbgObjectKind {
+	unknown,
+	executable,
+	sharedObject,
+}
+
+AdbgObjectKind adbg_object_format_kind(adbg_object_t *o)*/
+
+const(char)* adbg_object_format_kind_string(adbg_object_t *o) {
+	if (o == null)
+		goto Lunknown;
+	switch (o.format) with (AdbgObject) {
+	case mz:
+		return o.i.mz.header.e_ovno ? `Overlayed Executable` : `Executable`;
+	case ne:
+		return o.i.ne.header.ne_flags & NE_HFLAG_LIBMODULE ? `Library Module` : `Executable`;
+	case lx:
+		return adbg_object_lx_modtype_string(o.i.lx.header.mflags);
+	case pe:
+		return o.i.pe.header.Characteristics & PE_CHARACTERISTIC_DLL ? `Dynamically Linked Library` : `Executable`;
+	case macho:
+		if (o.i.macho.fat) return `Fat Executable`;
+		return adbg_object_macho_filetype_string(o.i.macho.header.filetype);
+	case elf:
+		return o.i.elf32.ehdr.e_type == ELF_ET_DYN ? `Shared Object` : `Executable`;
+	case pdb20, pdb70:
+		return `Debug Database`;
+	case mdmp, dmp:
+		return `Memory Dump`;
+	case archive:
+		return `Library`;
+	case coff, mscoff:
+		return `Object`;
+	default: Lunknown:
+		return `Unknown`;
+	}
 }

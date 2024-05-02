@@ -102,6 +102,8 @@ int adbg_object_mz_load(adbg_object_t *o) {
 	}
 	
 	o.format = AdbgObject.mz;
+	
+	//TODO: Use internal API to get location
 	with (o.i.mz)
 	if (header.e_lfarlc && header.e_crlc && header.e_lfarlc < o.file_size) {
 		relocs = cast(mz_reloc*)(o.buffer + header.e_lfarlc);

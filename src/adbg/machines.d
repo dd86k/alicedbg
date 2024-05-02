@@ -802,7 +802,7 @@ immutable(adbg_machine_t)* adbg_machine(AdbgMachine mach) {
 /// Get machine alias from enumeration value.
 /// Params: mach = Machine value.
 /// Returns: Machine name, or null if invalid.
-const(char)* adbg_object_machine_alias(AdbgMachine mach) {
+const(char)* adbg_machine_alias(AdbgMachine mach) {
 	immutable(adbg_machine_t)* m = adbg_machine(mach);
 	if (m == null) // Error already set.
 		return null;
