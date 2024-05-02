@@ -119,44 +119,55 @@ enum option_license    = option_t(0,   "license",	"Show the license page and exi
 
 private
 immutable(option_t)* getoptlong(const(char)* arg, immutable(option_t)[] options) {
-	foreach (ref opt; options) {
-		if (strncmp(arg, opt.longname.ptr, opt.longname.length))
-			continue;
-		return &opt;
+	foreach (ref o; options) {
+		if (strncmp(arg, o.longname.ptr, o.longname.length) == 0)
+			return &o;
 	}
 	return null;
 }
 private
 immutable(option_t)* getoptshort(char arg, immutable(option_t)[] options) {
-	foreach (ref opt; options) {
-		if (arg != opt.shortname)
-			continue;
-		return &opt;
+	foreach (ref o; options) {
+		if (arg == o.shortname)
+			return &o;
 	}
 	return null;
 }
 private
-int getoptexec(immutable(option_t)* option, int argc, const(char) **argv, int index) {
+int getoptexec(immutable(option_t)* option, const(char)* value) {
 	final switch (option.argtype) {
 	case ARG_NONE:
-		if (option.f()) return -1;
-		return 0;
+		return option.f();
 	case ARG_STRING: // with argument
-		if (++index >= argc)
+		if (value == null)
 			return getoptEmissingLong(option.longname.ptr);
-		const(char) *val = argv[index];
-		if (option.fa(val))
-			return getoptEinvValLong(option.longname.ptr, val);
-		return 1;
+		return option.fa(value);
 	}
 }
 
-//TODO: Return error
-// <0 -> error
-//  0 -> no args left
-// >0 -> args left
-//TODO: Make option functions return <0=error >0=ok, consumed arg(s)
+// Returns the position of the first occurence of the specified character.
+private
+ptrdiff_t strsrch(const(char) *hay, int needle) {
+	for (ptrdiff_t i; hay[i]; ++i)
+		if (hay[i] == needle)
+			return i;
+	return -1;
+}
+unittest {
+	assert(strsrch("hello", 'q') < 0);
+	assert(strsrch("hello", 'h') == 0);
+	assert(strsrch("hello", 'e') == 1);
+	assert(strsrch("hello", 'l') == 2);
+	assert(strsrch("hello", 'o') == 4);
+}
+
 /// Interpret options
+/// Process options.
+/// Params:
+/// 	argc = Argument count.
+/// 	argv = Argument vector.
+/// 	options = Option list.
+/// Returns: If negative: Error. Otherwise, number of arguments left.
 int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 	// On re-entry, clear extras and error buffers
 	getoptreset();
@@ -165,26 +176,44 @@ int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 	for (; i < argc; ++i) {
 		const(char) *arg = argv[i]; // Current argument
 		
+		const(char) *value;
 		immutable(option_t) *option = void;
-		if (arg[1] == '-') { // Long option
+		if (arg[1] == '-') { // "--" -> Long option
 			const(char) *argLong = arg + 2;
 			
-			// test for "--" (extra args)
+			// Test for "--" (do not process options anymore)
 			if (argLong[0] == 0)
 				goto Lskip;
 			
+			// Get value in advance, if possible
+			ptrdiff_t vp = strsrch(argLong, '=');
+			if (vp == 0) { // --=example is invalid
+				return getoptEmalformatted(argLong);
+			} else if (vp >= 0) { // --e=example means "example" is value
+				value = argLong + 1 + vp;
+			}
+			
+			// Get corresponding option
 			option = getoptlong(argLong, options);
-		} else if (arg[0] == '-') { // Short option
+		} else if (arg[0] == '-') { // "-" Short option
 			char argShort = arg[1];
 			
-			// Test for null (often for "-")
+			// Test for "-" (often for a stdin option)
 			if (argShort == 0) {
 				getoptaddextra(argc, arg);
 				continue;
 			}
 			
+			// Get corresponding option
 			option = getoptshort(argShort, options);
-		} else { // Not a switch
+			
+			// Option wants an argument
+			if (option && option.argtype) {
+				if (++i >= argc)
+					return getoptEmissingLong(option.longname.ptr);
+				value = argv[i];
+			}
+		} else { // Not a switch, add to "extras" list
 			getoptaddextra(argc, arg);
 			continue;
 		}
@@ -193,20 +222,18 @@ int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 		if (option == null)
 			return getoptEunknown(arg);
 		
-		// Execute option callback
-		int e = getoptexec(option, argc, argv, i);
-		if (e < 0) return e;
-		i += e;
+		// Execute option handler
+		int e = getoptexec(option, value);
+		if (e < 0)
+			return e;
 	}
 	
-	return getoptleftcount();
-
-Lskip:	// When '--' is given
-	for (++i; i < argc; ++i) {
-		const(char) *arg = argv[i]; // Current argument
-		getoptaddextra(argc, arg);
-	}
-	return getoptleftcount();
+	goto Lret;
+	
+Lskip:	// When '--' is given, add the rest of arguments as "extras"
+	for (++i; i < argc; ++i)
+		getoptaddextra(argc, argv[i]);
+Lret:	return getoptleftcount();
 }
 unittest {
 	__gshared int hit;
@@ -253,6 +280,45 @@ unittest {
 	assert(leftovers);
 	assert(strcmp(*leftovers, "alicedbg.exe") == 0);
 	assert(strcmp(*(leftovers + 1), "--version") == 0);
+}
+unittest {
+	__gshared const(char)* hit;
+	static int opttest(const(char)* arg) {
+		hit = arg;
+		return 0;
+	}
+	static immutable(option_t)[] options = [
+		option_t('t', "test", "testing switch", &opttest),
+	];
+	static const(char) **argv = [
+		"alicedbg", "--test=value"
+	];
+	static int argc = 2;
+	
+	int e = getopt(argc, argv, options);
+	assert(e == 0);   // No leftover argument
+	assert(hit); // 
+	assert(strcmp(hit, "value") == 0); // 
+	
+	const(char) **leftovers = getoptleftovers();
+	assert(leftovers == null);
+}
+unittest {
+	__gshared bool hit;
+	static int opttest() {
+		return 0;
+	}
+	static immutable(option_t)[] options = [
+		option_t('t', "test", "testing switch", &opttest),
+	];
+	static const(char) **argv = [
+		"alicedbg", "-E", "alicedbg.exe"
+	];
+	static int argc = 3;
+	
+	int e = getopt(argc, argv, options);
+	assert(e < 0);   // Option -E not found
+	assert(hit == false); // 
 }
 
 /// Print options
@@ -327,31 +393,37 @@ private int getopt_prepbuf() {
 private int getoptEunknown(const(char)* opt) {
 	if (getopt_prepbuf()) return -100;
 	snprintf(getopterrbuf, GETOPTBFSZ,
-		"main: unknown option '%s'\n", opt);
+		"main: unknown option '%s'.", opt);
 	return -1;
 }
 private int getoptEinvValLong(const(char)* opt, const(char)* val) {
 	if (getopt_prepbuf()) return -100;
 	snprintf(getopterrbuf, GETOPTBFSZ,
-		"main: '%s' is an invalid value for --%s\n", val, opt);
+		"main: '%s' is an invalid value for --%s.", val, opt);
 	return -1;
 }
 private int getoptEinvValShort(char opt, const(char)* val) {
 	if (getopt_prepbuf()) return -100;
 	snprintf(getopterrbuf, GETOPTBFSZ,
-		"main: '%s' is an invalid value for -%c\n", val, opt);
+		"main: '%s' is an invalid value for -%c.", val, opt);
 	return -1;
 }
 private int getoptEmissingLong(const(char)* opt) {
 	if (getopt_prepbuf()) return -100;
 	snprintf(getopterrbuf, GETOPTBFSZ,
-		"main: missing argument for --%s\n", opt);
+		"main: missing argument for --%s.", opt);
 	return -1;
 }
 private int getoptEmissingShort(char opt) {
 	if (getopt_prepbuf()) return -100;
 	snprintf(getopterrbuf, GETOPTBFSZ,
-		"main: missing argument for -%c\n", opt);
+		"main: missing argument for -%c.", opt);
+	return -1;
+}
+private int getoptEmalformatted(const(char)* opt) {
+	if (getopt_prepbuf()) return -100;
+	snprintf(getopterrbuf, GETOPTBFSZ,
+		"main: argument switch '--%s' is malformatted.", opt);
 	return -1;
 }
 
