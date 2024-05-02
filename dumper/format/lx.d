@@ -40,6 +40,7 @@ void dump_lx_hdr(adbg_object_t *o) {
 		"COMPATPMWIN".ptr, LX_FLAG_COMPATPMWIN,
 		"USESPMWIN".ptr, LX_FLAG_USESPMWIN,
 		"MODUNLOADABLE".ptr, LX_FLAG_MODUNLOADABLE,
+		"MPUNSAFE".ptr, LX_FLAG_MPUNSAFE,
 		"PROCLIBTERM".ptr, LX_FLAG_PROCLIBTERM,
 		null);
 	print_x32("e32_mflags:ModuleType", mflags, adbg_object_lx_modtype_string(mflags));

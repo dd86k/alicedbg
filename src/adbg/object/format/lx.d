@@ -5,12 +5,17 @@
 /// License: BSD-3-Clause-Clear
 module adbg.object.format.lx;
 
-// NOTE: LX is mainly 16-bit only and LE mixed 16/32-bit
-
 import adbg.error;
 import adbg.object.server : adbg_object_t, AdbgObject;
 import adbg.machines;
 import adbg.utils.bit;
+
+// Sources:
+// - Windows SDK headers
+// - LX - Linear eXecutable Module Format Description, June 3, 1992
+// - IBM OS/2 16/32-BIT OBJECT MODULE FORMAT (OMF) AND LINEAR EXECUTABLE MODULE FORMAT (LX) Version 10, October 9, 1996
+
+// NOTE: LX is mainly 16-bit only and LE mixed 16/32-bit
 
 extern (C):
 
@@ -35,6 +40,8 @@ enum : ushort {
 	LX_OS_DOS4	= 0x0003,
 	/// Windows 386
 	LX_OS_WINS386	= 0x0004,
+	/// IBM Microkernel Personality Neutral (Workplace OS)
+	LX_OS_NEUTRAL	= 0x0005,
 }
 enum : uint {
 	/// Per-Process Library Initialization
@@ -51,8 +58,10 @@ enum : uint {
 	LX_FLAG_USESPMWIN	= 0x00000300, // Mask
 	/// Module is not loadable.
 	LX_FLAG_MODUNLOADABLE	= 0x00002000,
+	/// Multiple-processor unsafe.
+	LX_FLAG_MPUNSAFE	= 0x00080000,
 	/// Per-process Library Termination.
-	LX_FLAG_PROCLIBTERM	= 0x40000000,
+	LX_FLAG_PROCLIBTERM	= 0x40000000, // Invalid for EXE
 	
 	/// Module type mask.
 	LX_FLAG_MODTYPE_MASK	= 0x00038000,
@@ -376,6 +385,7 @@ const(char)* adbg_object_lx_ostype_string(ushort os) {
 	case LX_OS_WIN:	return "Windows";
 	case LX_OS_DOS4:	return "DOS 4.x";
 	case LX_OS_WINS386:	return "Windows 386";
+	case LX_OS_NEUTRAL:	return "IBM Microkernel";
 	default:	return "Unknown";
 	}
 }
