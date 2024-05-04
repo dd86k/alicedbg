@@ -20,6 +20,8 @@ import common.error;
 import common.cli : opt_machine, opt_syntax;
 import common.utils;
 
+//TODO: print_error(string)
+
 extern (C):
 __gshared:
 
@@ -144,6 +146,7 @@ int dump(const(char)* path) {
 		case archive:	return dump_archive(o);
 		case mdmp:	return dump_minidump(o);
 		case dmp:	return dump_dmp(o);
+		case omf:	return dump_omf(o);
 		case coff:	return dump_coff(o);
 		case mscoff:	return dump_mscoff(o);
 		case unknown:	assert(0, "Unknown object type"); // Raw/unknown
@@ -151,7 +154,7 @@ int dump(const(char)* path) {
 	}
 	
 	// Otherwise, make a basic summary
-	printf("%s: %s (%s), %s\n", path,
+	printf("%s: %s (%s), %s", path,
 		adbg_object_format_name(o), adbg_object_format_shortname(o),
 		adbg_object_format_kind_string(o));
 	
@@ -286,41 +289,43 @@ void print_stringl(const(char)* name, const(char)* val, int len) {
 }
 //TODO: print_stringf
 
-void print_flags16(const(char) *section, ushort flags, ...) {
-	printf("%*s: 0x%04x\t(", __field_padding, section, flags);
-	
-	va_list args = void;
-	va_start(args, flags);
+
+private
+void print_flagsv(int flags, va_list list) {
 	ushort count;
-L_START:
-	const(char) *name = va_arg!(const(char)*)(args);
+Lfetch:
+	const(char) *name = va_arg!(const(char)*)(list);
 	if (name == null) {
 		puts(")");
 		return;
 	}
 	
-	if ((flags & va_arg!int(args)) == 0) goto L_START; // condition
+	if ((flags & va_arg!int(list)) == 0) goto Lfetch; // condition
 	if (count++) putchar(',');
 	printf("%s", name);
-	goto L_START;
+	goto Lfetch;
+}
+
+void print_flags8(const(char) *section, ubyte flags, ...) {
+	printf("%*s: 0x%02x\t(", __field_padding, section, flags);
+	
+	va_list args = void;
+	va_start(args, flags);
+	print_flagsv(flags, args);
+}
+void print_flags16(const(char) *section, ushort flags, ...) {
+	printf("%*s: 0x%04x\t(", __field_padding, section, flags);
+	
+	va_list args = void;
+	va_start(args, flags);
+	print_flagsv(flags, args);
 }
 void print_flags32(const(char) *section, uint flags, ...) {
 	printf("%*s: 0x%08x\t(", __field_padding, section, flags);
 	
 	va_list args = void;
 	va_start(args, flags);
-	ushort count;
-L_START:
-	const(char) *name = va_arg!(const(char)*)(args);
-	if (name == null) {
-		puts(")");
-		return;
-	}
-	
-	if ((flags & va_arg!int(args)) == 0) goto L_START; // condition
-	if (count++) putchar(',');
-	printf("%s", name);
-	goto L_START;
+	print_flagsv(flags, args);
 }
 void print_flags64(const(char) *section, ulong flags, ...) {
 	printf("%*s: 0x%016llx\t(", __field_padding, section, flags);

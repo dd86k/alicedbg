@@ -15,6 +15,7 @@ public import
 	adbg.object.format.pdb,
 	adbg.object.format.mdmp,
 	adbg.object.format.dmp,
+	adbg.object.format.omf,
 	adbg.object.format.ar,
 	adbg.object.format.coff,
 	adbg.object.format.mscoff;

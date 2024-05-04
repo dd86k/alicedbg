@@ -78,12 +78,20 @@ enum AdbgObject {
 	dmp,
 	/// Windows Minidump format. (.mdmp)
 	mdmp,
-	/// Library archive. (.lib)
+	/// OMF object or library. (.obj, .lib)
+	omf,
+	/// COFF Library archive. (.lib)
 	archive,
 	/// COFF object. (.obj)
 	coff,
 	/// MSCOFF object. (.obj)
 	mscoff,
+}
+
+/// 
+enum AdbgObjectKind {
+	unknown,
+	executable
 }
 
 /// Object origin. (or "load mode")
@@ -298,6 +306,13 @@ struct adbg_object_t {
 			dmp64_header *header64;
 		}
 		dmp_t dmp;
+		
+		struct omf_t {
+			omf_lib_header *header;
+			int pgsize;
+			int firstentry;
+		}
+		omf_t omf;
 		
 		struct coff_t {
 			coff_header *header;
@@ -716,8 +731,19 @@ L_ARG:
 	case COFF_MAGIC_MIPSEL:
 		return adbg_object_coff_load(o);
 	default:
-		return adbg_oops(AdbgError.objectUnknownFormat);
 	}
+	
+	// 8-bit signature detection
+	ubyte sig8 = *o.buffer8;
+	switch (sig8) {
+	case OMFRecord.LIBRARY: // OMF library header entry
+	case OMFRecord.THEADR: // First OMF object entry of THEADR
+	case OMFRecord.LHEADR: // First OMF object entry of LHEADR
+		return adbg_object_omf_load(o, sig8);
+	default:
+	}
+	
+	return adbg_oops(AdbgError.objectUnknownFormat);
 }
 
 //TODO: adbg_object_load_continue if partial was used
@@ -770,6 +796,7 @@ const(char)* adbg_object_format_shortname(adbg_object_t *o) {
 	case pdb70:	return "pdb70";
 	case mdmp:	return "mdmp";
 	case dmp:	return "dmp";
+	case omf:	return "omf";
 	case archive:	return "archive";
 	case coff:	return "coff";
 	case mscoff:	return "mscoff";
@@ -795,6 +822,7 @@ const(char)* adbg_object_format_name(adbg_object_t *o) {
 	case pdb70:	return `Program Database 7.0`;
 	case mdmp:	return `Windows Minidump`;
 	case dmp:	return `Windows Memory Dump`;
+	case omf:	return `Relocatable Object Module Format`;
 	case archive:	return `Common Object File Format Library Archive`;
 	case coff:	return `Common Object File Format`;
 	case mscoff:	return `Microsoft Common Object File Format`;
@@ -834,6 +862,8 @@ const(char)* adbg_object_format_kind_string(adbg_object_t *o) {
 		return `Memory Dump`;
 	case archive:
 		return `Library`;
+	case omf:
+		return o.i.omf.firstentry ? `Library` : `Object`;
 	case coff, mscoff:
 		return `Object`;
 	default: Lunknown:

@@ -16,6 +16,7 @@ public import
 	format.pdb20,
 	format.mdmp,
 	format.dmp,
+	format.omf,
 	format.ar,
 	format.coff,
 	format.mscoff;
