@@ -100,7 +100,7 @@ int shell_start(int argc, const(char)** argv) {
 	
 	// Start process if specified
 	if (argc > 0 && argv) {
-		// Assume argv is null-terminated
+		// Assume argv is null-terminated as it is on msvcrt and glibc
 		ecode = shell_proc_spawn(*argv, argv + 1);
 		if (ecode) {
 			printf("Error: %s\n", adbg_error_msg());
@@ -278,9 +278,7 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "spawn" ],
 		"Spawn a new process into debugger.",
-		[
-			"FILE [ARGS...]"
-		],
+		[ "FILE [ARGS...]" ],
 		MODULE_DEBUGGER, CATEGORY_PROCESS,
 		[
 			{
@@ -293,9 +291,7 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "attach" ],
 		"Attach debugger to live process.",
-		[
-			"PID"
-		],
+		[ "PID" ],
 		MODULE_DEBUGGER, CATEGORY_PROCESS,
 		[
 			{
@@ -364,12 +360,12 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "stepi" ],
 		"Perform an instruction step.",
-		[],
+		[ "[TIMES]" ],
 		MODULE_DEBUGGER, CATEGORY_PROCESS,
 		[
 			{
 				SECTION_DESCRIPTION,
-				[ "From a paused state, executes exactly one instruction." ]
+				[ "From a paused state, executes exactly one or more instruction." ]
 			}
 		],
 		&command_stepi,
@@ -380,9 +376,7 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "regs" ],
 		"Lists register values.",
-		[
-			"[NAME]"
-		],
+		[ "[NAME]" ],
 		MODULE_DEBUGGER, CATEGORY_CONTEXT,
 		[
 			{
@@ -398,9 +392,7 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "m", "memory" ],
 		"Dump process memory from address.",
-		[
-			"ADDRESS [LENGTH=64]"
-		],
+		[ "ADDRESS [LENGTH=64]" ],
 		MODULE_DEBUGGER, CATEGORY_MEMORY,
 		[
 			{
@@ -426,9 +418,7 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "d", "disassemble" ],
 		"Disassemble instructions at address.",
-		[
-			"ADDRESS [COUNT=1]"
-		],
+		[ "ADDRESS [COUNT=1]" ],
 		MODULE_DEBUGGER, CATEGORY_MEMORY,
 		[
 			{
@@ -444,11 +434,7 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "scan" ],
 		"Scan for value in memory.",
-		[
-			"TYPE VALUE",
-			"show",
-			"reset",
-		],
+		[ "TYPE VALUE", "show", "reset", ],
 		MODULE_DEBUGGER, CATEGORY_MEMORY,
 		[
 			{
@@ -482,9 +468,7 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "help" ],
 		"Show help or a command's help article.",
-		[
-			"[ITEM]"
-		],
+		[ "[ITEM]" ],
 		MODULE_SHELL, CATEGORY_SHELL,
 		[
 			
@@ -547,7 +531,7 @@ int shell_proc_spawn(const(char) *exec, const(char) **argv) {
 		return ShellError.alicedbg;
 	
 	printf("Process '%s' created", exec);
-	if (argv) {
+	if (argv && *argv) {
 		printf(" with arguments:");
 		for (int i; argv[i]; ++i)
 			printf(" '%s'", argv[i]);
@@ -835,6 +819,12 @@ int command_kill(int argc, const(char) **argv) {
 }
 
 int command_stepi(int argc, const(char) **argv) {
+	int times = 1;
+	if (argc > 0)
+		times = atoi(*argv);
+	if (times <= 0)
+		return ShellError.invalidParameter;
+	
 	if (adbg_debugger_stepi(process))
 		return ShellError.alicedbg;
 	if (adbg_debugger_wait(process, &shell_event_exception))

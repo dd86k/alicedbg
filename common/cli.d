@@ -320,6 +320,27 @@ unittest {
 	assert(e < 0);   // Option -E not found
 	assert(hit == false); // 
 }
+unittest {
+	__gshared bool hit;
+	static int opttest() {
+		return 0;
+	}
+	static immutable(option_t)[] options = [
+		option_t('t', "test", "testing switch", &opttest),
+	];
+	static const(char) **argv = [
+		"alicedbg", "alicedbg.exe"
+	];
+	static int argc = 2;
+	
+	int e = getopt(argc, argv, options);
+	assert(e == 1);
+	assert(hit == false); // 
+	
+	const(char) **leftovers = getoptleftovers();
+	assert(strcmp(*leftovers, "alicedbg.exe") == 0);
+	assert(*(leftovers + 1) == null);
+}
 
 /// Print options
 void getoptprinter(immutable(option_t)[] options) {

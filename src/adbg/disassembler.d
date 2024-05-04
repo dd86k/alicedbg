@@ -227,8 +227,6 @@ adbg_disassembler_t* adbg_dis_open(AdbgMachine machine = AdbgMachine.native) {
 	if (libcapstone_dynload())
 		return null;
 	
-	version (Trace) trace("machine=%u (%s)", machine, adbg_object_machine_alias(machine));
-	
 	int cs_arch = void, cs_mode = void;
 	if (adbg_dis_lib_a2cs(cs_arch, cs_mode, machine))
 		return null;

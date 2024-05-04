@@ -198,17 +198,21 @@ LOPT:
 	// Temporary until reworked
 	/*case AdbgSpawnOpt.args:
 		args = va_arg!(const(char)*)(list);
+		version (Trace) trace("args=%p", args);
 		goto LOPT;*/
 	case AdbgSpawnOpt.argv:
 		argv = va_arg!(const(char)**)(list);
+		version (Trace) trace("argv=%p", argv);
 		goto LOPT;
 	// Temporary until implemented
 	case AdbgSpawnOpt.directory:
 		dir = va_arg!(const(char)*)(list);
+		version (Trace) trace("dir=%p", dir);
 		goto LOPT;
 	// Temporary until reworked
 	/*case AdbgSpawnOpt.environment:
 		envp = va_arg!(const(char)**)(list);
+		version (Trace) trace("envp=%p", envp);
 		goto LOPT;*/
 	case AdbgSpawnOpt.debugChildren:
 		if (va_arg!(int)(list)) options |= OPT_DEBUG_ALL;
@@ -232,7 +236,7 @@ version (Windows) {
 	//       Windows will search for the external command, which is unwanted.
 	
 	// Add argv is specified, we'll have to cram it into args
-	if (argv) {
+	if (argv && *argv) {
 		// Get minimum total buffer size required
 		int argc;
 		size_t commlen = strlen(path);
@@ -260,7 +264,7 @@ version (Windows) {
 		int cl = cast(int)minlen - cast(int)i; // Buffer space left
 		if (cl <= 0) {
 			adbg_process_destroy(proc);
-			adbg_oops(AdbgError.crt);
+			adbg_oops(AdbgError.assertion);
 			return null;
 		}
 		size_t o = adbg_strings_flatten(proc.args + i, cl, argc, argv, 1);
@@ -343,7 +347,7 @@ version (Windows) {
 		return null;
 	}
 	proc.argv[0] = cast(char*)path;
-	if (argc && argv)
+	if (argc && argv && *argv)
 		memcpy(proc.argv + 1, argv, argc * size_t.sizeof);
 	proc.argv[argc + 1] = null;
 	
