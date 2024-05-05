@@ -5,19 +5,21 @@
 /// License: BSD-3-Clause-Clear
 module shell;
 
-import adbg.error, adbg.debugger, adbg.disassembler, adbg.object;
+import adbg.error, adbg.debugger, adbg.disassembler, adbg.object, adbg.machines;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import core.stdc.string;
-import debugger;
 import common.error;
 import common.cli : opt_syntax;
 import common.utils;
+import debugger;
 import term;
 
 // Enable new process name, although it is currently broken on Windows
 //version = UseNewProcessName
+
+//TODO: Make disassembler setting to space out machine opcodes
 
 extern (C):
 
@@ -166,6 +168,7 @@ const(char)** last_spawn_argv;
 
 // NOTE: BetterC stderr bindings on Windows are broken
 //       And don't allow re-opening the streams, so screw it
+//       Fixed since DMD 1.103.1 and LDC 1.32.1?
 
 FILE *logfd;
 int loginit(const(char) *path) {
@@ -360,7 +363,7 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "stepi" ],
 		"Perform an instruction step.",
-		[ "[TIMES]" ],
+		[],
 		MODULE_DEBUGGER, CATEGORY_PROCESS,
 		[
 			{
@@ -418,15 +421,16 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "d", "disassemble" ],
 		"Disassemble instructions at address.",
-		[ "ADDRESS [COUNT=1]" ],
+		[ "[ADDRESS=PC/EIP/RIP [COUNT=1]]" ],
 		MODULE_DEBUGGER, CATEGORY_MEMORY,
 		[
 			{
 				SECTION_DESCRIPTION,
-				[ "Invoke the disassembler at the address. The debugger "~
-				"will read process memory, if able, and will repeat "~
-				"the operation COUNT times. By default, it will only "~
-				"disassemble one instruction." ]
+				[ "Invoke the disassembler at the given address.",
+				"The debugger will read process memory, if able,"~
+				" and will repeat the operation COUNT times."~
+				" By default, it will only disassemble one instruction at"~
+				" the register value that PC, EIP, or RIP points to." ]
 			}
 		],
 		&command_disassemble,
@@ -504,7 +508,7 @@ debug { // Crash command
 	
 	if (strcmp(ucommand, ucommand_crash.names[0].ptr) == 0)
 		return &ucommand_crash;
-}
+} // debug
 	// NOTE: Can't use foreach for local var escape
 	for (size_t i; i < shell_commands.length; ++i) {
 		immutable(command2_t) *cmd = &shell_commands[i];
@@ -577,8 +581,8 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 	
 	enum MBUFSZ = 64; /// Machine string buffer size
 	
-	ubyte[MAX_INSTR_SIZE] data = void;
-	char[MBUFSZ] machbuf = void;
+	ubyte[MAX_INSTR_SIZE] data = void; /// Main input buffer
+	char[MBUFSZ] machbuf = void; /// Formatted machine codes buffer
 	for (int i; i < count; ++i) {
 		if (adbg_memory_read(process, address, data.ptr, MAX_INSTR_SIZE)) {
 			print_adbg_error();
@@ -592,17 +596,17 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 		
 		// Print address
 		if (showAddress)
-			printf("%8zx ", address);
+			printf("%zx ", address);
 		
 		// Print machine bytes into a dedicated buffer
 		size_t bo;
-		for (size_t bi; bi < op.size; ++bi) {
+		for (size_t bi; bi < op.size && bo < MBUFSZ; ++bi)
 			bo += snprintf(machbuf.ptr + bo, MBUFSZ - bo, " %02x", op.machine[bi]);
-			//printf(" %02x", op.machine[bi]);
-		}
 		
-		// Print mnemonic & operands
-		printf("%s  \t%s", machbuf.ptr, op.mnemonic);
+		// Print opcodes and mnemonic
+		printf("%*s  %s", -(10 * 3), machbuf.ptr, op.mnemonic);
+		
+		// Print operands, if any
 		if (op.operands)
 			printf(" %s", op.operands);
 		
@@ -818,13 +822,8 @@ int command_kill(int argc, const(char) **argv) {
 	return 0;
 }
 
+// NOTE: Can't simply execute stepi multiple times in a row
 int command_stepi(int argc, const(char) **argv) {
-	int times = 1;
-	if (argc > 0)
-		times = atoi(*argv);
-	if (times <= 0)
-		return ShellError.invalidParameter;
-	
 	if (adbg_debugger_stepi(process))
 		return ShellError.alicedbg;
 	if (adbg_debugger_wait(process, &shell_event_exception))
@@ -960,29 +959,43 @@ int command_maps(int argc, const(char) **argv) {
 	return 0;
 }
 
-//TODO: start,+length start,end syntax
+//TODO: "start,+length" and "start,end" syntax
 int command_disassemble(int argc, const(char) **argv) {
 	if (process == null)
 		return ShellError.unattached;
 	if (dis == null)
 		return ShellError.unavailable;
-	if (argc < 2)
-		return ShellError.missingOption;
 	
 	long uaddress = void;
-	if (unformat64(&uaddress, argv[1]))
-		return ShellError.unformat;
+	if (argc > 1) { // Address given
+		if (unformat64(&uaddress, argv[1]))
+			return ShellError.unformat;
+	} else { // Address not given, get PC/eIP value
+		//TODO: dedicated function to get PC/IP/EIP/RIP value
+		// HACK: register list should be allocated on-demand in global space
+		AdbgMachine mach = adbg_process_get_machine(process);
+		adbg_registers_t regs = void;
+		//if (adbg_registers_config(&regs, ))
+		//	return ShellError.alicedbg;
+		if (adbg_registers_fill(&regs, process))
+			return ShellError.alicedbg;
+		// Assume EIP/RIP is in regs[0]
+		switch (mach) with (AdbgMachine) {
+		case x86:   uaddress = regs.items[0].u32; break;
+		case amd64: uaddress = regs.items[0].u64; break;
+		default:    return ShellError.unavailable;
+		}
+	}
 	
-	int ucount = 1;
+	int ucount = 10;
 	if (argc >= 3) {
 		if (unformat(&ucount, argv[2]))
 			return ShellError.unformat;
 		if (ucount <= 0)
 			return 0;
 	}
-	if (ucount < 1) {
+	if (ucount < 1)
 		return ShellError.invalidCount;
-	}
 	
 	shell_event_disassemble(cast(size_t)uaddress, ucount);
 	return 0;
