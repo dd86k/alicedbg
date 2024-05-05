@@ -37,8 +37,8 @@ immutable option_t[] options = [
 	option_syntax,
 	// selections
 	option_t('H', "headers",      "Dump object's headers", &cliopt_headers),
-	option_t(0,   "section",      "Dump object's section by name", &cliopt_section),
 	option_t('S', "sections",     "Dump object's sections", &cliopt_sections),
+	option_t(0,   "section",      "Dump object's section by name", &cliopt_section),
 	option_t('I', "imports",      "Dump object's import information", &cliopt_imports),
 	option_t('E', "exports",      "Dump object's export information", &cliopt_exports),
 //	option_t(0,   "loadcfg",      "Dump object's load configuration", &cliopt_loadcfg),

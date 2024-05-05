@@ -15,6 +15,9 @@ import core.stdc.stdio;
 import core.stdc.stdlib;
 import core.stdc.string;
 
+//TODO: Consider separating getopt impl. to common.getopt,
+//      and leave common CLI options here
+
 /// Copyright string
 enum COPYRIGHT = "Copyright (c) 2019-2024 dd86k <dd@dax.moe>";
 
@@ -154,7 +157,7 @@ ptrdiff_t strsrch(const(char) *hay, int needle) {
 	return -1;
 }
 unittest {
-	assert(strsrch("hello", 'q') < 0);
+	assert(strsrch("hello", 'q')  < 0); // not found
 	assert(strsrch("hello", 'h') == 0);
 	assert(strsrch("hello", 'e') == 1);
 	assert(strsrch("hello", 'l') == 2);
@@ -341,6 +344,34 @@ unittest {
 	assert(strcmp(*leftovers, "alicedbg.exe") == 0);
 	assert(*(leftovers + 1) == null);
 }
+/// Test similar switch names
+/*unittest {
+	__gshared bool hit;
+	static int opttests() {
+		hit = true;
+		return 0;
+	}
+	__gshared const(char)* name;
+	static int opttest(const(char)* v) {
+		name = v;
+		return 0;
+	}
+	static immutable(option_t)[] options = [
+		option_t('T', "tests", "all tests", &opttest),
+		option_t('t', "test",  "select test", &opttest),
+	];
+	static const(char) **argv = [
+		"alicedbg", "--tests"
+	];
+	static int argc = 2;
+	
+	int e = getopt(argc, argv, options);
+	assert(e == 0); // No leftovers
+	assert(hit == true); // 
+	
+	const(char) **leftovers = getoptleftovers();
+	assert(leftovers == null);
+}*/
 
 /// Print options
 void getoptprinter(immutable(option_t)[] options) {
