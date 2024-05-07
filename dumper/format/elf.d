@@ -555,14 +555,60 @@ void dump_elf_section64(Elf64_Shdr *shdr, uint idx, const(char)* name, int nmax)
 //TODO: Section machine-specific flags (like SHF_X86_64_LARGE)
 
 void dump_elf_exports(adbg_object_t *o) {
-	adbg_section_t *section = adbg_object_section_n(o, ".dynsym");
-	if (section == null) {
-		print_string("error", "No dynamic section found");
+	adbg_section_t *dynsym = adbg_object_section_n(o, ".dynsym");
+	if (dynsym == null) {
+		print_string("error", ".dynsym section missing");
+		return;
+	}
+	adbg_section_t *dynstr = adbg_object_section_n(o, ".dynstr");
+	if (dynstr == null) {
+		print_string("error", ".dynstr section missing");
 		return;
 	}
 	
 	print_header("Dynamic Symbols");
 	
+	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
+	case ELF_CLASS_32:
+		Elf32_Sym* entry = cast(Elf32_Sym*)dynsym.data;
+		int count = cast(int)(dynsym.data_size / Elf32_Sym.sizeof);
+		
+		for (int i; i < count; ++i, ++entry) with (entry) {
+			//TODO: Check bounds
+			if (st_name + 1 >= dynstr.data_size) { // +null
+				print_string("error", "Name outside dynstr section");
+				break;
+			}
+			print_section(i, "test");
+			print_x32("st_name", st_name, cast(char*)dynstr.data + st_name);
+			print_x8("st_info", st_info);
+			print_x16("st_other", st_other);
+			print_x32("st_shndx", st_shndx);
+			print_x32("st_value", st_value);
+			print_x32("st_size", st_size);
+		}
+		break;
+	case ELF_CLASS_64:
+		Elf64_Sym* entry = cast(Elf64_Sym*)dynsym.data;
+		int count = cast(int)(dynsym.data_size / Elf64_Sym.sizeof);
+		
+		for (int i; i < count; ++i, ++entry) with (entry) {
+			//TODO: Check bounds
+			if (st_name + 1 >= dynstr.data_size) { // +null
+				print_string("error", "Name outside dynstr section");
+				break;
+			}
+			print_section(i, "test");
+			print_x32("st_name", st_name, cast(char*)dynstr.data + st_name);
+			print_x8("st_info", st_info);
+			print_x16("st_other", st_other);
+			print_x64("st_shndx", st_shndx);
+			print_x64("st_value", st_value);
+			print_x64("st_size", st_size);
+		}
+		break;
+	default:
+	}
 	
 }
 

@@ -20,11 +20,12 @@ import common.error;
 import common.cli : opt_machine, opt_syntax;
 import common.utils;
 
-//TODO: print_error(string)
+//TODO: print_error(string, ...)
 //TODO: Like print_flagsX, something for bit masks: print_mask
 //      signature: print_mask(name, flags, values...);
 //      usage: print_mask("something:something", 0x30, THING1, THING2, etc.)
 //TODO: print_stringf
+//TODO: print_wstringl (wide-string)
 //TODO: if opt_extract_to defined, save to it
 //      needs a unified "data out" function
 //TODO: (disassembly) attach shortest and longuest instructions found to buffers

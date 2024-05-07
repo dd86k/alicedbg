@@ -51,6 +51,10 @@ extern (C):
 //      Uses:
 //      - For swapping, uses less code than inlining it
 //      - For displaying and using field offsets
+//TODO: adbg_object_t: Consider grouping all properties into one
+//      Instead of multiple structures, it might be
+//      better to group all the options/properties/internals
+//      into one structure (e.g., "struct info_t" member .info)
 
 /// Executable or object file format.
 enum AdbgObject {
@@ -88,22 +92,24 @@ enum AdbgObject {
 	mscoff,
 }
 
-/// 
-enum AdbgObjectKind {
+// 
+/*enum AdbgObjectKind {
 	unknown,
-	executable
-}
+	executable,
+}*/
 
+// Can't this just be a flag?
 /// Object origin. (or "load mode")
 ///
 /// How was the object loaded or hooked.
+private
 enum AdbgObjectOrigin {
 	/// Object is unloaded, or the loading method is unknown.
 	unknown,
 	/// Object was loaded from disk.
 	disk,
 	/// Object was loaded from the debugger into memory.
-	debugger,
+	process,
 	//TODO: user buffer (memory)
 }
 
@@ -156,11 +162,6 @@ struct adbg_object_t {
 	
 	/// Loaded object format.
 	AdbgObject format;
-	
-	//TODO: Consider grouping all properties into one
-	//      Instead of multiple structures, it might be
-	//      better to group all the options/properties/internals
-	//      into one structure (e.g., "struct info_t" member .info)
 	
 	// Object properties.
 	package
@@ -466,8 +467,7 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 	va_start(list, path);
 	
 	if (adbg_object_loadv(o, list)) {
-		fclose(o.file_handle);
-		free(o);
+		adbg_object_close(o);
 		return null;
 	}
 	
@@ -560,7 +560,7 @@ void adbg_object_close(adbg_object_t *o) {
 		if (memcpy(buffer, o.buffer + location, rsize))
 			return adbg_oops(AdbgError.crt);
 		return 0;
-	case debugger:
+	case process:
 		return adbg_memory_read(
 			o.process, cast(size_t)location, buffer, cast(uint)rsize);
 	default:
@@ -754,9 +754,6 @@ L_ARG:
 	
 	return adbg_oops(AdbgError.objectUnknownFormat);
 }
-
-//TODO: adbg_object_load_continue if partial was used
-//      set new buffer_size, partial=false
 
 adbg_section_t* adbg_object_section_n(adbg_object_t *o, const(char)* name, uint flags = 0) {
 	if (o == null || name == null) {

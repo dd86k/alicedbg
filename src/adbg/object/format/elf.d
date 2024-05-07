@@ -1,8 +1,9 @@
 /// ELF format.
 ///
 /// Sources:
-/// - http://www.sco.com/developers/gabi/latest/ch4.eheader.html
 /// - linux/include/uapi/linux/elf.h
+/// - http://www.sco.com/developers/gabi/latest/ch4.eheader.html
+/// - https://docs.oracle.com/cd/E19683-01/816-1386/chapter6-79797/index.html
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -683,6 +684,15 @@ struct Elf64_Rela {
 	Elf32_Addr  offset;
 	Elf32_Word  info;
 	Elf32_Sword addend;
+}
+
+struct Elf64_Sym {
+        Elf64_Word  st_name;
+        ubyte       st_info;
+        ubyte       st_other;
+        Elf64_Half  st_shndx;
+        Elf64_Addr  st_value;
+        Elf64_Xword st_size;
 }
 
 /// ELF64 Compressed header
