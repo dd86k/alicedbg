@@ -324,6 +324,7 @@ struct adbg_object_t {
 		
 		struct coff_t {
 			coff_header *header;
+			ushort sig;
 		}
 		coff_t coff;
 		
@@ -738,17 +739,16 @@ L_ARG:
 	case COFF_MAGIC_MSP430:
 	case COFF_MAGIC_TMS320C5500P:
 	case COFF_MAGIC_MIPSEL:
-		return adbg_object_coff_load(o);
+		return adbg_object_coff_load(o, *o.buffer16);
 	default:
 	}
 	
 	// 8-bit signature detection
-	ubyte sig8 = *o.buffer8;
-	switch (sig8) {
+	switch (*o.buffer8) {
 	case OMFRecord.LIBRARY: // OMF library header entry
 	case OMFRecord.THEADR: // First OMF object entry of THEADR
 	case OMFRecord.LHEADR: // First OMF object entry of LHEADR
-		return adbg_object_omf_load(o, sig8);
+		return adbg_object_omf_load(o, *o.buffer8);
 	default:
 	}
 	
@@ -853,6 +853,24 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	case elf:
 		with (o.i.elf32.ehdr)
 		return adbg_object_elf_machine(e_machine, e_ident[ELF_EI_CLASS]);
+	case coff:
+		switch (o.i.coff.sig) {
+		case COFF_MAGIC_I386:
+		case COFF_MAGIC_I386_AIX:	return AdbgMachine.x86;
+		case COFF_MAGIC_AMD64:	return AdbgMachine.amd64;
+		case COFF_MAGIC_IA64:	return AdbgMachine.ia64;
+		case COFF_MAGIC_Z80:	return AdbgMachine.z80;
+		/*case COFF_MAGIC_TMS470:	return AdbgMachine.;
+		/*case COFF_MAGIC_TMS320C5400:	return AdbgMachine.;
+		case COFF_MAGIC_TMS320C6000:	return AdbgMachine.;
+		case COFF_MAGIC_TMS320C5500:	return AdbgMachine.;
+		case COFF_MAGIC_TMS320C2800:	return AdbgMachine.;
+		case COFF_MAGIC_MSP430:	return AdbgMachine.;
+		case COFF_MAGIC_TMS320C5500P:	return AdbgMachine.;*/
+		case COFF_MAGIC_MIPSEL:	return AdbgMachine.mipsle;
+		default:
+		}
+		break;
 	default:
 	}
 	return AdbgMachine.unknown;
