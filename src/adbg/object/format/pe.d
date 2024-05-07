@@ -180,6 +180,7 @@ enum : ushort { // PE_HEADER
 	PE_SUBSYSTEM_EFI_ROM	= 13,
 	PE_SUBSYSTEM_XBOX	= 14,
 	PE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION	= 16,
+	PE_SUBSYSTEM_XBOX_CODE_CATALOG	= 17,
 }
 
 /// COFF file header (object and image)
@@ -409,6 +410,8 @@ enum : uint {
 	PE_IMAGE_DEBUG_TYPE_REPRO	= 16,
 	/// Embedded Portable PDB Debug Directory Entry
 	PE_IMAGE_DEBUG_TYPE_EMBEDDED	= 17,
+	/// SPGo debug types
+	PE_IMAGE_DEBUG_TYPE_SPGO	= 18,
 	/// Crypto hash of the content of the symbol file the PE/COFF file was built with.
 	PE_IMAGE_DEBUG_TYPE_HASH	= 19,
 	/// Extended DLL characteristics bits.
@@ -589,6 +592,14 @@ struct PE_LOAD_CONFIG_DIR32 { align(1):
 	uint32_t Reserved3;
 	uint32_t EnclaveConfigurationPointer;	// VA
 	uint32_t VolatileMetadataPointer;	// VA
+	// 10.0.2261.0
+	uint GuardEHContinuationTable;	// VA
+	uint GuardEHContinuationCount;
+	uint GuardXFGCheckFunctionPointer;	// VA
+	uint GuardXFGDispatchFunctionPointer;	// VA
+	uint GuardXFGTableDispatchFunctionPointer;	// VA
+	uint CastGuardOsDeterminedFailureMode;	// VA
+	uint GuardMemcpyFunctionPointer;	// VA
 }
 
 /// IMAGE_LOAD_CONFIG_DIRECTORY64
@@ -640,6 +651,14 @@ struct PE_LOAD_CONFIG_DIR64 { align(1):
 	uint32_t Reserved3;
 	uint64_t EnclaveConfigurationPointer;     // VA
 	uint64_t VolatileMetadataPointer;         // VA
+	// 10.0.22621.0
+	ulong GuardEHContinuationTable;	// VA
+	ulong GuardEHContinuationCount;
+	ulong GuardXFGCheckFunctionPointer;	// VA
+	ulong GuardXFGDispatchFunctionPointer;	// VA
+	ulong GuardXFGTableDispatchFunctionPointer;	// VA
+	ulong CastGuardOsDeterminedFailureMode;	// VA
+	ulong GuardMemcpyFunctionPointer;	// VA
 }
 
 struct PE_SECTION_ENTRY { align(1):
@@ -1511,6 +1530,7 @@ const(char) *adbg_object_pe_subsys_string(ushort subsystem) {
 	case PE_SUBSYSTEM_EFI_ROM:	return "EFI ROM";
 	case PE_SUBSYSTEM_XBOX:	return "XBOX";
 	case PE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION:	return "Windows Boot";
+	case PE_SUBSYSTEM_XBOX_CODE_CATALOG:	return "XBOX Code Catalog";
 	default:	return null;
 	}
 }
