@@ -37,8 +37,8 @@ license "BSD-3-Clause-Clear"
 #       But since configurations do, they are defined here, this is important
 #       because on the reliance on betterC.
 
-#TODO: Make docs/ddox builds only peek in src/
-#      Works with -c library
+# NOTE: Documentation (docs/ddox) builds
+#       Works best with the "library" configuration (-c|--configuration)
 
 #
 # ANCHOR Configurations
@@ -71,6 +71,14 @@ configuration "simple" {
 
 # Library
 configuration "library" {
+	sourcePaths "src"
+}
+
+# Dynamic/Shared library
+# NOTE: Does not work on Windows, yet
+configuration "shared" {
+	targetType "dynamicLibrary"
+	libs "ucrt" "kernel32" platform="windows"
 	sourcePaths "src"
 }
 
