@@ -115,6 +115,13 @@ enum AdbgObjectInternalFlags {
 	notnative	= 0x2,
 }
 
+struct adbg_section_t {
+	void *header;
+	size_t header_size;
+	void *data;
+	size_t data_size;
+}
+
 /// Represents a file object image.
 ///
 /// All fields are used internally and should not be used directly.
@@ -527,6 +534,8 @@ void adbg_object_close(adbg_object_t *o) {
 		free(o);
 }
 
+//TODO: adbg_object_write (disk source being copy-on-write to memory)
+
 // Read raw data from object.
 // Params:
 // 	o = Object instance.
@@ -749,11 +758,82 @@ L_ARG:
 //TODO: adbg_object_load_continue if partial was used
 //      set new buffer_size, partial=false
 
-//adbg_section_t adbg_object_section(adbg_object_t *o, size_t index, uint flags = 0) {	
+adbg_section_t* adbg_object_section_n(adbg_object_t *o, const(char)* name, uint flags = 0) {
+	if (o == null || name == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+
+	// First, first the section header by name
+	void *headerp = void; size_t header_size = void;
+	void *datap = void;   size_t data_size = void;
+	switch (o.format) with (AdbgObject) {
+	//case pe:
+	//	break;
+	case elf:
+		switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
+		case ELF_CLASS_32:
+			Elf32_Shdr *shdr32 = adbg_object_elf_shdr32_n(o, name);
+			if (shdr32 == null)
+				return null;
+			headerp = shdr32;
+			header_size = Elf32_Shdr.sizeof;
+			datap = o.buffer + shdr32.sh_offset;
+			data_size = shdr32.sh_size;
+			break;
+		case ELF_CLASS_64:
+			Elf64_Shdr *shdr64 = adbg_object_elf_shdr64_n(o, name);
+			if (shdr64 == null)
+				return null;
+			headerp = shdr64;
+			header_size = Elf64_Shdr.sizeof;
+			datap = o.buffer + shdr64.sh_offset;
+			data_size = shdr64.sh_size;
+			break;
+		default:
+			goto Lunavail;
+		}
+		break;
+	default:
+	Lunavail:
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	// Is section within bounds?
+	if (adbg_object_outboundpl(o, datap, data_size)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
+	
+	// TODO: Turn into vararg helper tool
+	//       mcalloc(pointer, size, pointer, size, null);
+	// Then, allocate the memory to hold the header and data
+	adbg_section_t *section = cast(adbg_section_t*)malloc(
+		adbg_section_t.sizeof + header_size + data_size);
+	if (section == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	section.header      = cast(void*)section + adbg_section_t.sizeof;
+	section.header_size = header_size;
+	section.data        = cast(void*)section + adbg_section_t.sizeof + header_size;
+	section.data_size   = data_size;
+	// Copy section header and section data
+	memcpy(section.header, headerp, header_size);
+	memcpy(section.data,   datap,   data_size);
+
+	return section;
+}
+
+//adbg_section_t* adbg_object_section_i(adbg_object_t *o, size_t index, uint flags = 0) {	
 //}
 
-//adbg_section_t adbg_object_section_search(adbg_object_t *o, const(char)* name, uint flags = 0) {
-//}
+void adbg_object_section_free(adbg_object_t *o, adbg_section_t *section) {
+	if (section == null)
+		return;
+	free(section);
+}
 
 /// Returns the first machine type the object supports.
 /// Params: o = Object instance.
@@ -771,7 +851,8 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	case elf:
 		with (o.i.elf32.ehdr)
 		return adbg_object_elf_machine(e_machine, e_ident[ELF_EI_CLASS]);
-	default:	return AdbgMachine.unknown;
+	default:
+		return AdbgMachine.unknown;
 	}
 }
 const(char)* adbg_object_machine_string(adbg_object_t *o) {
