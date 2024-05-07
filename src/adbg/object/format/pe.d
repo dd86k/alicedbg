@@ -470,6 +470,15 @@ struct PE_DEBUG_DATA_CODEVIEW_PDB70 { align(1):
 	char[1] Path;	/// Path to PDB (0-terminated UTF-8)
 }
 
+/// VC Featured data
+struct PE_DEBUG_DATA_VC_FEAT { align(1):
+	uint prevc11;	/// Pre-VC11
+	uint ccpp;	/// C/C++
+	uint gs;	/// /GS
+	uint sdl;	/// /SDL
+	uint guardn;	/// guardN
+}
+
 /// Declares that debugging information is embedded in the PE file at location
 /// specified by PointerToRawData.
 // https://github.com/dotnet/runtime/blob/main/docs/design/specs/PE-COFF.md

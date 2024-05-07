@@ -761,6 +761,23 @@ void dump_pe_debug(adbg_object_t *o) {
 		case PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:
 			// TODO: PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS
 			break;
+		case PE_IMAGE_DEBUG_TYPE_VC_FEATURE:
+			if (SizeOfData != PE_DEBUG_DATA_VC_FEAT.sizeof) {
+				print_string("error", "SizeOfData does not correspond to VC feature structure size");
+				break;
+			}
+			PE_DEBUG_DATA_VC_FEAT* vc = void;
+			if (adbg_object_offsetl(o, cast(void**)&vc,
+				PointerToRawData, PE_DEBUG_DATA_VC_FEAT.sizeof)) {
+				print_string("error", "PE_DEBUG_DATA_MISC out of bounds");
+				continue;
+			}
+			print_u32("PreVC11", vc.prevc11);
+			print_u32("C/C++", vc.ccpp);
+			print_u32("/GS", vc.gs);
+			print_u32("/SDL", vc.sdl);
+			print_u32("GuardN", vc.guardn);
+			break;
 		case PE_IMAGE_DEBUG_TYPE_POGO:
 			const(char) *pgotypestr = void;
 			switch (sig) {
