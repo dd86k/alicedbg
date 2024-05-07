@@ -842,18 +842,23 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	if (o == null)
 		return AdbgMachine.native;
 	
-	// NOTE: Both Mach-O headers (regular/fat) match in layout for cputype
 	switch (o.format) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
-	case ne:	return AdbgMachine.i8086; // and 32-bit, but hard to know
+	case ne: // NOTE: Can have a mix of 8086/i286/i386 instructions, take the highest
+		if (o.i.ne.header.ne_flags & NE_HFLAG_INTI386)
+			return AdbgMachine.x86;
+		if (o.i.ne.header.ne_flags & (NE_HFLAG_INT8086 | NE_HFLAG_INTI286))
+			return AdbgMachine.i8086;
+		break;
 	case pe:	return adbg_object_pe_machine(o.i.pe.header.Machine);
-	case macho:	return adbg_object_macho_machine(o.i.macho.header.cputype);
+	case macho: // NOTE: Both Mach-O headers (regular/fat) match in layout for cputype
+		return adbg_object_macho_machine(o.i.macho.header.cputype);
 	case elf:
 		with (o.i.elf32.ehdr)
 		return adbg_object_elf_machine(e_machine, e_ident[ELF_EI_CLASS]);
 	default:
-		return AdbgMachine.unknown;
 	}
+	return AdbgMachine.unknown;
 }
 const(char)* adbg_object_machine_string(adbg_object_t *o) {
 	AdbgMachine mach = adbg_object_machine(o);

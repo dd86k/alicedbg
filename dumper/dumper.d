@@ -21,6 +21,13 @@ import common.cli : opt_machine, opt_syntax;
 import common.utils;
 
 //TODO: print_error(string)
+//TODO: Like print_flagsX, something for bit masks: print_mask
+//      signature: print_mask(name, flags, values...);
+//      usage: print_mask("something:something", 0x30, THING1, THING2, etc.)
+//TODO: print_stringf
+//TODO: if opt_extract_to defined, save to it
+//      needs a unified "data out" function
+//TODO: (disassembly) attach shortest and longuest instructions found to buffers
 
 extern (C):
 __gshared:
@@ -287,7 +294,6 @@ void print_string(const(char)* name, const(char)* val) {
 void print_stringl(const(char)* name, const(char)* val, int len) {
 	printf("%*s: %.*s\n", __field_padding, name, len, val);
 }
-//TODO: print_stringf
 
 
 private
@@ -353,9 +359,6 @@ void print_directory_entry(const(char)* name, uint rva, uint size) {
 void print_reloc16(uint index, ushort seg, ushort off) {
 	printf("%4u. 0x%04x:0x%04x\n", index, seg, off);
 }
-
-//TODO: if opt_extract_to defined, save to it
-//      needs a unified "data out" function
 
 void print_data(const(char)* name, void *data, size_t size, ulong baseaddress = 0) {
 	if (setting_hexdump())
@@ -457,7 +460,6 @@ int dump_disassemble(AdbgMachine machine, void* data, ulong size, ulong base_add
 	adbg_dis_start(dis, data, cast(size_t)size, base_address);
 	
 	// stats mode
-	//TODO: attach shortest and longuest instructions found
 	if (setting_disasm_stats()) {
 		uint stat_avg;	/// instruction average size
 		uint stat_min = uint.max;	/// smallest instruction size

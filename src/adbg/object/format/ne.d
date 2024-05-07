@@ -11,7 +11,10 @@ import adbg.error;
 import adbg.utils.bit;
 import adbg.include.c.stdlib : calloc, free;
 
-// Got lazy mid-way
+// Sources:
+// - Windows 3.00 Developer's Notes. (Q65260)
+// - winnt.h (10.0.2261.0)
+// - https://www.fileformat.info/format/exe/corion-ne.htm
 
 extern (C):
 
@@ -21,9 +24,37 @@ enum NE_MAGIC = CHAR16!"NE";
 // Header flags
 enum : ushort {
 	/// Shared automatic data segment
-	NE_HFLAG_SINGLEDATA = 0x0001,
+	NE_HFLAG_DGROUP_SINGLEDATA = 0x0001, // dgroup = data group?
 	/// Instanced automatic data segment
-	NE_HFLAG_MULTIPLEDATA = 0x0002,
+	NE_HFLAG_DGROUP_MULTIPLEDATA = 0x0002,
+	/// 
+	NE_HFLAG_DGROUP_MASK = 0x0003,
+	
+	/// Global initialization
+	NE_HFLAG_GLOBALINIT = 0x0004,
+	/// Protected only
+	NE_HFLAG_PROTECTED = 0x0008,
+	/// Has 8086 instructions
+	NE_HFLAG_INT8086 = 0x0010,
+	/// Has 80286 instructions
+	NE_HFLAG_INTI286 = 0x0020,
+	/// Has 80386 instructions
+	NE_HFLAG_INTI386 = 0x0040,
+	/// Has 80x87 instructions
+	NE_HFLAG_INTX87 = 0x0080,
+	
+	/// Full screen (not aware of Windows/P.M. API)
+	NE_HFLAG_APP_FULLSCREEN = 0x0100,
+	/// Compatible with Windows/P.M. API
+	NE_HFLAG_APP_COMPATPM = 0x0200,
+	/// Uses Windows/P.M. API
+	NE_HFLAG_APP_USINGPM = 0x0300, // 3 << 8
+	///
+	NE_HFLAG_APP_MASK = 0x0300,
+	
+	/// OS/2 family 
+	NE_HFLAG_OS2 = 0x0800,
+	
 	/// Errors detected at link time, module will not load.
 	NE_HFLAG_LINKERERROR = 0x2000,
 	/// Library module.
@@ -87,7 +118,7 @@ enum : ubyte {
 	NE_RFLAG_ADDITIVE = 0x4
 }
 
-// NOTE: Names from winnt.h:_IMAGE_OS2_HEADER
+// In winnt.h, its name is _IMAGE_OS2_HEADER
 /// NE header
 struct ne_header {
 	/// Signature word.

@@ -32,11 +32,39 @@ void dump_ne_hdr(adbg_object_t *o) {
 	print_u16("ne_cbenttab", ne_cbenttab);
 	print_x32("ne_crc", ne_crc);
 	print_flags16("ne_flags", ne_flags,
-		"SINGLEDATA".ptr, NE_HFLAG_SINGLEDATA,
-		"MULTIPLEDATA".ptr, NE_HFLAG_MULTIPLEDATA,
+		"GLOBALINIT".ptr, NE_HFLAG_GLOBALINIT,
+		"PROTECTED".ptr, NE_HFLAG_PROTECTED,
+		"INT8086".ptr, NE_HFLAG_INT8086,
+		"INTI286".ptr, NE_HFLAG_INTI286,
+		"INTI386".ptr, NE_HFLAG_INTI386,
+		"INTX87".ptr, NE_HFLAG_INTX87,
+		"OS2".ptr, NE_HFLAG_OS2,
 		"LINKERERROR".ptr, NE_HFLAG_LINKERERROR,
 		"LIBMODULE".ptr, NE_HFLAG_LIBMODULE,
 		null);
+	ushort dgroup = ne_flags & NE_HFLAG_DGROUP_MASK;
+	switch (dgroup) {
+	case NE_HFLAG_DGROUP_SINGLEDATA:
+		print_x16("ne_flags:dgroup", dgroup, "SINGLEDATA");
+		break;
+	case NE_HFLAG_DGROUP_MULTIPLEDATA:
+		print_x16("ne_flags:dgroup", dgroup, "MULTIPLEDATA");
+		break;
+	default:
+	}
+	ushort app = ne_flags & NE_HFLAG_APP_MASK;
+	switch (app) {
+	case NE_HFLAG_APP_FULLSCREEN:
+		print_x16("ne_flags:app", app, "FULLSCREEN");
+		break;
+	case NE_HFLAG_APP_COMPATPM:
+		print_x16("ne_flags:app", app, "COMPATPM");
+		break;
+	case NE_HFLAG_APP_USINGPM:
+		print_x16("ne_flags:app", app, "USINGPM");
+		break;
+	default:
+	}
 	print_u16("ne_autodata", ne_autodata);
 	print_u16("ne_heap", ne_heap);
 	print_u16("ne_stack", ne_stack);

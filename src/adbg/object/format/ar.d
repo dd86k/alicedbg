@@ -16,6 +16,7 @@ import core.stdc.string : memcpy;
 // - Microsoft Portable Executable and Common Object File Format Specification
 //   Microsoft Corporation, Revision 6.0 - February 1999
 //   Microsoft Corporation, Revision 8.3 - February 2013
+// - winnt.h (10.0.22621.0)
 
 // Format:
 //   Signature
@@ -32,6 +33,10 @@ enum AR_MAGIC = CHAR64!"!<arch>\n";
 enum AR_THIN_MAGIC = CHAR64!"!<thin>\n";
 /// 
 private enum AR_EOL = CHAR16!"`\n";
+
+//private immutable char[16] AR_LINKER_MEMBER    = "/               ";
+//private immutable char[16] AR_LONGNAMES_MEMBER = "//              ";
+//private immutable char[16] AR_HYBRIDMAP_MEMBER = "/<HYBRIDMAP>/   ";
 
 /// 
 struct ar_file_header {

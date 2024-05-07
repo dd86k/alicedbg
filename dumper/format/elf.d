@@ -25,6 +25,9 @@ int dump_elf(adbg_object_t *o) {
 	if (selected_sections())
 		dump_elf_sections(o);
 	
+	if (selected_exports())
+		dump_elf_exports(o);
+	
 	if (setting_disasm_any())
 		dump_elf_disasm(o);
 	
@@ -223,7 +226,7 @@ LNEWNHDR:
 	
 	void *note = void;
 	if (adbg_object_offsetl(o, &note, noffset, cast(size_t)nleft)) {
-		print_string("warning", "Elf64_Phdr::p_offset points outside of file bounds");
+		print_string("error", "Elf64_Phdr::p_offset points outside of file bounds");
 		return;
 	}
 	
@@ -413,7 +416,7 @@ void dump_elf_sections(adbg_object_t *o) {
 		if (section_count == 0)
 			return;
 		
-		// Check id is without section count
+		// Check id is outside section count
 		ushort id = o.i.elf32.ehdr.e_shstrndx;
 		if (id >= section_count) {
 			print_string("error", "String table index out of bounds");
@@ -550,6 +553,18 @@ void dump_elf_section64(Elf64_Shdr *shdr, uint idx, const(char)* name, int nmax)
 }
 
 //TODO: Section machine-specific flags (like SHF_X86_64_LARGE)
+
+void dump_elf_exports(adbg_object_t *o) {
+	adbg_section_t *section = adbg_object_section_n(o, ".dynsym");
+	if (section == null) {
+		print_string("error", "No dynamic section found");
+		return;
+	}
+	
+	print_header("Dynamic Symbols");
+	
+	
+}
 
 void dump_elf_disasm(adbg_object_t *o) {
 	print_header("Disassembly");

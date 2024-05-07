@@ -15,6 +15,7 @@ import adbg.error;
 import adbg.utils.bit;
 import adbg.include.c.stdlib : calloc, free;
 import adbg.include.c.config;
+import core.stdc.string : strncmp;
 
 // NOTE: The string table section is typically named .shstrtab
 
@@ -1192,6 +1193,56 @@ Elf32_Shdr* adbg_object_elf_shdr32(adbg_object_t *o, size_t index) {
 	return shdr;
 }
 
+Elf32_Shdr* adbg_object_elf_shdr32_n(adbg_object_t *o, const(char) *name) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.elf32.shdr == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	ushort id = o.i.elf32.ehdr.e_shstrndx;
+	if (id >= o.i.elf32.ehdr.e_shnum) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
+	
+	uint table_offset = o.i.elf32.shdr[id].sh_offset;
+	if (adbg_object_outbound(o, table_offset)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
+	
+	enum SNMLEN = 32;
+	Elf32_Shdr *shdr = void;
+	char *table = o.bufferc + table_offset; // string table
+	for (int index; index < o.i.elf32.ehdr.e_shnum; ++index) {
+		shdr = &o.i.elf32.shdr[index];
+		if (o.p.reversed && o.i.elf32.reversed_phdr[index] == false) {
+			shdr.sh_name	= adbg_bswap32(shdr.sh_name);
+			shdr.sh_type	= adbg_bswap32(shdr.sh_type);
+			shdr.sh_flags	= adbg_bswap32(shdr.sh_flags);
+			shdr.sh_addr	= adbg_bswap32(shdr.sh_addr);
+			shdr.sh_offset	= adbg_bswap32(shdr.sh_offset);
+			shdr.sh_size	= adbg_bswap32(shdr.sh_size);
+			shdr.sh_link	= adbg_bswap32(shdr.sh_link);
+			shdr.sh_info	= adbg_bswap32(shdr.sh_info);
+			shdr.sh_addralign	= adbg_bswap32(shdr.sh_addralign);
+			shdr.sh_entsize	= adbg_bswap32(shdr.sh_entsize);
+			o.i.elf32.reversed_shdr[index] = true;
+		}
+		
+		const(char) *sname = table + shdr.sh_name;
+		if (strncmp(sname, name, SNMLEN) == 0)
+			return shdr;
+	}
+	
+	adbg_oops(AdbgError.objectItemNotFound);
+	return null;
+}
+
 Elf64_Ehdr* adbg_object_elf_ehdr64(adbg_object_t *o) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -1259,6 +1310,56 @@ Elf64_Shdr* adbg_object_elf_shdr64(adbg_object_t *o, size_t index) {
 		o.i.elf32.reversed_shdr[index] = true;
 	}
 	return shdr;
+}
+
+Elf64_Shdr* adbg_object_elf_shdr64_n(adbg_object_t *o, const(char) *name) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.i.elf64.shdr == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	ushort id = o.i.elf64.ehdr.e_shstrndx;
+	if (id >= o.i.elf64.ehdr.e_shnum) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
+	
+	ulong table_offset = o.i.elf64.shdr[id].sh_offset;
+	if (adbg_object_outbound(o, table_offset)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
+	
+	enum SNMLEN = 32;
+	Elf64_Shdr *shdr = void;
+	char *table = o.bufferc + table_offset; // string table
+	for (int index; index < o.i.elf64.ehdr.e_shnum; ++index) {
+		shdr = &o.i.elf64.shdr[index];
+		if (o.p.reversed && o.i.elf64.reversed_phdr[index] == false) {
+			shdr.sh_name	= adbg_bswap32(shdr.sh_name);
+			shdr.sh_type	= adbg_bswap32(shdr.sh_type);
+			shdr.sh_flags	= adbg_bswap64(shdr.sh_flags);
+			shdr.sh_addr	= adbg_bswap64(shdr.sh_addr);
+			shdr.sh_offset	= adbg_bswap64(shdr.sh_offset);
+			shdr.sh_size	= adbg_bswap64(shdr.sh_size);
+			shdr.sh_link	= adbg_bswap32(shdr.sh_link);
+			shdr.sh_info	= adbg_bswap32(shdr.sh_info);
+			shdr.sh_addralign	= adbg_bswap64(shdr.sh_addralign);
+			shdr.sh_entsize	= adbg_bswap64(shdr.sh_entsize);
+			o.i.elf32.reversed_shdr[index] = true;
+		}
+		
+		const(char) *sname = table + shdr.sh_name;
+		if (strncmp(sname, name, SNMLEN) == 0)
+			return shdr;
+	}
+	
+	adbg_oops(AdbgError.objectItemNotFound);
+	return null;
 }
 
 AdbgMachine adbg_object_elf_machine(ushort machine, ubyte class_) {
