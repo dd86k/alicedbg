@@ -78,8 +78,16 @@ enum : ushort {
 }
 // Types
 enum : ushort {
+	/// OS/2
+	NE_TYPE_OS2 = 0x0001,
 	/// Windows
 	NE_TYPE_WINDOWS = 0x0002,
+	/// European MS-DOS 4.x
+	NE_TYPE_DOS4 = 0x0003,
+	/// Windows i386
+	NE_TYPE_WINDOWS386 = 0x0004,
+	/// Borland Operating System Services
+	NE_TYPE_BOSS = 0x0005,
 }
 // Segment flags
 enum : ushort {
@@ -347,7 +355,11 @@ int adbg_object_ne_load(adbg_object_t *o) {
 
 const(char)* adbg_object_ne_type(ubyte type) {
 	switch (type) {
-	case NE_TYPE_WINDOWS: return "Windows";
-	default: return "Unknown";
+	case NE_TYPE_OS2:	return "OS/2";
+	case NE_TYPE_WINDOWS:	return "Windows";
+	case NE_TYPE_DOS4:	return "European MS-DOS 4.x";
+	case NE_TYPE_WINDOWS386:	return "Windows i386";
+	case NE_TYPE_BOSS:	return "Borland Operating System Services";
+	default:	return "Unknown";
 	}
 }
