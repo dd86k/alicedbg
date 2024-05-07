@@ -1,5 +1,10 @@
 /// New Executable format, introduced in Windows 1.0.
 ///
+/// Sources:
+/// - Windows 3.00 Developer's Notes. (Q65260)
+/// - winnt.h (10.0.2261.0)
+/// - https://www.fileformat.info/format/exe/corion-ne.htm
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -10,11 +15,6 @@ import adbg.machines : AdbgMachine;
 import adbg.error;
 import adbg.utils.bit;
 import adbg.include.c.stdlib : calloc, free;
-
-// Sources:
-// - Windows 3.00 Developer's Notes. (Q65260)
-// - winnt.h (10.0.2261.0)
-// - https://www.fileformat.info/format/exe/corion-ne.htm
 
 extern (C):
 

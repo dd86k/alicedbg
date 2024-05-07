@@ -1,5 +1,13 @@
 /// Windows Program Database (PDB), Portable PDB (.NET), and Mono Database (MDB).
 ///
+/// Sources:
+/// - https://llvm.org/docs/PDB/MsfFile.html
+/// - llvm/include/llvm/DebugInfo/PDB/
+/// - llvm-pdbutil(1): llvm-pdbutil dump --summary PDBFILE
+/// - https://github.com/microsoft/microsoft-pdb
+/// - https://github.com/ziglang/zig/blob/master/lib/std/pdb.zig
+/// - https://github.com/MolecularMatters/raw_pdb
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -11,14 +19,6 @@ import adbg.utils.uid;
 import adbg.utils.bit;
 import core.stdc.stdlib : malloc, free;
 import core.stdc.string : memcpy;
-
-// Sources:
-// - https://llvm.org/docs/PDB/MsfFile.html
-// - llvm/include/llvm/DebugInfo/PDB/ and llvm-pdbutil(1)
-//   llvm-pdbutil dump --summary PDBFILE
-// - https://github.com/microsoft/microsoft-pdb
-// - https://github.com/ziglang/zig/blob/master/lib/std/pdb.zig
-// - https://github.com/MolecularMatters/raw_pdb
 
 //TODO: Find better memory management strategies
 //      Since the PDB file is loaded entirely in memory (by us),

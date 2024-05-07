@@ -1,5 +1,9 @@
 /// Mach-O format.
 ///
+/// Sources:
+/// - https://github.com/opensource-apple/cctools/blob/master/include/mach/machine.h
+/// - https://github.com/opensource-apple/cctools/blob/master/include/mach-o/loader.h
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -10,10 +14,6 @@ import adbg.object.server : adbg_object_t, AdbgObject;
 import adbg.machines : AdbgMachine;
 import adbg.utils.bit;
 import core.stdc.stdlib : calloc;
-
-// Sources:
-// - https://github.com/opensource-apple/cctools/blob/master/include/mach/machine.h
-// - https://github.com/opensource-apple/cctools/blob/master/include/mach-o/loader.h
 
 /// Smallest Mach-O size.
 // https://codegolf.stackexchange.com/a/154685

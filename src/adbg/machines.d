@@ -15,8 +15,9 @@ import adbg.error;
 //       This avoids (mostly) possible collisions.
 
 //TODO: Consider removing "native" as it just confused me with a process function.
-//      There are now a function to get the default machine.
-//TODO: Consider renaming from "adbg_object_machine_" to only "adbg_machine_".
+//      There is now a function to get the default machine.
+//TODO: Consider renaming x86 to i386 since it is the baseline
+//      And remove "x86_32" alias, it is confusing with x32
 
 /// Object machine type.
 enum AdbgMachine {

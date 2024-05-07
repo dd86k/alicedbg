@@ -1,5 +1,10 @@
 /// Linear Executable object format.
 ///
+/// Sources:
+/// - Windows SDK headers
+/// - LX - Linear eXecutable Module Format Description, June 3, 1992
+/// - IBM OS/2 16/32-BIT OBJECT MODULE FORMAT (OMF) AND LINEAR EXECUTABLE MODULE FORMAT (LX) Version 10, October 9, 1996
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -9,11 +14,6 @@ import adbg.error;
 import adbg.object.server : adbg_object_t, AdbgObject;
 import adbg.machines;
 import adbg.utils.bit;
-
-// Sources:
-// - Windows SDK headers
-// - LX - Linear eXecutable Module Format Description, June 3, 1992
-// - IBM OS/2 16/32-BIT OBJECT MODULE FORMAT (OMF) AND LINEAR EXECUTABLE MODULE FORMAT (LX) Version 10, October 9, 1996
 
 // NOTE: LX is mainly 16-bit only and LE mixed 16/32-bit
 

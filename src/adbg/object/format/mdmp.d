@@ -1,5 +1,9 @@
 /// Minidump file format.
 ///
+/// Sources:
+/// - https://learn.microsoft.com/en-us/windows/win32/api/minidumpapiset/
+/// - Windows Kits\10\Include\10.0.22621.0\um\minidumpapiset.h
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -7,10 +11,6 @@ module adbg.object.format.mdmp;
 
 import adbg.object.server : AdbgObject, adbg_object_t;
 import adbg.utils.bit : CHAR32;
-
-// Sources:
-// - https://learn.microsoft.com/en-us/windows/win32/api/minidumpapiset/
-// - Windows Kits\10\Include\10.0.22621.0\um\minidumpapiset.h
 
 /// Signature value
 enum MDMP_MAGIC = CHAR32!"MDMP";

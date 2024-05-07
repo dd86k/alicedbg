@@ -1,5 +1,11 @@
 /// COFF format.
 ///
+/// Sources:
+/// - https://delorie.com/djgpp/doc/coff/
+/// - https://www.ti.com/lit/an/spraao8/spraao8.pdf
+///
+/// ECOFF (MIPS) and XCOFF (AIX) aren't supported
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -7,12 +13,6 @@ module adbg.object.format.coff;
 
 import adbg.object.server : AdbgObject, adbg_object_t;
 import adbg.utils.bit;
-
-// NOTE: ECOFF (MIPS) and XCOFF (AIX) aren't supported
-
-// Sources:
-// - https://delorie.com/djgpp/doc/coff/
-// - https://www.ti.com/lit/an/spraao8/spraao8.pdf
 
 enum : ushort {
 	/// i386 COFF magic
@@ -88,9 +88,10 @@ struct coff_header {
 	//       TI: extends this with ushort TargetID;
 }
 
-int adbg_object_coff_load(adbg_object_t *o) {
+int adbg_object_coff_load(adbg_object_t *o, ushort sig) {
 	o.format = AdbgObject.coff;
 	
+	o.i.coff.sig = sig;
 	// NOTE: No swapping is done because I'm lazy and this is one a per-machine basis
 	
 	return 0;

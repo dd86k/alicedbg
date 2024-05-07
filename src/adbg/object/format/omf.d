@@ -6,6 +6,9 @@
 /// It was superseeded by COFF objects and libraries, and the MSCOFF format,
 /// when Windows Vista was released.
 ///
+/// Sources:
+/// - Tool Interface Standards (TIS) Relocatable Object Module Format (OMF) Specification Version 1.1
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -15,9 +18,6 @@ import adbg.object.server;
 import adbg.error;
 import core.stdc.stdlib : malloc, free;
 import core.stdc.string : memcpy;
-
-// Sources:
-// - Tool Interface Standards (TIS) Relocatable Object Module Format (OMF) Specification Version 1.1
 
 // NOTE: Checksums are either 0 or a modulo 256
 

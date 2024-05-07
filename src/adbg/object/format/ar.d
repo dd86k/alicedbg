@@ -1,4 +1,11 @@
-/// COFF Library archive format.
+/// Library archive format.
+///
+/// Sources:
+/// - gdb/include/aout/ar.h
+/// - Microsoft Portable Executable and Common Object File Format Specification
+///   Microsoft Corporation, Revision 6.0 - February 1999
+///   Microsoft Corporation, Revision 8.3 - February 2013
+/// - winnt.h (10.0.22621.0)
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -10,13 +17,6 @@ import adbg.object.server;
 import adbg.utils.bit;
 import core.stdc.stdlib : atoi;
 import core.stdc.string : memcpy;
-
-// Sources:
-// - gdb/include/aout/ar.h
-// - Microsoft Portable Executable and Common Object File Format Specification
-//   Microsoft Corporation, Revision 6.0 - February 1999
-//   Microsoft Corporation, Revision 8.3 - February 2013
-// - winnt.h (10.0.22621.0)
 
 // Format:
 //   Signature

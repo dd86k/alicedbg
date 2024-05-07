@@ -1,5 +1,8 @@
 /// Windows full memory dump format.
 ///
+/// Sources:
+/// - https://github.com/volatilityfoundation/volatility/
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -8,9 +11,6 @@ module adbg.object.format.dmp;
 import adbg.error;
 import adbg.object.server : adbg_object_t, AdbgObject;
 import adbg.utils.bit;
-
-// Sources:
-// - https://github.com/volatilityfoundation/volatility/
 
 /// 
 enum PAGEDUMP32_MAGIC = CHAR64!"PAGEDUMP";
