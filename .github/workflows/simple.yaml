@@ -5,13 +5,13 @@ on: [ push, pull_request ]
 # Tests ensures the project builds and executes unittest.
 # The entry points are rather minimal.
 jobs:
-  Simple:
+  Build:
     strategy:
       matrix:
         os: [ ubuntu-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - uses: dlang-community/setup-dlang@v1
-    - name: Test
+    - name: Build
       run: dub build -c simple
