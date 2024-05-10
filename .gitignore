@@ -8,6 +8,7 @@ __dummy.html
 *.json
 *.log
 *.lst
+*.exp
 
 # Executable objects
 /alicedbg

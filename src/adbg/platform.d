@@ -231,3 +231,38 @@ immutable(adbg_info_t)* adbg_info() {
 	static immutable adbg_info_t info;
 	return &info;
 }
+
+// This adds the requirement for building DLLs with BetterC.
+// See: https://learn.microsoft.com/en-us/windows/win32/dlls/dllmain
+// NOTE: This library avoids the use of TLS whenever possible,
+//       so the need of fixing up TLS entries for Win32 is not needed.
+//       It is performed in DRuntime (core.sys.windows.dll).
+// NOTE: TLSTable directory is not created for alicedbg.dll.
+// NOTE: Like ELF dynamic symbols, all symbols get exported when generating a DLL.
+version (Windows)
+version (SharedLib) {
+import core.sys.windows.windef : HINSTANCE, BOOL, TRUE, FALSE, DWORD, LPVOID,
+	DLL_PROCESS_DETACH, DLL_PROCESS_ATTACH, DLL_THREAD_ATTACH, DLL_THREAD_DETACH;
+private
+extern (Windows)
+BOOL DllMain(HINSTANCE hInstance, DWORD fdwReason, LPVOID lpvReserved) {
+	/*switch (dwReason) {
+	case DLL_PROCESS_DETACH:
+		// Do not do cleanup if process termination scenario
+		if (lpvReserved)
+			break;
+		// Otherwise, perform any necessary cleanup.
+		break;
+	// Initialize once for each new process.
+	// Return FALSE to fail DLL load.
+	case DLL_PROCESS_ATTACH:
+		return TRUE;
+	case DLL_THREAD_ATTACH:
+		break;
+	case DLL_THREAD_DETACH:
+		break;
+	default: assert(false);
+	}*/
+	return TRUE;
+}
+}

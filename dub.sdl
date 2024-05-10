@@ -44,7 +44,7 @@ license "BSD-3-Clause-Clear"
 # ANCHOR Configurations
 #
 
-# Debugger applicaton
+# Application: Debugger (alicedbg)
 configuration "debugger" {
 	targetType "executable"
 	targetName "alicedbg"
@@ -53,7 +53,7 @@ configuration "debugger" {
 	mainSourceFile "debugger/main.d"
 }
 
-# Dumper application
+# Application: Dumper (alicedump)
 configuration "dumper" {
 	targetType "executable"
 	targetName "alicedump"
@@ -62,7 +62,7 @@ configuration "dumper" {
 	mainSourceFile "dumper/main.d"
 }
 
-# Simple example application
+# Application: Example (simple)
 configuration "simple" {
 	targetType "executable"
 	targetName "simple"
@@ -70,15 +70,18 @@ configuration "simple" {
 }
 
 # Library
+# NOTE: DUB names it "alicedbg.lib" on Windows and "libalicedbg.a" elsewhere
 configuration "library" {
 	sourcePaths "src"
 }
 
-# Dynamic/Shared library
-# NOTE: Does not work on Windows, yet
+# Dynamic library/Shared object
+# NOTE: DUB names it "alicedbg.dll" on Windows and "libalicedbg.so" elsewhere
+# NOTE: MSVC Linker can't find vcruntime140.lib with libs declaration
+#       LIBPATH isn't compiler-provided one, but Windows SDK
 configuration "shared" {
+	versions "SharedLib" # "Shared" might confuse druntime
 	targetType "dynamicLibrary"
-	libs "ucrt" "kernel32" platform="windows"
 	sourcePaths "src"
 }
 
