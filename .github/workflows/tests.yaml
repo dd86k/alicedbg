@@ -33,6 +33,28 @@ jobs:
         compiler: ${{ matrix.dc }}
     - name: Test Alicedump
       run: dub test -c dumper
+  Library:
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022 ]
+        dc: [ dmd-latest, ldc-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dlang-community/setup-dlang@v1
+    - name: Build Library
+      run: dub build -c simple
+  Shared:
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022 ]
+        dc: [ dmd-latest, ldc-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dlang-community/setup-dlang@v1
+    - name: Build Shared Library
+      run: dub build -c shared
   Simple:
     strategy:
       matrix:
