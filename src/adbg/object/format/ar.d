@@ -1,10 +1,13 @@
-/// Library archive format.
+/// UNIX library archive format.
+///
+/// This only supports the System V (aka GNU) variant.
 ///
 /// Sources:
 /// - gdb/include/aout/ar.h
 /// - Microsoft Portable Executable and Common Object File Format Specification
-///   Microsoft Corporation, Revision 6.0 - February 1999
-///   Microsoft Corporation, Revision 8.3 - February 2013
+/// - Microsoft Corporation, Revision 6.0 - February 1999
+/// - Microsoft Corporation, Revision 8.3 - February 2013
+/// - Microsoft Corporation, Revision 11 - February 2013
 /// - winnt.h (10.0.22621.0)
 ///
 /// Authors: dd86k <dd@dax.moe>
@@ -18,25 +21,50 @@ import adbg.utils.bit;
 import core.stdc.stdlib : atoi;
 import core.stdc.string : memcpy;
 
-// Format:
-//   Signature
-//   Header + 1st Linker Member + Data
-//   Header + 2nd Linker Member + Data
-//   Header + Longnames Member + Data
-//   Header + obj n + Data
-
 // NOTE: MSVC linker can only process libraries under 4 GiB in size.
+
+// NOTE: Format detection (taken and updated from LLVM@llvm/lib/Object/Archive.cpp)
+//       Below is the pattern that is used to figure out the archive format
+//       GNU archive format
+//         First member : "/"  (May exist, if it exists, points to the symbol table)
+//         Second member: "//" (Ditto)
+//         Note: The string table is used if the filename exceeds 15 characters.
+//       BSD archive format
+//         First member: "__.SYMDEF" or "__.SYMDEF_64" (Darwin) or "__.SYMDEF SORTED" (symbol table)
+//         There is no string table, if the filename exceeds 15 characters or has a
+//         embedded space, the filename has #1/<size>, The size represents the size
+//         of the filename that needs to be read after the archive header.
+//       COFF archive format
+//         First member : "/"
+//         Second member: "/"  (Provides a directory of symbols)
+//         Third member : "//" (May exist, if it exists, contains the string table)
+//         Note: Microsoft PE/COFF Spec 8.3 says that the third member is present
+//         even if the string table is empty. However, lib.exe does not in fact
+//         seem to create the third member if there's no member whose filename
+//         exceeds 15 characters. So the third member is optional.
+
+// NOTE: Variants
+//       GNU archive format
+//         (optional) "/"
+//            Acts as a main index for all other members in the archive
+//            These members mostly contain object data (COFF or ELF these days)
+//            Data:
+//            u32:big    Number of offsets
+//            u32...:big Absolute file offsets
+//         (optional) "//"
+
+// NOTE: Member headers are observed, at least on MS variants, to be 2-byte aligned-up.
 
 /// COFF library archive magic.
 enum AR_MAGIC = CHAR64!"!<arch>\n";
-/// Thin COFF library archive magic.
+/// Thin COFF library archive magic. Used in GNU binutils and Elfutils.
 enum AR_THIN_MAGIC = CHAR64!"!<thin>\n";
 /// 
 private enum AR_EOL = CHAR16!"`\n";
 
-//private immutable char[16] AR_LINKER_MEMBER    = "/               ";
-//private immutable char[16] AR_LONGNAMES_MEMBER = "//              ";
-//private immutable char[16] AR_HYBRIDMAP_MEMBER = "/<HYBRIDMAP>/   ";
+private immutable char[16] AR_LINKER_MEMBER    = "/               ";
+private immutable char[16] AR_LONGNAMES_MEMBER = "//              ";
+private immutable char[16] AR_HYBRIDMAP_MEMBER = "/<HYBRIDMAP>/   ";
 
 /// 
 struct ar_file_header {
@@ -88,6 +116,11 @@ struct ar_member_header {
 	}
 }
 
+struct ar_member_data {
+	void *data;
+	int size;
+}
+
 /// When first name is "/"
 struct mscoff_first_linker_header {
 	/// 
@@ -111,69 +144,125 @@ int adbg_object_ar_load(adbg_object_t *o) {
 	return 0;
 }
 
-//TODO: Can this be transformed into functions with _start & _next?
-ar_member_header* adbg_object_ar_header(adbg_object_t *o, size_t index) {
+ar_member_header* adbg_object_ar_first_header(adbg_object_t *o) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	version (Trace) trace("index=%zu", index);
+	// First entry starts right after signature
+	o.i.ar.current = ar_file_header.sizeof;
 	
-	ar_member_header *p = cast(ar_member_header*)(o.buffer + ar_file_header.sizeof);
-	void *max = o.buffer + 0x8000_0000; // 2 GiB limit
-	for (size_t i; p < max; ++i) {
-		if (i == index) {
-			if (p.EndMarker != AR_EOL) {
-				adbg_oops(AdbgError.offsetBounds);
-				return null;
-			}
-			return p;
-		}
-		
-		// Adjust pointer
-		size_t offset = atoi(p.Size.ptr) + ar_member_header.sizeof;
-		version (Trace) trace("offset=%zu", offset);
-		p = cast(ar_member_header*)(cast(void*)p + offset);
-		
-		// Outside bounds
-		if (adbg_object_outboundpl(o, p, ar_member_header.sizeof)) {
-			adbg_oops(AdbgError.offsetBounds);
-			return null;
-		}
-	}
-	
-	adbg_oops(AdbgError.unfindable);
-	return null;
+	// Return it
+	return cast(ar_member_header*)(o.buffer + ar_file_header.sizeof);
 }
 
-int adbg_object_ar_header_size(adbg_object_t *o, ar_member_header *mhdr) {
-	if (o == null || mhdr == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return -1;
+/// Convert a number from a fixed character buffer to a scalar integer.
+/// Params:
+///   p = Character buffer pointer. Can be null-terminated.
+///   s = Size of character buffer. Or the maximum string length input.
+/// Returns: Integer value.
+int atoint(const(char)* p, int s) {
+	if (p == null || s <= 0)
+		return 0;
+	// If first non-space character met is '-', apply negation
+	int v; char c = void;
+	for (int i; i < s && (c = p[i]) != 0; ++i) {
+		if (c < '0' || c > '9')
+			continue;
+		v = (10 * v) + (c - '0');
 	}
-	
-	char[12] str = void;
-	memcpy(str.ptr, mhdr.Size.ptr, mhdr.Size.sizeof);
-	str[10] = 0;
-	return atoi(str.ptr);
+	return v;
+}
+unittest {
+	assert(atoint("0", 10) == 0);
+	assert(atoint("1", 10) == 1);
+	assert(atoint("2", 10) == 2);
+	assert(atoint("86", 10) == 86);
+	assert(atoint("123", 10) == 123);
+	assert(atoint("4000", 10) == 4000);
+	assert(atoint("68088", 10) == 68088);
+	assert(atoint("4000", 2) == 40);
 }
 
-void* adbg_object_ar_data(adbg_object_t *o, ar_member_header *mhdr) {
-	if (o == null || mhdr == null) {
+// Get the next instance of the header
+ar_member_header* adbg_object_ar_next_header(adbg_object_t *o) {
+	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	void *p = cast(void*)mhdr + ar_member_header.sizeof;
-	int size = adbg_object_ar_header_size(o, mhdr);
-	if (size < 0) {
-		adbg_oops(AdbgError.objectMalformed);
-		return null;
-	}
-	if (adbg_object_outboundpl(o, p, size)) {
+	// Jump to next header location using the current member size
+	ar_member_header *member = cast(ar_member_header*)(o.buffer + o.i.ar.current);
+	int size = cast(int)ar_member_header.sizeof + atoint(member.Size.ptr, member.Size.sizeof);
+	size_t newloc = adbg_alignup(o.i.ar.current + size, 2);
+	
+	// At minimum, get member header
+	if (adbg_object_outboundl(o, newloc, ar_member_header.sizeof)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
-	return p;
+	
+	// Evaluate new member header with its new size
+	member = cast(ar_member_header*)(o.buffer + newloc);
+	if (member.EndMarker != AR_EOL) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	size = cast(int)ar_member_header.sizeof + atoint(member.Size.ptr, member.Size.sizeof);
+	if (adbg_object_outboundl(o, newloc, ar_member_header.sizeof + size)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
+	
+	// All good, set as current, and return member
+	o.i.ar.current = newloc;
+	return member;
+}
+
+// 
+ar_member_data adbg_object_ar_data(adbg_object_t *o, ar_member_header *member) {
+	ar_member_data m = void;
+	
+	if (o == null || member == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		m.data = null; m.size = 0;
+		return m;
+	}
+	
+	m.data = cast(void*)member + ar_member_header.sizeof;
+	m.size = atoint(member.Size.ptr, member.Size.sizeof);
+	return m;
+}
+
+/*const(char)* adbg_object_ar_symbol(adbg_object_t *o, ar_member_header *member, uint index) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	//TODO: Redo/Clean using offsets
+	// NOTE: Hard to enforce length checks here
+	
+	//ar_member_header *member = cast(ar_member_header*)(o.buffer + lochead);
+	uint *items = cast(uint*)(member + 1);
+	uint  count = adbg_bswap32(*items++);
+	version (Trace) trace("count=%d", count);
+	if (index >= count) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
+	
+	uint locsym = adbg_bswap32(items[index]);
+	//int size = atoint(member.Size.ptr, member.Size.sizeof);
+	if (adbg_object_outbound(o, locsym)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
+	
+	return o.bufferc + locsym;
+}*/
+
+// No-op for now, planned function
+void adbg_object_ar_free(adbg_object_t *o, ar_member_header *member) {
 }

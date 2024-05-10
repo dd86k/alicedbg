@@ -9,6 +9,7 @@ import adbg.disassembler;
 import adbg.object.server;
 import adbg.machines;
 import adbg.object.format.ar;
+import adbg.error;
 import adbg.utils.bit : adbg_bswap32;
 import core.stdc.ctype : isdigit;
 import dumper;
@@ -18,69 +19,55 @@ extern (C):
 
 int dump_archive(adbg_object_t *o) {
 	if (selected_headers())
-		dump_archive_headers(o);
-	
+		dump_archive_firstheader(o);
+	if (selected_exports())
+		dump_archive_allheaders(o);
 	return 0;
 }
 
 private:
 
-void dump_archive_headers(adbg_object_t *o) {
+void dump_archive_header(ar_member_header *member) {
+	with (member) {
+	print_stringl("Name", Name.ptr, Name.sizeof);
+	print_stringl("Date", Date.ptr, Date.sizeof);
+	print_stringl("UserID", UserID.ptr, UserID.sizeof);
+	print_stringl("GroupID", GroupID.ptr, GroupID.sizeof);
+	print_stringl("Mode", Mode.ptr, Mode.sizeof);
+	print_stringl("Size", Size.ptr, Size.sizeof);
+	
+	char[10] b = void;
+	int l = realstring(b.ptr, 10, End.ptr, 2);
+	print_x16l("End", EndMarker, b.ptr, l);
+	}
+}
+
+// First header only
+void dump_archive_firstheader(adbg_object_t *o) {
 	print_header("Header");
 	
-	ar_member_header *rhdr = void; // Root headers
-	for (size_t i; (rhdr = adbg_object_ar_header(o, i)) != null; ++i) {
-		print_section(cast(uint)i);
-		print_stringl("Name", rhdr.Name.ptr, rhdr.Name.sizeof);
-		print_stringl("Date", rhdr.Date.ptr, rhdr.Date.sizeof);
-		print_stringl("UserID", rhdr.UserID.ptr, rhdr.UserID.sizeof);
-		print_stringl("GroupID", rhdr.GroupID.ptr, rhdr.GroupID.sizeof);
-		print_stringl("Mode", rhdr.Mode.ptr, rhdr.Mode.sizeof);
-		print_stringl("Size", rhdr.Size.ptr, rhdr.Size.sizeof);
-		
-		char[10] b = void;
-		int l = realstring(b.ptr, 10, rhdr.End.ptr, 2);
-		print_x16l("End", rhdr.EndMarker, b.ptr, l);
-		
-		/+void *data = adbg_object_ar_data(o, rhdr);
-		if (data == null) {
-			print_string("warning", "Could not get data pointer");
-			continue;
-		}
-		
-		int size = adbg_object_ar_header_size(o, rhdr);
-		if (size <= 0) {
-			print_string("warning", "Could not get size of data");
-			continue;
-		}
-		
-		import core.stdc.stdio : printf;
-		
-		int symcnt   = *cast(int*)data;
-		int *symoffs = cast(int*)data + 1;
-		for (int isym; isym < symcnt; ++isym) {
-			int off = adbg_bswap32(symoffs[isym]);
-			
-			ar_member_header *table = void;
-			if (adbg_object_offset(o, cast(void**)&table, off)) {
-				print_string("warning", "aaaaaaaaaaa cringe");
-				printf("there was %d headers\n", isym);
-				return;
-			}
-			
-			print_stringl("Name", table.Name.ptr, table.Name.sizeof);
-			print_stringl("Date", table.Date.ptr, table.Date.sizeof);
-			print_stringl("UserID", table.UserID.ptr, table.UserID.sizeof);
-			print_stringl("GroupID", table.GroupID.ptr, table.GroupID.sizeof);
-			print_stringl("Mode", table.Mode.ptr, table.Mode.sizeof);
-			print_stringl("Size", table.Size.ptr, table.Size.sizeof);
-			l = realstring(b.ptr, 10, table.End.ptr, 2, '"', '"');
-			print_x16l("End", table.EndMarker, b.ptr, l);
-			
-			if (table.Name[0] != '/' || isdigit(table.Name[1]) == 0)
-				continue;
-			
-			
-		}+/
+	ar_member_header *member = adbg_object_ar_first_header(o);
+	if (member == null) {
+		print_string("error", adbg_error_msg());
+		return;
 	}
+	dump_archive_header(member);
+}
+
+void dump_archive_allheaders(adbg_object_t *o) {
+	print_header("Debug data");
+
+	ar_member_header *member = adbg_object_ar_first_header(o);
+	if (member == null) {
+		print_string("error", adbg_error_msg());
+		return;
+	}
+
+	uint i;
+	do {
+		print_section(i++);
+		dump_archive_header(member);
+		//dump_archive_symbols(o, member);
+		adbg_object_ar_free(o, member);
+	} while ((member = adbg_object_ar_next_header(o)) != null);
 }

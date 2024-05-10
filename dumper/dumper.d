@@ -26,8 +26,6 @@ import common.utils;
 //      usage: print_mask("something:something", 0x30, THING1, THING2, etc.)
 //TODO: print_stringf
 //TODO: print_wstringl (wide-string)
-//TODO: if opt_extract_to defined, save to it
-//      needs a unified "data out" function
 //TODO: (disassembly) attach shortest and longuest instructions found to buffers
 
 extern (C):
@@ -112,7 +110,7 @@ int setting_disasm_any()	{ return opt_settings & Setting.disasmAny; }
 /// Returns: Error code if non-zero
 int dump(const(char)* path) {
 	if (setting_blob()) {
-		// NOTE: Program exits and memory is free'd
+		// NOTE: Program exits and memory is free'ds by OS
 		size_t size = void;
 		ubyte *buffer = readall(path, &size);
 		if (buffer == null)
@@ -371,6 +369,7 @@ void print_data(const(char)* name, void *data, size_t size, ulong baseaddress = 
 
 // dump binary data to stdout, unformatted
 // if rawdump to file specified, write to file, otherwise stdout
+private
 void rawdump(const(char)* fname, void* data, size_t tsize, ulong baseaddress = 0) {
 	FILE* fd = fname ? fopen(fname, "wb") : stdout;
 	if (fd == null) {
@@ -387,6 +386,7 @@ void rawdump(const(char)* fname, void* data, size_t tsize, ulong baseaddress = 0
 }
 
 // pretty hex dump to stdout
+private
 void hexdump(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0) {
 	print_header(name);
 	
@@ -394,7 +394,7 @@ void hexdump(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0)
 	static immutable string _soff = "Offset    ";
 	printf(_soff.ptr);
 	for (int ib; ib < __columns; ++ib)
-		printf("%02x ", ib);
+		printf("%2x ", ib);
 	putchar('\n');
 	
 	// Print data

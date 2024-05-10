@@ -41,7 +41,6 @@ extern (C):
 //      Naturally, more internal pointers will need to be created, and only accessible
 //      using the newer API.
 
-//TODO: const(ubyte)* adbg_obj_section(obj, ".abc");
 //TODO: const(ubyte)* adbg_obj_section_i(obj, index);
 //TODO: const(ubyte)* adbg_object_get_section_by_type(obj, type);
 //TODO: const(char)* adbg_object_get_debug_path(obj);
@@ -98,7 +97,7 @@ enum AdbgObject {
 	executable,
 }*/
 
-// Can't this just be a flag?
+// NOTE: This enum is a little weird but should be used as an I/O strategy
 /// Object origin. (or "load mode")
 ///
 /// How was the object loaded or hooked.
@@ -283,6 +282,11 @@ struct adbg_object_t {
 			bool *reversed_shdr;
 		}
 		elf64_t elf64;
+		
+		struct ar_t {
+			size_t current;
+		}
+		ar_t ar;
 		
 		struct pdb20_t {
 			pdb20_file_header *header;
@@ -785,7 +789,7 @@ adbg_section_t* adbg_object_section_n(adbg_object_t *o, const(char)* name, uint 
 			headerp = shdr64;
 			header_size = Elf64_Shdr.sizeof;
 			datap = o.buffer + shdr64.sh_offset;
-			data_size = shdr64.sh_size;
+			data_size = cast(size_t)shdr64.sh_size;
 			break;
 		default:
 			goto Lunavail;
@@ -924,7 +928,7 @@ const(char)* adbg_object_format_name(adbg_object_t *o) {
 	case mdmp:	return `Windows Minidump`;
 	case dmp:	return `Windows Memory Dump`;
 	case omf:	return `Relocatable Object Module Format`;
-	case archive:	return `Common Object File Format Library Archive`;
+	case archive:	return `Library Archive`;
 	case coff:	return `Common Object File Format`;
 	case mscoff:	return `Microsoft Common Object File Format`;
 	Lunknown:
