@@ -1,0 +1,45 @@
+name: Tests
+
+on: [ push, pull_request ]
+
+# Tests ensures the project builds and executes unittest.
+# The entry points are rather minimal.
+jobs:
+  Alicedbg:
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022 ]
+        dc: [ dmd-latest, ldc-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup D compiler
+      uses: dlang-community/setup-dlang@v1
+      with:
+        compiler: ${{ matrix.dc }}
+    - name: Test Alicedbg
+      run: dub test -c debugger
+  Alicedump:
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022 ]
+        dc: [ dmd-latest, ldc-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup D compiler
+      uses: dlang-community/setup-dlang@v1
+      with:
+        compiler: ${{ matrix.dc }}
+    - name: Test Alicedump
+      run: dub test -c dumper
+  Simple:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dlang-community/setup-dlang@v1
+    - name: Build Simple
+      run: dub build -c simple
