@@ -483,7 +483,7 @@ void dump_elf_sections(adbg_object_t *o) {
 			
 			if (setting_extract_any()) {
 				void *data = o.buffer + shdr.sh_offset;
-				print_data(opt_section_name, data, shdr.sh_size, shdr.sh_offset);
+				print_data(opt_section_name, data, cast(uint)shdr.sh_size, shdr.sh_offset);
 				return;
 			}
 
