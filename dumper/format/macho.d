@@ -11,7 +11,7 @@ import adbg.object.format.macho;
 import dumper;
 
 int dump_macho(adbg_object_t *o) {
-	if (selected_headers)
+	if (SELECTED(Select.headers))
 		dump_macho_hdr(o);
 	
 	return 0;

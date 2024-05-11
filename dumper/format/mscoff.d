@@ -14,7 +14,7 @@ import adbg.utils.uid;
 import dumper;
 
 int dump_mscoff(adbg_object_t *o) {
-	if (selected_headers())
+	if (SELECTED(Select.headers))
 		dump_mscoff_hdr(o);
 	
 	return 0;

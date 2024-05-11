@@ -18,12 +18,10 @@ import dumper;
 extern (C):
 
 int dump_pdb70(adbg_object_t *o) {
-	if (selected_headers())
+	if (SELECTED(Select.headers))
 		dump_pdb70_header(o);
-	
-	if (selected_debug())
+	if (SELECTED(Select.debug_))
 		dump_pdb70_debug(o);
-	
 	return 0;
 }
 

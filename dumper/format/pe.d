@@ -23,24 +23,18 @@ extern (C):
 ///   o = Object instance.
 /// Returns: Non-zero on error.
 int dump_pe(adbg_object_t *o) {
-	if (selected_headers())
+	if (SELECTED(Select.headers))
 		dump_pe_hdr(o);
-	
-	if (selected_sections())
+	if (SELECTED(Select.sections))
 		dump_pe_sections(o);
-	
-	if (selected_exports())
+	if (SELECTED(Select.exports))
 		dump_pe_exports(o);
-	
-	if (selected_imports())
+	if (SELECTED(Select.imports))
 		dump_pe_imports(o);
-	
-	if (selected_debug())
+	if (SELECTED(Select.debug_))
 		dump_pe_debug(o);
-	
-	if (setting_disasm_any())
+	if (SETTING(Setting.disasmAny))
 		dump_pe_disasm(o);
-	
 	return 0;
 }
 
@@ -48,7 +42,7 @@ private:
 
 // Returns true if the machine value is unknown
 void dump_pe_hdr(adbg_object_t *o) {
-	if (setting_extract_any()) {
+	if (SETTING(Setting.extractAny)) {
 		print_data("Header", o.i.pe.header, PE_HEADER.sizeof, mz_hdr_ext.sizeof);
 		return;
 	}
@@ -241,7 +235,7 @@ void dump_pe_sections(adbg_object_t *o) {
 		if (opt_section_name && strncmp(Name.ptr, opt_section_name, Name.sizeof))
 			continue;
 		
-		if (setting_extract_any()) {
+		if (SETTING(Setting.extractAny)) {
 			void *data = o.buffer + PointerToRawData;
 			print_data(opt_section_name, data, SizeOfRawData, PointerToRawData);
 		}
@@ -812,7 +806,7 @@ void dump_pe_debug(adbg_object_t *o) {
 void dump_pe_disasm(adbg_object_t *o) {
 	print_header("Disassembly");
 	
-	int all = setting_disasm_all();
+	int all = SETTING(Setting.disasmAll);
 	PE_SECTION_ENTRY *section = void;
 	size_t i;
 	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {

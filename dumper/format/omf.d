@@ -12,9 +12,9 @@ import dumper;
 extern (C):
 
 int dump_omf(adbg_object_t *o) {
-	if (selected_headers())
+	if (SELECTED(Select.headers))
 		dump_omf_hdr(o);
-	if (selected_debug())
+	if (SELECTED(Select.debug_))
 		dump_omf_debug(o);
 	return 0;
 }

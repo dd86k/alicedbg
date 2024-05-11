@@ -17,18 +17,18 @@ import common.utils : realchar, hexstr;
 extern (C):
 
 int dump_elf(adbg_object_t *o) {
-	if (selected_headers()) {
+	if (SELECTED(Select.headers)) {
 		dump_elf_ehdr(o);
 		dump_elf_phdr(o);
 	}
 	
-	if (selected_sections())
+	if (SELECTED(Select.sections))
 		dump_elf_sections(o);
 	
-	if (selected_exports())
+	if (SELECTED(Select.exports))
 		dump_elf_exports(o);
 	
-	if (setting_disasm_any())
+	if (SETTING(Setting.disasmAny))
 		dump_elf_disasm(o);
 	
 	return 0;
@@ -439,7 +439,7 @@ void dump_elf_sections(adbg_object_t *o) {
 			if (opt_section_name && strncmp(sname, opt_section_name, SNMLEN))
 				continue;
 			
-			if (setting_extract_any()) {
+			if (SETTING(Setting.extractAny)) {
 				void *data = o.buffer + shdr.sh_offset;
 				print_data(opt_section_name, data, shdr.sh_size, shdr.sh_offset);
 				return;
@@ -481,7 +481,7 @@ void dump_elf_sections(adbg_object_t *o) {
 			if (opt_section_name && strncmp(sname, opt_section_name, SNMLEN))
 				continue;
 			
-			if (setting_extract_any()) {
+			if (SETTING(Setting.extractAny)) {
 				void *data = o.buffer + shdr.sh_offset;
 				print_data(opt_section_name, data, cast(uint)shdr.sh_size, shdr.sh_offset);
 				return;
@@ -615,7 +615,7 @@ void dump_elf_exports(adbg_object_t *o) {
 void dump_elf_disasm(adbg_object_t *o) {
 	print_header("Disassembly");
 	
-	int all = setting_disasm_all(); /// dump all
+	int all = SETTING(Setting.disasmAll); /// dump all
 	
 	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:

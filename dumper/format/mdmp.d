@@ -15,10 +15,10 @@ import dumper;
 import common.utils : realstring;
 
 int dump_minidump(adbg_object_t *o) {
-	if (selected_headers())
+	if (SELECTED(Select.headers))
 		dump_minidump_headers(o);
 	
-	//if (selected_debug())
+	//if (SELECTED(Select.debug_))
 	//	dump_minidump_debug(o);
 	
 	return 0;

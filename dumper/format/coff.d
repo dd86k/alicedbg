@@ -17,7 +17,7 @@ import dumper;
 import common.utils : realstring;
 
 int dump_coff(adbg_object_t *o) {
-	if (selected_headers())
+	if (SELECTED(Select.headers))
 		dump_coff_hdr(o);
 	
 	return 0;

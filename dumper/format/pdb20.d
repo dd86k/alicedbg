@@ -14,7 +14,7 @@ import dumper;
 extern (C):
 
 int dump_pdb20(adbg_object_t *o) {
-	if (selected_headers())
+	if (SELECTED(Select.headers))
 		dump_pdb20_header(o);
 	
 	return 0;

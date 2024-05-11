@@ -19,15 +19,12 @@ extern (C):
 ///   o = Object instance.
 /// Returns: Non-zero on error.
 int dump_mz(adbg_object_t *o) {
-	if (selected_headers())
+	if (SELECTED(Select.headers))
 		dump_mz_hdr(o);
-	
-	if (selected_relocs())
+	if (SELECTED(Select.relocs))
 		dump_mz_relocs(o);
-	
-	if (setting_disasm_any())
+	if (SETTING(Setting.disasmAny))
 		dump_mz_disasm(o);
-	
 	return 0;
 }
 

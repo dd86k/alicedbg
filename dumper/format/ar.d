@@ -18,9 +18,9 @@ import common.utils : realstring;
 extern (C):
 
 int dump_archive(adbg_object_t *o) {
-	if (selected_headers())
+	if (SELECTED(Select.headers))
 		dump_archive_firstheader(o);
-	if (selected_exports())
+	if (SELECTED(Select.exports))
 		dump_archive_allheaders(o);
 	return 0;
 }
@@ -55,7 +55,7 @@ void dump_archive_firstheader(adbg_object_t *o) {
 }
 
 void dump_archive_memberdata(adbg_object_t *o, ar_member_header *member) {
-	if (setting_extract_any() == false)
+	if (SETTING(Setting.extractAny) == false)
 		return;
 	
 	ar_member_data m = adbg_object_ar_data(o, member);

@@ -86,30 +86,13 @@ const(char)* opt_section_name;
 long opt_baseaddress;
 const(char)* opt_extractfile;
 
-int selected_headers()	{ return opt_selected & Select.headers; }
-int selected_sections()	{ return opt_selected & Select.sections; }
-int selected_relocs()	{ return opt_selected & Select.relocs; }
-int selected_exports()	{ return opt_selected & Select.exports; }
-int selected_imports()	{ return opt_selected & Select.imports; }
-int selected_rsrc()	{ return opt_selected & Select.rsrc; }
-int selected_debug()	{ return opt_selected & Select.debug_; }
-int selected_dirs()	{ return opt_selected & Select.dirs; }
-int selected_loadcfg()	{ return opt_selected & Select.loadcfg; }
-
-int setting_blob()	{ return opt_settings & Setting.blob; }
-int setting_hexdump()	{ return opt_settings & Setting.hexdump; }
-int setting_extract()	{ return opt_settings & Setting.extract; }
-int setting_extract_any()	{ return opt_settings & Setting.extractAny; }
-
-int setting_disasm()	{ return opt_settings & Setting.disasm; }
-int setting_disasm_all()	{ return opt_settings & Setting.disasmAll; }
-int setting_disasm_stats()	{ return opt_settings & Setting.disasmStats; }
-int setting_disasm_any()	{ return opt_settings & Setting.disasmAny; }
+int SELECTED(Select selection) { return opt_selected & selection; }
+int SETTING(Setting setting)   { return opt_settings & setting; }
 
 /// Dump given file to stdout.
 /// Returns: Error code if non-zero
 int dump(const(char)* path) {
-	if (setting_blob()) {
+	if (SETTING(Setting.blob)) {
 		// NOTE: Program exits and memory is free'ds by OS
 		size_t size = void;
 		ubyte *buffer = readall(path, &size);
@@ -134,7 +117,7 @@ int dump(const(char)* path) {
 	// If anything was selected to dump specifically
 	if (opt_selected) {
 		// If not in any "extract" mode, print file info
-		if (setting_extract_any() == 0) {
+		if (SETTING(Setting.extractAny) == 0) {
 			print_string("filename", path);
 			print_u64("filesize", o.file_size);
 			print_string("format", adbg_object_format_name(o));
@@ -360,10 +343,10 @@ void print_reloc16(uint index, ushort seg, ushort off) {
 }
 
 void print_data(const(char)* name, void *data, size_t size, ulong baseaddress = 0) {
-	if (setting_hexdump())
+	if (SETTING(Setting.hexdump))
 		hexdump(name, data, size, baseaddress);
 
-	if (setting_extract())
+	if (SETTING(Setting.extract))
 		rawdump(opt_extractfile, data, size, baseaddress);
 }
 
@@ -461,7 +444,7 @@ int dump_disassemble(AdbgMachine machine, void* data, ulong size, ulong base_add
 	adbg_dis_start(dis, data, cast(size_t)size, base_address);
 	
 	// stats mode
-	if (setting_disasm_stats()) {
+	if (SETTING(Setting.disasmStats)) {
 		uint stat_avg;	/// instruction average size
 		uint stat_min = uint.max;	/// smallest instruction size
 		uint stat_max;	/// longest instruction size
