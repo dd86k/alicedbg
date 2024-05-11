@@ -9,6 +9,9 @@ import adbg.include.d.config : D_FEATURE_TARGETINFO;
 
 //TODO: has feature xyz should be dynamic
 //      e.g., capstone may not be available, but could be after installing it
+//TODO: Consider having configuration info (e.g., library, shared object, exectuable (default), etc.)
+//TODO: Consider having a build info string to avoid breakage
+//      Versus functions/structures changing
 
 // Other interesting versions:
 // - DRuntime_Use_Libunwind
@@ -42,6 +45,16 @@ enum ADBG_VERSION = "0.3.0";
 
 debug enum __BUILDTYPE__ = "debug";	/// Library build type.
 else  enum __BUILDTYPE__ = "release";	/// Ditto
+
+version (SharedLib)
+	/// Alicedbg configured build
+	enum ADBG_CONFIG = "shared";
+else version (StaticLib)
+	/// Ditto
+	enum ADBG_CONFIG = "static";
+else
+	/// Ditto
+	enum ADBG_CONFIG = "executable";
 
 //
 // ANCHOR Endianness
@@ -180,6 +193,7 @@ static if (D_FEATURE_TARGETINFO) {
 version (PrintTargetInfo) {
 	pragma(msg, "ADBG_VERSION     ", ADBG_VERSION);
 	pragma(msg, "__BUILDTYPE__    ", __BUILDTYPE__);
+	pragma(msg, "ADBG_CONFIG      ", ADBG_CONFIG);
 	pragma(msg, "TARGET_PLATFORM  ", TARGET_PLATFORM);
 	pragma(msg, "TARGET_OS        ", TARGET_OS);
 	pragma(msg, "TARGET_ENV       ", TARGET_ENV);
@@ -213,9 +227,10 @@ enum D_FEATURES = PIC~PIE~SIMD~AVX~AVX2~NoBoundsCheck;
 //
 
 /// Target information structure
-struct adbg_info_t {
+struct adbg_build_info_t {
 	const(char) *adbgver = ADBG_VERSION;	/// Library version.
 	const(char) *build   = __BUILDTYPE__;	/// "debug" or "release".
+	const(char) *config  = ADBG_CONFIG;	/// Configuration.
 	const(char) *arch    = TARGET_PLATFORM;	/// Architecture.
 	const(char) *os      = TARGET_OS;	/// Operating system.
 	const(char) *env     = TARGET_ENV;	/// Target environment.
@@ -223,12 +238,14 @@ struct adbg_info_t {
 	const(char) *objfmt  = TARGET_OBJFMT;	/// Object format (e.g., coff).
 	const(char) *fltabi  = TARGET_FLTABI;	/// Float ABI (hard or soft).
 	const(char) *dflags  = D_FEATURES;	/// D compile features.
+	const(char) *end     = null;	/// End of strings
 }
 
 /// Get compilation information structure.
+/// Note: This can be interpreted as a null-terminated array of string pointers.
 /// Returns: AdbgInfo structure pointer
-immutable(adbg_info_t)* adbg_info() {
-	static immutable adbg_info_t info;
+immutable(adbg_build_info_t)* adbg_build_info() {
+	static immutable adbg_build_info_t info;
 	return &info;
 }
 
