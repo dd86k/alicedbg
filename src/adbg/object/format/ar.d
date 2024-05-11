@@ -232,6 +232,8 @@ ar_member_data adbg_object_ar_data(adbg_object_t *o, ar_member_header *member) {
 	
 	m.data = cast(void*)member + ar_member_header.sizeof;
 	m.size = atoint(member.Size.ptr, member.Size.sizeof);
+	if (adbg_object_outboundpl(o, m.data, m.size))
+		adbg_oops(AdbgError.offsetBounds);
 	return m;
 }
 
