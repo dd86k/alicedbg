@@ -25,6 +25,20 @@ import core.stdc.stdlib : malloc, free;
 //TODO: Close function should close CS lib too
 //      Make sure we have a function to reconfigure machine
 
+// NOTE: Longest architectural instruction contest
+//       x86: 15 bytes
+//       AArch32: 2 or 4 bytes
+//       AArch64: 4 bytes
+//       Power: 4 bytes
+//       MIPS: 4 bytes
+//       RISC-V: 24 bytes (reserved)
+//       SPARC: 4 bytes
+//       IA64: 16 bytes
+//       Alpha: 4 bytes
+
+/// Maximum instruction size in bytes.
+enum MAX_INSTR_SIZE = 16;
+
 version (X86) { // CS_OPT_SYNTAX_DEFAULT
 	private enum {
 		CS_DEFAULT_PLATFORM = CS_ARCH_X86,	/// Platform default platform
@@ -63,10 +77,6 @@ version (X86) { // CS_OPT_SYNTAX_DEFAULT
 } else {
 	static assert(0, "Set DEFAULT_PLATFORM and DEFAULT_SYNTAX");
 }
-
-/// Maximum instruction size in bytes.
-/// Currently, this title goes to x86 with 15 bytes. Congrats!
-enum MAX_INSTR_SIZE = 16;
 
 private {
 	enum ADBG_MAGIC = 0xcafebabe;

@@ -244,6 +244,7 @@ struct adbg_build_info_t {
 /// Get compilation information structure.
 /// Note: This can be interpreted as a null-terminated array of string pointers.
 /// Returns: AdbgInfo structure pointer
+export
 immutable(adbg_build_info_t)* adbg_build_info() {
 	static immutable adbg_build_info_t info;
 	return &info;

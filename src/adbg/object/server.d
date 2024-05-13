@@ -759,6 +759,17 @@ L_ARG:
 	return adbg_oops(AdbgError.objectUnknownFormat);
 }
 
+export
+void* adbg_object_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	// NOTE: Cleared on allocation until image is loaded
+	return o.i.header;
+}
+
 adbg_section_t* adbg_object_section_n(adbg_object_t *o, const(char)* name, uint flags = 0) {
 	if (o == null || name == null) {
 		adbg_oops(AdbgError.invalidArgument);

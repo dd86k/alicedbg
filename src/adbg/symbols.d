@@ -15,13 +15,13 @@ import core.stdc.stdlib : atoi;
 // - https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling
 
 // NOTE: Support notes
-// | Language | Description       |
-// |----------|-------------------|
-// | C        | Varies.           |
-// | C++      | Varies.           |
-// | D        | Uses `_D` prefix. |
-// | Zig      | Uses C names.     |
-// | Rust     | Uses `_R` prefix. |
+//       | Language | Description       |
+//       |----------|-------------------|
+//       | C        | Varies.           |
+//       | C++      | Varies.           |
+//       | D        | Uses `_D` prefix. |
+//       | Zig      | Uses C names.     |
+//       | Rust     | Uses `_R` prefix. |
 
 extern (C):
 
@@ -37,7 +37,7 @@ enum AdbgSymbolMangling {
 	/// Exact mangled symbol name, as given.
 	exact,
 	/// C mangled name. (Most 32-bit targets)
-	/// Example: int g(int) -> _g
+	/// Example: int g(int) -> _g (Windows, 32 and 64 bit targets)
 	cdecl,
 	/// Windows Standard Call mangled name. (32-bit targets)
 	/// Example: (C) int g(int) -> _g@4
@@ -48,7 +48,7 @@ enum AdbgSymbolMangling {
 	/// Example: (C++) int g(int) -> ?g@@YIHH@Z
 	fastcall,
 	/// C++ mangled name for GCC/Clang.
-	/// Example: int g(int) -> _Z1gi
+	/// Example: (C++) int g(int) -> _Z1gi
 	gnucpp,
 	// C++ mangled name for old GCC (2.9x)
 	//oldgnucpp,
