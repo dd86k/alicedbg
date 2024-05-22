@@ -48,7 +48,7 @@ void dump_archive_firstheader(adbg_object_t *o) {
 	
 	ar_member_header *member = adbg_object_ar_first_header(o);
 	if (member == null) {
-		print_string("error", adbg_error_msg());
+		print_string("error", adbg_error_message());
 		return;
 	}
 	dump_archive_header(member);
@@ -60,7 +60,7 @@ void dump_archive_memberdata(adbg_object_t *o, ar_member_header *member) {
 	
 	ar_member_data m = adbg_object_ar_data(o, member);
 	if (m.data == null) {
-		print_string("warning", adbg_error_msg());
+		print_string("warning", adbg_error_message());
 		return;
 	}
 	print_data("data", m.data, m.size);
@@ -71,7 +71,7 @@ void dump_archive_allheaders(adbg_object_t *o) {
 
 	ar_member_header *member = adbg_object_ar_first_header(o);
 	if (member == null) {
-		print_string("error", adbg_error_msg());
+		print_string("error", adbg_error_message());
 		return;
 	}
 

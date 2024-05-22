@@ -489,7 +489,7 @@ L_DISASM:
 	case disasmEndOfData:
 		return 0;
 	default:
-		print_string("error", adbg_error_msg());
+		print_string("error", adbg_error_message());
 		return 1;
 	}
 }

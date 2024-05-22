@@ -452,6 +452,7 @@ enum AdbgObjectLoadOption {
 ///   path = File path.
 ///   ... = Options. Terminated with 0.
 /// Returns: Object instance, or null on error.
+export
 adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 	version (Trace) trace("path=%s", path);
 	
@@ -485,6 +486,7 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 }*/
 
 /// Close object instance.
+export
 void adbg_object_close(adbg_object_t *o) {
 	if (o == null)
 		return;

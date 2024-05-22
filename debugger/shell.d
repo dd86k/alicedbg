@@ -51,7 +51,7 @@ enum ShellError {
 const(char) *shell_error_string(int code) {
 	switch (code) with (ShellError) {
 	case alicedbg:
-		return adbg_error_msg;
+		return adbg_error_message();
 	case invalidParameter:
 		return "Invalid command parameter.";
 	case invalidCommand:
@@ -93,7 +93,6 @@ const(char) *shell_error_string(int code) {
 	}
 }
 
-//TODO: Turn into character array (like gdb --args)
 int shell_start(int argc, const(char)** argv) {
 	int ecode = void;
 	
@@ -105,13 +104,13 @@ int shell_start(int argc, const(char)** argv) {
 		// Assume argv is null-terminated as it is on msvcrt and glibc
 		ecode = shell_proc_spawn(*argv, argv + 1);
 		if (ecode) {
-			printf("Error: %s\n", adbg_error_msg());
+			printf("Error: %s\n", adbg_error_message());
 			return ecode;
 		}
 	} else if (opt_pid) { // Or attach to process if specified
 		ecode = shell_proc_attach(opt_pid);
 		if (ecode) {
-			printf("Error: %s\n", adbg_error_msg());
+			printf("Error: %s\n", adbg_error_message());
 			return ecode;
 		}
 	}
@@ -545,7 +544,7 @@ int shell_proc_spawn(const(char) *exec, const(char) **argv) {
 	// Open disassembler for process machine type
 	dis = adbg_dis_open(adbg_process_get_machine(process));
 	if (dis == null)
-		logwarn("Disassembler not available (%s)", adbg_error_msg());
+		logwarn("Disassembler not available (%s)", adbg_error_message());
 	
 	return 0;
 }
@@ -569,7 +568,7 @@ int shell_proc_attach(int pid) {
 			adbg_dis_options(dis, AdbgDisOpt.syntax, opt_syntax, 0);
 	} else {
 		printf("warning: Disassembler not available (%s)\n",
-			adbg_error_msg());
+			adbg_error_message());
 	}
 	
 	return 0;
@@ -590,7 +589,7 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 		}
 		adbg_opcode_t op = void;
 		if (adbg_dis_once(dis, &op, data.ptr, MAX_INSTR_SIZE)) {
-			printf("%8llx (error:%s)\n", cast(ulong)address, adbg_error_msg);
+			printf("%8llx (error:%s)\n", cast(ulong)address, adbg_error_message());
 			return;
 		}
 		
@@ -637,13 +636,13 @@ void shell_event_exception(adbg_process_t *proc, int event, void* evdata) {
 			// Print machine bytes
 			ubyte[MAX_INSTR_SIZE] data = void;
 			if (adbg_memory_read(process, ex.faultz, data.ptr, MAX_INSTR_SIZE)) {
-				printf(" read error (%s)\n", adbg_error_msg());
+				printf(" read error (%s)\n", adbg_error_message());
 				return; // Nothing else to do
 			}
 			
 			adbg_opcode_t op = void;
 			if (adbg_dis_once(dis, &op, data.ptr, MAX_INSTR_SIZE)) {
-				printf(" disassembly error (%s)\n", adbg_error_msg());
+				printf(" disassembly error (%s)\n", adbg_error_message());
 				return;
 			}
 			
@@ -1175,7 +1174,7 @@ version (UseNewProcessName) {
 			continue;
 		}
 		version (Trace)
-			trace("error: %s", adbg_error_msg());
+			trace("error: %s", adbg_error_message());
 		putchar('\n');
 	}
 	

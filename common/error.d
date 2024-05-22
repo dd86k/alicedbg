@@ -29,7 +29,7 @@ void print_adbg_error(
 	int line = __LINE__) {
 	printf("%s", mod);
 	debug printf("@%u", line);
-	printf(": %s\n", mod, line, adbg_error_msg());
+	printf(": %s\n", mod, line, adbg_error_message());
 	debug print_adbg_trace();
 }
 
@@ -46,7 +46,7 @@ void panic(int code, const(char)* message,
 	exit(code);
 }
 void panic_crt() { panic(errno, strerror(errno)); }
-void panic_adbg() { panic(adbg_errno(), adbg_error_msg()); }
+void panic_adbg() { panic(adbg_errno(), adbg_error_message()); }
 
 void oopsie(adbg_process_t *proc, adbg_exception_t *ex) {
 	puts(
@@ -63,7 +63,7 @@ void oopsie(adbg_process_t *proc, adbg_exception_t *ex) {
 	printf(
 	"Exception  : %s\n"~
 	"PID        : %d\n",
-	adbg_exception_name(ex), adbg_process_get_pid(proc)); // casting is temp
+	adbg_exception_name(ex), adbg_process_get_pid(proc));
 	
 	//TODO: Get thread context
 	
@@ -86,7 +86,7 @@ void oopsie(adbg_process_t *proc, adbg_exception_t *ex) {
 			// 
 			puts(")");
 		} else {
-			printf(" Disassembly unavailable (%s)\n", adbg_error_msg());
+			printf(" Disassembly unavailable (%s)\n", adbg_error_message());
 		}
 	}
 	

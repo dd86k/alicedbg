@@ -107,7 +107,7 @@ struct adbg_error_t {
 	const(char)* mod;	/// Source module
 	int line;	/// Line source
 	int code;	/// Error code
-	void *res;	/// External handle or code
+	void *handle;	/// External handle or code
 }
 /// Last error in alicedbg.
 private __gshared adbg_error_t error;
@@ -207,12 +207,12 @@ const(char)* adbg_sys_error(int code) {
 	}
 }
 
-/// Get the last error code from the OS (or CRT)
-/// Returns: GetLastError from Windows, otherwise errno
+/// Get the last error code from the OS (or CRT).
+/// Returns: GetLastError from Windows, otherwise errno.
 private
 int adbg_error_system() {
 	version (Windows) {
-		return error.res ? cast(uint)error.res : GetLastError();
+		return error.handle ? cast(uint)error.handle : GetLastError();
 	} else
 		return errno;
 }
@@ -225,17 +225,17 @@ int adbg_error_system() {
 /// populated.
 /// Params:
 /// 	e = Error code.
-/// 	res = External resource (handle, etc.).
+/// 	extra = External resource (handle, code, etc.).
 /// 	m = Automatically set to `__MODULE__`.
 /// 	l = Automatically set to `__LINE__`.
 /// 	f = Automatically set to `__FUNCTION__`.
 /// Returns: Error code
-int adbg_oops(AdbgError e, void *res = null,
+int adbg_oops(AdbgError e, void *extra = null,
 	string m = __MODULE__, int l = __LINE__, const(char)* f = __FUNCTION__.ptr) {
 	version (Trace) trace("code=%d res=%p caller=%s:%d", e, res, f, l);
 	error.mod = m.ptr;
 	error.line = l;
-	error.res = res;
+	error.handle = extra;
 	return error.code = e;
 }
 
@@ -245,6 +245,7 @@ int adbg_oops(AdbgError e, void *res = null,
 
 /// Obtain the last set code.
 /// Returns: Error code.
+export
 int adbg_errno() {
 	return error.code;
 }
@@ -256,30 +257,37 @@ int adbg_errno_extern() {
 	case crt:	return errno;
 	case os:	return adbg_error_system;
 	case libCapstone:
-		if (error.res == null) return 0;
-		return cs_errno(*cast(csh*)error.res);
+		return error.handle ? cs_errno(*cast(csh*)error.handle) : 0;
 	default:	return error.code;
 	}
 }
 
-/// Obtain an error message with the last error code set.
-/// Returns: Error message
-const(char)* adbg_error_msg(int code = error.code) {
-	switch (error.code) with (AdbgError) {
+/// Obtain an error message with code.
+/// Returns: Error message.
+export
+const(char)* adbg_error_msg(int code) {
+	switch (code) with (AdbgError) {
 	case crt:
 		return strerror(errno);
 	case os:
 		return adbg_sys_error(adbg_error_system());
 	case libCapstone:
-		if (error.res == null)
+		if (error.handle == null)
 			break;
-		return cs_strerror(cs_errno(*cast(csh*)error.res));
+		return cs_strerror(cs_errno(*cast(csh*)error.handle));
 	default:
 		foreach (ref e; errors_msg)
 			if (code == e.code)
 				return e.msg;
 	}
 	return defaultMsg;
+}
+
+/// Get the last set error message.
+/// Returns: Error message.
+export
+const(char)* adbg_error_message() {
+	return adbg_error_msg(error.code);
 }
 
 version (Trace) {

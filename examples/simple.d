@@ -17,7 +17,7 @@ private: // Shuts up dscanner
 adbg_disassembler_t *dis;
 
 void die(int code = 0, const(char) *reason = null) {
-	printf("error: %s\n", reason ? reason : adbg_error_msg);
+	printf("error: %s\n", reason ? reason : adbg_error_message);
 	if (code == 0) code = adbg_errno;
 	exit(code);
 }
@@ -48,7 +48,7 @@ void loop_handler(adbg_process_t *proc, int event, void *evdata) {
 	if (dis && ex.faultz) {
 		adbg_opcode_t op = void;
 		if (adbg_dis_process_once(dis, &op, proc, ex.fault_address)) {
-			printf("  (error:%s)\n", adbg_error_msg);
+			printf("  (error:%s)\n", adbg_error_message);
 			return;
 		}
 		if (op.operands)
@@ -68,7 +68,7 @@ int main(int argc, const(char) **argv) {
 	
 	dis = adbg_dis_open(adbg_process_get_machine(process));
 	if (dis == null)
-		printf("warning: Disassembler unavailable (%s)\n", adbg_error_msg());
+		printf("warning: Disassembler unavailable (%s)\n", adbg_error_message());
 	
 LOOP:	// Process input
 	switch (choice("Action [?=Help]")) {

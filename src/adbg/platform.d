@@ -256,7 +256,6 @@ immutable(adbg_build_info_t)* adbg_build_info() {
 //       so the need of fixing up TLS entries for Win32 is not needed.
 //       It is performed in DRuntime (core.sys.windows.dll).
 // NOTE: TLSTable directory is not created for alicedbg.dll.
-// NOTE: Like ELF dynamic symbols, all symbols get exported when generating a DLL.
 version (Windows)
 version (SharedLib) {
 import core.sys.windows.windef : HINSTANCE, BOOL, TRUE, FALSE, DWORD, LPVOID,
