@@ -172,7 +172,7 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	// Misc.
 	//
-	{ AdbgError.assertion,	"A soft debugging assertion was hit." },
+	{ AdbgError.assertion,	"A soft debug assertion was hit." },
 	{ AdbgError.unimplemented,	"Feature is not implemented." },
 	{ AdbgError.success,	"No errors occured." },
 ];
