@@ -6,8 +6,8 @@
 module common.cli;
 
 import adbg.platform;
-import adbg.machines : AdbgMachine;
-import adbg.disassembler : AdbgDisSyntax;
+import adbg.machines;
+import adbg.disassembler : AdbgDisSyntax, adbg_dis_machines;
 import adbg.include.capstone : libcapstone_dynload, cs_version;
 import adbg.include.c.stdlib : exit;
 import adbg.include.d.config : GDC_VERSION, GDC_EXCEPTION_MODE, LLVM_VERSION;
@@ -226,9 +226,8 @@ int getopt(int argc, const(char) **argv, immutable(option_t)[] options) {
 			return getoptEunknown(arg);
 		
 		// Execute option handler
-		int e = getoptexec(option, value);
-		if (e < 0)
-			return e;
+		if (getoptexec(option, value))
+			return getoptEfailed(arg, value);
 	}
 	
 	goto Lret;
@@ -390,11 +389,11 @@ private void getoptreset() {
 		free(getoptextras);
 		getoptextras = null;
 	}
-	getoptextrascnt = 0;
 	if (getopterrbuf) {
 		free(getopterrbuf);
 		getopterrbuf = null;
 	}
+	getoptextrascnt = 0;
 }
 
 // CLI "extra" argument handling
@@ -424,7 +423,7 @@ int getoptleftcount() {
 
 // CLI error handling
 
-private enum GETOPTBFSZ = 2048;
+private enum GETOPTBFSZ = 256;
 private __gshared char* getopterrbuf;
 
 /// Get getopt error message
@@ -478,6 +477,12 @@ private int getoptEmalformatted(const(char)* opt) {
 		"main: argument switch '--%s' is malformatted.", opt);
 	return -1;
 }
+private int getoptEfailed(const(char) *arg, const(char) *value) {
+	if (getopt_prepbuf()) return -100;
+	snprintf(getopterrbuf, GETOPTBFSZ,
+		"main: value '%s' is invalied in option '%s'.", value, arg);
+	return -1;
+}
 
 /// Is user asking for help with this option?
 bool wantsHelp(const(char) *query) {
@@ -487,40 +492,28 @@ bool wantsHelp(const(char) *query) {
 private:
 
 //
-// --march
+// -m|--machine
 //
 
-//TODO: Interface with machine module instead
-//      Needs a filter at the disassembler level: adbg_dasm_machine_available()
-
-struct setting_platform_t {
-	AdbgMachine val;
-	const(char)* opt, alt, desc;
-}
-immutable setting_platform_t[] platforms = [
-	{ AdbgMachine.i8086,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
-	{ AdbgMachine.i386,	"x86",     "i386",  "x86 32-bit (extended mode)" },
-	{ AdbgMachine.amd64,	"x86_64",  "amd64", "x86 64-bit (long mode)" },
-	{ AdbgMachine.thumb,	"t16",  "thumb",    "Thumb" },
-	{ AdbgMachine.thumb32,	"t32",  "thumb32",  "Thumb (32-bit)" },
-	{ AdbgMachine.arm,	"a32",  "arm",      "Armv8 (32-bit)" },
-	{ AdbgMachine.aarch64,	"a64",  "aarch64",  "Armv8 (64-bit)" },
-];
-
 int cli_march(const(char) *val) {
+	immutable(AdbgMachine)* machines = adbg_dis_machines();
 	if (wantsHelp(val)) {
 		puts("Available machine architectures:");
-		foreach (setting_platform_t p; platforms) {
-			with (p)
-			printf("%8s, %-10s  %s\n", opt, alt, desc);
+		for (; *machines; ++machines) {
+			immutable(adbg_machine_t)* m = adbg_machine(*machines);
+			printf("- %-8s  %s\n", m.alias1, m.name);
 		}
 		exit(0);
 	}
-	foreach (setting_platform_t p; platforms) {
-		if (strcmp(val, p.opt) == 0 || strcmp(val, p.alt) == 0) {
-			opt_machine = p.val;
-			return EXIT_SUCCESS;
-		}
+	immutable(adbg_machine_t)* m = adbg_machine_select(val);
+	// Selected machine is valid
+	if (m) {
+		// Selected machine is in accepted list for disassembler
+		for (; *machines; ++machines)
+			if (*machines == m.machine) {
+				opt_machine = m.machine;
+				return EXIT_SUCCESS;
+			}
 	}
 	return EXIT_FAILURE;
 }

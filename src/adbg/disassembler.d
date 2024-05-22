@@ -24,6 +24,7 @@ import core.stdc.stdlib : malloc, free;
 //TODO: Function to format machine code
 //TODO: Close function should close CS lib too
 //      Make sure we have a function to reconfigure machine
+//TODO: Rename functions from _dis_ to _dism_ (sounds cuter)
 
 // NOTE: Longest architectural instruction contest
 //       x86: 15 bytes
@@ -277,6 +278,22 @@ void adbg_dis_close(adbg_disassembler_t *dasm) {
 		cs_free(dasm.cs_inst, 1);
 	cs_close(&dasm.cs_handle);
 	free(dasm);
+}
+
+/// Returns a null-terminated list of machines that the disassembler supports.
+/// Returns: Pointer to null-terminated list.
+immutable(AdbgMachine)* adbg_dis_machines() {
+	static immutable AdbgMachine[] mlist = [
+		AdbgMachine.i8086,
+		AdbgMachine.i386,
+		AdbgMachine.amd64,
+		AdbgMachine.thumb,
+		AdbgMachine.thumb32,
+		AdbgMachine.arm,
+		AdbgMachine.aarch64,
+		AdbgMachine.unknown, // null-terminator
+	];
+	return mlist.ptr;
 }
 
 /// Configure an option to the disassembler.
