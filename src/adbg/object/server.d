@@ -180,15 +180,6 @@ struct adbg_object_t {
 	}
 	adbg_object_properties_t p;
 	
-	package
-	struct adbg_object_options_t {
-		/// Option: Partial loading.
-		/// Warning: Rest of object must be loaded automatically before
-		/// using other services.
-		bool partial;
-	}
-	adbg_object_options_t o;
-	
 	// Pointers to machine-dependant structures
 	//TODO: Move stuff like "reversed_"/"is64"/etc. fields into properties
 	package
@@ -442,7 +433,7 @@ bool adbg_object_offsett(T)(adbg_object_t *o, T* dst, ulong offset) {
 
 /// Object server options.
 enum AdbgObjectLoadOption {
-	partial = 1,
+	reserved = 1,
 }
 
 /// Load an object from disk into memory.
@@ -584,17 +575,12 @@ int adbg_object_loadv(adbg_object_t *o, va_list args) {
 	if (o == null || o.file_handle == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
-	memset(&o.o, 0, o.o.sizeof); // Init options
 	memset(&o.p, 0, o.p.sizeof); // Init object properties
 	memset(&o.i, 0, o.i.sizeof); // Init object internal structures
 	
 	// options
-L_ARG:
-	switch (va_arg!int(args)) {
+L_ARG:	switch (va_arg!int(args)) {
 	case 0: break;
-	case AdbgObjectLoadOption.partial:
-		o.o.partial = true;
-		goto L_ARG;
 	default:
 		return adbg_oops(AdbgError.invalidOption);
 	}
@@ -610,8 +596,7 @@ L_ARG:
 	version (Trace) trace("filesize=%llu", o.file_size);
 	
 	// Allocate
-	enum PARTIAL_SIZE = 4096;
-	o.buffer_size = o.o.partial ? PARTIAL_SIZE : cast(size_t)o.file_size;
+	o.buffer_size = cast(size_t)o.file_size;
 	o.buffer = malloc(o.buffer_size);
 	if (o.buffer == null)
 		return adbg_oops(AdbgError.crt);
