@@ -42,16 +42,16 @@ enum AdbgMachine {
 	l10m,
 	/// Intel K10M
 	k10m,
-	/// Intel Itanium
+	/// Intel Itanium (EPIC)
 	ia64,
 	
 	/// Thumb 16-bit T16
 	thumb,
-	/// Thumb 32-bit T32
+	/// Thumb 32-bit T32 (Thumb-2)
 	thumb32,
-	/// Arm A32
+	/// Arm AArch32/A32
 	arm,
-	/// Arm A64
+	/// Arm AArch64/A64
 	aarch64,
 	/// Compiled-Hybrid Portable Executable,
 	/// a Microsoft extension
@@ -466,14 +466,14 @@ enum AdbgMachine {
 struct adbg_machine_t {
 	/// Machine type.
 	AdbgMachine machine;
-	/// Machine alias.
-	/// Example: x86-32
+	/// Short name.
+	/// Example: "i386"
 	const(char) *alias1;
 	/// Common alias.
-	/// Example: x86
+	/// Example: "x86"
 	const(char) *alias2;
-	/// Machine full name.
-	/// Example: Intel x86
+	/// Full name.
+	/// Example: "Intel x86"
 	const(char) *name;
 }
 
@@ -513,7 +513,7 @@ immutable adbg_machine_t[] machines = [
 	
 	// Sun Microsystems
 	{ AdbgMachine.sparc,   "sparc", null, "SPARC" },
-	{ AdbgMachine.sparc8p, "sparc8p", null, "SPARC Version 8+ (Enhanced SPARC)" },
+	{ AdbgMachine.sparc8p, "sparc8p", null, "Enhanced SPARC Version 8+" },
 	{ AdbgMachine.sparc9,  "sparc9", null, "SPARC Version 9" },
 	
 	// RISC-V
@@ -524,14 +524,14 @@ immutable adbg_machine_t[] machines = [
 	
 	// MIPS
 	{ AdbgMachine.mipsx,     "mipsx", null, "Stanford MIPS-X" },
-	{ AdbgMachine.mips,      "mips", "rs3000", "MIPS I (RS3000)" },
-	{ AdbgMachine.mipsfpu,   "mipsfpu", "rs3000", "MIPS I (RS3000) with FPU" },
-	{ AdbgMachine.mipsle,    "mipsle", "rs3000", "MIPS I (RS3000) Little-Endian" },
+	{ AdbgMachine.mips,      "mips", "rs3000", "MIPS I RS3000" },
+	{ AdbgMachine.mipsfpu,   "mipsfpu", "rs3000", "MIPS I RS3000 with FPU" },
+	{ AdbgMachine.mipsle,    "mipsle", "rs3000", "MIPS I RS3000 Little-Endian" },
 	{ AdbgMachine.mips16,    "mips16", null, "MIPS16" },
 	{ AdbgMachine.mips16fpu, "mips16fpu", null, "MIPS16 with FPU" },
-	{ AdbgMachine.mipsii,    "mipsii", "r3000", "MIPS II (R3000)" },
-	{ AdbgMachine.mipsiii,   "mipsiii", "r4000", "MIPS III (R4000)" },
-	{ AdbgMachine.mipsiv,    "mipsiv", "r10000", "MIPS IV (R10000)" },
+	{ AdbgMachine.mipsii,    "mipsii", "r3000", "MIPS II R3000" },
+	{ AdbgMachine.mipsiii,   "mipsiii", "r4000", "MIPS III R4000" },
+	{ AdbgMachine.mipsiv,    "mipsiv", "r10000", "MIPS IV R10000" },
 	{ AdbgMachine.mipswcele, "mipswcele", "wcev2le", "MIPS WCE v2 Little-Endian" },
 	
 	// DEC
@@ -555,8 +555,8 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.xgate,    "xgate", null, "Motorola XGATE" },
 	
 	// Atmel
-	{ AdbgMachine.avr,   "avr", null, "Atmel AVR (8-bit)" },
-	{ AdbgMachine.avr32, "avr32", null, "Atmel AVR (32-bit)" },
+	{ AdbgMachine.avr,   "avr", null, "Atmel AVR 8-bit" },
+	{ AdbgMachine.avr32, "avr32", null, "Atmel AVR 32-bit" },
 	
 	// Hitachi
 	{ AdbgMachine.h8300,  "h8300", null, "Hitachi H8/300" },
@@ -573,7 +573,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.d10v,    "d10v", null, "Mitsubishi D10V" },
 	{ AdbgMachine.d30v,    "d30v", null, "Mitsubishi D30V" },
 	{ AdbgMachine.m32r,    "m32r", null, "Mitsubishi M32R" },
-	{ AdbgMachine.am33,    "am33", null, "Mitsubishi MN10300 (AM33)" },
+	{ AdbgMachine.am33,    "am33", null, "Mitsubishi AM33" }, // MN10300?
 	{ AdbgMachine.mn10200, "mn10200", null, "Mitsubishi MN10200" },
 	{ AdbgMachine.mn10300, "mn10300", null, "Mitsubishi MN10300" },
 	
@@ -696,8 +696,8 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.sep,	"sep", null, "Sharp" },
 	{ AdbgMachine.arca,	"arca", null, "Arca RISC" },
 	{ AdbgMachine.unicore,	"unicore", null, "PKU-Unity/Pekin Unicore" },
-	{ AdbgMachine.excess,	"excess", null, "eXcess (16/32/64-bit)" },
-	{ AdbgMachine.dxp,	"dxp", null, "Icera Semiconductor Inc. Deep Execution (DXP)" },
+	{ AdbgMachine.excess,	"excess", null, "eXcess 16/32/64-bit" },
+	{ AdbgMachine.dxp,	"dxp", null, "Icera Semiconductor Inc. Deep Execution" },
 	{ AdbgMachine.nios2,	"nios2", null, "Altera Nios II soft-core" },
 	{ AdbgMachine.dspic30f,	"dspic30f", null, "Microchip Technology DSPIC30F" },
 	{ AdbgMachine.tsk3000,	"tsk3000", null, "Altium TSK3000" },
@@ -721,7 +721,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.ecog1x,	"ecog1x", null, "Cyan Technology eCOG1X" },
 	{ AdbgMachine.ecog2,	"ecog2", null, "Cyan Technology eCOG2" },
 	{ AdbgMachine.c166,	"c166", null, "Infineon C16x/XC16x" },
-	{ AdbgMachine.sle9x,	"sle9x", null, "Infineon Technologies SLE9X (32-bit)" },
+	{ AdbgMachine.sle9x,	"sle9x", null, "Infineon Technologies SLE9X 32-bit" },
 	{ AdbgMachine.tile64,	"tile64", null, "Tilera TILE64" },
 	{ AdbgMachine.tilepro,	"tilepro", null, "Tilera TILEPro" },
 	{ AdbgMachine.tilegx,	"tilegx", null, "Tilera TILE-Gx" },
@@ -751,7 +751,7 @@ immutable adbg_machine_t[] machines = [
 //
 
 version (X86) {
-	private enum DEFAULT_MACHINE = AdbgMachine.x86;
+	private enum DEFAULT_MACHINE = AdbgMachine.i386;
 } else version (X86_64) {
 	private enum DEFAULT_MACHINE = AdbgMachine.amd64;
 } else version (Arm) {
@@ -841,5 +841,6 @@ immutable(adbg_machine_t)* adbg_machine_select(const(char) *alias_) {
 }
 @system unittest {
 	assert(adbg_machine_select("I do not exist") == null);
-	assert(adbg_machine_select("x86").machine == AdbgMachine.x86);
+	assert(adbg_machine_select("i386").machine == AdbgMachine.i386);
+	assert(adbg_machine_select("amd64").machine == AdbgMachine.amd64);
 }
