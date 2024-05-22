@@ -609,12 +609,6 @@ L_ARG:
 		return adbg_oops(AdbgError.crt);
 	version (Trace) trace("filesize=%llu", o.file_size);
 	
-	// HACK: To avoid loading gigabyte memory dumps
-	//       Until partial system is implemented, or something
-	enum TEMP_LIMIT = MiB!100;
-	if (o.file_size > TEMP_LIMIT)
-		o.file_size = TEMP_LIMIT;
-	
 	// Allocate
 	enum PARTIAL_SIZE = 4096;
 	o.buffer_size = o.o.partial ? PARTIAL_SIZE : cast(size_t)o.file_size;
@@ -914,7 +908,7 @@ const(char)* adbg_object_format_shortname(adbg_object_t *o) {
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return "mz";
 	case ne:	return "ne";
-	case lx:	return "lx";
+	case lx:	return o.i.lx.header.magic == LX_MAGIC ? "lx" : "le";
 	case pe:	return "pe32";
 	case macho:	return "macho";
 	case elf:	return "elf";
