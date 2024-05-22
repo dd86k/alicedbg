@@ -860,7 +860,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	case mz:	return AdbgMachine.i8086;
 	case ne: // NOTE: Can have a mix of 8086/i286/i386 instructions, take the highest
 		if (o.i.ne.header.ne_flags & NE_HFLAG_INTI386)
-			return AdbgMachine.x86;
+			return AdbgMachine.i386;
 		if (o.i.ne.header.ne_flags & (NE_HFLAG_INT8086 | NE_HFLAG_INTI286))
 			return AdbgMachine.i8086;
 		break;
@@ -868,7 +868,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 		switch (o.i.lx.header.cpu) {
 		case LX_CPU_80286: return AdbgMachine.i8086;
 		case LX_CPU_80386:
-		case LX_CPU_80486: return AdbgMachine.x86;
+		case LX_CPU_80486: return AdbgMachine.i386;
 		default:
 		}
 		break;
@@ -881,7 +881,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	case coff:
 		switch (o.i.coff.sig) {
 		case COFF_MAGIC_I386:
-		case COFF_MAGIC_I386_AIX:	return AdbgMachine.x86;
+		case COFF_MAGIC_I386_AIX:	return AdbgMachine.i386;
 		case COFF_MAGIC_AMD64:	return AdbgMachine.amd64;
 		case COFF_MAGIC_IA64:	return AdbgMachine.ia64;
 		case COFF_MAGIC_Z80:	return AdbgMachine.z80;

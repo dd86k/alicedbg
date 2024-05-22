@@ -1036,10 +1036,10 @@ AdbgMachine adbg_process_get_machine(adbg_process_t *tracee) {
 	if (tracee == null)
 		return AdbgMachine.unknown;
 	
-		//TODO: There's probably a way to remotely check this
-		//      Windows: IsWow64Process/IsWow64Process2 with process handle
+	//TODO: There's probably a way to remotely check this
+	//      Windows: IsWow64Process/IsWow64Process2 with process handle
 	version (Win64) {
-		if (tracee.wow64) return AdbgMachine.x86;
+		if (tracee.wow64) return AdbgMachine.i386;
 	}
 	
 	return adbg_machine_default();

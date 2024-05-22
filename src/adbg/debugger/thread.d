@@ -126,7 +126,7 @@ int adbg_registers_config(adbg_registers_t *ctx, AdbgMachine mach) {
 	immutable(adbg_register_info_t)[] regs = void;
 	
 	switch (mach) with (AdbgMachine) {
-	case x86:
+	case i386:
 		regs = regs_x86;
 		break;
 	case amd64:
@@ -154,11 +154,11 @@ void adbg_registers_init(adbg_registers_t *ctx, adbg_process_t *tracee) {
 		return;
 	
 	version (X86) {
-		adbg_registers_config(ctx, AdbgMachine.x86);
+		adbg_registers_config(ctx, AdbgMachine.i386);
 	} else version (X86_64) {
 		version (Win64) { // Windows 64-bit
 			if (tracee.wow64)
-				adbg_registers_config(ctx, AdbgMachine.x86);
+				adbg_registers_config(ctx, AdbgMachine.i386);
 			else
 				adbg_registers_config(ctx, AdbgMachine.amd64);
 		} else // Anything else 64-bit

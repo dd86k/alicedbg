@@ -1,7 +1,7 @@
 /// Object name definitions.
 ///
-/// This is expressed as instruction sets, typically ones that are
-/// incompatible with the rest of the list.
+/// This module handles various machine definitions as expressed as
+/// baseline instruction set architectures.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -16,8 +16,6 @@ import adbg.error;
 
 //TODO: Consider removing "native" as it just confused me with a process function.
 //      There is now a function to get the default machine.
-//TODO: Consider renaming x86 to i386 since it is the baseline
-//      And remove "x86_32" alias, it is confusing with x32
 
 /// Object machine type.
 enum AdbgMachine {
@@ -29,8 +27,8 @@ enum AdbgMachine {
 	/// Intel x86 16-bit (8086)
 	i8086,
 	/// Intel x86 32-bit (i386)
-	x86,
-	/// Intel x86 64-bit (amd64)
+	i386,
+	/// AMD x86 64-bit (amd64)
 	amd64,
 	/// Intel MCU
 	mcu,
@@ -481,14 +479,14 @@ struct adbg_machine_t {
 
 // NOTE: Full name consistency.
 //     - Proper names (like an English name or title).
-//     - Avoid parentheses when possible (makes titles a little less clean).
+//     - Avoid parentheses when possible as they can be confused with another set.
 /// List of known machines.
 immutable adbg_machine_t[] machines = [
 	// Intel
-	{ AdbgMachine.i8086,  "8086", "x86_16", "Intel 8086" },
-	{ AdbgMachine.x86,    "x86", "x86_32", "Intel x86" },
+	{ AdbgMachine.i8086,  "8086",  null,     "Intel 8086" },
+	{ AdbgMachine.i386,   "i386",  "x86",    "Intel x86" },
 	{ AdbgMachine.amd64,  "amd64", "x86_64", "AMD x86-64" },
-	{ AdbgMachine.mcu,    "mcu", null, "Intel MCU" },
+	{ AdbgMachine.mcu,    "mcu",  null, "Intel MCU" },
 	{ AdbgMachine.i860,   "i860", null, "Intel i860" },
 	{ AdbgMachine.i960,   "i960", null, "Intel i960" },
 	{ AdbgMachine.i8051,  "8051", null, "Intel 8051" },

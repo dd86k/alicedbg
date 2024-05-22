@@ -192,7 +192,7 @@ int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 		cs_arch = CS_ARCH_X86;
 		cs_mode = CS_MODE_16;
 		break;
-	case x86:
+	case i386:
 		cs_arch = CS_ARCH_X86;
 		cs_mode = CS_MODE_32;
 		break;

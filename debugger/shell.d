@@ -980,7 +980,7 @@ int command_disassemble(int argc, const(char) **argv) {
 			return ShellError.alicedbg;
 		// Assume EIP/RIP is in regs[0]
 		switch (mach) with (AdbgMachine) {
-		case x86:   uaddress = regs.items[0].u32; break;
+		case i386:  uaddress = regs.items[0].u32; break;
 		case amd64: uaddress = regs.items[0].u64; break;
 		default:    return ShellError.unavailable;
 		}

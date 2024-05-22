@@ -499,7 +499,7 @@ struct setting_platform_t {
 }
 immutable setting_platform_t[] platforms = [
 	{ AdbgMachine.i8086,	"x86_16",  "8086",  "x86 16-bit (real mode)" },
-	{ AdbgMachine.x86,	"x86",     "i386",  "x86 32-bit (extended mode)" },
+	{ AdbgMachine.i386,	"x86",     "i386",  "x86 32-bit (extended mode)" },
 	{ AdbgMachine.amd64,	"x86_64",  "amd64", "x86 64-bit (long mode)" },
 	{ AdbgMachine.thumb,	"t16",  "thumb",    "Thumb" },
 	{ AdbgMachine.thumb32,	"t32",  "thumb32",  "Thumb (32-bit)" },

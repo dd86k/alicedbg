@@ -1443,7 +1443,7 @@ PE_DEBUG_DIRECTORY* adbg_object_pe_debug_directory(adbg_object_t *o, size_t inde
 
 AdbgMachine adbg_object_pe_machine(ushort machine) {
 	switch (machine) {
-	case PE_MACHINE_I386:	return AdbgMachine.x86;
+	case PE_MACHINE_I386:	return AdbgMachine.i386;
 	case PE_MACHINE_AMD64:	return AdbgMachine.amd64;
 	case PE_MACHINE_ALPHAOLD, PE_MACHINE_ALPHA:	return AdbgMachine.alpha;
 	case PE_MACHINE_ALPHA64:	return AdbgMachine.alpha64;

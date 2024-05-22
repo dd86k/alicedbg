@@ -1377,7 +1377,7 @@ AdbgMachine adbg_object_elf_machine(ushort machine, ubyte class_) {
 	switch (machine) {
 	case ELF_EM_M32:	return AdbgMachine.we32100;
 	case ELF_EM_SPARC:	return AdbgMachine.sparc;
-	case ELF_EM_386:	return AdbgMachine.x86;
+	case ELF_EM_386:	return AdbgMachine.i386;
 	case ELF_EM_68K:	return AdbgMachine.m68k;
 	case ELF_EM_88K:	return AdbgMachine.m88k;
 	case ELF_EM_MCU:	return AdbgMachine.mcu;
