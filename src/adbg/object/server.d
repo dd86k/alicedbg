@@ -864,6 +864,14 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 		if (o.i.ne.header.ne_flags & (NE_HFLAG_INT8086 | NE_HFLAG_INTI286))
 			return AdbgMachine.i8086;
 		break;
+	case lx:
+		switch (o.i.lx.header.cpu) {
+		case LX_CPU_80286: return AdbgMachine.i8086;
+		case LX_CPU_80386:
+		case LX_CPU_80486: return AdbgMachine.x86;
+		default:
+		}
+		break;
 	case pe:	return adbg_object_pe_machine(o.i.pe.header.Machine);
 	case macho: // NOTE: Both Mach-O headers (regular/fat) match in layout for cputype
 		return adbg_object_macho_machine(o.i.macho.header.cputype);
