@@ -14,8 +14,8 @@ version (Windows) {
 
 import adbg.symbols;
 import adbg.error;
-import core.stdc.stdlib : malloc, calloc, free;
-import core.stdc.string : memset, strncpy;
+import core.stdc.stdlib : calloc, free;
+import core.stdc.string : strncpy;
 
 // NOTE: Calling dlerror(3) clears the last error
 

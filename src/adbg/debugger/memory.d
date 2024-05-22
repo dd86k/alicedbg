@@ -7,12 +7,11 @@ module adbg.debugger.memory;
 
 import adbg.debugger.process : adbg_process_t;
 import adbg.include.c.stdlib;
-import adbg.include.c.stdio;
 import adbg.include.c.stdarg;
-import core.stdc.string : memcpy, strncpy;
+import core.stdc.string : memcpy;
 import core.stdc.config : c_long;
 import adbg.error;
-import adbg.utils.math;
+import adbg.utils.math; // For MiB template
 
 // NOTE: Linux ptrace memory I/O based on https://www.linuxjournal.com/article/6100
 //       However, when possible, /proc/PID/mem is used.
@@ -21,16 +20,12 @@ import adbg.utils.math;
 version (Windows) {
 	import core.sys.windows.winbase; // WriteProcessMemory
 	import core.sys.windows.winnt;
-	import adbg.include.windows.wow64apiset;
 	import adbg.include.windows.psapi_dyn;
-	import adbg.include.windows.ntdll;
 } else version (Posix) {
-	import core.sys.posix.sys.stat;
-	import core.sys.posix.sys.uio;
-	import core.sys.posix.fcntl;
-	import adbg.include.posix.mann;
+	import core.stdc.stdio : snprintf, sscanf;
+	import core.sys.posix.fcntl : open, O_RDWR;
 	import adbg.include.posix.ptrace;
-	import adbg.include.posix.unistd;
+	import adbg.include.posix.unistd : sysconf, read, write, ssize_t, _SC_PAGESIZE;
 	
 	version (linux) {
 		import adbg.include.linux.user;
@@ -49,7 +44,7 @@ size_t adbg_memory_pagesize() {
 		return sysinfo.dwPageSize;
 	} else version (Posix) {
 		// NOTE: sysconf, on error, returns -1
-		c_long r = sysconf(_SC_PAGE_SIZE);
+		c_long r = sysconf(_SC_PAGESIZE);
 		return r < 0 ? 0 : r;
 	}
 }

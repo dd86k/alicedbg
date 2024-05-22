@@ -18,8 +18,6 @@ module adbg.object.format.ar;
 import adbg.error;
 import adbg.object.server;
 import adbg.utils.bit;
-import core.stdc.stdlib : atoi;
-import core.stdc.string : memcpy;
 
 // NOTE: MSVC linker can only process libraries under 4 GiB in size.
 

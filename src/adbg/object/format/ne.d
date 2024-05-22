@@ -14,7 +14,6 @@ import adbg.object.server;
 import adbg.machines : AdbgMachine;
 import adbg.error;
 import adbg.utils.bit;
-import adbg.include.c.stdlib : calloc, free;
 
 extern (C):
 

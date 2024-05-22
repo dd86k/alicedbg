@@ -8,7 +8,6 @@ module adbg.debugger.thread;
 import adbg.debugger.process : adbg_process_t;
 import adbg.include.c.stdio : snprintf;
 import adbg.include.c.stdlib;
-import core.stdc.string : memset, strncmp;
 import adbg.error;
 import adbg.machines;
 
@@ -23,7 +22,6 @@ version (Windows) {
 } else version (Posix) {
 	import adbg.include.linux.user;
 	import adbg.include.posix.ptrace;
-	import core.sys.posix.signal;
 }
 
 /// Number of registers, used for buffer

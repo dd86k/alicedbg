@@ -18,9 +18,7 @@ module adbg.debugger.process;
 //TODO: Has remote debugger attached?
 
 import adbg.include.c.stdlib; // malloc, calloc, free, exit;
-import adbg.include.c.stdio;  // snprintf;
 import adbg.include.c.stdarg;
-import adbg.platform : ADBG_CHILD_STACK_SIZE;
 import adbg.error;
 import adbg.utils.strings;
 import adbg.debugger.exception : adbg_exception_t, adbg_exception_translate;
@@ -31,10 +29,8 @@ version (Windows) {
 	import adbg.include.windows.wow64apiset;
 	import adbg.include.windows.psapi_dyn;
 	import adbg.include.windows.winnt;
-	import core.sys.windows.basetsd;
 	import core.sys.windows.winbase;
 } else version (Posix) {
-	import adbg.include.posix.mann;
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
 	import adbg.include.posix.sys.wait;
@@ -44,6 +40,8 @@ version (Windows) {
 	import core.sys.posix.fcntl;
 	import core.sys.posix.dirent;
 	import core.sys.posix.libgen : basename;
+	import adbg.include.c.stdio;  // snprintf;
+	import adbg.platform : ADBG_CHILD_STACK_SIZE;
 }
 
 //version (CRuntime_Glibc)

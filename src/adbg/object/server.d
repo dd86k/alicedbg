@@ -17,12 +17,10 @@ import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import adbg.error;
-import adbg.utils.bit;
-import adbg.utils.math;
+import adbg.utils.math;	// For MiB template
 import adbg.object.formats;
 import adbg.machines : AdbgMachine, adbg_machine_name;
 import adbg.debugger.process : adbg_process_t;
-import adbg.debugger.memory : adbg_memory_map_t, adbg_memory_read;
 import core.stdc.string;
 
 extern (C):
@@ -131,8 +129,6 @@ struct adbg_section_t {
 ///
 /// All fields are used internally and should not be used directly.
 struct adbg_object_t {
-	/// Object's loading origin.
-	AdbgObjectOrigin origin;
 	union {
 		struct {
 			union {
@@ -159,6 +155,8 @@ struct adbg_object_t {
 		}
 	}
 	
+	/// Object's loading origin.
+	AdbgObjectOrigin origin;
 	/// Loaded object format.
 	AdbgObject format;
 	

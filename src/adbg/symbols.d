@@ -7,9 +7,6 @@ module adbg.symbols;
 
 import adbg.error;
 import adbg.machines : AdbgMachine;
-import core.stdc.ctype : isdigit;
-import core.stdc.string : strcmp, strncpy;
-import core.stdc.stdlib : atoi;
 
 // Sources:
 // - https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling

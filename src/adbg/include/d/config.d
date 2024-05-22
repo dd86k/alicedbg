@@ -81,41 +81,41 @@ version (LDC) {
 	// See driver/main.cpp::registerPredefinedVersions.
 	// No traits to get LDC/LLVM versions.
 	// LDC started in 2009, supporting LLVM 2.0.
-	version (LDC_LLVM_1800) {
+	version (LDC_LLVM_1800)
 		enum LLVM_VERSION = 18;	/// LLVM version used to compile.
-	} else version (LDC_LLVM_1700) {
+	else version (LDC_LLVM_1700)
 		enum LLVM_VERSION = 17;	/// Ditto
-	} else version (LDC_LLVM_1600) {
+	else version (LDC_LLVM_1600)
 		enum LLVM_VERSION = 16;	/// Ditto
-	} else version (LDC_LLVM_1500) {
+	else version (LDC_LLVM_1500)
 		enum LLVM_VERSION = 15;	/// Ditto
-	} else version (LDC_LLVM_1400) {
+	else version (LDC_LLVM_1400)
 		enum LLVM_VERSION = 14;	/// Ditto
-	} else version (LDC_LLVM_1300) {
+	else version (LDC_LLVM_1300)
 		enum LLVM_VERSION = 13;	/// Ditto
-	} else version (LDC_LLVM_1200) {
+	else version (LDC_LLVM_1200)
 		enum LLVM_VERSION = 12;	/// Ditto
-	} else version (LDC_LLVM_1100) {
+	else version (LDC_LLVM_1100)
 		enum LLVM_VERSION = 11;	/// Ditto
-	} else version (LDC_LLVM_1000) {
+	else version (LDC_LLVM_1000)
 		enum LLVM_VERSION = 10;	/// Ditto
-	} else version (LDC_LLVM_900) {
+	else version (LDC_LLVM_900)
 		enum LLVM_VERSION = 9;	/// Ditto
-	} else version (LDC_LLVM_800) {
+	else version (LDC_LLVM_800)
 		enum LLVM_VERSION = 8;	/// Ditto
-	} else version (LDC_LLVM_700) {
+	else version (LDC_LLVM_700)
 		enum LLVM_VERSION = 7;	/// Ditto
-	} else version (LDC_LLVM_600) {
+	else version (LDC_LLVM_600)
 		enum LLVM_VERSION = 6;	/// Ditto
-	} else version (LDC_LLVM_500) {
+	else version (LDC_LLVM_500)
 		enum LLVM_VERSION = 5;	/// Ditto
-	} else version (LDC_LLVM_400) {
+	else version (LDC_LLVM_400)
 		enum LLVM_VERSION = 4;	/// Ditto
-	} else version (LDC_LLVM_300) {
+	else version (LDC_LLVM_300)
 		enum LLVM_VERSION = 3;	/// Ditto
-	} else version (LDC_LLVM_200) {
+	else version (LDC_LLVM_200)
 		enum LLVM_VERSION = 2;	/// Ditto
-	} else
+	else
 		enum LLVM_VERSION = 0;	/// Ditto
 } else {
 	enum LLVM_VERSION = 0;	/// Ditto

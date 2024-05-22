@@ -14,7 +14,6 @@ import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.debugger.process : adbg_process_t;
 import adbg.machines : AdbgMachine;
-import adbg.debugger.exception : adbg_exception_t;
 import adbg.debugger.memory : adbg_memory_read;
 import core.stdc.string : memcpy;
 import core.stdc.stdlib : malloc, free;
