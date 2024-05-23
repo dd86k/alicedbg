@@ -285,8 +285,8 @@ unittest {
 	char[BUFSZ] buffer = void;
 	int r = adbg_register_format(buffer.ptr, BUFSZ, &reg, AdbgRegFormat.hex);
 	assert(r == 4);
-	// 16 to check null terminator
-	assert(strncmp(buffer.ptr, "1234", BUFSZ) == 0);
+	assert(buffer[r] == 0);
+	assert(buffer[0..r] == "1234");
 }
 
 private:
