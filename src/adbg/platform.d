@@ -41,7 +41,7 @@ enum ADBG_CHILD_STACK_SIZE	= 1024 * 1024 * 8;
 //
 
 /// Library version.
-enum ADBG_VERSION = "0.3.0";
+enum ADBG_VERSION = "0.4.0";
 
 debug enum __BUILDTYPE__ = "debug";	/// Library build type.
 else  enum __BUILDTYPE__ = "release";	/// Ditto

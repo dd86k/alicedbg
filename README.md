@@ -10,7 +10,7 @@ Features:
 - Disassembler (using Capstone)
 - Object server
 
-Written from scratch for educational purposes.
+Written from scratch for self-taught educational purposes.
 
 ## Warnings
 
@@ -23,9 +23,7 @@ None of the functions are currently thread-safe.
 
 # Usage
 
-The application features two modes:
-- Debugger
-- Image dumper
+Usage for `alicedbg` (Debugger) and `alicedump` (Dumper) can be looked in the repo Wiki.
 
 The disassembly feature is provided by Capstone 4.0.2.
 
@@ -38,29 +36,6 @@ For other platforms, package names are typically:
 - Alpine: `capstone-dev`
 
 Capstone is licensed under the 3-clause BSD license.
-
-## Debugger
-
-The debugger is the default operating mode.
-
-In this mode, the default option is to spawn a process with a file path.
-
-To attach to a live process, use the `--attach PID` option, where PID is a
-Process ID.
-
-Examples:
-- Spawn process on Windows: `alicedbg test.exe`
-- Spawn process on Posix: `alicedbg ./test`
-- Attach to process ID 3428: `alicedbg --attach 3428`
-
-## Image Dumper
-
-To invoke the object dumper, use `--dump PATH`, where PATH is a file path to a
-binary image.
-
-Examples:
-- Dump headers: `alicedbg --dump alicedbg`
-- Dump exports: `alicedbg --dump-exports alicedbg.exe`
 
 # Documentation
 
