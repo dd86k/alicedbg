@@ -33,6 +33,16 @@ jobs:
         compiler: ${{ matrix.dc }}
     - name: Test Alicedump
       run: dub test -c dumper
+  Simple:
+    strategy:
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dlang-community/setup-dlang@v1
+    - name: Build Simple
+      run: dub build -c simple
   Library:
     strategy:
       matrix:
@@ -43,7 +53,7 @@ jobs:
     - uses: actions/checkout@v4
     - uses: dlang-community/setup-dlang@v1
     - name: Build Library
-      run: dub build -c simple
+      run: dub build -c library
   Shared:
     strategy:
       matrix:
@@ -55,13 +65,3 @@ jobs:
     - uses: dlang-community/setup-dlang@v1
     - name: Build Shared Library
       run: dub build -c shared
-  Simple:
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, windows-latest ]
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dlang-community/setup-dlang@v1
-    - name: Build Simple
-      run: dub build -c simple
