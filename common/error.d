@@ -40,13 +40,20 @@ void print_adbg_trace() {
 }
 
 void panic(int code, const(char)* message,
+	const(char)* prefix = null,
 	const(char)* mod = cast(char*)__MODULE__,
 	int line = __LINE__) {
-	printf("%s@%u: %s\n", mod, line, message);
+	if (prefix) printf("%s: ", prefix);
+	debug printf("%s@%u: %s\n", mod, line, message);
+	puts(message);
 	exit(code);
 }
-void panic_crt() { panic(errno, strerror(errno)); }
-void panic_adbg() { panic(adbg_errno(), adbg_error_message()); }
+void panic_crt(const(char)* prefix = null) {
+	panic(errno, strerror(errno), prefix);
+}
+void panic_adbg(const(char)* prefix = null) {
+	panic(adbg_errno(), adbg_error_message(), prefix);
+}
 
 void oopsie(adbg_process_t *proc, adbg_exception_t *ex) {
 	puts(

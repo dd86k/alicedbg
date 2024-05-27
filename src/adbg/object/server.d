@@ -885,6 +885,7 @@ const(char)* adbg_object_machine_string(adbg_object_t *o) {
 /// Get the short name of the loaded object format.
 /// Params: o = Object instance.
 /// Returns: Object format name.
+export
 const(char)* adbg_object_format_shortname(adbg_object_t *o) {
 	if (o == null)
 		goto Lunknown;
@@ -911,6 +912,7 @@ const(char)* adbg_object_format_shortname(adbg_object_t *o) {
 /// Get the full name of the loaded object format.
 /// Params: o = Object instance.
 /// Returns: Object format name.
+export
 const(char)* adbg_object_format_name(adbg_object_t *o) {
 	if (o == null)
 		goto Lunknown;

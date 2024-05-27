@@ -14,6 +14,7 @@ import adbg.utils.bit : adbg_bswap32;
 import core.stdc.ctype : isdigit;
 import dumper;
 import common.utils : realstring;
+import common.error;
 
 extern (C):
 
@@ -47,10 +48,8 @@ void dump_archive_firstheader(adbg_object_t *o) {
 	print_header("Header");
 	
 	ar_member_header *member = adbg_object_ar_first_header(o);
-	if (member == null) {
-		print_string("error", adbg_error_message());
-		return;
-	}
+	if (member == null)
+		panic_adbg();
 	dump_archive_header(member);
 }
 
@@ -59,10 +58,8 @@ void dump_archive_memberdata(adbg_object_t *o, ar_member_header *member) {
 		return;
 	
 	ar_member_data m = adbg_object_ar_data(o, member);
-	if (m.data == null) {
-		print_string("warning", adbg_error_message());
-		return;
-	}
+	if (m.data == null)
+		panic_adbg();
 	print_data("data", m.data, m.size);
 }
 
@@ -70,10 +67,8 @@ void dump_archive_allheaders(adbg_object_t *o) {
 	print_header("Debug data");
 
 	ar_member_header *member = adbg_object_ar_first_header(o);
-	if (member == null) {
-		print_string("error", adbg_error_message());
-		return;
-	}
+	if (member == null)
+		panic_adbg();
 
 	uint i;
 	do {

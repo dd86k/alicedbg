@@ -14,6 +14,7 @@ import adbg.utils.uid;
 import adbg.utils.date;
 import adbg.include.c.stdio : printf, snprintf, putchar;
 import dumper;
+import common.error;
 
 extern (C):
 
@@ -97,10 +98,8 @@ void dump_pdb70_debug(adbg_object_t *o) {
 	// Stream 0 - Old MSF directory
 	
 	print_section(0, StreamNames[0].ptr, cast(int)StreamNames[0].length);
-	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.pdb)) {
-		print_string("error", "Couldn't read Stream 0");
-		return;
-	}
+	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.pdb))
+		panic_adbg("Failed to open Steam 0");
 	/*if (strsize)
 		print_hexdump("Stream 0 Data", buffer, strsize);*/
 	adbg_object_pdb70_stream_close(o, &buffer);
@@ -108,10 +107,8 @@ void dump_pdb70_debug(adbg_object_t *o) {
 	// Stream 1
 	
 	print_section(1, StreamNames[1].ptr, cast(int)StreamNames[1].length);
-	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.pdb)) {
-		print_string("error", "Couldn't read Stream 1");
-		return;
-	}
+	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.pdb))
+		panic_adbg("Failed to open Steam 1");
 	if (strsize >= pdb70_pdb_header.sizeof) {
 		pdb70_pdb_header *pdb = cast(pdb70_pdb_header*)buffer;
 		const(char) *vcver = void;
@@ -146,10 +143,8 @@ void dump_pdb70_debug(adbg_object_t *o) {
 	// Stream 2
 	
 	print_section(2, StreamNames[2].ptr, cast(int)StreamNames[2].length);
-	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.tpi)) {
-		print_string("error", "Couldn't read Stream 2");
-		return;
-	}
+	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.tpi))
+		panic_adbg("Failed to open Steam 2");
 	if (strsize >= pdb70_tpi_header.sizeof) {
 		pdb70_tpi_header *tpi = cast(pdb70_tpi_header*)buffer;
 		const(char) *vcver = void;
@@ -192,10 +187,8 @@ void dump_pdb70_debug(adbg_object_t *o) {
 	// Stream 3
 	
 	print_section(3, StreamNames[3].ptr, cast(int)StreamNames[3].length);
-	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.dbi)) {
-		print_string("error", "Couldn't read Stream 3");
-		return;
-	}
+	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.dbi))
+		panic_adbg("Failed to open Steam 3");
 	if (strsize >= pdb70_dbi_header.sizeof) {
 		pdb70_dbi_header *dbi = cast(pdb70_dbi_header*)buffer;
 		
@@ -250,10 +243,8 @@ void dump_pdb70_debug(adbg_object_t *o) {
 	
 	// Stream 4
 	/+print_section(4, StreamNames[4].ptr, cast(int)StreamNames[4].length);
-	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.dbi)) {
-		print_string("error", "Couldn't read Stream 3");
-		return;
-	}
+	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.dbi))
+		panic_adbg("Failed to open Steam 4");
 	if (strsize >= pdb70_subsection_header.sizeof) {
 		pdb70_subsection_header *ipi = cast(pdb70_subsection_header*)buffer;
 		

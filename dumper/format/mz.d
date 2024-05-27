@@ -10,6 +10,7 @@ import adbg.object.server;
 import adbg.machines : AdbgMachine;
 import adbg.object.format.mz;
 import dumper;
+import common.error;
 
 extern (C):
 
@@ -62,21 +63,10 @@ void dump_mz_relocs(adbg_object_t *o) {
 void dump_mz_disasm(adbg_object_t *o) {
 	// Get start of data
 	uint start = (o.i.mz.header.e_cparh << 4) + o.i.mz.header.e_cblp; // paragraphs * 16
-	if (start < mz_hdr.sizeof || start >= o.file_size) {
-		print_string("error", "Data start outside of file buffer");
-		return;
-	}
+	if (start < mz_hdr.sizeof || start >= o.file_size)
+		panic(1, "Data start outside of file buffer");
 	
-	// Get data length
+	// Get data length, disassembler takes care of error checking
 	uint len = (o.i.mz.header.e_cp << 4) + o.i.mz.header.e_cblp; // paragraphs * 16
-	if (len == 0) {
-		print_string("error", "Length is zero");
-		return;
-	}
-	if (len > o.file_size) {
-		print_string("error", "Data length cannot be bigger than file");
-		return;
-	}
-	
 	dump_disassemble_object(o, null, 0, o.buffer + start, len, 0);
 }

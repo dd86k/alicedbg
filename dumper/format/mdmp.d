@@ -13,6 +13,7 @@ import adbg.utils.date : ctime32;
 import adbg.include.windows.winnt;
 import dumper;
 import common.utils : realstring;
+import common.error;
 
 int dump_minidump(adbg_object_t *o) {
 	if (SELECTED(Select.headers))
@@ -72,10 +73,8 @@ void dump_minidump_debug(adbg_object_t *o) {
 	uint cnt = o.i.mdmp.header.StreamCount;
 	uint off = o.i.mdmp.header.StreamRva;
 	mdmp_directory_entry *dir = void;
-	if (adbg_object_offsetl(o, cast(void**)&dir, off, cnt * mdmp_directory_entry.sizeof)) {
-		print_string("error", "Directory outside file bounds");
-		return;
-	}
+	if (adbg_object_offsetl(o, cast(void**)&dir, off, cnt * mdmp_directory_entry.sizeof))
+		panic(1, "Directory outside file bounds");
 	
 	for (uint i; i < cnt; ++i) {
 		mdmp_directory_entry *entry = &dir[i];
@@ -93,7 +92,7 @@ void dump_minidump_debug(adbg_object_t *o) {
 			mdmp_threadlist *tlist = void;
 			if (adbg_object_offsetl(o, cast(void**)&tlist,
 				entry.Rva, uint.sizeof + mdmp_thread.sizeof)) {
-				print_string("warning", "Threadlist.Rva points outbound");
+				print_warningf("Threadlist.Rva points outbound");
 				continue;
 			}
 			for (uint ti; ti < tlist.Count; ++ti) {
@@ -108,7 +107,7 @@ void dump_minidump_debug(adbg_object_t *o) {
 				X86_NT_CONTEXT *context = void;
 				if (adbg_object_offsetl(o, cast(void**)&context,
 					thread.ThreadContext.Rva, thread.ThreadContext.Size)) {
-					print_string("warning", "Thread.Context.Rva points outbound");
+					print_warningf("Thread.Context.Rva points outbound");
 					continue;
 				}
 				

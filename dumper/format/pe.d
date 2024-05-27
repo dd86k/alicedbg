@@ -14,6 +14,7 @@ import adbg.utils.date : ctime32;
 import adbg.utils.uid, adbg.utils.bit;
 import core.stdc.string : strncmp;
 import dumper;
+import common.error;
 
 extern (C):
 
@@ -601,7 +602,7 @@ void dump_pe_imports(adbg_object_t *o) {
 					ushort *hint = adbg_object_pe_import_entry32_hint(o, import_, t32);
 					if (hint == null) {
 				LBADINDEX32:
-						print_string("warning", "String index outside buffer");
+						print_warningf("String index outside buffer");
 						continue;
 					}
 					const(char)* import_name = cast(const(char)*)hint + ushort.sizeof;
@@ -623,7 +624,7 @@ void dump_pe_imports(adbg_object_t *o) {
 					ushort *hint = adbg_object_pe_import_entry64_hint(o, import_, t64);
 					if (hint == null) {
 				LBADINDEX64:
-						print_string("warning", "String index outside buffer");
+						print_warningf("String index outside buffer");
 						continue;
 					}
 					const(char)* import_name = cast(const(char)*)hint + ushort.sizeof;
@@ -656,10 +657,8 @@ void dump_pe_debug(adbg_object_t *o) {
 		print_x32("PointerToRawData", PointerToRawData);
 		
 		uint sig = void;
-		if (adbg_object_offsett!uint(o, &sig, PointerToRawData)) {
-			print_string("error", "PointerToRawData out of bounds");
-			return;
-		}
+		if (adbg_object_offsett!uint(o, &sig, PointerToRawData))
+			panic(1, "PointerToRawData out of bounds");
 		
 		const(char) *sigstr = void;
 		switch (Type) {
@@ -681,10 +680,8 @@ void dump_pe_debug(adbg_object_t *o) {
 				print_x32("Signature", sig, sigstr);
 				PE_DEBUG_DATA_CODEVIEW_PDB20* pdb = void;
 				if (adbg_object_offsetl(o, cast(void**)&pdb,
-					PointerToRawData, PE_DEBUG_DATA_CODEVIEW_PDB20.sizeof + 256)) {
-					print_string("error", "PE_DEBUG_DATA_CODEVIEW_PDB20 out of bounds");
-					continue;
-				}
+					PointerToRawData, PE_DEBUG_DATA_CODEVIEW_PDB20.sizeof + 256))
+					panic(1, "PE_DEBUG_DATA_CODEVIEW_PDB20 out of bounds");
 				print_x32("Offset", pdb.Offset);
 				print_x32("Timestamp", pdb.Timestamp, ctime32(pdb.Timestamp));
 				print_u32("Age", pdb.Age);
@@ -693,10 +690,8 @@ void dump_pe_debug(adbg_object_t *o) {
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV700: // PDB 7.0 / CodeView 7.0
 				PE_DEBUG_DATA_CODEVIEW_PDB70* pdb = void;
 				if (adbg_object_offsetl(o, cast(void**)&pdb,
-					PointerToRawData, PE_DEBUG_DATA_CODEVIEW_PDB70.sizeof + 256)) {
-					print_string("error", "PE_DEBUG_DATA_CODEVIEW_PDB70 out of bounds");
-					continue;
-				}
+					PointerToRawData, PE_DEBUG_DATA_CODEVIEW_PDB70.sizeof + 256))
+					panic(1, "PE_DEBUG_DATA_CODEVIEW_PDB70 out of bounds");
 				char[UID_TEXTLEN] guid = void;
 				uid_text(pdb.Guid, guid, UID_GUID);
 				print_x32("Signature", sig, "PDB 7.0 / CodeView 7.0");
@@ -711,10 +706,8 @@ void dump_pe_debug(adbg_object_t *o) {
 			case PE_IMAGE_DEBUG_MAGIC_PPDB:
 				PE_DEBUG_DATA_PPDB *ppdb = void;
 				if (adbg_object_offsetl(o, cast(void**)&ppdb,
-					PointerToRawData, PE_DEBUG_DATA_PPDB.sizeof + 64)) {
-					print_string("error", "PE_DEBUG_DATA_PPDB out of bounds");
-					continue;
-				}
+					PointerToRawData, PE_DEBUG_DATA_PPDB.sizeof + 64))
+					panic(1, "PE_DEBUG_DATA_PPDB out of bounds");
 				print_x32("Signature", sig, "Portable PDB");
 				print_u16("MajorVersion", ppdb.MajorVersion);
 				print_u16("MinorVersion", ppdb.MinorVersion);
@@ -731,14 +724,10 @@ void dump_pe_debug(adbg_object_t *o) {
 		case PE_IMAGE_DEBUG_TYPE_MISC:
 			PE_DEBUG_DATA_MISC* misc = void;
 			if (adbg_object_offsetl(o, cast(void**)&misc,
-				PointerToRawData, PE_DEBUG_DATA_MISC.sizeof + 256)) {
-				print_string("error", "PE_DEBUG_DATA_MISC out of bounds");
-				continue;
-			}
-			if (misc.DataType != 1) { // IMAGE_DEBUG_MISC_EXENAME
-				print_string("error", "PE_DEBUG_DATA_MISC.DataType is not set to 1.");
-				continue;
-			}
+				PointerToRawData, PE_DEBUG_DATA_MISC.sizeof + 256))
+				panic(1, "PE_DEBUG_DATA_MISC out of bounds");
+			if (misc.DataType != 1) // IMAGE_DEBUG_MISC_EXENAME
+				panic(1, "PE_DEBUG_DATA_MISC.DataType is not set to 1.");
 			print_x32("Signature", sig, "Misc. Debug Data");
 			print_x32("DataType", misc.DataType);
 			print_x32("Length", misc.Length);
@@ -756,16 +745,12 @@ void dump_pe_debug(adbg_object_t *o) {
 			// TODO: PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS
 			break;
 		case PE_IMAGE_DEBUG_TYPE_VC_FEATURE:
-			if (SizeOfData != PE_DEBUG_DATA_VC_FEAT.sizeof) {
-				print_string("error", "SizeOfData does not correspond to VC feature structure size");
-				break;
-			}
+			if (SizeOfData != PE_DEBUG_DATA_VC_FEAT.sizeof)
+				panic(1, "SizeOfData does not correspond to VC feature structure size");
 			PE_DEBUG_DATA_VC_FEAT* vc = void;
 			if (adbg_object_offsetl(o, cast(void**)&vc,
-				PointerToRawData, PE_DEBUG_DATA_VC_FEAT.sizeof)) {
-				print_string("error", "PE_DEBUG_DATA_MISC out of bounds");
-				continue;
-			}
+				PointerToRawData, PE_DEBUG_DATA_VC_FEAT.sizeof))
+				panic(1, "PE_DEBUG_DATA_MISC out of bounds");
 			print_u32("PreVC11", vc.prevc11);
 			print_u32("C/C++", vc.ccpp);
 			print_u32("/GS", vc.gs);
@@ -788,9 +773,8 @@ void dump_pe_debug(adbg_object_t *o) {
 			
 			PE_DEBUG_POGO_ENTRY* pogoentry = void;
 			if (adbg_object_offsetl(o, cast(void**)&pogoentry,
-				PointerToRawData, PE_DEBUG_POGO_ENTRY.sizeof + 256)) { // Guess
-				print_string("error", "PE_DEBUG_POGO_ENTRY out of bounds");
-			}
+				PointerToRawData, PE_DEBUG_POGO_ENTRY.sizeof + 256)) // Guess
+				panic(1, "PE_DEBUG_POGO_ENTRY out of bounds");
 			
 			print_x32("RVA", pogoentry.Rva);
 			print_x32("Size", pogoentry.Size);

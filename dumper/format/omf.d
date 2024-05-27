@@ -8,6 +8,7 @@ module format.omf;
 import adbg.object.server;
 import adbg.object.format.omf;
 import dumper;
+import common.error;
 
 extern (C):
 
@@ -66,10 +67,8 @@ int dump_omf_print_entry(omf_entry *entry) {
 	switch (entry.type) with (OMFRecord) {
 	case THEADR, LHEADR:
 		ubyte len = (cast(ubyte*)entry.data)[0];
-		if (len >= entry.size) {
-			print_string("error", "String length outside bounds");
-			return 1;
-		}
+		if (len >= entry.size)
+			panic(1, "String length outside bounds");
 		const(char)* str = cast(const(char)*)entry.data + 1;
 		print_stringl("Name", str, len);
 		break;

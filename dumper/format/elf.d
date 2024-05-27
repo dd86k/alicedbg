@@ -13,6 +13,7 @@ import adbg.object.format.elf;
 import core.stdc.string : memcmp, strncmp;
 import dumper;
 import common.utils : realchar, hexstr;
+import common.error;
 
 extern (C):
 
@@ -225,10 +226,8 @@ LNEWNHDR:
 		return;
 	
 	void *note = void;
-	if (adbg_object_offsetl(o, &note, noffset, cast(size_t)nleft)) {
-		print_string("error", "Elf64_Phdr::p_offset points outside of file bounds");
-		return;
-	}
+	if (adbg_object_offsetl(o, &note, noffset, cast(size_t)nleft))
+		panic(1, "Elf64_Phdr::p_offset points outside of file bounds");
 	
 	Elf64_Nhdr *nhdr = cast(Elf64_Nhdr*)note;
 	
@@ -418,16 +417,13 @@ void dump_elf_sections(adbg_object_t *o) {
 		
 		// Check id is outside section count
 		ushort id = o.i.elf32.ehdr.e_shstrndx;
-		if (id >= section_count) {
-			print_string("error", "String table index out of bounds");
+		if (id >= section_count)
+			panic(1, "String table index out of bounds");
 			return;
-		}
 		
 		uint offset = o.i.elf32.shdr[id].sh_offset;
-		if (offset < Elf32_Ehdr.sizeof || offset > o.file_size) {
-			print_string("error", "String table offset out of bounds");
-			return;
-		}
+		if (offset < Elf32_Ehdr.sizeof || offset > o.file_size)
+			panic(1, "String table offset out of bounds");
 		
 		char *table = o.bufferc + offset; // string table
 		for (uint i; i < section_count; ++i) {
@@ -460,16 +456,12 @@ void dump_elf_sections(adbg_object_t *o) {
 		
 		// Check id is without section count
 		ushort id = o.i.elf64.ehdr.e_shstrndx;
-		if (id >= section_count) {
-			print_string("error", "String table index out of bounds");
-			return;
-		}
+		if (id >= section_count)
+			panic(1, "String table index out of bounds");
 		
 		ulong offset = o.i.elf64.shdr[id].sh_offset;
-		if (offset < Elf64_Ehdr.sizeof || offset > o.file_size) {
-			print_string("error", "String table offset out of bounds");
-			return;
-		}
+		if (offset < Elf64_Ehdr.sizeof || offset > o.file_size)
+			panic(1, "String table offset out of bounds");
 		
 		char *table = o.bufferc + offset; // string table
 		for (uint i; i < section_count; ++i) {
@@ -556,15 +548,11 @@ void dump_elf_section64(Elf64_Shdr *shdr, uint idx, const(char)* name, int nmax)
 
 void dump_elf_exports(adbg_object_t *o) {
 	adbg_section_t *dynsym = adbg_object_section_n(o, ".dynsym");
-	if (dynsym == null) {
-		print_string("error", ".dynsym section missing");
-		return;
-	}
+	if (dynsym == null)
+		panic(1, ".dynsym section missing");
 	adbg_section_t *dynstr = adbg_object_section_n(o, ".dynstr");
-	if (dynstr == null) {
-		print_string("error", ".dynstr section missing");
-		return;
-	}
+	if (dynstr == null)
+		panic(1, ".dynstr section missing");
 	
 	print_header("Dynamic Symbols");
 	
@@ -575,10 +563,8 @@ void dump_elf_exports(adbg_object_t *o) {
 		
 		for (int i; i < count; ++i, ++entry) with (entry) {
 			//TODO: Check bounds
-			if (st_name + 1 >= dynstr.data_size) { // +null
-				print_string("error", "Name outside dynstr section");
-				break;
-			}
+			if (st_name + 1 >= dynstr.data_size) // +null
+				panic(1, "Name outside dynstr section");
 			print_section(i, "test");
 			print_x32("st_name", st_name, cast(char*)dynstr.data + st_name);
 			print_x8("st_info", st_info);
@@ -594,10 +580,8 @@ void dump_elf_exports(adbg_object_t *o) {
 		
 		for (int i; i < count; ++i, ++entry) with (entry) {
 			//TODO: Check bounds
-			if (st_name + 1 >= dynstr.data_size) { // +null
-				print_string("error", "Name outside dynstr section");
-				break;
-			}
+			if (st_name + 1 >= dynstr.data_size) // +null
+				panic(1, "Name outside dynstr section");
 			print_section(i, "test");
 			print_x32("st_name", st_name, cast(char*)dynstr.data + st_name);
 			print_x8("st_info", st_info);
@@ -626,17 +610,13 @@ void dump_elf_disasm(adbg_object_t *o) {
 		
 		// Check id is without section count
 		ushort id = o.i.elf32.ehdr.e_shstrndx;
-		if (id >= section_count) {
-			print_string("error", "String table index out of bounds");
-			return;
-		}
+		if (id >= section_count)
+			panic(1, "String table index out of bounds");
 		
 		Elf32_Shdr *shdr = o.i.elf32.shdr;
 		uint offset = shdr[id].sh_offset;
-		if (offset < Elf32_Ehdr.sizeof || offset > o.file_size) {
-			print_string("error", "String table offset out of bounds");
-			return;
-		}
+		if (offset < Elf32_Ehdr.sizeof || offset > o.file_size)
+			panic(1, "String table offset out of bounds");
 		
 		Elf32_Shdr *max = shdr + section_count;
 		char *table = o.bufferc + offset; // string table
@@ -655,17 +635,13 @@ void dump_elf_disasm(adbg_object_t *o) {
 		
 		// Check id is without section count
 		ushort id = o.i.elf64.ehdr.e_shstrndx;
-		if (id >= section_count) {
-			print_string("error", "String table index out of bounds");
-			return;
-		}
+		if (id >= section_count)
+			panic(1, "String table index out of bounds");
 		
 		Elf64_Shdr *shdr = o.i.elf64.shdr;
 		ulong offset = shdr[id].sh_offset;
-		if (offset < Elf64_Ehdr.sizeof || offset > o.file_size) {
-			print_string("error", "String table offset out of bounds");
-			return;
-		}
+		if (offset < Elf64_Ehdr.sizeof || offset > o.file_size)
+			panic(1, "String table offset out of bounds");
 		
 		Elf64_Shdr *max = shdr + section_count;
 		char *table = o.bufferc + offset; // string table

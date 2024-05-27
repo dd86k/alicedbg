@@ -379,13 +379,8 @@ int adbg_dis_step(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	
 	opcode.address = dasm.address_base; // Save before CS modifies it
 	
-	//TODO: Consider making a specific error code if decoded count is zero.
-	//      Use case:
-	//        If cs_disasm_iter returns false and cs_errno
-	//        returns CS_ERR_OK, this could mean that an invalid
-	//        machine type was specified when opening the instance.
-	//TODO: Consider replacing mnemonic by "error"
-	//      Needs to be something specific (e.g. .bytes 0x11 0x22)
+	//TODO: Consider replacing mnemonic by "error" or "illegal"
+	//      Needs to be something specific (e.g., .bytes 0x11 0x22)
 	
 	// NOTE: CS modifies buffer, buffer_size, and address_base.
 	if (cs_disasm_iter(dasm.cs_handle,

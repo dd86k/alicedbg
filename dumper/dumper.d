@@ -20,7 +20,6 @@ import common.error;
 import common.cli : opt_machine, opt_syntax;
 import common.utils;
 
-//TODO: print_error(string, ...)
 //TODO: Like print_flagsX, something for bit masks: print_mask
 //      signature: print_mask(name, flags, values...);
 //      usage: print_mask("something:something", 0x30, THING1, THING2, etc.)
@@ -112,7 +111,7 @@ int dump(const(char)* path) {
 	
 	adbg_object_t *o = adbg_object_open_file(path, 0);
 	if (o == null)
-		panic_adbg();
+		panic_adbg("Failed to open object");
 	
 	// If anything was selected to dump specifically
 	if (opt_selected) {
@@ -277,7 +276,14 @@ void print_stringl(const(char)* name, const(char)* val, int len) {
 	printf("%*s: %.*s\n", __field_padding, name, len, val);
 }
 
+void print_warningf(const(char)* fmt, ...) {
+	printf("%*s: ", __field_padding, "warning".ptr);
+	va_list list = void;
+	va_start(list, fmt);
+	vprintf(fmt, list);
+}
 
+// exists due to int promotion
 private
 void print_flagsv(int flags, va_list list) {
 	ushort count;
@@ -418,15 +424,14 @@ int dump_disassemble_object(adbg_object_t *o,
 	if (name && namemax)
 		print_stringl("section", name, namemax);
 	
-	if (data + size >= o.buffer + o.file_size) {
-		print_string("error", "data + size >= dump.o.buffer + dump.o.file_size");
-		return EXIT_FAILURE;
-	}
-	
-	if (data == null || size == 0) {
-		print_string("error", "data is NULL or size is 0");
+	if (size == 0)
 		return 0;
-	}
+	
+	if (data == null)
+		panic(1, "Data pointer is null");
+	
+	if (data + size >= o.buffer + o.file_size)
+		panic(1, "Data offset overflow");
 	
 	return dump_disassemble(adbg_object_machine(o), data, size, base_address);
 }
@@ -489,7 +494,7 @@ L_DISASM:
 	case disasmEndOfData:
 		return 0;
 	default:
-		print_string("error", adbg_error_message());
-		return 1;
+		panic_adbg();
+		return 0;
 	}
 }
