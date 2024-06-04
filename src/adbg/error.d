@@ -48,6 +48,8 @@ enum AdbgError {
 	indexBounds	= 8,	/// Index is outside of bounds of list
 	unavailable	= 9,	/// Feature or item is unavailable
 	unfindable	= 10,	/// Item cannot be found in list
+	partialRead	= 11,	/// Not all data could be read.
+	partialWrite	= 12,	/// Not all data could be written.
 	//
 	// 100-199: Debugger
 	//
@@ -232,7 +234,7 @@ int adbg_error_system() {
 /// Returns: Error code
 int adbg_oops(AdbgError e, void *extra = null,
 	string m = __MODULE__, int l = __LINE__, const(char)* f = __FUNCTION__.ptr) {
-	version (Trace) trace("code=%d res=%p caller=%s:%d", e, res, f, l);
+	version (Trace) trace("code=%d res=%p caller=%s:%d", e, extra, f, l);
 	error.mod = m.ptr;
 	error.line = l;
 	error.handle = extra;

@@ -44,8 +44,8 @@ void panic(int code, const(char)* message,
 	const(char)* mod = cast(char*)__MODULE__,
 	int line = __LINE__) {
 	if (prefix) printf("%s: ", prefix);
-	debug printf("%s@%u: %s\n", mod, line, message);
-	puts(message);
+	debug printf("error at %s@%u: %s\n", mod, line, message);
+	else  printf("error: %s\n", message);
 	exit(code);
 }
 void panic_crt(const(char)* prefix = null) {
