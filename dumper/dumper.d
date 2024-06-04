@@ -114,13 +114,13 @@ int dump(const(char)* path) {
 		panic_adbg("Failed to open object");
 	
 	// If anything was selected to dump specifically
-	if (opt_selected) {
+	if (opt_selected || opt_settings) {
 		// If not in any "extract" mode, print file info
 		if (SETTING(Setting.extractAny) == 0) {
 			print_string("filename", path);
 			print_u64("filesize", o.file_size);
-			print_string("format", adbg_object_format_name(o));
-			print_string("short_name", adbg_object_format_shortname(o));
+			print_string("type", adbg_object_type_name(o));
+			print_string("shortname", adbg_object_type_shortname(o));
 		}
 		final switch (o.format) with (AdbgObject) {
 		case mz:	return dump_mz(o);
@@ -142,10 +142,12 @@ int dump(const(char)* path) {
 	}
 	
 	// Otherwise, make a basic summary
-	printf("%s: %s (%s), %s", path,
-		adbg_object_format_name(o), adbg_object_format_shortname(o),
-		adbg_object_format_kind_string(o));
+	printf("%s: %s (%s), %s",
+		path,
+		adbg_object_type_name(o), adbg_object_type_shortname(o),
+		adbg_object_kind_string(o));
 	
+	// Print instruction set used for object
 	AdbgMachine mach = adbg_object_machine(o);
 	if (mach)
 		printf(", for %s (%s) machines",

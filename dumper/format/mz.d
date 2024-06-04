@@ -9,6 +9,7 @@ import adbg.disassembler;
 import adbg.object.server;
 import adbg.machines : AdbgMachine;
 import adbg.object.format.mz;
+import core.stdc.stdlib;
 import dumper;
 import common.error;
 
@@ -34,7 +35,11 @@ private:
 void dump_mz_hdr(adbg_object_t *o) {
 	print_header("Header");
 	
-	with (o.i.mz.header) {
+	//TODO: If start of code or relocs start within extended header,
+	//      manually cut it off from the header prints (reserved words and newloc)
+	mz_header_t* header = adbg_object_mz_header(o);
+	
+	with (header) {
 	print_u16("e_cblp", e_cblp);
 	print_u16("e_cp", e_cp);
 	print_u16("e_crlc", e_crlc);
@@ -54,19 +59,28 @@ void dump_mz_hdr(adbg_object_t *o) {
 void dump_mz_relocs(adbg_object_t *o) {
 	print_header("Relocations");
 	
-	mz_reloc *reloc = void;
+	mz_reloc_t *reloc = void;
 	size_t i;
-	while ((reloc = adbg_object_mz_reloc(o, i++)) != null) with (reloc)
-		print_reloc16(cast(uint)i, segment, offset);
+	while ((reloc = adbg_object_mz_reloc(o, i++)) != null)
+		with (reloc) print_reloc16(cast(uint)i, segment, offset);
 }
 
 void dump_mz_disasm(adbg_object_t *o) {
-	// Get start of data
-	uint start = (o.i.mz.header.e_cparh << 4) + o.i.mz.header.e_cblp; // paragraphs * 16
-	if (start < mz_hdr.sizeof || start >= o.file_size)
+	mz_header_t* header = adbg_object_mz_header(o);
+	
+	// Get data location
+	uint start = (header.e_cparh << 4) + header.e_cblp; // (paragraphs * 16) + rest
+	if (start < mz_header_t.sizeof)
 		panic(1, "Data start outside of file buffer");
 	
-	// Get data length, disassembler takes care of error checking
-	uint len = (o.i.mz.header.e_cp << 4) + o.i.mz.header.e_cblp; // paragraphs * 16
-	dump_disassemble_object(o, null, 0, o.buffer + start, len, 0);
+	// Get data length
+	uint len = (header.e_cp << 4) + header.e_cblp; // (paragraphs * 16) + rest
+	
+	void* buffer = malloc(len);
+	if (buffer == null)
+		panic_crt();
+	if (adbg_object_read_at(o, start, buffer, len))
+		panic_adbg();
+	
+	dump_disassemble_object(o, null, 0, buffer, len, 0);
 }

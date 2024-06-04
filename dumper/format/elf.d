@@ -419,7 +419,6 @@ void dump_elf_sections(adbg_object_t *o) {
 		ushort id = o.i.elf32.ehdr.e_shstrndx;
 		if (id >= section_count)
 			panic(1, "String table index out of bounds");
-			return;
 		
 		uint offset = o.i.elf32.shdr[id].sh_offset;
 		if (offset < Elf32_Ehdr.sizeof || offset > o.file_size)

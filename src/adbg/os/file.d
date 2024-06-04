@@ -9,10 +9,15 @@ module adbg.os.file;
 
 version (Windows) {
 	import core.sys.windows.winnt :
-		LPVOID, MEM_COMMIT, MEM_RELEASE,
+		LPVOID,
+		MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
+		PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_READWRITE,
+		PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_WRITECOPY,
 		DWORD, HANDLE, LARGE_INTEGER, FALSE,
-		GENERIC_ALL, GENERIC_READ, GENERIC_WRITE;
+		GENERIC_ALL, GENERIC_READ, GENERIC_WRITE,
+		FILE_SHARE_READ;
 	import core.sys.windows.winbase :
+		GetLastError,
 		CreateFileA, CreateFileW,
 		SetFilePointerEx, GetFileSizeEx,
 		ReadFile, ReadFileEx, WriteFile, FlushFileBuffers, CloseHandle,
@@ -66,6 +71,8 @@ version (Windows) {
 	private alias OSHANDLE = int;
 }
 
+import adbg.error;
+
 /// File seek origin.
 enum OSFileSeek {
 	start	= SEEK_SET,	/// Seek from start of file.
@@ -87,23 +94,26 @@ struct OSFILE {
 
 OSFILE* osfopen(const(char) *path, int flags) {
 version (Windows) {
-	OSFILE* file = cast(OSFILE*)VirtualAlloc(null, OSFILE.sizeof, MEM_COMMIT, 0);
-	if (file == null)
+	OSFILE* file = cast(OSFILE*)VirtualAlloc(null, OSFILE.sizeof, MEM_COMMIT, PAGE_READWRITE);
+	if (file == null) {
+		version (Trace) trace("VirtualAlloc=%#x", GetLastError());
 		return null;
+	}
 	
 	uint dwAccess;
 	if (flags & OSFileOFlags.read)  dwAccess |= GENERIC_READ;
 	if (flags & OSFileOFlags.write) dwAccess |= GENERIC_WRITE;
 	
 	file.handle = CreateFileA(path, // lpFileName
-		dwAccess,      // dwDesiredAccess
-		0,             // dwShareMode
-		null,          // lpSecurityAttributes
-		OPEN_EXISTING, // dwCreationDisposition
-		0,             // dwFlagsAndAttributes
-		null           // hTemplateFile
+		dwAccess,        // dwDesiredAccess
+		FILE_SHARE_READ, // dwShareMode
+		null,            // lpSecurityAttributes
+		OPEN_EXISTING,   // dwCreationDisposition
+		0,               // dwFlagsAndAttributes
+		null             // hTemplateFile
 	);
 	if (file.handle == INVALID_HANDLE_VALUE) {
+		version (Trace) trace("CreateFileA=%#x", GetLastError());
 		VirtualFree(cast(void*)file, OSFILE.sizeof, MEM_RELEASE);
 		return null;
 	}

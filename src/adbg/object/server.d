@@ -13,15 +13,18 @@
 /// License: BSD-3-Clause-Clear
 module adbg.object.server;
 
+import adbg.debugger.memory : adbg_memory_read;
+import adbg.debugger.process : adbg_process_t;
+import adbg.error;
+import adbg.machines : AdbgMachine, adbg_machine_name;
+import adbg.utils.math;	// For MiB template
+import adbg.object.formats;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
-import adbg.error;
-import adbg.utils.math;	// For MiB template
-import adbg.object.formats;
-import adbg.machines : AdbgMachine, adbg_machine_name;
-import adbg.debugger.process : adbg_process_t;
+import adbg.os.file;
 import core.stdc.string;
+import core.stdc.string : memcpy;
 
 extern (C):
 
@@ -107,15 +110,14 @@ enum AdbgObjectOrigin {
 	disk,
 	/// Object was loaded from the debugger into memory.
 	process,
-	//TODO: user buffer (memory)
+	/// 
+	userbuffer,
 }
 
 package
 enum AdbgObjectInternalFlags {
 	/// Object has its fields swapped because of its target endianness.
 	reversed	= 0x1,
-	/// 
-	notnative	= 0x2,
 }
 
 struct adbg_section_t {
@@ -129,7 +131,10 @@ struct adbg_section_t {
 ///
 /// All fields are used internally and should not be used directly.
 struct adbg_object_t {
-	union {
+	// NOTE: It's important that none of the modules rely on a total size,
+	//       like a file size, since the origin can be of any kind (e.g., a process).
+	//       However, it must be seekable.
+	deprecated union {
 		struct {
 			union {
 				void   *buffer;	/// Buffer to file object.
@@ -146,19 +151,35 @@ struct adbg_object_t {
 			FILE *file_handle;
 			/// File size.
 			ulong file_size;
-	
 			/// Allocated buffer size.
 			size_t buffer_size;
 		}
+	}
+	package union {
+		struct {
+			OSFILE *file;
+		}
 		struct {
 			adbg_process_t *process;
+			size_t location;
 		}
 	}
 	
 	/// Object's loading origin.
 	AdbgObjectOrigin origin;
 	/// Loaded object format.
-	AdbgObject format;
+	AdbgObject type;
+	// Old alias
+	alias format = type;
+	
+	/// Internal status flags. (e.g., swapping required)
+	int status;
+	
+	// NOTE: This can be turned into a static buffer.
+	/// Managed by the object handler.
+	void *internal;
+	
+	//TODO: Deprecate *all* of this
 	
 	// Object properties.
 	package
@@ -176,6 +197,7 @@ struct adbg_object_t {
 		// 
 		size_t debug_offset;
 	}
+	deprecated
 	adbg_object_properties_t p;
 	
 	// Pointers to machine-dependant structures
@@ -186,10 +208,7 @@ struct adbg_object_t {
 		void *header;
 		
 		struct mz_t {
-			union {
-				mz_hdr *header;
-				mz_hdr_ext *header_ext;
-			}
+			mz_hdr_ext *header_ext;
 			mz_reloc *relocs;
 			void *newbase;
 			bool *reversed_relocs;
@@ -330,6 +349,7 @@ struct adbg_object_t {
 		mscoff_t mscoff;
 	}
 	/// Internal object definitions.
+	deprecated
 	adbg_object_internals_t i;
 }
 
@@ -338,6 +358,7 @@ struct adbg_object_t {
 /// 	o = Object instance.
 /// 	p = Pointer.
 /// Returns: True if outside bounds.
+deprecated
 bool adbg_object_outboundp(adbg_object_t *o, void *p) {
 	version (Trace) trace("p=%zx", cast(size_t)p);
 	return p < o.buffer || p >= o.buffer + o.file_size;
@@ -348,6 +369,7 @@ bool adbg_object_outboundp(adbg_object_t *o, void *p) {
 /// 	p = Pointer.
 /// 	size = Data size.
 /// Returns: True if outside bounds.
+deprecated
 bool adbg_object_outboundpl(adbg_object_t *o, void *p, size_t size) {
 	version (Trace) trace("p=%zx length=%zu", cast(size_t)p, size);
 	return p < o.buffer || p + size >= o.buffer + o.file_size;
@@ -358,6 +380,7 @@ bool adbg_object_outboundpl(adbg_object_t *o, void *p, size_t size) {
 /// 	o = Object instance.
 /// 	off = File offset.
 /// Returns: True if in bounds.
+deprecated
 bool adbg_object_outbound(adbg_object_t *o, ulong off) {
 	version (Trace) trace("offset=%llx", off);
 	if (o == null) return true;
@@ -370,6 +393,7 @@ bool adbg_object_outbound(adbg_object_t *o, ulong off) {
 /// 	off = File offset.
 /// 	size = Data size.
 /// Returns: True if in bounds.
+deprecated
 bool adbg_object_outboundl(adbg_object_t *o, ulong off, size_t size) {
 	version (Trace) trace("offset=%llx length=%zu", off, size);
 	if (o == null) return true;
@@ -382,6 +406,7 @@ bool adbg_object_outboundl(adbg_object_t *o, ulong off, size_t size) {
 /// 	p = Destination pointer.
 /// 	offset = File offset.
 /// Returns: True if outside bounds.
+deprecated
 bool adbg_object_offset(adbg_object_t *o, void** p, ulong offset) {
 	version (Trace) trace("p=%zx offset=%llx", cast(size_t)p, offset);
 	if (p == null) return true;
@@ -397,6 +422,7 @@ bool adbg_object_offset(adbg_object_t *o, void** p, ulong offset) {
 /// 	offset = File offset.
 /// 	size = Data size.
 /// Returns: True if outside bounds.
+deprecated
 bool adbg_object_offsetl(adbg_object_t *o, void** p, ulong offset, size_t size) {
 	version (Trace) trace("p=%zx offset=%llx length=%zu", cast(size_t)p, offset, size);
 	if (p == null) return true;
@@ -419,6 +445,7 @@ unittest {
 /// 	dst = Destination pointer.
 /// 	offset = File offset.
 /// Returns: True if outside bounds.
+deprecated
 bool adbg_object_offsett(T)(adbg_object_t *o, T* dst, ulong offset) {
 	if (dst == null) return true;
 	if (adbg_object_outboundl(o, offset, T.sizeof)) return true;
@@ -427,11 +454,6 @@ bool adbg_object_offsett(T)(adbg_object_t *o, T* dst, ulong offset) {
 	else
 		static assert(0, "adbg_object_offsett memcpy TODO");
 	return false;
-}
-
-/// Object server options.
-enum AdbgObjectLoadOption {
-	reserved = 1,
 }
 
 /// Load an object from disk into memory.
@@ -451,12 +473,22 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 		return null;
 	}
 	
+	//TODO: To remove
 	o.file_handle = fopen(path, "rb");
 	if (o.file_handle == null) {
 		free(o);
 		adbg_oops(AdbgError.crt);
 		return null;
 	}
+	
+	o.file = osfopen(path, OSFileOFlags.read);
+	if (o.file == null) {
+		free(o);
+		adbg_oops(AdbgError.os);
+		return null;
+	}
+	
+	o.origin = AdbgObjectOrigin.disk;
 	
 	va_list list = void;
 	va_start(list, path);
@@ -481,9 +513,12 @@ void adbg_object_close(adbg_object_t *o) {
 		return;
 	switch (o.format) with (AdbgObject) {
 	case mz:
+		adbg_object_mz_unload(o);
+		//TODO: Remove junk
 		with (o.i.mz) if (reversed_relocs) free(reversed_relocs);
 		break;
 	case pe:
+		//TODO: Remove junk
 		with (o.i.pe) {
 			if (reversed_sections) free(reversed_sections);
 			if (reversed_dir_export_entries) free(reversed_dir_export_entries);
@@ -492,12 +527,14 @@ void adbg_object_close(adbg_object_t *o) {
 		}
 		break;
 	case macho:
+		//TODO: Remove junk
 		with (o.i.macho) {
 		if (reversed_fat_arch) free(reversed_fat_arch);
 		if (reversed_commands) free(reversed_commands);
 		}
 		break;
 	case elf:
+		//TODO: Remove junk
 		import adbg.object.format.elf :
 			ELF_EI_CLASS, ELF_CLASS_32, ELF_CLASS_64;
 		switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
@@ -517,6 +554,7 @@ void adbg_object_close(adbg_object_t *o) {
 		}
 		break;
 	case pdb70:
+		//TODO: Remove junk
 		with (o.i.pdb70) if (dir) free(dir);
 		with (o.i.pdb70) if (strmap) free(strmap);
 		break;
@@ -526,44 +564,87 @@ void adbg_object_close(adbg_object_t *o) {
 		fclose(o.file_handle);
 	if (o.buffer && o.buffer_size)
 		free(o.buffer);
-	if (o.p.noalloc == false) // check is temporary
-		free(o);
+	free(o);
 }
 
-//TODO: adbg_object_write (disk source being copy-on-write to memory)
+
+//TODO: Error on partial reads (flag can override)
+int adbg_object_read(adbg_object_t *o, void *buffer, size_t rsize, int flags = 0) {
+	if (o == null || buffer == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return -1;
+	}
+	if (rsize == 0)
+		return 0;
+	
+	switch (o.origin) with (AdbgObjectOrigin) {
+	case disk:
+		int target = cast(int)rsize;
+		int r = osfread(o.file, buffer, target);
+		if (r < 0) {
+			adbg_oops(AdbgError.os);
+			return -1;
+		}
+		if (r < target) {
+			adbg_oops(AdbgError.partialRead);
+			return -1;
+		}
+		return target;
+	case process:
+		//TODO: Process memory read errors
+		return adbg_memory_read(o.process, o.location, buffer, cast(uint)rsize);
+	//case userbuffer:
+		//if (location + rsize >= o.buffer_size)
+		//	return adbg_oops(AdbgError.objectOutsideAccess);
+		//if (memcpy(buffer, o.buffer + location, rsize))
+		//	return adbg_oops(AdbgError.crt);
+	default:
+	}
+	
+	return adbg_oops(AdbgError.unimplemented);
+}
 
 // Read raw data from object.
 // Params:
 // 	o = Object instance.
 // 	buffer = Buffer pointer.
 // 	rsize = Size to read.
-// Returns: Error code.
-/+int adbg_object_read(adbg_object_t *o, ulong location, void *buffer, size_t rsize) {
-	if (rsize == 0)
-		return 0;
+// Returns: Number of bytes read. Otherwise -1 on error.
+int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rsize, int flags = 0) {
 	if (o == null || buffer == null) {
-		adbg_oops(AdbgError.nullArgument);
+		adbg_oops(AdbgError.invalidArgument);
 		return -1;
 	}
-	
-	import adbg.debugger.memory : adbg_memory_read;
-	import core.stdc.string : memcpy;
+	if (rsize == 0)
+		return 0;
 	
 	switch (o.origin) with (AdbgObjectOrigin) {
 	case disk:
-		if (location + rsize >= o.buffer_size)
-			return adbg_oops(AdbgError.objectOutsideAccess);
-		if (memcpy(buffer, o.buffer + location, rsize))
-			return adbg_oops(AdbgError.crt);
-		return 0;
+		if (osfseek(o.file, location, OSFileSeek.start) < 0) {
+			adbg_oops(AdbgError.os);
+			return -1;
+		}
+		break;
 	case process:
-		return adbg_memory_read(
-			o.process, cast(size_t)location, buffer, cast(uint)rsize);
+		o.location = cast(size_t)location;
+		break;
 	default:
+		return adbg_oops(AdbgError.unimplemented);
 	}
 	
-	return adbg_oops(AdbgError.unimplemented);
-}+/
+	return adbg_object_read(o, buffer, rsize);
+}
+
+/// 
+private
+union SIGNATURE {
+	ubyte[64] buffer;
+	ulong u64;
+	uint u32;
+	ushort u16;
+	ubyte u8;
+	mz_header_t mzheader;
+}
 
 // Object detection and loading
 private
@@ -582,6 +663,8 @@ L_ARG:	switch (va_arg!int(args)) {
 	default:
 		return adbg_oops(AdbgError.invalidOption);
 	}
+	
+	// SECTION: OLD STRATEGY
 	
 	// Get file size
 	if (fseek(o.file_handle, 0, SEEK_END))
@@ -607,20 +690,31 @@ L_ARG:	switch (va_arg!int(args)) {
 	// Also used in auto-detection
 	o.i.header = o.buffer;
 	
-	// Auto-detection
-	//TODO: Consider moving auto-detection as separate function?
-	//      Especially if debugger can return process' base address for image headers
+	// SECTION: OLD STRATEGY
+	
+	// SECTION: NEW STRATEGY
+	
+	// Load minimum for signature detection
+	// Also tests seeking in case this is a streamed input
+	SIGNATURE sig = void;
+	int ssz = osfread(o.file, &sig, SIGNATURE.sizeof); /// signature size
+	if (ssz < 0)
+		return adbg_oops(AdbgError.os);
+	if (ssz < 32) // File is empty or too small to mean anything
+		return adbg_oops(AdbgError.objectTooSmall);
+	if (osfseek(o.file, 0, OSFileSeek.start) < 0) // Reset offset, test seek
+		return adbg_oops(AdbgError.os);
+	
+	// !SECTION: NEW STRATEGY
 	
 	// Magic detection over 8 Bytes
-	if (o.file_size > PDB_DEFAULT_PAGESIZE) {
-		if (memcmp(o.buffer, PDB20_MAGIC.ptr, PDB20_MAGIC.length) == 0)
-			return adbg_object_pdb20_load(o);
-		if (memcmp(o.buffer, PDB70_MAGIC.ptr, PDB70_MAGIC.length) == 0)
-			return adbg_object_pdb70_load(o);
-	}
+	if (memcmp(sig.buffer.ptr, PDB20_MAGIC.ptr, PDB20_MAGIC.length) == 0)
+		return adbg_object_pdb20_load(o);
+	if (memcmp(sig.buffer.ptr, PDB70_MAGIC.ptr, PDB70_MAGIC.length) == 0)
+		return adbg_object_pdb70_load(o);
 	
 	// 64-bit signature detection
-	switch (*o.buffer64) {
+	switch (sig.u64) {
 	case AR_MAGIC:
 		return adbg_object_ar_load(o);
 	case PAGEDUMP32_MAGIC, PAGEDUMP64_MAGIC:
@@ -629,7 +723,7 @@ L_ARG:	switch (va_arg!int(args)) {
 	}
 	
 	// 32-bit signature detection
-	switch (*o.buffer32) {
+	switch (sig.u32) {
 	case ELF_MAGIC:	// ELF
 		return adbg_object_elf_load(o);
 	case MACHO_MAGIC:	// Mach-O 32-bit
@@ -645,7 +739,7 @@ L_ARG:	switch (va_arg!int(args)) {
 	}
 	
 	// 16-bit signature detection
-	switch (*o.buffer16) {
+	switch (sig.u16) {
 	// Anonymous MSCOFF
 	case 0:
 		if (o.file_size < mscoff_anon_header_bigobj.sizeof)
@@ -655,44 +749,35 @@ L_ARG:	switch (va_arg!int(args)) {
 		
 		return adbg_object_mscoff_load(o);
 	case MAGIC_MZ:
-		if (o.file_size < mz_hdr.sizeof)
-			return adbg_oops(AdbgError.objectUnknownFormat);
-		
-		version (Trace) trace("e_lfarlc=%#x", o.i.mz.header.e_lfarlc);
-		
 		// If e_lfarlc (relocation table) starts lower than e_lfanew,
 		// then assume old MZ.
 		// NOTE: e_lfarlc can point to 0x40.
-		if (o.i.mz.header.e_lfarlc < 0x40)
+		if (sig.mzheader.e_lfarlc < 0x40)
 			return adbg_object_mz_load(o);
 		
-		// If e_lfanew points within MZ extended header
-		if (o.i.mz.header_ext.e_lfanew <= mz_hdr_ext.sizeof)
+		// If e_lfanew points within MZ header
+		if (sig.mzheader.e_lfanew <= mz_header_t.sizeof)
 			return adbg_object_mz_load(o);
 		
-		// If e_lfanew points outside file
-		if (o.i.mz.header_ext.e_lfanew >= o.file_size)
+		// ReactOS checks if NtHeaderOffset is not higher than 256 MiB
+		//TODO: Consider if malformed.
+		if (sig.mzheader.e_lfanew >= MiB!256)
 			return adbg_object_mz_load(o);
 		
-		// NOTE: ReactOS checks if NtHeaderOffset is not higher than 256 MiB
-		//       At this point, it could be malformed.
-		//       Have you seen a 256M DOS executable?
-		if (o.i.mz.header_ext.e_lfanew >= MiB!256)
-			return adbg_object_mz_load(o);
-		
-		// Set where new header is located, used by sub-loaders
-		o.i.mz.newbase = o.buffer + o.i.mz.header_ext.e_lfanew;
+		uint newsig = void;
+		if (adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof))
+			return adbg_errno();
 		
 		// 32-bit signature check
-		uint sig = *cast(uint*)o.i.mz.newbase;
-		switch (sig) {
+		uint mzsig = *cast(uint*)o.i.mz.newbase;
+		switch (mzsig) {
 		case MAGIC_PE32:
 			return adbg_object_pe_load(o);
 		default:
 		}
 		
 		// 16-bit signature check
-		switch (cast(ushort)sig) {
+		switch (cast(ushort)mzsig) {
 		case NE_MAGIC:
 			return adbg_object_ne_load(o);
 		case LX_MAGIC, LE_MAGIC:
@@ -704,9 +789,7 @@ L_ARG:	switch (va_arg!int(args)) {
 		return adbg_object_mz_load(o);
 	// Old MZ magic or swapped
 	case MAGIC_ZM:
-		if (o.file_size < mz_hdr.sizeof)
-			return adbg_oops(AdbgError.objectUnknownFormat);
-		
+		//TODO: pre-checked if only the signature is swapped
 		goto case MAGIC_MZ;
 	// COFF magics
 	case COFF_MAGIC_I386:
@@ -722,16 +805,16 @@ L_ARG:	switch (va_arg!int(args)) {
 	case COFF_MAGIC_MSP430:
 	case COFF_MAGIC_TMS320C5500P:
 	case COFF_MAGIC_MIPSEL:
-		return adbg_object_coff_load(o, *o.buffer16);
+		return adbg_object_coff_load(o, sig.u16);
 	default:
 	}
 	
 	// 8-bit signature detection
-	switch (*o.buffer8) {
+	switch (sig.u8) {
 	case OMFRecord.LIBRARY: // OMF library header entry
 	case OMFRecord.THEADR: // First OMF object entry of THEADR
 	case OMFRecord.LHEADR: // First OMF object entry of LHEADR
-		return adbg_object_omf_load(o, *o.buffer8);
+		return adbg_object_omf_load(o, sig.u8);
 	default:
 	}
 	
@@ -882,11 +965,11 @@ const(char)* adbg_object_machine_string(adbg_object_t *o) {
 	return mach ? adbg_machine_name(mach) : `Unknown`;
 }
 
-/// Get the short name of the loaded object format.
+/// Get the short name of the loaded object type.
 /// Params: o = Object instance.
-/// Returns: Object format name.
+/// Returns: Object type name.
 export
-const(char)* adbg_object_format_shortname(adbg_object_t *o) {
+const(char)* adbg_object_type_shortname(adbg_object_t *o) {
 	if (o == null)
 		goto Lunknown;
 	final switch (o.format) with (AdbgObject) {
@@ -909,11 +992,11 @@ const(char)* adbg_object_format_shortname(adbg_object_t *o) {
 	}
 }
 
-/// Get the full name of the loaded object format.
+/// Get the full name of the loaded object type.
 /// Params: o = Object instance.
-/// Returns: Object format name.
+/// Returns: Object type name.
 export
-const(char)* adbg_object_format_name(adbg_object_t *o) {
+const(char)* adbg_object_type_name(adbg_object_t *o) {
 	if (o == null)
 		goto Lunknown;
 	final switch (o.format) with (AdbgObject) {
@@ -942,14 +1025,14 @@ const(char)* adbg_object_format_name(adbg_object_t *o) {
 	sharedObject,
 }
 
-AdbgObjectKind adbg_object_format_kind(adbg_object_t *o)*/
+AdbgObjectKind adbg_object_kind(adbg_object_t *o)*/
 
-const(char)* adbg_object_format_kind_string(adbg_object_t *o) {
+const(char)* adbg_object_kind_string(adbg_object_t *o) {
+	const(char)* str;
 	if (o == null)
 		goto Lunknown;
 	switch (o.format) with (AdbgObject) {
-	case mz:
-		return o.i.mz.header.e_ovno ? `Overlayed Executable` : `Executable`;
+	case mz:	str = adbg_object_mz_kind_string(o); break;
 	case ne:
 		return o.i.ne.header.ne_flags & NE_HFLAG_LIBMODULE ? `Library Module` : `Executable`;
 	case lx:
@@ -971,7 +1054,8 @@ const(char)* adbg_object_format_kind_string(adbg_object_t *o) {
 		return o.i.omf.firstentry ? `Library` : `Object`;
 	case coff, mscoff:
 		return `Object`;
-	default: Lunknown:
-		return `Unknown`;
+	default:
 	}
+Lunknown:
+	return str ? str : `Unknown`;
 }
