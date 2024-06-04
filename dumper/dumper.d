@@ -115,7 +115,7 @@ int dump(const(char)* path) {
 		panic_adbg();
 	
 	// If anything was selected to dump specifically
-	if (opt_selected) {
+	if (opt_selected || opt_settings) {
 		// If not in any "extract" mode, print file info
 		if (SETTING(Setting.extractAny) == 0) {
 			print_string("filename", path);
