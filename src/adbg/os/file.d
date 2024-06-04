@@ -123,12 +123,12 @@ version (Windows) {
 		return null;
 	
 	int oflags; // O_RDONLY == 0
-	if ((flags & OSFileOFlags.readWrite) == OFlags.readWrite)
+	if ((flags & OSFileOFlags.readWrite) == OSFileOFlags.readWrite)
 		oflags |= O_RDWR;
-	else if (flags & OFlags.write)
+	else if (flags & OSFileOFlags.write)
 		oflags |= O_WRONLY;
 	file.handle = .open(path, oflags);
-	if (handle == 0) {
+	if (file.handle == 0) {
 		free(file);
 		return null;
 	}
@@ -188,7 +188,7 @@ version (Windows) {
 	case S_IFBLK: // Block devices (like a disk)
 		//TODO: BSD variants
 		long s = void;
-		return ioctl(handle, BLOCKSIZE, &s) < 0 ? -1 : s;
+		return ioctl(file.handle, BLOCKSIZE, &s) < 0 ? -1 : s;
 	default:
 		return -1;
 	}
