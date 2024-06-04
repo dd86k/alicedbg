@@ -66,7 +66,12 @@ version (Windows) {
 	private enum BLKGETSIZE64 = cast(int)_IOR!(0x12,114,size_t.sizeof);
 	private alias BLOCKSIZE = BLKGETSIZE64;
 	
-	private extern (C) int ioctl(int,long,...);
+	version (Android)
+		alias off_t = int;
+	else
+		alias off_t = long;
+	
+	private extern (C) int ioctl(int,off_t,...);
 	
 	private alias OSHANDLE = int;
 }
@@ -150,6 +155,11 @@ version (Windows) {
 	if (position < 0)
 		return -1;
 	return position;
+} else version (Android) {
+	position = lseek(file.handle, position, origin);
+	if (position < 0)
+		return -1;
+	return position;
 } else version (Posix) {
 	position = lseek64(file.handle, position, origin);
 	if (position < 0)
@@ -164,6 +174,8 @@ version (Windows) {
 	SetFilePointerEx(file.handle, i, &i, FILE_CURRENT);
 	return i.QuadPart;
 } else version (OSX) {
+	return lseek(file.handle, 0, SEEK_CUR);
+} else version (Android) {
 	return lseek(file.handle, 0, SEEK_CUR);
 } else version (Posix) {
 	return lseek64(file.handle, 0, SEEK_CUR);
