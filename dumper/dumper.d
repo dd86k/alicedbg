@@ -132,10 +132,8 @@ int dump_file(const(char)* path) {
 	if (o == null)
 		panic_adbg("Failed to open object");
 	
-	// MODE: Advanced
-	// If anything was selected to dump specifically, we'll proceed
-	// to dump object-specific information.
-	if (opt_selected || SETTING(Setting.disasmAny)) {
+	// If anything was selected to dump specifically
+	if (opt_selected || opt_settings) {
 		// If not in any "extract" mode, print file info
 		if (SETTING(Setting.extractAny) == 0) {
 			print_string("filename", path);
