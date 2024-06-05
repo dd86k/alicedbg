@@ -80,13 +80,17 @@ struct internal_mz_t {
 }
 
 int adbg_object_mz_load(adbg_object_t *o) {
+	version (Trace) trace("o=%p", o);
+	
 	// Set format and allocate object internals
 	o.format = AdbgObject.mz;
 	o.internal = calloc(1, internal_mz_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, 0, o.internal, mz_header_t.sizeof) < 0)
+	if (adbg_object_read_at(o, 0, o.internal, mz_header_t.sizeof) < 0) {
+		free(o.internal);
 		return adbg_errno();
+	}
 	
 	// Inverse header if required
 	mz_header_t* header = cast(mz_header_t*)o.internal;
@@ -131,7 +135,7 @@ mz_header_t* adbg_object_mz_header(adbg_object_t *o) {
 		adbg_oops(AdbgError.uninitiated);
 		return null;
 	}
-	return &(cast(internal_mz_t*)o.internal).header;
+	return cast(mz_header_t*)o.internal;
 }
 
 mz_reloc_t* adbg_object_mz_reloc(adbg_object_t *o, size_t index) {

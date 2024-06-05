@@ -24,7 +24,9 @@ private:
 void dump_ne_hdr(adbg_object_t *o) {
 	print_header("Header");
 	
-	with (o.i.ne.header) {
+	ne_header_t* header = adbg_object_ne_header(o);
+	
+	with (header) {
 	print_x16("ne_magic", ne_magic);
 	print_u8("ne_ver", ne_ver);
 	print_u8("ne_rev", ne_rev);

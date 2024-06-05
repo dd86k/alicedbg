@@ -14,6 +14,7 @@ import adbg.object.server;
 import adbg.machines : AdbgMachine;
 import adbg.error;
 import adbg.utils.bit;
+import core.stdc.stdlib;
 
 extern (C):
 
@@ -127,7 +128,7 @@ enum : ubyte {
 
 // In winnt.h, its name is _IMAGE_OS2_HEADER
 /// NE header
-struct ne_header {
+struct ne_header_t {
 	/// Signature word.
 	ushort ne_magic;
 	/// Version number of the linker.
@@ -227,9 +228,11 @@ struct ne_header {
 	/// Expected Windows version number
 	ushort ne_expver;
 }
+// Old alias for header
+alias ne_header = ne_header_t;
 
 /// NE segment, after header
-struct ne_segment {
+struct ne_segment_t {
 	/// Logical-sector offset (n byte) to the contents of the segment
 	/// data, relative to the beginning of the file. Zero means no
 	/// file data.
@@ -243,20 +246,20 @@ struct ne_segment {
 	ushort Minimum;
 }
 
-/// NE segment header in segment
-struct ne_segment_data {
-	ushort RelocationCount;
-	ne_segment_reloc[1] Relocations;
-}
-
-struct ne_segment_reloc {
+struct ne_segment_reloc_t {
 	ubyte Type;
 	ubyte Flags;
 	ushort Offset;
 }
 
+/// NE segment header in segment
+struct ne_segment_data_t {
+	ushort RelocationCount;
+	ne_segment_reloc_t[1] Relocations;
+}
+
 /// NE resource entry found in blocks
-struct ne_resource_entry {
+struct ne_resource_entry_t {
 	/// File offset to the contents of the resource data,
 	/// relative to beginning of file. The offset is in terms
 	/// of the alignment shift count value specified at
@@ -275,7 +278,7 @@ struct ne_resource_entry {
 }
 
 /// NE resource block, found in resource tables
-struct ne_resource_block {
+struct ne_resource_block_t {
 	/// Type ID. This is an integer type if the high-order bit is
 	/// set (8000h); otherwise, it is an offset to the type string,
 	/// the offset is relative to the beginning of the resource
@@ -287,17 +290,17 @@ struct ne_resource_block {
 	uint Reserved;
 	/// A table of resources for this type follows. The following is
 	/// the format of each resource (8 bytes each):
-	ne_resource_entry[1] Entries;
+	ne_resource_entry_t[1] Entries;
 }
 
 /// NE resource, after segments
 struct ne_resource {
 	/// Alignment shift count for resource data.
 	ushort Alignment;
-	ne_resource_block[1] Blocks;
+	ne_resource_block_t[1] Blocks;
 }
 /// After resource blocks
-struct ne_resource_string {
+struct ne_resource_string_t {
 	/// Length of the type or name string that follows. A zero value
         /// indicates the end of the resource type and name string, also
         /// the end of the resource table.
@@ -308,20 +311,31 @@ struct ne_resource_string {
 	char[1] Text;
 }
 
-struct ne_resident {
+struct ne_resident_t {
 	ubyte Length;
 	char[1] Text;
 	ushort Ordinal;
 }
 
-int adbg_object_ne_load(adbg_object_t *o) {
+private
+struct internal_ne_t {
+	ne_header_t header;
+}
+
+int adbg_object_ne_load(adbg_object_t *o, uint e_lfanew) {
+	version (Trace) trace("o=%p", o);
 	
 	o.format = AdbgObject.ne;
+	o.internal = malloc(internal_ne_t.sizeof);
+	if (o.internal == null)
+		return adbg_oops(AdbgError.crt);
+	if (adbg_object_read_at(o, e_lfanew, o.internal, ne_header_t.sizeof) < 0) {
+		free(o.internal);
+		return adbg_errno();
+	}
 	
-	o.i.ne.header = cast(ne_header*)o.i.mz.newbase;
-	
-	with (o.i.ne.header)
-	if (o.p.reversed) {
+	with (cast(ne_header_t*)o.internal)
+	if (o.status & AdbgObjectInternalFlags.reversed) {
 		ne_enttab	= adbg_bswap16(ne_enttab);
 		ne_cbenttab	= adbg_bswap16(ne_cbenttab);
 		ne_crc	= adbg_bswap32(ne_crc);
@@ -350,6 +364,44 @@ int adbg_object_ne_load(adbg_object_t *o) {
 	}
 	
 	return 0;
+}
+
+void adbg_object_ne_unload(adbg_object_t *o) {
+	if (o == null)
+		return;
+	
+	if (o.internal) free(o.internal);
+}
+
+ne_header_t* adbg_object_ne_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	return cast(ne_header_t*)o.internal;
+}
+
+AdbgMachine adbg_object_ne_machine(adbg_object_t *o) {
+	if (o == null || o.internal == null)
+		return AdbgMachine.unknown;
+	ne_header_t* header = cast(ne_header_t*)o.internal;
+	// NOTE: Can have a mix of 8086/i286/i386 instructions, take the highest
+	if (header.ne_flags & NE_HFLAG_INTI386)
+		return AdbgMachine.i386;
+	if (header.ne_flags & (NE_HFLAG_INT8086 | NE_HFLAG_INTI286))
+		return AdbgMachine.i8086;
+	return AdbgMachine.unknown;
+}
+
+const(char)* adbg_object_ne_kind_string(adbg_object_t *o) {
+	if (o == null || o.internal == null)
+		return null;
+	ne_header_t* header = cast(ne_header_t*)o.internal;
+	return header.ne_flags & NE_HFLAG_LIBMODULE ? `Library Module` : `Executable`;
 }
 
 const(char)* adbg_object_ne_type(ubyte type) {

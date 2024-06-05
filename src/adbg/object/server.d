@@ -24,7 +24,6 @@ import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import adbg.os.file;
 import core.stdc.string;
-import core.stdc.string : memcpy;
 
 extern (C):
 
@@ -512,11 +511,8 @@ void adbg_object_close(adbg_object_t *o) {
 	if (o == null)
 		return;
 	switch (o.format) with (AdbgObject) {
-	case mz:
-		adbg_object_mz_unload(o);
-		//TODO: Remove junk
-		with (o.i.mz) if (reversed_relocs) free(reversed_relocs);
-		break;
+	case mz: adbg_object_mz_unload(o); break;
+	case ne: adbg_object_ne_unload(o); break;
 	case pe:
 		//TODO: Remove junk
 		with (o.i.pe) {
@@ -560,6 +556,8 @@ void adbg_object_close(adbg_object_t *o) {
 		break;
 	default:
 	}
+	if (o.file)
+		osfclose(o.file);
 	if (o.file_handle)
 		fclose(o.file_handle);
 	if (o.buffer && o.buffer_size)
@@ -567,20 +565,22 @@ void adbg_object_close(adbg_object_t *o) {
 	free(o);
 }
 
-
-//TODO: Error on partial reads (flag can override)
-int adbg_object_read(adbg_object_t *o, void *buffer, size_t rsize, int flags = 0) {
+int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 0) {
+	version (Trace) trace("buffer=%p rdsize=%zu", buffer, rdsize);
+	
 	if (o == null || buffer == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return -1;
 	}
-	if (rsize == 0)
+	if (rdsize == 0)
 		return 0;
 	
+	version (Trace) trace("origin=%d", o.origin);
 	switch (o.origin) with (AdbgObjectOrigin) {
 	case disk:
-		int target = cast(int)rsize;
+		int target = cast(int)rdsize;
 		int r = osfread(o.file, buffer, target);
+		version (Trace) trace("osfread=%d", r);
 		if (r < 0) {
 			adbg_oops(AdbgError.os);
 			return -1;
@@ -592,7 +592,11 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rsize, int flags = 0
 		return target;
 	case process:
 		//TODO: Process memory read errors
-		return adbg_memory_read(o.process, o.location, buffer, cast(uint)rsize);
+		int r = adbg_memory_read(o.process, o.location, buffer, cast(uint)rdsize);
+		o.location += rdsize;
+		if (r)
+			return -1;
+		return cast(int)rdsize;
 	//case userbuffer:
 		//if (location + rsize >= o.buffer_size)
 		//	return adbg_oops(AdbgError.objectOutsideAccess);
@@ -604,18 +608,20 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rsize, int flags = 0
 	return adbg_oops(AdbgError.unimplemented);
 }
 
-// Read raw data from object.
+// Read raw data from object at absolute position.
 // Params:
 // 	o = Object instance.
 // 	buffer = Buffer pointer.
 // 	rsize = Size to read.
 // Returns: Number of bytes read. Otherwise -1 on error.
-int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rsize, int flags = 0) {
+int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rdsize, int flags = 0) {
+	version (Trace) trace("location=%lld buffer=%p rdsize=%zu", location, buffer, rdsize);
+	
 	if (o == null || buffer == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return -1;
 	}
-	if (rsize == 0)
+	if (rdsize == 0)
 		return 0;
 	
 	switch (o.origin) with (AdbgObjectOrigin) {
@@ -632,7 +638,7 @@ int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rs
 		return adbg_oops(AdbgError.unimplemented);
 	}
 	
-	return adbg_object_read(o, buffer, rsize);
+	return adbg_object_read(o, buffer, rdsize);
 }
 
 /// 
@@ -649,9 +655,7 @@ union SIGNATURE {
 // Object detection and loading
 private
 int adbg_object_loadv(adbg_object_t *o, va_list args) {
-	import core.stdc.string : memset;
-	
-	if (o == null || o.file_handle == null)
+	if (o == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	memset(&o.p, 0, o.p.sizeof); // Init object properties
@@ -698,6 +702,7 @@ L_ARG:	switch (va_arg!int(args)) {
 	// Also tests seeking in case this is a streamed input
 	SIGNATURE sig = void;
 	int ssz = osfread(o.file, &sig, SIGNATURE.sizeof); /// signature size
+	version (Trace) trace("ssz=%d", ssz);
 	if (ssz < 0)
 		return adbg_oops(AdbgError.os);
 	if (ssz < 32) // File is empty or too small to mean anything
@@ -714,6 +719,7 @@ L_ARG:	switch (va_arg!int(args)) {
 		return adbg_object_pdb70_load(o);
 	
 	// 64-bit signature detection
+	version (Trace) trace("u64=%#x", sig.u64);
 	switch (sig.u64) {
 	case AR_MAGIC:
 		return adbg_object_ar_load(o);
@@ -723,6 +729,7 @@ L_ARG:	switch (va_arg!int(args)) {
 	}
 	
 	// 32-bit signature detection
+	version (Trace) trace("u32=%#x", sig.u32);
 	switch (sig.u32) {
 	case ELF_MAGIC:	// ELF
 		return adbg_object_elf_load(o);
@@ -739,6 +746,7 @@ L_ARG:	switch (va_arg!int(args)) {
 	}
 	
 	// 16-bit signature detection
+	version (Trace) trace("u16=%#x", sig.u16);
 	switch (sig.u16) {
 	// Anonymous MSCOFF
 	case 0:
@@ -746,16 +754,17 @@ L_ARG:	switch (va_arg!int(args)) {
 			return adbg_oops(AdbgError.objectUnknownFormat);
 		if (o.i.mscoff.import_header.Sig2 != 0xffff)
 			return adbg_oops(AdbgError.objectUnknownFormat);
-		
 		return adbg_object_mscoff_load(o);
 	case MAGIC_MZ:
+		version (Trace) trace("e_lfarlc=%#x", sig.mzheader.e_lfarlc);
+		
 		// If e_lfarlc (relocation table) starts lower than e_lfanew,
 		// then assume old MZ.
 		// NOTE: e_lfarlc can point to 0x40.
 		if (sig.mzheader.e_lfarlc < 0x40)
 			return adbg_object_mz_load(o);
 		
-		// If e_lfanew points within MZ header
+		// If e_lfanew points within (extended) MZ header
 		if (sig.mzheader.e_lfanew <= mz_header_t.sizeof)
 			return adbg_object_mz_load(o);
 		
@@ -765,21 +774,22 @@ L_ARG:	switch (va_arg!int(args)) {
 			return adbg_object_mz_load(o);
 		
 		uint newsig = void;
-		if (adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof))
+		if (adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof) < 0)
 			return adbg_errno();
 		
+		version (Trace) trace("newsig=%#x", newsig);
+		
 		// 32-bit signature check
-		uint mzsig = *cast(uint*)o.i.mz.newbase;
-		switch (mzsig) {
+		switch (newsig) {
 		case MAGIC_PE32:
 			return adbg_object_pe_load(o);
 		default:
 		}
 		
 		// 16-bit signature check
-		switch (cast(ushort)mzsig) {
+		switch (cast(ushort)newsig) {
 		case NE_MAGIC:
-			return adbg_object_ne_load(o);
+			return adbg_object_ne_load(o, sig.mzheader.e_lfanew);
 		case LX_MAGIC, LE_MAGIC:
 			return adbg_object_lx_load(o);
 		default:
@@ -810,6 +820,7 @@ L_ARG:	switch (va_arg!int(args)) {
 	}
 	
 	// 8-bit signature detection
+	version (Trace) trace("u8=%#x", sig.u8);
 	switch (sig.u8) {
 	case OMFRecord.LIBRARY: // OMF library header entry
 	case OMFRecord.THEADR: // First OMF object entry of THEADR
@@ -918,12 +929,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	
 	switch (o.format) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
-	case ne: // NOTE: Can have a mix of 8086/i286/i386 instructions, take the highest
-		if (o.i.ne.header.ne_flags & NE_HFLAG_INTI386)
-			return AdbgMachine.i386;
-		if (o.i.ne.header.ne_flags & (NE_HFLAG_INT8086 | NE_HFLAG_INTI286))
-			return AdbgMachine.i8086;
-		break;
+	case ne:	return adbg_object_ne_machine(o);
 	case lx:
 		switch (o.i.lx.header.cpu) {
 		case LX_CPU_80286: return AdbgMachine.i8086;
@@ -1028,13 +1034,12 @@ const(char)* adbg_object_type_name(adbg_object_t *o) {
 AdbgObjectKind adbg_object_kind(adbg_object_t *o)*/
 
 const(char)* adbg_object_kind_string(adbg_object_t *o) {
-	const(char)* str;
+	const(char)* kind;
 	if (o == null)
 		goto Lunknown;
 	switch (o.format) with (AdbgObject) {
-	case mz:	str = adbg_object_mz_kind_string(o); break;
-	case ne:
-		return o.i.ne.header.ne_flags & NE_HFLAG_LIBMODULE ? `Library Module` : `Executable`;
+	case mz:	kind = adbg_object_mz_kind_string(o); break;
+	case ne:	kind = adbg_object_ne_kind_string(o); break;
 	case lx:
 		return adbg_object_lx_modtype_string(o.i.lx.header.mflags);
 	case pe:
@@ -1057,5 +1062,5 @@ const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	default:
 	}
 Lunknown:
-	return str ? str : `Unknown`;
+	return kind ? kind : `Unknown`;
 }
