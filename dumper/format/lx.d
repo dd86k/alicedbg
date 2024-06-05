@@ -24,7 +24,9 @@ private:
 void dump_lx_hdr(adbg_object_t *o) {
 	print_header("Header");
 	
-	with (o.i.lx.header) {
+	lx_header_t* header = adbg_object_lx_header(o);
+	
+	with (header) {
 	print_x16("e32_magic", magic, magic == LE_MAGIC ? "LE" : "LX");
 	print_x8("e32_border", border);
 	print_x8("e32_worder", worder);
@@ -96,19 +98,19 @@ void dump_lx_hdr(adbg_object_t *o) {
 		print_u32("winreslen", winreslen);
 		print_x16("device_id", device_id);
 		print_x16("ddk_version", ddk_version);
-	} else {
-		print_x8("e32_res[8]",  res[8]);
-		print_x8("e32_res[9]",  res[9]);
-		print_x8("e32_res[10]", res[10]);
-		print_x8("e32_res[11]", res[11]);
-		print_x8("e32_res[12]", res[12]);
-		print_x8("e32_res[13]", res[13]);
-		print_x8("e32_res[14]", res[14]);
-		print_x8("e32_res[15]", res[15]);
-		print_x8("e32_res[16]", res[16]);
-		print_x8("e32_res[17]", res[17]);
-		print_x8("e32_res[18]", res[18]);
-		print_x8("e32_res[19]", res[19]);
+		return;
 	}
+	print_x8("e32_res[8]",  res[8]);
+	print_x8("e32_res[9]",  res[9]);
+	print_x8("e32_res[10]", res[10]);
+	print_x8("e32_res[11]", res[11]);
+	print_x8("e32_res[12]", res[12]);
+	print_x8("e32_res[13]", res[13]);
+	print_x8("e32_res[14]", res[14]);
+	print_x8("e32_res[15]", res[15]);
+	print_x8("e32_res[16]", res[16]);
+	print_x8("e32_res[17]", res[17]);
+	print_x8("e32_res[18]", res[18]);
+	print_x8("e32_res[19]", res[19]);
 	}
 }

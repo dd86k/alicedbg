@@ -513,6 +513,7 @@ void adbg_object_close(adbg_object_t *o) {
 	switch (o.format) with (AdbgObject) {
 	case mz: adbg_object_mz_unload(o); break;
 	case ne: adbg_object_ne_unload(o); break;
+	case lx: adbg_object_lx_unload(o); break;
 	case pe:
 		//TODO: Remove junk
 		with (o.i.pe) {
@@ -658,6 +659,7 @@ int adbg_object_loadv(adbg_object_t *o, va_list args) {
 	if (o == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
+	o.status = 0;
 	memset(&o.p, 0, o.p.sizeof); // Init object properties
 	memset(&o.i, 0, o.i.sizeof); // Init object internal structures
 	
@@ -791,7 +793,7 @@ L_ARG:	switch (va_arg!int(args)) {
 		case NE_MAGIC:
 			return adbg_object_ne_load(o, sig.mzheader.e_lfanew);
 		case LX_MAGIC, LE_MAGIC:
-			return adbg_object_lx_load(o);
+			return adbg_object_lx_load(o, sig.mzheader.e_lfanew);
 		default:
 		}
 		
@@ -832,6 +834,7 @@ L_ARG:	switch (va_arg!int(args)) {
 	return adbg_oops(AdbgError.objectUnknownFormat);
 }
 
+deprecated
 export
 void* adbg_object_header(adbg_object_t *o) {
 	if (o == null) {
@@ -843,6 +846,7 @@ void* adbg_object_header(adbg_object_t *o) {
 	return o.i.header;
 }
 
+deprecated
 adbg_section_t* adbg_object_section_n(adbg_object_t *o, const(char)* name, uint flags = 0) {
 	if (o == null || name == null) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -930,14 +934,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	switch (o.format) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
 	case ne:	return adbg_object_ne_machine(o);
-	case lx:
-		switch (o.i.lx.header.cpu) {
-		case LX_CPU_80286: return AdbgMachine.i8086;
-		case LX_CPU_80386:
-		case LX_CPU_80486: return AdbgMachine.i386;
-		default:
-		}
-		break;
+	case lx:	return adbg_object_lx_machine(o);
 	case pe:	return adbg_object_pe_machine(o.i.pe.header.Machine);
 	case macho: // NOTE: Both Mach-O headers (regular/fat) match in layout for cputype
 		return adbg_object_macho_machine(o.i.macho.header.cputype);
@@ -1040,8 +1037,7 @@ const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	switch (o.format) with (AdbgObject) {
 	case mz:	kind = adbg_object_mz_kind_string(o); break;
 	case ne:	kind = adbg_object_ne_kind_string(o); break;
-	case lx:
-		return adbg_object_lx_modtype_string(o.i.lx.header.mflags);
+	case lx:	kind = adbg_object_lx_kind_string(o); break;
 	case pe:
 		return o.i.pe.header.Characteristics & PE_CHARACTERISTIC_DLL ? `Dynamically Linked Library` : `Executable`;
 	case macho:

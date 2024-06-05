@@ -11,9 +11,10 @@
 module adbg.object.format.lx;
 
 import adbg.error;
-import adbg.object.server : adbg_object_t, AdbgObject;
+import adbg.object.server : adbg_object_t, AdbgObject, adbg_object_read_at;
 import adbg.machines;
 import adbg.utils.bit;
+import core.stdc.stdlib;
 
 // NOTE: LX is mainly 16-bit only and LE mixed 16/32-bit
 
@@ -83,7 +84,7 @@ private enum E32RESBYTES3 = 196 - 176; // lx_header.sizeof
 
 // winnt.h:_IMAGE_VXD_HEADER
 /// LX/LE header
-struct lx_header { // NOTE: Names are taken from spec except for its "e32_exe" name
+struct lx_header_t { // NOTE: Names are taken from spec except for its "e32_exe" name
 	/// Header magic. "LX" or "LE"
 	ushort magic;
 	/// Byte Ordering.
@@ -216,8 +217,10 @@ struct lx_header { // NOTE: Names are taken from spec except for its "e32_exe" n
 		}
 	}
 }
+// Old alias
+alias lx_header = lx_header_t;
 
-struct lx_record {
+struct lx_record_t {
 	uint size;	/// Object virtual size
 	uint addr;	/// Base virtual address
 	uint flags;
@@ -360,14 +363,68 @@ enum {
 	LX_OSF_TFLAG_ORDINAL_8BIT      = 0x80,
 }
 
-int adbg_object_lx_load(adbg_object_t *o) {
+private
+struct internal_lx_t {
+	lx_header_t header;
+}
+
+int adbg_object_lx_load(adbg_object_t *o, uint e_lfanew) {
+	version (Trace) trace("o=%p", o);
 	
 	o.format = AdbgObject.lx;
-	o.i.lx.header = cast(lx_header*)o.i.mz.newbase;
+	o.internal = malloc(internal_lx_t.sizeof);
+	if (o.internal == null)
+		return adbg_oops(AdbgError.crt);
+	if (adbg_object_read_at(o, e_lfanew, o.internal, lx_header_t.sizeof) < 0)
+		return adbg_errno();
 	
 	//TODO: Deal with word order
 	
 	return 0;
+}
+
+void adbg_object_lx_unload(adbg_object_t *o) {
+	if (o == null)
+		return;
+	if (o.internal) free(o.internal);
+}
+
+lx_header_t* adbg_object_lx_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	return cast(lx_header_t*)o.internal;
+}
+
+AdbgMachine adbg_object_lx_machine(adbg_object_t *o) {
+	if (o == null || o.internal == null)
+		return AdbgMachine.unknown;
+	lx_header_t* header = cast(lx_header_t*)o.internal;
+	switch (header.cpu) {
+	case LX_CPU_80486:
+	case LX_CPU_80386: return AdbgMachine.i386;
+	case LX_CPU_80286: return AdbgMachine.i8086;
+	default:
+	}
+	return AdbgMachine.unknown;
+}
+
+const(char)* adbg_object_lx_kind_string(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	lx_header_t* header = cast(lx_header_t*)o.internal;
+	return adbg_object_lx_modtype_string(header.mflags);
 }
 
 const(char)* adbg_object_lx_cputype_string(ushort cpu) {
