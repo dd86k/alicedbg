@@ -375,7 +375,7 @@ int adbg_object_lx_load(adbg_object_t *o, uint e_lfanew) {
 	o.internal = calloc(1, internal_lx_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, e_lfanew, o.internal, lx_header_t.sizeof) < 0)
+	if (adbg_object_read_at(o, e_lfanew, o.internal, lx_header_t.sizeof))
 		return adbg_errno();
 	
 	//TODO: Deal with word order
@@ -425,6 +425,19 @@ const(char)* adbg_object_lx_kind_string(adbg_object_t *o) {
 	}
 	lx_header_t* header = cast(lx_header_t*)o.internal;
 	return adbg_object_lx_modtype_string(header.mflags);
+}
+
+const(char)* adbg_object_lx_header_shortname(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	lx_header_t* header = cast(lx_header_t*)o.internal;
+	return header.magic == LX_MAGIC ? "lx" : "le";
 }
 
 const(char)* adbg_object_lx_cputype_string(ushort cpu) {

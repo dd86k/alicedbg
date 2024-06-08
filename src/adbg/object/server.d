@@ -978,7 +978,7 @@ const(char)* adbg_object_type_shortname(adbg_object_t *o) {
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return "mz";
 	case ne:	return "ne";
-	case lx:	return o.i.lx.header.magic == LX_MAGIC ? "lx" : "le";
+	case lx:	return adbg_object_lx_header_shortname(o);
 	case pe:	return "pe32";
 	case macho:	return "macho";
 	case elf:	return "elf";
