@@ -329,7 +329,7 @@ int adbg_object_ne_load(adbg_object_t *o, uint e_lfanew) {
 	o.internal = calloc(1, internal_ne_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, e_lfanew, o.internal, ne_header_t.sizeof) < 0) {
+	if (adbg_object_read_at(o, e_lfanew, o.internal, ne_header_t.sizeof)) {
 		free(o.internal);
 		return adbg_errno();
 	}

@@ -14,6 +14,8 @@ module adbg.utils.bit;
 import adbg.platform;
 import core.bitop : bswap;
 
+// TODO: Helper for array of bits (checking/unchecking array of bytes)
+
 extern (C):
 
 /// Create a 1-bit bitmask with a bit position (0-based, 1 << a).

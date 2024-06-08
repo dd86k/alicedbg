@@ -87,7 +87,7 @@ int adbg_object_mz_load(adbg_object_t *o) {
 	o.internal = calloc(1, internal_mz_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, 0, o.internal, mz_header_t.sizeof) < 0) {
+	if (adbg_object_read_at(o, 0, o.internal, mz_header_t.sizeof)) {
 		free(o.internal);
 		return adbg_errno();
 	}
@@ -165,7 +165,7 @@ mz_reloc_t* adbg_object_mz_reloc(adbg_object_t *o, size_t index) {
 			return null;
 		}
 		// Error set by function
-		if (adbg_object_read_at(o, header.e_lfarlc, relocs, size) < 0) {
+		if (adbg_object_read_at(o, header.e_lfarlc, relocs, size)) {
 			free(relocs);
 			relocs = null;
 			return null;
