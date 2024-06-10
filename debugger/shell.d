@@ -584,7 +584,7 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 	char[MBUFSZ] machbuf = void; /// Formatted machine codes buffer
 	for (int i; i < count; ++i) {
 		if (adbg_memory_read(process, address, data.ptr, MAX_INSTR_SIZE)) {
-			print_adbg_error();
+			print_error_adbg();
 			return;
 		}
 		adbg_opcode_t op = void;
