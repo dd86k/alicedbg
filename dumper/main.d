@@ -189,7 +189,7 @@ extern (C)
 int main(int argc, const(char)** argv) {
 	// Set crash handle, and ignore on error
 	// Could do a warning, but it might be a little confusing
-	adbg_self_set_crashhandler(&oopsie);
+	adbg_self_set_crashhandler(&crashed);
 	
 	int e = getopt(argc, argv, options);
 	if (e < 0) {

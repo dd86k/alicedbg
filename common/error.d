@@ -24,19 +24,22 @@ import core.stdc.stdlib : malloc;
 
 extern (C):
 
-void print_adbg_error(
+void print_error(const(char) *message,
 	const(char)* mod = cast(char*)__MODULE__,
 	int line = __LINE__) {
-	printf("%s", mod);
-	debug printf("@%u", line);
-	printf(": %s\n", mod, line, adbg_error_message());
-	debug print_adbg_trace();
+	debug {
+		printf("[%s@%d] ", mod, line);
+	}
+	printf("error: %s\n", message);
 }
-
-private
-void print_adbg_trace() {
+void print_error_adbg(
+	const(char)* mod = cast(char*)__FILE__,
+	int line = __LINE__) {
+	debug {
+		printf("[%s@%d] ", mod, line);
+	}
 	const(adbg_error_t)* e = adbg_error_current();
-	printf("  %s@%u\n", e.mod, e.line);
+	print_error(adbg_error_message(), e.mod, e.line);
 }
 
 void panic(int code, const(char)* message,
@@ -44,18 +47,22 @@ void panic(int code, const(char)* message,
 	const(char)* mod = cast(char*)__MODULE__,
 	int line = __LINE__) {
 	if (prefix) printf("%s: ", prefix);
-	debug printf("error at %s@%u: %s\n", mod, line, message);
-	else  printf("error: %s\n", message);
+	print_error(message, mod, line);
 	exit(code);
 }
-void panic_crt(const(char)* prefix = null) {
-	panic(errno, strerror(errno), prefix);
+void panic_crt(const(char)* prefix = null,
+	const(char)* mod = cast(char*)__MODULE__,
+	int line = __LINE__) {
+	panic(errno, strerror(errno), prefix, mod, line);
 }
-void panic_adbg(const(char)* prefix = null) {
-	panic(adbg_errno(), adbg_error_message(), prefix);
+void panic_adbg(const(char)* prefix = null,
+	const(char)* mod = cast(char*)__MODULE__,
+	int line = __LINE__) {
+	const(adbg_error_t)* e = adbg_error_current();
+	panic(adbg_errno(), adbg_error_message(), prefix, e.mod, e.line);
 }
 
-void oopsie(adbg_process_t *proc, adbg_exception_t *ex) {
+void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 	puts(
 `
    _ _ _   _ _ _       _ _       _ _ _   _     _   _
