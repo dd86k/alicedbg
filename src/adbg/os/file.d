@@ -7,23 +7,11 @@
 /// License: BSD-3-Clause-Clear
 module adbg.os.file;
 
+//TODO: wchar_t support
+
 version (Windows) {
-	import core.sys.windows.winnt :
-		LPVOID,
-		MEM_COMMIT, MEM_RELEASE, MEM_RESERVE,
-		PAGE_EXECUTE, PAGE_EXECUTE_READ, PAGE_READWRITE,
-		PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_WRITECOPY,
-		DWORD, HANDLE, LARGE_INTEGER, FALSE,
-		GENERIC_ALL, GENERIC_READ, GENERIC_WRITE,
-		FILE_SHARE_READ;
-	import core.sys.windows.winbase :
-		GetLastError,
-		CreateFileA, CreateFileW,
-		SetFilePointerEx, GetFileSizeEx,
-		ReadFile, ReadFileEx, WriteFile, FlushFileBuffers, CloseHandle,
-		OPEN_ALWAYS, OPEN_EXISTING, INVALID_HANDLE_VALUE,
-		FILE_BEGIN, FILE_CURRENT, FILE_END,
-		VirtualAlloc, VirtualFree;
+	import core.sys.windows.winnt;
+	import core.sys.windows.winbase;
 
 	private alias OSHANDLE = HANDLE;
 	private alias SEEK_SET = FILE_BEGIN;
@@ -119,7 +107,7 @@ version (Windows) {
 	);
 	if (file.handle == INVALID_HANDLE_VALUE) {
 		version (Trace) trace("CreateFileA=%#x", GetLastError());
-		VirtualFree(cast(void*)file, OSFILE.sizeof, MEM_RELEASE);
+		VirtualFree(cast(void*)file, 0, MEM_RELEASE);
 		return null;
 	}
 } else version (Posix) {
@@ -244,7 +232,7 @@ version (Windows) {
 void osfclose(OSFILE* file) {
 version (Windows) {
 	CloseHandle(file.handle);
-	VirtualFree(cast(void*)file, OSFILE.sizeof, MEM_RELEASE);
+	VirtualFree(cast(void*)file, 0, MEM_RELEASE);
 } else version (Posix) {
 	.close(file.handle);
 	free(file);

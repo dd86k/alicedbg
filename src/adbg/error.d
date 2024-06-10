@@ -30,6 +30,7 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 //      - automatically set error code
 //      adbg_oopsn(AdbgError)
 //      - returns null
+//TODO: Localize error messages as option (including system ones, when able)
 
 extern (C):
 
@@ -47,15 +48,15 @@ enum AdbgError {
 	offsetBounds	= 7,	/// File offset is outside of file size
 	indexBounds	= 8,	/// Index is outside of bounds of list
 	unavailable	= 9,	/// Feature or item is unavailable
-	unfindable	= 10,	/// Item cannot be found in list
-	partialRead	= 11,	/// Not all data could be read.
-	partialWrite	= 12,	/// Not all data could be written.
+	unfindable	= 10,	/// Item not found
+	partialRead	= 11,	/// Not all data could be read
+	partialWrite	= 12,	/// Not all data could be written
 	//
 	// 100-199: Debugger
 	//
 	debuggerUnattached	= 100,
 	debuggerUnpaused	= 101,
-	debuggerInvalidAction	= 102,	/// Wrong action from creation method.
+	debuggerInvalidAction	= 102,	/// Wrong action from creation method
 	debuggerPresent	= 103,	/// Debugger already present in remote process
 	//
 	// 200-299: Disasembler
@@ -129,8 +130,8 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.uninitiated,	"Object or structure requires to be initialized first." },
 	{ AdbgError.invalidOption,	"Option unknown." },
 	{ AdbgError.invalidValue,	"Option received invalid value." },
-	{ AdbgError.offsetBounds,	"File offset outside file size." },
-	{ AdbgError.indexBounds,	"Index outside of list." },
+	{ AdbgError.offsetBounds,	"Offset outside range." },
+	{ AdbgError.indexBounds,	"Index outside range." },
 	{ AdbgError.unavailable,	"Feature or item is unavailable." },
 	{ AdbgError.unfindable,	"Item was not found." },
 	//
