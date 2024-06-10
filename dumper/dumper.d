@@ -157,6 +157,10 @@ int dump(const(char)* path) {
 	return 0;
 }
 
+const(char)* SAFEVAL(const(char)* value) {
+	return value ? value : "Unknown";
+}
+
 private immutable {
 	/// Padding spacing to use in characters
 	// PE32 has fields like MinorOperatingSystemVersion (27 chars)
@@ -277,12 +281,20 @@ void print_string(const(char)* name, const(char)* val) {
 void print_stringl(const(char)* name, const(char)* val, int len) {
 	printf("%*s: %.*s\n", __field_padding, name, len, val);
 }
+void print_stringf(const(char)* name, const(char)* fmt, ...) {
+	printf("%*s: ", __field_padding, name);
+	va_list list = void;
+	va_start(list, fmt);
+	vprintf(fmt, list);
+	putchar('\n');
+}
 
 void print_warningf(const(char)* fmt, ...) {
 	printf("%*s: ", __field_padding, "warning".ptr);
 	va_list list = void;
 	va_start(list, fmt);
 	vprintf(fmt, list);
+	putchar('\n');
 }
 
 // exists due to int promotion
