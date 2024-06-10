@@ -15,6 +15,12 @@ import adbg.platform;
 import core.bitop : bswap;
 
 // TODO: Helper for array of bits (checking/unchecking array of bytes)
+// TODO: adbg_bit_listget
+//       Base pointer to item list (void*)
+//       Index to item list (size_t)
+//       Base range pointer (void*)
+//       Range size in item count (size_t)
+//       Size of one item (size_t)
 
 extern (C):
 
@@ -166,4 +172,28 @@ unittest {
 	assert(adbg_alignup(7, ulong.sizeof) == 8);
 	assert(adbg_alignup(8, ulong.sizeof) == 8);
 	assert(adbg_alignup(9, ulong.sizeof) == 16);
+}
+
+/// Returns true if pointer is outside a sized range.
+/// Params:
+/// 	ptr = Pointer value to check.
+/// 	base = Base pointer value of range.
+/// 	size = Size of range in bytes.
+/// Returns: False if ptr is inside range, true if outside range.
+bool adbg_bits_ptr_outside(void* ptr, void* base, size_t size) {
+	return ptr < base || ptr >= base + size;
+}
+unittest {
+	// Within bounds
+	assert(adbg_bits_ptr_outside(cast(void*)0,  cast(void*)0, 20) == false);
+	assert(adbg_bits_ptr_outside(cast(void*)1,  cast(void*)0, 20) == false);
+	assert(adbg_bits_ptr_outside(cast(void*)10, cast(void*)0, 20) == false);
+	assert(adbg_bits_ptr_outside(cast(void*)11, cast(void*)0, 20) == false);
+	assert(adbg_bits_ptr_outside(cast(void*)19, cast(void*)0, 20) == false);
+	// Outside bounds
+	assert(adbg_bits_ptr_outside(cast(void*)20, cast(void*)0, 20));
+	assert(adbg_bits_ptr_outside(cast(void*)30, cast(void*)0, 20));
+	assert(adbg_bits_ptr_outside(cast(void*)40, cast(void*)0, 20));
+	assert(adbg_bits_ptr_outside(cast(void*)-1, cast(void*)0, 20));
+	assert(adbg_bits_ptr_outside(cast(void*)0,  cast(void*)10, 20));
 }
