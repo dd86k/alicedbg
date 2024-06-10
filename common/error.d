@@ -25,12 +25,19 @@ import core.stdc.stdlib : malloc;
 extern (C):
 
 void print_error(const(char) *message,
+	const(char)* prefix = null,
 	const(char)* mod = cast(char*)__MODULE__,
 	int line = __LINE__) {
 	debug {
 		printf("[%s@%d] ", mod, line);
 	}
-	printf("error: %s\n", message);
+	fputs("error: ", stderr);
+	if (prefix) {
+		fputs(prefix, stderr);
+		fputs(": ", stderr);
+	}
+	fputs(message, stderr);
+	fputs("\n", stderr);
 }
 void print_error_adbg(
 	const(char)* mod = cast(char*)__FILE__,
@@ -39,15 +46,14 @@ void print_error_adbg(
 		printf("[%s@%d] ", mod, line);
 	}
 	const(adbg_error_t)* e = adbg_error_current();
-	print_error(adbg_error_message(), e.mod, e.line);
+	print_error(adbg_error_message(), null, e.mod, e.line);
 }
 
 void panic(int code, const(char)* message,
 	const(char)* prefix = null,
 	const(char)* mod = cast(char*)__MODULE__,
 	int line = __LINE__) {
-	if (prefix) printf("%s: ", prefix);
-	print_error(message, mod, line);
+	print_error(message, prefix, mod, line);
 	exit(code);
 }
 void panic_crt(const(char)* prefix = null,
