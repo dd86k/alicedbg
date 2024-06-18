@@ -1,12 +1,23 @@
 /// Object server.
 ///
 /// The goal of the object/image loader is being able to obtain information
-/// from obj/pdb/image files such as:
+/// from object files such as:
 /// - Object Type;
 /// - Machine architecture;
 /// - Symbols;
 /// - Debugging information (types, etc.);
 /// - And a few extras for dumping purposes.
+///
+/// Implementating these services from scratch gives a few benefits:
+/// - Control, all information from objects is available.
+/// - Flexbility, the operating system might limited in options for symbol discovery.
+/// - Fallbacks, such as selecting at least one source for symbols.
+///
+/// The way this is structured is simple: This module provides a generic object API
+/// and implements basic I/O for submodules to use.
+/// 
+/// The submodules that implementing specific object formats manage their own internal
+/// memory buffers.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -32,15 +43,7 @@ extern (C):
 //       (e.g., pe, elf, etc.) to make things consistent. This is why
 //       auxiliary names are simply "adbg_object_offset", for example.
 
-//TODO: (Important) Redo I/O handling
-//      To reduce memory usage (will require better internal APIs):
-//      - Load 4 KiB chunk in memory for header(s)
-//      - Allocate and load data on-demand (e.g., section headers, etc.)
-//      - Require each object implementation have its own closing function.
-//      This is a big endeavour because of the reliance on the internal buffer pointers.
-//      Naturally, more internal pointers will need to be created, and only accessible
-//      using the newer API.
-
+//TODO: adbg_object_read_at: Add flag to allocate memory.
 //TODO: const(ubyte)* adbg_obj_section_i(obj, index);
 //TODO: const(ubyte)* adbg_object_get_section_by_type(obj, type);
 //TODO: const(char)* adbg_object_get_debug_path(obj);
@@ -50,10 +53,6 @@ extern (C):
 //      Uses:
 //      - For swapping, uses less code than inlining it
 //      - For displaying and using field offsets
-//TODO: adbg_object_t: Consider grouping all properties into one
-//      Instead of multiple structures, it might be
-//      better to group all the options/properties/internals
-//      into one structure (e.g., "struct info_t" member .info)
 
 /// Executable or object file format.
 enum AdbgObject {
@@ -205,24 +204,6 @@ struct adbg_object_t {
 	union adbg_object_internals_t {
 		// Main header. All object files have some form of header.
 		void *header;
-		
-		struct mz_t {
-			mz_hdr_ext *header_ext;
-			mz_reloc *relocs;
-			void *newbase;
-			bool *reversed_relocs;
-		}
-		mz_t mz;
-		
-		struct ne_t {
-			ne_header *header;
-		}
-		ne_t ne;
-		
-		struct lx_t {
-			lx_header *header;
-		}
-		lx_t lx;
 		
 		struct pe_t {
 			// Headers
@@ -514,15 +495,7 @@ void adbg_object_close(adbg_object_t *o) {
 	case mz: adbg_object_mz_unload(o); break;
 	case ne: adbg_object_ne_unload(o); break;
 	case lx: adbg_object_lx_unload(o); break;
-	case pe:
-		//TODO: Remove junk
-		with (o.i.pe) {
-			if (reversed_sections) free(reversed_sections);
-			if (reversed_dir_export_entries) free(reversed_dir_export_entries);
-			if (reversed_dir_imports) free(reversed_dir_imports);
-			if (reversed_dir_debug) free(reversed_dir_debug);
-		}
-		break;
+	case pe: adbg_object_pe_unload(o); break;
 	case macho:
 		//TODO: Remove junk
 		with (o.i.macho) {
@@ -569,10 +542,8 @@ void adbg_object_close(adbg_object_t *o) {
 int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 0) {
 	version (Trace) trace("buffer=%p rdsize=%zu", buffer, rdsize);
 	
-	if (o == null || buffer == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return -1;
-	}
+	if (o == null || buffer == null)
+		return adbg_oops(AdbgError.invalidArgument);
 	if (rdsize == 0)
 		return 0;
 	
@@ -582,22 +553,13 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 		int target = cast(int)rdsize;
 		int r = osfread(o.file, buffer, target);
 		version (Trace) trace("osfread=%d", r);
-		if (r < 0) {
-			adbg_oops(AdbgError.os);
-			return -1;
-		}
-		if (r < target) {
-			adbg_oops(AdbgError.partialRead);
-			return -1;
-		}
-		return target;
+		if (r < 0)
+			return adbg_oops(AdbgError.os);
+		if (r < target)
+			return adbg_oops(AdbgError.partialRead);
+		return 0;
 	case process:
-		//TODO: Process memory read errors
-		int r = adbg_memory_read(o.process, o.location, buffer, cast(uint)rdsize);
-		o.location += rdsize;
-		if (r)
-			return -1;
-		return cast(int)rdsize;
+		return adbg_memory_read(o.process, o.location, buffer, cast(uint)rdsize);
 	//case userbuffer:
 		//if (location + rsize >= o.buffer_size)
 		//	return adbg_oops(AdbgError.objectOutsideAccess);
@@ -609,12 +571,14 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 	return adbg_oops(AdbgError.unimplemented);
 }
 
-// Read raw data from object at absolute position.
-// Params:
-// 	o = Object instance.
-// 	buffer = Buffer pointer.
-// 	rsize = Size to read.
-// Returns: Number of bytes read. Otherwise -1 on error.
+/// Read raw data from object at absolute position.
+/// Params:
+/// 	o = Object instance.
+/// 	location = Absolute file offset.
+/// 	buffer = Buffer pointer.
+/// 	rsize = Size to read.
+/// 	flags = Additional settings.
+/// Returns: Zero on success; Otherwise error code.
 int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rdsize, int flags = 0) {
 	version (Trace) trace("location=%lld buffer=%p rdsize=%zu", location, buffer, rdsize);
 	
@@ -627,10 +591,8 @@ int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rd
 	
 	switch (o.origin) with (AdbgObjectOrigin) {
 	case disk:
-		if (osfseek(o.file, location, OSFileSeek.start) < 0) {
-			adbg_oops(AdbgError.os);
-			return -1;
-		}
+		if (osfseek(o.file, location, OSFileSeek.start) < 0)
+			return adbg_oops(AdbgError.os);
 		break;
 	case process:
 		o.location = cast(size_t)location;
@@ -776,7 +738,7 @@ L_ARG:	switch (va_arg!int(args)) {
 			return adbg_object_mz_load(o);
 		
 		uint newsig = void;
-		if (adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof) < 0)
+		if (adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof))
 			return adbg_errno();
 		
 		version (Trace) trace("newsig=%#x", newsig);
@@ -784,7 +746,7 @@ L_ARG:	switch (va_arg!int(args)) {
 		// 32-bit signature check
 		switch (newsig) {
 		case MAGIC_PE32:
-			return adbg_object_pe_load(o);
+			return adbg_object_pe_load(o, sig.mzheader.e_lfanew);
 		default:
 		}
 		
@@ -935,7 +897,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	case mz:	return AdbgMachine.i8086;
 	case ne:	return adbg_object_ne_machine(o);
 	case lx:	return adbg_object_lx_machine(o);
-	case pe:	return adbg_object_pe_machine(o.i.pe.header.Machine);
+	case pe:	return adbg_object_pe_machine(o);
 	case macho: // NOTE: Both Mach-O headers (regular/fat) match in layout for cputype
 		return adbg_object_macho_machine(o.i.macho.header.cputype);
 	case elf:
@@ -975,6 +937,8 @@ export
 const(char)* adbg_object_type_shortname(adbg_object_t *o) {
 	if (o == null)
 		goto Lunknown;
+	//TODO: Consider merging pdb20 and pdb70 to only "pdb"
+	//TODO: Consider dropping "le" to stick only with "lx"
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return "mz";
 	case ne:	return "ne";
@@ -990,7 +954,7 @@ const(char)* adbg_object_type_shortname(adbg_object_t *o) {
 	case archive:	return "archive";
 	case coff:	return "coff";
 	case mscoff:	return "mscoff";
-	Lunknown:
+Lunknown:
 	case unknown:	return "unknown";
 	}
 }
@@ -1017,32 +981,21 @@ const(char)* adbg_object_type_name(adbg_object_t *o) {
 	case archive:	return `Library Archive`;
 	case coff:	return `Common Object File Format`;
 	case mscoff:	return `Microsoft Common Object File Format`;
-	Lunknown:
+Lunknown:
 	case unknown:	return "Unknown";
 	}
 }
 
-/*enum AdbgObjectKind {
-	unknown,
-	executable,
-	sharedObject,
-}
-
-AdbgObjectKind adbg_object_kind(adbg_object_t *o)*/
-
+// Printing purposes only
 const(char)* adbg_object_kind_string(adbg_object_t *o) {
-	const(char)* kind;
 	if (o == null)
-		goto Lunknown;
+		return null;
 	switch (o.format) with (AdbgObject) {
-	case mz:	kind = adbg_object_mz_kind_string(o); break;
-	case ne:	kind = adbg_object_ne_kind_string(o); break;
-	case lx:	kind = adbg_object_lx_kind_string(o); break;
-	case pe:
-		return o.i.pe.header.Characteristics & PE_CHARACTERISTIC_DLL ? `Dynamically Linked Library` : `Executable`;
-	case macho:
-		if (o.i.macho.fat) return `Fat Executable`;
-		return adbg_object_macho_filetype_string(o.i.macho.header.filetype);
+	case mz:	return adbg_object_mz_kind_string(o);
+	case ne:	return adbg_object_ne_kind_string(o);
+	case lx:	return adbg_object_lx_kind_string(o);
+	case pe:	return adbg_object_pe_kind_string(o);
+	case macho:	return adbg_object_macho_kind_string(o);
 	case elf:
 		return o.i.elf32.ehdr.e_type == ELF_ET_DYN ? `Shared Object` : `Executable`;
 	case pdb20, pdb70:
@@ -1057,6 +1010,5 @@ const(char)* adbg_object_kind_string(adbg_object_t *o) {
 		return `Object`;
 	default:
 	}
-Lunknown:
-	return kind ? kind : `Unknown`;
+	return null;
 }

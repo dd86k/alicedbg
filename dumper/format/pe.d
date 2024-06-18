@@ -12,6 +12,8 @@ import adbg.object.format.pe;
 import adbg.object.format.mz : mz_hdr_ext;
 import adbg.utils.date : ctime32;
 import adbg.utils.uid, adbg.utils.bit;
+import adbg.error;
+import core.stdc.stdlib;
 import core.stdc.string : strncmp;
 import dumper;
 import common.error;
@@ -20,7 +22,6 @@ extern (C):
 
 /// Print PE object.
 /// Params:
-///   dump = Dumper instance.
 ///   o = Object instance.
 /// Returns: Non-zero on error.
 int dump_pe(adbg_object_t *o) {
@@ -43,20 +44,21 @@ private:
 
 // Returns true if the machine value is unknown
 void dump_pe_hdr(adbg_object_t *o) {
+	pe_header_t *header = adbg_object_pe_header(o);
+	
+	// NOTE: Optional header selection
+	//       This is kind of hard to fix without a dedicated switch
+	//       And the base address for e_lfanew is needed
+	// TODO: 
 	if (SETTING(Setting.extractAny)) {
-		print_data("Header", o.i.pe.header, PE_HEADER.sizeof, mz_hdr_ext.sizeof);
+		print_data("Header", header, pe_header_t.sizeof, 0);
 		return;
 	}
 	
 	print_header("Header");
 	
-	const(char) *str_mach = adbg_object_pe_machine_string(o.i.pe.header.Machine);
-	
-	if (str_mach == null)
-		str_mach = "Unknown";
-	
-	with (o.i.pe.header) {
-	print_x32("Machine", Machine, str_mach);
+	with (header) {
+	print_x32("Machine", Machine, adbg_object_pe_machine_string(o));
 	print_u32("NumberOfSections", NumberOfSections);
 	print_x32("TimeDateStamp", TimeDateStamp, ctime32(TimeDateStamp));
 	print_x32("PointerToSymbolTable", PointerToSymbolTable);
@@ -82,27 +84,30 @@ void dump_pe_hdr(adbg_object_t *o) {
 		null);
 	}
 	
-	if (str_mach == null)
-		return;
-	//TODO: Could be a server check
-	if (o.i.pe.header.SizeOfOptionalHeader == 0)
-		return;
-	
 	dump_pe_opthdr(o);
 }
 
 void dump_pe_opthdr(adbg_object_t *o) {
+	pe_optional_header_t *opthdr = cast(pe_optional_header_t*)adbg_object_pe_optional_header(o);
+	if (opthdr == null) {
+		print_warningf("Optional header: %s", adbg_error_message());
+		return;
+	}
+	
+	if (SETTING(Setting.extractAny)) {
+		pe_header_t* header = adbg_object_pe_header(o);
+		print_data("Optional Header", opthdr, header.SizeOfOptionalHeader);
+		return;
+	}
+	
 	print_header("Optional Header");
 	
 	// NOTE: Server already checks magic format
-	const(char) *str_mag = adbg_object_pe_magic_string(o.i.pe.opt_header.Magic);
-	const(char) *str_sys = adbg_object_pe_subsys_string(o.i.pe.opt_header.Subsystem);
-	if (str_sys == null)
-		str_sys = "Unknown";
+	const(char) *subsystem = SAFEVAL(adbg_object_pe_subsys_string(o));
 	
 	// Common in all magic formats
-	with (o.i.pe.opt_header) {
-	print_x16("Magic", Magic, str_mag);
+	with (opthdr) {
+	print_x16("Magic", Magic, SAFEVAL(adbg_object_pe_magic_string(o)));
 	print_u8("MajorLinkerVersion", MajorLinkerVersion);
 	print_u8("MinorLinkerVersion", MinorLinkerVersion);
 	print_u32("SizeOfCode", SizeOfCode);
@@ -112,9 +117,9 @@ void dump_pe_opthdr(adbg_object_t *o) {
 	print_x32("BaseOfCode", BaseOfCode);
 	}
 	
-	switch (o.i.pe.opt_header.Magic) {
-	case PE_FMT_32: // 32
-		with (o.i.pe.opt_header) {
+	switch (opthdr.Magic) {
+	case PE_CLASS_32: // 32
+		with (opthdr) {
 		print_x32("BaseOfData", BaseOfData);
 		print_x32("ImageBase", ImageBase);
 		print_u32("SectionAlignment", SectionAlignment);
@@ -129,7 +134,7 @@ void dump_pe_opthdr(adbg_object_t *o) {
 		print_u32("SizeOfImage", SizeOfImage);
 		print_u32("SizeOfHeaders", SizeOfHeaders);
 		print_x32("CheckSum", CheckSum);
-		print_x16("Subsystem", Subsystem, str_sys);
+		print_x16("Subsystem", Subsystem, subsystem);
 		dump_pe_dllcharactiristics(DllCharacteristics);
 		print_x32("SizeOfStackReserve", SizeOfStackReserve);
 		print_x32("SizeOfStackCommit", SizeOfStackCommit);
@@ -139,8 +144,8 @@ void dump_pe_opthdr(adbg_object_t *o) {
 		print_u32("NumberOfRvaAndSizes", NumberOfRvaAndSizes);
 		}
 		break;
-	case PE_FMT_64: // 64
-		with (o.i.pe.opt_header64) {
+	case PE_CLASS_64: // 64
+		with (cast(pe_optional_header64_t*)opthdr) {
 		print_x64("ImageBase", ImageBase);
 		print_x32("SectionAlignment", SectionAlignment);
 		print_x32("FileAlignment", FileAlignment);
@@ -154,7 +159,7 @@ void dump_pe_opthdr(adbg_object_t *o) {
 		print_u32("SizeOfImage", SizeOfImage);
 		print_u32("SizeOfHeaders", SizeOfHeaders);
 		print_x32("CheckSum", CheckSum);
-		print_u32("Subsystem", Subsystem, str_sys);
+		print_u32("Subsystem", Subsystem, subsystem);
 		dump_pe_dllcharactiristics(DllCharacteristics);
 		print_u64("SizeOfStackReserve", SizeOfStackReserve);
 		print_u64("SizeOfStackCommit", SizeOfStackCommit);
@@ -164,8 +169,8 @@ void dump_pe_opthdr(adbg_object_t *o) {
 		print_u32("NumberOfRvaAndSizes", NumberOfRvaAndSizes);
 		}
 		break;
-	case PE_FMT_ROM: // ROM has no flags/directories
-		with (o.i.pe.opt_headerrom) {
+	case PE_CLASS_ROM: // ROM has no flags/directories
+		with (cast(pe_optional_headerrom_t*)opthdr) {
 		print_x32("BaseOfData", BaseOfData);
 		print_x32("BaseOfBss", BaseOfBss);
 		print_x32("GprMask", GprMask);
@@ -199,30 +204,27 @@ void dump_pe_dllcharactiristics(ushort dllchars) {
 }
 
 void dump_pe_dirs(adbg_object_t *o) {
-	// ROM check
-	//TODO: Make this a server check
-	if (o.i.pe.directory == null)
-		return;
+	pe_image_data_directory_t *directories = adbg_object_pe_directories(o);
 	
 	print_header("Directories");
 	
-	with (o.i.pe.directory) {
-	print_directory_entry("ExportTable", ExportTable.rva, ExportTable.size);
-	print_directory_entry("ImportTable", ImportTable.rva, ImportTable.size);
-	print_directory_entry("ResourceTable", ResourceTable.rva, ResourceTable.size);
-	print_directory_entry("ExceptionTable", ExceptionTable.rva, ExceptionTable.size);
-	print_directory_entry("CertificateTable", CertificateTable.rva, CertificateTable.size);
-	print_directory_entry("BaseRelocationTable", BaseRelocationTable.rva, BaseRelocationTable.size);
-	print_directory_entry("DebugDirectory", DebugDirectory.rva, DebugDirectory.size);
-	print_directory_entry("ArchitectureData", ArchitectureData.rva, ArchitectureData.size);
-	print_directory_entry("GlobalPtr", GlobalPtr.rva, GlobalPtr.size);
-	print_directory_entry("TLSTable", TLSTable.rva, TLSTable.size);
-	print_directory_entry("LoadConfigurationTable", LoadConfigurationTable.rva, LoadConfigurationTable.size);
-	print_directory_entry("BoundImportTable", BoundImportTable.rva, BoundImportTable.size);
-	print_directory_entry("ImportAddressTable", ImportAddressTable.rva, ImportAddressTable.size);
-	print_directory_entry("DelayImport", DelayImport.rva, DelayImport.size);
-	print_directory_entry("CLRHeader", CLRHeader.rva, CLRHeader.size);
-	print_directory_entry("Reserved", Reserved.rva, Reserved.size);
+	with (directories) {
+	with (ExportTable)            print_directory_entry("ExportTable", rva, size);
+	with (ImportTable)            print_directory_entry("ImportTable", rva, size);
+	with (ResourceTable)          print_directory_entry("ResourceTable", rva, size);
+	with (ExceptionTable)         print_directory_entry("ExceptionTable", rva, size);
+	with (CertificateTable)       print_directory_entry("CertificateTable", rva, size);
+	with (BaseRelocationTable)    print_directory_entry("BaseRelocationTable", rva, size);
+	with (DebugDirectory)         print_directory_entry("DebugDirectory", rva, size);
+	with (ArchitectureData)       print_directory_entry("ArchitectureData", rva, size);
+	with (GlobalPtr)              print_directory_entry("GlobalPtr", rva, size);
+	with (TLSTable)               print_directory_entry("TLSTable", rva, size);
+	with (LoadConfigurationTable) print_directory_entry("LoadConfigurationTable", rva, size);
+	with (BoundImportTable)       print_directory_entry("BoundImportTable", rva, size);
+	with (ImportAddressTable)     print_directory_entry("ImportAddressTable", rva, size);
+	with (DelayImport)            print_directory_entry("DelayImport", rva, size);
+	with (CLRHeader)              print_directory_entry("CLRHeader", rva, size);
+	with (Reserved)               print_directory_entry("Reserved", rva, size);
 	}
 }
 
@@ -237,8 +239,10 @@ void dump_pe_sections(adbg_object_t *o) {
 			continue;
 		
 		if (SETTING(Setting.extractAny)) {
-			void *data = o.buffer + PointerToRawData;
-			print_data(opt_section_name, data, SizeOfRawData, PointerToRawData);
+			char[8] name = void;
+			cast(void)strncmp(name.ptr, Name.ptr, Name.sizeof);
+			print_data(name.ptr, section, SizeOfRawData, PointerToRawData);
+			continue;
 		}
 		
 		print_section(cast(uint)i, Name.ptr, 8);
@@ -547,16 +551,16 @@ void dump_pe_sections(adbg_object_t *o) {
 void dump_pe_exports(adbg_object_t *o) {
 	print_header("Exports");
 	
-	PE_EXPORT_DESCRIPTOR *export_ = adbg_object_pe_export(o);
+	pe_export_descriptor_t *export_ = adbg_object_pe_export(o);
 	if (export_ == null)
-		return;
+		panic_adbg();
 	
 	with (export_) {
 	print_x32("ExportFlags", ExportFlags);
 	print_x32("Timestamp", Timestamp);
 	print_x16("MajorVersion", MajorVersion);
 	print_x16("MinorVersion", MinorVersion);
-	print_x32("Name", Name, adbg_object_pe_export_name(o, export_));
+	print_x32("Name", Name, adbg_object_pe_export_module_name(o, export_));
 	print_x32("OrdinalBase", OrdinalBase);
 	print_x32("AddressTableEntries", AddressTableEntries);
 	print_x32("NumberOfNamePointers", NumberOfNamePointers);
@@ -567,105 +571,80 @@ void dump_pe_exports(adbg_object_t *o) {
 	
 	PE_EXPORT_ENTRY *entry = void;
 	size_t ie;
-	while ((entry = adbg_object_pe_export_name_entry(o, export_, ie++)) != null) {
+	while ((entry = adbg_object_pe_export_entry_name(o, export_, ie++)) != null) {
 		print_x32("Export", entry.Export, adbg_object_pe_export_name_string(o, export_, entry));
 	}
 }
 
 void dump_pe_imports(adbg_object_t *o) {
 	print_header("Imports");
-	PE_IMPORT_DESCRIPTOR *import_ = void;
+	pe_import_descriptor_t *import_ = void;
 	size_t i;
-	while ((import_ = adbg_object_pe_import(o, i++)) != null) with (import_) {
-		char* name = adbg_object_pe_import_name(o, import_);
-		print_section(cast(uint)i, name, 128);
+	while ((import_ = adbg_object_pe_import(o, i)) != null) with (import_) {
+		i++;
+		const(char)* module_name = adbg_object_pe_import_module_name(o, import_);
+		if (module_name == null)
+			panic_adbg();
+		
+		print_section(cast(uint)i);
 		
 		print_x32("Characteristics", Characteristics);
 		print_x32("TimeDateStamp", TimeDateStamp);
 		print_x32("ForwarderChain", ForwarderChain);
-		print_x32("Name", Name);
+		print_x32l("Name", Name, module_name, 128);
 		print_x32("FirstThunk", FirstThunk);
 		
-		//TODO: Function to get import name+hint from lte directly
-		//      adbg_object_pe_import_entry_string(o, import_, i++);
-		
-		size_t il;
-		switch (o.i.pe.opt_header.Magic) {
-		case PE_FMT_32:
-			PE_IMPORT_ENTRY32 *t32 = adbg_object_pe_import_entry32(o, import_, il);
-			if (t32 == null) continue;
-			do with (t32) {
-				if (ordinal >= 0x8000_0000) { // Ordinal
-					print_section(cast(uint)il);
-					print_x16("Number", number);
-				} else { // RVA
-					ushort *hint = adbg_object_pe_import_entry32_hint(o, import_, t32);
-					if (hint == null) {
-				LBADINDEX32:
-						print_warningf("String index outside buffer");
-						continue;
-					}
-					const(char)* import_name = cast(const(char)*)hint + ushort.sizeof;
-					if (adbg_object_outboundp(o, cast(void*)import_name))
-						goto LBADINDEX32;
-					print_x32("RVA", rva);
-					print_x16l("Hint", *hint, import_name, 64);
-				}
-			} while ((t32 = adbg_object_pe_import_entry32(o, import_, ++il)) != null);
-			continue;
-		case PE_FMT_64:
-			PE_IMPORT_ENTRY64 *t64 = adbg_object_pe_import_entry64(o, import_, il);
-			if (t64 == null) continue;
-			do with (t64) {
-				if (ordinal >= 0x8000_0000_0000_0000) { // Ordinal
-					print_section(cast(uint)il);
-					print_x16("Number", number);
-				} else { // RVA
-					ushort *hint = adbg_object_pe_import_entry64_hint(o, import_, t64);
-					if (hint == null) {
-				LBADINDEX64:
-						print_warningf("String index outside buffer");
-						continue;
-					}
-					const(char)* import_name = cast(const(char)*)hint + ushort.sizeof;
-					if (adbg_object_outboundp(o, cast(void*)import_name))
-						goto LBADINDEX64;
-					print_x32("RVA", rva);
-					print_x16l("Hint", *hint, import_name, 64);
-				}
-			} while ((t64 = adbg_object_pe_import_entry64(o, import_, ++il)) != null);
-			continue;
-		default:
+		size_t i2;
+		void* entry = void;
+		while ((entry = adbg_object_pe_import_entry(o, import_, i2)) != null) {
+			i2++;
+			// Custom formatting for alignment purposes
+			print_stringf("Import", "0x%08x 0x%04x %s",
+				adbg_object_pe_import_entry_rva(o, import_, entry),
+				adbg_object_pe_import_entry_hint(o, import_, entry),
+				adbg_object_pe_import_entry_string(o, import_, entry));
 		}
+		// A PE32 image with an import table and no symbols would be weird
+		if (i2 == 0)
+			panic_adbg();
 	}
 }
 
 void dump_pe_debug(adbg_object_t *o) {
 	print_header("Debug");
 	
-	PE_DEBUG_DIRECTORY *debug_ = void;
+	// Mutiple directories. One directory points to one entry.
+	pe_debug_directory_entry_t *debug_ = void;
 	size_t i;
-	while ((debug_ = adbg_object_pe_debug_directory(o, i++)) != null) with (debug_) {
+	while ((debug_ = adbg_object_pe_debug_directory(o, i++)) != null) {
 		print_section(cast(uint)i);
-		print_x32("Characteristics", Characteristics);
-		print_x32("TimeDateStamp", TimeDateStamp);
-		print_u16("MajorVersion", MajorVersion);
-		print_u16("MinorVersion", MinorVersion);
-		print_u32("Type", Type, adbg_object_pe_debug_type_string(Type));
-		print_u32("SizeOfData", SizeOfData);
-		print_x32("AddressOfRawData", AddressOfRawData);
-		print_x32("PointerToRawData", PointerToRawData);
+		print_x32("Characteristics", debug_.Characteristics);
+		print_x32("TimeDateStamp", debug_.TimeDateStamp);
+		print_u16("MajorVersion", debug_.MajorVersion);
+		print_u16("MinorVersion", debug_.MinorVersion);
+		print_u32("Type", debug_.Type, adbg_object_pe_debug_type_string(debug_.Type));
+		print_u32("SizeOfData", debug_.SizeOfData);
+		print_x32("AddressOfRawData", debug_.AddressOfRawData);
+		print_x32("PointerToRawData", debug_.PointerToRawData);
 		
-		uint sig = void;
-		if (adbg_object_offsett!uint(o, &sig, PointerToRawData))
-			panic(1, "PointerToRawData out of bounds");
+		if (debug_.SizeOfData < uint.sizeof) {
+			print_warningf("Debug entry too small: Needed %u, got %u",
+				cast(uint)uint.sizeof, debug_.SizeOfData);
+			continue;
+		}
+		
+		void *data = adbg_object_pe_debug_directory_data(o, debug_);
+		if (data == null)
+			panic_adbg();
 		
 		const(char) *sigstr = void;
-		switch (Type) {
+		switch (debug_.Type) {
 		case PE_IMAGE_DEBUG_TYPE_CODEVIEW:
 			//TODO: Check MajorVersion/MinorVersion
 			//      For example, a modern D program use 0.0
 			//      Probably meaningless
+			
+			uint sig = *cast(uint*)data;
 			
 			switch (sig) {
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV410: // PDB 2.0+ / CodeView 4.10
@@ -675,44 +654,54 @@ void dump_pe_debug(adbg_object_t *o) {
 				sigstr = "PDB 2.0+ / NB10";
 				goto L_DEBUG_PDB20;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV500: // PDB 2.0+ / CodeView 5.0
+				if (debug_.SizeOfData < pe_debug_data_codeview_pdb20_t.sizeof) {
+					print_warningf("Size too small for pe_debug_data_codeview_pdb20_t (%u v. %u)",
+						debug_.SizeOfData, cast(uint)pe_debug_data_codeview_pdb20_t.sizeof);
+					continue;
+				}
 				sigstr = "PDB 2.0+ / CodeView 5.0";
 			L_DEBUG_PDB20:
+				pe_debug_data_codeview_pdb20_t* pdb = cast(pe_debug_data_codeview_pdb20_t*)data;
 				print_x32("Signature", sig, sigstr);
-				PE_DEBUG_DATA_CODEVIEW_PDB20* pdb = void;
-				if (adbg_object_offsetl(o, cast(void**)&pdb,
-					PointerToRawData, PE_DEBUG_DATA_CODEVIEW_PDB20.sizeof + 256))
-					panic(1, "PE_DEBUG_DATA_CODEVIEW_PDB20 out of bounds");
 				print_x32("Offset", pdb.Offset);
 				print_x32("Timestamp", pdb.Timestamp, ctime32(pdb.Timestamp));
 				print_u32("Age", pdb.Age);
-				if (pdb.Offset == 0) print_stringl("Path", pdb.Path.ptr, 256);
+				if (pdb.Offset == 0) // ?
+					print_stringl("Path", pdb.Path.ptr,
+						cast(int)(debug_.SizeOfData - pe_debug_data_codeview_pdb20_t.sizeof));
 				break;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV700: // PDB 7.0 / CodeView 7.0
-				PE_DEBUG_DATA_CODEVIEW_PDB70* pdb = void;
-				if (adbg_object_offsetl(o, cast(void**)&pdb,
-					PointerToRawData, PE_DEBUG_DATA_CODEVIEW_PDB70.sizeof + 256))
-					panic(1, "PE_DEBUG_DATA_CODEVIEW_PDB70 out of bounds");
+				if (debug_.SizeOfData < pe_debug_data_codeview_pdb70_t.sizeof) {
+					print_warningf("Size too small for pe_debug_data_codeview_pdb70_t (%u v. %u)",
+						debug_.SizeOfData, cast(uint)pe_debug_data_codeview_pdb70_t.sizeof);
+					continue;
+				}
+				pe_debug_data_codeview_pdb70_t* pdb = cast(pe_debug_data_codeview_pdb70_t*)data;
 				char[UID_TEXTLEN] guid = void;
 				uid_text(pdb.Guid, guid, UID_GUID);
 				print_x32("Signature", sig, "PDB 7.0 / CodeView 7.0");
 				print_stringl("GUID", guid.ptr, UID_TEXTLEN);
 				print_u32("Age", pdb.Age); // ctime32?
-				print_stringl("Path", pdb.Path.ptr, 256);
+				print_stringl("Path", pdb.Path.ptr,
+					cast(int)(debug_.SizeOfData - pe_debug_data_codeview_pdb70_t.sizeof));
 				break;
 			case PE_IMAGE_DEBUG_MAGIC_EMBEDDED_PPDB: // Portable PDB
 				// NOTE: major_version >= 0x100 && minor_version == 0x100
 				print_x32("Signature", sig, "Embedded Portable PDB");
 				break;
 			case PE_IMAGE_DEBUG_MAGIC_PPDB:
-				PE_DEBUG_DATA_PPDB *ppdb = void;
-				if (adbg_object_offsetl(o, cast(void**)&ppdb,
-					PointerToRawData, PE_DEBUG_DATA_PPDB.sizeof + 64))
-					panic(1, "PE_DEBUG_DATA_PPDB out of bounds");
+				if (debug_.SizeOfData < pe_debug_data_ppdb_t.sizeof) {
+					print_warningf("Size too small for pe_debug_data_ppdb_t (%u v. %u)",
+						debug_.SizeOfData, cast(uint)pe_debug_data_ppdb_t.sizeof);
+					continue;
+				}
+				pe_debug_data_ppdb_t *ppdb = cast(pe_debug_data_ppdb_t*)data;
 				print_x32("Signature", sig, "Portable PDB");
 				print_u16("MajorVersion", ppdb.MajorVersion);
 				print_u16("MinorVersion", ppdb.MinorVersion);
 				print_x32("Reserved", ppdb.Reserved);
 				print_u32("Length", ppdb.Length);
+				// Forgot why I limited that to 64 chars
 				print_stringl("Version", ppdb.Version.ptr,
 					ppdb.Length > 64 ? 64 : ppdb.Length);
 				break;
@@ -722,42 +711,62 @@ void dump_pe_debug(adbg_object_t *o) {
 			}
 			break;
 		case PE_IMAGE_DEBUG_TYPE_MISC:
-			PE_DEBUG_DATA_MISC* misc = void;
-			if (adbg_object_offsetl(o, cast(void**)&misc,
-				PointerToRawData, PE_DEBUG_DATA_MISC.sizeof + 256))
-				panic(1, "PE_DEBUG_DATA_MISC out of bounds");
+			if (debug_.SizeOfData < pe_debug_data_misc_t.sizeof) {
+				print_warningf("Size too small for pe_debug_data_misc_t (%u v. %u)",
+					debug_.SizeOfData, cast(uint)pe_debug_data_misc_t.sizeof);
+				continue;
+			}
+			pe_debug_data_misc_t *misc = cast(pe_debug_data_misc_t*)data;
 			if (misc.DataType != 1) // IMAGE_DEBUG_MISC_EXENAME
-				panic(1, "PE_DEBUG_DATA_MISC.DataType is not set to 1.");
-			print_x32("Signature", sig, "Misc. Debug Data");
-			print_x32("DataType", misc.DataType);
+				panic(1, "Unknown PE_DEBUG_DATA_MISC.DataType value.");
+			print_x32("Signature", misc.Signature32, "Misc. Debug Data");
+			print_x32("DataType", misc.DataType, "MISC_EXENAME");
 			print_x32("Length", misc.Length);
 			print_u8("Unicode", misc.Unicode);
 			print_u8("Reserved[0]", misc.Reserved[0]);
 			print_u8("Reserved[1]", misc.Reserved[1]);
 			print_u8("Reserved[2]", misc.Reserved[2]);
+			// TODO: Support wide strings
 			if (misc.Unicode == false)
-				print_stringl("Data", cast(char*)misc.Data.ptr, 256);
+				print_stringl("Data", cast(char*)misc.Data.ptr,
+					cast(int)(debug_.SizeOfData - pe_debug_data_misc_t.sizeof));
 			break;
 		case PE_IMAGE_DEBUG_TYPE_FPO:
-			// TODO: PE_IMAGE_DEBUG_TYPE_FPO
+			if (debug_.SizeOfData < pe_debug_data_fpo_t.sizeof) {
+				print_warningf("Size too small for pe_debug_data_fpo_t (%u v. %u)",
+					debug_.SizeOfData, cast(uint)pe_debug_data_fpo_t.sizeof);
+				continue;
+			}
+			pe_debug_data_fpo_t *fpo = cast(pe_debug_data_fpo_t*)data;
+			print_x32("ulOffStart", fpo.ulOffStart);
+			print_x32("cbProcSize", fpo.cbProcSize);
+			print_x32("cdwLocals", fpo.cdwLocals);
+			print_x16("cdwParams", fpo.cdwParams);
+			print_x16("Flags", fpo.Flags);
 			break;
 		case PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS:
 			// TODO: PE_IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS
 			break;
 		case PE_IMAGE_DEBUG_TYPE_VC_FEATURE:
-			if (SizeOfData != PE_DEBUG_DATA_VC_FEAT.sizeof)
-				panic(1, "SizeOfData does not correspond to VC feature structure size");
-			PE_DEBUG_DATA_VC_FEAT* vc = void;
-			if (adbg_object_offsetl(o, cast(void**)&vc,
-				PointerToRawData, PE_DEBUG_DATA_VC_FEAT.sizeof))
-				panic(1, "PE_DEBUG_DATA_MISC out of bounds");
-			print_u32("PreVC11", vc.prevc11);
-			print_u32("C/C++", vc.ccpp);
-			print_u32("/GS", vc.gs);
-			print_u32("/SDL", vc.sdl);
-			print_u32("GuardN", vc.guardn);
+			if (debug_.SizeOfData < pe_debug_data_vc_feat_t.sizeof) {
+				print_warningf("Size too small for pe_debug_data_vc_feat_t (%u v. %u)",
+					debug_.SizeOfData, cast(uint)pe_debug_data_vc_feat_t.sizeof);
+				continue;
+			}
+			pe_debug_data_vc_feat_t* vc = cast(pe_debug_data_vc_feat_t*)data;
+			print_u32("PreVC11", vc.PreVC11);
+			print_u32("C/C++", vc.CCpp);
+			print_u32("/GS", vc.GS);
+			print_u32("/SDL", vc.SDL);
+			print_u32("GuardN", vc.GuardN);
 			break;
 		case PE_IMAGE_DEBUG_TYPE_POGO:
+			if (debug_.SizeOfData < pe_debug_data_pogo_entry_t.sizeof) {
+				print_warningf("Size too small for pe_debug_data_pogo_entry_t (%u v. %u)",
+					debug_.SizeOfData, cast(uint)pe_debug_data_pogo_entry_t.sizeof);
+				continue;
+			}
+			uint sig = *cast(uint*)data;
 			const(char) *pgotypestr = void;
 			switch (sig) {
 			case PE_IMAGE_DEBUG_MAGIC_POGO_LTCG:
@@ -771,19 +780,32 @@ void dump_pe_debug(adbg_object_t *o) {
 			}
 			print_x32("Signature", sig, pgotypestr);
 			
-			PE_DEBUG_POGO_ENTRY* pogoentry = void;
-			if (adbg_object_offsetl(o, cast(void**)&pogoentry,
-				PointerToRawData, PE_DEBUG_POGO_ENTRY.sizeof + 256)) // Guess
-				panic(1, "PE_DEBUG_POGO_ENTRY out of bounds");
-			
-			print_x32("RVA", pogoentry.Rva);
-			print_x32("Size", pogoentry.Size);
-			print_stringl("Size", pogoentry.Name.ptr, 256); // Guess
+			//TODO: Check if multiple entries.
+			pe_debug_data_pogo_entry_t* pogo = cast(pe_debug_data_pogo_entry_t*)data;
+			print_x32("RVA", pogo.Rva);
+			print_x32("Size", pogo.Size);
+			print_stringl("Size", pogo.Name.ptr,
+				cast(int)(debug_.SizeOfData - pe_debug_data_pogo_entry_t.sizeof));
 			break;
 		case PE_IMAGE_DEBUG_TYPE_R2R_PERFMAP:
+			if (debug_.SizeOfData < pe_debug_data_r2r_perfmap_t.sizeof) {
+				print_warningf("Size too small for pe_debug_data_r2r_perfmap_t (%u v. %u)",
+					debug_.SizeOfData, cast(uint)pe_debug_data_r2r_perfmap_t.sizeof);
+				continue;
+			}
+			pe_debug_data_r2r_perfmap_t* r2r = cast(pe_debug_data_r2r_perfmap_t*)data;
+			char[UID_TEXTLEN] buf = void;
+			uid_text(r2r.Signature, buf, UID_GUID);
+			print_x32("Magic", r2r.Magic32, "R2R PerfMap");
+			print_string("Signature", buf.ptr);
+			print_x32("Version", r2r.Version);
+			print_stringl("Path", r2r.Path.ptr,
+				cast(int)(debug_.SizeOfData - pe_debug_data_r2r_perfmap_t.sizeof));
 			break;
 		default:
 		}
+		
+		adbg_object_pe_debug_directory_data_close(data);
 	}
 }
 
@@ -791,12 +813,21 @@ void dump_pe_disasm(adbg_object_t *o) {
 	print_header("Disassembly");
 	
 	int all = SETTING(Setting.disasmAll);
-	PE_SECTION_ENTRY *section = void;
 	size_t i;
-	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
-		if (all || Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE) {
-			dump_disassemble_object(o, Name.ptr, 8,
-				o.buffer + PointerToRawData, SizeOfRawData, 0);
-		}
+	pe_section_entry_t *section = void;
+	while ((section = adbg_object_pe_section(o, i++)) != null) {
+		//
+		if (all == 0 && (section.Characteristics & PE_SECTION_CHARACTERISTIC_MEM_EXECUTE) == 0)
+			continue;
+		// Compare section string if mentionned
+		if (opt_section_name && strncmp(opt_section_name, section.Name.ptr, section.Name.sizeof))
+			continue;
+		void *buffer = malloc(section.SizeOfRawData);
+		if (buffer == null)
+			panic_crt();
+		if (adbg_object_read_at(o, section.PointerToRawData, buffer, section.SizeOfRawData))
+			panic_adbg();
+		with (section) dump_disassemble_object(o, Name.ptr, Name.sizeof, buffer, SizeOfRawData, 0);
+		free(buffer);
 	}
 }

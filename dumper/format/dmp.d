@@ -9,7 +9,7 @@ import adbg.disassembler;
 import adbg.object.server;
 import adbg.machines;
 import adbg.object.format.dmp;
-import adbg.object.format.pe : adbg_object_pe_machine_string;
+import adbg.object.format.pe : adbg_object_pe_machine_value_string;
 import dumper;
 
 extern (C):
@@ -36,7 +36,7 @@ void dump_dmp_header(adbg_object_t *o) {
 		print_x32("PsLoadedModuleList", PsLoadedModuleList);
 		print_x32("PsActiveProcessHead", PsActiveProcessHead);
 		print_x32("MachineImageType", MachineImageType,
-			adbg_object_pe_machine_string(cast(ushort)MachineImageType));
+			adbg_object_pe_machine_value_string(cast(ushort)MachineImageType));
 		print_u32("NumberProcessors", NumberProcessors);
 		print_x32("BugCheckCode", BugCheckCode);
 		print_x32("BugCheckParameter1", BugCheckParameters[0]);
@@ -54,7 +54,7 @@ void dump_dmp_header(adbg_object_t *o) {
 		print_x32("PsLoadedModuleList", PsLoadedModuleList);
 		print_x32("PsActiveProcessHead", PsActiveProcessHead);
 		print_x32("MachineImageType", MachineImageType,
-			adbg_object_pe_machine_string(cast(ushort)MachineImageType));
+			adbg_object_pe_machine_value_string(cast(ushort)MachineImageType));
 		print_u32("NumberProcessors", NumberProcessors);
 		print_x32("BugCheckCode", BugCheckCode);
 		print_x32("BugCheckParameter1", BugCheckParameters[0]);

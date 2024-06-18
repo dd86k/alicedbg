@@ -89,6 +89,7 @@ int SELECTED(Select selection) { return opt_selected & selection; }
 int SETTING(Setting setting)   { return opt_settings & setting; }
 
 /// Dump given file to stdout.
+/// Params: path = Path to object file.
 /// Returns: Error code if non-zero
 int dump(const(char)* path) {
 	if (SETTING(Setting.blob)) {
@@ -108,6 +109,9 @@ int dump(const(char)* path) {
 		
 		return dump_disassemble(opt_machine, buffer, size, opt_baseaddress);
 	}
+	
+	// hotfix when section name specifed, force select all sections
+	opt_settings |= Setting.disasmAll;
 	
 	adbg_object_t *o = adbg_object_open_file(path, 0);
 	if (o == null)

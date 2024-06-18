@@ -2,20 +2,18 @@
 ///
 /// PE32 format for both images (executables) and objects (mscoff object files).
 ///
-/// Loosely based on Windows Kits\10\Include\10.0.17763.0\um\winnt.h
-///
 /// Sources:
+/// - Windows Kits\10\Include\10.0.17763.0\um\winnt.h
 /// - Microsoft Corporation, Microsoft Portable Executable and Common Object File Format Specification, Revision 6.0 - February 1999
 /// - Microsoft Corporation, Microsoft Portable Executable and Common Object File Format Specification, Revision 8.3 – February 6, 2013
 /// - Microsoft Corporation, PE Format, 2019-08-26
-/// - https://github.com/Microsoft/microsoft-pdb/
+/// - https://github.com/dotnet/runtime/blob/main/docs/design/specs/PE-COFF.md
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
 module adbg.object.format.pe;
 
-import core.stdc.inttypes;
 import core.stdc.stdlib;
 import adbg.error;
 import adbg.object.server;
@@ -25,10 +23,7 @@ import adbg.utils.bit;
 
 // NOTE: Avoid the Windows base types as they are not defined outside "version (Windows)"
 // NOTE: Microsoft loader limits sections to 96 maximum
-
-//TODO: Function to check RVA bounds (within file_size)
-//TODO: Return everything as const(type)*
-//      Memory implementation will potentially be read-only
+// NOTE: Load Configuration depends on Linker version, Windows depend on that to load PE32 images
 
 extern (C):
 
@@ -161,9 +156,9 @@ enum { // PE_SECTION_ENTRY.Characteristics flags
 }
 
 enum : ushort { // PE image format/magic
-	PE_FMT_ROM	= 0x0107,	// No longer used? Docs no longer have it
-	PE_FMT_32	= 0x010B,	/// PE32
-	PE_FMT_64	= 0x020B,	/// PE32+
+	PE_CLASS_ROM	= 0x0107,	// No longer used? Docs no longer have it
+	PE_CLASS_32	= 0x010B,	/// PE32
+	PE_CLASS_64	= 0x020B,	/// PE32+
 }
 
 enum : ushort { // PE_HEADER
@@ -184,188 +179,201 @@ enum : ushort { // PE_HEADER
 }
 
 /// COFF file header (object and image)
-struct PE_HEADER { align(1):
+struct pe_header_t { align(1):
 	union {
-		uint8_t[4] Signature;
-		uint32_t   Signature32;
+		ubyte[4] Signature;
+		uint   Signature32;
 	}
-	uint16_t Machine;
-	uint16_t NumberOfSections;
-	uint32_t TimeDateStamp; // C time_t
-	uint32_t PointerToSymbolTable;
-	uint32_t NumberOfSymbols;
-	uint16_t SizeOfOptionalHeader;
-	uint16_t Characteristics;
+	ushort Machine;
+	ushort NumberOfSections;
+	uint TimeDateStamp; // C time_t
+	uint PointerToSymbolTable;
+	uint NumberOfSymbols;
+	ushort SizeOfOptionalHeader;
+	ushort Characteristics;
 }
+alias PE_HEADER = pe_header_t;
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/ms680339(v=vs.85).aspx
 // Image only
-struct PE_OPTIONAL_HEADER { align(1):
-	uint16_t Magic; // "Format"
-	uint8_t  MajorLinkerVersion;
-	uint8_t  MinorLinkerVersion;
-	uint32_t SizeOfCode;
-	uint32_t SizeOfInitializedData;
-	uint32_t SizeOfUninitializedData;
-	uint32_t AddressOfEntryPoint;
-	uint32_t BaseOfCode;
-	uint32_t BaseOfData;
-	uint32_t ImageBase;
-	uint32_t SectionAlignment;
-	uint32_t FileAlignment;
-	uint16_t MajorOperatingSystemVersion;
-	uint16_t MinorOperatingSystemVersion;
-	uint16_t MajorImageVersion;
-	uint16_t MinorImageVersion;
-	uint16_t MajorSubsystemVersion;
-	uint16_t MinorSubsystemVersion;
-	uint32_t Win32VersionValue;
-	uint32_t SizeOfImage;
-	uint32_t SizeOfHeaders;
-	uint32_t CheckSum;
-	uint16_t Subsystem;
-	uint16_t DllCharacteristics;
-	uint32_t SizeOfStackReserve;
-	uint32_t SizeOfStackCommit;
-	uint32_t SizeOfHeapReserve;
-	uint32_t SizeOfHeapCommit;
-	uint32_t LoaderFlags;	/// Obsolete
-	uint32_t NumberOfRvaAndSizes;
+struct pe_optional_header_t { align(1):
+	ushort Magic; // "Format"
+	ubyte  MajorLinkerVersion;
+	ubyte  MinorLinkerVersion;
+	uint SizeOfCode;
+	uint SizeOfInitializedData;
+	uint SizeOfUninitializedData;
+	uint AddressOfEntryPoint;
+	uint BaseOfCode;
+	uint BaseOfData;
+	uint ImageBase;
+	uint SectionAlignment;
+	uint FileAlignment;
+	ushort MajorOperatingSystemVersion;
+	ushort MinorOperatingSystemVersion;
+	ushort MajorImageVersion;
+	ushort MinorImageVersion;
+	ushort MajorSubsystemVersion;
+	ushort MinorSubsystemVersion;
+	uint Win32VersionValue;
+	uint SizeOfImage;
+	uint SizeOfHeaders;
+	uint CheckSum;
+	ushort Subsystem;
+	ushort DllCharacteristics;
+	uint SizeOfStackReserve;
+	uint SizeOfStackCommit;
+	uint SizeOfHeapReserve;
+	uint SizeOfHeapCommit;
+	uint LoaderFlags;	/// Obsolete
+	uint NumberOfRvaAndSizes;
 }
-struct PE_OPTIONAL_HEADER64 { align(1):
-	uint16_t Magic; // "Format"
-	uint8_t  MajorLinkerVersion;
-	uint8_t  MinorLinkerVersion;
-	uint32_t SizeOfCode;
-	uint32_t SizeOfInitializedData;
-	uint32_t SizeOfUninitializedData;
-	uint32_t AddressOfEntryPoint;
-	uint32_t BaseOfCode;
-	uint64_t ImageBase;
-	uint32_t SectionAlignment;
-	uint32_t FileAlignment;
-	uint16_t MajorOperatingSystemVersion;
-	uint16_t MinorOperatingSystemVersion;
-	uint16_t MajorImageVersion;
-	uint16_t MinorImageVersion;
-	uint16_t MajorSubsystemVersion;
-	uint16_t MinorSubsystemVersion;
-	uint32_t Win32VersionValue;
-	uint32_t SizeOfImage;
-	uint32_t SizeOfHeaders;
-	uint32_t CheckSum;
-	uint16_t Subsystem;
-	uint16_t DllCharacteristics;
-	uint64_t SizeOfStackReserve;
-	uint64_t SizeOfStackCommit;
-	uint64_t SizeOfHeapReserve;
-	uint64_t SizeOfHeapCommit;
-	uint32_t LoaderFlags; // Obsolete
-	uint32_t NumberOfRvaAndSizes;
-}
+alias PE_OPTIONAL_HEADER = pe_optional_header_t;
 
-struct PE_OPTIONAL_HEADERROM {
-	uint16_t Magic;
-	uint8_t  MajorLinkerVersion;
-	uint8_t  MinorLinkerVersion;
-	uint32_t SizeOfCode;
-	uint32_t SizeOfInitializedData;
-	uint32_t SizeOfUninitializedData;
-	uint32_t AddressOfEntryPoint;
-	uint32_t BaseOfCode;
-	uint32_t BaseOfData;
-	uint32_t BaseOfBss;
-	uint32_t GprMask;
-	uint32_t[4] CprMask;
-	uint32_t GpValue;
+struct pe_optional_header64_t { align(1):
+	ushort Magic; // "Format"
+	ubyte  MajorLinkerVersion;
+	ubyte  MinorLinkerVersion;
+	uint SizeOfCode;
+	uint SizeOfInitializedData;
+	uint SizeOfUninitializedData;
+	uint AddressOfEntryPoint;
+	uint BaseOfCode;
+	ulong ImageBase;
+	uint SectionAlignment;
+	uint FileAlignment;
+	ushort MajorOperatingSystemVersion;
+	ushort MinorOperatingSystemVersion;
+	ushort MajorImageVersion;
+	ushort MinorImageVersion;
+	ushort MajorSubsystemVersion;
+	ushort MinorSubsystemVersion;
+	uint Win32VersionValue;
+	uint SizeOfImage;
+	uint SizeOfHeaders;
+	uint CheckSum;
+	ushort Subsystem;
+	ushort DllCharacteristics;
+	ulong SizeOfStackReserve;
+	ulong SizeOfStackCommit;
+	ulong SizeOfHeapReserve;
+	ulong SizeOfHeapCommit;
+	uint LoaderFlags; // Obsolete
+	uint NumberOfRvaAndSizes;
 }
+alias PE_OPTIONAL_HEADER64 = pe_optional_header64_t;
 
-struct PE_DIRECTORY_ENTRY { align(1):
-	uint32_t rva;	/// Relative Virtual Address
-	uint32_t size;	/// Size in bytes
+struct pe_optional_headerrom_t {
+	ushort Magic;
+	ubyte  MajorLinkerVersion;
+	ubyte  MinorLinkerVersion;
+	uint SizeOfCode;
+	uint SizeOfInitializedData;
+	uint SizeOfUninitializedData;
+	uint AddressOfEntryPoint;
+	uint BaseOfCode;
+	uint BaseOfData;
+	uint BaseOfBss;
+	uint GprMask;
+	uint[4] CprMask;
+	uint GpValue;
 }
+alias PE_OPTIONAL_HEADERROM = pe_optional_headerrom_t;
+
+struct pe_directory_entry_t { align(1):
+	uint rva;	/// Relative Virtual Address
+	uint size;	/// Size in bytes
+}
+alias PE_DIRECTORY_ENTRY = pe_directory_entry_t;
 
 // IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16
 // MS recommends checking NumberOfRvaAndSizes but it always been 16
-struct PE_IMAGE_DATA_DIRECTORY { align(1):
-	PE_DIRECTORY_ENTRY ExportTable;
-	PE_DIRECTORY_ENTRY ImportTable;
-	PE_DIRECTORY_ENTRY ResourceTable;
-	PE_DIRECTORY_ENTRY ExceptionTable;
-	PE_DIRECTORY_ENTRY CertificateTable;	// File Pointer (instead of RVA)
-	PE_DIRECTORY_ENTRY BaseRelocationTable;
-	PE_DIRECTORY_ENTRY DebugDirectory;
-	PE_DIRECTORY_ENTRY ArchitectureData;
-	PE_DIRECTORY_ENTRY GlobalPtr;
-	PE_DIRECTORY_ENTRY TLSTable;
-	PE_DIRECTORY_ENTRY LoadConfigurationTable;
-	PE_DIRECTORY_ENTRY BoundImportTable;
-	PE_DIRECTORY_ENTRY ImportAddressTable;
-	PE_DIRECTORY_ENTRY DelayImport;
-	PE_DIRECTORY_ENTRY CLRHeader;	// Used to be (or alias to) COM+ Runtime Header
-	PE_DIRECTORY_ENTRY Reserved;
+struct pe_image_data_directory_t { align(1):
+	pe_directory_entry_t ExportTable;
+	pe_directory_entry_t ImportTable;
+	pe_directory_entry_t ResourceTable;
+	pe_directory_entry_t ExceptionTable;
+	pe_directory_entry_t CertificateTable;	// File Pointer (instead of RVA)
+	pe_directory_entry_t BaseRelocationTable;
+	pe_directory_entry_t DebugDirectory;
+	pe_directory_entry_t ArchitectureData;
+	pe_directory_entry_t GlobalPtr;
+	pe_directory_entry_t TLSTable;
+	pe_directory_entry_t LoadConfigurationTable;
+	pe_directory_entry_t BoundImportTable;
+	pe_directory_entry_t ImportAddressTable;
+	pe_directory_entry_t DelayImport;
+	pe_directory_entry_t CLRHeader;	// Used to be (or alias to) COM+ Runtime Header
+	pe_directory_entry_t Reserved;
 }
+alias PE_IMAGE_DATA_DIRECTORY = pe_image_data_directory_t;
 
 //
 // ANCHOR Directory structures
 //
 
-struct PE_EXPORT_DESCRIPTOR { align(1):
-	uint32_t ExportFlags;
-	uint32_t Timestamp;
-	uint16_t MajorVersion;
-	uint16_t MinorVersion;
-	uint32_t Name;	/// RVA
-	uint32_t OrdinalBase;
-	uint32_t AddressTableEntries;	/// Number of export entries
-	uint32_t NumberOfNamePointers;	/// Same amount for ordinal
-	uint32_t ExportAddressTable;	/// RVA
-	uint32_t NamePointer;	/// RVA, "The address of the export name pointer table"
-	uint32_t OrdinalTable;	/// RVA
+struct pe_export_descriptor_t { align(1):
+	uint ExportFlags;
+	uint Timestamp;
+	ushort MajorVersion;
+	ushort MinorVersion;
+	uint Name;	/// RVA
+	uint OrdinalBase;
+	uint AddressTableEntries;	/// Number of export entries
+	uint NumberOfNamePointers;	/// Same amount for ordinal
+	uint ExportAddressTable;	/// RVA
+	uint NamePointer;	/// RVA, "The address of the export name pointer table"
+	uint OrdinalTable;	/// RVA
 }
+alias PE_EXPORT_DESCRIPTOR = pe_export_descriptor_t;
 
-union PE_EXPORT_ENTRY { align(1):
-	uint32_t Export;	/// RVA
-	uint32_t Forwarder;	/// RVA
+union pe_export_entry_t { align(1):
+	uint Export;	/// RVA
+	uint Forwarder;	/// RVA
 }
+alias PE_EXPORT_ENTRY = pe_export_entry_t;
 
 // IMAGE_IMPORT_DESCRIPTOR
-struct PE_IMPORT_DESCRIPTOR { align(1):
-	uint32_t Characteristics; // used in WINNT.H but no longer descriptive
-	uint32_t TimeDateStamp; // time_t
-	uint32_t ForwarderChain;
-	uint32_t Name;
-	uint32_t FirstThunk;
+struct pe_import_descriptor_t { align(1):
+	uint Characteristics; // used in WINNT.H but no longer descriptive
+	uint TimeDateStamp; // time_t
+	uint ForwarderChain;
+	uint Name;
+	uint FirstThunk;
 }
+alias PE_IMPORT_DESCRIPTOR = pe_import_descriptor_t;
 
 /// Import Lookup Table entry structure
-struct PE_IMPORT_ENTRY32 { align(1):
+struct pe_import_entry32_t { align(1):
 	union {
 		uint ordinal;	/// Ordinal/Name Flag
 		ushort number;	/// Ordinal Number (val[31] is set)
 		uint rva;	/// Hint/Name Table RVA (val[31] is clear)
 	}
 }
+alias PE_IMPORT_ENTRY32 = pe_import_entry32_t;
+
 /// Import Lookup Table entry structure
-struct PE_IMPORT_ENTRY64 { align(1):
+struct pe_import_entry64_t { align(1):
 	union {
 		ulong ordinal;	/// Ordinal/Name Flag
 		ushort number;	/// Ordinal Number (val2[31] is set)
 		uint rva;	/// Hint/Name Table RVA (val2[31] is clear)
 	}
 }
+alias PE_IMPORT_ENTRY64 = pe_import_entry64_t;
 
-/// DEBUG Directory
-struct PE_DEBUG_DIRECTORY { align(1):
-	uint32_t Characteristics;	/// reserved, must be zero
-	uint32_t TimeDateStamp;	/// time and date that the debug data was created
-	uint16_t MajorVersion;	/// The major version number of the debug data format
-	uint16_t MinorVersion;	/// The minor version number of the debug data format
-	uint32_t Type;	/// The format of debugging information
-	uint32_t SizeOfData;	/// The size of the debug data (not including the debug directory itself)
-	uint32_t AddressOfRawData;	/// The address of the debug data relative to the image base
-	uint32_t PointerToRawData;	/// The file pointer to the debug data
+struct pe_debug_directory_entry_t { align(1):
+	uint Characteristics;	/// reserved, must be zero
+	uint TimeDateStamp;	/// time and date that the debug data was created
+	ushort MajorVersion;	/// The major version number of the debug data format
+	ushort MinorVersion;	/// The minor version number of the debug data format
+	uint Type;	/// The format of debugging information
+	uint SizeOfData;	/// The size of the debug data (not including the debug directory itself)
+	uint AddressOfRawData;	/// The address of the debug data relative to the image base
+	uint PointerToRawData;	/// The file pointer to the debug data
 }
+alias PE_DEBUG_DIRECTORY = pe_debug_directory_entry_t;
 
 // Debug Types
 enum : uint {
@@ -396,7 +404,7 @@ enum : uint {
 	PE_IMAGE_DEBUG_TYPE_RESERVED10	= 10,
 	/// Reserved.
 	PE_IMAGE_DEBUG_TYPE_CLSID	= 11,
-	/// Undocumented, from winnt.h
+	/// Visual C++ features
 	PE_IMAGE_DEBUG_TYPE_VC_FEATURE	= 12,
 	/// Profile Guided Optimization.
 	/// See: https://devblogs.microsoft.com/cppblog/pogo/
@@ -420,6 +428,8 @@ enum : uint {
 	PE_IMAGE_DEBUG_TYPE_R2R_PERFMAP	= 21,
 }
 
+// Debug entry 2: CodeView/PDB stuff
+
 // Magics for debug structures
 enum : uint {
 	PE_IMAGE_DEBUG_MAGIC_CODEVIEW_LINK510	= CHAR32!"NB02", /// MS LINK 5.10
@@ -438,69 +448,103 @@ enum : uint {
 	PE_IMAGE_DEBUG_MAGIC_POGO_PGU	= CHAR32!"PGU\0", /// Profile Guided Update (/LTCG:PGUPDATE)
 }
 
-struct PE_DEBUG_DATA_MISC { align(1):
-	char[4] Signature;	/// 
+/// PDB 2.0 and above
+struct pe_debug_data_codeview_pdb20_t { align(1):
+	// Old PE32 doc mentions "NB05" -- CodeView 4.0 or earlier?
+	char[4] Signature;	/// Magic: "NB09"/"NB10"/"NB11" bytes
+	/// Offset to the start of the actual debug information from the
+	/// beginning of the CodeView data. Zero if it's another file.
+	uint Offset;
+	uint Timestamp;	///
+	uint Age;	/// incremented each time the executable is remade by the linker
+	char[1] Path;	/// Path to PDB (0-terminated)
+}
+alias PE_DEBUG_DATA_CODEVIEW_PDB20 = pe_debug_data_codeview_pdb20_t;
+
+/// PDB 7.0
+struct pe_debug_data_codeview_pdb70_t { align(1):
+	char[4] Signature;	/// Magic: "RSDS" bytes
+	UID Guid;	/// GUID of PDB file, matches with PDB file
+	uint Age;	/// incremented each time the executable is remade by the linker
+	char[1] Path;	/// Path to PDB (0-terminated UTF-8)
+}
+alias PE_DEBUG_DATA_CODEVIEW_PDB70 = pe_debug_data_codeview_pdb70_t;
+
+// Debug entry 3: The frame pointer omission (FPO) information.
+
+// This information tells the debugger how to interpret nonstandard stack frames,
+// which use the EBP register for a purpose other than as a frame pointer. 
+enum FRAME_FPO  = 0;
+enum FRAME_TRAP = 1;
+enum FRAME_TSS  = 2; // i286 Task Switch
+struct pe_debug_data_fpo_t { // struct _FPO_DATA
+	uint ulOffStart; // offset 1st byte of function code
+	uint cbProcSize; // # bytes in function
+	uint cdwLocals; // # bytes in locals/4
+	ushort cdwParams; // # bytes in params/4
+	ushort Flags;
+	//WORD cbProlog : 8; // # bytes in prolog
+	//WORD cbRegs : 3; // # regs saved
+	//WORD fHasSEH : 1; // TRUE if SEH in func
+	//WORD fUseBP : 1; // TRUE if EBP has been allocated
+	//WORD reserved : 1; // reserved for future use
+	//WORD cbFrame : 2; // frame type
+}
+
+// Debug entry 4: The location of a DBG file.
+
+struct pe_debug_data_misc_t { align(1):
+	union {
+		char[4] Signature;	/// 
+		uint Signature32;
+	}
 	uint DataType;	/// Must be 1
 	uint Length;	/// Multiple of four; Total length of data block
 	bool Unicode;	/// If true, Unicode string
 	byte[3] Reserved;
 	byte[1] Data;
 }
+alias PE_DEBUG_DATA_MISC = pe_debug_data_misc_t;
 
-/// CodeView format for PDB 2.0 and above
-// See http://www.debuginfo.com/articles/debuginfomatch.html
-struct PE_DEBUG_DATA_CODEVIEW_PDB20 { align(1):
-	// Old PE32 doc mentions "NB05" -- CodeView 4.0 or earlier?
-	char[4] Signature;	/// Magic: "NB09"/"NB10"/"NB11" bytes
-	/// Offset to the start of the actual debug information from the
-	/// beginning of the CodeView data. Zero if it's another file.
-	uint32_t Offset;
-	uint32_t Timestamp;	///
-	uint32_t Age;	/// incremented each time the executable is remade by the linker
-	char[1] Path;	/// Path to PDB (0-terminated)
-}
-
-/// CodeView format for PDB 7.0
-// See http://www.godevtool.com/Other/pdb.htm
-// and http://www.debuginfo.com/articles/debuginfomatch.html
-struct PE_DEBUG_DATA_CODEVIEW_PDB70 { align(1):
-	char[4] Signature;	/// Magic: "RSDS" bytes
-	UID Guid;	/// GUID of PDB file, matches with PDB file
-	uint32_t Age;	/// incremented each time the executable is remade by the linker
-	char[1] Path;	/// Path to PDB (0-terminated UTF-8)
-}
+// Debug entry 12: VC Features
 
 /// VC Featured data
-struct PE_DEBUG_DATA_VC_FEAT { align(1):
-	uint prevc11;	/// Pre-VC11
-	uint ccpp;	/// C/C++
-	uint gs;	/// /GS
-	uint sdl;	/// /SDL
-	uint guardn;	/// guardN
+struct pe_debug_data_vc_feat_t { align(1):
+	uint PreVC11;	/// Pre-VC11
+	uint CCpp;	/// C/C++
+	uint GS;	/// /GS
+	uint SDL;	/// /SDL
+	uint GuardN;	/// guardN
 }
+alias PE_DEBUG_DATA_VC_FEAT = pe_debug_data_vc_feat_t;
+
+// Debug entry 13: POGO
+
+/// POGO Entry containing filename. Should be ending with .PGD (Profile-Guided Database).
+struct pe_debug_data_pogo_entry_t {
+	uint Magic;
+	uint Rva;
+	uint Size;
+	char[1] Name;
+}
+alias PE_DEBUG_POGO_ENTRY = pe_debug_data_pogo_entry_t;
+
+// Debug entry 17: Embedded PDB
 
 /// Declares that debugging information is embedded in the PE file at location
 /// specified by PointerToRawData.
-// https://github.com/dotnet/runtime/blob/main/docs/design/specs/PE-COFF.md
 // Version Major=any, Minor=0x0100 of the data format:
-struct PE_DEBUG_DATA_EMBEDDED { align(1):
+struct pe_debug_data_embedded_t { align(1):
 	char[4] Signature;	/// Magic: "MPDB"
 	uint UncompressedSize;
 	// SizeOfData - 8: PortablePdbImage
 	//                 Portable PDB image compressed using Deflate algorithm
 	ubyte[1] PortablePdbImage;
 }
-
-/// POGO Entry containing filename. Should be ending with .PGD (Profile-Guided Database).
-struct PE_DEBUG_POGO_ENTRY {
-	uint Magic;
-	uint Rva;
-	uint Size;
-	char[1] Name;
-}
+alias PE_DEBUG_DATA_EMBEDDED = pe_debug_data_embedded_t;
 
 // aka MetadataRootHeader
-struct PE_DEBUG_DATA_PPDB {
+struct pe_debug_data_ppdb_t {
 	/// Magic signature for physical metadata : 0x424A5342.
 	// or "BSJB"
 	char[4] Signature;
@@ -519,88 +563,103 @@ struct PE_DEBUG_DATA_PPDB {
 	// - "Standard CLI 2002" (17 chars, so rounded to 20 chars)
 	char[1] Version;
 }
+alias PE_DEBUG_DATA_PPDB = pe_debug_data_ppdb_t;
+
 // After MetadataRootHeader + Version string
-struct PE_DEBUG_DATA_PPDB_FLAGS {
+struct pe_debug_data_ppdb_flags_t {
 	ushort Flags;
 	ushort Streams;
 }
+alias PE_DEBUG_DATA_PPDB_FLAGS = pe_debug_data_ppdb_flags_t;
 
-struct PE_DEBUG_DATA_PPDB_STREAM {
+struct pe_debug_data_ppdb_stream_t {
 	uint Offset;
 	uint Size;
 	char[1] Name;
 }
+alias PE_DEBUG_DATA_PPDB_STREAM = pe_debug_data_ppdb_stream_t;
+
+// Debug type 21: R2R PerfMap
 
 /// Declares that the image has an associated PerfMap file containing a table
 /// mapping symbols to offsets for ready to run compilations.
 // Version Major=0x0001, Minor=0x0000 of the entry data format is following:
-struct PE_DEBUG_DATA_R2R_PERFMAP { align(1):
-	char[4] Magic;	/// "R2RM"
+struct pe_debug_data_r2r_perfmap_t { align(1):
+	union {
+		char[4] Magic;	/// "R2RM"
+		uint Magic32;
+	}
 	/// Byte sequence uniquely identifying the associated PerfMap.
-	ubyte[16] Signature;
+	UID Signature; // Used to be ubyte[16]
 	/// Version number of the PerfMap. Currently only version 1 is supported.
 	uint Version;
 	/// UTF-8 NUL-terminated path to the associated .r2rmap file.
 	char[1] Path;
 }
+alias PE_DEBUG_DATA_R2R_PERFMAP = pe_debug_data_r2r_perfmap_t;
 
-struct PE_LOAD_CONFIG_CODE_INTEGRITY { align(1):
-	uint16_t Flags;	// Flags to indicate if CI information is available, etc.
-	uint16_t Catalog;	// 0xFFFF means not available
-	uint32_t CatalogOffset;
-	uint32_t Reserved;	// Additional bitmask to be defined later
+//
+// Load configuration directory
+//
+
+struct pe_load_config_code_integrity_t { align(1):
+	ushort Flags;	// Flags to indicate if CI information is available, etc.
+	ushort Catalog;	// 0xFFFF means not available
+	uint CatalogOffset;
+	uint Reserved;	// Additional bitmask to be defined later
 }
+alias PE_LOAD_CONFIG_CODE_INTEGRITY = pe_load_config_code_integrity_t;
 
 /// IMAGE_LOAD_CONFIG_DIRECTORY32
 //TODO: Map sizes to WindowsNT versions
 //      Or very likely MSVC linker versions
-struct PE_LOAD_CONFIG_DIR32 { align(1):
+struct pe_load_config_dir32_t { align(1):
 	// Windows XP and after
-	uint32_t Size; // Doc: Characteristics, header: Size, Windows XP=64
-	uint32_t TimeDateStamp; // time_t
-	uint16_t MajorVersion;
-	uint16_t MinorVersion;
-	uint32_t GlobalFlagsClear;
-	uint32_t GlobalFlagsSet;
-	uint32_t CriticalSectionDefaultTimeout;
-	uint32_t DeCommitFreeBlockThreshold;
-	uint32_t DeCommitTotalBlockThreshold;
-	uint32_t LockPrefixTable;
-	uint32_t MaximumAllocationSize;
-	uint32_t VirtualMemoryThreshold;
-	uint32_t ProcessHeapFlags;
-	uint32_t ProcessAffinityMask;
-	uint16_t CSDVersion;
-	uint16_t Reserved1;
-	uint32_t EditList;
+	uint Size; // Doc: Characteristics, header: Size, Windows XP=64
+	uint TimeDateStamp; // time_t
+	ushort MajorVersion;
+	ushort MinorVersion;
+	uint GlobalFlagsClear;
+	uint GlobalFlagsSet;
+	uint CriticalSectionDefaultTimeout;
+	uint DeCommitFreeBlockThreshold;
+	uint DeCommitTotalBlockThreshold;
+	uint LockPrefixTable;
+	uint MaximumAllocationSize;
+	uint VirtualMemoryThreshold;
+	uint ProcessHeapFlags;
+	uint ProcessAffinityMask;
+	ushort CSDVersion;
+	ushort Reserved1;
+	uint EditList;
 	// Windows 7 and later
-	uint32_t SecurityCookie;
-	uint32_t SEHandlerTable;
-	uint32_t SEHandlerCount;
-	uint32_t GuardCFCheckFunctionPointer; // Control Flow
-	uint32_t GuardCFDispatchFunctionPointer;
-	uint32_t GuardCFFunctionTable;
-	uint32_t GuardCFFunctionCount;
+	uint SecurityCookie;
+	uint SEHandlerTable;
+	uint SEHandlerCount;
+	uint GuardCFCheckFunctionPointer; // Control Flow
+	uint GuardCFDispatchFunctionPointer;
+	uint GuardCFFunctionTable;
+	uint GuardCFFunctionCount;
 	// Windows 8 and later?
-	uint32_t GuardFlags;
+	uint GuardFlags;
 	PE_LOAD_CONFIG_CODE_INTEGRITY CodeIntegrity;
-	uint32_t GuardAddressTakenIatEntryTable;
-	uint32_t GuardAddressTakenIatEntryCount;
-	uint32_t GuardLongJumpTargetTable;
-	uint32_t GuardLongJumpTargetCount; // Windows 8's limit?
+	uint GuardAddressTakenIatEntryTable;
+	uint GuardAddressTakenIatEntryCount;
+	uint GuardLongJumpTargetTable;
+	uint GuardLongJumpTargetCount; // Windows 8's limit?
 	// Windows 10 and later?
-	uint32_t DynamicValueRelocTable;	// VA
-	uint32_t CHPEMetadataPointer;
-	uint32_t GuardRFFailureRoutine;	// VA
-	uint32_t GuardRFFailureRoutineFunctionPointer;	// VA
-	uint32_t DynamicValueRelocTableOffset;
-	uint16_t DynamicValueRelocTableSection;
-	uint16_t Reserved2;
-	uint32_t GuardRFVerifyStackPointerFunctionPointer;	// VA
-	uint32_t HotPatchTableOffset;
-	uint32_t Reserved3;
-	uint32_t EnclaveConfigurationPointer;	// VA
-	uint32_t VolatileMetadataPointer;	// VA
+	uint DynamicValueRelocTable;	// VA
+	uint CHPEMetadataPointer;
+	uint GuardRFFailureRoutine;	// VA
+	uint GuardRFFailureRoutineFunctionPointer;	// VA
+	uint DynamicValueRelocTableOffset;
+	ushort DynamicValueRelocTableSection;
+	ushort Reserved2;
+	uint GuardRFVerifyStackPointerFunctionPointer;	// VA
+	uint HotPatchTableOffset;
+	uint Reserved3;
+	uint EnclaveConfigurationPointer;	// VA
+	uint VolatileMetadataPointer;	// VA
 	// 10.0.2261.0
 	uint GuardEHContinuationTable;	// VA
 	uint GuardEHContinuationCount;
@@ -610,56 +669,57 @@ struct PE_LOAD_CONFIG_DIR32 { align(1):
 	uint CastGuardOsDeterminedFailureMode;	// VA
 	uint GuardMemcpyFunctionPointer;	// VA
 }
+alias PE_LOAD_CONFIG_DIR32 = pe_load_config_dir32_t;
 
 /// IMAGE_LOAD_CONFIG_DIRECTORY64
 //TODO: Map sizes to WindowsNT versions
 //      Or MSVC linker versions
-struct PE_LOAD_CONFIG_DIR64 { align(1):
-	uint32_t Size; // Characteristics
-	uint32_t TimeDateStamp; // time_t
-	uint16_t MajorVersion;
-	uint16_t MinorVersion;
-	uint32_t GlobalFlagsClear;
-	uint32_t GlobalFlagsSet;
-	uint32_t CriticalSectionDefaultTimeout;
-	uint64_t DeCommitFreeBlockThreshold;
-	uint64_t DeCommitTotalBlockThreshold;
-	uint64_t LockPrefixTable;
-	uint64_t MaximumAllocationSize;
-	uint64_t VirtualMemoryThreshold;
-	uint64_t ProcessAffinityMask;
-	uint32_t ProcessHeapFlags;
-	uint16_t CSDVersion;
-	uint16_t Reserved1;
-	uint64_t EditList;
+struct pe_load_config_dir64_t { align(1):
+	uint Size; // Characteristics
+	uint TimeDateStamp; // time_t
+	ushort MajorVersion;
+	ushort MinorVersion;
+	uint GlobalFlagsClear;
+	uint GlobalFlagsSet;
+	uint CriticalSectionDefaultTimeout;
+	ulong DeCommitFreeBlockThreshold;
+	ulong DeCommitTotalBlockThreshold;
+	ulong LockPrefixTable;
+	ulong MaximumAllocationSize;
+	ulong VirtualMemoryThreshold;
+	ulong ProcessAffinityMask;
+	uint ProcessHeapFlags;
+	ushort CSDVersion;
+	ushort Reserved1;
+	ulong EditList;
 	// Windows 7 and later
-	uint64_t SecurityCookie;
-	uint64_t SEHandlerTable;
-	uint64_t SEHandlerCount;
-	uint64_t GuardCFCheckFunctionPointer; // Control Flow
-	uint64_t GuardCFDispatchFunctionPointer;
-	uint64_t GuardCFFunctionTable;
-	uint64_t GuardCFFunctionCount;
-	uint32_t GuardFlags;
+	ulong SecurityCookie;
+	ulong SEHandlerTable;
+	ulong SEHandlerCount;
+	ulong GuardCFCheckFunctionPointer; // Control Flow
+	ulong GuardCFDispatchFunctionPointer;
+	ulong GuardCFFunctionTable;
+	ulong GuardCFFunctionCount;
+	uint GuardFlags;
 	// Windows 8 and later?
 	PE_LOAD_CONFIG_CODE_INTEGRITY CodeIntegrity;
-	uint64_t GuardAddressTakenIatEntryTable;
-	uint64_t GuardAddressTakenIatEntryCount;
-	uint64_t GuardLongJumpTargetTable;
-	uint64_t GuardLongJumpTargetCount;
+	ulong GuardAddressTakenIatEntryTable;
+	ulong GuardAddressTakenIatEntryCount;
+	ulong GuardLongJumpTargetTable;
+	ulong GuardLongJumpTargetCount;
 	// Windows 10 and later?
-	uint64_t DynamicValueRelocTable;         // VA
-	uint64_t CHPEMetadataPointer;            // VA
-	uint64_t GuardRFFailureRoutine;          // VA
-	uint64_t GuardRFFailureRoutineFunctionPointer; // VA
-	uint32_t DynamicValueRelocTableOffset;
-	uint16_t DynamicValueRelocTableSection;
-	uint16_t Reserved2;
-	uint64_t GuardRFVerifyStackPointerFunctionPointer; // VA
-	uint32_t HotPatchTableOffset;
-	uint32_t Reserved3;
-	uint64_t EnclaveConfigurationPointer;     // VA
-	uint64_t VolatileMetadataPointer;         // VA
+	ulong DynamicValueRelocTable;         // VA
+	ulong CHPEMetadataPointer;            // VA
+	ulong GuardRFFailureRoutine;          // VA
+	ulong GuardRFFailureRoutineFunctionPointer; // VA
+	uint DynamicValueRelocTableOffset;
+	ushort DynamicValueRelocTableSection;
+	ushort Reserved2;
+	ulong GuardRFVerifyStackPointerFunctionPointer; // VA
+	uint HotPatchTableOffset;
+	uint Reserved3;
+	ulong EnclaveConfigurationPointer;     // VA
+	ulong VolatileMetadataPointer;         // VA
 	// 10.0.22621.0
 	ulong GuardEHContinuationTable;	// VA
 	ulong GuardEHContinuationCount;
@@ -669,8 +729,9 @@ struct PE_LOAD_CONFIG_DIR64 { align(1):
 	ulong CastGuardOsDeterminedFailureMode;	// VA
 	ulong GuardMemcpyFunctionPointer;	// VA
 }
+alias PE_LOAD_CONFIG_DIR64 = pe_load_config_dir64_t;
 
-struct PE_SECTION_ENTRY { align(1):
+struct pe_section_entry_t { align(1):
 	/// An 8-byte, null-padded UTF-8 encoded string. If
 	/// the string is exactly 8 characters long, there is
 	/// no terminating null. For longer names, this field
@@ -687,7 +748,7 @@ struct PE_SECTION_ENTRY { align(1):
 	/// SizeOfRawData, the section is zero-padded. This
 	/// field is valid only for executable images and
 	/// should be set to zero for object files.
-	uint32_t VirtualSize;
+	uint VirtualSize;
 	/// For executable images, the address of the first
 	/// byte of the section relative to the image base
 	/// when the section is loaded into memory. For
@@ -696,7 +757,7 @@ struct PE_SECTION_ENTRY { align(1):
 	/// compilers should set this to zero. Otherwise, it
 	/// is an arbitrary value that is subtracted from
 	/// offsets during relocation.
-	uint32_t VirtualAddress;
+	uint VirtualAddress;
 	/// The size of the section (for object files) or the
 	/// size of the initialized data on disk (for image
 	/// files). For executable images, this must be a
@@ -708,7 +769,7 @@ struct PE_SECTION_ENTRY { align(1):
 	/// SizeOfRawData to be greater than VirtualSize as
 	/// well. When a section contains only uninitialized
 	/// data, this field should be zero.
-	uint32_t SizeOfRawData;
+	uint SizeOfRawData;
 	/// The file pointer to the first page of the section
 	/// within the COFF file. For executable images, this
 	/// must be a multiple of FileAlignment from the
@@ -716,48 +777,85 @@ struct PE_SECTION_ENTRY { align(1):
 	/// should be aligned on a 4-byte boundary for best
 	/// performance. When a section contains only
 	/// uninitialized data, this field should be zero.
-	uint32_t PointerToRawData;
+	uint PointerToRawData;
 	/// The file pointer to the beginning of relocation
 	/// entries for the section. This is set to zero for
 	/// executable images or if there are no
 	/// relocations.
-	uint32_t PointerToRelocations;
+	uint PointerToRelocations;
 	/// The file pointer to the beginning of line-number
 	/// entries for the section. This is set to zero if
 	/// there are no COFF line numbers. This value
 	/// should be zero for an image because COFF
 	/// debugging information is deprecated.
-	uint32_t PointerToLinenumbers;
+	uint PointerToLinenumbers;
 	/// The number of relocation entries for the
 	/// section. This is set to zero for executable
 	/// images.
-	uint16_t NumberOfRelocations;
+	ushort NumberOfRelocations;
 	/// The number of line-number entries for the
 	/// section. This value should be zero for an image
 	/// because COFF debugging information is
 	/// deprecated.
-	uint16_t NumberOfLinenumbers;
+	ushort NumberOfLinenumbers;
 	/// The flags that describe the characteristics of the
 	/// section.
-	uint32_t Characteristics;
+	uint Characteristics;
+}
+alias PE_SECTION_ENTRY = pe_section_entry_t;
+
+private
+struct internal_pe_t {
+	pe_header_t header;
+	union {
+		pe_optional_header_t optheader;
+		pe_optional_header64_t optheader64;
+		pe_optional_headerrom_t optheaderrom;
+	}
+	pe_image_data_directory_t directory;
+	uint locsections;
+	pe_section_entry_t *sections;
+	bool *r_sections;
+	// export directory
+	pe_export_descriptor_t *export_directory;
+	bool *r_export_entries;
+	// import directory
+	pe_import_descriptor_t *import_directory; // not allocated
+	pe_section_entry_t *import_section; // associated section, not allocated
+	void *import_buffer; // section buffer
+	//bool *r_import_desc;
+	//bool *r_import_entries; // Current only, cleared when selecting other descriptor
+	// debug directory
+	pe_debug_directory_entry_t *debug_directory; // not allocated
+	pe_section_entry_t *debug_section;
+	void *debug_buffer; // section buffer
+	bool *r_debug_entries;
+	// load configuration directory
+	union {
+		pe_load_config_dir32_t *load32_directory;
+		pe_load_config_dir64_t *load64_directory;
+	}
+	bool r_loaddir;
 }
 
 /// (Internal) Called by the server to preload a PE object.
-/// Params: o = Object instance.
+/// Params:
+/// 	o = Object instance.
+/// 	e_lfanew = Location of PE COFF Header.
 /// Returns: Error code.
-int adbg_object_pe_load(adbg_object_t *o) {
-	if (o.file_size < MINIMUM_SIZE)
-		return adbg_oops(AdbgError.objectTooSmall);
-	
+int adbg_object_pe_load(adbg_object_t *o, uint e_lfanew) {
 	o.format = AdbgObject.pe;
+	o.internal = calloc(1, internal_pe_t.sizeof);
+	if (o.internal == null)
+		return adbg_oops(AdbgError.crt);
+	if (adbg_object_read_at(o, e_lfanew, o.internal, pe_header_t.sizeof)) {
+		free(o.internal);
+		return adbg_errno();
+	}
 	
-	// Boundchecks are done later
-	void *base = o.i.mz.newbase;
-	o.i.pe.header = cast(PE_HEADER*)base;
-	o.i.pe.opt_header = cast(PE_OPTIONAL_HEADER*)(base + PE_OFFSET_OPTHDR);
-	
-	with (o.i.pe.header)
-	if (o.p.reversed) {
+	pe_header_t *header = cast(pe_header_t*)o.internal;
+	with (header)
+	if (o.status & AdbgObjectInternalFlags.reversed) {
 		Signature32	= adbg_bswap32(Signature32);
 		Machine	= adbg_bswap16(Machine);
 		NumberOfSections	= adbg_bswap16(NumberOfSections);
@@ -766,127 +864,135 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		NumberOfSymbols	= adbg_bswap32(NumberOfSymbols);
 		SizeOfOptionalHeader	= adbg_bswap16(SizeOfOptionalHeader);
 		Characteristics	= adbg_bswap16(Characteristics);
-		
-		with (o.i.pe.opt_header) Magic = adbg_bswap16(Magic);
 	}
 	
-	switch (o.i.pe.opt_header.Magic) {
-	case PE_FMT_32:
-		if (adbg_object_outboundpl(o, o.i.pe.opt_header, PE_OPTIONAL_HEADER.sizeof))
-			return adbg_oops(AdbgError.offsetBounds);
+	e_lfanew += pe_header_t.sizeof; // adjust to optional header
+	ushort optmagic = void;
+	if (adbg_object_read_at(o, e_lfanew, &optmagic, ushort.sizeof)) {
+		free(o.internal);
+		return adbg_errno();
+	}
+	
+	internal_pe_t* internal = cast(internal_pe_t*)o.internal;
+	switch (optmagic) {
+	case PE_CLASS_32:
+		if (adbg_object_read_at(o, e_lfanew, &internal.optheader, pe_optional_header_t.sizeof)) {
+			free(o.internal);
+			return adbg_errno();
+		}
 		
-		o.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR32);
-		if (adbg_object_outboundpl(o, o.i.pe.directory, PE_IMAGE_DATA_DIRECTORY.sizeof))
-			return adbg_oops(AdbgError.offsetBounds);
+		e_lfanew += pe_optional_header_t.sizeof; // adjust to directory
+		if (adbg_object_read_at(o, e_lfanew, &internal.directory, pe_image_data_directory_t.sizeof)) {
+			free(o.internal);
+			return adbg_errno();
+		}
 		
-		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR32);
-		if (adbg_object_outboundpl(o, o.i.pe.sections,
-			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
-			return adbg_oops(AdbgError.offsetBounds);
+		e_lfanew += pe_image_data_directory_t.sizeof; // adjust to sections
 		
-		if (o.p.reversed) {
-			PE_OPTIONAL_HEADER *hdr = o.i.pe.opt_header;
-			hdr.SizeOfCode	= adbg_bswap32(hdr.SizeOfCode);
-			hdr.SizeOfInitializedData	= adbg_bswap32(hdr.SizeOfInitializedData);
-			hdr.SizeOfUninitializedData	= adbg_bswap32(hdr.SizeOfUninitializedData);
-			hdr.AddressOfEntryPoint	= adbg_bswap32(hdr.AddressOfEntryPoint);
-			hdr.BaseOfCode	= adbg_bswap32(hdr.BaseOfCode);
-			hdr.BaseOfData	= adbg_bswap32(hdr.BaseOfData);
-			hdr.ImageBase	= adbg_bswap32(hdr.ImageBase);
-			hdr.SectionAlignment	= adbg_bswap32(hdr.SectionAlignment);
-			hdr.FileAlignment	= adbg_bswap32(hdr.FileAlignment);
-			hdr.MajorOperatingSystemVersion	= adbg_bswap16(hdr.MajorOperatingSystemVersion);
-			hdr.MinorOperatingSystemVersion	= adbg_bswap16(hdr.MinorOperatingSystemVersion);
-			hdr.MajorImageVersion	= adbg_bswap16(hdr.MajorImageVersion);
-			hdr.MinorImageVersion	= adbg_bswap16(hdr.MinorImageVersion);
-			hdr.MajorSubsystemVersion	= adbg_bswap16(hdr.MajorSubsystemVersion);
-			hdr.MinorSubsystemVersion	= adbg_bswap16(hdr.MinorSubsystemVersion);
-			hdr.Win32VersionValue	= adbg_bswap32(hdr.Win32VersionValue);
-			hdr.SizeOfImage	= adbg_bswap32(hdr.SizeOfImage);
-			hdr.SizeOfHeaders	= adbg_bswap32(hdr.SizeOfHeaders);
-			hdr.CheckSum	= adbg_bswap32(hdr.CheckSum);
-			hdr.Subsystem	= adbg_bswap16(hdr.Subsystem);
-			hdr.DllCharacteristics	= adbg_bswap16(hdr.DllCharacteristics);
-			hdr.SizeOfStackReserve	= adbg_bswap32(hdr.SizeOfStackReserve);
-			hdr.SizeOfStackCommit	= adbg_bswap32(hdr.SizeOfStackCommit);
-			hdr.SizeOfHeapReserve	= adbg_bswap32(hdr.SizeOfHeapReserve);
-			hdr.SizeOfHeapCommit	= adbg_bswap32(hdr.SizeOfHeapCommit);
-			hdr.LoaderFlags	= adbg_bswap32(hdr.LoaderFlags);
-			hdr.NumberOfRvaAndSizes	= adbg_bswap32(hdr.NumberOfRvaAndSizes);
+		if (o.status & AdbgObjectInternalFlags.reversed) with (internal.optheader) {
+			SizeOfCode	= adbg_bswap32(SizeOfCode);
+			SizeOfInitializedData	= adbg_bswap32(SizeOfInitializedData);
+			SizeOfUninitializedData	= adbg_bswap32(SizeOfUninitializedData);
+			AddressOfEntryPoint	= adbg_bswap32(AddressOfEntryPoint);
+			BaseOfCode	= adbg_bswap32(BaseOfCode);
+			BaseOfData	= adbg_bswap32(BaseOfData);
+			ImageBase	= adbg_bswap32(ImageBase);
+			SectionAlignment	= adbg_bswap32(SectionAlignment);
+			FileAlignment	= adbg_bswap32(FileAlignment);
+			MajorOperatingSystemVersion	= adbg_bswap16(MajorOperatingSystemVersion);
+			MinorOperatingSystemVersion	= adbg_bswap16(MinorOperatingSystemVersion);
+			MajorImageVersion	= adbg_bswap16(MajorImageVersion);
+			MinorImageVersion	= adbg_bswap16(MinorImageVersion);
+			MajorSubsystemVersion	= adbg_bswap16(MajorSubsystemVersion);
+			MinorSubsystemVersion	= adbg_bswap16(MinorSubsystemVersion);
+			Win32VersionValue	= adbg_bswap32(Win32VersionValue);
+			SizeOfImage	= adbg_bswap32(SizeOfImage);
+			SizeOfHeaders	= adbg_bswap32(SizeOfHeaders);
+			CheckSum	= adbg_bswap32(CheckSum);
+			Subsystem	= adbg_bswap16(Subsystem);
+			DllCharacteristics	= adbg_bswap16(DllCharacteristics);
+			SizeOfStackReserve	= adbg_bswap32(SizeOfStackReserve);
+			SizeOfStackCommit	= adbg_bswap32(SizeOfStackCommit);
+			SizeOfHeapReserve	= adbg_bswap32(SizeOfHeapReserve);
+			SizeOfHeapCommit	= adbg_bswap32(SizeOfHeapCommit);
+			LoaderFlags	= adbg_bswap32(LoaderFlags);
+			NumberOfRvaAndSizes	= adbg_bswap32(NumberOfRvaAndSizes);
 		}
 		break;
-	case PE_FMT_64:
-		if (adbg_object_outboundpl(o, o.i.pe.opt_header, PE_OPTIONAL_HEADER64.sizeof))
-			return adbg_oops(AdbgError.offsetBounds);
+	case PE_CLASS_64:
+		if (adbg_object_read_at(o, e_lfanew, &internal.optheader64, pe_optional_header64_t.sizeof)) {
+			free(o.internal);
+			return adbg_errno();
+		}
 		
-		o.i.pe.directory = cast(PE_IMAGE_DATA_DIRECTORY*)(base + PE_OFFSET_DIR_OPTHDR64);
-		if (adbg_object_outboundpl(o, o.i.pe.directory, PE_IMAGE_DATA_DIRECTORY.sizeof))
-			return adbg_oops(AdbgError.offsetBounds);
+		e_lfanew += pe_optional_header64_t.sizeof; // adjust to directory
+		if (adbg_object_read_at(o, e_lfanew, &internal.directory, pe_image_data_directory_t.sizeof)) {
+			free(o.internal);
+			return adbg_errno();
+		}
 		
-		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDR64);
-		if (adbg_object_outboundpl(o, o.i.pe.sections,
-			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
-			return adbg_oops(AdbgError.offsetBounds);
+		e_lfanew += pe_image_data_directory_t.sizeof; // adjust to sections
 		
-		if (o.p.reversed) {
-			PE_OPTIONAL_HEADER64 *hdr = o.i.pe.opt_header64;
-			hdr.SizeOfCode	= adbg_bswap32(hdr.SizeOfCode);
-			hdr.SizeOfInitializedData	= adbg_bswap32(hdr.SizeOfInitializedData);
-			hdr.SizeOfUninitializedData	= adbg_bswap32(hdr.SizeOfUninitializedData);
-			hdr.AddressOfEntryPoint	= adbg_bswap32(hdr.AddressOfEntryPoint);
-			hdr.BaseOfCode	= adbg_bswap32(hdr.BaseOfCode);
-			hdr.ImageBase	= adbg_bswap64(hdr.ImageBase);
-			hdr.SectionAlignment	= adbg_bswap32(hdr.SectionAlignment);
-			hdr.FileAlignment	= adbg_bswap32(hdr.FileAlignment);
-			hdr.MajorOperatingSystemVersion	= adbg_bswap16(hdr.MajorOperatingSystemVersion);
-			hdr.MinorOperatingSystemVersion	= adbg_bswap16(hdr.MinorOperatingSystemVersion);
-			hdr.MajorImageVersion	= adbg_bswap16(hdr.MajorImageVersion);
-			hdr.MinorImageVersion	= adbg_bswap16(hdr.MinorImageVersion);
-			hdr.MajorSubsystemVersion	= adbg_bswap16(hdr.MajorSubsystemVersion);
-			hdr.MinorSubsystemVersion	= adbg_bswap16(hdr.MinorSubsystemVersion);
-			hdr.Win32VersionValue	= adbg_bswap32(hdr.Win32VersionValue);
-			hdr.SizeOfImage	= adbg_bswap32(hdr.SizeOfImage);
-			hdr.SizeOfHeaders	= adbg_bswap32(hdr.SizeOfHeaders);
-			hdr.CheckSum	= adbg_bswap32(hdr.CheckSum);
-			hdr.Subsystem	= adbg_bswap16(hdr.Subsystem);
-			hdr.DllCharacteristics	= adbg_bswap16(hdr.DllCharacteristics);
-			hdr.SizeOfStackReserve	= adbg_bswap64(hdr.SizeOfStackReserve);
-			hdr.SizeOfStackCommit	= adbg_bswap64(hdr.SizeOfStackCommit);
-			hdr.SizeOfHeapReserve	= adbg_bswap64(hdr.SizeOfHeapReserve);
-			hdr.SizeOfHeapCommit	= adbg_bswap64(hdr.SizeOfHeapCommit);
-			hdr.LoaderFlags	= adbg_bswap32(hdr.LoaderFlags);
-			hdr.NumberOfRvaAndSizes	= adbg_bswap32(hdr.NumberOfRvaAndSizes);
+		if (o.status & AdbgObjectInternalFlags.reversed) with (internal.optheader64) {
+			SizeOfCode	= adbg_bswap32(SizeOfCode);
+			SizeOfInitializedData	= adbg_bswap32(SizeOfInitializedData);
+			SizeOfUninitializedData	= adbg_bswap32(SizeOfUninitializedData);
+			AddressOfEntryPoint	= adbg_bswap32(AddressOfEntryPoint);
+			BaseOfCode	= adbg_bswap32(BaseOfCode);
+			ImageBase	= adbg_bswap64(ImageBase);
+			SectionAlignment	= adbg_bswap32(SectionAlignment);
+			FileAlignment	= adbg_bswap32(FileAlignment);
+			MajorOperatingSystemVersion	= adbg_bswap16(MajorOperatingSystemVersion);
+			MinorOperatingSystemVersion	= adbg_bswap16(MinorOperatingSystemVersion);
+			MajorImageVersion	= adbg_bswap16(MajorImageVersion);
+			MinorImageVersion	= adbg_bswap16(MinorImageVersion);
+			MajorSubsystemVersion	= adbg_bswap16(MajorSubsystemVersion);
+			MinorSubsystemVersion	= adbg_bswap16(MinorSubsystemVersion);
+			Win32VersionValue	= adbg_bswap32(Win32VersionValue);
+			SizeOfImage	= adbg_bswap32(SizeOfImage);
+			SizeOfHeaders	= adbg_bswap32(SizeOfHeaders);
+			CheckSum	= adbg_bswap32(CheckSum);
+			Subsystem	= adbg_bswap16(Subsystem);
+			DllCharacteristics	= adbg_bswap16(DllCharacteristics);
+			SizeOfStackReserve	= adbg_bswap64(SizeOfStackReserve);
+			SizeOfStackCommit	= adbg_bswap64(SizeOfStackCommit);
+			SizeOfHeapReserve	= adbg_bswap64(SizeOfHeapReserve);
+			SizeOfHeapCommit	= adbg_bswap64(SizeOfHeapCommit);
+			LoaderFlags	= adbg_bswap32(LoaderFlags);
+			NumberOfRvaAndSizes	= adbg_bswap32(NumberOfRvaAndSizes);
 		}
 		break;
-	case PE_FMT_ROM: // NOTE: ROM have no optional header and directories
-		o.i.pe.directory = null;
-		o.i.pe.sections = cast(PE_SECTION_ENTRY*)(base + PE_OFFSET_SEC_OPTHDRROM);
-		if (adbg_object_outboundpl(o, o.i.pe.sections,
-			PE_SECTION_ENTRY.sizeof * o.i.pe.header.NumberOfSections))
-			return adbg_oops(AdbgError.offsetBounds);
+	case PE_CLASS_ROM: // NOTE: ROM have no optional header and directories
+		if (adbg_object_read_at(o, e_lfanew, &internal.optheaderrom, pe_optional_headerrom_t.sizeof)) {
+			free(o.internal);
+			return adbg_errno();
+		}
+		e_lfanew += pe_optional_headerrom_t.sizeof; // adjust to sections, no directories
 		
-		if (o.p.reversed) {
-			PE_OPTIONAL_HEADERROM *hdr = o.i.pe.opt_headerrom;
-			hdr.SizeOfCode	= adbg_bswap32(hdr.SizeOfCode);
-			hdr.SizeOfInitializedData	= adbg_bswap32(hdr.SizeOfInitializedData);
-			hdr.SizeOfUninitializedData	= adbg_bswap32(hdr.SizeOfUninitializedData);
-			hdr.AddressOfEntryPoint	= adbg_bswap32(hdr.AddressOfEntryPoint);
-			hdr.BaseOfCode	= adbg_bswap32(hdr.BaseOfCode);
-			hdr.BaseOfData	= adbg_bswap32(hdr.BaseOfData);
-			hdr.BaseOfBss	= adbg_bswap32(hdr.BaseOfBss);
-			hdr.GprMask	= adbg_bswap32(hdr.GprMask);
-			hdr.CprMask[0]	= adbg_bswap32(hdr.CprMask[0]);
-			hdr.CprMask[1]	= adbg_bswap32(hdr.CprMask[1]);
-			hdr.CprMask[2]	= adbg_bswap32(hdr.CprMask[2]);
-			hdr.CprMask[3]	= adbg_bswap32(hdr.CprMask[3]);
-			hdr.GpValue	= adbg_bswap32(hdr.GpValue);
+		if (o.status & AdbgObjectInternalFlags.reversed) with (internal.optheaderrom) {
+			SizeOfCode	= adbg_bswap32(SizeOfCode);
+			SizeOfInitializedData	= adbg_bswap32(SizeOfInitializedData);
+			SizeOfUninitializedData	= adbg_bswap32(SizeOfUninitializedData);
+			AddressOfEntryPoint	= adbg_bswap32(AddressOfEntryPoint);
+			BaseOfCode	= adbg_bswap32(BaseOfCode);
+			BaseOfData	= adbg_bswap32(BaseOfData);
+			BaseOfBss	= adbg_bswap32(BaseOfBss);
+			GprMask	= adbg_bswap32(GprMask);
+			CprMask[0]	= adbg_bswap32(CprMask[0]);
+			CprMask[1]	= adbg_bswap32(CprMask[1]);
+			CprMask[2]	= adbg_bswap32(CprMask[2]);
+			CprMask[3]	= adbg_bswap32(CprMask[3]);
+			GpValue	= adbg_bswap32(GpValue);
 		}
 		return 0;
 	default:
 		return adbg_oops(AdbgError.objectInvalidClass);
 	}
 	
-	if (o.p.reversed && o.i.pe.directory) with (o.i.pe.directory) {
+	internal.locsections = e_lfanew; // updated to point at section headers
+	
+	// If reversed and it's not a "rom" image, swap dictionary entries
+	if (o.status & AdbgObjectInternalFlags.reversed && optmagic != PE_CLASS_ROM) with (internal.directory) {
 		ExportTable.rva	= adbg_bswap32(ExportTable.rva);
 		ExportTable.size	= adbg_bswap32(ExportTable.size);
 		ImportTable.rva	= adbg_bswap32(ImportTable.rva);
@@ -921,126 +1027,191 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		Reserved.size	= adbg_bswap32(Reserved.size);
 	}
 	
-	if (o.p.reversed == false)
-		return 0;
-	
-	if (o.i.pe.header.NumberOfSections) {
-		o.i.pe.reversed_sections = cast(bool*)
-			calloc(o.i.pe.header.NumberOfSections, bool.sizeof);
-		if (o.i.pe.reversed_sections == null)
-			return adbg_oops(AdbgError.crt);
-	}
-	with (o.i.pe.directory.ExportTable) if (size && rva) {
-		size_t count = size / PE_EXPORT_DESCRIPTOR.sizeof;
-		o.i.pe.reversed_dir_exports = false;
-		o.i.pe.reversed_dir_export_entries = cast(bool*)calloc(count, bool.sizeof);
-		if (o.i.pe.reversed_dir_export_entries == null)
-			return adbg_oops(AdbgError.crt);
-	}
-	with (o.i.pe.directory.ImportTable) if (size && rva) {
-		size_t count = size / PE_IMPORT_DESCRIPTOR.sizeof;
-		o.i.pe.reversed_dir_imports = cast(bool*)calloc(count, bool.sizeof);
-		if (o.i.pe.reversed_dir_imports == null)
-			return adbg_oops(AdbgError.crt);
-	}
-	with (o.i.pe.directory.DebugDirectory) if (size && rva) {
-		size_t count = size / PE_DEBUG_DIRECTORY.sizeof;
-		o.i.pe.reversed_dir_debug = cast(bool*)calloc(count, bool.sizeof);
-		if (o.i.pe.reversed_dir_debug == null)
-			return adbg_oops(AdbgError.crt);
-	}
-	
 	return 0;
 }
 
-//TODO: Calculate VA function
-//      FileOffset = Section.RawPtr + (Directory.RVA - Section.RVA)
+void adbg_object_pe_unload(adbg_object_t *o) {
+	if (o == null) return;
+	if (o.internal == null) return;
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	
+	if (internal.sections) free(internal.sections);
+	if (internal.r_sections) free(internal.r_sections);
+	
+	if (internal.export_directory) free(internal.export_directory);
+	if (internal.r_export_entries) free(internal.r_export_entries);
+	
+	if (internal.import_buffer) free(internal.import_buffer);
+	
+	if (internal.debug_buffer) free(internal.debug_buffer);
+	if (internal.r_debug_entries) free(internal.r_debug_entries);
+	
+	if (internal.load32_directory) free(internal.load32_directory);
+	
+	free(o.internal);
+}
 
-// maps rva to section if found
-void* adbg_object_pe_locate(adbg_object_t *o, uint rva) {
+// NOTE: Mapping directory RVAs to file offsets
+//       1. Given the Directory RVA, map it to a section
+//       2. Calculate the Section RVA with the Directory RVA
+
+// Given the directory RVA, map it to a section
+private
+pe_section_entry_t* adbg_object_pe_directory_section(adbg_object_t *o, uint rva) {
+	version (Trace) trace("o=%p rva=%#x", o, rva);
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	
-	uint sections = o.i.pe.header.NumberOfSections;
-	for (uint si; si < sections; ++si) {
-		PE_SECTION_ENTRY s = o.i.pe.sections[si];
-		
-		uint va = s.VirtualAddress;
-		
-		version (Trace) trace("va=%x rva=%x", va, rva);
-		
-		if (va > rva || va + s.SizeOfRawData <= rva)
-			continue;
-		
-		void* a = o.buffer + (s.PointerToRawData + (rva - va));
-		if (adbg_object_outboundp(o, a)) {
-			adbg_oops(AdbgError.offsetBounds);
-			return null;
-		}
-		return a;
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
 	}
 	
-	version (Trace) trace("null");
+	internal_pe_t* internal = cast(internal_pe_t*)o.internal;
+	ushort seccnt = internal.header.NumberOfSections;
+	for (ushort i; i < seccnt; ++i) {
+		// Function sets error
+		pe_section_entry_t *section = adbg_object_pe_section(o, i);
+		if (section == null) return null;
+		
+		// If RVA is outside section's VA and range
+		with (section) if (rva < VirtualAddress || rva > VirtualAddress + SizeOfRawData)
+			continue;
+		
+		return section;
+	}
+	
 	adbg_oops(AdbgError.unfindable);
 	return null;
 }
 
-PE_HEADER* adbg_object_pe_header(adbg_object_t *o) {
+// Given a section and directory RVA, return absolute file offset
+private
+uint adbg_object_pe_directory_offset_section(pe_section_entry_t *section, uint dirrva) {
+	version (Trace) trace("dir_rva=%#x", dirrva);
+	if (section == null) return 0;
+	with (section) return PointerToRawData + (dirrva - VirtualAddress);
+}
+
+// Given a directory RVA, return absolute file offset
+private
+uint adbg_object_pe_directory_offset(adbg_object_t *o, uint dirrva) {
+	version (Trace) trace("dir_rva=%#x", dirrva);
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return 0;
+	}
+	// Function checks null
+	return adbg_object_pe_directory_offset_section(
+		adbg_object_pe_directory_section(o, dirrva), dirrva);
+}
+
+pe_header_t* adbg_object_pe_header(adbg_object_t *o) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	return o.i.pe.header;
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	return cast(pe_header_t*)o.internal;
 }
 
-PE_OPTIONAL_HEADER* adbg_object_pe_optheader(adbg_object_t *o) {
+// void* to force a pointer cast
+// NOTE: then shouldn't there be a function to return the type of optional header?
+void* adbg_object_pe_optional_header(adbg_object_t *o) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	return o.i.pe.opt_header;
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	internal_pe_t* internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	return &internal.optheader;
 }
 
-PE_OPTIONAL_HEADER64* adbg_object_pe_optheader64(adbg_object_t *o) {
+pe_image_data_directory_t* adbg_object_pe_directories(adbg_object_t *o) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	return o.i.pe.opt_header64;
-}
-
-PE_OPTIONAL_HEADERROM* adbg_object_pe_optheaderrom(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
 		return null;
 	}
-	return o.i.pe.opt_headerrom;
+	internal_pe_t* internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	return &internal.directory;
 }
 
-PE_SECTION_ENTRY* adbg_object_pe_section(adbg_object_t *o, size_t index) {
+pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 	version (Trace) trace("o=%p index=%u", o, cast(uint)index);
 	
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.pe.sections == null) {
-		adbg_oops(AdbgError.unavailable);
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
 		return null;
 	}
 	if (index >= MAXIMUM_SECTIONS) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
-	if (index >= o.i.pe.header.NumberOfSections) {
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	
+	ushort count = internal.header.NumberOfSections;
+	if (index >= count || index >= MAXIMUM_SECTIONS) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	PE_SECTION_ENTRY *section = &o.i.pe.sections[index];
-	if (o.p.reversed && o.i.pe.reversed_sections[index] == false) with (section) {
+	// Otherwise, load section headers
+	if (internal.sections == null) {
+		size_t totsize = count * pe_section_entry_t.sizeof;
+		internal.sections = cast(pe_section_entry_t*)malloc(totsize);
+		if (internal.sections == null) {
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		if (adbg_object_read_at(o, internal.locsections, internal.sections, totsize)) { // sets error
+			free(internal.sections);
+			return null;
+		}
+		
+		// Init swapping stuff if required
+		if (o.status & AdbgObjectInternalFlags.reversed) {
+			internal.r_sections = cast(bool*)malloc(count);
+			if (internal.r_sections == null) {
+				free(internal.sections);
+				adbg_oops(AdbgError.crt);
+				return null;
+			}
+		}
+	}
+	
+	pe_section_entry_t *section = &internal.sections[index];
+	
+	// If needs to be swapped
+	if (o.status & AdbgObjectInternalFlags.reversed && internal.r_sections[index] == false) with (section) {
 		VirtualSize	= adbg_bswap32(VirtualSize);
 		VirtualAddress	= adbg_bswap32(VirtualAddress);
 		SizeOfRawData	= adbg_bswap32(SizeOfRawData);
@@ -1050,14 +1221,15 @@ PE_SECTION_ENTRY* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 		NumberOfRelocations	= adbg_bswap16(NumberOfRelocations);
 		NumberOfLinenumbers	= adbg_bswap16(NumberOfLinenumbers);
 		Characteristics	= adbg_bswap32(Characteristics);
-		o.i.pe.reversed_sections[index] = true;
+		internal.r_sections[index] = true;
 	}
+	
 	return section;
 }
 
 // TODO:
-// - [x] ExportTable
-// - [x] ImportTable
+// - [x] ExportTable: Size includes everything
+// - [x] ImportTable: Size only includes descriptor tables
 // - [ ] ResourceTable
 // - [ ] ExceptionTable
 // - [ ] CertificateTable
@@ -1065,8 +1237,8 @@ PE_SECTION_ENTRY* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 // - [x] DebugDirectory
 // - [ ] ArchitectureData
 // - [ ] GlobalPtr
-// - [ ] TLSTable
-// - [ ] LoadConfigurationTable
+// - [ ] TLSTable: Size includes everything
+// - [ ] LoadConfigurationTable: Size includes everything
 // - [ ] BoundImportTable
 // - [ ] ImportAddressTable
 // - [ ] DelayImport
@@ -1075,124 +1247,162 @@ PE_SECTION_ENTRY* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 //
 // Export directory functions
 //
-// One descriptortable, multiple entries, because one module can emit one table.
+
+// One descriptor table, multiple entries, because one module emits one table.
 //   Name -> Name of the module
 //   ExportAddressTable -> raw address to RVAs
 //     AddressTableEntries for count
 //     RVA -> hint + entry
-
-PE_EXPORT_DESCRIPTOR* adbg_object_pe_export(adbg_object_t *o) {
+pe_export_descriptor_t* adbg_object_pe_export(adbg_object_t *o) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.pe.directory == null) {
-		adbg_oops(AdbgError.unavailable); // Due to PE-ROM
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
 		return null;
 	}
 	
-	// Set base
-	with (o.i.pe) if (directory_exports == null) {
-		directory_exports = cast(PE_EXPORT_DESCRIPTOR*)
-			adbg_object_pe_locate(o, directory.ExportTable.rva);
-		// Not found
-		if (directory_exports == null) {
-			adbg_oops(AdbgError.unavailable);
-			return null;
-		}
-	}
-	
-	// adbg_object_pe_locate checked pointer bounds
-	PE_EXPORT_DESCRIPTOR* exportdir = o.i.pe.directory_exports;
-	
-	// ExportFlags must be zero
-	if (exportdir.ExportFlags != 0) {
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ExportTable.size == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
-	if (o.p.reversed && o.i.pe.reversed_dir_exports == false) with (exportdir) {
-		ExportFlags	= adbg_bswap32(ExportFlags);
-		Timestamp	= adbg_bswap32(Timestamp);
-		MajorVersion	= adbg_bswap16(MajorVersion);
-		MinorVersion	= adbg_bswap16(MinorVersion);
-		Name	= adbg_bswap32(Name);
-		OrdinalBase	= adbg_bswap32(OrdinalBase);
-		AddressTableEntries	= adbg_bswap32(AddressTableEntries);
-		NumberOfNamePointers	= adbg_bswap32(NumberOfNamePointers);
-		ExportAddressTable	= adbg_bswap32(ExportAddressTable);
-		NamePointer	= adbg_bswap32(NamePointer);
-		OrdinalTable	= adbg_bswap32(OrdinalTable);
-		o.i.pe.reversed_dir_exports = true;
+	// If not already loaded
+	if (internal.export_directory == null) {
+		// Function sets error
+		uint offset = adbg_object_pe_directory_offset(o, internal.directory.ExportTable.rva);
+		if (offset == 0)
+			return null;
+		
+		// Load exports in memory
+		uint size = internal.directory.ExportTable.size;
+		internal.export_directory = cast(pe_export_descriptor_t*)malloc(size);
+		if (internal.export_directory == null) {
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		if (adbg_object_read_at(o, offset, internal.export_directory, size)) // sets error
+			return null;
+		
+		// If need to be swapped
+		if (o.status & AdbgObjectInternalFlags.reversed) with (internal.export_directory) {
+			ExportFlags	= adbg_bswap32(ExportFlags);
+			Timestamp	= adbg_bswap32(Timestamp);
+			MajorVersion	= adbg_bswap16(MajorVersion);
+			MinorVersion	= adbg_bswap16(MinorVersion);
+			Name	= adbg_bswap32(Name);
+			OrdinalBase	= adbg_bswap32(OrdinalBase);
+			AddressTableEntries	= adbg_bswap32(AddressTableEntries);
+			NumberOfNamePointers	= adbg_bswap32(NumberOfNamePointers);
+			ExportAddressTable	= adbg_bswap32(ExportAddressTable);
+			NamePointer	= adbg_bswap32(NamePointer);
+			OrdinalTable	= adbg_bswap32(OrdinalTable);
+		}
 	}
 	
-	return exportdir;
+	// ExportFlags must be zero
+	if (internal.export_directory.ExportFlags != 0) {
+		free(internal.export_directory);
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	return internal.export_directory;
 }
 
-const(char)* adbg_object_pe_export_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_) {
+const(char)* adbg_object_pe_export_module_name(adbg_object_t *o, pe_export_descriptor_t *export_) {
 	if (o == null || export_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.pe.directory == null || o.i.pe.directory_exports == null) {
-		adbg_oops(AdbgError.unavailable); // Due to PE-ROM
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ExportTable.size == 0) {
+		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
-	const(char) *name =
-		cast(const(char)*)o.i.pe.directory_exports
-		- o.i.pe.directory.ExportTable.rva
-		+ export_.Name;
-	
-	if (adbg_object_outboundp(o, cast(void*)name)) {
-		adbg_oops(AdbgError.offsetBounds);
+	// directory_exports (offset) - ExportTable.rva + export.Name
+	// or try: directory_exports + sizeof(export_descriptor_t) ?
+	void* base = cast(void*)export_ -
+		internal.directory.ExportTable.rva +
+		export_.Name;
+	if (adbg_bits_ptr_outside(base, export_, internal.directory.ExportTable.size)) {
+		adbg_oops(AdbgError.offsetBounds); // or assertion?
 		return null;
 	}
 	
-	return name;
+	return cast(const(char)*)base;
 }
 
-PE_EXPORT_ENTRY* adbg_object_pe_export_name_entry(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, size_t index) {
+pe_export_entry_t* adbg_object_pe_export_entry_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, size_t index) {
 	if (o == null || export_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.pe.directory == null || o.i.pe.directory_exports == null) {
-		adbg_oops(AdbgError.unavailable); // Due to PE-ROM
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
 		return null;
 	}
+	
 	if (index >= export_.NumberOfNamePointers) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	// Check bounds with table RVA
-	void *base = cast(void*)o.i.pe.directory_exports
-		- o.i.pe.directory.ExportTable.rva
-		+ export_.NamePointer;
-	if (adbg_object_outboundp(o, base)) {
-		adbg_oops(AdbgError.offsetBounds);
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ExportTable.size == 0) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	// Entry table
+	void* base = cast(void*)export_ -
+		internal.directory.ExportTable.rva +
+		export_.NamePointer;
+	if (adbg_bits_ptr_outside(base, export_, internal.directory.ExportTable.size)) {
+		adbg_oops(AdbgError.offsetBounds); // or assertion?
 		return null;
 	}
 	
 	// Check bounds with name pointer and requested index
-	PE_EXPORT_ENTRY *entry = cast(PE_EXPORT_ENTRY*)base + index;
-	if (adbg_object_outboundp(o, entry)) {
-		adbg_oops(AdbgError.offsetBounds);
+	pe_export_entry_t *entry = cast(pe_export_entry_t*)base + index;
+	if (adbg_bits_ptr_outside(entry, export_, internal.directory.ExportTable.size)) {
+		adbg_oops(AdbgError.offsetBounds); // or assertion?
 		return null;
 	}
 	
-	if (o.p.reversed && o.i.pe.reversed_dir_export_entries[index] == false) with (entry) {
+	if (o.status & AdbgObjectInternalFlags.reversed && internal.r_export_entries[index] == false) with (entry) {
 		entry.Export = adbg_bswap32(entry.Export);
-		o.i.pe.reversed_dir_export_entries[index] = true;
+		internal.r_export_entries[index] = true;
 	}
 	
 	return entry;
 }
 
-const(char)* adbg_object_pe_export_name_string(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, PE_EXPORT_ENTRY *entry) {
+const(char)* adbg_object_pe_export_name_string(adbg_object_t *o,
+	pe_export_descriptor_t *export_, pe_export_entry_t *entry) {
 	if (o == null || export_ == null || entry == null) {
 		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ExportTable.size == 0) {
+		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
@@ -1207,13 +1417,14 @@ const(char)* adbg_object_pe_export_name_string(adbg_object_t *o, PE_EXPORT_DESCR
 	//if (entry.Export >= o.i.pe.directory.ExportTable.size)
 	//	return null;
 	
-	// Check bounds with table RVA
-	void *base = cast(void*)o.i.pe.directory_exports -
-		o.i.pe.directory.ExportTable.rva + entry.Export;
-	if (adbg_object_outboundp(o, base)) {
-		adbg_oops(AdbgError.offsetBounds);
+	void *base = cast(void*)export_ -
+		internal.directory.ExportTable.rva +
+		entry.Export;
+	if (adbg_bits_ptr_outside(base, export_, internal.directory.ExportTable.size)) {
+		adbg_oops(AdbgError.offsetBounds); // or assertion?
 		return null;
 	}
+	
 	return cast(const(char)*)base;
 }
 
@@ -1221,136 +1432,248 @@ const(char)* adbg_object_pe_export_name_string(adbg_object_t *o, PE_EXPORT_DESCR
 // Import directory functions
 //
 
-PE_IMPORT_DESCRIPTOR* adbg_object_pe_import(adbg_object_t *o, size_t index) {
+// NOTE: Import directory handling
+//       Because the import directory is not self-contained (its size only reflects headers),
+//       the entire section is loaded in memory, hoping that nothing 
+// Multiple tables, multiple entries per table
+pe_import_descriptor_t* adbg_object_pe_import(adbg_object_t *o, size_t index) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.pe.directory == null) {
-		adbg_oops(AdbgError.unavailable); // Due to PE-ROM
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
 		return null;
 	}
-	size_t count = o.i.pe.directory.ImportTable.size / PE_IMPORT_DESCRIPTOR.sizeof;
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	// NOTE: The last directory entry is empty (filled with null values),
+	//       which indicates the end of the directory table.
+	// NOTE: In theory, the entire set of import tables and names should be in the same section
+	//       But, name RVA *could* point outside of it as Windows loads the entire image in memory
+	
+	// If zero, or just "one" entry
+	if (internal.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	size_t count = (internal.directory.ImportTable.size / pe_import_descriptor_t.sizeof) - 1;
+	version (Trace) trace("count=%zu", count);
 	if (index >= count) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	// Set base
-	if (o.i.pe.directory_imports == null) {
-		o.i.pe.directory_imports = cast(PE_IMPORT_DESCRIPTOR*)
-			adbg_object_pe_locate(o, o.i.pe.directory.ImportTable.rva);
-		// Not found
-		if (o.i.pe.directory_imports == null) {
+	// Load the section associated with the import directory
+	if (internal.import_directory == null) {
+		internal.import_section = adbg_object_pe_directory_section(o, internal.directory.ImportTable.rva);
+		if (internal.import_section == null) {
 			adbg_oops(AdbgError.unavailable);
+			return null;
+		}
+		
+		uint secsize = internal.import_section.SizeOfRawData;
+		uint secoffs = internal.import_section.PointerToRawData;
+		
+		// Get file offset of import descriptors
+		uint offset = adbg_object_pe_directory_offset_section(internal.import_section, internal.directory.ImportTable.rva);
+		
+		//TODO: Check if section already loaded
+		//      While Load Config and TLS tables might be in the same section,
+		//      they also could not be. So let's just hope this fuckery is only for imports.
+		// Load the section because import table only contains descriptors
+		internal.import_buffer = malloc(secsize);
+		if (internal.import_buffer == null) {
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		if (adbg_object_read_at(o, secoffs, internal.import_buffer, secsize)) {
+			free(internal.import_buffer);
+			return null;
+		}
+		
+		// Adjust offset to point from base of section to import descritor tables
+		internal.import_directory = cast(pe_import_descriptor_t*)(internal.import_buffer + (offset - secoffs));
+		if (adbg_bits_ptr_outside(internal.import_directory, internal.import_buffer, secsize)) {
+			free(internal.import_buffer);
+			adbg_oops(AdbgError.offsetBounds);
 			return null;
 		}
 	}
 	
-	PE_IMPORT_DESCRIPTOR* import_ = o.i.pe.directory_imports + index;
+	// Select descriptor
+	pe_import_descriptor_t *import_ = internal.import_directory + index;
+	if (adbg_bits_ptr_outside(import_, internal.import_buffer, internal.import_section.SizeOfRawData)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
 	if (import_.Characteristics == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	if (o.p.reversed && o.i.pe.reversed_dir_imports[index] == false) with (import_) {
+	
+	/*if (o.status & AdbgObjectInternalFlags.reversed && internal.r_import_desc[index] == false) with (import_) {
 		Characteristics	= adbg_bswap32(Characteristics);
 		TimeDateStamp	= adbg_bswap32(TimeDateStamp);
 		ForwarderChain	= adbg_bswap32(ForwarderChain);
 		Name	= adbg_bswap32(Name);
 		FirstThunk	= adbg_bswap32(FirstThunk);
-		o.i.pe.reversed_dir_imports[index] = true;
-	}
+		internal.r_import_desc[index] = true;
+	}*/
+	
 	return import_;
 }
 
-char* adbg_object_pe_import_name(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_) {
+// get module name out of import descriptor
+const(char)* adbg_object_pe_import_module_name(adbg_object_t *o, pe_import_descriptor_t *import_) {
 	if (o == null || import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.pe.directory == null) {
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
-	char *s = cast(char*)o.i.pe.directory_imports -
-		o.i.pe.directory.ImportTable.rva + import_.Name;
-	if (adbg_object_outboundp(o, s)) {
+	void* name = cast(void*)internal.import_directory -
+		internal.directory.ImportTable.rva +
+		import_.Name;
+	with (internal)
+	if (adbg_bits_ptr_outside(name, import_buffer, import_section.SizeOfRawData)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
-	return s;
+	return cast(const(char)*)name;
 }
 
 //TODO: Byte-swap import look-up table entries
 
-PE_IMPORT_ENTRY32* adbg_object_pe_import_entry32(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
+pe_import_entry32_t* adbg_object_pe_import_entry32(adbg_object_t *o, pe_import_descriptor_t *import_, size_t index) {
 	if (o == null || import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.pe.directory_imports == null) {
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
-	PE_IMPORT_ENTRY32* lte32 = cast(PE_IMPORT_ENTRY32*)
-		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
-		+ index;
-	if (adbg_object_outboundp(o, lte32) || lte32.ordinal == 0) {
+	pe_import_entry32_t* entry = cast(pe_import_entry32_t*)(
+		cast(void*)internal.import_directory +
+		(import_.Characteristics - internal.directory.ImportTable.rva)) +
+		index;
+	with (internal)
+	if (adbg_bits_ptr_outside(entry, import_buffer, import_section.SizeOfRawData)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
-	return lte32;
+	//TODO: Swap import entry
+	/*if (o.status & AdbgObjectInternalFlags.reversed && internal.r_import_entries[index] == false) {
+		entry.ordinal = adbg_bswap32(entry.ordinal);
+		internal.r_import_entries[index] = true;
+	}*/
+	
+	// Not supported
+	if (entry.ordinal == 0) {
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+	
+	return entry;
 }
 
-ushort* adbg_object_pe_import_entry32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_ENTRY32 *im32) {
+/*ushort* adbg_object_pe_import_entry32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_ENTRY32 *im32) {
 	if (o == null || import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.pe.directory_imports == null) {
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
-	ushort* base = cast(ushort*)
-		((cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva) + im32.rva);
-	if (adbg_object_outboundp(o, base)) {
+	void* base =
+		internal.import_directory -
+		internal.directory.ImportTable.rva +
+		im32.rva;
+	with (internal)
+	if (adbg_bits_ptr_outside(entry, import_buffer, import_section.SizeOfRawData)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
-	return base;
-}
+	return cast(ushort*)base;
+}*/
 
-PE_IMPORT_ENTRY64* adbg_object_pe_import_entry64(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
+pe_import_entry64_t* adbg_object_pe_import_entry64(adbg_object_t *o, pe_import_descriptor_t *import_, size_t index) {
 	if (o == null || import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.pe.directory_imports == null) {
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
-	PE_IMPORT_ENTRY64* lte64 = cast(PE_IMPORT_ENTRY64*)
-		(cast(char*)o.i.pe.directory_imports + (import_.Characteristics - o.i.pe.directory.ImportTable.rva))
-		+ index;
-	
-	version (Trace) trace("imports=%p lte64=%p fs=%zx", o.i.pe.directory_imports, lte64, o.file_size);
-	
-	if (adbg_object_outboundp(o, lte64) || lte64.ordinal == 0) {
+	pe_import_entry64_t* entry = cast(pe_import_entry64_t*)(
+		cast(void*)internal.import_directory +
+		(import_.Characteristics - internal.directory.ImportTable.rva)) +
+		index;
+	with (internal)
+	if (adbg_bits_ptr_outside(entry, import_buffer, import_section.SizeOfRawData)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
-	return lte64;
+	//TODO: Swap import entry
+	
+	// Not supported
+	if (entry.ordinal == 0) {
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+	
+	return entry;
 }
 
-ushort* adbg_object_pe_import_entry64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_ENTRY64 *im64) {
+/*ushort* adbg_object_pe_import_entry64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_ENTRY64 *im64) {
 	if (o == null || import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -1371,59 +1694,274 @@ ushort* adbg_object_pe_import_entry64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTO
 	}
 	
 	return base;
-}
+}*/
 
-// Import Directory Table -1,*-> lookup tables -1,1-> hint
-// Helper function
-/+const(char)* adbg_object_pe_import_string_entry(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, size_t index) {
-	if (o == null || import_ == null) return null;
-	if (o.i.pe.directory_imports == null) return null;
-	
-	
-	switch (o.i.pe.opt_header.Magic) {
-	case PE_FMT_32:
-		PE_IMPORT_LTE32 *t32 = adbg_object_pe_import_lte32(o, import_, index);
-		if (t32 == null) return null;
-		return;
-	case PE_FMT_64:
-		return;
-	default:
+// Classless functions
+// TODO: Optimize these, maybe cache the last result in internals
+
+void* adbg_object_pe_import_entry(adbg_object_t *o, pe_import_descriptor_t *import_, size_t index) {
+	if (o == null || import_ == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-}+/
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	switch (internal.optheader.Magic) {
+	case PE_CLASS_32:
+		return adbg_object_pe_import_entry32(o, import_, index);
+	case PE_CLASS_64:
+		return adbg_object_pe_import_entry64(o, import_, index);
+	default:
+		adbg_oops(AdbgError.objectInvalidClass);
+		return null;
+	}
+}
 
+uint adbg_object_pe_import_entry_rva(adbg_object_t *o, pe_import_descriptor_t *import_, void *entry) {
+	if (o == null || import_ == null || entry == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
+		return 0;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
+		adbg_oops(AdbgError.unavailable);
+		return 0;
+	}
+	
+	switch (internal.optheader.Magic) {
+	case PE_CLASS_32:
+		return (cast(pe_import_entry32_t*)entry).rva;
+	case PE_CLASS_64:
+		return (cast(pe_import_entry64_t*)entry).rva;
+	default:
+		adbg_oops(AdbgError.objectInvalidClass);
+		return 0;
+	}
+}
+
+ushort adbg_object_pe_import_entry_hint(adbg_object_t *o, pe_import_descriptor_t *import_, void *entry) {
+	if (o == null || import_ == null || entry == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
+		return 0;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
+		adbg_oops(AdbgError.unavailable);
+		return 0;
+	}
+	
+	ushort *hint = void;
+	switch (internal.optheader.Magic) {
+	case PE_CLASS_32:
+		pe_import_entry32_t *entry32 = cast(pe_import_entry32_t*)entry;
+		
+		// By ordinal
+		if (entry32.ordinal >= 0x8000_0000) {
+			adbg_oops(AdbgError.unavailable);
+			return 0;
+		}
+		
+		// By RVA
+		hint = cast(ushort*)(
+			cast(void*)internal.import_directory -
+			internal.directory.ImportTable.rva +
+			entry32.rva);
+		break;
+	case PE_CLASS_64:
+		pe_import_entry64_t *entry64 = cast(pe_import_entry64_t*)entry;
+		
+		// By ordinal
+		if (entry64.ordinal >= 0x8000_0000) {
+			adbg_oops(AdbgError.unavailable);
+			return 0;
+		}
+		
+		// By RVA
+		hint = cast(ushort*)(
+			cast(void*)internal.import_directory -
+			internal.directory.ImportTable.rva +
+			entry64.rva);
+		break;
+	default:
+		adbg_oops(AdbgError.objectInvalidClass);
+		return 0;
+	}
+	
+	with (internal)
+	if (adbg_bits_ptr_outside(hint, import_buffer, import_section.SizeOfRawData)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return 0;
+	}
+	
+	return *hint;
+}
+
+const(char)* adbg_object_pe_import_entry_string(adbg_object_t *o, pe_import_descriptor_t *import_, void *entry) {
+	if (o == null || import_ == null || entry == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	ushort *hint = void;
+	switch (internal.optheader.Magic) {
+	case PE_CLASS_32:
+		pe_import_entry32_t *entry32 = cast(pe_import_entry32_t*)entry;
+		
+		// By ordinal
+		if (entry32.ordinal >= 0x8000_0000) {
+			adbg_oops(AdbgError.unavailable);
+			return null;
+		}
+		
+		// By RVA
+		hint = cast(ushort*)(
+			cast(void*)internal.import_directory -
+			internal.directory.ImportTable.rva +
+			entry32.rva);
+		break;
+	case PE_CLASS_64:
+		pe_import_entry64_t *entry64 = cast(pe_import_entry64_t*)entry;
+		
+		// By ordinal
+		if (entry64.ordinal >= 0x8000_0000_0000_0000L) {
+			adbg_oops(AdbgError.unavailable);
+			return null;
+		}
+		
+		// By RVA
+		hint = cast(ushort*)(
+			cast(void*)internal.import_directory -
+			internal.directory.ImportTable.rva +
+			entry64.rva);
+		break;
+	default:
+		adbg_oops(AdbgError.objectInvalidClass);
+		return null;
+	}
+	
+	hint++;
+	
+	with (internal)
+	if (adbg_bits_ptr_outside(hint, import_buffer, import_section.SizeOfRawData)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
+	
+	return cast(const(char)*)hint;
+}
 //
 // Debug directory functions
 //
 
-PE_DEBUG_DIRECTORY* adbg_object_pe_debug_directory(adbg_object_t *o, size_t index) {
+pe_debug_directory_entry_t* adbg_object_pe_debug_directory(adbg_object_t *o, size_t index) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.pe.directory == null) {
-		adbg_oops(AdbgError.unavailable); // Due to PE-ROM
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
 		return null;
 	}
-	size_t count = o.i.pe.directory.DebugDirectory.size / PE_DEBUG_DIRECTORY.sizeof;
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.DebugDirectory.size == 0) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	size_t count = internal.directory.DebugDirectory.size / PE_DEBUG_DIRECTORY.sizeof;
 	if (index >= count) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	// Set base
-	if (o.i.pe.directory_debug == null) {
-		o.i.pe.directory_debug = cast(PE_DEBUG_DIRECTORY*)
-			adbg_object_pe_locate(o, o.i.pe.directory.DebugDirectory.rva);
-		// Not found
-		if (o.i.pe.directory_debug == null) {
+	// Load debug directory
+	if (internal.debug_directory == null) {
+		// Same as imports, load the section
+		internal.debug_section = adbg_object_pe_directory_section(o, internal.directory.DebugDirectory.rva);
+		if (internal.debug_section == null) {
 			adbg_oops(AdbgError.unavailable);
+			return null;
+		}
+		
+		uint secsize = internal.debug_section.SizeOfRawData;
+		uint secoffs = internal.debug_section.PointerToRawData;
+		
+		// Get file offset of debug descriptors
+		uint offset = adbg_object_pe_directory_offset_section(internal.debug_section, internal.directory.DebugDirectory.rva);
+		
+		version (Trace) trace("ssize=%u soff=%u off=%u", secsize, secoffs, offset);
+		
+		// Load the section because debug table only contains descriptors
+		internal.debug_buffer = malloc(secsize);
+		if (internal.debug_buffer == null) {
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		if (adbg_object_read_at(o, secoffs, internal.debug_buffer, secsize)) {
+			free(internal.debug_buffer);
+			return null;
+		}
+		
+		// Adjust offset to point from base of section to import descritor tables
+		internal.debug_directory =
+			cast(pe_debug_directory_entry_t*)(cast(void*)internal.debug_buffer + (offset - secoffs));
+		if (adbg_bits_ptr_outside(internal.debug_directory, internal.debug_buffer, secsize)) {
+			free(internal.debug_buffer);
+			adbg_oops(AdbgError.offsetBounds);
+			return null;
+		}
+		
+		// Allocate reverse status bools
+		internal.r_debug_entries = cast(bool*)malloc(count);
+		if (internal.r_debug_entries == null) {
+			free(internal.debug_buffer);
+			adbg_oops(AdbgError.crt);
 			return null;
 		}
 	}
 	
-	PE_DEBUG_DIRECTORY* debug_ = o.i.pe.directory_debug + index;
-	if (o.p.reversed && o.i.pe.reversed_dir_debug[index] == false) with (debug_) {
+	// Select directory entry
+	pe_debug_directory_entry_t *debug_ = internal.debug_directory + index;
+	if (adbg_bits_ptr_outside(debug_, internal.debug_buffer, internal.debug_section.SizeOfRawData)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
+	
+	if (o.status & AdbgObjectInternalFlags.reversed && internal.r_debug_entries[index] == false) with (debug_) {
 		Characteristics	= adbg_bswap32(Characteristics);
 		TimeDateStamp	= adbg_bswap32(TimeDateStamp);
 		MajorVersion	= adbg_bswap16(MajorVersion);
@@ -1432,17 +1970,58 @@ PE_DEBUG_DIRECTORY* adbg_object_pe_debug_directory(adbg_object_t *o, size_t inde
 		SizeOfData	= adbg_bswap32(SizeOfData);
 		AddressOfRawData	= adbg_bswap32(AddressOfRawData);
 		PointerToRawData	= adbg_bswap32(PointerToRawData);
-		o.i.pe.reversed_dir_debug[index] = true;
+		internal.r_debug_entries[index] = true;
 	}
 	return debug_;
+}
+
+void* adbg_object_pe_debug_directory_data(adbg_object_t *o, pe_debug_directory_entry_t *entry) {
+	if (o == null || entry == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.DebugDirectory.size == 0) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	//TODO: Type size checking (minimum fulfillment)?
+	void* data = malloc(entry.SizeOfData);
+	if (data == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	if (adbg_object_read_at(o, entry.PointerToRawData, data, entry.SizeOfData))
+		return null;
+	
+	return data;
+}
+void adbg_object_pe_debug_directory_data_close(void* entry) {
+	if (entry) free(entry);
 }
 
 //
 // Other helpers
 //
 
-AdbgMachine adbg_object_pe_machine(ushort machine) {
-	switch (machine) {
+AdbgMachine adbg_object_pe_machine(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return AdbgMachine.unknown;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return AdbgMachine.unknown;
+	}
+	pe_header_t* header = cast(pe_header_t*)o.internal;
+	switch (header.Machine) {
 	case PE_MACHINE_I386:	return AdbgMachine.i386;
 	case PE_MACHINE_AMD64:	return AdbgMachine.amd64;
 	case PE_MACHINE_ALPHAOLD, PE_MACHINE_ALPHA:	return AdbgMachine.alpha;
@@ -1478,9 +2057,8 @@ AdbgMachine adbg_object_pe_machine(ushort machine) {
 	}
 }
 
-const(char) *adbg_object_pe_machine_string(ushort machine) {
-	switch (machine) {
-	case PE_MACHINE_UNKNOWN:	return "None";
+const(char)* adbg_object_pe_machine_value_string(ushort Machine) {
+	switch (Machine) {
 	case PE_MACHINE_ALPHA:	return "DEC Alpha";
 	case PE_MACHINE_ALPHA64:	return "DEC Alpha (64-bit)";
 	case PE_MACHINE_AM33:	return "Mitsubishi MN10300 (AM33)";
@@ -1512,20 +2090,62 @@ const(char) *adbg_object_pe_machine_string(ushort machine) {
 	case PE_MACHINE_THUMB:	return "ARM Thumb";
 	case PE_MACHINE_WCEMIPSV2:	return "MIPS little-endian WCE v2";
 	case PE_MACHINE_CLR:	return "Common Language Runtime";
-	default:	return null;
+	default:
+		adbg_oops(AdbgError.objectInvalidMachine);
+		return null;
 	}
 }
 
-const(char) *adbg_object_pe_magic_string(ushort magic) {
-	switch (magic) {
-	case PE_FMT_32:	return "PE32";
-	case PE_FMT_64:	return "PE32+";
-	case PE_FMT_ROM:	return "PE-ROM";
-	default:	return null;
+const(char)* adbg_object_pe_machine_string(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	return adbg_object_pe_machine_value_string((cast(pe_header_t*)o.internal).Machine);
+}
+
+const(char)* adbg_object_pe_magic_string(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	pe_optional_header_t* opthdr = &(cast(internal_pe_t*)o.internal).optheader;
+	switch (opthdr.Magic) {
+	case PE_CLASS_32:	return "PE32";
+	case PE_CLASS_64:	return "PE32+";
+	case PE_CLASS_ROM:	return "PE-ROM";
+	default:
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
 	}
 }
 
-const(char) *adbg_object_pe_subsys_string(ushort subsystem) {
+const(char)* adbg_object_pe_subsys_string(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	pe_optional_header_t* opthdr = &(cast(internal_pe_t*)o.internal).optheader;
+	ushort subsystem = void;
+	switch (opthdr.Magic) {
+	case PE_CLASS_32: subsystem = opthdr.Subsystem; break;
+	case PE_CLASS_64: subsystem = (cast(pe_optional_header64_t*)opthdr).Subsystem; break;
+	default:
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 	switch (subsystem) {
 	case PE_SUBSYSTEM_NATIVE:	return "Native";
 	case PE_SUBSYSTEM_WINDOWS_GUI:	return "Windows GUI";
@@ -1540,11 +2160,13 @@ const(char) *adbg_object_pe_subsys_string(ushort subsystem) {
 	case PE_SUBSYSTEM_XBOX:	return "XBOX";
 	case PE_SUBSYSTEM_WINDOWS_BOOT_APPLICATION:	return "Windows Boot";
 	case PE_SUBSYSTEM_XBOX_CODE_CATALOG:	return "XBOX Code Catalog";
-	default:	return null;
+	default:
+		adbg_oops(AdbgError.objectInvalidType);
+		return null;
 	}
 }
 
-const(char) *adbg_object_pe_debug_type_string(uint type) {
+const(char)* adbg_object_pe_debug_type_string(uint type) {
 	switch (type) {
 	case PE_IMAGE_DEBUG_TYPE_UNKNOWN:	return "Unknown";
 	case PE_IMAGE_DEBUG_TYPE_COFF:	return "COFF";
@@ -1571,30 +2193,17 @@ const(char) *adbg_object_pe_debug_type_string(uint type) {
 	}
 }
 
+const(char)* adbg_object_pe_kind_string(adbg_object_t *o) {
+	if (o == null) return null;
+	if (o.internal == null) return null;
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	return internal.header.Characteristics & PE_CHARACTERISTIC_DLL ?
+		`Dynamically Linked Library` : `Executable`;
+}
+
 private:
 
-// Rough guesses for OS limits, offsets+4 since missing Size (already read)
-// If the count is still misleading, the size check will be performed by field
-//TODO: Shouldn't this depend more or less on the linker version?
-// Examples:
-// putty-x86 0.73: 92
-// putty-amd64 0.73: 148
-enum PE_LOAD_CONFIG32_LIMIT_XP = 64;
-enum PE_LOAD_CONFIG32_LIMIT_7 = PE_LOAD_CONFIG_DIR32.GuardFlags.offsetof + 4;
-enum PE_LOAD_CONFIG32_LIMIT_8 = PE_LOAD_CONFIG_DIR32.GuardLongJumpTargetCount.offsetof + 4;
-enum PE_LOAD_CONFIG64_LIMIT_XP = PE_LOAD_CONFIG_DIR64.SecurityCookie.offsetof + 4;
-enum PE_LOAD_CONFIG64_LIMIT_7 = PE_LOAD_CONFIG_DIR64.GuardFlags.offsetof + 4;
-enum PE_LOAD_CONFIG64_LIMIT_8 = PE_LOAD_CONFIG_DIR64.GuardLongJumpTargetCount.offsetof + 4;
-
-enum int PE_DIRECTORY_SIZE = PE_IMAGE_DATA_DIRECTORY.sizeof;
-enum int PE_OHDR_SIZE = PE_OPTIONAL_HEADER.sizeof + PE_DIRECTORY_SIZE; // PE32
-enum int PE_OHDR64_SIZE = PE_OPTIONAL_HEADER64.sizeof + PE_DIRECTORY_SIZE; // PE32+
-enum int PE_OHDRROM_SIZE = PE_OPTIONAL_HEADERROM.sizeof + PE_DIRECTORY_SIZE; // PE-ROM
-
-enum PE_OFFSET_OPTHDR        = PE_HEADER.sizeof;
-enum PE_OFFSET_DIR_OPTHDR32  = PE_OFFSET_OPTHDR + PE_OPTIONAL_HEADER.sizeof;
-enum PE_OFFSET_DIR_OPTHDR64  = PE_OFFSET_OPTHDR + PE_OPTIONAL_HEADER64.sizeof;
-enum PE_OFFSET_DIR_OPTHDRROM = PE_OFFSET_OPTHDR + PE_OPTIONAL_HEADERROM.sizeof;
-enum PE_OFFSET_SEC_OPTHDR32  = PE_OFFSET_DIR_OPTHDR32 + PE_IMAGE_DATA_DIRECTORY.sizeof;
-enum PE_OFFSET_SEC_OPTHDR64  = PE_OFFSET_DIR_OPTHDR64 + PE_IMAGE_DATA_DIRECTORY.sizeof;
-enum PE_OFFSET_SEC_OPTHDRROM = PE_OFFSET_DIR_OPTHDRROM + PE_IMAGE_DATA_DIRECTORY.sizeof;
+//TODO: Map linker version with load configuration sizes
+// Exec        Version   Size
+// putty-x86      0.73     92
+// putty-amd64    0.73    148

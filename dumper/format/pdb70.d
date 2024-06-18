@@ -1,5 +1,10 @@
 /// PDB 7.00 dumper
 ///
+/// Sources:
+/// - https://github.com/Microsoft/microsoft-pdb/
+/// - http://www.godevtool.com/Other/pdb.htm
+/// - http://www.debuginfo.com/articles/debuginfomatch.html
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -9,7 +14,7 @@ import adbg.disassembler;
 import adbg.object.server;
 import adbg.machines;
 import adbg.object.format.pdb;
-import adbg.object.format.pe : adbg_object_pe_machine_string;
+import adbg.object.format.pe : adbg_object_pe_machine_value_string;
 import adbg.utils.uid;
 import adbg.utils.date;
 import adbg.include.c.stdio : printf, snprintf, putchar;
@@ -231,7 +236,7 @@ void dump_pdb70_debug(adbg_object_t *o) {
 			"PrivateSymbolsStripped".ptr,	PdbRaw_DbiFlags.PrivateSymbolsStripped,
 			"ConflictingTypes".ptr,	PdbRaw_DbiFlags.ConflictingTypes,
 			null);
-		print_x16("Machine", dbi.Machine, adbg_object_pe_machine_string(dbi.Machine));
+		print_x16("Machine", dbi.Machine, adbg_object_pe_machine_value_string(dbi.Machine));
 		print_u32("Padding", dbi.Padding);
 		
 		/*void *leftover = buffer + pdb70_dbi_header.sizeof;
