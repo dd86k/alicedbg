@@ -39,6 +39,7 @@ immutable option_t[] options = [
 	option_t('H', "headers",      "Dump object's headers", &cliopt_headers),
 	option_t('S', "sections",     "Dump object's sections", &cliopt_sections),
 	option_t(0,   "section",      "Dump object's section by name", &cliopt_section),
+	option_t(0,   "segments",     "Dump object's segments", &cliopt_segments),
 	option_t('I', "imports",      "Dump object's import information", &cliopt_imports),
 	option_t('E', "exports",      "Dump object's export information", &cliopt_exports),
 //	option_t(0,   "loadcfg",      "Dump object's load configuration", &cliopt_loadcfg),
@@ -79,6 +80,10 @@ int cliopt_section(const(char) *val) {
 }
 int cliopt_sections() {
 	opt_selected |= Select.sections;
+	return 0;
+}
+int cliopt_segments() {
+	opt_selected |= Select.segments;
 	return 0;
 }
 int cliopt_imports() {

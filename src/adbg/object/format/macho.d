@@ -10,6 +10,14 @@
 /// License: BSD-3-Clause-Clear
 module adbg.object.format.macho;
 
+// NOTE: Layout
+//       Header
+//       Load Commands (one or more)
+//         Segment (zero or one) (for LC_SEGMENT)
+//           Section (zero or more)
+//
+// Debug info in LC_DYSYMTAB
+
 import adbg.error;
 import adbg.object.server;
 import adbg.machines : AdbgMachine;
@@ -28,66 +36,6 @@ enum MACHO_CIGAM	= 0xCEFAEDFEu; /// Mach-O LE 32-bit magic
 enum MACHO_CIGAM64	= 0xCFFAEDFEu; /// Mach-O LE 64-bit magic
 enum MACHO_FATMAGIC	= 0xCAFEBABEu; /// Mach-O FAT BE magic
 enum MACHO_FATCIGAM	= 0xBEBAFECAu; /// Mach-O FAT LE magic
-
-// 64-bit version just adds a 32-bit reserved field at the end.
-struct macho_header_t {
-	uint magic;      /// Mach magic number identifier
-	uint cputype;    /// Cpu specifier
-	uint subtype;    /// Machine specifier
-	uint filetype;   /// Type of file
-	uint ncmds;      /// Number of load commands
-	uint sizeofcmds; /// The size of all the load commands
-	uint flags;      /// Flags
-	// NOTE: 64-bit header has an extra uint field, but it's reserved
-}
-
-struct macho_fat_header_t {
-	uint magic;     /// Magic
-	uint nfat_arch; /// Number of architectures (structs) in binary
-}
-
-struct macho_fat_arch_entry_t {
-	uint cputype;    /// 
-	uint subtype;    /// 
-	uint offset;     /// File offset to first segment or command?
-	uint size;       /// Segments size?
-	uint alignment;  /// Page alignment?
-}
-
-struct macho_load_command_t {
-	uint cmd;	/// type of load command
-	uint cmdsize;	/// total size of command in bytes
-}
-
-alias int vm_prot_t;
-
-struct macho_segment_command_t { /* for 32-bit architectures */
-	uint      cmd;	/// LC_SEGMENT
-	uint      cmdsize;	/// includes sizeof section structs
-	char[16]  segname;	/// segment name
-	uint      vmaddr;	/// memory address of this segment
-	uint      vmsize;	/// memory size of this segment
-	uint      fileoff;	/// file offset of this segment
-	uint      filesize;	/// amount to map from the file
-	vm_prot_t maxprot;	/// maximum VM protection
-	vm_prot_t initprot;	/// initial VM protection
-	uint      nsects;	/// number of sections in segment
-	uint      flags;	/// flags
-}
-
-struct macho_segment_command_64_t { /* for 64-bit architectures */
-	uint      cmd;	/// LC_SEGMENT_64
-	uint      cmdsize;	/// includes sizeof section_64 structs
-	char[16]  segname;	/// segment name
-	ulong     vmaddr;	/// memory address of this segment
-	ulong     vmsize;	/// memory size of this segment
-	ulong     fileoff;	/// file offset of this segment
-	ulong     filesize;	/// amount to map from the file
-	vm_prot_t maxprot;	/// maximum VM protection
-	vm_prot_t initprot;	/// initial VM protection
-	uint      nsects;	/// number of sections in segment
-	uint      flags;	/// flags
-}
 
 alias cpu_type_t = int;
 enum {
@@ -385,6 +333,70 @@ enum {
 	MACHO_LC_LINKER_OPTION	= 0x2D,	/// linker options in MH_OBJECT files
 	MACHO_LC_LINKER_OPTIMIZATION_HINT	= 0x2e,	/// Optimization hints in MH_OBJECT files
 	MACHO_LC_VERSION_MIN_WATCHOS	= 0x30,	/// Build for Watch min OS version
+}
+
+// 64-bit version just adds a 32-bit reserved field at the end.
+struct macho_header_t {
+	uint magic;      /// Mach magic number identifier
+	uint cputype;    /// Cpu specifier
+	uint subtype;    /// Machine specifier
+	uint filetype;   /// Type of file
+	uint ncmds;      /// Number of load commands
+	uint sizeofcmds; /// The size of all the load commands
+	uint flags;      /// Flags
+	// NOTE: 64-bit header has an extra uint field, but it's reserved
+}
+
+struct macho_fat_header_t {
+	uint magic;     /// Magic
+	uint nfat_arch; /// Number of architectures (structs) in binary
+}
+
+struct macho_fat_arch_entry_t {
+	uint cputype;    /// 
+	uint subtype;    /// 
+	uint offset;     /// File offset to first segment or command?
+	uint size;       /// Segments size?
+	uint alignment;  /// Page alignment?
+}
+
+struct macho_load_command_t {
+	uint cmd;	/// type of load command
+	uint cmdsize;	/// total size of command in bytes
+}
+
+// NOTE: Mach-O structure
+//       A load command can lead to a segment command.
+//       A segment command can contain multiple sections.
+
+alias int vm_prot_t;
+
+struct macho_segment_command_t { /* for 32-bit architectures */
+	uint      cmd;	/// LC_SEGMENT
+	uint      cmdsize;	/// includes sizeof section structs
+	char[16]  segname;	/// segment name
+	uint      vmaddr;	/// memory address of this segment
+	uint      vmsize;	/// memory size of this segment
+	uint      fileoff;	/// file offset of this segment
+	uint      filesize;	/// amount to map from the file
+	vm_prot_t maxprot;	/// maximum VM protection
+	vm_prot_t initprot;	/// initial VM protection
+	uint      nsects;	/// number of sections in segment
+	uint      flags;	/// flags
+}
+
+struct macho_segment_command_64_t { /* for 64-bit architectures */
+	uint      cmd;	/// LC_SEGMENT_64
+	uint      cmdsize;	/// includes sizeof section_64 structs
+	char[16]  segname;	/// segment name
+	ulong     vmaddr;	/// memory address of this segment
+	ulong     vmsize;	/// memory size of this segment
+	ulong     fileoff;	/// file offset of this segment
+	ulong     filesize;	/// amount to map from the file
+	vm_prot_t maxprot;	/// maximum VM protection
+	vm_prot_t initprot;	/// initial VM protection
+	uint      nsects;	/// number of sections in segment
+	uint      flags;	/// flags
 }
 
 private

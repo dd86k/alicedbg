@@ -31,19 +31,24 @@ extern (C):
 __gshared:
 
 enum Select {
+	/// Headers, program headers
 	headers	= BIT!0,
 	/// Sections
 	sections	= BIT!1,
+	/// Segments
+	segments	= BIT!2,
+	
 	/// Relocations
-	relocs	= BIT!2,
+	relocs	= BIT!4,
+	
 	/// Exported/dynamic symbols
-	exports	= BIT!3,
+	exports	= BIT!8,
 	/// Import symbols
-	imports	= BIT!4,
+	imports	= BIT!9,
 	/// Resources
-	rsrc	= BIT!5,
+	rsrc	= BIT!10,
 	/// Debug info
-	debug_	= BIT!6,
+	debug_	= BIT!11,
 	
 	// Source
 //	source	= 

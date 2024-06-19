@@ -14,6 +14,8 @@ int dump_macho(adbg_object_t *o) {
 	if (SELECTED(Select.headers))
 		adbg_object_macho_is_fat(o) ?
 			dump_macho_header_fat(o) : dump_macho_header_regular(o);
+	if (SELECTED(Select.segments))
+		dump_macho_segments(o);
 	
 	return 0;
 }
@@ -41,6 +43,7 @@ void dump_macho_header_fat(adbg_object_t *o) {
 		print_x32("alignment", alignment);
 	}
 }
+
 void dump_macho_header_regular(adbg_object_t *o) {
 	print_header("Header");
 	
@@ -82,13 +85,46 @@ void dump_macho_header_regular(adbg_object_t *o) {
 		"APP_EXTENSION_SAFE".ptr,	MACHO_FLAG_APP_EXTENSION_SAFE,
 		null);
 	}
-	
-	print_header("Load commands");
+}
+
+void dump_macho_segments(adbg_object_t *o) {
+	// NOTE: These are load commands but using segments for all of them
+	//       just makes naming shorter and simpler
+	print_header("Segments");
 	
 	size_t i;
 	macho_load_command_t *command = void;
 	while ((command = adbg_object_macho_load_command(o, i++)) != null) with (command) {
+		print_section(cast(uint)i);
 		print_x32("cmd", cmd, SAFEVAL(adbg_object_macho_command_string(cmd)));
 		print_x32("cmdsize", cmdsize);
+		
+		switch (cmd) {
+		case MACHO_LC_SEGMENT:
+			macho_segment_command_t *seg = cast(macho_segment_command_t*)command;
+			print_stringl("segname", seg.segname.ptr, cast(uint)seg.segname.sizeof);
+			print_x32("vmaddr", seg.vmaddr);
+			print_x32("vmsize", seg.vmsize);
+			print_x32("fileoff", seg.fileoff);
+			print_x32("filesize", seg.filesize);
+			print_u32("maxprot", seg.maxprot);
+			print_u32("initprot", seg.initprot);
+			print_u32("nsects", seg.nsects);
+			print_x32("flags", seg.flags);
+			continue;
+		case MACHO_LC_SEGMENT_64:
+			macho_segment_command_64_t *seg = cast(macho_segment_command_64_t*)command;
+			print_stringl("segname", seg.segname.ptr, cast(uint)seg.segname.sizeof);
+			print_x64("vmaddr", seg.vmaddr);
+			print_x64("vmsize", seg.vmsize);
+			print_x64("fileoff", seg.fileoff);
+			print_x64("filesize", seg.filesize);
+			print_u32("maxprot", seg.maxprot);
+			print_u32("initprot", seg.initprot);
+			print_u32("nsects", seg.nsects);
+			print_x32("flags", seg.flags);
+			continue;
+		default: continue;
+		}
 	}
 }
