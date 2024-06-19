@@ -233,10 +233,9 @@ int adbg_error_system() {
 /// 	l = Automatically set to `__LINE__`.
 /// 	f = Automatically set to `__FUNCTION__`.
 /// Returns: Error code
-int adbg_oops(AdbgError e, void *extra = null,
-	string m = __MODULE__, int l = __LINE__, const(char)* f = __FUNCTION__.ptr) {
-	version (Trace) trace("code=%d res=%p caller=%s:%d", e, extra, f, l);
-	error.mod = m.ptr;
+int adbg_oops(AdbgError e, void *extra = null, const(char)* m = __MODULE__.ptr, int l = __LINE__) {
+	version (Trace) trace("code=%d res=%p caller=%s@%d", e, extra, m, l);
+	error.mod = m;
 	error.line = l;
 	error.handle = extra;
 	return error.code = e;
@@ -266,6 +265,7 @@ int adbg_errno_extern() {
 }
 
 /// Obtain an error message with code.
+/// Params: code = Error code.
 /// Returns: Error message.
 export
 const(char)* adbg_error_msg(int code) {
@@ -305,7 +305,7 @@ version (Trace) {
 		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
 			va_list va;
 			va_start(va, fmt);
-			printf("TRACE:%s:%u: ", func.ptr, line);
+			printf("TRACE:%s@%u: ", func.ptr, line);
 			vprintf(fmt, va);
 			putchar('\n');
 		}
@@ -314,7 +314,7 @@ version (Trace) {
 		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
 			va_list va;
 			va_start(va, fmt);
-			printf("TRACE:%s:%u: ", func.ptr, line);
+			printf("TRACE:%s@%u: ", func.ptr, line);
 			vprintf(fmt, va);
 			putchar('\n');
 		}

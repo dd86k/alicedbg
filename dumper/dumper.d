@@ -111,7 +111,8 @@ int dump(const(char)* path) {
 	}
 	
 	// hotfix when section name specifed, force select all sections
-	opt_settings |= Setting.disasmAll;
+	if (opt_section_name)
+		opt_settings |= Setting.disasmAll;
 	
 	adbg_object_t *o = adbg_object_open_file(path, 0);
 	if (o == null)

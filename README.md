@@ -1,7 +1,6 @@
 # Alice Debugger Project
 
-Aiming to be a simple cross-platform framework for debugging, and object and
-symbol handling.
+Aiming to be a simple cross-platform framework for debugging and object inspection.
 
 Fully written in D's [BetterC mode](https://dlang.org/spec/betterc.html),
 and available as a DUB package.
