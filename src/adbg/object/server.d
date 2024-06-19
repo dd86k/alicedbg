@@ -170,6 +170,7 @@ struct adbg_object_t {
 	// Old alias
 	alias format = type;
 	
+	// NOTE: Sub modules are free to use upper 16 bits
 	/// Internal status flags. (e.g., swapping required)
 	int status;
 	
@@ -205,42 +206,13 @@ struct adbg_object_t {
 		// Main header. All object files have some form of header.
 		void *header;
 		
-		struct pe_t {
-			// Headers
-			PE_HEADER *header;
-			union {
-				PE_OPTIONAL_HEADER *opt_header;
-				PE_OPTIONAL_HEADER64 *opt_header64;
-				PE_OPTIONAL_HEADERROM *opt_headerrom;
-			}
-			// Directories
-			PE_IMAGE_DATA_DIRECTORY *directory;
-			PE_EXPORT_DESCRIPTOR *directory_exports;
-			PE_IMPORT_DESCRIPTOR *directory_imports;
-			PE_DEBUG_DIRECTORY *directory_debug;
-			union {
-				PE_LOAD_CONFIG_DIR32 *load_config32;
-				PE_LOAD_CONFIG_DIR64 *load_config64;
-			}
-			// Data
-			PE_SECTION_ENTRY *sections;
-			
-			bool *reversed_sections;
-			bool *reversed_dir_export_entries;
-			bool *reversed_dir_imports;
-			bool *reversed_dir_debug;
-			
-			bool reversed_dir_exports;
-		}
-		pe_t pe;
-		
 		struct macho_t {
 			union {
-				macho_header *header;
-				macho_fatmach_header *fat_header;
+				macho_header_t *header;
+				macho_fat_header_t *fat_header;
 			}
-			macho_fat_arch *fat_arch;
-			macho_load_command *commands;
+			macho_fat_arch_entry_t *fat_arch;
+			macho_load_command_t *commands;
 			bool is64;
 			bool fat;
 			
@@ -626,11 +598,13 @@ int adbg_object_loadv(adbg_object_t *o, va_list args) {
 	memset(&o.i, 0, o.i.sizeof); // Init object internal structures
 	
 	// options
+	/*
 L_ARG:	switch (va_arg!int(args)) {
 	case 0: break;
 	default:
 		return adbg_oops(AdbgError.invalidOption);
 	}
+	*/
 	
 	// SECTION: OLD STRATEGY
 	
@@ -703,7 +677,7 @@ L_ARG:	switch (va_arg!int(args)) {
 	case MACHO_CIGAM64:	// Mach-O 64-bit reversed
 	case MACHO_FATMAGIC:	// Mach-O Fat
 	case MACHO_FATCIGAM:	// Mach-O Fat reversed
-		return adbg_object_macho_load(o);
+		return adbg_object_macho_load(o, sig.u32);
 	case MDMP_MAGIC:
 		return adbg_object_mdmp_load(o);
 	default:

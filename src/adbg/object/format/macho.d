@@ -1,6 +1,7 @@
 /// Mach-O format.
 ///
 /// Sources:
+/// - Mac OS X ABI Mach-O File Format Reference
 /// - https://github.com/opensource-apple/cctools/blob/master/include/mach/machine.h
 /// - https://github.com/opensource-apple/cctools/blob/master/include/mach-o/loader.h
 ///
@@ -10,10 +11,10 @@
 module adbg.object.format.macho;
 
 import adbg.error;
-import adbg.object.server : adbg_object_t, AdbgObject;
+import adbg.object.server;
 import adbg.machines : AdbgMachine;
 import adbg.utils.bit;
-import core.stdc.stdlib : calloc;
+import core.stdc.stdlib;
 
 /// Smallest Mach-O size.
 // https://codegolf.stackexchange.com/a/154685
@@ -21,15 +22,15 @@ private enum MINIMUM_SIZE = 0x1000; // Due to paging
 private enum LIMIT_FAT_ARCH = 200;
 private enum LIMIT_COMMANDS = 2000;
 
-enum MACHO_MAGIC	= 0xFEEDFACEu; /// Mach-O BE magic
-enum MACHO_MAGIC64	= 0xFEEDFACFu; /// Mach-O BE x64 magic
-enum MACHO_CIGAM	= 0xCEFAEDFEu; /// Mach-O LE magic
-enum MACHO_CIGAM64	= 0xCFFAEDFEu; /// Mach-O LE x64 magic
+enum MACHO_MAGIC	= 0xFEEDFACEu; /// Mach-O BE 32-bit magic
+enum MACHO_MAGIC64	= 0xFEEDFACFu; /// Mach-O BE 64-bit magic
+enum MACHO_CIGAM	= 0xCEFAEDFEu; /// Mach-O LE 32-bit magic
+enum MACHO_CIGAM64	= 0xCFFAEDFEu; /// Mach-O LE 64-bit magic
 enum MACHO_FATMAGIC	= 0xCAFEBABEu; /// Mach-O FAT BE magic
 enum MACHO_FATCIGAM	= 0xBEBAFECAu; /// Mach-O FAT LE magic
 
 // 64-bit version just adds a 32-bit reserved field at the end.
-struct macho_header {
+struct macho_header_t {
 	uint magic;      /// Mach magic number identifier
 	uint cputype;    /// Cpu specifier
 	uint subtype;    /// Machine specifier
@@ -37,14 +38,15 @@ struct macho_header {
 	uint ncmds;      /// Number of load commands
 	uint sizeofcmds; /// The size of all the load commands
 	uint flags;      /// Flags
+	// NOTE: 64-bit header has an extra uint field, but it's reserved
 }
 
-struct macho_fatmach_header {
+struct macho_fat_header_t {
 	uint magic;     /// Magic
 	uint nfat_arch; /// Number of architectures (structs) in binary
 }
 
-struct macho_fat_arch {
+struct macho_fat_arch_entry_t {
 	uint cputype;    /// 
 	uint subtype;    /// 
 	uint offset;     /// File offset to first segment or command?
@@ -52,14 +54,14 @@ struct macho_fat_arch {
 	uint alignment;  /// Page alignment?
 }
 
-struct macho_load_command {
+struct macho_load_command_t {
 	uint cmd;	/// type of load command
 	uint cmdsize;	/// total size of command in bytes
 }
 
 alias int vm_prot_t;
 
-struct macho_segment_command { /* for 32-bit architectures */
+struct macho_segment_command_t { /* for 32-bit architectures */
 	uint      cmd;	/// LC_SEGMENT
 	uint      cmdsize;	/// includes sizeof section structs
 	char[16]  segname;	/// segment name
@@ -73,7 +75,7 @@ struct macho_segment_command { /* for 32-bit architectures */
 	uint      flags;	/// flags
 }
 
-struct macho_segment_command_64 { /* for 64-bit architectures */
+struct macho_segment_command_64_t { /* for 64-bit architectures */
 	uint      cmd;	/// LC_SEGMENT_64
 	uint      cmdsize;	/// includes sizeof section_64 structs
 	char[16]  segname;	/// segment name
@@ -385,174 +387,245 @@ enum {
 	MACHO_LC_VERSION_MIN_WATCHOS	= 0x30,	/// Build for Watch min OS version
 }
 
-int adbg_object_macho_load(adbg_object_t *o) {
-	if (o.file_size < MINIMUM_SIZE)
-		return adbg_oops(AdbgError.objectTooSmall);
+private
+struct internal_macho_t {
+	union {
+		macho_header_t header;
+		macho_fat_header_t fat_header;
+	}
+	union {
+		macho_load_command_t *commands;
+		macho_fat_arch_entry_t *fat_entries;
+	}
+	union {
+		bool *r_commands;
+		bool *r_fat_entries;
+	}
+}
+private enum {
+	MACHO_S_64  = 1 << 16,
+	MACHO_S_FAT = 1 << 17,
+}
+
+int adbg_object_macho_load(adbg_object_t *o, uint magic) {
+	o.internal = calloc(1, internal_macho_t.sizeof);
+	if (o.internal == null)
+		return adbg_oops(AdbgError.crt);
 	
-	o.format = AdbgObject.macho;
+	o.type = AdbgObject.macho;
 	
-	o.i.macho.header = cast(macho_header*)o.buffer;
-	
-	// NOTE: Internals are set to zero.
-	//       Unless I change that, and this snippet leads to a crash.
-	with (o.i) switch (macho.header.magic) {
+	// Bit messy but can be made better later
+	size_t size = void;
+	switch (magic) {
 	case MACHO_MAGIC:	// 32-bit LE
+		size = macho_header_t.sizeof;
 		break;
 	case MACHO_MAGIC64:	// 64-bit LE
-		macho.is64 = true;
+		size = macho_header_t.sizeof;
+		o.status |= MACHO_S_64;
 		break;
 	case MACHO_CIGAM:	// 32-bit BE
-		o.p.reversed = true;
+		size = macho_header_t.sizeof;
+		o.status |= AdbgObjectInternalFlags.reversed;
 		break;
 	case MACHO_CIGAM64:	// 64-bit BE
-		o.p.reversed = true;
-		macho.is64 = true;
+		size = macho_header_t.sizeof;
+		o.status |= AdbgObjectInternalFlags.reversed | MACHO_S_64;
 		break;
 	case MACHO_FATMAGIC:	// Fat LE
-		macho.fat = true;
+		size = macho_fat_header_t.sizeof;
+		o.status |= MACHO_S_FAT;
 		break;
 	case MACHO_FATCIGAM:	// Fat BE
-		macho.fat = true;
-		o.p.reversed = true;
+		size = macho_fat_header_t.sizeof;
+		o.status |= AdbgObjectInternalFlags.reversed | MACHO_S_FAT;
 		break;
-	default:
-		return adbg_oops(AdbgError.assertion);
+	default: // Unless loader gave a new signature?
+		return adbg_oops(AdbgError.objectMalformed);
 	}
+	if (adbg_object_read_at(o, 0, o.internal, size))
+		return adbg_errno();
 	
-	version (Trace) trace("64=%d reversed=%d fat=%d", o.i.macho.is64, o.p.reversed, o.i.macho.fat);
+	version (Trace) trace("status=%#x", o.status);
 	
-	with (o.i)
-	if (o.p.reversed) {
-		if (macho.fat) {
-			macho.fat_header.nfat_arch = adbg_bswap32(macho.fat_header.nfat_arch);
-			macho.fat_arch.cputype = adbg_bswap32(macho.fat_arch.cputype);
-			macho.fat_arch.subtype = adbg_bswap32(macho.fat_arch.subtype);
-			macho.fat_arch.offset = adbg_bswap32(macho.fat_arch.offset);
-			macho.fat_arch.size = adbg_bswap32(macho.fat_arch.size);
-			macho.fat_arch.alignment = adbg_bswap32(macho.fat_arch.alignment);
-		} else {
-			macho.header.cputype = adbg_bswap32(macho.header.cputype);
-			macho.header.subtype = adbg_bswap32(macho.header.subtype);
-			macho.header.filetype = adbg_bswap32(macho.header.filetype);
-			macho.header.ncmds = adbg_bswap32(macho.header.ncmds);
-			macho.header.sizeofcmds = adbg_bswap32(macho.header.sizeofcmds);
-			macho.header.flags = adbg_bswap32(macho.header.flags);
-		}
-	}
-	
-	with (o.i)
-	if (macho.fat) {
-		macho.fat_arch = cast(macho_fat_arch*)(o.buffer + macho_fatmach_header.sizeof);
-		macho.reversed_fat_arch = cast(bool*)calloc(macho.fat_header.nfat_arch, bool.sizeof);
-		if (macho.reversed_fat_arch == null)
-			return adbg_oops(AdbgError.crt);
-	} else if (macho.header.ncmds) {
-		macho.reversed_commands = cast(bool*)calloc(macho.header.ncmds, bool.sizeof);
-		if (macho.reversed_commands == null)
-			return adbg_oops(AdbgError.crt);
-		size_t cl = macho.is64 ? macho_header.sizeof + uint.sizeof : macho_header.sizeof;
-		version (Trace) trace("cl=%zx 64=%d", cl, macho.is64);
-		macho.commands = cast(macho_load_command*)(o.buffer + cl);
+	// If fields need to be swapped
+	with (cast(internal_macho_t*)o.internal)
+	if (o.status & (AdbgObjectInternalFlags.reversed | MACHO_S_FAT)) {
+		fat_header.nfat_arch = adbg_bswap32(fat_header.nfat_arch);
+		
+	} else if (o.status & AdbgObjectInternalFlags.reversed) {
+		header.cputype = adbg_bswap32(header.cputype);
+		header.subtype = adbg_bswap32(header.subtype);
+		header.filetype = adbg_bswap32(header.filetype);
+		header.ncmds = adbg_bswap32(header.ncmds);
+		header.sizeofcmds = adbg_bswap32(header.sizeofcmds);
+		header.flags = adbg_bswap32(header.flags);
 	}
 	
 	return 0;
 }
-
-//TODO: Consider adbg_object_macho_isfat
-
-macho_header* adbg_object_macho_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	// NOTE: pre-swapped
-	return o.i.macho.header;
+void adbg_object_macho_unload(adbg_object_t *o) {
+	if (o == null) return;
+	if (o.internal == null) return;
+	
+	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
+	
+	free(o.internal);
 }
 
-macho_fatmach_header* adbg_object_macho_header_fat(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	// NOTE: pre-swapped
-	return o.i.macho.fat_header;
+//
+// Fat Mach-O util functions
+//
+
+int adbg_object_macho_is_fat(adbg_object_t *o) {
+	return o ? o.status & MACHO_S_FAT : 0;
 }
 
-macho_fat_arch* adbg_object_macho_fat_arch(adbg_object_t *o, size_t index) {
+macho_fat_header_t* adbg_object_macho_fat_header(adbg_object_t *o) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.macho.fat_header == null) {
+	if (o.internal == null) {
 		adbg_oops(AdbgError.uninitiated);
-		return null; // not loaded
+		return null;
 	}
-	if (o.i.macho.fat == false) {
+	return &(cast(internal_macho_t*)o.internal).fat_header;
+}
+
+macho_fat_arch_entry_t* adbg_object_macho_fat_arch(adbg_object_t *o, size_t index) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	if ((o.status & MACHO_S_FAT) == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	if (index >= LIMIT_FAT_ARCH) {
-		adbg_oops(AdbgError.indexBounds);
-		return null;
-	}
-	if (index >= o.i.macho.fat_header.nfat_arch) {
+	
+	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
+	
+	if (index >= internal.fat_header.nfat_arch) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	macho_fat_arch* fat_arch = &o.i.macho.fat_arch[index];
-	if (o.p.reversed && o.i.macho.reversed_fat_arch[index] == false) {
-		fat_arch.cputype	= adbg_bswap32(fat_arch.cputype);
-		fat_arch.subtype	= adbg_bswap32(fat_arch.subtype);
-		fat_arch.offset	= adbg_bswap32(fat_arch.offset);
-		fat_arch.size	= adbg_bswap32(fat_arch.size);
-		fat_arch.alignment	= adbg_bswap32(fat_arch.alignment);
-		o.i.macho.reversed_fat_arch[index] = true;
+	if (internal.fat_entries == null) with (internal) {
+		size_t size = fat_header.nfat_arch * macho_fat_arch_entry_t.sizeof;
+		fat_entries = cast(macho_fat_arch_entry_t*)malloc(size);
+		if (fat_entries == null) {
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		if (adbg_object_read_at(o, macho_fat_header_t.sizeof, fat_entries, size))
+			return null;
+		
+		if (o.status & AdbgObjectInternalFlags.reversed) {
+			r_fat_entries = cast(bool*)malloc(fat_header.nfat_arch);
+			if (r_fat_entries == null) {
+				adbg_oops(AdbgError.crt);
+				free(fat_entries);
+				return null;
+			}
+		}
 	}
-	return fat_arch;
+	
+	macho_fat_arch_entry_t* entry = internal.fat_entries + index;
+	if (o.status & AdbgObjectInternalFlags.reversed && internal.r_fat_entries[index] == false) {
+		entry.cputype	= adbg_bswap32(entry.cputype);
+		entry.subtype	= adbg_bswap32(entry.subtype);
+		entry.offset	= adbg_bswap32(entry.offset);
+		entry.size	= adbg_bswap32(entry.size);
+		entry.alignment	= adbg_bswap32(entry.alignment);
+		internal.r_fat_entries[index] = true;
+	}
+	return entry;
+}
+
+//
+// Regular Mach-O functions
+//
+
+macho_header_t* adbg_object_macho_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	return &(cast(internal_macho_t*)o.internal).header;
 }
 
 // Load commands have a type and size.
 // Size includes type (4 bytes), size (4 bytes), and anything that follows it
 // until next command.
-macho_load_command* adbg_object_macho_load_command(adbg_object_t *o, size_t index) {
+macho_load_command_t* adbg_object_macho_load_command(adbg_object_t *o, size_t index) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.i.macho.header == null) {
+	if (o.internal == null) {
 		adbg_oops(AdbgError.uninitiated);
-		return null; // not loaded
+		return null;
 	}
-	if (o.i.macho.fat) {
+	if (o.status & MACHO_S_FAT) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	if (index >= LIMIT_COMMANDS) {
-		adbg_oops(AdbgError.indexBounds);
-		return null;
-	}
-	if (index >= o.i.macho.header.ncmds) {
+	
+	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
+	
+	if (index >= internal.header.ncmds) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	//TODO: Consider "caching" positions (calloc array) for faster lookup
-	macho_load_command* command = void;
-	size_t next;
-	for (size_t i; i <= index; ++i) {
-		command = cast(macho_load_command*)(cast(void*)o.i.macho.commands + next);
-		if (o.p.reversed && o.i.macho.reversed_commands[i] == false) {
-			version (Trace) trace("Reversing %u", cast(uint)i);
+	// NOTE: Commands
+	//       Commands are not organized in a typical table (with offsets),
+	//       but each command occupies a tiny header, then data follows.
+	//       Thankfully, sizeofcmds includes the entire set of commands.
+	
+	if (internal.commands == null) with (internal) {
+		commands = cast(macho_load_command_t*)malloc(header.sizeofcmds);
+		if (commands == null) {
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		size_t cmdoff = o.status & MACHO_S_64 ? macho_header_t.sizeof + 4 : macho_header_t.sizeof;
+		if (adbg_object_read_at(o, cmdoff, commands, header.sizeofcmds))
+			return null;
+		
+		if (o.status & AdbgObjectInternalFlags.reversed) {
+			r_commands = cast(bool*)malloc(header.ncmds);
+			if (r_commands == null) {
+				adbg_oops(AdbgError.crt);
+				free(commands);
+				return null;
+			}
+		}
+	}
+	
+	// First load command
+	macho_load_command_t *command = internal.commands;
+	for (size_t i; i < index; ++i) { // up until we reach index we want
+		if (o.status & AdbgObjectInternalFlags.reversed && internal.r_commands[i] == false) {
 			command.cmd = adbg_bswap32(command.cmd);
 			command.cmdsize = adbg_bswap32(command.cmdsize);
-			o.i.macho.reversed_commands[i] = true;
+			internal.r_commands[i] = true;
 		}
-		version (Trace) trace("command cmd=%x size=0x%x", command.cmd, command.cmdsize);
-		next += command.cmdsize;
-		if (next >= o.file_size)
+		if (adbg_bits_ptr_outside(command, internal.commands, internal.header.sizeofcmds)) {
+			adbg_oops(AdbgError.offsetBounds);
 			return null;
+		}
+		command = cast(macho_load_command_t*)(cast(void*)command + command.cmdsize);
 	}
+	
 	return command;
 }
 
@@ -564,7 +637,7 @@ const(char) *adbg_object_macho_magic_string(uint signature) {
 	case MACHO_CIGAM64:	return "MACHO_CIGAM_64";
 	case MACHO_FATMAGIC:	return "MACHO_FAT_MAGIC";
 	case MACHO_FATCIGAM:	return "MACHO_FAT_CIGAM";
-	default:	return "?";
+	default:	return null;
 	}
 }
 
@@ -582,7 +655,7 @@ const(char) *adbg_object_macho_filetype_string(uint type) {
 	case MACHO_FILETYPE_DYLIB_STUB:	return "Dynamic library stub";
 	case MACHO_FILETYPE_DSYM:	return "Companion file (debug)";
 	case MACHO_FILETYPE_KEXT_BUNDLE:	return "Kext bundle";
-	default:	return "?";
+	default:	return null;
 	}
 }
 
@@ -612,7 +685,7 @@ AdbgMachine adbg_object_macho_machine(uint type) {
 	}
 }
 
-const(char) *adbg_object_macho_cputype_string(uint type) {
+const(char)* adbg_object_macho_cputype_string(uint type) {
 	switch (type) {
 	case MACHO_CPUTYPE_VAX:	return "VAX";
 	case MACHO_CPUTYPE_ROMP:	return "ROMP";
@@ -632,11 +705,11 @@ const(char) *adbg_object_macho_cputype_string(uint type) {
 	case MACHO_CPUTYPE_POWERPC64:	return "PowerPC64";
 	case MACHO_CPUTYPE_POWERPC:	return "PowerPC";
 	case MACHO_CPUTYPE_VEO:	return "VEO";
-	default:	return "?";
+	default:	return null;
 	}
 }
 
-const(char) *adbg_object_macho_subtype_string(uint type, uint subtype) {
+const(char)* adbg_object_macho_subtype_string(uint type, uint subtype) {
 	switch (type) {
 	case MACHO_CPUTYPE_VAX:
 		switch (subtype) {
@@ -754,7 +827,7 @@ const(char) *adbg_object_macho_subtype_string(uint type, uint subtype) {
 		default:	return "PowerPC";
 		}
 	case MACHO_CPUTYPE_VEO:	return "VEO";
-	default:	return "?";
+	default:	return null;
 	}
 }
 
@@ -808,6 +881,22 @@ const(char)* adbg_object_macho_command_string(uint command) {
 	case MACHO_LC_LINKER_OPTION:	return "LC_LINKER_OPTION";
 	case MACHO_LC_LINKER_OPTIMIZATION_HINT:	return "LC_LINKER_OPTIMIZATION_HINT";
 	case MACHO_LC_VERSION_MIN_WATCHOS:	return "LC_VERSION_MIN_WATCHOS";
-	default:	return "?";
+	default:	return null;
 	}
+}
+
+const(char)* adbg_object_macho_kind_string(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
+	
+	if (o.status & MACHO_S_FAT) return `Fat Executable`;
+	return adbg_object_macho_filetype_string(internal.header.filetype);
 }
