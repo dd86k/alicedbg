@@ -399,6 +399,102 @@ struct macho_segment_command_64_t { /* for 64-bit architectures */
 	uint      flags;	/// flags
 }
 
+enum MACHO_SECTION_TYPE = 0x000000ff;	/// Section flags type mask
+enum MACHO_SECTION_ATTR = 0xffffff00;	/// Section flags attributes mask
+
+// Constants for the section attributes part of the flags field of a section
+// structure.
+
+/// User setable attributes
+enum MACHO_SECTION_ATTRIBUTES_USR =	0xff000000;
+/// section contains only true machine instructions
+enum MACHO_S_ATTR_PURE_INSTRUCTIONS =	0x80000000;
+/// section contains coalesced symbols that are not to be in a ranlib table of contents
+enum MACHO_S_ATTR_NO_TOC =	0x40000000;
+/// ok to strip static symbols in this section in files with the MH_DYLDLINK flag
+enum MACHO_S_ATTR_STRIP_STATIC_SYMS =	0x20000000;
+/// no dead stripping
+enum MACHO_S_ATTR_NO_DEAD_STRIP =	0x10000000;
+/// blocks are live if they reference live blocks
+enum MACHO_S_ATTR_LIVE_SUPPORT =	0x08000000;
+/// Used with i386 code stubs written on by dyld
+enum MACHO_S_ATTR_SELF_MODIFYING_CODE =	0x04000000;
+
+// Constants for the type of a section
+
+/// regular section
+enum MACHO_S_REGULAR		= 0x0;
+/// zero fill on demand section
+enum MACHO_S_ZEROFILL		= 0x1;
+/// section with only literal C strings
+enum MACHO_S_CSTRING_LITERALS	= 0x2;
+/// section with only 4 byte literals
+enum MACHO_S_4BYTE_LITERALS	= 0x3;
+/// section with only 8 byte literals
+enum MACHO_S_8BYTE_LITERALS	= 0x4;
+/// section with only pointers to literals
+enum MACHO_S_LITERAL_POINTERS	= 0x5;
+/// section with only non-lazy symbol pointers
+enum MACHO_S_NON_LAZY_SYMBOL_POINTERS	= 0x6;
+/// section with only lazy symbol pointers
+enum MACHO_S_LAZY_SYMBOL_POINTERS	= 0x7;
+/// section with only symbol stubs, byte size of stub in the reserved2 field
+enum MACHO_S_SYMBOL_STUBS	= 0x8;
+/// section with only function pointers for initialization
+enum MACHO_S_MOD_INIT_FUNC_POINTERS	= 0x9;
+/// section with only function pointers for termination
+enum MACHO_S_MOD_TERM_FUNC_POINTERS	= 0xa;
+/// section contains symbols that are to be coalesced
+enum MACHO_S_COALESCED	= 0xb;
+/// zero fill on demand section (that can be larger than 4 gigabytes
+enum MACHO_S_GB_ZEROFILL	= 0xc;
+/// section with only pairs of function pointers for interposing
+enum MACHO_S_INTERPOSING	= 0xd;
+/// section with only 16 byte literals
+enum MACHO_S_16BYTE_LITERALS	= 0xe;
+/// section contains DTrace Object Format
+enum MACHO_S_DTRACE_DOF	= 0xf;
+/// section with only lazy symbol pointers to lazy loaded dylibs
+enum MACHO_S_LAZY_DYLIB_SYMBOL_POINTERS	= 0x10;
+/// TLS: template of initial values for TLVs
+enum MACHO_S_THREAD_LOCAL_REGULAR	= 0x11;
+/// TLS: template of initial values for TLVs
+enum MACHO_S_THREAD_LOCAL_ZEROFILL	= 0x12;
+/// TLS: TLV descriptors
+enum MACHO_S_THREAD_LOCAL_VARIABLES	= 0x13;
+/// TLS: pointers to TLV descriptors
+enum MACHO_S_THREAD_LOCAL_VARIABLE_POINTERS	= 0x14;
+/// TLS: functions to call to initialize TLV values
+enum MACHO_S_THREAD_LOCAL_INIT_FUNCTION_POINTERS	= 0x15;
+
+struct macho_section_t {
+	char[16] sectname;	/// Section name
+	char[16] segname;	/// Name of parent segment
+	uint addr;	/// Memory address
+	uint size;	/// Size of section
+	uint offset;	/// File offset to this section
+	uint align_;	/// Section alignment, power of 2
+	uint reloff;	/// File offset to relocation entries
+	uint nrelocs;	/// Number of relocation entries
+	uint flags;	/// Flags
+	uint reserved1;	/// 
+	uint reserved2;	/// 
+}
+struct macho_section64_t {
+	char[16] sectname;	/// Section name
+	char[16] segname;	/// Name of parent segment
+	ulong addr;	/// Memory address
+	ulong size;	/// Size of section
+	uint offset;	/// File offset to this section
+	uint align_;	/// Section alignment, power of 2
+	uint reloff;	/// File offset to relocation entries
+	uint nrelocs;	/// Number of relocation entries
+	uint flags;	/// Flags
+	uint reserved1;	/// 
+	uint reserved2;	/// 
+	uint reserved3;	/// 
+}
+
 private
 struct internal_macho_t {
 	union {
@@ -413,10 +509,11 @@ struct internal_macho_t {
 		bool *r_commands;
 		bool *r_fat_entries;
 	}
+	bool *r_sections;
 }
 private enum {
-	MACHO_S_64  = 1 << 16,
-	MACHO_S_FAT = 1 << 17,
+	MACHO_IS_64  = 1 << 16,
+	MACHO_IS_FAT = 1 << 17,
 }
 
 int adbg_object_macho_load(adbg_object_t *o, uint magic) {
@@ -434,7 +531,7 @@ int adbg_object_macho_load(adbg_object_t *o, uint magic) {
 		break;
 	case MACHO_MAGIC64:	// 64-bit LE
 		size = macho_header_t.sizeof;
-		o.status |= MACHO_S_64;
+		o.status |= MACHO_IS_64;
 		break;
 	case MACHO_CIGAM:	// 32-bit BE
 		size = macho_header_t.sizeof;
@@ -442,15 +539,15 @@ int adbg_object_macho_load(adbg_object_t *o, uint magic) {
 		break;
 	case MACHO_CIGAM64:	// 64-bit BE
 		size = macho_header_t.sizeof;
-		o.status |= AdbgObjectInternalFlags.reversed | MACHO_S_64;
+		o.status |= AdbgObjectInternalFlags.reversed | MACHO_IS_64;
 		break;
 	case MACHO_FATMAGIC:	// Fat LE
 		size = macho_fat_header_t.sizeof;
-		o.status |= MACHO_S_FAT;
+		o.status |= MACHO_IS_FAT;
 		break;
 	case MACHO_FATCIGAM:	// Fat BE
 		size = macho_fat_header_t.sizeof;
-		o.status |= AdbgObjectInternalFlags.reversed | MACHO_S_FAT;
+		o.status |= AdbgObjectInternalFlags.reversed | MACHO_IS_FAT;
 		break;
 	default: // Unless loader gave a new signature?
 		return adbg_oops(AdbgError.objectMalformed);
@@ -462,9 +559,8 @@ int adbg_object_macho_load(adbg_object_t *o, uint magic) {
 	
 	// If fields need to be swapped
 	with (cast(internal_macho_t*)o.internal)
-	if (o.status & (AdbgObjectInternalFlags.reversed | MACHO_S_FAT)) {
+	if (o.status & (AdbgObjectInternalFlags.reversed | MACHO_IS_FAT)) {
 		fat_header.nfat_arch = adbg_bswap32(fat_header.nfat_arch);
-		
 	} else if (o.status & AdbgObjectInternalFlags.reversed) {
 		header.cputype = adbg_bswap32(header.cputype);
 		header.subtype = adbg_bswap32(header.subtype);
@@ -485,12 +581,16 @@ void adbg_object_macho_unload(adbg_object_t *o) {
 	free(o.internal);
 }
 
+int adbg_object_macho_is_64bit(adbg_object_t *o) {
+	return o.status & MACHO_IS_64;
+}
+
 //
 // Fat Mach-O util functions
 //
 
 int adbg_object_macho_is_fat(adbg_object_t *o) {
-	return o ? o.status & MACHO_S_FAT : 0;
+	return o.status & MACHO_IS_FAT;
 }
 
 macho_fat_header_t* adbg_object_macho_fat_header(adbg_object_t *o) {
@@ -514,7 +614,7 @@ macho_fat_arch_entry_t* adbg_object_macho_fat_arch(adbg_object_t *o, size_t inde
 		adbg_oops(AdbgError.uninitiated);
 		return null;
 	}
-	if ((o.status & MACHO_S_FAT) == 0) {
+	if ((o.status & MACHO_IS_FAT) == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
@@ -586,7 +686,7 @@ macho_load_command_t* adbg_object_macho_load_command(adbg_object_t *o, size_t in
 		adbg_oops(AdbgError.uninitiated);
 		return null;
 	}
-	if (o.status & MACHO_S_FAT) {
+	if (o.status & MACHO_IS_FAT) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
@@ -609,7 +709,7 @@ macho_load_command_t* adbg_object_macho_load_command(adbg_object_t *o, size_t in
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
-		size_t cmdoff = o.status & MACHO_S_64 ? macho_header_t.sizeof + 4 : macho_header_t.sizeof;
+		size_t cmdoff = o.status & MACHO_IS_64 ? macho_header_t.sizeof + 4 : macho_header_t.sizeof;
 		if (adbg_object_read_at(o, cmdoff, commands, header.sizeofcmds))
 			return null;
 		
@@ -639,6 +739,59 @@ macho_load_command_t* adbg_object_macho_load_command(adbg_object_t *o, size_t in
 	}
 	
 	return command;
+}
+
+void* adbg_object_macho_segment_section(adbg_object_t *o, macho_load_command_t *c, size_t index) {
+	if (o == null || c == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	if (o.status & MACHO_IS_FAT) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	//TODO: Swap fields
+	
+	switch (c.cmd) {
+	case MACHO_LC_SEGMENT:
+		macho_segment_command_t *seg = cast(macho_segment_command_t*)c;
+		
+		if (index > seg.nsects) {
+			adbg_oops(AdbgError.indexBounds);
+			return null;
+		}
+		
+		macho_section_t *section = cast(macho_section_t*)
+			(cast(void*)seg + macho_segment_command_t.sizeof) + index;
+		if (adbg_bits_ptr_outside(section, c, c.cmdsize)) {
+			adbg_oops(AdbgError.offsetBounds);
+			return null;
+		}
+		return section;
+	case MACHO_LC_SEGMENT_64:
+		macho_segment_command_64_t *seg64 = cast(macho_segment_command_64_t*)c;
+		
+		if (index > seg64.nsects) {
+			adbg_oops(AdbgError.indexBounds);
+			return null;
+		}
+		
+		macho_section64_t *section64 = cast(macho_section64_t*)
+			(cast(void*)seg64 + macho_segment_command_64_t.sizeof) + index;
+		if (adbg_bits_ptr_outside(section64, c, c.cmdsize)) {
+			adbg_oops(AdbgError.offsetBounds);
+			return null;
+		}
+		return section64;
+	default:
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 }
 
 const(char) *adbg_object_macho_magic_string(uint signature) {
@@ -909,6 +1062,6 @@ const(char)* adbg_object_macho_kind_string(adbg_object_t *o) {
 	
 	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
 	
-	if (o.status & MACHO_S_FAT) return `Fat Executable`;
+	if (o.status & MACHO_IS_FAT) return `Fat Executable`;
 	return adbg_object_macho_filetype_string(internal.header.filetype);
 }

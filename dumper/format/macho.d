@@ -9,6 +9,7 @@ import adbg.disassembler;
 import adbg.object.server;
 import adbg.object.format.macho;
 import dumper;
+import common.error;
 
 int dump_macho(adbg_object_t *o) {
 	if (SELECTED(Select.headers))
@@ -16,6 +17,8 @@ int dump_macho(adbg_object_t *o) {
 			dump_macho_header_fat(o) : dump_macho_header_regular(o);
 	if (SELECTED(Select.segments))
 		dump_macho_segments(o);
+	if (SELECTED(Select.sections))
+		dump_macho_sections(o);
 	
 	return 0;
 }
@@ -94,12 +97,12 @@ void dump_macho_segments(adbg_object_t *o) {
 	
 	size_t i;
 	macho_load_command_t *command = void;
-	while ((command = adbg_object_macho_load_command(o, i++)) != null) with (command) {
+	for (; (command = adbg_object_macho_load_command(o, i)) != null; ++i) {
 		print_section(cast(uint)i);
-		print_x32("cmd", cmd, SAFEVAL(adbg_object_macho_command_string(cmd)));
-		print_x32("cmdsize", cmdsize);
+		print_x32("cmd", command.cmd, SAFEVAL(adbg_object_macho_command_string(command.cmd)));
+		print_x32("cmdsize", command.cmdsize);
 		
-		switch (cmd) {
+		switch (command.cmd) {
 		case MACHO_LC_SEGMENT:
 			macho_segment_command_t *seg = cast(macho_segment_command_t*)command;
 			print_stringl("segname", seg.segname.ptr, cast(uint)seg.segname.sizeof);
@@ -127,4 +130,52 @@ void dump_macho_segments(adbg_object_t *o) {
 		default: continue;
 		}
 	}
+	if (i == 0)
+		panic_adbg();
+}
+
+void dump_macho_sections(adbg_object_t *o) {
+	print_header("Sections");
+	
+	int i64 = adbg_object_macho_is_64bit(o);
+	size_t i;
+	macho_load_command_t *command = void;
+	for (; (command = adbg_object_macho_load_command(o, i)) != null; ++i) {
+		size_t si;
+		void *section = void;
+		for (; (section = adbg_object_macho_segment_section(o, command, si)) != null; ++si) {
+			print_section(cast(uint)i);
+			i64 ?
+				dump_macho_section32(cast(macho_section_t*)section) :
+				dump_macho_section64(cast(macho_section64_t*)section);
+		}
+	}
+}
+void dump_macho_section32(macho_section_t *section) {
+	print_stringl("sectname", section.sectname.ptr, section.sectname.sizeof);
+	print_stringl("sectname", section.segname.ptr, section.segname.sizeof);
+	print_x32("addr", section.addr);
+	print_x32("size", section.size);
+	print_x32("offset", section.offset);
+	print_x32("align", section.align_);
+	print_x32("reloff", section.reloff);
+	print_x32("nrelocs", section.nrelocs);
+	print_x32("flags", section.flags);
+	print_x32("reserved1", section.reserved1);
+	print_x32("reserved2", section.reserved2);
+}
+void dump_macho_section64(macho_section64_t *section) {
+	print_stringl("sectname", section.sectname.ptr, section.sectname.sizeof);
+	print_stringl("sectname", section.segname.ptr, section.segname.sizeof);
+	print_x64("addr", section.addr);
+	print_x64("size", section.size);
+	print_x32("offset", section.offset);
+	print_x32("align", section.align_);
+	print_x32("reloff", section.reloff);
+	print_x32("nrelocs", section.nrelocs);
+	print_x32("flags", section.flags);
+	print_x32("reserved1", section.reserved1);
+	print_x32("reserved2", section.reserved2);
+	print_x32("reserved3", section.reserved3);
+	
 }
