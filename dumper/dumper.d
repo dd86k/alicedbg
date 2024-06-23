@@ -96,7 +96,7 @@ int SETTING(Setting setting)   { return opt_settings & setting; }
 /// Dump given file to stdout.
 /// Params: path = Path to object file.
 /// Returns: Error code if non-zero
-int dump(const(char)* path) {
+int dump_file(const(char)* path) {
 	if (SETTING(Setting.blob)) {
 		// NOTE: Program exits and memory is free'ds by OS
 		size_t size = void;

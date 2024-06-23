@@ -196,7 +196,7 @@ int main(int argc, const(char)** argv) {
 	// Could do a warning, but it might be a little confusing
 	adbg_self_set_crashhandler(&crashed);
 	
-	int e = getopt(argc, argv, options);
+	int e = getoptions(argc, argv, options);
 	if (e < 0) {
 		puts(getopterror());
 		return EXIT_FAILURE;
@@ -206,5 +206,5 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
-	return dump(*getoptleftovers()); // First argument as file
+	return dump_file(*getoptleftovers()); // First argument as file
 }

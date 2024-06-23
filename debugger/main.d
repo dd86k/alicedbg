@@ -114,7 +114,7 @@ int main(int argc, const(char)** argv) {
 	// Could do a warning, but it might be a little confusing
 	adbg_self_set_crashhandler(&crashed);
 	
-	int cnt = getopt(argc, argv, options);
+	int cnt = getoptions(argc, argv, options);
 	if (cnt < 0) {
 		puts(getopterror());
 		return EXIT_FAILURE;
