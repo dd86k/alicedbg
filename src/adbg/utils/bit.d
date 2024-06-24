@@ -180,6 +180,7 @@ unittest {
 /// 	base = Base pointer value of range.
 /// 	size = Size of range in bytes.
 /// Returns: False if ptr is inside range, true if outside range.
+deprecated("Use adbg_bits_ptrbounded")
 bool adbg_bits_ptr_outside(void* ptr, void* base, size_t size) {
 	return ptr < base || ptr >= base + size;
 }
@@ -196,4 +197,32 @@ unittest {
 	assert(adbg_bits_ptr_outside(cast(void*)40, cast(void*)0, 20));
 	assert(adbg_bits_ptr_outside(cast(void*)-1, cast(void*)0, 20));
 	assert(adbg_bits_ptr_outside(cast(void*)0,  cast(void*)10, 20));
+}
+
+/// Check if pointer instance fits inside buffer.
+/// Params:
+/// 	ptr = Pointer of instance.
+/// 	sizeof = Size of the instance in memory.
+/// 	buffer = Base pointer of the memory buffer.
+/// 	bufsize = Size of the bufer memory allocation.
+/// Returns: True is pointer instance breaches outside allocated memory buffer.
+align(true)
+bool adbg_bits_ptrbounds(void *ptr, size_t sizeof, void *buffer, size_t bufsize) {
+	return ptr < buffer || ptr + sizeof >= buffer + bufsize;
+}
+unittest {
+	template P(size_t n) { enum P = cast(void*)n; }
+	// Within bounds
+	assert(adbg_bits_ptrbounds(P!0,  uint.sizeof, P!0, 20) == false);
+	assert(adbg_bits_ptrbounds(P!1,  uint.sizeof, P!0, 20) == false);
+	assert(adbg_bits_ptrbounds(P!10, uint.sizeof, P!0, 20) == false);
+	assert(adbg_bits_ptrbounds(P!11, uint.sizeof, P!0, 20) == false);
+	assert(adbg_bits_ptrbounds(P!16, uint.sizeof, P!0, 20) == false);
+	// Outside bounds
+	assert(adbg_bits_ptrbounds(P!19, uint.sizeof, P!0, 20));
+	assert(adbg_bits_ptrbounds(P!20, uint.sizeof, P!0, 20));
+	assert(adbg_bits_ptrbounds(P!30, uint.sizeof, P!0, 20));
+	assert(adbg_bits_ptrbounds(P!40, uint.sizeof, P!0, 20));
+	assert(adbg_bits_ptrbounds(P!(-1), uint.sizeof, P!0, 20));
+	assert(adbg_bits_ptrbounds(P!0, 100, P!0, 20));
 }
