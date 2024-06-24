@@ -1,5 +1,10 @@
 /// CodeView type records and information.
 ///
+/// Sources:
+/// - Microsoft Symbol and Type Information CodeView 1.0
+/// - https://llvm.org/docs/PDB/CodeViewSymbols.html
+/// - https://llvm.org/docs/PDB/CodeViewTypes.html
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
