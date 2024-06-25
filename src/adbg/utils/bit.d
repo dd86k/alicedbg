@@ -199,7 +199,7 @@ unittest {
 	assert(adbg_bits_ptr_outside(cast(void*)0,  cast(void*)10, 20));
 }
 
-/// Check if pointer instance fits inside buffer.
+/// Ensure that a pointer instance with its size is situated inside an allocated buffer.
 /// Params:
 /// 	ptr = Pointer of instance.
 /// 	sizeof = Size of the instance in memory.
@@ -208,21 +208,25 @@ unittest {
 /// Returns: True is pointer instance breaches outside allocated memory buffer.
 align(true)
 bool adbg_bits_ptrbounds(void *ptr, size_t sizeof, void *buffer, size_t bufsize) {
-	return ptr < buffer || ptr + sizeof >= buffer + bufsize;
+	// ptr + sizeof might overflow
+	return ptr < buffer || ptr >= buffer + bufsize || ptr + sizeof > buffer + bufsize;
 }
 unittest {
 	template P(size_t n) { enum P = cast(void*)n; }
+	// Typical usage, check if pointer instance and size within buffer
+	assert(adbg_bits_ptrbounds(P!20, uint.sizeof, P!10, 30) == false);
 	// Within bounds
-	assert(adbg_bits_ptrbounds(P!0,  uint.sizeof, P!0, 20) == false);
-	assert(adbg_bits_ptrbounds(P!1,  uint.sizeof, P!0, 20) == false);
-	assert(adbg_bits_ptrbounds(P!10, uint.sizeof, P!0, 20) == false);
-	assert(adbg_bits_ptrbounds(P!11, uint.sizeof, P!0, 20) == false);
-	assert(adbg_bits_ptrbounds(P!16, uint.sizeof, P!0, 20) == false);
+	assert(adbg_bits_ptrbounds(P!0,  4, P!0, 20) == false);
+	assert(adbg_bits_ptrbounds(P!1,  4, P!0, 20) == false);
+	assert(adbg_bits_ptrbounds(P!10, 4, P!0, 20) == false);
+	assert(adbg_bits_ptrbounds(P!11, 4, P!0, 20) == false);
+	assert(adbg_bits_ptrbounds(P!16, 4, P!0, 20) == false);
 	// Outside bounds
-	assert(adbg_bits_ptrbounds(P!19, uint.sizeof, P!0, 20));
-	assert(adbg_bits_ptrbounds(P!20, uint.sizeof, P!0, 20));
-	assert(adbg_bits_ptrbounds(P!30, uint.sizeof, P!0, 20));
-	assert(adbg_bits_ptrbounds(P!40, uint.sizeof, P!0, 20));
-	assert(adbg_bits_ptrbounds(P!(-1), uint.sizeof, P!0, 20));
+	assert(adbg_bits_ptrbounds(P!0,  4, P!100, 20));
+	assert(adbg_bits_ptrbounds(P!19, 4, P!0, 20));
+	assert(adbg_bits_ptrbounds(P!20, 4, P!0, 20));
+	assert(adbg_bits_ptrbounds(P!30, 4, P!0, 20));
+	assert(adbg_bits_ptrbounds(P!40, 4, P!0, 20));
+	assert(adbg_bits_ptrbounds(P!(-1), 4, P!0, 20));
 	assert(adbg_bits_ptrbounds(P!0, 100, P!0, 20));
 }
