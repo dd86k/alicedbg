@@ -375,8 +375,11 @@ int adbg_object_lx_load(adbg_object_t *o, uint e_lfanew) {
 	o.internal = calloc(1, internal_lx_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, e_lfanew, o.internal, lx_header_t.sizeof))
+	if (adbg_object_read_at(o, e_lfanew, o.internal, lx_header_t.sizeof)) {
+		free(o.internal);
+		o.internal = null;
 		return adbg_errno();
+	}
 	
 	//TODO: Deal with word order
 	
