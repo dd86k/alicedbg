@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module common.error;
+module common.errormgmt;
 
 
 import adbg.platform;
@@ -12,7 +12,6 @@ import adbg.debugger.exception : adbg_exception_t, adbg_exception_name;
 import adbg.self;
 import adbg.machines : adbg_machine_default;
 import adbg.disassembler;
-import adbg.error;
 import adbg.debugger.process;
 import adbg.error;
 import adbg.disassembler;
@@ -40,32 +39,32 @@ void print_error(const(char) *message,
 	fputs("\n", stderr);
 }
 void print_error_adbg(
-	const(char)* mod = cast(char*)__FILE__,
+	const(char)* mod = __FILE__.ptr,
 	int line = __LINE__) {
 	debug {
 		printf("[%s@%d] ", mod, line);
 	}
 	const(adbg_error_t)* e = adbg_error_current();
-	print_error(adbg_error_message(), null, e.mod, e.line);
+	print_error(adbg_error_message(), null, e.func, e.line);
 }
 
 void panic(int code, const(char)* message,
 	const(char)* prefix = null,
-	const(char)* mod = cast(char*)__MODULE__,
+	const(char)* mod = __MODULE__.ptr,
 	int line = __LINE__) {
 	print_error(message, prefix, mod, line);
 	exit(code);
 }
 void panic_crt(const(char)* prefix = null,
-	const(char)* mod = cast(char*)__MODULE__,
+	const(char)* mod = __MODULE__.ptr,
 	int line = __LINE__) {
 	panic(errno, strerror(errno), prefix, mod, line);
 }
 void panic_adbg(const(char)* prefix = null,
-	const(char)* mod = cast(char*)__MODULE__,
+	const(char)* mod = __MODULE__.ptr,
 	int line = __LINE__) {
 	const(adbg_error_t)* e = adbg_error_current();
-	panic(adbg_errno(), adbg_error_message(), prefix, e.mod, e.line);
+	panic(adbg_errno(), adbg_error_message(), prefix, e.func, e.line);
 }
 
 void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
@@ -95,15 +94,12 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 		adbg_disassembler_t *dis = adbg_dis_open(adbg_machine_default());
 		printf("Instruction:");
 		if (dis && adbg_dis_process_once(dis, &op, proc, ex.fault_address) == 0) {
-			// Print address
 			// Print machine bytes
 			for (size_t bi; bi < op.size; ++bi)
 				printf(" %02x", op.machine[bi]);
-			// 
 			printf(" (%s", op.mnemonic);
 			if (op.operands)
 				printf(" %s", op.operands);
-			// 
 			puts(")");
 		} else {
 			printf(" Disassembly unavailable (%s)\n", adbg_error_message());

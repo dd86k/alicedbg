@@ -8,7 +8,7 @@ module format.omf;
 import adbg.object.server;
 import adbg.object.format.omf;
 import dumper;
-import common.error;
+import common.errormgmt;
 
 extern (C):
 
@@ -40,7 +40,7 @@ void dump_omf_hdr(adbg_object_t *o) {
 	print_header("First Object Entry");
 	omf_entry* entry = adbg_object_omf_entry(o, 0);
 	dump_omf_print_entry(entry);
-	adbg_object_omf_entry_free(o, entry);
+	adbg_object_omf_entry_close(o, entry);
 }
 
 void dump_omf_debug(adbg_object_t *o) {
@@ -55,7 +55,7 @@ Lentry:
 	if (dump_omf_print_entry(entry)) // print entry
 		return;
 	offset += entry.size + 3; // advance
-	adbg_object_omf_entry_free(o, entry); // free
+	adbg_object_omf_entry_close(o, entry); // free
 	goto Lentry;
 }
 

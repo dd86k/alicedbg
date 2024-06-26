@@ -10,7 +10,7 @@ import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import core.stdc.string;
-import common.error;
+import common.errormgmt;
 import common.cli : opt_syntax;
 import common.utils;
 import debugger;
@@ -18,8 +18,6 @@ import term;
 
 // Enable new process name, although it is currently broken on Windows
 //version = UseNewProcessName
-
-//TODO: Make disassembler setting to space out machine opcodes
 
 extern (C):
 

@@ -9,7 +9,7 @@ import adbg.disassembler;
 import adbg.object.server;
 import adbg.object.format.macho;
 import dumper;
-import common.error;
+import common.errormgmt;
 
 int dump_macho(adbg_object_t *o) {
 	if (SELECTED(Select.headers))

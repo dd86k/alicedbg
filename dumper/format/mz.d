@@ -11,7 +11,7 @@ import adbg.machines : AdbgMachine;
 import adbg.object.format.mz;
 import core.stdc.stdlib;
 import dumper;
-import common.error;
+import common.errormgmt;
 
 extern (C):
 

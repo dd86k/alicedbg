@@ -107,10 +107,10 @@ enum AdbgError {
 
 /// Represents an error in alicedbg.
 struct adbg_error_t {
-	const(char)* mod;	/// Source module
-	int line;	/// Line source
 	int code;	/// Error code
 	void *handle;	/// External handle or code
+	const(char)* func;	/// Source function
+	int line;	/// Line source
 }
 /// Last error in alicedbg.
 private __gshared adbg_error_t error;
@@ -191,7 +191,7 @@ const(adbg_error_t)* adbg_error_current() {
 /// Get error message from the OS (or CRT) by providing the error code
 /// Params: code = Error code number from OS
 /// Returns: String
-const(char)* adbg_sys_error(int code) {
+const(char)* adbg_error_system_message(int code) {
 	version (Windows) {
 		//TODO: Handle NTSTATUS codes
 		enum ERR_BUF_SZ = 256;
@@ -224,18 +224,23 @@ int adbg_error_system() {
 // ANCHOR Error setters
 //
 
+// NOTE: D compilers changed how __MODULE__ and __FILE__ are evaluated.
+//       It used so that the caller evaluated those but now the front-end
+//       puts in the value of the callee instead. To prove this, __LINE__
+//       and __FUNCTION__ remains unchanged. To fix that, I'm supposed to
+//       use a template, but function templates pollute the final binary.
 /// Sets the last error code. The module path and line are automatically
 /// populated.
 /// Params:
 /// 	e = Error code.
 /// 	extra = External resource (handle, code, etc.).
-/// 	m = Automatically set to `__MODULE__`.
-/// 	l = Automatically set to `__LINE__`.
 /// 	f = Automatically set to `__FUNCTION__`.
+/// 	l = Automatically set to `__LINE__`.
 /// Returns: Error code
-int adbg_oops(AdbgError e, void *extra = null, const(char)* m = __MODULE__.ptr, int l = __LINE__) {
-	version (Trace) trace("code=%d res=%p caller=%s@%d", e, extra, m, l);
-	error.mod = m;
+int adbg_oops(AdbgError e,
+	void *extra = null, const(char)* f = __FUNCTION__.ptr, int l = __LINE__) {
+	version (Trace) trace("code=%d res=%p caller=%s@%d", e, extra, f, l);
+	error.func = f;
 	error.line = l;
 	error.handle = extra;
 	return error.code = e;
@@ -273,7 +278,7 @@ const(char)* adbg_error_msg(int code) {
 	case crt:
 		return strerror(errno);
 	case os:
-		return adbg_sys_error(adbg_error_system());
+		return adbg_error_system_message(adbg_error_system());
 	case libCapstone:
 		if (error.handle == null)
 			break;

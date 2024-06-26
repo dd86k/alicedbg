@@ -527,7 +527,7 @@ pdb70_file_header* adbg_object_pdb70_header(adbg_object_t *o) {
 }
 
 // true=unallocated
-bool adbg_object_pdb70_block_free(adbg_object_t *o, uint num) {
+bool adbg_object_pdb70_block_close(adbg_object_t *o, uint num) {
 	if (o == null)
 		return true;
 	
@@ -546,7 +546,7 @@ ubyte* adbg_object_pdb70_get_block(adbg_object_t *o, uint num) {
 	pdb70_file_header *header = o.i.pdb70.header;
 	
 	// Check with selected FPM if block is allocated
-	if (adbg_object_pdb70_block_free(o, num)) {
+	if (adbg_object_pdb70_block_close(o, num)) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}

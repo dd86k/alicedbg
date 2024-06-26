@@ -16,7 +16,7 @@ import adbg.debugger.process : adbg_process_t;
 import core.stdc.stdlib : EXIT_FAILURE;
 import core.stdc.stdio;
 import dumper;
-import common.error;
+import common.errormgmt;
 import common.cli;
 import common.utils : unformat64;
 
@@ -24,7 +24,6 @@ private:
 
 //TODO: --dump-blob-offset/--dump-blob-seek/--dump-blob-start: Starting offset for raw blob
 //TODO: --dump-length/--dump-end: Length or end
-//TODO: --dump-imports-all: Dependency walker
 //TODO: --dump-stats: File statistics?
 //                    pdb: stream count, positions, etc.
 //TODO: --type-only: Returns short-name only for identification purposes

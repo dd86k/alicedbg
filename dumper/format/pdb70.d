@@ -19,7 +19,7 @@ import adbg.utils.uid;
 import adbg.utils.date;
 import adbg.include.c.stdio : printf, snprintf, putchar;
 import dumper;
-import common.error;
+import common.errormgmt;
 
 extern (C):
 

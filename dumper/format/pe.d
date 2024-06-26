@@ -16,7 +16,7 @@ import adbg.error;
 import core.stdc.stdlib;
 import core.stdc.string : strncmp;
 import dumper;
-import common.error;
+import common.errormgmt;
 
 extern (C):
 

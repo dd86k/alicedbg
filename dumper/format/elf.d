@@ -16,7 +16,7 @@ import core.stdc.stdlib;
 import core.stdc.stdio : snprintf;
 import dumper;
 import common.utils : realchar, hexstr;
-import common.error;
+import common.errormgmt;
 
 extern (C):
 

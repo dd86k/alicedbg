@@ -16,14 +16,13 @@ import core.stdc.string;
 import core.stdc.ctype : isprint;
 import core.stdc.errno;
 import format;
-import common.error;
+import common.errormgmt;
 import common.cli : opt_machine, opt_syntax;
 import common.utils;
 
 //TODO: Like print_flagsX, something for bit masks: print_mask
 //      signature: print_mask(name, flags, values...);
-//      usage: print_mask("something:something", 0x30, THING1, THING2, etc.)
-//TODO: print_stringf
+//      usage: print_mask("something", "something", FLAGS, MASK, FLAG1, FLAG2, etc.)
 //TODO: print_wstringl (wide-string)
 //TODO: (disassembly) attach shortest and longuest instructions found to buffers
 

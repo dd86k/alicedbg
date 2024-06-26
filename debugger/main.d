@@ -16,7 +16,7 @@ import adbg.debugger.process;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.stdio;
 import debugger, shell;
-import common.error;
+import common.errormgmt;
 import common.cli;
 import common.utils : unformat64;
 

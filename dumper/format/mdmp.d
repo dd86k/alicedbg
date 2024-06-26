@@ -13,7 +13,7 @@ import adbg.utils.date : ctime32;
 import adbg.include.windows.winnt;
 import dumper;
 import common.utils : realstring;
-import common.error;
+import common.errormgmt;
 
 int dump_minidump(adbg_object_t *o) {
 	if (SELECTED(Select.headers))

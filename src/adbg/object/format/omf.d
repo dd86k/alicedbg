@@ -197,7 +197,7 @@ omf_entry* adbg_object_omf_entry(adbg_object_t *o, int offset) {
 	return entry;
 }
 
-void adbg_object_omf_entry_free(adbg_object_t *o, omf_entry *entry) {
+void adbg_object_omf_entry_close(adbg_object_t *o, omf_entry *entry) {
 	if (entry == null)
 		return;
 	free(entry);

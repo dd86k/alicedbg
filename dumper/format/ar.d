@@ -14,7 +14,7 @@ import adbg.utils.bit : adbg_bswap32;
 import core.stdc.ctype : isdigit;
 import dumper;
 import common.utils : realstring;
-import common.error;
+import common.errormgmt;
 
 extern (C):
 
