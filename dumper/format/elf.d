@@ -363,90 +363,25 @@ void dump_elf_coredump64(adbg_object_t *o, Elf64_Phdr *phdr) {
 void dump_elf_sections(adbg_object_t *o) {
 	print_header("Sections");
 	
-	//TODO: Get section by name here if opt_section_name is specified
+	int class_ = adbg_object_elf_class(o);
 	
-	//TODO: Functions to get section + section name safely
-	
-	/// Arbritrary maximum section name length
-	enum SNMLEN = 32;
-	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
+	enum SNMLEN = 32; /// Arbritrary maximum section name length
+	uint i;
+	switch (class_) {
 	case ELF_CLASS_32:
-		if (o.i.elf32.ehdr == null)
-			return;
-		
-		ushort section_count = o.i.elf32.ehdr.e_shnum;
-		if (section_count == 0)
-			return;
-		
-		// Check id is outside section count
-		ushort id = o.i.elf32.ehdr.e_shstrndx;
-		if (id >= section_count)
-			panic(1, "String table index out of bounds");
-		
-		uint offset = o.i.elf32.shdr[id].sh_offset;
-		if (offset < Elf32_Ehdr.sizeof || offset > o.file_size)
-			panic(1, "String table offset out of bounds");
-		
-		char *table = o.bufferc + offset; // string table
-		for (uint i; i < section_count; ++i) {
-			Elf32_Shdr *shdr = adbg_object_elf_shdr32(o, i);
-
-			const(char) *sname = table + shdr.sh_name;
-
-			// If we're searching sections, match and don't print yet
-			if (opt_section_name && strncmp(sname, opt_section_name, SNMLEN))
-				continue;
-			
-			if (SETTING(Setting.extractAny)) {
-				void *data = o.buffer + shdr.sh_offset;
-				print_data(opt_section_name, data, shdr.sh_size, shdr.sh_offset);
-				return;
-			}
-			
-			dump_elf_section32(shdr, i, sname, SNMLEN);
-			
-			if (opt_section_name) break;
+		for (Elf32_Shdr *s = void; (s = adbg_object_elf_shdr32(o, i)) != null; ++i) {
+			dump_elf_section32(s, i,
+				adbg_object_elf_shdr32_name(o, s), SNMLEN);
 		}
 		break;
 	case ELF_CLASS_64:
-		if (o.i.elf64.ehdr == null)
-			return;
-		
-		ushort section_count = o.i.elf64.ehdr.e_shnum;
-		if (section_count == 0)
-			return;
-		
-		// Check id is without section count
-		ushort id = o.i.elf64.ehdr.e_shstrndx;
-		if (id >= section_count)
-			panic(1, "String table index out of bounds");
-		
-		ulong offset = o.i.elf64.shdr[id].sh_offset;
-		if (offset < Elf64_Ehdr.sizeof || offset > o.file_size)
-			panic(1, "String table offset out of bounds");
-		
-		char *table = o.bufferc + offset; // string table
-		for (uint i; i < section_count; ++i) {
-			Elf64_Shdr *shdr = adbg_object_elf_shdr64(o, i);
-
-			const(char) *sname = table + shdr.sh_name;
-			
-			// If we're searching sections, match and don't print yet
-			if (opt_section_name && strncmp(sname, opt_section_name, SNMLEN))
-				continue;
-			
-			if (SETTING(Setting.extractAny)) {
-				void *data = o.buffer + shdr.sh_offset;
-				print_data(opt_section_name, data, cast(uint)shdr.sh_size, shdr.sh_offset);
-				return;
-			}
-
-			dump_elf_section64(shdr, i, sname, SNMLEN);
-			
-			if (opt_section_name) break;
+		for (Elf64_Shdr *s = void; (s = adbg_object_elf_shdr64(o, i)) != null; ++i) {
+			dump_elf_section64(s, i,
+				adbg_object_elf_shdr64_name(o, s), SNMLEN);
 		}
 		break;
 	default:
+		panic_adbg();
 	}
 }
 
@@ -509,14 +444,16 @@ void dump_elf_section64(Elf64_Shdr *shdr, uint idx, const(char)* name, int nmax)
 //TODO: Section machine-specific flags (like SHF_X86_64_LARGE)
 
 void dump_elf_exports(adbg_object_t *o) {
-	adbg_section_t *dynsym = adbg_object_section_n(o, ".dynsym");
+	adbg_section_t *dynsym = adbg_object_search_section_by_name(o, ".dynsym");
 	if (dynsym == null)
 		panic(1, ".dynsym section missing");
-	adbg_section_t *dynstr = adbg_object_section_n(o, ".dynstr");
+	adbg_section_t *dynstr = adbg_object_search_section_by_name(o, ".dynstr");
 	if (dynstr == null)
 		panic(1, ".dynstr section missing");
 	
 	print_header("Dynamic Symbols");
+	
+	//TODO: Interface for dynamic symbols
 	
 	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
 	case ELF_CLASS_32:

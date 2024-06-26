@@ -521,7 +521,7 @@ int adbg_object_macho_load(adbg_object_t *o, uint magic) {
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
 	
-	o.type = AdbgObject.macho;
+	o.format = AdbgObject.macho;
 	
 	// Bit messy but can be made better later
 	size_t size = void;

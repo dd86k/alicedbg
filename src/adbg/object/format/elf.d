@@ -418,7 +418,7 @@ enum ELF_SHT_HIPROC	= 0x7fffffff;	/// Processor specific
 enum ELF_SHT_LOUSER	= 0x80000000;	/// Application specific
 enum ELF_SHT_HIUSER	= 0xffffffff;	/// Application specific
 /// This section contains unwind function table entries for stack unwinding
-enum ELF_SHT_X86_64_UNWIND	= 0x70000001; // ELF_SHT_LOPROC + 1?
+enum ELF_SHT_X86_64_UNWIND	= ELF_SHT_LOPROC + 1;
 
 // Section flags
 
@@ -1053,8 +1053,13 @@ struct internal_elf_t {
 		Elf32_Shdr *sheader32;
 		Elf64_Shdr *sheader64;
 	}
-	bool *r_pheader;
-	bool *r_sheader;
+	bool *r_pheader; // swapped fields for program headers
+	bool *r_sheader; // swapped fields for section headers
+	void *strtable; // string table buffer
+	union {
+		uint strtable_size32;
+		ulong strtable_size64;
+	}
 }
 
 int adbg_object_elf_load(adbg_object_t *o) {
@@ -1070,7 +1075,7 @@ int adbg_object_elf_load(adbg_object_t *o) {
 	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
 	
 	// Set reverse flag (bit 0) if endianness not the same as host
-	o.status |= internal.ident_class == PLATFORM_DATA;
+	o.status |= internal.ident_data != PLATFORM_DATA;
 	version (Trace) trace("status=%#x ident_class=%u", o.status, internal.ident_class);
 	
 	switch (internal.ident_class) {
@@ -1141,6 +1146,7 @@ void adbg_object_elf_unload(adbg_object_t *o) {
 	if (internal.sheader32) free(internal.sheader32);
 	if (internal.r_pheader) free(internal.r_pheader);
 	if (internal.r_sheader) free(internal.r_sheader);
+	if (internal.strtable)  free(internal.strtable);
 	
 	free(internal);
 }
@@ -1340,6 +1346,50 @@ Elf32_Shdr* adbg_object_elf_shdr32(adbg_object_t *o, size_t index) {
 	return shdr;
 }
 
+// Get name of section
+const(char)* adbg_object_elf_shdr32_name(adbg_object_t *o, Elf32_Shdr *s) {
+	if (o == null || s == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
+	
+	// If string table is not loaded, load it
+	if (internal.strtable == null) {
+		// Get the section index of the string table
+		Elf32_Shdr *s_strtbl = adbg_object_elf_shdr32(o, internal.eheader32.e_shstrndx);
+		if (s_strtbl == null)
+			return null; // Function sets error
+		
+		// Load string table into memory
+		internal.strtable = malloc(s_strtbl.sh_size);
+		if (internal.strtable == null) {
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		if (adbg_object_read_at(o, s_strtbl.sh_offset, internal.strtable, s_strtbl.sh_size))
+			return null; // Function sets error
+		
+		internal.strtable_size32 = s_strtbl.sh_size;
+	}
+	
+	// TODO: 3 minimum (".n\0") could be wrong, check strlen?
+	//       or make adbg_bits_strbounds variant?
+	//       or null-terminate the memory buffer?
+	void *str = internal.strtable + s.sh_name;
+	if (adbg_bits_ptrbounds(str, 3, internal.strtable, internal.strtable_size32)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
+	
+	return cast(char*)str;
+}
+
 deprecated
 Elf32_Shdr* adbg_object_elf_shdr32_n(adbg_object_t *o, const(char) *name) {
 	if (o == null) {
@@ -1493,7 +1543,7 @@ Elf64_Shdr* adbg_object_elf_shdr64(adbg_object_t *o, size_t index) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	with (internal.eheader32)
+	with (internal.eheader64)
 	if (e_shoff == 0 || e_shnum == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
@@ -1545,6 +1595,49 @@ Elf64_Shdr* adbg_object_elf_shdr64(adbg_object_t *o, size_t index) {
 		internal.r_sheader[index] = true;
 	}
 	return shdr;
+}
+
+// Get name of section
+const(char)* adbg_object_elf_shdr64_name(adbg_object_t *o, Elf64_Shdr *s) {
+	if (o == null || s == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
+	
+	// If string table is not loaded, load it
+	if (internal.strtable == null) {
+		// Get the section index of the string table
+		Elf64_Shdr *s_strtbl = adbg_object_elf_shdr64(o, internal.eheader64.e_shstrndx);
+		if (s_strtbl == null)
+			return null; // Function sets error
+		
+		// Load string table into memory
+		internal.strtable = malloc(s_strtbl.sh_size);
+		if (internal.strtable == null) {
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		if (adbg_object_read_at(o, s_strtbl.sh_offset, internal.strtable, s_strtbl.sh_size))
+			return null; // Function sets error
+		
+		internal.strtable_size64 = s_strtbl.sh_size;
+	}
+	
+	// TODO: 3 minimum (".n\0") could be wrong, check strlen?
+	//       or make adbg_bits_strbounds variant?
+	void *str = internal.strtable + s.sh_name;
+	if (adbg_bits_ptrbounds(str, 3, internal.strtable, internal.strtable_size64)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
+	
+	return cast(char*)str;
 }
 
 deprecated

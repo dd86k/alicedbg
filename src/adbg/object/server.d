@@ -43,12 +43,6 @@ extern (C):
 //       (e.g., pe, elf, etc.) to make things consistent. This is why
 //       auxiliary names are simply "adbg_object_offset", for example.
 
-//TODO: adbg_object_read_at: Add flag to allocate memory.
-//TODO: const(ubyte)* adbg_obj_section_i(obj, index);
-//TODO: const(ubyte)* adbg_object_get_section_by_type(obj, type);
-//TODO: const(char)* adbg_object_get_debug_path(obj);
-//TODO: Function to attach debug or coredump object to executable
-//      int adbg_object_load_debug(obj, path);
 //TODO: Consider structure definition, using a template
 //      Uses:
 //      - For swapping, uses less code than inlining it
@@ -169,9 +163,7 @@ struct adbg_object_t {
 	/// Object's loading origin.
 	AdbgObjectOrigin origin;
 	/// Loaded object format.
-	AdbgObject type;
-	// Old alias
-	alias format = type;
+	AdbgObject format;
 	
 	// NOTE: Sub modules are free to use upper 16 bits
 	/// Internal status flags. (e.g., swapping required)
@@ -307,6 +299,9 @@ struct adbg_object_t {
 	deprecated
 	adbg_object_internals_t i;
 }
+
+//TODO: adbg_object_needswap
+//      Check origin (==disk) and swap field, return true if fields need to be swapped
 
 /// Check if pointer is outside the object bounds.
 /// Params:
@@ -522,6 +517,7 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 	return adbg_oops(AdbgError.unimplemented);
 }
 
+//TODO: adbg_object_read_at: Add flag to allocate memory. Or make a new function (new signature)
 /// Read raw data from object at absolute position.
 /// Params:
 /// 	o = Object instance.
@@ -749,14 +745,99 @@ L_ARG:	switch (va_arg!int(args)) {
 	return adbg_oops(AdbgError.objectUnknownFormat);
 }
 
-//TODO: adbg_object_search_section_by_name
-//      Flags: Contains (default: exact), case insensitive
-//      adbg_object_section_close
-//      1. Search for section, return null if null
-//      2. Allocate for header + section header + section data
-//      3. Copy header meta, section header, and section data
-
-
+//TODO: Flags: Contains (default: exact), case insensitive, executable only, etc.
+adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char) *name, int flags = 0) {
+	if (o == null || name == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	// Search every section for its name
+	void *section_header;
+	size_t section_header_size;
+	long section_offset;
+	size_t section_size;
+	switch (o.format) with (AdbgObject) {
+	case elf:
+		switch (adbg_object_elf_class(o)) {
+		case ELF_CLASS_32:
+			size_t i;
+			for (Elf32_Shdr *s = void; (s = adbg_object_elf_shdr32(o, i)) != null; ++i) {
+				const(char) *sname = adbg_object_elf_shdr32_name(o, s);
+				if (sname == null)
+					continue;
+				if (strcmp(name, sname) == 0) {
+					section_header = s;
+					section_header_size = Elf32_Shdr.sizeof;
+					section_offset = s.sh_offset;
+					section_size = s.sh_size;
+					break;
+				}
+			}
+			break;
+		case ELF_CLASS_64:
+			size_t i;
+			for (Elf64_Shdr *s = void; (s = adbg_object_elf_shdr64(o, i)) != null; ++i) {
+				const(char) *sname = adbg_object_elf_shdr64_name(o, s);
+				if (sname == null)
+					continue;
+				if (strcmp(name, sname) == 0) {
+					section_header = s;
+					section_header_size = Elf32_Shdr.sizeof;
+					section_offset = s.sh_offset;
+					section_size = s.sh_size;
+					break;
+				}
+			}
+			break;
+		default:
+			return null;
+		}
+		break;
+	default:
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	// No section found
+	if (section_header == null) {
+		adbg_oops(AdbgError.unfindable);
+		return null;
+	}
+	
+	// Everything needs to be set. OK to do since this is internal information.
+	assert(section_header);
+	assert(section_header_size);
+	assert(section_offset);
+	assert(section_size);
+	
+	// Allocate the buffer to hold the section header and data
+	size_t totalsize = adbg_section_t.sizeof + section_header_size + section_size;
+	void *section_buffer = malloc(totalsize);
+	if (section_buffer == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	
+	// Copy everything into the new buffer
+	adbg_section_t *section = cast(adbg_section_t*)section_buffer;
+	section.header_size = section_header_size;
+	section.data_size = section_size;
+	
+	// Header starts after section metadata
+	section.header = section_buffer + adbg_section_t.sizeof;
+	memcpy(section.header, section_header, section_header_size);
+	
+	// Data starts after section header data
+	section.data = section_buffer + adbg_section_t.sizeof + section_header_size;
+	if (adbg_object_read_at(o, section_offset, section.data, section_size)) {
+		free(section_buffer);
+		return null; // function sets error
+	}
+	
+	// Return buffer pointer
+	return section;
+}
 
 deprecated
 export
@@ -839,10 +920,7 @@ adbg_section_t* adbg_object_section_n(adbg_object_t *o, const(char)* name, uint 
 	return section;
 }
 
-//adbg_section_t* adbg_object_section_i(adbg_object_t *o, size_t index, uint flags = 0) {	
-//}
-
-void adbg_object_section_free(adbg_object_t *o, adbg_section_t *section) {
+void adbg_object_section_close(adbg_object_t *o, adbg_section_t *section) {
 	if (section == null)
 		return;
 	free(section);
