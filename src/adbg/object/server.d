@@ -114,8 +114,11 @@ enum AdbgObjectOrigin {
 
 package
 enum AdbgObjectInternalFlags {
+	//TODO: Rename to swapped since this is a little confusing
 	/// Object has its fields swapped because of its target endianness.
-	reversed	= 0x1,
+	swapped	= 0x1,
+	/// Old alias for swapped.
+	reversed = swapped,
 }
 
 struct adbg_section_t {
@@ -459,42 +462,18 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 }*/
 
 /// Close object instance.
+/// Params: o = Object instance.
 export
 void adbg_object_close(adbg_object_t *o) {
 	if (o == null)
 		return;
 	switch (o.format) with (AdbgObject) {
-	case mz: adbg_object_mz_unload(o); break;
-	case ne: adbg_object_ne_unload(o); break;
-	case lx: adbg_object_lx_unload(o); break;
-	case pe: adbg_object_pe_unload(o); break;
-	case macho:
-		//TODO: Remove junk
-		with (o.i.macho) {
-		if (reversed_fat_arch) free(reversed_fat_arch);
-		if (reversed_commands) free(reversed_commands);
-		}
-		break;
-	case elf:
-		//TODO: Remove junk
-		import adbg.object.format.elf :
-			ELF_EI_CLASS, ELF_CLASS_32, ELF_CLASS_64;
-		switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
-		case ELF_CLASS_32:
-			with (o.i.elf32) {
-				if (reversed_phdr) free(reversed_phdr);
-				if (reversed_shdr) free(reversed_shdr);
-			}
-			break;
-		case ELF_CLASS_64:
-			with (o.i.elf64) {
-				if (reversed_phdr) free(reversed_phdr);
-				if (reversed_shdr) free(reversed_shdr);
-			}
-			break;
-		default:
-		}
-		break;
+	case mz:	adbg_object_mz_unload(o); break;
+	case ne:	adbg_object_ne_unload(o); break;
+	case lx:	adbg_object_lx_unload(o); break;
+	case pe:	adbg_object_pe_unload(o); break;
+	case macho:	adbg_object_macho_unload(o); break;
+	case elf:	adbg_object_elf_unload(o); break;
 	case pdb70:
 		//TODO: Remove junk
 		with (o.i.pdb70) if (dir) free(dir);
@@ -548,7 +527,7 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 /// 	o = Object instance.
 /// 	location = Absolute file offset.
 /// 	buffer = Buffer pointer.
-/// 	rsize = Size to read.
+/// 	rdsize = Size to read.
 /// 	flags = Additional settings.
 /// Returns: Zero on success; Otherwise error code.
 int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rdsize, int flags = 0) {
@@ -769,6 +748,15 @@ L_ARG:	switch (va_arg!int(args)) {
 	
 	return adbg_oops(AdbgError.objectUnknownFormat);
 }
+
+//TODO: adbg_object_search_section_by_name
+//      Flags: Contains (default: exact), case insensitive
+//      adbg_object_section_close
+//      1. Search for section, return null if null
+//      2. Allocate for header + section header + section data
+//      3. Copy header meta, section header, and section data
+
+
 
 deprecated
 export
