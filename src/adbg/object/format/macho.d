@@ -578,6 +578,10 @@ void adbg_object_macho_unload(adbg_object_t *o) {
 	
 	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
 	
+	if (internal.commands) free(internal.commands); // and fat_entries
+	if (internal.r_commands) free(internal.r_commands); // and r_fat_entries
+	if (internal.r_sections) free(internal.r_sections);
+	
 	free(o.internal);
 }
 
@@ -641,6 +645,7 @@ macho_fat_arch_entry_t* adbg_object_macho_fat_arch(adbg_object_t *o, size_t inde
 			if (r_fat_entries == null) {
 				adbg_oops(AdbgError.crt);
 				free(fat_entries);
+				fat_entries = null;
 				return null;
 			}
 		}
@@ -718,6 +723,7 @@ macho_load_command_t* adbg_object_macho_load_command(adbg_object_t *o, size_t in
 			if (r_commands == null) {
 				adbg_oops(AdbgError.crt);
 				free(commands);
+				commands = null;
 				return null;
 			}
 		}
@@ -731,7 +737,7 @@ macho_load_command_t* adbg_object_macho_load_command(adbg_object_t *o, size_t in
 			command.cmdsize = adbg_bswap32(command.cmdsize);
 			internal.r_commands[i] = true;
 		}
-		if (adbg_bits_ptr_outside(command, internal.commands, internal.header.sizeofcmds)) {
+		if (adbg_bits_ptrbounds(command, macho_load_command_t.sizeof, internal.commands, internal.header.sizeofcmds)) {
 			adbg_oops(AdbgError.offsetBounds);
 			return null;
 		}
@@ -768,7 +774,7 @@ void* adbg_object_macho_segment_section(adbg_object_t *o, macho_load_command_t *
 		
 		macho_section_t *section = cast(macho_section_t*)
 			(cast(void*)seg + macho_segment_command_t.sizeof) + index;
-		if (adbg_bits_ptr_outside(section, c, c.cmdsize)) {
+		if (adbg_bits_ptrbounds(section, macho_section_t.sizeof, c, c.cmdsize)) {
 			adbg_oops(AdbgError.offsetBounds);
 			return null;
 		}
@@ -783,7 +789,7 @@ void* adbg_object_macho_segment_section(adbg_object_t *o, macho_load_command_t *
 		
 		macho_section64_t *section64 = cast(macho_section64_t*)
 			(cast(void*)seg64 + macho_segment_command_64_t.sizeof) + index;
-		if (adbg_bits_ptr_outside(section64, c, c.cmdsize)) {
+		if (adbg_bits_ptrbounds(section64, macho_section64_t.sizeof, c, c.cmdsize)) {
 			adbg_oops(AdbgError.offsetBounds);
 			return null;
 		}
