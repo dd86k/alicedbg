@@ -758,10 +758,53 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 	long section_offset;
 	size_t section_size;
 	switch (o.format) with (AdbgObject) {
+	case pe:
+		size_t i;
+		for (pe_section_entry_t *s = void; (s = adbg_object_pe_section(o, i)) != null; ++i) {
+			//TODO: Section name function (in case of long section names)
+			if (strncmp(name, s.Name.ptr, s.Name.sizeof) == 0) {
+				section_header = s;
+				section_header_size = pe_section_entry_t.sizeof;
+				section_offset = s.PointerToRawData;
+				section_size = s.SizeOfRawData;
+				break;
+			}
+		}
+		break;
+	case macho:
+		int macho64 = adbg_object_macho_is_64bit(o);
+		size_t ci;
+		MACHO_FOR: for (macho_load_command_t *c = void; (c = adbg_object_macho_load_command(o, ci)) != null; ++ci) {
+			size_t si;
+			for (void *s = void; (s = adbg_object_macho_segment_section(o, c, si)) != null; ++si) {
+				if (macho64) {
+					macho_section64_t *s64 = cast(macho_section64_t*)s;
+					
+					if (strncmp(name, s64.sectname.ptr, s64.sectname.sizeof) == 0) {
+						section_header = s64;
+						section_header_size = macho_section64_t.sizeof;
+						section_offset = s64.offset;
+						section_size = s64.size;
+						break MACHO_FOR;
+					}
+				} else { // 32-bit
+					macho_section_t *s32 = cast(macho_section_t*)s;
+				
+					if (strncmp(name, s32.sectname.ptr, s32.sectname.sizeof) == 0) {
+						section_header = s32;
+						section_header_size = macho_section_t.sizeof;
+						section_offset = s32.offset;
+						section_size = s32.size;
+						break MACHO_FOR;
+					}
+				}
+			}
+		}
+		break;
 	case elf:
+		size_t i;
 		switch (adbg_object_elf_class(o)) {
 		case ELF_CLASS_32:
-			size_t i;
 			for (Elf32_Shdr *s = void; (s = adbg_object_elf_shdr32(o, i)) != null; ++i) {
 				const(char) *sname = adbg_object_elf_shdr32_name(o, s);
 				if (sname == null)
@@ -776,7 +819,6 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 			}
 			break;
 		case ELF_CLASS_64:
-			size_t i;
 			for (Elf64_Shdr *s = void; (s = adbg_object_elf_shdr64(o, i)) != null; ++i) {
 				const(char) *sname = adbg_object_elf_shdr64_name(o, s);
 				if (sname == null)
