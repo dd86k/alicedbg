@@ -174,6 +174,12 @@ unittest {
 	assert(adbg_alignup(9, ulong.sizeof) == 16);
 }
 
+// Ditto but returns long unconditionally
+long adbg_alignup64(long x, int s) {
+	long mask = s - 1;
+	return (x + mask) & (~mask);
+}
+
 /// Returns true if pointer is outside a sized range.
 /// Params:
 /// 	ptr = Pointer value to check.

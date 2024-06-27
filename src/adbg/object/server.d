@@ -474,10 +474,10 @@ void adbg_object_close(adbg_object_t *o) {
 		with (o.i.pdb70) if (dir) free(dir);
 		with (o.i.pdb70) if (strmap) free(strmap);
 		break;
+	case archive:	adbg_object_ar_unload(o); break;
 	default:
 	}
-	if (o.file)
-		osfclose(o.file);
+	if (o.file) osfclose(o.file);
 	if (o.file_handle)
 		fclose(o.file_handle);
 	if (o.buffer && o.buffer_size)
@@ -746,6 +746,7 @@ L_ARG:	switch (va_arg!int(args)) {
 }
 
 //TODO: Flags: Contains (default: exact), case insensitive, executable only, etc.
+//TODO: unix archives (ar), by member name
 adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char) *name, int flags = 0) {
 	if (o == null || name == null) {
 		adbg_oops(AdbgError.invalidArgument);

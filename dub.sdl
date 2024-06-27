@@ -81,8 +81,8 @@ configuration "library" {
 # NOTE: MSVC Linker can't find vcruntime140.lib with libs declaration
 #       LIBPATH isn't compiler-provided one, but Windows SDK
 configuration "shared" {
-	versions "SharedLib" # "Shared" might confuse druntime
 	targetType "dynamicLibrary"
+	versions "SharedLib" # "Shared" might confuse druntime
 	sourcePaths "src"
 }
 

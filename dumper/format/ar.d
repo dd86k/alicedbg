@@ -57,24 +57,24 @@ void dump_archive_memberdata(adbg_object_t *o, ar_member_header *member) {
 	if (SETTING(Setting.extractAny) == false)
 		return;
 	
-	ar_member_data m = adbg_object_ar_data(o, member);
-	if (m.data == null)
+	ar_member_data *m = adbg_object_ar_member_data(o, member);
+	if (m == null)
 		panic_adbg();
 	print_data("data", m.data, m.size);
+	adbg_object_ar_member_data_close(m);
 }
 
 void dump_archive_allheaders(adbg_object_t *o) {
 	print_header("Debug data");
-
+	
 	ar_member_header *member = adbg_object_ar_first_header(o);
 	if (member == null)
 		panic_adbg();
-
+	
 	uint i;
 	do {
 		print_section(i++);
 		dump_archive_header(member);
 		dump_archive_memberdata(o, member);
-		adbg_object_ar_free(o, member);
 	} while ((member = adbg_object_ar_next_header(o)) != null);
 }
