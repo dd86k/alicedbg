@@ -1695,9 +1695,20 @@ Elf64_Shdr* adbg_object_elf_shdr64_n(adbg_object_t *o, const(char) *name) {
 // Generic
 //
 
-AdbgMachine adbg_object_elf_machine(ushort machine, ubyte class_) {
+AdbgMachine adbg_object_elf_machine(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return AdbgMachine.unknown;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return AdbgMachine.unknown;
+	}
+	
+	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
+	
 	// NOTE: Many reserved values are excluded
-	switch (machine) {
+	switch (internal.eheader32.e_ident[ELF_EI_CLASS]) {
 	case ELF_EM_M32:	return AdbgMachine.we32100;
 	case ELF_EM_SPARC:	return AdbgMachine.sparc;
 	case ELF_EM_386:	return AdbgMachine.i386;
@@ -1875,7 +1886,7 @@ AdbgMachine adbg_object_elf_machine(ushort machine, ubyte class_) {
 	case ELF_EM_AMDGPU:	return AdbgMachine.amdgpu;
 	case ELF_EM_RISCV:	return AdbgMachine.riscv;
 	case ELF_EM_LOONGARCH:
-		switch (class_) {
+		switch (internal.eheader32.e_ident[ELF_EI_CLASS]) {
 		case ELF_CLASS_32: return AdbgMachine.loongarch32;
 		case ELF_CLASS_64: return AdbgMachine.loongarch64;
 		default:
@@ -1936,6 +1947,30 @@ const(char) *adbg_object_elf_et_string(ushort type) {
 	case ELF_ET_LOPROC:	return "LOPROC";
 	case ELF_ET_HIPROC:	return "HIPROC";
 	default:	return null;
+	}
+}
+
+const(char) *adbg_object_elf_kind_string(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
+	
+	switch (internal.eheader32.e_type) {
+	case ELF_ET_NONE:	return "None";
+	case ELF_ET_REL:	return "Relocatable";
+	case ELF_ET_EXEC:	return "Executable";
+	case ELF_ET_DYN:	return "Dynamic";
+	case ELF_ET_CORE:	return "Coredump";
+	default:
+		adbg_oops(AdbgError.objectInvalidType);
+		return null;
 	}
 }
 

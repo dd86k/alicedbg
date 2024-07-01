@@ -830,8 +830,25 @@ const(char) *adbg_object_macho_filetype_string(uint type) {
 	}
 }
 
-AdbgMachine adbg_object_macho_machine(uint type) {
-	switch (type) {
+AdbgMachine adbg_object_macho_machine(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return AdbgMachine.unknown;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return AdbgMachine.unknown;
+	}
+	
+	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
+	
+	//TODO: Better support fat Mach-Os
+	if (o.status & MACHO_IS_FAT) {
+		adbg_oops(AdbgError.unavailable);
+		return AdbgMachine.unknown;
+	}
+	
+	switch (internal.header.cputype) {
 	case MACHO_CPUTYPE_VAX:	return AdbgMachine.vax;
 	case MACHO_CPUTYPE_ROMP:	return AdbgMachine.romp;
 	case MACHO_CPUTYPE_NS32032:

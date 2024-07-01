@@ -47,6 +47,9 @@ extern (C):
 //      Uses:
 //      - For swapping, uses less code than inlining it
 //      - For displaying and using field offsets
+//TODO: adbg_object_endiannes
+//      Why? Machine module do not include endianness.
+//           And would be beneficial when host has incompatible endianness.
 
 /// Executable or object file format.
 enum AdbgObject {
@@ -998,16 +1001,14 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	if (o == null)
 		return AdbgMachine.native;
 	
+	// TODO: Turn to function pointer
 	switch (o.format) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
 	case ne:	return adbg_object_ne_machine(o);
 	case lx:	return adbg_object_lx_machine(o);
 	case pe:	return adbg_object_pe_machine(o);
-	case macho: // NOTE: Both Mach-O headers (regular/fat) match in layout for cputype
-		return adbg_object_macho_machine(o.i.macho.header.cputype);
-	case elf:
-		with (o.i.elf32.ehdr)
-		return adbg_object_elf_machine(e_machine, e_ident[ELF_EI_CLASS]);
+	case macho:	return adbg_object_macho_machine(o);
+	case elf:	return adbg_object_elf_machine(o);
 	case coff:
 		switch (o.i.coff.sig) {
 		case COFF_MAGIC_I386:
@@ -1101,8 +1102,7 @@ const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	case lx:	return adbg_object_lx_kind_string(o);
 	case pe:	return adbg_object_pe_kind_string(o);
 	case macho:	return adbg_object_macho_kind_string(o);
-	case elf:
-		return o.i.elf32.ehdr.e_type == ELF_ET_DYN ? `Shared Object` : `Executable`;
+	case elf:	return adbg_object_elf_kind_string(o);
 	case pdb20, pdb70:
 		return `Debug Database`;
 	case mdmp, dmp:
