@@ -134,6 +134,8 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.indexBounds,	"Index outside range." },
 	{ AdbgError.unavailable,	"Feature or item is unavailable." },
 	{ AdbgError.unfindable,	"Item was not found." },
+	{ AdbgError.partialRead,	"Not all required data could be read." },
+	{ AdbgError.partialWrite,	"Not all required data could be written." },
 	//
 	// Debugger
 	//
@@ -224,6 +226,12 @@ int adbg_error_system() {
 // ANCHOR Error setters
 //
 
+/// Reset the last set error code.
+void adbg_error_reset() {
+	// NOTE: Code is enough. Other fields are purely internal.
+	error.code = 0;
+}
+
 // NOTE: D compilers changed how __MODULE__ and __FILE__ are evaluated.
 //       It used so that the caller evaluated those but now the front-end
 //       puts in the value of the callee instead. To prove this, __LINE__
@@ -239,7 +247,7 @@ int adbg_error_system() {
 /// Returns: Error code
 int adbg_oops(AdbgError e,
 	void *extra = null, const(char)* f = __FUNCTION__.ptr, int l = __LINE__) {
-	version (Trace) trace("code=%d res=%p caller=%s@%d", e, extra, f, l);
+	version (Trace) trace("code=%d extra=%p caller=%s@%d", e, extra, f, l);
 	error.func = f;
 	error.line = l;
 	error.handle = extra;

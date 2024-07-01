@@ -366,6 +366,7 @@ void dump_elf_sections(adbg_object_t *o) {
 	int class_ = adbg_object_elf_class(o);
 	
 	enum SNMLEN = 32; /// Arbritrary maximum section name length
+	reset_error();
 	uint i;
 	switch (class_) {
 	case ELF_CLASS_32:
@@ -383,6 +384,8 @@ void dump_elf_sections(adbg_object_t *o) {
 	default:
 		panic_adbg();
 	}
+	if (i == 0 && errorcode())
+		panic_adbg();
 }
 
 void dump_elf_section32(Elf32_Shdr *shdr, uint idx, const(char)* name, int nmax) {
@@ -446,16 +449,18 @@ void dump_elf_section64(Elf64_Shdr *shdr, uint idx, const(char)* name, int nmax)
 void dump_elf_exports(adbg_object_t *o) {
 	adbg_section_t *dynsym = adbg_object_search_section_by_name(o, ".dynsym");
 	if (dynsym == null)
-		panic(1, ".dynsym section missing");
+		panic_adbg(".dynsym section missing");
 	adbg_section_t *dynstr = adbg_object_search_section_by_name(o, ".dynstr");
 	if (dynstr == null)
-		panic(1, ".dynstr section missing");
+		panic_adbg(".dynstr section missing");
 	
 	print_header("Dynamic Symbols");
 	
 	//TODO: Interface for dynamic symbols
 	
-	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
+	int class_ = adbg_object_elf_class(o);
+	
+	switch (class_) {
 	case ELF_CLASS_32:
 		Elf32_Sym* entry = cast(Elf32_Sym*)dynsym.data;
 		int count = cast(int)(dynsym.data_size / Elf32_Sym.sizeof);
@@ -491,6 +496,7 @@ void dump_elf_exports(adbg_object_t *o) {
 		}
 		break;
 	default:
+		panic_adbg();
 	}
 	
 }
@@ -500,57 +506,48 @@ void dump_elf_disasm(adbg_object_t *o) {
 	
 	int all = SETTING(Setting.disasmAll); /// dump all
 	
-	switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
+	int class_ = adbg_object_elf_class(o);
+	
+	void *buffer = void;
+	size_t i;
+	switch (class_) {
 	case ELF_CLASS_32:
-		ushort section_count = o.i.elf32.ehdr.e_shnum;
-		
-		if (section_count == 0)
-			return;
-		
-		// Check id is without section count
-		ushort id = o.i.elf32.ehdr.e_shstrndx;
-		if (id >= section_count)
-			panic(1, "String table index out of bounds");
-		
-		Elf32_Shdr *shdr = o.i.elf32.shdr;
-		uint offset = shdr[id].sh_offset;
-		if (offset < Elf32_Ehdr.sizeof || offset > o.file_size)
-			panic(1, "String table offset out of bounds");
-		
-		Elf32_Shdr *max = shdr + section_count;
-		char *table = o.bufferc + offset; // string table
-		while (shdr++ < max) with (shdr) {
-			if (all || sh_flags & ELF_SHF_EXECINSTR)
+		for (Elf32_Shdr *s = void; (s = adbg_object_elf_shdr32(o, i)) != null; ++i) {
+			if (all || s.sh_flags & ELF_SHF_EXECINSTR) {
+				buffer = malloc(s.sh_size);
+				if (buffer == null)
+					panic_crt();
+				
+				if (adbg_object_read_at(o, s.sh_offset, buffer, s.sh_size))
+					panic_adbg();
+				
 				dump_disassemble_object(o,
-					table + sh_name, 32,
-					o.buffer8 + sh_offset, sh_size, 0);
+					adbg_object_elf_shdr32_name(o, s), 32,
+					buffer, s.sh_size, s.sh_offset);
+				
+				free(buffer);
+			}
 		}
 		break;
 	case ELF_CLASS_64:
-		ushort section_count = o.i.elf64.ehdr.e_shnum;
-		
-		if (section_count == 0)
-			return;
-		
-		// Check id is without section count
-		ushort id = o.i.elf64.ehdr.e_shstrndx;
-		if (id >= section_count)
-			panic(1, "String table index out of bounds");
-		
-		Elf64_Shdr *shdr = o.i.elf64.shdr;
-		ulong offset = shdr[id].sh_offset;
-		if (offset < Elf64_Ehdr.sizeof || offset > o.file_size)
-			panic(1, "String table offset out of bounds");
-		
-		Elf64_Shdr *max = shdr + section_count;
-		char *table = o.bufferc + offset; // string table
-		while (shdr++ < max) with (shdr) {
-			if (all || sh_flags & ELF_SHF_EXECINSTR)
+		for (Elf64_Shdr *s = void; (s = adbg_object_elf_shdr64(o, i)) != null; ++i) {
+			if (all || s.sh_flags & ELF_SHF_EXECINSTR) {
+				buffer = malloc(s.sh_size);
+				if (buffer == null)
+					panic_crt();
+				
+				if (adbg_object_read_at(o, s.sh_offset, buffer, s.sh_size))
+					panic_adbg();
+				
 				dump_disassemble_object(o,
-					table + sh_name, 32,
-					o.buffer8 + sh_offset, sh_size, 0);
+					adbg_object_elf_shdr64_name(o, s), 32,
+					buffer, s.sh_size, s.sh_offset);
+				
+				free(buffer);
+			}
 		}
 		break;
 	default:
+		panic_adbg();
 	}
 }

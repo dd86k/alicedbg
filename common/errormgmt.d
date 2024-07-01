@@ -5,66 +5,54 @@
 /// License: BSD-3-Clause-Clear
 module common.errormgmt;
 
-
-import adbg.platform;
-import adbg.include.c.stdlib : exit;
-import adbg.debugger.exception : adbg_exception_t, adbg_exception_name;
+import adbg.debugger.exception;
 import adbg.self;
 import adbg.machines : adbg_machine_default;
 import adbg.disassembler;
 import adbg.debugger.process;
 import adbg.error;
-import adbg.disassembler;
-import adbg.debugger.exception;
 import core.stdc.string : strerror;
 import core.stdc.errno : errno;
 import core.stdc.stdio;
-import core.stdc.stdlib : malloc;
+import core.stdc.stdlib : malloc, exit;
 
 extern (C):
 
-void print_error(const(char) *message,
-	const(char)* prefix = null,
-	const(char)* mod = cast(char*)__MODULE__,
-	int line = __LINE__) {
-	debug {
-		printf("[%s@%d] ", mod, line);
-	}
+void print_error(const(char) *message, int code,
+	const(char)* prefix = null, const(char)* mod = cast(char*)__MODULE__, int line = __LINE__) {
+	debug printf("[%s@%d] ", mod, line);
 	fputs("error: ", stderr);
 	if (prefix) {
 		fputs(prefix, stderr);
 		fputs(": ", stderr);
 	}
-	fputs(message, stderr);
-	fputs("\n", stderr);
+	fprintf(stderr, "(%d) %s\n", code, message);
 }
 void print_error_adbg(
-	const(char)* mod = __FILE__.ptr,
-	int line = __LINE__) {
-	debug {
-		printf("[%s@%d] ", mod, line);
-	}
+	const(char)* mod = __FILE__.ptr, int line = __LINE__) {
+	debug printf("[%s@%d] ", mod, line);
 	const(adbg_error_t)* e = adbg_error_current();
-	print_error(adbg_error_message(), null, e.func, e.line);
+	print_error(adbg_error_message(), e.code, null, e.func, e.line);
 }
 
 void panic(int code, const(char)* message,
-	const(char)* prefix = null,
-	const(char)* mod = __MODULE__.ptr,
-	int line = __LINE__) {
-	print_error(message, prefix, mod, line);
+	const(char)* prefix = null, const(char)* mod = __MODULE__.ptr, int line = __LINE__) {
+	print_error(message, code, prefix, mod, line);
 	exit(code);
 }
-void panic_crt(const(char)* prefix = null,
-	const(char)* mod = __MODULE__.ptr,
-	int line = __LINE__) {
+void panic_crt(const(char)* prefix = null, const(char)* mod = __MODULE__.ptr, int line = __LINE__) {
 	panic(errno, strerror(errno), prefix, mod, line);
 }
-void panic_adbg(const(char)* prefix = null,
-	const(char)* mod = __MODULE__.ptr,
-	int line = __LINE__) {
+void panic_adbg(const(char)* prefix = null, const(char)* mod = __MODULE__.ptr, int line = __LINE__) {
 	const(adbg_error_t)* e = adbg_error_current();
 	panic(adbg_errno(), adbg_error_message(), prefix, e.func, e.line);
+}
+
+void reset_error() {
+	adbg_error_reset();
+}
+int errorcode() {
+	return adbg_errno();
 }
 
 void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
