@@ -1,7 +1,5 @@
 /// UNIX library archive format.
 ///
-/// This only supports the System V (aka GNU) variant.
-///
 /// Sources:
 /// - gdb/include/aout/ar.h
 /// - Microsoft Portable Executable and Common Object File Format Specification
@@ -20,11 +18,15 @@ import adbg.object.server;
 import adbg.utils.bit;
 import core.stdc.stdlib;
 
+// NOTE: Possible object formats included
+//       - ELF relocatable objects (POSIX)
+//       - COFF objects (Windows)
+
 // NOTE: MSVC linker can only process libraries under 4 GiB in size.
 
 // NOTE: Format detection (taken and updated from llvm/lib/Object/Archive.cpp)
 //       Below is the pattern that is used to figure out the archive format
-//       GNU archive format
+//       GNU / System V archive format
 //         First member : "/"  (May exist, if it exists, points to the symbol table)
 //         Second member: "//" (Ditto)
 //         "/" acts as a main index for all other members in the archive.
@@ -50,8 +52,18 @@ import core.stdc.stdlib;
 
 /// COFF library archive magic.
 enum AR_MAGIC = CHAR64!"!<arch>\n";
-/// Thin COFF library archive magic. Used in GNU binutils and Elfutils.
-enum AR_THIN_MAGIC = CHAR64!"!<thin>\n";
+
+// Thin COFF library archive magic. Used in GNU binutils and Elfutils.
+//enum AR_THIN_MAGIC = CHAR64!"!<thin>\n";
+
+// IBM's big library archive format
+//  https://www.ibm.com/docs/en/aix/7.2?topic=formats-ar-file-format-big
+//enum AR_BIG_MAGIC = CHAR64!"<bigaf>\n";
+
+// IBM's small library archive format
+//  https://www.ibm.com/docs/en/aix/7.2?topic=formats-ar-file-format-small
+//enum AR_SMALL_MAGIC = CHAR64!"<aiaff>\n";
+
 /// 
 private enum AR_EOL = CHAR16!"`\n";
 
@@ -140,9 +152,14 @@ private enum ARFormat {
 }
 
 private struct internal_ar_t {
-	long current; // location of current header
-	ar_member_header header; // current header
+	long offset; // current file offset of current header
+	ar_member_header current; // current member
+	ar_member_header symbol;  // symbol member
+	void *symbol_buffer;
+	int symbol_size;
 }
+
+private enum STATUS_SYMBOL_LOADED = 1 << 16;
 
 int adbg_object_ar_load(adbg_object_t *o) {
 	o.internal = malloc(internal_ar_t.sizeof);
@@ -204,19 +221,19 @@ ar_member_header* adbg_object_ar_first_header(adbg_object_t *o) {
 	internal_ar_t *internal = cast(internal_ar_t*)o.internal;
 	
 	// First entry starts right after signature
-	internal.current = ar_file_header.sizeof;
+	internal.offset = ar_file_header.sizeof;
 	
 	// Read first member
-	if (adbg_object_read_at(o, ar_file_header.sizeof, &internal.header, ar_member_header.sizeof))
+	if (adbg_object_read_at(o, ar_file_header.sizeof, &internal.current, ar_member_header.sizeof))
 		return null;
 	
 	// 
-	if (internal.header.EndMarker != AR_EOL) {
+	if (internal.current.EndMarker != AR_EOL) {
 		adbg_oops(AdbgError.assertion);
 		return null;
 	}
 	
-	return &internal.header;
+	return &internal.current;
 }
 
 // Get the next instance of the header
@@ -232,7 +249,7 @@ ar_member_header* adbg_object_ar_next_header(adbg_object_t *o) {
 	
 	internal_ar_t *internal = cast(internal_ar_t*)o.internal;
 	
-	int size = adbg_object_ar_membersize(&internal.header);
+	int size = adbg_object_ar_membersize(&internal.current);
 	if (size < 0) {
 		adbg_oops(AdbgError.assertion);
 		return null;
@@ -240,21 +257,21 @@ ar_member_header* adbg_object_ar_next_header(adbg_object_t *o) {
 	
 	// Jump to next header location using the current member size
 	// The alignment is needed at least for MS variants
-	long newloc = adbg_alignup64(internal.current + ar_member_header.sizeof + size, 2);
+	long newloc = adbg_alignup64(internal.offset + ar_member_header.sizeof + size, 2);
 	
 	// Read header
-	if (adbg_object_read_at(o, newloc, &internal.header, ar_member_header.sizeof))
+	if (adbg_object_read_at(o, newloc, &internal.current, ar_member_header.sizeof))
 		return null;
 	
 	// 
-	if (internal.header.EndMarker != AR_EOL) {
+	if (internal.current.EndMarker != AR_EOL) {
 		adbg_oops(AdbgError.assertion);
 		return null;
 	}
 	
 	// All good, set as current, and return member
-	internal.current = newloc;
-	return &internal.header;
+	internal.offset = newloc;
+	return &internal.current;
 }
 
 int adbg_object_ar_membersize(ar_member_header *member) {
@@ -293,7 +310,7 @@ ar_member_data* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header *m
 	data.size = size;
 	data.data = buffer + ar_member_data.sizeof;
 	
-	long dataloc = internal.current + size;
+	long dataloc = internal.offset + size;
 	if (adbg_object_read_at(o, dataloc, data.data, size)) {
 		free(buffer);
 		return null;
@@ -306,30 +323,72 @@ void adbg_object_ar_member_data_close(ar_member_data *data) {
 	if (data) free(data);
 }
 
-/*const(char)* adbg_object_ar_symbol(adbg_object_t *o, ar_member_header *member, uint index) {
+//TODO: adbg_object_ar_symbol
+//      This will require going through all object files and get their symbols
+//      So, waiting on being able to load objects in-memory
+
+/*
+const(char)* adbg_object_ar_symbol(adbg_object_t *o, size_t index) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
 	
-	//TODO: Redo/Clean using offsets
-	// NOTE: Hard to enforce length checks here
+	internal_ar_t *internal = cast(internal_ar_t*)o.internal;
 	
-	//ar_member_header *member = cast(ar_member_header*)(o.buffer + lochead);
-	uint *items = cast(uint*)(member + 1);
-	uint  count = adbg_bswap32(*items++);
-	version (Trace) trace("count=%d", count);
+	// Symbol member not loaded
+	if ((o.status & STATUS_SYMBOL_LOADED) == 0) {
+		version (Trace) trace("Loading first member");
+		
+		if (adbg_object_read_at(o, ar_file_header.sizeof, &internal.symbol, ar_member_header.sizeof))
+			return null;
+		
+		internal.symbol_size = adbg_object_ar_membersize(&internal.symbol);
+		if (internal.symbol_size < 0)
+			return null;
+		if (internal.symbol_size <= uint.sizeof) {
+			adbg_oops(AdbgError.assertion);
+			return null;
+		}
+		
+		internal.symbol_buffer = malloc(internal.symbol_size);
+		if (internal.symbol_buffer == null) {
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		
+		if (adbg_object_read_at(o, ar_file_header.sizeof + ar_member_header.sizeof,
+			internal.symbol_buffer, internal.symbol_size))
+			return null;
+		
+		o.status |= STATUS_SYMBOL_LOADED;
+	}
+	
+	uint count = adbg_bswap32(*cast(uint*)internal.symbol_buffer);
+	
 	if (index >= count) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	uint locsym = adbg_bswap32(items[index]);
-	//int size = atoint(member.Size.ptr, member.Size.sizeof);
-	if (adbg_object_outbound(o, locsym)) {
+	uint *offsets = cast(uint*)(internal.symbol_buffer + uint.sizeof);
+	
+	uint *offset = offsets + index;
+	
+	if (adbg_bits_ptrbounds(offset, uint.sizeof, offsets, internal.symbol_size)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
 	
-	return o.bufferc + locsym;
-}*/
+	// Offset to member headers
+	uint aoffset = adbg_bswap32(*offset);
+	
+	version (Trace) trace("aoffset=%#x", aoffset);
+	
+	return null;
+}
+*/

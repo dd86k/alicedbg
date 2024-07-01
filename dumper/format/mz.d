@@ -16,9 +16,7 @@ import common.errormgmt;
 extern (C):
 
 /// Print MZ object.
-/// Params:
-///   dump = Dumper instance.
-///   o = Object instance.
+/// Params: o = Object instance.
 /// Returns: Non-zero on error.
 int dump_mz(adbg_object_t *o) {
 	if (SELECTED(Select.headers))

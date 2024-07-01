@@ -78,3 +78,18 @@ void dump_archive_allheaders(adbg_object_t *o) {
 		dump_archive_memberdata(o, member);
 	} while ((member = adbg_object_ar_next_header(o)) != null);
 }
+
+/*
+void dump_archive_symbols(adbg_object_t *o) {
+	print_header("Symbols");
+	
+	size_t i;
+	const(char)* symbol = adbg_object_ar_symbol(o, i);
+	if (symbol == null)
+		panic_adbg();
+	
+	do {
+		print_string("symbol", symbol);
+	} while ((symbol = adbg_object_ar_symbol(o, ++i)) != null);
+}
+*/

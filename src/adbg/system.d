@@ -19,6 +19,7 @@ import core.stdc.string : strncpy;
 
 // NOTE: Calling dlerror(3) clears the last error
 
+//TODO: Move to adbg.os.dynlibs (or with similar name)
 //TODO: Consider versioning support
 //      Some libraries, like Capstone, can be found in various versions
 //      depending on the distrobution.
@@ -134,12 +135,17 @@ void adbg_system_library_addmissing(adbg_system_library_t *lib, const(char) *sym
 }
 
 /// Returns the missing symbol count.
+/// Params: lib = Library instance.
 /// Returns: Missed symbol count.
 size_t adbg_system_library_missingcnt(adbg_system_library_t *lib) {
 	if (lib == null) return 0;
 	return lib.missingcnt;
 }
-/// Get missing
+/// Get missing symbol name by index.
+/// Params:
+/// 	lib = Library instance.
+/// 	index = Index.
+/// Returns: Missing symbol.
 const(char)* adbg_system_library_missing(adbg_system_library_t *lib, size_t index) {
 	if (lib == null || index >= lib.missingcnt) return null;
 	return cast(const(char)*)&lib.missing[index];

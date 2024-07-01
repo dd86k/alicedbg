@@ -28,6 +28,7 @@ private:
 //                    pdb: stream count, positions, etc.
 //TODO: --type-only: Returns short-name only for identification purposes
 //TODO: --name: Extract by section, import, export name (will replace --section?)
+//TODO: --all (to complement --headers)
 immutable option_t[] options = [
 	// secrets
 	option_t(0,   "woof", null, &cliopt_woof),
@@ -35,16 +36,16 @@ immutable option_t[] options = [
 	option_arch,
 	option_syntax,
 	// selections
-	option_t('H', "headers",      "Dump object's headers", &cliopt_headers),
-	option_t('S', "sections",     "Dump object's sections", &cliopt_sections),
-	option_t(0,   "section",      "Dump object's section by name", &cliopt_section),
-	option_t(0,   "segments",     "Dump object's segments", &cliopt_segments),
-	option_t('I', "imports",      "Dump object's import information", &cliopt_imports),
-	option_t('E', "exports",      "Dump object's export information", &cliopt_exports),
-//	option_t(0,   "loadcfg",      "Dump object's load configuration", &cliopt_loadcfg),
-//	option_t(0,   "source",       "Dump object's source with disassembly", &cliopt_source),
-	option_t(0,   "relocs",       "Dump object's relocations", &cliopt_relocs),
-	option_t(0,   "debug",        "Dump object's debug information", &cliopt_debug),
+	option_t('H', "headers",      "Dump headers", &cliopt_headers),
+	option_t('S', "sections",     "Dump sections", &cliopt_sections),
+	option_t(0,   "section",      "Dump section by name", &cliopt_section),
+	option_t(0,   "segments",     "Dump segments", &cliopt_segments),
+	option_t('I', "imports",      "Dump import information", &cliopt_imports),
+	option_t('E', "exports",      "Dump export information", &cliopt_exports),
+//	option_t(0,   "loadcfg",      "Dump load configuration", &cliopt_loadcfg),
+//	option_t(0,   "source",       "Dump source with disassembly", &cliopt_source),
+	option_t(0,   "relocs",       "Dump relocations", &cliopt_relocs),
+	option_t(0,   "debug",        "Dump debug information", &cliopt_debug),
 	option_t(0,   "everything",   "Dump everything except disassembly", &cliopt_everything),
 	// settings
 	option_t(0,   "as-blob",           "Setting: Input is headless binary blob", &cliopt_as_blob),
