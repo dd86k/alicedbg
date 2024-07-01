@@ -127,7 +127,7 @@ int dump_file(const(char)* path) {
 		// If not in any "extract" mode, print file info
 		if (SETTING(Setting.extractAny) == 0) {
 			print_string("filename", path);
-			print_u64("filesize", o.file_size);
+			print_u64("filesize", adbg_object_filesize(o));
 			print_string("type", adbg_object_type_name(o));
 			print_string("shortname", adbg_object_type_shortname(o));
 		}
@@ -347,17 +347,17 @@ void print_flags64(const(char) *section, ulong flags, ...) {
 	va_list args = void;
 	va_start(args, flags);
 	ushort count;
-L_START:
+Lfetch:
 	const(char) *name = va_arg!(const(char)*)(args);
 	if (name == null) {
 		puts(")");
 		return;
 	}
 	
-	if ((flags & va_arg!long(args)) == 0) goto L_START; // condition
+	if ((flags & va_arg!long(args)) == 0) goto Lfetch; // condition
 	if (count++) putchar(',');
 	printf("%s", name);
-	goto L_START;
+	goto Lfetch;
 }
 
 void print_directory_entry(const(char)* name, uint rva, uint size) {
@@ -438,6 +438,7 @@ void hexdump(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0)
 int dump_disassemble_object(adbg_object_t *o,
 	const(char) *name, int namemax,
 	void* data, ulong size, ulong base_address) {
+	assert(data, "Data pointer null");
 	
 	print_header("Disassembly");
 	
@@ -446,12 +447,6 @@ int dump_disassemble_object(adbg_object_t *o,
 	
 	if (size == 0)
 		return 0;
-	
-	if (data == null)
-		panic(1, "Data pointer is null");
-	
-	if (data + size >= o.buffer + o.file_size)
-		panic(1, "Data offset overflow");
 	
 	return dump_disassemble(adbg_object_machine(o), data, size, base_address);
 }
@@ -475,19 +470,19 @@ int dump_disassemble(AdbgMachine machine, void* data, ulong size, ulong base_add
 		uint stat_max;	/// longest instruction size
 		uint stat_total;	/// total instruction count
 		uint stat_illegal;	/// Number of illegal instructions
-L_STAT:
+Lstat:
 		switch (adbg_dis_step(dis, &op)) with (AdbgError) {
 		case success:
 			stat_avg += op.size;
 			++stat_total;
 			if (op.size > stat_max) stat_max = op.size;
 			if (op.size < stat_min) stat_min = op.size;
-			goto L_STAT;
+			goto Lstat;
 		case disasmIllegalInstruction:
 			stat_avg += op.size;
 			++stat_total;
 			++stat_illegal;
-			goto L_STAT;
+			goto Lstat;
 		case disasmEndOfData: break;
 		default:
 			panic_adbg();
@@ -503,14 +498,14 @@ L_STAT:
 	}
 	
 	// normal disasm mode
-L_DISASM:
+Ldisasm:
 	switch (adbg_dis_step(dis, &op)) with (AdbgError) {
 	case success:
 		print_disasm_line(&op);
-		goto L_DISASM;
+		goto Ldisasm;
 	case disasmIllegalInstruction:
 		print_disasm_line(&op, "illegal");
-		goto L_DISASM;
+		goto Ldisasm;
 	case disasmEndOfData:
 		return 0;
 	default:

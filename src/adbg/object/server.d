@@ -462,6 +462,8 @@ export
 void adbg_object_close(adbg_object_t *o) {
 	if (o == null)
 		return;
+	//TODO: Consider attaching function pointer for unloading.
+	//      This would help submodule management.
 	switch (o.format) with (AdbgObject) {
 	case mz:	adbg_object_mz_unload(o); break;
 	case ne:	adbg_object_ne_unload(o); break;
@@ -967,6 +969,26 @@ void adbg_object_section_close(adbg_object_t *o, adbg_section_t *section) {
 	if (section == null)
 		return;
 	free(section);
+}
+
+/// Get the size of the object. Only applies for objects loaded from disks.
+/// Params: o = Object instance.
+/// Returns: Size in bytes, or -1 on error.
+long adbg_object_filesize(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return -1;
+	}
+	if (o.file == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return -1;
+	}
+	if (o.origin != AdbgObjectOrigin.disk) {
+		adbg_oops(AdbgError.unavailable);
+		return -1;
+	}
+	
+	return osfsize(o.file);
 }
 
 /// Returns the first machine type the object supports.
