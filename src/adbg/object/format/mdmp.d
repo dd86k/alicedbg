@@ -9,8 +9,10 @@
 /// License: BSD-3-Clause-Clear
 module adbg.object.format.mdmp;
 
-import adbg.object.server : AdbgObject, adbg_object_t;
-import adbg.utils.bit : CHAR32;
+import adbg.object.server;
+import adbg.error;
+import adbg.utils.bit;
+import core.stdc.stdlib;
 
 /// Signature value
 enum MDMP_MAGIC = CHAR32!"MDMP";
@@ -165,25 +167,7 @@ enum : MINIDUMP_TYPE {
 	MiniDumpValidTypeFlags	= 0x01ffffff
 }
 
-struct mdmp_location_descriptor {
-	uint Size;
-	uint Rva;
-}
-struct mdmp_location_descriptor64 {
-	ulong Size;
-	ulong Rva;
-}
-struct mdmp_memory_descriptor {
-	ulong RangeStart;
-	mdmp_location_descriptor Memory;
-}
-// Used for full-memory minidumps
-struct mdmp_memory_descriptor64 {
-	ulong RangeStart;
-	ulong Size;
-}
-
-struct mdump_header {
+struct mdmp_header_t {
 	/// "MDMP" string.
 	uint Signature;
 	/// Used internally. Typically 0xa793.
@@ -203,7 +187,25 @@ struct mdump_header {
 	ulong Flags;
 }
 
-struct mdmp_vs_fixedfileinfo {
+struct mdmp_location_descriptor_t {
+	uint Size;
+	uint Rva;
+}
+struct mdmp_location_descriptor64_t {
+	ulong Size;
+	ulong Rva;
+}
+struct mdmp_memory_descriptor_t {
+	ulong RangeStart;
+	mdmp_location_descriptor_t Memory;
+}
+// Used for full-memory minidumps
+struct mdmp_memory_descriptor64_t {
+	ulong RangeStart;
+	ulong Size;
+}
+
+struct mdmp_vs_fixedfileinfo_t {
 	/// 0xFEEF04BD
 	uint dwSignature;
 	uint dwStrucVersion;
@@ -220,7 +222,7 @@ struct mdmp_vs_fixedfileinfo {
 	uint dwFileDateLS;
 }
 /* // Pseudo-structure
-struct mdmp_vs_versioninfo {
+struct mdmp_vs_versioninfo_t {
 	ushort             wLength;
 	ushort             wValueLength;
 	ushort             wType;
@@ -235,70 +237,204 @@ struct mdmp_vs_versioninfo {
 // Type 3 - Thread list
 //
 
-struct mdmp_directory_entry {
+struct mdmp_directory_entry_t {
 	uint StreamType;
 	uint Size;
 	uint Rva;
 }
 
-struct mdmp_thread {
+struct mdmp_thread_t {
 	uint ID;
 	uint SuspendCount;
 	uint PriorityClass;
 	uint Priority;
 	ulong Teb;
-	mdmp_memory_descriptor Stack;
-	mdmp_location_descriptor ThreadContext;
+	mdmp_memory_descriptor_t Stack;
+	mdmp_location_descriptor_t ThreadContext;
 }
-struct mdmp_threadlist {
+struct mdmp_threadlist_t {
 	uint Count;
-	mdmp_thread[0] Threads;
+	mdmp_thread_t[0] Threads;
 }
 
-struct mdmp_thread_ex {
+struct mdmp_thread_ex_t {
 	uint ID;
 	uint SuspendCount;
 	uint PriorityClass;
 	uint Priority;
 	ulong Teb;
-	mdmp_memory_descriptor Stack;
-	mdmp_location_descriptor ThreadContext;
-	mdmp_memory_descriptor BackingStore;
+	mdmp_memory_descriptor_t Stack;
+	mdmp_location_descriptor_t ThreadContext;
+	mdmp_memory_descriptor_t BackingStore;
 }
-struct mdmp_threadlist_ex {
+struct mdmp_threadlist_ex_t {
 	uint Count;
-	mdmp_thread_ex[1] Threads;
+	mdmp_thread_ex_t[1] Threads;
 }
 
 //
 // Type 4 - Module list
 //
 
-struct mdmp_module {
+// 64-bit?
+struct mdmp_module_t {
 	ulong Imagebase;
 	uint ImageSize;
 	uint Checksum;
 	uint Timestamp;
 	uint ModuleNameRva;
-	mdmp_vs_fixedfileinfo VersionInfo;
-	mdmp_location_descriptor CvRecord;
-	mdmp_location_descriptor MiscRecord;
+	mdmp_vs_fixedfileinfo_t VersionInfo;
+	mdmp_location_descriptor_t CvRecord;
+	mdmp_location_descriptor_t MiscRecord;
 	ulong Reserved0;
 	ulong Reserved1;
 }
-struct mdmp_module_list {
+struct mdmp_module_list_t {
 	uint Count;
-	mdmp_module[1] Modules;
+	mdmp_module_t[1] Modules;
 }
 
 //
 // Functions
 //
 
+private
+struct internal_mdmp_t {
+	mdmp_header_t header;
+	mdmp_directory_entry_t *directories;
+}
+
 int adbg_object_mdmp_load(adbg_object_t *o) {
+	o.internal = calloc(1, internal_mdmp_t.sizeof);
+	if (o.internal == null)
+		return adbg_oops(AdbgError.crt);
+	if (adbg_object_read_at(o, 0, o.internal, mdmp_header_t.sizeof)) {
+		free(o.internal);
+		return adbg_errno();
+	}
+	
 	o.format = AdbgObject.mdmp;
 	
-	//if (o.i.mdmp.header.Version != MDMP
+	//TODO: Support swapping
 	
 	return 0;
+}
+
+mdmp_header_t* adbg_object_mdmp_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	return &(cast(internal_mdmp_t*)o.internal).header;
+}
+
+mdmp_directory_entry_t* adbg_object_mdmp_dir_entry(adbg_object_t *o, size_t index) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	internal_mdmp_t *internal = cast(internal_mdmp_t*)o.internal;
+	
+	if (index >= internal.header.StreamCount) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
+	
+	size_t size = internal.header.StreamCount * mdmp_directory_entry_t.sizeof;
+	
+	// Directories not loaded
+	if (internal.directories == null) {
+		internal.directories = cast(mdmp_directory_entry_t*)malloc(size);
+		if (internal.directories == null) {
+			adbg_oops(AdbgError.crt);
+			return null;
+		}
+		if (adbg_object_read_at(o, internal.header.StreamRva, internal.directories, size)) {
+			free(internal.directories);
+			return null;
+		}
+	}
+	
+	mdmp_directory_entry_t *entry = internal.directories + index;
+	if (adbg_bits_boundchk(entry, mdmp_directory_entry_t.sizeof, internal.directories, size)) {
+		adbg_oops(AdbgError.offsetBounds);
+		return null;
+	}
+	
+	return entry;
+}
+
+const(char)* adbg_object_mdmp_dir_entry_type_string(mdmp_directory_entry_t *entry) {
+	if (entry == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	switch (entry.StreamType) {
+	case ThreadListStream:	return "ThreadListStream";
+	case ModuleListStream:	return "ModuleListStream";
+	case MemoryListStream:	return "MemoryListStream";
+	case ExceptionStream:	return "ExceptionStream";
+	case SystemInfoStream:	return "SystemInfoStream";
+	case ThreadExListStream:	return "ThreadExListStream";
+	case Memory64ListStream:	return "Memory64ListStream";
+	case CommentStreamA:	return "CommentStreamA";
+	case CommentStreamW:	return "CommentStreamW";
+	case HandleDataStream:	return "HandleDataStream";
+	case FunctionTableStream:	return "FunctionTableStream";
+	case UnloadedModuleListStream:	return "UnloadedModuleListStream";
+	case MiscInfoStream:	return "MiscInfoStream";
+	case MemoryInfoListStream:	return "MemoryInfoListStream";
+	case ThreadInfoListStream:	return "ThreadInfoListStream";
+	case HandleOperationListStream:	return "HandleOperationListStream";
+	case TokenStream:	return "TokenStream";
+	case JavaScriptDataStream:	return "JavaScriptDataStream";
+	case SystemMemoryInfoStream:	return "SystemMemoryInfoStream";
+	case ProcessVmCountersStream:	return "ProcessVmCountersStream";
+	case IptTraceStream:	return "IptTraceStream";
+	case ThreadNamesStream:	return "ThreadNamesStream";
+	default:
+		adbg_oops(AdbgError.unimplemented);
+		return null;
+	}
+}
+
+uint adbg_object_mdmp_dir_entry_size(mdmp_directory_entry_t *entry) {
+	if (entry == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
+	return entry.Size;
+}
+void* adbg_object_mdmp_dir_entry_data(adbg_object_t *o, mdmp_directory_entry_t *entry) {
+	if (o == null || entry == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	void *data = malloc(entry.Size);
+	if (data == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	if (adbg_object_read_at(o, entry.Rva, data, entry.Size))
+		return null;
+	
+	return data;
+}
+void adbg_object_mdmp_dir_entry_data_close(void *data) {
+	if (data) free(data);
 }

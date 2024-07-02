@@ -224,11 +224,6 @@ struct adbg_object_t {
 		}
 		pdb70_t pdb70;
 		
-		struct mdmp_t {
-			mdump_header *header;
-		}
-		mdmp_t mdmp;
-		
 		struct omf_t {
 			omf_lib_header *header;
 			int pgsize;

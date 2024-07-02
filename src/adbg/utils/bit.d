@@ -213,7 +213,7 @@ unittest {
 /// 	bufsize = Size of the bufer memory allocation.
 /// Returns: True is pointer instance breaches outside allocated memory buffer.
 align(true)
-bool adbg_bits_ptrbounds(void *ptr, size_t sizeof, void *buffer, size_t bufsize) {
+bool adbg_bits_boundchk(void *ptr, size_t sizeof, void *buffer, size_t bufsize) {
 	// ptr + sizeof might overflow
 	return ptr < buffer || ptr >= buffer + bufsize || ptr + sizeof > buffer + bufsize;
 }
@@ -236,3 +236,5 @@ unittest {
 	assert(adbg_bits_ptrbounds(P!(-1), 4, P!0, 20));
 	assert(adbg_bits_ptrbounds(P!0, 100, P!0, 20));
 }
+
+alias adbg_bits_ptrbounds = adbg_bits_boundchk;

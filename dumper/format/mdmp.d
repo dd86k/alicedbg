@@ -19,8 +19,8 @@ int dump_minidump(adbg_object_t *o) {
 	if (SELECTED(Select.headers))
 		dump_minidump_headers(o);
 	
-	//if (SELECTED(Select.debug_))
-	//	dump_minidump_debug(o);
+	if (SELECTED(Select.debug_))
+		dump_minidump_debug(o);
 	
 	return 0;
 }
@@ -29,11 +29,14 @@ private:
 
 void dump_minidump_headers(adbg_object_t *o) {
 	print_header("Header");
-	with (o.i.mdmp.header) {
+	
+	mdmp_header_t *header = adbg_object_mdmp_header(o);
+	
+	with (header) {
 	print_x32("Signature", Signature);
 	print_x16("Magic", Magic);
 	print_u16("Version", Version);
-	print_x32("StreamCount", StreamCount);
+	print_u32("StreamCount", StreamCount);
 	print_x32("StreamRva", StreamRva);
 	print_x32("Checksum", Checksum);
 	print_x32("Timestamp", Timestamp, ctime32(Timestamp));
@@ -70,33 +73,25 @@ void dump_minidump_headers(adbg_object_t *o) {
 void dump_minidump_debug(adbg_object_t *o) {
 	print_header("Debug");
 	
-	uint cnt = o.i.mdmp.header.StreamCount;
-	uint off = o.i.mdmp.header.StreamRva;
-	mdmp_directory_entry *dir = void;
-	if (adbg_object_offsetl(o, cast(void**)&dir, off, cnt * mdmp_directory_entry.sizeof))
-		panic(1, "Directory outside file bounds");
-	
-	for (uint i; i < cnt; ++i) {
-		mdmp_directory_entry *entry = &dir[i];
-		
-		with (entry) {
-		print_x32("StreamType", StreamType);
-		print_x32("Size", Size);
-		print_x32("Rva", Rva);
-		}
+	reset_error();
+	size_t i;
+	for (mdmp_directory_entry_t *entry; (entry = adbg_object_mdmp_dir_entry(o, i)) != null; ++i) {
+		print_section(cast(uint)i);
+		print_u32("StreamType", entry.StreamType, adbg_object_mdmp_dir_entry_type_string(entry));
+		print_x32("Size", entry.Size);
+		print_x32("Rva", entry.Rva);
 		
 		switch (entry.StreamType) {
 		case ThreadListStream:
 			print_header("Threadlist");
 			
-			mdmp_threadlist *tlist = void;
-			if (adbg_object_offsetl(o, cast(void**)&tlist,
-				entry.Rva, uint.sizeof + mdmp_thread.sizeof)) {
-				print_warningf("Threadlist.Rva points outbound");
-				continue;
-			}
-			for (uint ti; ti < tlist.Count; ++ti) {
-				mdmp_thread *thread = &tlist.Threads.ptr[ti];
+			mdmp_threadlist_t *threads =
+				cast(mdmp_threadlist_t*)adbg_object_mdmp_dir_entry_data(o, entry);
+			if (threads == null)
+				panic_adbg();
+			
+			for (uint ti; ti < threads.Count; ++ti) {
+				mdmp_thread_t *thread = &threads.Threads.ptr[ti];
 				print_section(ti);
 				print_x32("ID", thread.ID);
 				print_x32("SuspendCount", thread.SuspendCount);
@@ -104,6 +99,7 @@ void dump_minidump_debug(adbg_object_t *o) {
 				print_x32("Priority", thread.Priority);
 				print_x64("Teb", thread.Teb);
 				
+				/*
 				X86_NT_CONTEXT *context = void;
 				if (adbg_object_offsetl(o, cast(void**)&context,
 					thread.ThreadContext.Rva, thread.ThreadContext.Size)) {
@@ -112,7 +108,10 @@ void dump_minidump_debug(adbg_object_t *o) {
 				}
 				
 				print_x32("Eip", context.Eip);
+				*/
 			}
+			
+			adbg_object_mdmp_dir_entry_data_close(threads);
 			break;
 		case ModuleListStream:
 			break;
@@ -159,4 +158,6 @@ void dump_minidump_debug(adbg_object_t *o) {
 		default: continue;
 		}
 	}
+	if (i == 0 && errorcode())
+		panic_adbg();
 }
