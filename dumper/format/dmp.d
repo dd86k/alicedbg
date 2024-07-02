@@ -11,6 +11,7 @@ import adbg.machines;
 import adbg.object.format.dmp;
 import adbg.object.format.pe : adbg_object_pe_machine_value_string;
 import dumper;
+import common.utils;
 
 extern (C):
 
@@ -26,9 +27,17 @@ private:
 void dump_dmp_header(adbg_object_t *o) {
 	print_header("Header");
 	
-	if (o.i.dmp.header.ValidDumpInt == PAGEDUMP64_VALID) with (o.i.dmp.header64) {
-		print_x32l("Signature", SignatureInt, Signature.ptr, 4);
-		print_x32l("ValidDump", ValidDumpInt, ValidDump.ptr, 4);
+	void *header = adbg_object_dmp_header(o);
+	
+	char[16] realbuf = void;
+	
+	if (adbg_object_dmp_is_64bit(o)) {
+		dmp64_header_t *header64 = cast(dmp64_header_t*)header;
+		with (header64) {
+		int l = realstring(realbuf.ptr, 16, Signature.ptr, Signature.sizeof);
+		print_x32l("Signature", Signature32, realbuf.ptr, l);
+		l = realstring(realbuf.ptr, 16, ValidDump.ptr, ValidDump.sizeof);
+		print_x32l("ValidDump", ValidDump32, realbuf.ptr, l);
 		print_u32("MajorVersion", MajorVersion);
 		print_u32("MinorVersion", MinorVersion);
 		print_x32("DirectoryTableBase", DirectoryTableBase);
@@ -44,9 +53,14 @@ void dump_dmp_header(adbg_object_t *o) {
 		print_x32("BugCheckParameter3", BugCheckParameters[2]);
 		print_x32("BugCheckParameter4", BugCheckParameters[3]);
 		print_x64("KdDebuggerDataBlock", KdDebuggerDataBlock);
-	} else with (o.i.dmp.header) {
-		print_x32l("Signature", SignatureInt, Signature.ptr, 4);
-		print_x32l("ValidDump", ValidDumpInt, ValidDump.ptr, 4);
+		}
+	} else {
+		dmp32_header_t *header32 = cast(dmp32_header_t*)header;
+		with (header32) {
+		int l = realstring(realbuf.ptr, 16, Signature.ptr, Signature.sizeof);
+		print_x32l("Signature", Signature32, realbuf.ptr, l);
+		l = realstring(realbuf.ptr, 16, ValidDump.ptr, ValidDump.sizeof);
+		print_x32l("ValidDump", ValidDump32, realbuf.ptr, l);
 		print_u32("MajorVersion", MajorVersion);
 		print_u32("MinorVersion", MinorVersion);
 		print_x32("DirectoryTableBase", DirectoryTableBase);
@@ -63,5 +77,6 @@ void dump_dmp_header(adbg_object_t *o) {
 		print_x32("BugCheckParameter4", BugCheckParameters[3]);
 		print_u8("PaeEnabled", PaeEnabled);
 		print_x32("KdDebuggerDataBlock", KdDebuggerDataBlock);
+		}
 	}
 }

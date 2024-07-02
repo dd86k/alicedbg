@@ -229,12 +229,6 @@ struct adbg_object_t {
 		}
 		mdmp_t mdmp;
 		
-		struct dmp_t {
-			dmp_header *header;
-			dmp64_header *header64;
-		}
-		dmp_t dmp;
-		
 		struct omf_t {
 			omf_lib_header *header;
 			int pgsize;
@@ -254,9 +248,6 @@ struct adbg_object_t {
 	deprecated
 	adbg_object_internals_t i;
 }
-
-//TODO: adbg_object_needswap
-//      Check origin (==disk) and swap field, return true if fields need to be swapped
 
 /// Check if pointer is outside the object bounds.
 /// Params:
@@ -395,10 +386,7 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 	
 	o.origin = AdbgObjectOrigin.disk;
 	
-	va_list list = void;
-	va_start(list, path);
-	
-	if (adbg_object_loadv(o, list)) {
+	if (adbg_object_loadv(o)) {
 		adbg_object_close(o);
 		return null;
 	}
@@ -521,52 +509,13 @@ union SIGNATURE {
 
 // Object detection and loading
 private
-int adbg_object_loadv(adbg_object_t *o, va_list args) {
+int adbg_object_loadv(adbg_object_t *o) {
 	if (o == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	o.status = 0;
 	memset(&o.p, 0, o.p.sizeof); // Init object properties
 	memset(&o.i, 0, o.i.sizeof); // Init object internal structures
-	
-	// options
-	/*
-L_ARG:	switch (va_arg!int(args)) {
-	case 0: break;
-	default:
-		return adbg_oops(AdbgError.invalidOption);
-	}
-	*/
-	
-	// SECTION: OLD STRATEGY
-	
-	// Get file size
-	if (fseek(o.file_handle, 0, SEEK_END))
-		return adbg_oops(AdbgError.crt);
-	o.file_size = ftell(o.file_handle);
-	if (o.file_size < 0) // -1
-		return adbg_oops(AdbgError.crt);
-	if (fseek(o.file_handle, 0, SEEK_SET))
-		return adbg_oops(AdbgError.crt);
-	version (Trace) trace("filesize=%llu", o.file_size);
-	
-	// Allocate
-	o.buffer_size = cast(size_t)o.file_size;
-	o.buffer = malloc(o.buffer_size);
-	if (o.buffer == null)
-		return adbg_oops(AdbgError.crt);
-	
-	// Read
-	if (fread(o.buffer, cast(size_t)o.file_size, 1, o.file_handle) == 0)
-		return adbg_oops(AdbgError.crt);
-	
-	// Set first header
-	// Also used in auto-detection
-	o.i.header = o.buffer;
-	
-	// SECTION: OLD STRATEGY
-	
-	// SECTION: NEW STRATEGY
 	
 	// Load minimum for signature detection
 	// Also tests seeking in case this is a streamed input
@@ -579,8 +528,6 @@ L_ARG:	switch (va_arg!int(args)) {
 		return adbg_oops(AdbgError.objectTooSmall);
 	if (osfseek(o.file, 0, OSFileSeek.start) < 0) // Reset offset, test seek
 		return adbg_oops(AdbgError.os);
-	
-	// !SECTION: NEW STRATEGY
 	
 	// Magic detection over 8 Bytes
 	if (siglen > PDB20_MAGIC.length &&

@@ -97,7 +97,7 @@ struct internal_coff_t {
 }
 
 int adbg_object_coff_load(adbg_object_t *o) {
-	o.internal = malloc(internal_coff_t.sizeof);
+	o.internal = calloc(1, internal_coff_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
 	
