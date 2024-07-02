@@ -42,17 +42,25 @@ For other platforms, package names are typically:
 
 Capstone is licensed under the BSD 3-Clause license.
 
-# Documentation
+# Hacking
 
-For information about compilation, internal structures, support,
-see the repository's Wiki for information.
+There are two main branches:
+- `master`: Main development branch. Very unstable.
+- `stable`: Last released branch.
+
+This project primarily uses [DUB](https://dub.pm/cli-reference/dub/)
+for compilation and unittesting.
+
+Wiki contains more information on structure, features, and compilation
+instructions.
 
 # Contributing
 
-Currently not looking for contributors, sorry.
+Because I'm not very good at managing people and I tend to be a little too
+pedantic, I am currently not looking for contributors, sorry.
 
-Feel free to provide suggestions regarding contributor management, features,
-and fixes.
+However, feel free to provide feedback regarding contributor management,
+features, enhancements, and fixes. It's appreciated.
 
 # License
 

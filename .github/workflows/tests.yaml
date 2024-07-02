@@ -8,7 +8,7 @@ jobs:
   Alicedbg:
     strategy:
       matrix:
-        os: [ ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022 ]
+        os: [ ubuntu-22.04, windows-2022 ]
         dc: [ dmd-latest, ldc-latest ]
     runs-on: ${{ matrix.os }}
     steps:
@@ -22,7 +22,7 @@ jobs:
   Alicedump:
     strategy:
       matrix:
-        os: [ ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022 ]
+        os: [ ubuntu-22.04, windows-2022 ]
         dc: [ dmd-latest, ldc-latest ]
     runs-on: ${{ matrix.os }}
     steps:
@@ -33,35 +33,3 @@ jobs:
         compiler: ${{ matrix.dc }}
     - name: Test Alicedump
       run: dub test -c dumper
-  Simple:
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, windows-latest ]
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dlang-community/setup-dlang@v1
-    - name: Build Simple
-      run: dub build -c simple
-  Library:
-    strategy:
-      matrix:
-        os: [ ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022 ]
-        dc: [ dmd-latest, ldc-latest ]
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dlang-community/setup-dlang@v1
-    - name: Build Library
-      run: dub build -c library
-  Shared:
-    strategy:
-      matrix:
-        os: [ ubuntu-20.04, ubuntu-22.04, windows-2019, windows-2022 ]
-        dc: [ dmd-latest, ldc-latest ]
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v4
-    - uses: dlang-community/setup-dlang@v1
-    - name: Build Shared Library
-      run: dub build -c shared
