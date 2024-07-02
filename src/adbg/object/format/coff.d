@@ -11,8 +11,11 @@
 /// License: BSD-3-Clause-Clear
 module adbg.object.format.coff;
 
-import adbg.object.server : AdbgObject, adbg_object_t;
+import adbg.object.server;
 import adbg.utils.bit;
+import adbg.machines;
+import adbg.error;
+import core.stdc.stdlib;
 
 enum : ushort {
 	/// i386 COFF magic
@@ -68,7 +71,7 @@ enum : ushort {
 }
 
 // NOTE: PE32 shares this header
-struct coff_header {
+struct coff_header_t {
 	/// Magic
 	ushort f_magic;
 	/// Number of sections
@@ -88,13 +91,77 @@ struct coff_header {
 	//       TI: extends this with ushort TargetID;
 }
 
-int adbg_object_coff_load(adbg_object_t *o, ushort sig) {
+private
+struct internal_coff_t {
+	coff_header_t header;
+}
+
+int adbg_object_coff_load(adbg_object_t *o) {
+	o.internal = malloc(internal_coff_t.sizeof);
+	if (o.internal == null)
+		return adbg_oops(AdbgError.crt);
+	
+	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
+	
+	if (adbg_object_read_at(o, 0, &internal.header, coff_header_t.sizeof))
+		return adbg_errno();
+	
 	o.format = AdbgObject.coff;
 	
-	o.i.coff.sig = sig;
-	// NOTE: No swapping is done because I'm lazy and this is one a per-machine basis
-	
+	// TODO: Support swapping
 	return 0;
+}
+void adbg_object_coff_unload(adbg_object_t *o) {
+	if (o == null) return;
+	if (o.internal == null) return;
+	
+	free(o.internal);
+}
+
+coff_header_t* adbg_object_coff_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	return &(cast(internal_coff_t*)o.internal).header;
+}
+
+AdbgMachine adbg_object_coff_machine(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return AdbgMachine.unknown;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return AdbgMachine.unknown;
+	}
+	
+	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
+	
+	switch (internal.header.f_magic) {
+	case COFF_MAGIC_I386:
+	case COFF_MAGIC_I386_AIX:	return AdbgMachine.i386;
+	case COFF_MAGIC_AMD64:	return AdbgMachine.amd64;
+	case COFF_MAGIC_IA64:	return AdbgMachine.ia64;
+	case COFF_MAGIC_Z80:	return AdbgMachine.z80;
+//	case COFF_MAGIC_MSP430:	return "MSP430";
+//	case COFF_MAGIC_TMS470:	return "TMS470";
+//	case COFF_MAGIC_TMS320C5400:	return "TMS320C5400";
+//	case COFF_MAGIC_TMS320C5500:	return "TMS320C5500";
+//	case COFF_MAGIC_TMS320C2800:	return "TMS320C2800";
+//	case COFF_MAGIC_TMS320C5500P:	return "TMS320C5500P";
+	case COFF_MAGIC_TMS320C6000:	return AdbgMachine.tic6000;
+	case COFF_MAGIC_MIPSEL:	return AdbgMachine.mipsle;
+	default:
+	}
+	
+	adbg_oops(AdbgError.objectUnknownFormat);
+	return AdbgMachine.unknown;
 }
 
 const(char)* adbg_object_coff_magic_string(ushort mach) {

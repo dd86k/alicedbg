@@ -28,7 +28,9 @@ private:
 void dump_coff_hdr(adbg_object_t *o) {
 	print_header("Header");
 	
-	with (o.i.coff.header) {
+	coff_header_t *header = adbg_object_coff_header(o);
+	
+	with (header) {
 	print_x16("f_magic", f_magic, adbg_object_coff_magic_string(f_magic));
 	print_u16("f_nscns", f_nscns);
 	print_u32("f_timedat", f_timedat);

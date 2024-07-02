@@ -204,48 +204,6 @@ struct adbg_object_t {
 		// Main header. All object files have some form of header.
 		void *header;
 		
-		struct macho_t {
-			union {
-				macho_header_t *header;
-				macho_fat_header_t *fat_header;
-			}
-			macho_fat_arch_entry_t *fat_arch;
-			macho_load_command_t *commands;
-			bool is64;
-			bool fat;
-			
-			bool *reversed_fat_arch;
-			bool *reversed_commands;
-		}
-		macho_t macho;
-		
-		struct elf32_t {
-			Elf32_Ehdr *ehdr;
-			Elf32_Phdr *phdr;
-			Elf32_Shdr *shdr;
-			
-			bool reversed_ehdr;
-			bool *reversed_phdr;
-			bool *reversed_shdr;
-		}
-		elf32_t elf32;
-		
-		struct elf64_t {
-			Elf64_Ehdr *ehdr;
-			Elf64_Phdr *phdr;
-			Elf64_Shdr *shdr;
-			
-			bool reversed_ehdr;
-			bool *reversed_phdr;
-			bool *reversed_shdr;
-		}
-		elf64_t elf64;
-		
-		struct ar_t {
-			size_t current;
-		}
-		ar_t ar;
-		
 		struct pdb20_t {
 			pdb20_file_header *header;
 		}
@@ -283,12 +241,6 @@ struct adbg_object_t {
 			int firstentry;
 		}
 		omf_t omf;
-		
-		struct coff_t {
-			coff_header *header;
-			ushort sig;
-		}
-		coff_t coff;
 		
 		union mscoff_t {
 			mscoff_import_header      *import_header;
@@ -619,11 +571,11 @@ L_ARG:	switch (va_arg!int(args)) {
 	// Load minimum for signature detection
 	// Also tests seeking in case this is a streamed input
 	SIGNATURE sig = void;
-	int ssz = osfread(o.file, &sig, SIGNATURE.sizeof); /// signature size
-	version (Trace) trace("ssz=%d", ssz);
-	if (ssz < 0)
+	int siglen = osfread(o.file, &sig, SIGNATURE.sizeof); /// signature size
+	version (Trace) trace("siglen=%d", siglen);
+	if (siglen < 0)
 		return adbg_oops(AdbgError.os);
-	if (ssz < 32) // File is empty or too small to mean anything
+	if (siglen <= uint.sizeof)
 		return adbg_oops(AdbgError.objectTooSmall);
 	if (osfseek(o.file, 0, OSFileSeek.start) < 0) // Reset offset, test seek
 		return adbg_oops(AdbgError.os);
@@ -631,14 +583,16 @@ L_ARG:	switch (va_arg!int(args)) {
 	// !SECTION: NEW STRATEGY
 	
 	// Magic detection over 8 Bytes
-	if (memcmp(sig.buffer.ptr, PDB20_MAGIC.ptr, PDB20_MAGIC.length) == 0)
+	if (siglen > PDB20_MAGIC.length &&
+		memcmp(sig.buffer.ptr, PDB20_MAGIC.ptr, PDB20_MAGIC.length) == 0)
 		return adbg_object_pdb20_load(o);
-	if (memcmp(sig.buffer.ptr, PDB70_MAGIC.ptr, PDB70_MAGIC.length) == 0)
+	if (siglen > PDB70_MAGIC.length &&
+		memcmp(sig.buffer.ptr, PDB70_MAGIC.ptr, PDB70_MAGIC.length) == 0)
 		return adbg_object_pdb70_load(o);
 	
 	// 64-bit signature detection
 	version (Trace) trace("u64=%#x", sig.u64);
-	switch (sig.u64) {
+	if (siglen > ulong.sizeof) switch (sig.u64) {
 	case AR_MAGIC:
 		return adbg_object_ar_load(o);
 	case PAGEDUMP32_MAGIC, PAGEDUMP64_MAGIC:
@@ -648,7 +602,7 @@ L_ARG:	switch (va_arg!int(args)) {
 	
 	// 32-bit signature detection
 	version (Trace) trace("u32=%#x", sig.u32);
-	switch (sig.u32) {
+	if (siglen > uint.sizeof) switch (sig.u32) {
 	case ELF_MAGIC:	// ELF
 		return adbg_object_elf_load(o);
 	case MACHO_MAGIC:	// Mach-O 32-bit
@@ -665,7 +619,7 @@ L_ARG:	switch (va_arg!int(args)) {
 	
 	// 16-bit signature detection
 	version (Trace) trace("u16=%#x", sig.u16);
-	switch (sig.u16) {
+	if (siglen > ushort.sizeof) switch (sig.u16) {
 	// Anonymous MSCOFF
 	case 0:
 		if (o.file_size < mscoff_anon_header_bigobj.sizeof)
@@ -673,6 +627,7 @@ L_ARG:	switch (va_arg!int(args)) {
 		if (o.i.mscoff.import_header.Sig2 != 0xffff)
 			return adbg_oops(AdbgError.objectUnknownFormat);
 		return adbg_object_mscoff_load(o);
+	// MZ executables
 	case MAGIC_MZ:
 		version (Trace) trace("e_lfarlc=%#x", sig.mzheader.e_lfarlc);
 		
@@ -725,15 +680,15 @@ L_ARG:	switch (va_arg!int(args)) {
 	case COFF_MAGIC_AMD64:
 	case COFF_MAGIC_IA64:
 	case COFF_MAGIC_Z80:
-	case COFF_MAGIC_TMS470:
-	case COFF_MAGIC_TMS320C5400:
-	case COFF_MAGIC_TMS320C6000:
-	case COFF_MAGIC_TMS320C5500:
-	case COFF_MAGIC_TMS320C2800:
 	case COFF_MAGIC_MSP430:
+	case COFF_MAGIC_TMS470:
+	case COFF_MAGIC_TMS320C2800:
+	case COFF_MAGIC_TMS320C5400:
+	case COFF_MAGIC_TMS320C5500:
 	case COFF_MAGIC_TMS320C5500P:
+	case COFF_MAGIC_TMS320C6000:
 	case COFF_MAGIC_MIPSEL:
-		return adbg_object_coff_load(o, sig.u16);
+		return adbg_object_coff_load(o);
 	default:
 	}
 	
@@ -741,8 +696,8 @@ L_ARG:	switch (va_arg!int(args)) {
 	version (Trace) trace("u8=%#x", sig.u8);
 	switch (sig.u8) {
 	case OMFRecord.LIBRARY: // OMF library header entry
-	case OMFRecord.THEADR: // First OMF object entry of THEADR
-	case OMFRecord.LHEADR: // First OMF object entry of LHEADR
+	case OMFRecord.THEADR:  // First OMF object entry of THEADR
+	case OMFRecord.LHEADR:  // First OMF object entry of LHEADR
 		return adbg_object_omf_load(o, sig.u8);
 	default:
 	}
@@ -887,87 +842,6 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 	return section;
 }
 
-deprecated
-export
-void* adbg_object_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	// NOTE: Cleared on allocation until image is loaded
-	return o.i.header;
-}
-
-deprecated
-adbg_section_t* adbg_object_section_n(adbg_object_t *o, const(char)* name, uint flags = 0) {
-	if (o == null || name == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-
-	// First, first the section header by name
-	void *headerp = void; size_t header_size = void;
-	void *datap = void;   size_t data_size = void;
-	switch (o.format) with (AdbgObject) {
-	//case pe:
-	//	break;
-	case elf:
-		switch (o.i.elf32.ehdr.e_ident[ELF_EI_CLASS]) {
-		case ELF_CLASS_32:
-			Elf32_Shdr *shdr32 = adbg_object_elf_shdr32_n(o, name);
-			if (shdr32 == null)
-				return null;
-			headerp = shdr32;
-			header_size = Elf32_Shdr.sizeof;
-			datap = o.buffer + shdr32.sh_offset;
-			data_size = shdr32.sh_size;
-			break;
-		case ELF_CLASS_64:
-			Elf64_Shdr *shdr64 = adbg_object_elf_shdr64_n(o, name);
-			if (shdr64 == null)
-				return null;
-			headerp = shdr64;
-			header_size = Elf64_Shdr.sizeof;
-			datap = o.buffer + shdr64.sh_offset;
-			data_size = cast(size_t)shdr64.sh_size;
-			break;
-		default:
-			goto Lunavail;
-		}
-		break;
-	default:
-	Lunavail:
-		adbg_oops(AdbgError.unavailable);
-		return null;
-	}
-	
-	// Is section within bounds?
-	if (adbg_object_outboundpl(o, datap, data_size)) {
-		adbg_oops(AdbgError.offsetBounds);
-		return null;
-	}
-	
-	// TODO: Turn into vararg helper tool
-	//       mcalloc(pointer, size, pointer, size, null);
-	// Then, allocate the memory to hold the header and data
-	adbg_section_t *section = cast(adbg_section_t*)malloc(
-		adbg_section_t.sizeof + header_size + data_size);
-	if (section == null) {
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
-	section.header      = cast(void*)section + adbg_section_t.sizeof;
-	section.header_size = header_size;
-	section.data        = cast(void*)section + adbg_section_t.sizeof + header_size;
-	section.data_size   = data_size;
-	// Copy section header and section data
-	memcpy(section.header, headerp, header_size);
-	memcpy(section.data,   datap,   data_size);
-
-	return section;
-}
-
 void adbg_object_section_close(adbg_object_t *o, adbg_section_t *section) {
 	if (section == null)
 		return;
@@ -1009,24 +883,8 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	case pe:	return adbg_object_pe_machine(o);
 	case macho:	return adbg_object_macho_machine(o);
 	case elf:	return adbg_object_elf_machine(o);
-	case coff:
-		switch (o.i.coff.sig) {
-		case COFF_MAGIC_I386:
-		case COFF_MAGIC_I386_AIX:	return AdbgMachine.i386;
-		case COFF_MAGIC_AMD64:	return AdbgMachine.amd64;
-		case COFF_MAGIC_IA64:	return AdbgMachine.ia64;
-		case COFF_MAGIC_Z80:	return AdbgMachine.z80;
-		/*case COFF_MAGIC_TMS470:	return AdbgMachine.;
-		/*case COFF_MAGIC_TMS320C5400:	return AdbgMachine.;
-		case COFF_MAGIC_TMS320C6000:	return AdbgMachine.;
-		case COFF_MAGIC_TMS320C5500:	return AdbgMachine.;
-		case COFF_MAGIC_TMS320C2800:	return AdbgMachine.;
-		case COFF_MAGIC_MSP430:	return AdbgMachine.;
-		case COFF_MAGIC_TMS320C5500P:	return AdbgMachine.;*/
-		case COFF_MAGIC_MIPSEL:	return AdbgMachine.mipsle;
-		default:
-		}
-		break;
+	case coff:	return adbg_object_coff_machine(o);
+	// TODO: For UNIX archives, get first object and return machine of sub object instance
 	default:
 	}
 	return AdbgMachine.unknown;
