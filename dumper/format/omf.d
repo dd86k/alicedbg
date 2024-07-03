@@ -14,7 +14,7 @@ extern (C):
 
 int dump_omf(adbg_object_t *o) {
 	if (SELECTED(Select.headers))
-		dump_omf_hdr(o);
+		dump_omf_header(o);
 	if (SELECTED(Select.debug_))
 		dump_omf_debug(o);
 	return 0;
@@ -22,53 +22,57 @@ int dump_omf(adbg_object_t *o) {
 
 private:
 
-void dump_omf_hdr(adbg_object_t *o) {
-	// Library
-	if (o.i.omf.firstentry) {
-		print_header("Library Header");
-		with (o.i.omf.header) {
-		print_x8("Type", type);
-		print_u16("RecordLength", size);
-		print_x32("DictionaryOffset", dicoff);
-		print_u16("DictionarySize", dicsize);
-		print_flags8("Flags", flags,
-			"CaseSensitive".ptr, OMF_LF_CS,
-			null);
-		}
+void dump_omf_header(adbg_object_t *o) {
+	print_header("Library Header");
+	
+	omf_lib_header_t *libheader = adbg_object_omf_library_header(o);
+	
+	if (libheader == null) {
+		print_warningf("Not a library, so no header");
+		return;
 	}
 	
+	with (libheader) {
+	print_x8("Type", type);
+	print_u16("RecordLength", size);
+	print_x32("DictionaryOffset", dicoff);
+	print_u16("DictionarySize", dicsize);
+	print_flags8("Flags", flags,
+		"CaseSensitive".ptr, OMF_LF_CS,
+		null);
+	}
+	
+	/*
 	print_header("First Object Entry");
 	omf_entry* entry = adbg_object_omf_entry(o, 0);
 	dump_omf_print_entry(entry);
 	adbg_object_omf_entry_close(o, entry);
+	*/
 }
 
 void dump_omf_debug(adbg_object_t *o) {
-	int offset = o.i.omf.firstentry;
-	
-Lentry:
-	omf_entry* entry = adbg_object_omf_entry(o, offset);
+	omf_entry_t *entry = adbg_object_omf_entry_first(o);
 	if (entry == null)
-		return;
+		panic_adbg();
 	
-	print_header("Entry");
-	if (dump_omf_print_entry(entry)) // print entry
-		return;
-	offset += entry.size + 3; // advance
-	adbg_object_omf_entry_close(o, entry); // free
-	goto Lentry;
+	do {
+		dump_omf_print_entry(entry);
+		adbg_object_omf_entry_close(entry);
+	} while ((entry = adbg_object_omf_entry_next(o)) != null);
 }
 
 // print entry
-int dump_omf_print_entry(omf_entry *entry) {
+int dump_omf_print_entry(omf_entry_t *entry) {
+	__gshared uint i;
+	print_section(i++);
 	print_x8("Type", entry.type, adbg_object_omf_type_string(entry));
 	print_u16("Size", entry.size);
 	print_x8("Checksum", entry.checksum);
 	switch (entry.type) with (OMFRecord) {
 	case THEADR, LHEADR:
-		ubyte len = (cast(ubyte*)entry.data)[0];
+		int len = (cast(ubyte*)entry.data)[0]; // string size
 		if (len >= entry.size)
-			panic(1, "String length outside bounds");
+			panic(3, "String length outside bounds");
 		const(char)* str = cast(const(char)*)entry.data + 1;
 		print_stringl("Name", str, len);
 		break;

@@ -106,7 +106,6 @@ enum AdbgObjectOrigin {
 
 package
 enum AdbgObjectInternalFlags {
-	//TODO: Rename to swapped since this is a little confusing
 	/// Object has its fields swapped because of its target endianness.
 	swapped	= 0x1,
 	/// Old alias for swapped.
@@ -229,13 +228,6 @@ struct adbg_object_t {
 			pdb70_stream *strmap;	/// Stream mapping
 		}
 		pdb70_t pdb70;
-		
-		struct omf_t {
-			omf_lib_header *header;
-			int pgsize;
-			int firstentry;
-		}
-		omf_t omf;
 	}
 	/// Internal object definitions.
 	deprecated
@@ -354,14 +346,6 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 		return null;
 	}
 	
-	//TODO: To remove
-	o.file_handle = fopen(path, "rb");
-	if (o.file_handle == null) {
-		free(o);
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
-	
 	o.file = osfopen(path, OSFileOFlags.read);
 	if (o.file == null) {
 		free(o);
@@ -403,10 +387,6 @@ void adbg_object_close(adbg_object_t *o) {
 	default:
 	}
 	if (o.file) osfclose(o.file);
-	if (o.file_handle)
-		fclose(o.file_handle);
-	if (o.buffer && o.buffer_size)
-		free(o.buffer);
 	free(o);
 }
 
@@ -830,7 +810,6 @@ const(char)* adbg_object_type_shortname(adbg_object_t *o) {
 	if (o == null)
 		goto Lunknown;
 	//TODO: Consider merging pdb20 and pdb70 to only "pdb"
-	//TODO: Consider dropping "le" to stick only with "lx"
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return "mz";
 	case ne:	return "ne";
@@ -889,16 +868,11 @@ const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	case pe:	return adbg_object_pe_kind_string(o);
 	case macho:	return adbg_object_macho_kind_string(o);
 	case elf:	return adbg_object_elf_kind_string(o);
-	case pdb20, pdb70:
-		return `Debug Database`;
-	case mdmp, dmp:
-		return `Memory Dump`;
-	case archive:
-		return `Library`;
-	case omf:
-		return o.i.omf.firstentry ? `Library` : `Object`;
-	case coff, mscoff:
-		return `Object`;
+	case pdb20, pdb70:	return `Debug Database`;
+	case mdmp, dmp:	return `Memory Dump`;
+	case archive, mscoff:	return `Library`;
+	case omf:	return adbg_object_omf_is_library(o) ? `Library` : `Object`;
+	case coff:	return `Object`;
 	default:
 	}
 	return null;
