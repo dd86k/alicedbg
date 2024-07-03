@@ -11,8 +11,11 @@ module adbg.object.format.mscoff;
 
 // NOTE: PE32/PE-COFF is an extension of COFF and MZ
 
-import adbg.object.server : AdbgObject, adbg_object_t;
+import adbg.object.server;
 import adbg.utils.uid;
+import adbg.utils.math;
+import adbg.error;
+import core.stdc.stdlib;
 
 //
 // Non-COFF Object file headers (.obj from VS2002-VS2015, mscoff)
@@ -44,7 +47,7 @@ enum {
 	MSCOFF_IMPORT_NAME_EXPORTAS = 4,
 }
 
-struct mscoff_import_header { // IMPORT_OBJECT_HEADER
+struct mscoff_import_header_t { // IMPORT_OBJECT_HEADER
 	/// Must be IMAGE_FILE_MACHINE_UNKNOWN.
 	ushort Sig1;
 	/// Must be 0xFFFF.
@@ -64,7 +67,7 @@ struct mscoff_import_header { // IMPORT_OBJECT_HEADER
 	ulong Flags;
 }
 
-struct mscoff_anon_header { // ANON_OBJECT_HEADER
+struct mscoff_anon_header_t { // ANON_OBJECT_HEADER
 	ushort Sig1;            // Must be IMAGE_FILE_MACHINE_UNKNOWN
 	ushort Sig2;            // Must be 0xffff
 	ushort Version;         // >= 1 (implies the CLSID field is present)
@@ -75,7 +78,7 @@ struct mscoff_anon_header { // ANON_OBJECT_HEADER
 	uint   SizeOfData;      // Size of data that follows the header
 }
 
-struct mscoff_anon_header_v2 { // ANON_OBJECT_HEADER_V2
+struct mscoff_anon_header_v2_t { // ANON_OBJECT_HEADER_V2
 	ushort Sig1;            // Must be IMAGE_FILE_MACHINE_UNKNOWN
 	ushort Sig2;            // Must be 0xffff
 	ushort Version;         // >= 2 (implies the Flags field is present - otherwise V1)
@@ -89,7 +92,7 @@ struct mscoff_anon_header_v2 { // ANON_OBJECT_HEADER_V2
 	uint   MetaDataOffset;  // Offset of CLR metadata
 }
 
-struct mscoff_anon_header_bigobj { // ANON_OBJECT_HEADER_BIGOBJ
+struct mscoff_anon_header_bigobj_t { // ANON_OBJECT_HEADER_BIGOBJ
 	/* same as ANON_OBJECT_HEADER_V2 */
 	ushort Sig1;            // Must be IMAGE_FILE_MACHINE_UNKNOWN
 	ushort Sig2;            // Must be 0xffff
@@ -112,7 +115,7 @@ struct mscoff_anon_header_bigobj { // ANON_OBJECT_HEADER_BIGOBJ
 // Same as PE32
 enum SYMNMLEN = 8;
 
-struct mscoff_anon_symbol_table32 {
+struct mscoff_anon_symbol_table32_t {
 	union {
 		ubyte[SYMNMLEN] Name;
 		struct {
@@ -126,9 +129,9 @@ struct mscoff_anon_symbol_table32 {
 	ubyte StorageClass;
 	ubyte NumberOfAuxSymbols;
 }
-static assert(mscoff_anon_symbol_table32.sizeof == 20);
+static assert(mscoff_anon_symbol_table32_t.sizeof == 20);
 
-struct mscoff_anon_symbol_table { align(1):
+struct mscoff_anon_symbol_table_t { align(1):
 	ubyte[SYMNMLEN] Name;
 	uint Value;
 	short SectionNumber;
@@ -136,12 +139,60 @@ struct mscoff_anon_symbol_table { align(1):
 	ubyte StorageClass;
 	ubyte NumberOfAuxSymbols;
 }
-static assert(mscoff_anon_symbol_table.sizeof == 18);
+static assert(mscoff_anon_symbol_table_t.sizeof == 18);
+
+private
+struct internal_mscoff_t {
+	union {
+		mscoff_import_header_t import_header;
+		mscoff_anon_header_t anon_header;
+		mscoff_anon_header_v2_t anonv2_header;
+	}
+}
+
+private enum MAX1 = MAX!(mscoff_anon_header_t.sizeof, mscoff_anon_header_v2_t.sizeof);
+private enum MAX2 = MAX!(MAX1, mscoff_import_header_t.sizeof);
 
 int adbg_object_mscoff_load(adbg_object_t *o) {
+	o.internal = calloc(1, internal_mscoff_t.sizeof);
+	if (o.internal == null)
+		return adbg_oops(AdbgError.crt);
+	if (adbg_object_read_at(o, 0, o.internal, MAX2))
+		return adbg_errno();
+	
 	o.format = AdbgObject.mscoff;
 	
-	// NOTE: No swapping is done because there is currently no sane way of detecting it
+	// TODO: Support swapping
 	
 	return 0;
+}
+void adbg_object_mscoff_unload(adbg_object_t *o) {
+	if (o == null) return;
+	if (o.internal == null) return;
+	free(o.internal);
+}
+
+uint adbg_object_mscoff_version(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return -1;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return -1;
+	}
+	internal_mscoff_t *internal = cast(internal_mscoff_t*)o.internal;
+	return internal.anon_header.Version;
+}
+
+void* adbg_object_mscoff_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	return o.internal;
 }

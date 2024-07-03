@@ -15,19 +15,21 @@ import dumper;
 
 int dump_mscoff(adbg_object_t *o) {
 	if (SELECTED(Select.headers))
-		dump_mscoff_hdr(o);
+		dump_mscoff_header(o);
 	
 	return 0;
 }
 
 private:
 
-void dump_mscoff_hdr(adbg_object_t *o) {
+void dump_mscoff_header(adbg_object_t *o) {
 	print_header("Header");
 	
-	switch (o.i.mscoff.import_header.Version) {
+	mscoff_import_header_t *header = cast(mscoff_import_header_t*)adbg_object_mscoff_header(o);
+	
+	switch (header.Version) {
 	case MSCOFF_VERSION_IMPORT: // 0
-		with (o.i.mscoff.import_header) {
+		with (header) {
 		print_x16("Sig1", Sig1);
 		print_x16("Sig2", Sig2);
 		print_u16("Version", Version);
@@ -39,7 +41,8 @@ void dump_mscoff_hdr(adbg_object_t *o) {
 		}
 		break;
 	case MSCOFF_VERSION_ANON: // 1
-		with (o.i.mscoff.anon_header) {
+		mscoff_anon_header_t *header1 = cast(mscoff_anon_header_t*)header;
+		with (header1) {
 		print_x16("Sig1", Sig1);
 		print_x16("Sig2", Sig2);
 		print_u16("Version", Version);
@@ -52,7 +55,8 @@ void dump_mscoff_hdr(adbg_object_t *o) {
 		}
 		break;
 	case MSCOFF_VERSION_ANONV2: // 2
-		with (o.i.mscoff.anon_v2_header) {
+		mscoff_anon_header_v2_t *header2 = cast(mscoff_anon_header_v2_t*)header;
+		with (header2) {
 		print_x16("Sig1", Sig1);
 		print_x16("Sig2", Sig2);
 		print_u16("Version", Version);

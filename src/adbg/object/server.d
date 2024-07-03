@@ -43,13 +43,17 @@ extern (C):
 //       (e.g., pe, elf, etc.) to make things consistent. This is why
 //       auxiliary names are simply "adbg_object_offset", for example.
 
-//TODO: Consider structure definition, using a template
+// TODO: Consider structure definition, using a template
 //      Uses:
 //      - For swapping, uses less code than inlining it
 //      - For displaying and using field offsets
-//TODO: adbg_object_endiannes
-//      Why? Machine module do not include endianness.
-//           And would be beneficial when host has incompatible endianness.
+// TODO: adbg_object_endiannes
+//       Why? Machine module do not include endianness.
+//       And would be beneficial when host has incompatible endianness.
+// TODO: adbg_object_open_process(int pid, ...)
+// TODO: adbg_object_open_buffer(void *buffer, size_t size, ...)
+// TODO: Consider function to ease submodule setup
+//       adbg_object_setup(AdbgObject type, size_t internal_buffer_size, void function(adbg_object_t*) fclose)
 
 /// Executable or object file format.
 enum AdbgObject {
@@ -87,16 +91,7 @@ enum AdbgObject {
 	mscoff,
 }
 
-// 
-/*enum AdbgObjectKind {
-	unknown,
-	executable,
-}*/
-
-// NOTE: This enum is a little weird but should be used as an I/O strategy
-/// Object origin. (or "load mode")
-///
-/// How was the object loaded or hooked.
+/// Object origin. Used in adbg_object_read.
 private
 enum AdbgObjectOrigin {
 	/// Object is unloaded, or the loading method is unknown.
@@ -161,6 +156,10 @@ struct adbg_object_t {
 			adbg_process_t *process;
 			size_t location;
 		}
+		struct {
+			void *user_buffer;
+			size_t user_size;
+		}
 	}
 	
 	/// Object's loading origin.
@@ -175,6 +174,11 @@ struct adbg_object_t {
 	// NOTE: This can be turned into a static buffer.
 	/// Managed by the object handler.
 	void *internal;
+	
+	package:
+	
+	/// Used to attach the unload function
+	void function(adbg_object_t*) func_unload;
 	
 	//TODO: Deprecate *all* of this
 	
@@ -230,14 +234,6 @@ struct adbg_object_t {
 			int firstentry;
 		}
 		omf_t omf;
-		
-		union mscoff_t {
-			mscoff_import_header      *import_header;
-			mscoff_anon_header        *anon_header;
-			mscoff_anon_header_v2     *anon_v2_header;
-			mscoff_anon_header_bigobj *anon_big_header;
-		}
-		mscoff_t mscoff;
 	}
 	/// Internal object definitions.
 	deprecated
@@ -389,11 +385,6 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 	return o;
 }
 
-/*adbg_object_t* adbg_object_open_process(adbg_process_t *proc) {
-	adbg_oops(AdbgError.unimplemented);
-	return null;
-}*/
-
 /// Close object instance.
 /// Params: o = Object instance.
 export
@@ -457,7 +448,9 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 	return adbg_oops(AdbgError.unimplemented);
 }
 
-//TODO: adbg_object_read_at: Add flag to allocate memory. Or make a new function (new signature)
+//TODO: adbg_object_readalloc_at: Allocate memory and read.
+//      void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, int flags)
+
 /// Read raw data from object at absolute position.
 /// Params:
 /// 	o = Object instance.
@@ -491,10 +484,13 @@ int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rd
 	return adbg_object_read(o, buffer, rdsize);
 }
 
-/// 
+/// Size of signature buffer.
+private enum SIGMAX = MAX!(PDB20_MAGIC.length, PDB70_MAGIC.length);
+
+/// Used in signature detection.
 private
 union SIGNATURE {
-	ubyte[64] buffer;
+	ubyte[SIGMAX] buffer;
 	ulong u64;
 	uint u32;
 	ushort u16;
@@ -509,14 +505,12 @@ int adbg_object_loadv(adbg_object_t *o) {
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	o.status = 0;
-	memset(&o.p, 0, o.p.sizeof); // Init object properties
-	memset(&o.i, 0, o.i.sizeof); // Init object internal structures
 	
 	// Load minimum for signature detection
 	// Also tests seeking in case this is a streamed input
 	SIGNATURE sig = void;
 	int siglen = osfread(o.file, &sig, SIGNATURE.sizeof); /// signature size
-	version (Trace) trace("siglen=%d", siglen);
+	version (Trace) trace("siglen=%d sigmax=%u", siglen, cast(uint)SIGMAX);
 	if (siglen < 0)
 		return adbg_oops(AdbgError.os);
 	if (siglen <= uint.sizeof)
@@ -564,11 +558,9 @@ int adbg_object_loadv(adbg_object_t *o) {
 	if (siglen > ushort.sizeof) switch (sig.u16) {
 	// Anonymous MSCOFF
 	case 0:
-		if (o.file_size < mscoff_anon_header_bigobj.sizeof)
-			return adbg_oops(AdbgError.objectUnknownFormat);
-		if (o.i.mscoff.import_header.Sig2 != 0xffff)
-			return adbg_oops(AdbgError.objectUnknownFormat);
-		return adbg_object_mscoff_load(o);
+		if (siglen > uint.sizeof && (sig.u32 >> 16) == 0xffff)
+			return adbg_object_mscoff_load(o);
+		break;
 	// MZ executables
 	case MAGIC_MZ:
 		version (Trace) trace("e_lfarlc=%#x", sig.mzheader.e_lfarlc);
