@@ -18,6 +18,8 @@ import adbg.object.server;
 import adbg.error;
 import core.stdc.stdlib;
 
+extern (C):
+
 // NOTE: Checksums are either 0 or a modulo 256
 
 /*enum {
@@ -149,8 +151,6 @@ int adbg_object_omf_load(adbg_object_t *o, ubyte first) {
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
 	
-	o.format = AdbgObject.omf;
-	
 	// NOTE: No swapping is done because I'm lazy
 	
 	internal_omf_t *internal = cast(internal_omf_t*)o.internal;
@@ -174,6 +174,8 @@ int adbg_object_omf_load(adbg_object_t *o, ubyte first) {
 	default:
 		return adbg_oops(AdbgError.objectMalformed);
 	}
+	
+	adbg_object_postload(o, AdbgObject.omf, &adbg_object_omf_unload);
 	
 	return 0;
 }

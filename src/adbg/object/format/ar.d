@@ -18,6 +18,8 @@ import adbg.object.server;
 import adbg.utils.bit;
 import core.stdc.stdlib;
 
+extern (C):
+
 // NOTE: Possible object formats included
 //       - ELF relocatable objects (POSIX)
 //       - COFF objects (Windows)
@@ -166,7 +168,7 @@ int adbg_object_ar_load(adbg_object_t *o) {
 	if (o.internal == null) 
 		return adbg_oops(AdbgError.crt);
 		
-	o.format = AdbgObject.archive;
+	adbg_object_postload(o, AdbgObject.archive, &adbg_object_ar_unload);
 	return 0;
 }
 

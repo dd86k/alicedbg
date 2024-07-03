@@ -24,6 +24,8 @@ import adbg.machines : AdbgMachine;
 import adbg.utils.bit;
 import core.stdc.stdlib;
 
+extern (C):
+
 /// Smallest Mach-O size.
 // https://codegolf.stackexchange.com/a/154685
 private enum MINIMUM_SIZE = 0x1000; // Due to paging
@@ -521,8 +523,6 @@ int adbg_object_macho_load(adbg_object_t *o, uint magic) {
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
 	
-	o.format = AdbgObject.macho;
-	
 	// Bit messy but can be made better later
 	size_t size = void;
 	switch (magic) {
@@ -554,6 +554,8 @@ int adbg_object_macho_load(adbg_object_t *o, uint magic) {
 	}
 	if (adbg_object_read_at(o, 0, o.internal, size))
 		return adbg_errno();
+	
+	adbg_object_postload(o, AdbgObject.macho, &adbg_object_macho_unload);
 	
 	version (Trace) trace("status=%#x", o.status);
 	

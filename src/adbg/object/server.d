@@ -53,7 +53,7 @@ extern (C):
 // TODO: adbg_object_open_process(int pid, ...)
 // TODO: adbg_object_open_buffer(void *buffer, size_t size, ...)
 // TODO: Consider function to ease submodule setup
-//       adbg_object_setup(AdbgObject type, size_t internal_buffer_size, void function(adbg_object_t*) fclose)
+//       adbg_object_postload(AdbgObject type, size_t internal_buffer_size, void function(adbg_object_t*) fclose)
 
 /// Executable or object file format.
 enum AdbgObject {
@@ -174,12 +174,8 @@ struct adbg_object_t {
 	/// Managed by the object handler.
 	void *internal;
 	
-	/*
-	package:
-	
 	/// Used to attach the unload function
 	void function(adbg_object_t*) func_unload;
-	*/
 	
 	//TODO: Deprecate *all* of this
 	
@@ -232,6 +228,18 @@ struct adbg_object_t {
 	/// Internal object definitions.
 	deprecated
 	adbg_object_internals_t i;
+}
+
+// Internal function for submodules to setup internals
+package
+void adbg_object_postload(adbg_object_t *o,
+	AdbgObject type, void function(adbg_object_t *o) funload) {
+	assert(o);
+	assert(type);
+	assert(funload);
+	
+	o.format = type;
+	o.func_unload = funload;
 }
 
 /// Check if pointer is outside the object bounds.
@@ -360,6 +368,9 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 		return null;
 	}
 	
+	version (Trace) if (o.func_unload == null)
+		trace("WARNING: object type %d does not have unload function set", o.format);
+	
 	return o;
 }
 
@@ -369,24 +380,11 @@ export
 void adbg_object_close(adbg_object_t *o) {
 	if (o == null)
 		return;
-	//TODO: Consider attaching function pointer for unloading.
-	//      This would help submodule management.
-	switch (o.format) with (AdbgObject) {
-	case mz:	adbg_object_mz_unload(o); break;
-	case ne:	adbg_object_ne_unload(o); break;
-	case lx:	adbg_object_lx_unload(o); break;
-	case pe:	adbg_object_pe_unload(o); break;
-	case macho:	adbg_object_macho_unload(o); break;
-	case elf:	adbg_object_elf_unload(o); break;
-	case pdb70:
-		//TODO: Remove junk
-		with (o.i.pdb70) if (dir) free(dir);
-		with (o.i.pdb70) if (strmap) free(strmap);
-		break;
-	case archive:	adbg_object_ar_unload(o); break;
-	default:
-	}
+	
+	if (o.func_unload) o.func_unload(o);
+	
 	if (o.file) osfclose(o.file);
+	
 	free(o);
 }
 

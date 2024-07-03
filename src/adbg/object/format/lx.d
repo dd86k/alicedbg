@@ -11,7 +11,7 @@
 module adbg.object.format.lx;
 
 import adbg.error;
-import adbg.object.server : adbg_object_t, AdbgObject, adbg_object_read_at;
+import adbg.object.server;
 import adbg.machines;
 import adbg.utils.bit;
 import core.stdc.stdlib;
@@ -371,7 +371,6 @@ struct internal_lx_t {
 int adbg_object_lx_load(adbg_object_t *o, uint e_lfanew) {
 	version (Trace) trace("o=%p", o);
 	
-	o.format = AdbgObject.lx;
 	o.internal = calloc(1, internal_lx_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
@@ -380,6 +379,8 @@ int adbg_object_lx_load(adbg_object_t *o, uint e_lfanew) {
 		o.internal = null;
 		return adbg_errno();
 	}
+	
+	adbg_object_postload(o, AdbgObject.lx, &adbg_object_lx_unload);
 	
 	//TODO: Deal with word order
 	

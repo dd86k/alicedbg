@@ -10,6 +10,8 @@ import adbg.object.server;
 import adbg.utils.bit;
 import core.stdc.stdlib : malloc, calloc, free;
 
+extern (C):
+
 //TODO: Support compressed MZ files?
 
 /// Minimum file size for an MZ EXE.
@@ -83,7 +85,6 @@ int adbg_object_mz_load(adbg_object_t *o) {
 	version (Trace) trace("o=%p", o);
 	
 	// Set format and allocate object internals
-	o.format = AdbgObject.mz;
 	o.internal = calloc(1, internal_mz_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
@@ -91,6 +92,8 @@ int adbg_object_mz_load(adbg_object_t *o) {
 		free(o.internal);
 		return adbg_errno();
 	}
+	
+	adbg_object_postload(o, AdbgObject.mz, &adbg_object_mz_unload);
 	
 	// Inverse header if required
 	mz_header_t* header = cast(mz_header_t*)o.internal;

@@ -844,7 +844,6 @@ struct internal_pe_t {
 /// 	e_lfanew = Location of PE COFF Header.
 /// Returns: Error code.
 int adbg_object_pe_load(adbg_object_t *o, uint e_lfanew) {
-	o.format = AdbgObject.pe;
 	o.internal = calloc(1, internal_pe_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
@@ -1033,6 +1032,8 @@ int adbg_object_pe_load(adbg_object_t *o, uint e_lfanew) {
 		Reserved.rva	= adbg_bswap32(Reserved.rva);
 		Reserved.size	= adbg_bswap32(Reserved.size);
 	}
+	
+	adbg_object_postload(o, AdbgObject.pe, &adbg_object_pe_unload);
 	
 	return 0;
 }

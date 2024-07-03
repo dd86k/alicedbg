@@ -19,6 +19,8 @@ import adbg.include.c.config;
 import core.stdc.string : strncmp;
 import adbg.utils.math : MAX;
 
+extern (C):
+
 // NOTE: The string table section is typically named .shstrtab
 
 /// Signature magic for ELF.
@@ -44,8 +46,6 @@ private alias int	Elf64_Sword;
 private alias uint	Elf64_Word;
 private alias ulong	Elf64_Xword;
 private alias long	Elf64_Sxword;
-
-extern (C):
 
 // Constants
 
@@ -1063,7 +1063,6 @@ struct internal_elf_t {
 }
 
 int adbg_object_elf_load(adbg_object_t *o) {
-	o.format = AdbgObject.elf;
 	o.internal = calloc(1, internal_elf_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
@@ -1071,6 +1070,8 @@ int adbg_object_elf_load(adbg_object_t *o) {
 	// Read much of the header as possible
 	if (adbg_object_read_at(o, 0, o.internal, MAX!(Elf32_Ehdr.sizeof, Elf64_Ehdr.sizeof)))
 		return adbg_errno();
+	
+	adbg_object_postload(o, AdbgObject.elf, &adbg_object_elf_unload);
 	
 	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
 	

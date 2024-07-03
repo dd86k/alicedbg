@@ -15,6 +15,8 @@ import adbg.utils.bit;
 import adbg.utils.math : MAX;
 import core.stdc.stdlib;
 
+extern (C):
+
 /// 
 enum PAGEDUMP32_MAGIC = CHAR64!"PAGEDUMP";
 /// 
@@ -41,15 +43,15 @@ private enum DMP_HEADER_COMMENT_SIZE             = 128;
 
 alias DUMP_TYPES = int;
 enum {
-    DUMP_TYPE_INVALID           = -1,
-    DUMP_TYPE_UNKNOWN           = 0,
-    DUMP_TYPE_FULL              = 1,
-    DUMP_TYPE_SUMMARY           = 2,
-    DUMP_TYPE_HEADER            = 3,
-    DUMP_TYPE_TRIAGE            = 4,
-    DUMP_TYPE_BITMAP_FULL       = 5,
-    DUMP_TYPE_BITMAP_KERNEL     = 6,
-    DUMP_TYPE_AUTOMATIC         = 7
+	DUMP_TYPE_INVALID           = -1,
+	DUMP_TYPE_UNKNOWN           = 0,
+	DUMP_TYPE_FULL              = 1,
+	DUMP_TYPE_SUMMARY           = 2,
+	DUMP_TYPE_HEADER            = 3,
+	DUMP_TYPE_TRIAGE            = 4,
+	DUMP_TYPE_BITMAP_FULL       = 5,
+	DUMP_TYPE_BITMAP_KERNEL     = 6,
+	DUMP_TYPE_AUTOMATIC         = 7
 }
 
 // _DUMP_FILE_ATTRIBUTES
@@ -270,7 +272,7 @@ int adbg_object_dmp_load(adbg_object_t *o) {
 		return adbg_errno();
 	}
 	
-	o.format = AdbgObject.dmp;
+	adbg_object_postload(o, AdbgObject.dmp, &adbg_object_dmp_unload);
 	
 	internal_dmp_t *internal = cast(internal_dmp_t*)o.internal;
 	

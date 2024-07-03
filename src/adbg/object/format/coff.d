@@ -17,6 +17,8 @@ import adbg.machines;
 import adbg.error;
 import core.stdc.stdlib;
 
+extern (C):
+
 enum : ushort {
 	/// i386 COFF magic
 	COFF_MAGIC_I386	= I16!(0x4c, 0x01),	// 0x14c
@@ -106,7 +108,7 @@ int adbg_object_coff_load(adbg_object_t *o) {
 	if (adbg_object_read_at(o, 0, &internal.header, coff_header_t.sizeof))
 		return adbg_errno();
 	
-	o.format = AdbgObject.coff;
+	adbg_object_postload(o, AdbgObject.coff, &adbg_object_coff_unload);
 	
 	// TODO: Support swapping
 	return 0;

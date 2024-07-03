@@ -325,7 +325,6 @@ struct internal_ne_t {
 int adbg_object_ne_load(adbg_object_t *o, uint e_lfanew) {
 	version (Trace) trace("o=%p", o);
 	
-	o.format = AdbgObject.ne;
 	o.internal = calloc(1, internal_ne_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
@@ -334,6 +333,8 @@ int adbg_object_ne_load(adbg_object_t *o, uint e_lfanew) {
 		o.internal = null;
 		return adbg_errno();
 	}
+	
+	adbg_object_postload(o, AdbgObject.ne, &adbg_object_ne_unload);
 	
 	with (cast(ne_header_t*)o.internal)
 	if (o.status & AdbgObjectInternalFlags.reversed) {

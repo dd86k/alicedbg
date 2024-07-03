@@ -14,6 +14,8 @@ import adbg.error;
 import adbg.utils.bit;
 import core.stdc.stdlib;
 
+extern (C):
+
 // NOTE: Minidump version.
 //       MSDN states: "The version of the minidump format. The low-order word
 //                     is MINIDUMP_VERSION. The high-order word is an internal
@@ -311,7 +313,7 @@ int adbg_object_mdmp_load(adbg_object_t *o) {
 		return adbg_errno();
 	}
 	
-	o.format = AdbgObject.mdmp;
+	adbg_object_postload(o, AdbgObject.mdmp, &adbg_object_mdmp_unload);
 	
 	//TODO: Support swapping
 	

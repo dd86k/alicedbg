@@ -17,6 +17,8 @@ import adbg.utils.math;
 import adbg.error;
 import core.stdc.stdlib;
 
+extern (C):
+
 //
 // Non-COFF Object file headers (.obj from VS2002-VS2015, mscoff)
 //
@@ -160,7 +162,7 @@ int adbg_object_mscoff_load(adbg_object_t *o) {
 	if (adbg_object_read_at(o, 0, o.internal, MAX2))
 		return adbg_errno();
 	
-	o.format = AdbgObject.mscoff;
+	adbg_object_postload(o, AdbgObject.mscoff, &adbg_object_mscoff_unload);
 	
 	// TODO: Support swapping
 	
