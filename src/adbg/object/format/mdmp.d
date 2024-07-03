@@ -14,20 +14,18 @@ import adbg.error;
 import adbg.utils.bit;
 import core.stdc.stdlib;
 
+// NOTE: Minidump version.
+//       MSDN states: "The version of the minidump format. The low-order word
+//                     is MINIDUMP_VERSION. The high-order word is an internal
+//                     value that is implementation specific."
+//       Observed values
+//       SDK (from version 5.0 to 10) defines it as 42899 (0xa793).
+//         For user-generated dumps?
+//       41053 (0xa05d) - Windows 11 64-bit process
+//       41057 (0xa061) - WoW64 32-bit process
+
 /// Signature value
 enum MDMP_MAGIC = CHAR32!"MDMP";
-/// Minidump version defined by WinNT 10.0.22621.0
-// Version SDK
-// 41053   Unknown - Target is 64-bit, Windows 11
-// 41057   Unknown - Target was 32-bit on WoW64
-// 42899   5.0
-// 42899   6.0
-// 42899   7.0
-// 42899   7.1
-// 42899   8.0
-// 42899   10.0.22000.0
-// 42899   10.0.22621.0
-enum ushort MDMP_VERSION	= 42899;
 
 alias MINIDUMP_STREAM_TYPE = int;
 enum : MINIDUMP_STREAM_TYPE {
@@ -318,6 +316,16 @@ int adbg_object_mdmp_load(adbg_object_t *o) {
 	//TODO: Support swapping
 	
 	return 0;
+}
+void adbg_object_mdmp_unload(adbg_object_t *o) {
+	if (o == null)
+	if (o.internal == null) return;
+	
+	internal_mdmp_t *internal = cast(internal_mdmp_t*)o.internal;
+	
+	if (internal.directories) free(internal.directories);
+	
+	free(o.internal);
 }
 
 mdmp_header_t* adbg_object_mdmp_header(adbg_object_t *o) {

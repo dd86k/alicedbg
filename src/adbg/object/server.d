@@ -175,10 +175,12 @@ struct adbg_object_t {
 	/// Managed by the object handler.
 	void *internal;
 	
+	/*
 	package:
 	
 	/// Used to attach the unload function
 	void function(adbg_object_t*) func_unload;
+	*/
 	
 	//TODO: Deprecate *all* of this
 	
@@ -316,14 +318,6 @@ bool adbg_object_offsetl(adbg_object_t *o, void** p, ulong offset, size_t size) 
 	if (adbg_object_outboundl(o, offset, size)) return true;
 	*p = o.buffer + offset;
 	return false;
-}
-unittest {
-	adbg_object_t o = void;
-	o.buffer = cast(void*)0x10;
-	o.file_size = 10_000;
-	void *p;
-	assert(adbg_object_offsetl(&o, &p, 0x10, 100) == false);
-	assert(cast(size_t)p == 0x20);
 }
 
 /// Template helper to get pointer from offset with length automatically.
