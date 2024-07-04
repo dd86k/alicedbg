@@ -5,7 +5,8 @@
 /// License: BSD-3-Clause-Clear
 module shell;
 
-import adbg.error, adbg.debugger, adbg.disassembler, adbg.object, adbg.machines;
+import adbg;
+import adbg.machines;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;

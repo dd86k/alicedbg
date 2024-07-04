@@ -5,14 +5,9 @@
 /// License: BSD-3-Clause-Clear
 module main;
 
-import adbg.platform;
 import adbg.include.c.stdlib : exit;
-import adbg.debugger.exception : adbg_exception_t, adbg_exception_name;
 import adbg.self;
-import adbg.machines : adbg_machine_default;
-import adbg.disassembler;
 import adbg.error;
-import adbg.debugger.process;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.stdio;
 import debugger, shell;
