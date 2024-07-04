@@ -25,13 +25,13 @@ private:
 void dump_pdb20_header(adbg_object_t *o) {
 	print_header("Header");
 	
-	pdb20_file_header *header = adbg_object_pdb20_header(o);
+	pdb20_file_header_t *header = adbg_object_pdb20_header(o);
 	
 	with (header) {
 	print_stringl("Magic", header.Magic.ptr, 37);
-	print_u32("PageSize", PageSize);
+	print_u32("BlockSize", BlockSize);
 	print_u16("StartPage", StartPage);
-	print_u16("PageCount", PageCount);
+	print_u16("BlockCount", BlockCount);
 	print_u32("RootSize", RootSize);
 	print_x32("Reserved", Reserved);
 	print_u16("RootNumber", RootNumber);

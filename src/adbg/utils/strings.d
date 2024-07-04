@@ -169,23 +169,6 @@ int adbg_util_hex_array(ubyte *dst, size_t sz, const(char) *src, ref size_t news
 	assert(buf[2] == 0xcc);
 }
 
-deprecated("Use safer adbg_strings_flatten")
-size_t adbg_util_argv_flatten(char *buf, int buflen, const(char) **argv) {
-	if (argv == null)
-		return 0;
-
-	ptrdiff_t ai, bi, t;
-	while (argv[ai]) {
-		t = snprintf(buf + bi, buflen, "%s ", argv[ai]);
-		if (t < 0)
-			return 0;
-		bi += t;
-		++ai;
-	}
-
-	return bi;
-}
-
 /// Flatten a multi-vector string into a singular buffer. Like an Array.join() function.
 /// Params:
 /// 	buf = Destination buffer.

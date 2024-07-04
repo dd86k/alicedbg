@@ -15,16 +15,12 @@ module adbg.object.format.pdb;
 
 import adbg.error;
 import adbg.object.server;
-import adbg.utils.uid;
 import adbg.utils.bit;
-import core.stdc.stdlib : malloc, free;
-import core.stdc.string : memcpy;
+import adbg.utils.uid;
+import adbg.utils.math;
+import core.stdc.stdlib;
 
-//TODO: Find better memory management strategies
-//      Since the PDB file is loaded entirely in memory (by us),
-//      instead of allocating memory and copying blocks,
-//      it could make sense to move blocks and modify the indexes,
-//      but would require a *lot* of maintenance...
+extern (C):
 
 /// Default (smallest?) size of a PDB 2.0 and 7.0 page.
 enum PDB_DEFAULT_PAGESIZE = 0x400;
@@ -40,29 +36,56 @@ enum PDB_DEFAULT_PAGESIZE = 0x400;
 
 immutable string PDB20_MAGIC = "Microsoft C/C++ program database 2.00\r\n\x1aJG\0\0";
 
-struct pdb20_file_header {
+struct pdb20_file_header_t {
 	char[44] Magic;
-	uint PageSize;	// Usually 0x400
+	uint BlockSize;	// Usually 0x400
 	ushort StartPage;	// 
-	ushort PageCount;	// Number of file pages
+	ushort BlockCount;	// Number of file pages
 	uint RootSize;	// Root stream size
 	uint Reserved;
 	ushort RootNumber;	// Root stream page number list
 }
 
+private
+struct internal_pdb20_t {
+	pdb20_file_header_t header;
+}
+
 int adbg_object_pdb20_load(adbg_object_t *o) {
-	o.format = AdbgObject.pdb20;
+	o.internal = calloc(1, internal_pdb20_t.sizeof);
+	if (o.internal == null)
+		return adbg_oops(AdbgError.crt);
+	if (adbg_object_read_at(o, 0, o.internal, pdb20_file_header_t.sizeof)) {
+		free(o.internal);
+		return adbg_errno();
+	}
+	
+	adbg_object_postload(o, AdbgObject.pdb20, &adbg_object_pdb20_unload);
 	//o.p.debug_offset = offset;
 	//
 	//with (o.i.pdb20.header)
-	//if (PageCount * PageSize != o.file_size)
+	//if (BlockCount * BlockSize != o.file_size)
 	//	return adbg_oops(AdbgError.assertion);
 	
 	return 0;
 }
+void adbg_object_pdb20_unload(adbg_object_t *o) {
+	if (o == null) return;
+	if (o.internal == null) return;
+	free(o.internal);
+}
 
-pdb20_file_header* adbg_object_pdb20_header(adbg_object_t *o) {
-	return o.i.pdb20.header;
+pdb20_file_header_t* adbg_object_pdb20_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	internal_pdb20_t *internal = cast(internal_pdb20_t*)o.internal;
+	return &internal.header;
 }
 
 //
@@ -77,69 +100,78 @@ pdb20_file_header* adbg_object_pdb20_header(adbg_object_t *o) {
 // Stream
 // 	A Stream is contained in multiple blocks.
 //
-// # Structure
+// # PDB 7.0 Structure
 //
-// 1. The Superblock is read, going to block directory
-//    Directory offset: DirectoryOffset * PageSize
-//    Directory block count: ceil(DirectorySize / PageSize)
-//    Selects FPM by index
-// 2. Directory blocks are read (by n count), giving Stream 0
-// 3. Stream 0 entries contains n count of streams, their sizes, and offsets
+// 1. The very first block containing the file header, the Superblock, is read.
+// 2. The FPM (for block index usage) is read. This is to see which blocks are used.
+//    FPM offset: FPMIndex * BlockSize
+//    The FPM is always one BlockSize of size.
+// 3. The offset to the block directory is calculated.
+//    This directory only contains information to load Stream 0.
+//    Directory offset: DirectoryOffset * BlockSize
+//    Directory block count: ceil(DirectorySize / BlockSize)
+// 4. Load Stream 0 into memory.
+//    Layout of Stream 0:
+//    uint StreamCount;
+//    uint[Count] StreamSize;
+//    uint[Count * ceil(StreamSize / BlockSize)] StreamBlockIDs;
+// 5. Now possible to load a stream using an index.
+//    StreamSize[n]: Size of stream n in bytes.
+//    StreamBlockIDs[n]: Holds a list of block IDs to load.
 //
-//        Blocks
-//         vvv
-// 1      +---+ -+
-// +----- |   |  +- B[0]: Superblock
-// |      +---+ -+        Contains FPM index used, BlockSize, and directory page offset
-// |      |   |  |
-// |      +---+  +- B[1..2]: Two FPM blocks, acts as a huge array of bitfields
-// |      |   |  |           1-bit/block: 0=unallocated/unused, 1=allocated/used
-// | 2    +---+ -+
-// | +--> |   |  |
-// | | 3  +---+  +- B[3..4095]: Data blocks (1 or more or any block)
-// | | +- |   |  |              Stream 0 will redirect to other streams
-// | | |  +---+  |
-// | | +> |   |  |
-// | |    +---+ -+
-// | |    ...       If there are more than 4096 blocks:
-// | |    +---+ -+
-// | |    |   |  +- B[4096]: Data
-// | |    +---+ -+
-// | |    |   |  |
-// | |    +---+  +- B[4097..4098]: FPM blocks. Kept for compatibility
-// | |    |   |  |
-// | |    +---+ -+
-// | |    |   |  |
-// | |    +---+  +- B[4099..8191]: Data blocks (1 or more)
-// | |    |   |  |
-// | |    +---+ -+
-// | |    ...
-// | |    +---+ -+- Block directory, usually at the end
-// | +--- |   |  |  Contains block IDs pointing to Stream 0:
-// |      +---+  +  - uint streamcount;
-// +----> |   |  |  - uint[streamcount] sizes; (by stream)
-//        +---+ -+  - uint[streamcount] offsets;
+// Blocks
+//  vvv
+// +---+ -+
+// |   |  +- B[0]: Superblock
+// +---+ -+        Contains FPM index used, BlockSize, and directory page offset
+// |   |  |
+// +---+  +- B[1..2]: Two FPM blocks, acts as a huge array of bitfields
+// |   |  |           1-bit/block: 0=unallocated/unused, 1=allocated/used
+// +---+ -+
+// |   |  |
+// +---+  +- B[3..4095]: Data blocks (1 or more or any block)
+// |   |  |              Stream 0 contains information to load streams
+// +---+  |
+// |   |  |
+// +---+ -+
+//  ...      If there are more than 4096 blocks:
+// +---+ -+
+// |   |  +- B[4096]: Data
+// +---+ -+
+// |   |  |
+// +---+  +- B[4097..4098]: FPM blocks. Kept for compatibility
+// |   |  |
+// +---+ -+
+// |   |  |
+// +---+  +- B[4099..8191]: Data blocks (1 or more)
+// |   |  |
+// +---+ -+
+//  ...
+// +---+ -+- Block directory and Stream 0 usually at the end.
+// |   |  |  Header points to block directory.
+// +---+  +  Block directory points to Stream 0.
+// |   |  |
+// +---+ -+
 //
 
 immutable string PDB70_MAGIC = "Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0";
 
 // MSF container
-struct pdb70_file_header {
+struct pdb70_file_header_t {
 	char[32] Magic;	/// Magic string
-	uint PageSize;	/// Usually 0x1000
+	uint BlockSize;	/// Usually 0x1000
 	uint FreeIndex;	/// FPM index
-	uint PageCount;	/// Block count * PAGESIZE = Byte size
-	uint DirectorySize;	/// Size of block directory
+	uint BlockCount;	/// Total block count. Multiply with BlockSize and you get filesize
+	uint DirectorySize;	/// Size of block directory, in bytes
 	uint Unknown;	/// Reserved
-	uint DirectoryOffset; /// Offset (in block) * PAGESIZE = Byte offset in file
+	/// Offset in blocks to directory. Multiply with BlockSize for true file offset.
+	uint DirectoryOffset;
 }
 
-/// Meta structure used internally
-struct pdb70_stream {
-	/// Number of blocks stream occupies
-	uint count;
-	/// Points to stream's first block from directory (Stream 0)
-	uint *blocks;
+/// Represents a stream.
+struct pdb70_stream_t {
+	size_t size;
+	void *data;
 }
 
 /// Fixed streams
@@ -194,7 +226,7 @@ enum PdbRaw_PdbFeatures : uint {
 }
 
 /// Stream 1 structure
-struct pdb70_pdb_header {
+struct pdb70_pdb_header_t {
 	/// Contains VC version
 	uint Version;
 	/// Timestamp (Using time(3))
@@ -219,7 +251,7 @@ enum PdbRaw_TpiVer : uint {
 }
 
 /// Stream 2 TPI header
-struct pdb70_tpi_header {
+struct pdb70_tpi_header_t {
 	/// Maps to PdbRaw_TpiVer, usually v80.
 	uint Version;
 	/// Usually size of this header.
@@ -286,7 +318,7 @@ enum PdbRaw_DbiFlags : ushort {
 }
 
 /// Stream 3 DBI header
-struct pdb70_dbi_header {
+struct pdb70_dbi_header_t {
 	/// Seems to be always -1.
 	int VersonSignature;
 	/// Maps to PdbRaw_DbiVersion.
@@ -347,7 +379,7 @@ struct pdb70_dbi_header {
 }
 
 /// Follows the DBI header, substream information
-struct pdb70_dbi_modinfo {
+struct pdb70_dbi_modinfo_t {
 	/// 
 	uint Unused1;
 	struct pdb70_dbi_mod_contrib_entry {
@@ -406,219 +438,368 @@ enum PdbSubsectionKind : uint {
 	coffSymbolRVA	= 0xfd,
 }
 
-struct pdb70_subsection_header {
+struct pdb70_subsection_header_t {
 	PdbSubsectionKind Kind;
 	uint Length;
 }
 
-struct pdb70_stringtable_header {
+struct pdb70_stringtable_header_t {
 	uint Signature;
 	uint HashVersion;
 	uint ByteSize;
 }
 
-int adbg_object_pdb70_load(adbg_object_t *o, size_t offset = 0) {
+private
+struct internal_pdb70_t {
+	pdb70_file_header_t header; /// Superblock
 	
-	o.format = AdbgObject.pdb70;
-	o.p.debug_offset = offset;
+	ubyte *fpm;	/// Points to used FPM block
+	size_t fpmcnt;
+	size_t fpmoffset;
 	
-	with (o.i.pdb70) {
+	// Buffer for Stream 0
+	void *stream0;	/// Buffer to hold Stream 0
+	size_t stream0size;	/// Buffer size of Stream 0
+	
+	// Stream 0: Holds stream information
+	uint stream_count;	/// Number of streams in PDB
+	uint *stream_sizes;	/// Pointer to stream sizes in Stream 0
+	uint **stream_blocks;	/// Allocated index buffer to 
+}
+
+int adbg_object_pdb70_load(adbg_object_t *o) {
+	o.internal = calloc(1, internal_pdb70_t.sizeof);
+	if (o.internal == null)
+		return adbg_oops(AdbgError.crt);
+	if (adbg_object_read_at(o, 0, o.internal, pdb70_file_header_t.sizeof)) {
+		free(o.internal);
+		return adbg_errno();
+	}
+	
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	pdb70_file_header_t *header = &internal.header;
 	
 	// Check SuperBlock
-	if (header.PageSize < 512 || // Cannot be lower than 512 bytes
-		header.PageSize > 4096 || // Not observed to be higher than 4,096 bytes
-		header.PageSize % 512 != 0 || // Must be a multiple of "sectors"
-		header.PageCount * header.PageSize != o.file_size || // Must fit file length
-		header.Unknown || // Must be empty (for now)
-		((header.FreeIndex == 1 || header.FreeIndex == 2) == false)) // Can only be block 1 or 2
-		return adbg_oops(AdbgError.assertion);
+	// header.BlockCount * header.BlockSize must be file length, but can't have that yet
+	if (header.BlockSize < 512 || header.BlockSize > 4096 || // Not observed to be higher than 4,096 bytes
+		header.BlockSize % 512 != 0 || // Multiple of "sector"
+		header.Unknown || // This must be empty
+		header.FreeIndex < 1 || header.FreeIndex > 2) { // 1 or 2 only
+		free(o.internal);
+		return adbg_oops(AdbgError.objectMalformed);
+	}
 	
-	// Cache FPM pointer
-	with (o.i.pdb70)
-	if (adbg_object_offsetl(o, cast(void**)&fpm,
-		header.FreeIndex * header.PageSize, header.PageSize))
-		return adbg_oops(AdbgError.assertion);
-	
-	//
-	// Load Stream 0 into memory
-	//
-	
-	// block count used by block directory = ceil(DirectorySize / PageSize)
-	uint dircnt = (header.DirectorySize + header.PageSize - 1) / header.PageSize;
-	// block id ptr = Superblock::DirectoryOffset * ::PageSize
-	uint diroff = header.DirectoryOffset * header.PageSize;
-	
-	version (Trace) trace("dircnt=%u diroff=%u", dircnt, diroff);
-	
-	//TODO: dircnt > PageSize / uint.sizeof -> Unhandled BigDirectoryStream
-	
-	// Allocate buffer for block directory
-	// DirectorySize is smaller but makes it harder to copy blocks
-	dir = cast(uint*)malloc(dircnt * header.PageSize);
-	if (dir == null)
+	// NOTE: This loads the first (current) FPM. Other FPMs may be loaded later.
+	// Load FPM, being the block after the superblock
+	internal.fpmoffset = header.FreeIndex * header.BlockSize;
+	version (Trace) trace("fpmoffset=%zu", internal.fpmoffset);
+	internal.fpm = cast(ubyte*)malloc(header.BlockSize);
+	internal.fpmcnt = header.BlockCount / 8; // Assuming
+	if (internal.fpm == null) {
+		free(o.internal);
 		return adbg_oops(AdbgError.crt);
+	}
+	if (adbg_object_read_at(o, header.BlockSize * header.FreeIndex, internal.fpm, header.BlockSize)) {
+		free(internal.fpm);
+		free(o.internal);
+		return adbg_errno();
+	}
 	
-	// 
-	uint *dirblk = void;
-	if (adbg_object_offsetl(o, cast(void**)&dirblk, diroff, header.PageSize)) {
+	// Load block directory, we need this to load Stream 0
+	// TODO: dircnt > BlockSize / uint.sizeof -> Unhandled BigDirectoryStream
+	
+	// block id ptr = Superblock::DirectoryOffset * ::BlockSize
+	size_t diroffset = header.DirectoryOffset * header.BlockSize;
+	//
+	size_t dirsize = header.DirectorySize; // dircnt * header.BlockSize;
+	version (Trace) trace("dir offset=%zu size=%u", diroffset, dirsize);
+	// Allocate and read block directory
+	void *dir = malloc(dirsize);
+	if (dir == null) {
+		free(internal.fpm);
+		free(o.internal);
+		return adbg_oops(AdbgError.crt);
+	}
+	if (adbg_object_read_at(o, diroffset, dir, dirsize)) {
 		free(dir);
+		free(internal.fpm);
+		free(o.internal);
+		return adbg_errno();
+	}
+	
+	// Load Stream 0
+	
+	// From the main directory, get stream 0
+	uint *s0blocks = cast(uint*)dir;
+	// block count
+	uint s0bcount = ceildiv32(header.DirectorySize, header.BlockSize);
+	version (Trace) trace("s0bcount=%u", s0bcount);
+	
+	// Allocate buffer for Stream 0
+	internal.stream0size = header.DirectorySize;
+	internal.stream0 = malloc(header.DirectorySize);
+	if (internal.stream0 == null) {
+		free(dir);
+		free(internal.fpm);
+		free(o.internal);
+		return adbg_oops(AdbgError.crt);
+	}
+	
+	// Read every block into Stream 0 buffer
+	size_t o0; // Offset to stream 0 so far
+	for (uint i; i < s0bcount; ++i) {
+		long blkoffset = s0blocks[i] * header.BlockSize;
+		
+		// Last read
+		bool last = o0 + header.BlockSize >= header.DirectorySize;
+		size_t rdsize = last ? header.DirectorySize - o0 : header.BlockSize;
+		
+		if (adbg_object_read_at(o, blkoffset, internal.stream0 + o0, rdsize)) {
+			free(dir);
+			free(internal.fpm);
+			free(o.internal);
+			return adbg_errno();
+		}
+		
+		if (last) break;
+		
+		o0 += header.BlockSize;
+	}
+	
+	free(dir); // Done with the block directory
+	
+	// Setup Stream 0 data: Sizes and block IDs
+	uint *s0 = cast(uint*)internal.stream0;
+	internal.stream_count  = *s0;
+	internal.stream_sizes  = s0 + 1;
+	uint *blocks = s0 + 1 + internal.stream_count;
+	version (Trace) trace("stream_count=%u", internal.stream_count);
+	with (internal)
+	if (adbg_bits_boundchk(blocks, stream_count * uint.sizeof, stream0, stream0size)) {
+		free(internal.fpm);
+		free(internal.stream0);
+		free(o.internal);
 		return adbg_oops(AdbgError.offsetBounds);
 	}
 	
-	// Load stream directory blocks into the memory buffer
-	for (uint dirblkidx; dirblkidx < dircnt; ++dirblkidx) {
-		version (Trace) trace("dirblk[%u]=%u", dirblkidx, dirblk[dirblkidx]);
-		uint blockoff = dirblk[dirblkidx] * header.PageSize;
-		void *block = void;
-		if (adbg_object_offsetl(o, &block, blockoff, header.PageSize)) {
-			free(dir);
-			return adbg_oops(AdbgError.offsetBounds);
-		}
-		
-		memcpy(dir + (dirblkidx * header.PageSize), block, header.PageSize);
-	}
-	
-	// Setup stream directory information
-	uint *direntry = cast(uint*)dir;
-	strcnt  = *direntry;
-	strsize = direntry + 1;
-	stroff  = direntry + 1 + strcnt;
-	
-	//
-	// Map stream information (count and IDs)
-	// This helps to avoid recalculating the block offsets everytime
-	//
-	
-	// Allocate buffer for the stream map
-	strmap = cast(pdb70_stream*)malloc(strcnt * pdb70_stream.sizeof);
-	if (strmap == null) {
-		free(dir);
+	// To avoid cycling through stream block IDs when loading streams,
+	// we have to remap them as they don't linearly align with stream indexes,
+	// unlike stream_sizes:
+	// Stream: |-1-| |-2-| |----3----| |-------4-------| ...
+	// Blocks:     1     2     3     4     5     6     7 ...
+	internal.stream_blocks = cast(uint**)malloc(size_t.sizeof * internal.stream_count);
+	if (internal.stream_blocks == null) {
+		free(internal.fpm);
+		free(internal.stream0);
+		free(o.internal);
 		return adbg_oops(AdbgError.crt);
 	}
-	// Map stream block IDs to memory buffer
-	uint *blkcur = stroff;
-	for (uint stri; stri < strcnt; ++stri) {
-		pdb70_stream *stream = &strmap[stri];
-		
-		uint size = strsize[stri];
-		if (size == 0 || size == 0xffff_ffff) {
-			stream.count = 0;
-			continue;
-		}
-		
-		// Block count for stream
-		stream.count  = (size + header.PageSize - 1) / header.PageSize;
-		stream.blocks = blkcur;
-		
-		version (Trace)
-			trace("stream[%u] count=%u blk0=%u",
-			stri, stream.count, *stream.blocks);
-		
-		blkcur += stream.count;
+	for (uint b; b < internal.stream_count; ++b) {
+		// Size of stream in bytes
+		uint ssz = internal.stream_sizes[b];
+		// Block count
+		uint bcnt = ceildiv32(ssz, header.BlockSize);
+		// Assign blocks pointer
+		internal.stream_blocks[b] = blocks;
+		// Next set of blocks
+		blocks += bcnt;
 	}
 	
-	} // with (o.i.pdb70)
-	
+	adbg_object_postload(o, AdbgObject.pdb70, &adbg_object_pdb70_unload);
 	return 0;
 }
 
-pdb70_file_header* adbg_object_pdb70_header(adbg_object_t *o) {
-	return o.i.pdb70.header;
-}
-
-// true=unallocated
-bool adbg_object_pdb70_block_close(adbg_object_t *o, uint num) {
-	if (o == null)
-		return true;
+void adbg_object_pdb70_unload(adbg_object_t *o) {
+	if (o == null) return;
+	if (o.internal == null) return;
 	
-	uint bi = num / 8; // block byte index
-	uint br = 7 - (num % 8); // block reminder shift
-	bool free = (o.i.pdb70.fpm[bi] & 1 << br) == 0;
-	return free == 0;
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	
+	if (internal.fpm) free(internal.fpm);
+	if (internal.stream0) free(internal.stream0);
+	
+	free(o.internal);
 }
 
-ubyte* adbg_object_pdb70_get_block(adbg_object_t *o, uint num) {
+// Return PDB 7.0 file header
+pdb70_file_header_t* adbg_object_pdb70_header(adbg_object_t *o) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	
-	pdb70_file_header *header = o.i.pdb70.header;
-	
-	// Check with selected FPM if block is allocated
-	if (adbg_object_pdb70_block_close(o, num)) {
-		adbg_oops(AdbgError.unavailable);
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
 		return null;
 	}
-	
-	// Get block
-	ubyte *block = void;
-	if (adbg_object_offsetl(o, cast(void**)&block,
-		num * header.PageSize, header.PageSize)) {
-		adbg_oops(AdbgError.offsetBounds);
-		return null;
-	}
-	
-	return block;
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	return &internal.header;
 }
 
-int adbg_object_pdb70_stream_open(adbg_object_t *o, void **ubuffer, uint *usize, uint num) {
-	if (o == null || ubuffer == null || usize == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	if (num >= o.i.pdb70.strcnt)
-		return adbg_oops(AdbgError.indexBounds);
-	
-	// Get stream size and availability
-	uint ssize = *usize = o.i.pdb70.strsize[num];
-	version (Trace) trace("stream size=%u", ssize);
-	if (ssize == 0 || ssize == PDB_BLOCK_SIZE_UNUSED) {
-		*ubuffer = null;
+// Get FPM table
+ubyte* adbg_object_pdb70_fpm(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	return internal.fpm;
+}
+// Get FPM entries in bytes
+size_t adbg_object_pdb70_fpmcount(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
-	
-	// Allocate buffer
-	void *sbuffer = *ubuffer = malloc(ssize);
-	if (sbuffer == null)
-		return adbg_oops(AdbgError.crt);
-	
-	// Read blocks into buffer
-	pdb70_stream *stream = &o.i.pdb70.strmap[num];
-	uint pagesize = o.i.pdb70.header.PageSize;
-	uint offset; // read count
-	uint readsz = pagesize;
-	version (Trace) trace("stream counts %u blocks", stream.count);
-	for (uint blki; blki < stream.count; ++blki) {
-		version (Trace) trace("stream block[%u]=%u", blki, stream.blocks[blki]);
-		
-		//TODO: Check if block is allocated !!!
-		uint fileoff = stream.blocks[blki] * pagesize;
-		void *block = void;
-		if (adbg_object_offsetl(o, &block, fileoff, readsz)) {
-			free(sbuffer);
-			*ubuffer = null;
-			return adbg_oops(AdbgError.offsetBounds);
-		}
-		
-		// Adjust read size on last block
-		if (offset + readsz > ssize) readsz = ssize - offset;
-		
-		version (Trace) trace("offset=%p", sbuffer);
-		memcpy(sbuffer + offset, block, readsz);
-		
-		offset += readsz;
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return 0;
 	}
-	
-	return 0;
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	return internal.fpmcnt;
 }
-void adbg_object_pdb70_stream_close(adbg_object_t *o, void **ubuffer) {
-	if (o == null || ubuffer == null) {
+
+// Total count of streams
+uint adbg_object_pdb70_total_count(adbg_object_t *o) {
+	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
-		return;
+		return 0;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return 0;
+	}
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	return internal.stream_count;
+}
+// Return the Stream size in bytes
+//TODO: Could be a uint*
+uint adbg_object_pdb70_stream_size(adbg_object_t *o, size_t i) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return 0;
+	}
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	if (i >= internal.stream_count) {
+		adbg_oops(AdbgError.indexBounds);
+		return 0;
+	}
+	return internal.stream_sizes[i];
+}
+// Return the Stream number of blocks used
+//TODO: Could be a uint*
+uint adbg_object_pdb70_stream_block_count(adbg_object_t *o, size_t i) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return 0;
+	}
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	if (i >= internal.stream_count) {
+		adbg_oops(AdbgError.indexBounds);
+		return 0;
+	}
+	// ceil(StreamSize / BlockSize) -> Number of Blocks used
+	with (internal.header) return ceildiv32(internal.stream_sizes[i], BlockSize);
+}
+// Return array of blocks for Stream
+uint* adbg_object_pdb70_stream_blocks(adbg_object_t *o, size_t i) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	if (i >= internal.stream_count) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
+	return internal.stream_blocks[ i ];
+}
+
+// true=unallocated
+private
+bool adbg_object_pdb70_block_closed(adbg_object_t *o, uint num) {
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	
+	uint bi = num / 8; // block byte index
+	uint br = 7 - (num % 8); // block reminder shift
+	return (internal.fpm[bi] & (1 << br)) == 0; // set=free, so reverse that
+}
+
+// Open by stream number id
+pdb70_stream_t* adbg_object_pdb70_stream_open(adbg_object_t *o, uint num) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
 	}
 	
-	if (*ubuffer) {
-		free(*ubuffer);
+	version (Trace) trace("stream index=%u", num);
+	
+	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
+	
+	if (num >= internal.stream_count) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
 	}
+	
+	uint streamsize = internal.stream_sizes[num];
+	version (Trace) trace("stream size=%u", streamsize);
+	if (streamsize == 0 || streamsize == PDB_BLOCK_SIZE_UNUSED) {
+		//TODO: errorcode
+		adbg_oops(AdbgError.assertion);
+		return null;
+	}
+	
+	uint BlockSize = internal.header.BlockSize;
+	
+	// Get number of blocks
+	size_t blockcount = ceildiv32(streamsize, BlockSize);
+	//
+	size_t size = blockcount * BlockSize;
+	
+	void *buffer = malloc(pdb70_stream_t.sizeof + size);
+	if (buffer == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	pdb70_stream_t *stream = cast(pdb70_stream_t*)buffer;
+	stream.size = streamsize;
+	stream.data = buffer + pdb70_stream_t.sizeof;
+	
+	// Copy blocks into stream buffer
+	uint *blocks = internal.stream_blocks[num];
+	size_t of;
+	for (size_t b; b < blockcount; ++b, of += BlockSize) {
+		long boffset = blocks[b] * BlockSize;
+		
+		if (adbg_object_read_at(o, boffset, stream.data + of, BlockSize)) {
+			free(buffer);
+			return null;
+		}
+	}
+	
+	return stream;
+}
+void adbg_object_pdb70_stream_close(pdb70_stream_t *stream) {
+	if (stream) free(stream);
 }
 
 //
@@ -632,6 +813,7 @@ void adbg_object_pdb70_stream_close(adbg_object_t *o, void **ubuffer) {
 // - https://github.com/dotnet/runtime/blob/main/docs/design/specs/PortablePdb-Metadata.md
 // - https://github.com/mono/mono/blob/main/mono/metadata/debug-mono-ppdb.c
 
+/*
 struct pdb_stream {
 	char[20] id;
 	uint EntryPoint;
@@ -664,3 +846,4 @@ struct cildb_file_header {
 	uint CountOfMiscBytes;
 	uint CountOfStringBytes;
 }
+*/

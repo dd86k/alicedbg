@@ -60,3 +60,21 @@ template KiB(int a) {
 	static assert(GiB!1 == 1024 * 1024 * 1024);
 	static assert(GiB!4 == 1024L * 1024 * 1024 * 4);
 }
+
+/// Perform a division and round the result upwards.
+///
+/// Initially created for PDB to get the number of blocks from a stream size and blocksize.
+/// Params:
+///   a = Numerator.
+///   b = Denominator.
+/// Returns: Result.
+uint ceildiv32(uint a, uint b) pure {
+	return (a + b + 1) / b;
+}
+@system unittest {
+	assert(ceildiv32(0, 512) == 1);
+	assert(ceildiv32(50, 512) == 1);
+	assert(ceildiv32(512, 512) == 2);
+	assert(ceildiv32(768, 512) == 2);
+	assert(ceildiv32(1024, 512) == 3);
+}

@@ -123,30 +123,6 @@ struct adbg_section_t {
 ///
 /// All fields are used internally and should not be used directly.
 struct adbg_object_t {
-	// NOTE: It's important that none of the modules rely on a total size,
-	//       like a file size, since the origin can be of any kind (e.g., a process).
-	//       However, it must be seekable.
-	deprecated union {
-		struct {
-			union {
-				void   *buffer;	/// Buffer to file object.
-				char   *bufferc;	/// Ditto
-				wchar  *bufferw;	/// Ditto
-				dchar  *bufferd;	/// Ditto
-				ubyte  *buffer8;	/// Ditto
-				ushort *buffer16;	/// Ditto
-				uint   *buffer32;	/// Ditto
-				ulong  *buffer64;	/// Ditto
-			}
-			
-			/// File handle to object.
-			FILE *file_handle;
-			/// File size.
-			ulong file_size;
-			/// Allocated buffer size.
-			size_t buffer_size;
-		}
-	}
 	package union {
 		struct {
 			OSFILE *file;
@@ -176,58 +152,6 @@ struct adbg_object_t {
 	
 	/// Used to attach the unload function
 	void function(adbg_object_t*) func_unload;
-	
-	//TODO: Deprecate *all* of this
-	
-	// Object properties.
-	package
-	struct adbg_object_properties_t {
-		/// Target endianness is reversed and therefore fields needs
-		/// to be byte-swapped.
-		bool reversed;
-		// Target object has code that can be run on this platform.
-		// Examples: x86 on x86-64 or Arm A32 on Arm A64 via WoW64
-		//TODO: bool platform_native;
-		
-		// Temp field to avoid free'ing non-allocated memory
-		bool noalloc;
-		
-		// 
-		size_t debug_offset;
-	}
-	deprecated
-	adbg_object_properties_t p;
-	
-	// Pointers to machine-dependant structures
-	//TODO: Move stuff like "reversed_"/"is64"/etc. fields into properties
-	package
-	union adbg_object_internals_t {
-		// Main header. All object files have some form of header.
-		void *header;
-		
-		struct pdb20_t {
-			pdb20_file_header *header;
-		}
-		pdb20_t pdb20;
-		
-		struct pdb70_t {
-			pdb70_file_header *header;
-			ubyte *fpm;	/// Points to used FPM block
-			void *dir;	/// Directory buffer (Stream 0)
-			
-			// Stream 0 meta
-			uint strcnt;	/// Stream count
-			uint *strsize;	/// Stream size (Points to Stream[0].size)
-			uint *stroff;	/// Block IDs (Points to Stream[0].block[0])
-			
-			// Lookup table made from Stream 0
-			pdb70_stream *strmap;	/// Stream mapping
-		}
-		pdb70_t pdb70;
-	}
-	/// Internal object definitions.
-	deprecated
-	adbg_object_internals_t i;
 }
 
 // Internal function for submodules to setup internals
@@ -240,101 +164,6 @@ void adbg_object_postload(adbg_object_t *o,
 	
 	o.format = type;
 	o.func_unload = funload;
-}
-
-/// Check if pointer is outside the object bounds.
-/// Params:
-/// 	o = Object instance.
-/// 	p = Pointer.
-/// Returns: True if outside bounds.
-deprecated
-bool adbg_object_outboundp(adbg_object_t *o, void *p) {
-	version (Trace) trace("p=%zx", cast(size_t)p);
-	return p < o.buffer || p >= o.buffer + o.file_size;
-}
-/// Check if pointer with length is outside the object bounds.
-/// Params:
-/// 	o = Object instance.
-/// 	p = Pointer.
-/// 	size = Data size.
-/// Returns: True if outside bounds.
-deprecated
-bool adbg_object_outboundpl(adbg_object_t *o, void *p, size_t size) {
-	version (Trace) trace("p=%zx length=%zu", cast(size_t)p, size);
-	return p < o.buffer || p + size >= o.buffer + o.file_size;
-}
-
-/// Check if offset is within file boundaries
-/// Params:
-/// 	o = Object instance.
-/// 	off = File offset.
-/// Returns: True if in bounds.
-deprecated
-bool adbg_object_outbound(adbg_object_t *o, ulong off) {
-	version (Trace) trace("offset=%llx", off);
-	if (o == null) return true;
-	return off >= o.file_size;
-}
-
-/// Check if offset with size is within file boundaries
-/// Params:
-/// 	o = Object instance.
-/// 	off = File offset.
-/// 	size = Data size.
-/// Returns: True if in bounds.
-deprecated
-bool adbg_object_outboundl(adbg_object_t *o, ulong off, size_t size) {
-	version (Trace) trace("offset=%llx length=%zu", off, size);
-	if (o == null) return true;
-	return off + size > o.file_size;
-}
-
-/// Get pointer from offset.
-/// Params:
-/// 	o = Object instance.
-/// 	p = Destination pointer.
-/// 	offset = File offset.
-/// Returns: True if outside bounds.
-deprecated
-bool adbg_object_offset(adbg_object_t *o, void** p, ulong offset) {
-	version (Trace) trace("p=%zx offset=%llx", cast(size_t)p, offset);
-	if (p == null) return true;
-	if (adbg_object_outbound(o, offset)) return true;
-	*p = o.buffer + offset;
-	return false;
-}
-
-/// Get pointer from offset with size.
-/// Params:
-/// 	o = Object instance.
-/// 	p = Destination pointer.
-/// 	offset = File offset.
-/// 	size = Data size.
-/// Returns: True if outside bounds.
-deprecated
-bool adbg_object_offsetl(adbg_object_t *o, void** p, ulong offset, size_t size) {
-	version (Trace) trace("p=%zx offset=%llx length=%zu", cast(size_t)p, offset, size);
-	if (p == null) return true;
-	if (adbg_object_outboundl(o, offset, size)) return true;
-	*p = o.buffer + offset;
-	return false;
-}
-
-/// Template helper to get pointer from offset with length automatically.
-/// Params:
-/// 	o = Object instance.
-/// 	dst = Destination pointer.
-/// 	offset = File offset.
-/// Returns: True if outside bounds.
-deprecated
-bool adbg_object_offsett(T)(adbg_object_t *o, T* dst, ulong offset) {
-	if (dst == null) return true;
-	if (adbg_object_outboundl(o, offset, T.sizeof)) return true;
-	static if (T.sizeof <= ulong.sizeof)
-		*dst = *cast(T*)(o.buffer + offset);
-	else
-		static assert(0, "adbg_object_offsett memcpy TODO");
-	return false;
 }
 
 /// Load an object from disk into memory.
@@ -478,8 +307,7 @@ int adbg_object_loadv(adbg_object_t *o) {
 	
 	o.status = 0;
 	
-	// Load minimum for signature detection
-	// Also tests seeking in case this is a streamed input
+	// Load enough for signature detection
 	SIGNATURE sig = void;
 	int siglen = osfread(o.file, &sig, SIGNATURE.sizeof); /// signature size
 	version (Trace) trace("siglen=%d sigmax=%u", siglen, cast(uint)SIGMAX);
