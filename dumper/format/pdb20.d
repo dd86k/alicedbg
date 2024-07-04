@@ -6,9 +6,9 @@
 module format.pdb20;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines;
-import adbg.object.format.pdb;
+import adbg.objects.pdb;
 import dumper;
 
 extern (C):

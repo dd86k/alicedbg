@@ -6,9 +6,9 @@
 module format.mdmp;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines;
-import adbg.object.format.mdmp;
+import adbg.objects.mdmp;
 import adbg.utils.date : ctime32;
 import adbg.include.windows.winnt;
 import dumper;

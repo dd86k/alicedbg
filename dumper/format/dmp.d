@@ -6,10 +6,10 @@
 module format.dmp;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines;
-import adbg.object.format.dmp;
-import adbg.object.format.pe : adbg_object_pe_machine_value_string;
+import adbg.objects.dmp;
+import adbg.objects.pe : adbg_object_pe_machine_value_string;
 import dumper;
 import common.utils;
 

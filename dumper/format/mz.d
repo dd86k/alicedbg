@@ -6,9 +6,9 @@
 module format.mz;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines : AdbgMachine;
-import adbg.object.format.mz;
+import adbg.objects.mz;
 import core.stdc.stdlib;
 import dumper;
 import common.errormgmt;

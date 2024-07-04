@@ -2,13 +2,14 @@
 ///
 /// Sources:
 /// - Microsoft Symbol and Type Information CodeView 1.0
+/// - https://github.com/Microsoft/microsoft-pdb/blob/master/include/cvinfo.h
 /// - https://llvm.org/docs/PDB/CodeViewSymbols.html
 /// - https://llvm.org/docs/PDB/CodeViewTypes.html
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module adbg.object.types.cv;
+module adbg.types.cv;
 
 alias CV_CPU_TYPE_e = ushort;
 enum : CV_CPU_TYPE_e {

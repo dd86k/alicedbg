@@ -3,10 +3,10 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module adbg.object.format.mz;
+module adbg.objects.mz;
 
 import adbg.error;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.utils.bit;
 import core.stdc.stdlib : malloc, calloc, free;
 

@@ -7,9 +7,9 @@ module format.elf;
 
 import adbg.utils.bit : adbg_alignup;
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines;
-import adbg.object.format.elf;
+import adbg.objects.elf;
 import adbg.utils.bit;
 import core.stdc.string : memcmp, strncmp;
 import core.stdc.stdlib;

@@ -6,10 +6,10 @@
 module format.pe;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines : AdbgMachine;
-import adbg.object.format.pe;
-import adbg.object.format.mz : mz_hdr_ext;
+import adbg.objects.pe;
+import adbg.objects.mz : mz_hdr_ext;
 import adbg.utils.date : ctime32;
 import adbg.utils.uid, adbg.utils.bit;
 import adbg.error;

@@ -6,8 +6,8 @@
 module format.macho;
 
 import adbg.disassembler;
-import adbg.object.server;
-import adbg.object.format.macho;
+import adbg.objectserver;
+import adbg.objects.macho;
 import dumper;
 import common.errormgmt;
 

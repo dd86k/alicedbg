@@ -6,10 +6,10 @@
 module format.mscoff;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines;
-import adbg.object.format.mscoff;
-import adbg.object.format.pe : adbg_object_pe_machine_value_string;
+import adbg.objects.mscoff;
+import adbg.objects.pe : adbg_object_pe_machine_value_string;
 import adbg.utils.uid;
 import dumper;
 

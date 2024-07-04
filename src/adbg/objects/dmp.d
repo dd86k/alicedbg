@@ -7,10 +7,10 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module adbg.object.format.dmp;
+module adbg.objects.dmp;
 
 import adbg.error;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.utils.bit;
 import adbg.utils.math : MAX;
 import core.stdc.stdlib;

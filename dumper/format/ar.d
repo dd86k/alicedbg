@@ -6,9 +6,9 @@
 module format.ar;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines;
-import adbg.object.format.ar;
+import adbg.objects.ar;
 import adbg.error;
 import adbg.utils.bit : adbg_bswap32;
 import core.stdc.ctype : isdigit;

@@ -5,8 +5,8 @@
 /// License: BSD-3-Clause-Clear
 module format.omf;
 
-import adbg.object.server;
-import adbg.object.format.omf;
+import adbg.objectserver;
+import adbg.objects.omf;
 import dumper;
 import common.errormgmt;
 

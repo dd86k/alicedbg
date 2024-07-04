@@ -5,7 +5,7 @@
 /// License: BSD-3-Clause-Clear
 module dumper;
 
-import adbg.error, adbg.disassembler, adbg.object;
+import adbg.error, adbg.disassembler, adbg.objectserver;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, free;
 import adbg.include.c.stdarg;

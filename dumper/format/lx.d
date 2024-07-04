@@ -6,9 +6,9 @@
 module format.lx;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines : AdbgMachine;
-import adbg.object.format.lx;
+import adbg.objects.lx;
 import dumper;
 
 extern (C):

@@ -22,18 +22,17 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module adbg.object.server;
+module adbg.objectserver;
 
 import adbg.debugger.memory : adbg_memory_read;
 import adbg.debugger.process : adbg_process_t;
 import adbg.error;
 import adbg.machines : AdbgMachine, adbg_machine_name;
 import adbg.utils.math;	// For MiB template
-import adbg.object.formats;
-import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import adbg.os.file;
+import adbg.objects;
 import core.stdc.string;
 
 extern (C):
@@ -52,8 +51,6 @@ extern (C):
 //       And would be beneficial when host has incompatible endianness.
 // TODO: adbg_object_open_process(int pid, ...)
 // TODO: adbg_object_open_buffer(void *buffer, size_t size, ...)
-// TODO: Consider function to ease submodule setup
-//       adbg_object_postload(AdbgObject type, size_t internal_buffer_size, void function(adbg_object_t*) fclose)
 
 /// Executable or object file format.
 enum AdbgObject {

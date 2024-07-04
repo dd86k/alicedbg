@@ -6,9 +6,9 @@
 module format.ne;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines : AdbgMachine;
-import adbg.object.format.ne;
+import adbg.objects.ne;
 import dumper;
 
 extern (C):

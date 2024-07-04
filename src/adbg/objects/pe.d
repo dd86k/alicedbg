@@ -12,11 +12,11 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module adbg.object.format.pe;
+module adbg.objects.pe;
 
 import core.stdc.stdlib;
 import adbg.error;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit;

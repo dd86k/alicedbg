@@ -6,10 +6,10 @@
 module format.coff;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines;
-import adbg.object.format.coff;
-import adbg.object.format.pe : adbg_object_pe_machine_string;
+import adbg.objects.coff;
+import adbg.objects.pe : adbg_object_pe_machine_string;
 import adbg.utils.bit : adbg_bswap32;
 import adbg.utils.uid;
 import core.stdc.ctype : isdigit;

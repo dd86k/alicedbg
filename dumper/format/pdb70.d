@@ -11,10 +11,10 @@
 module format.pdb70;
 
 import adbg.disassembler;
-import adbg.object.server;
+import adbg.objectserver;
 import adbg.machines;
-import adbg.object.format.pdb;
-import adbg.object.format.pe : adbg_object_pe_machine_value_string;
+import adbg.objects.pdb;
+import adbg.objects.pe : adbg_object_pe_machine_value_string;
 import adbg.utils.uid;
 import adbg.utils.date;
 import adbg.include.c.stdio : printf, snprintf, putchar;
