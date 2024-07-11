@@ -137,23 +137,25 @@ void dump_macho_segments(adbg_object_t *o) {
 void dump_macho_sections(adbg_object_t *o) {
 	print_header("Sections");
 	
-	int i64 = adbg_object_macho_is_64bit(o);
+	void function(void*) dumpsection =
+		adbg_object_macho_is_64bit(o) ?
+		cast(void function(void*))&dump_macho_section64 :
+		cast(void function(void*))&dump_macho_section32;
 	size_t i;
+	uint t;
 	macho_load_command_t *command = void;
 	for (; (command = adbg_object_macho_load_command(o, i)) != null; ++i) {
 		size_t si;
 		void *section = void;
 		for (; (section = adbg_object_macho_segment_section(o, command, si)) != null; ++si) {
-			print_section(cast(uint)i);
-			i64 ?
-				dump_macho_section32(cast(macho_section_t*)section) :
-				dump_macho_section64(cast(macho_section64_t*)section);
+			print_section(t++);
+			dumpsection(section);
 		}
 	}
 }
 void dump_macho_section32(macho_section_t *section) {
 	print_stringl("sectname", section.sectname.ptr, section.sectname.sizeof);
-	print_stringl("sectname", section.segname.ptr, section.segname.sizeof);
+	print_stringl("segname", section.segname.ptr, section.segname.sizeof);
 	print_x32("addr", section.addr);
 	print_x32("size", section.size);
 	print_x32("offset", section.offset);
@@ -166,7 +168,7 @@ void dump_macho_section32(macho_section_t *section) {
 }
 void dump_macho_section64(macho_section64_t *section) {
 	print_stringl("sectname", section.sectname.ptr, section.sectname.sizeof);
-	print_stringl("sectname", section.segname.ptr, section.segname.sizeof);
+	print_stringl("segname", section.segname.ptr, section.segname.sizeof);
 	print_x64("addr", section.addr);
 	print_x64("size", section.size);
 	print_x32("offset", section.offset);
