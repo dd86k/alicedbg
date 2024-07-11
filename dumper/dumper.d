@@ -63,7 +63,10 @@ enum Select {
 enum Setting {
 	/// Input file or data is blob
 	blob	= BIT!0,
+	/// 
+	shortName	= BIT!1,
 	
+	/// 
 	noPrefix = BIT!8,
 	
 	// bits 17-16: Extraction type
@@ -154,6 +157,11 @@ int dump_file(const(char)* path) {
 	
 	if (SETTING(Setting.noPrefix) == 0)
 		printf("%s: ", path);
+	
+	if (SETTING(Setting.shortName)) {
+		puts(SAFEVAL(adbg_object_type_shortname(o)));
+		return 0;
+	}
 	
 	// Otherwise, make a basic summary
 	printf("%s, %s",
