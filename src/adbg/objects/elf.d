@@ -1607,7 +1607,7 @@ AdbgMachine adbg_object_elf_machine(adbg_object_t *o) {
 	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
 	
 	// NOTE: Many reserved values are excluded
-	switch (internal.eheader32.e_ident[ELF_EI_CLASS]) {
+	switch (internal.eheader32.e_machine) {
 	case ELF_EM_M32:	return AdbgMachine.we32100;
 	case ELF_EM_SPARC:	return AdbgMachine.sparc;
 	case ELF_EM_386:	return AdbgMachine.i386;
