@@ -56,6 +56,7 @@ immutable option_t[] options = [
 	option_t(0,   "extract",           "Setting: Output selected portion to stdout", &cliopt_extract),
 	option_t(0,   "extract-to",        "Setting: Output selected portion to file", &cliopt_extract_to),
 	option_t(0,   "hexdump",           "Setting: Output selected portion to stdout as hexdump", &cliopt_hexdump),
+	option_t(0,   "no-prefix",         "Setting: Remove file path prefix of output", &cliopt_no_prefix),
 	// pages
 	option_t('h', "help", "Show this help screen and exit", &cliopt_help),
 	option_version,
@@ -147,6 +148,11 @@ int cliopt_extract_to(const(char)* fname) {
 }
 int cliopt_hexdump() {
 	opt_settings |= Setting.hexdump;
+	return 0;
+}
+
+int cliopt_no_prefix() {
+	opt_settings |= Setting.noPrefix;
 	return 0;
 }
 

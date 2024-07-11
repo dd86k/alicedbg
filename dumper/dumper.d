@@ -64,6 +64,8 @@ enum Setting {
 	/// Input file or data is blob
 	blob	= BIT!0,
 	
+	noPrefix = BIT!8,
+	
 	// bits 17-16: Extraction type
 	
 	/// Extract binary information into stdout
@@ -123,7 +125,7 @@ int dump_file(const(char)* path) {
 		panic_adbg("Failed to open object");
 	
 	// If anything was selected to dump specifically
-	if (opt_selected || opt_settings) {
+	if (opt_selected || SETTING(Setting.disasmAny)) {
 		// If not in any "extract" mode, print file info
 		if (SETTING(Setting.extractAny) == 0) {
 			print_string("filename", path);
@@ -150,8 +152,11 @@ int dump_file(const(char)* path) {
 		}
 	}
 	
+	if (SETTING(Setting.noPrefix) == 0)
+		printf("%s: ", path);
+	
 	// Otherwise, make a basic summary
-	printf("%s: %s, %s", path,
+	printf("%s, %s",
 		adbg_object_type_name(o), adbg_object_kind_string(o));
 	
 	// Print machine type used for object
