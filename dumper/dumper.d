@@ -213,8 +213,7 @@ void print_columns(const(char)* field, ...) {
 
 void print_section(uint i, const(char) *name = null, int len = 0) {
 	putchar('\n');
-	print_u32("index", i);
-	if (name && len) print_stringl("name", name, len);
+	len ? print_u32l("index", i, name, len) : print_u32("index", i, name);
 }
 void print_disasm_line(adbg_opcode_t *op, const(char)* msg = null) {
 	// Print address
