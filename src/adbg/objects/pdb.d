@@ -38,7 +38,7 @@ immutable string PDB20_MAGIC = "Microsoft C/C++ program database 2.00\r\n\x1aJG\
 
 struct pdb20_file_header_t {
 	char[44] Magic;
-	uint BlockSize;	// Usually 0x400
+	uint BlockSize;	// Usually 0x400, multiply with BlockCount to get filesize
 	ushort StartPage;	// 
 	ushort BlockCount;	// Number of file pages
 	uint RootSize;	// Root stream size
@@ -61,12 +61,6 @@ int adbg_object_pdb20_load(adbg_object_t *o) {
 	}
 	
 	adbg_object_postload(o, AdbgObject.pdb20, &adbg_object_pdb20_unload);
-	//o.p.debug_offset = offset;
-	//
-	//with (o.i.pdb20.header)
-	//if (BlockCount * BlockSize != o.file_size)
-	//	return adbg_oops(AdbgError.assertion);
-	
 	return 0;
 }
 void adbg_object_pdb20_unload(adbg_object_t *o) {
@@ -492,54 +486,63 @@ int adbg_object_pdb70_load(adbg_object_t *o) {
 	// NOTE: This loads the first (current) FPM. Other FPMs may be loaded later.
 	// Load FPM, being the block after the superblock
 	internal.fpmoffset = header.FreeIndex * header.BlockSize;
-	version (Trace) trace("fpmoffset=%zu", internal.fpmoffset);
+	version (Trace) trace("fpm offset=%zu", internal.fpmoffset);
 	internal.fpm = cast(ubyte*)malloc(header.BlockSize);
 	internal.fpmcnt = header.BlockCount / 8; // Assuming
 	if (internal.fpm == null) {
 		free(o.internal);
 		return adbg_oops(AdbgError.crt);
 	}
-	if (adbg_object_read_at(o, header.BlockSize * header.FreeIndex, internal.fpm, header.BlockSize)) {
+	if (adbg_object_read_at(o, internal.fpmoffset, internal.fpm, header.BlockSize)) {
 		free(internal.fpm);
 		free(o.internal);
 		return adbg_errno();
 	}
 	
-	// Load block directory, we need this to load Stream 0
-	// TODO: dircnt > BlockSize / uint.sizeof -> Unhandled BigDirectoryStream
+	// Load block directory, we'll need this to load Stream 0
+	
+	// Get number of offsets for Stream 0.
+	uint dircount = ceildiv32(header.DirectorySize, header.BlockSize);
+	version (Trace) trace("dircount=%u", dircount);
+	
+	// Big directory stream check
+	// If the number of offsets for Stream 0 is beyond the number of offsets
+	// allowed in the directory block, it is a "big" directory stream, which
+	// we don't support yet.
+	if (dircount > header.BlockSize / uint.sizeof) {
+		free(internal.fpm);
+		free(o.internal);
+		return adbg_oops(AdbgError.objectUnsupportedFormat);
+	}
 	
 	// block id ptr = Superblock::DirectoryOffset * ::BlockSize
 	size_t diroffset = header.DirectoryOffset * header.BlockSize;
-	//
-	size_t dirsize = header.DirectorySize; // dircnt * header.BlockSize;
-	version (Trace) trace("dir offset=%zu size=%u", diroffset, dirsize);
+	// Directory size
+	// Do note that most cases, the indices for Stream 0 fit one block.
+	// NumberOfEntries = ceil(DirSize / BlockSize)
+	// EffectiveSize = NumberOfEntries * 4
+	size_t dirsize = dircount * uint.sizeof;
+	version (Trace) trace("dir offset=%u size=%u effective=%zu",
+		header.DirectoryOffset, header.DirectorySize, diroffset);
+	
 	// Allocate and read block directory
-	void *dir = malloc(dirsize);
+	void *dir = adbg_object_readalloc_at(o, diroffset, dirsize);
 	if (dir == null) {
-		free(internal.fpm);
-		free(o.internal);
-		return adbg_oops(AdbgError.crt);
-	}
-	if (adbg_object_read_at(o, diroffset, dir, dirsize)) {
-		free(dir);
 		free(internal.fpm);
 		free(o.internal);
 		return adbg_errno();
 	}
+	scope(exit) free(dir); // Since it is a temp buffer
 	
 	// Load Stream 0
 	
 	// From the main directory, get stream 0
 	uint *s0blocks = cast(uint*)dir;
-	// block count
-	uint s0bcount = ceildiv32(header.DirectorySize, header.BlockSize);
-	version (Trace) trace("s0bcount=%u", s0bcount);
 	
 	// Allocate buffer for Stream 0
 	internal.stream0size = header.DirectorySize;
 	internal.stream0 = malloc(header.DirectorySize);
 	if (internal.stream0 == null) {
-		free(dir);
 		free(internal.fpm);
 		free(o.internal);
 		return adbg_oops(AdbgError.crt);
@@ -547,7 +550,7 @@ int adbg_object_pdb70_load(adbg_object_t *o) {
 	
 	// Read every block into Stream 0 buffer
 	size_t o0; // Offset to stream 0 so far
-	for (uint i; i < s0bcount; ++i) {
+	for (uint i; i < dircount; ++i) {
 		long blkoffset = s0blocks[i] * header.BlockSize;
 		
 		// Last read
@@ -555,7 +558,6 @@ int adbg_object_pdb70_load(adbg_object_t *o) {
 		size_t rdsize = last ? header.DirectorySize - o0 : header.BlockSize;
 		
 		if (adbg_object_read_at(o, blkoffset, internal.stream0 + o0, rdsize)) {
-			free(dir);
 			free(internal.fpm);
 			free(o.internal);
 			return adbg_errno();
@@ -565,8 +567,6 @@ int adbg_object_pdb70_load(adbg_object_t *o) {
 		
 		o0 += header.BlockSize;
 	}
-	
-	free(dir); // Done with the block directory
 	
 	// Setup Stream 0 data: Sizes and block IDs
 	uint *s0 = cast(uint*)internal.stream0;

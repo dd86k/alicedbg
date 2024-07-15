@@ -51,6 +51,8 @@ extern (C):
 //       And would be beneficial when host has incompatible endianness.
 // TODO: adbg_object_open_process(int pid, ...)
 // TODO: adbg_object_open_buffer(void *buffer, size_t size, ...)
+// TODO: adbg_object_origin_string(o)
+//       Return string of how object was loaded, mainly for tracing purposes
 
 /// Executable or object file format.
 enum AdbgObject {
@@ -97,8 +99,10 @@ enum AdbgObjectOrigin {
 	disk,
 	/// Object was loaded from the debugger into memory.
 	process,
-	/// 
+	/// TODO: Object is a whole buffer provided externally.
 	userbuffer,
+	/// TODO: Object is memory-mapped.
+	mmap,
 }
 
 package
@@ -214,6 +218,13 @@ void adbg_object_close(adbg_object_t *o) {
 	free(o);
 }
 
+/// Read data from object at the current position.
+/// Params:
+/// 	o = Object instance.
+/// 	buffer = Buffer pointer.
+/// 	rdsize = Size to read.
+/// 	flags = Additional settings.
+/// Returns: Error code if set.
 int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 0) {
 	version (Trace) trace("buffer=%p rdsize=%zu", buffer, rdsize);
 	
@@ -225,12 +236,11 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 	version (Trace) trace("origin=%d", o.origin);
 	switch (o.origin) with (AdbgObjectOrigin) {
 	case disk:
-		int target = cast(int)rdsize;
-		int r = osfread(o.file, buffer, target);
+		int r = osfread(o.file, buffer, cast(int)rdsize);
 		version (Trace) trace("osfread=%d", r);
 		if (r < 0)
 			return adbg_oops(AdbgError.os);
-		if (r < target)
+		if (r < rdsize)
 			return adbg_oops(AdbgError.partialRead);
 		return 0;
 	case process:
@@ -246,10 +256,7 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 	return adbg_oops(AdbgError.unimplemented);
 }
 
-//TODO: adbg_object_readalloc_at: Allocate memory and read.
-//      void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, int flags)
-
-/// Read raw data from object at absolute position.
+/// Read data from object from absolute position.
 /// Params:
 /// 	o = Object instance.
 /// 	location = Absolute file offset.
@@ -280,6 +287,38 @@ int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rd
 	}
 	
 	return adbg_object_read(o, buffer, rdsize);
+}
+
+/// Allocate a buffer with read size, and read data from object from absolute position.
+///
+/// On error, this function automatically frees the buffer.
+/// Params:
+/// 	o = Object instance.
+/// 	location = Absolute file offset.
+/// 	rdsize = Size to read.
+/// 	flags = Additional settings.
+/// Returns: Null pointer on error.
+void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, int flags = 0) {
+	version (Trace) trace("location=%lld buffer=%p", location, rdsize);
+	
+	if (o == null || rdsize == 0) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	void *buffer = malloc(rdsize);
+	if (buffer == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	
+	// Function sets error
+	if (adbg_object_read_at(o, location, buffer, rdsize, flags)) {
+		free(buffer);
+		return null;
+	}
+	
+	return buffer;
 }
 
 /// Size of signature buffer.
