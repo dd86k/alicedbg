@@ -197,6 +197,20 @@ void print_name(const(char)* name) {
 	printf("%*s: ", __field_padding, name);
 }
 
+void print_columns(const(char)* field, ...) {
+	print_name(field);
+	
+	va_list args = void;
+	va_start(args, field);
+	const(char) *name = void;
+	size_t i;
+	while ((name = va_arg!(char*)(args)) != null) {
+		if (i++) putchar('\t');
+		printf(name);
+	}
+	putchar('\n');
+}
+
 void print_section(uint i, const(char) *name = null, int len = 0) {
 	putchar('\n');
 	print_u32("index", i);
