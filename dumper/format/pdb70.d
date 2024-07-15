@@ -18,6 +18,7 @@ import adbg.objects.pe : adbg_object_pe_machine_value_string;
 import adbg.utils.uid;
 import adbg.utils.date;
 import adbg.include.c.stdio : printf, snprintf, putchar;
+import adbg.types.cv;
 import dumper;
 import common.errormgmt;
 
@@ -106,23 +107,27 @@ void dump_pdb70_debug(adbg_object_t *o) {
 	pdb70_stream_t *stream = void;
 	const(char) *vcver = void;
 	
+	//
 	// Stream 0 - Old MSF directory
+	//
 	
 	/*
 	stream = adbg_object_pdb70_stream_open(o, 0);
 	if (stream == null)
-		panic_adbg("Failed to open Steam 0");
+		panic_adbg("Failed to open Stream 0");
 	print_section(0, StreamNames[0].ptr, cast(int)StreamNames[0].length);
 	if (stream)
 		print_hexdump("Stream 0 Data", buffer, strsize);
 	adbg_object_pdb70_stream_close(stream);
 	*/
 	
+	//
 	// Stream 1 - PDB
+	//
 	
 	stream = adbg_object_pdb70_stream_open(o, PdbStream.pdb);
 	if (stream == null)
-		panic_adbg("Failed to open Steam 1");
+		panic_adbg("Failed to open Stream 1");
 	
 	print_section(PdbStream.pdb, pdb_stream_name(PdbStream.pdb));
 	
@@ -151,11 +156,13 @@ void dump_pdb70_debug(adbg_object_t *o) {
 	print_raw("Stream 1 Data", leftover, leftlen);*/
 	adbg_object_pdb70_stream_close(stream);
 	
+	//
 	// Stream 2 - TPI
+	//
 	
 	stream = adbg_object_pdb70_stream_open(o, PdbStream.tpi);
 	if (stream == null)
-		panic_adbg("Failed to open Steam 1");
+		panic_adbg("Failed to open Stream 2");
 	
 	print_section(PdbStream.tpi, pdb_stream_name(PdbStream.tpi));
 	pdb70_tpi_header_t *tpi = cast(pdb70_tpi_header_t*)stream.data;
@@ -184,16 +191,31 @@ void dump_pdb70_debug(adbg_object_t *o) {
 	print_u32("HashAdjBufferOffset", tpi.HashAdjBufferOffset);
 	print_u32("HashAdjBufferLength", tpi.HashAdjBufferLength);
 	
+	cv_record_t *rec = cast(cv_record_t*)(stream.data + pdb70_tpi_header_t.sizeof);
+	int tpioffset;
+	while (tpioffset < stream.size) {
+		print_u16("Length", rec.length);
+		print_x16("Kind", rec.kind, SAFEVAL( adbg_type_cv_leaf_enum_string(rec.kind) ));
+		
+		if (rec.kind == 0 || rec.length == 0)
+			break;
+		
+		rec = cast(cv_record_t*)(cast(void*)rec + rec.length + ushort.sizeof);
+		tpioffset += rec.length;
+	}
+	
 	/*void *leftover = buffer + pdb70_tpi_header.sizeof;
 	size_t leftlen = strsize - pdb70_tpi_header.sizeof;
 	print_raw("Stream 2 Data", leftover, leftlen);*/
 	adbg_object_pdb70_stream_close(stream);
 	
+	//
 	// Stream 3 - DBI
+	//
 	
 	stream = adbg_object_pdb70_stream_open(o, PdbStream.dbi);
 	if (stream == null)
-		panic_adbg("Failed to open Steam 1");
+		panic_adbg("Failed to open Stream 3");
 	
 	print_section(PdbStream.dbi, pdb_stream_name(PdbStream.dbi));
 	
@@ -239,33 +261,60 @@ void dump_pdb70_debug(adbg_object_t *o) {
 		null);
 	print_x16("Machine", dbi.Machine, adbg_object_pe_machine_value_string(dbi.Machine));
 	print_u32("Padding", dbi.Padding);
+	
 	/*void *leftover = buffer + pdb70_dbi_header.sizeof;
 	size_t leftlen = strsize - pdb70_dbi_header.sizeof;
 	print_raw("Stream 3 Data", leftover, leftlen);*/
 	adbg_object_pdb70_stream_close(stream);
 	
+	//
 	// Stream 4 - IPI
-	/+print_section(4, StreamNames[4].ptr, cast(int)StreamNames[4].length);
-	if (adbg_object_pdb70_stream_open(o, &buffer, &strsize, PdbStream.dbi))
-		panic_adbg("Failed to open Steam 4");
-	if (strsize >= pdb70_subsection_header.sizeof) {
-		pdb70_subsection_header *ipi = cast(pdb70_subsection_header*)buffer;
-		
-		enum LIMIT = 200; // Arbitrary
-		
-		size_t i;
-	Lr:
-		print_x32("Kind", ipi.Kind);
-		print_x32("Length", ipi.Length);
-		
-		ipi = cast(pdb70_subsection_header*)((cast(void*)ipi) + ipi.Length);
-		if (ipi.Kind && ipi.Length && ++i < LIMIT) goto Lr;
-	}
-	adbg_object_pdb70_stream_close(o, &buffer);+/
+	//
 	
-	/*uint strcnt = o.i.pdb70.strcnt;
-	for (uint stridx = 5; stridx < strcnt; ++stridx) {
-		char[32] buf = void;
-		int l = snprintf(buf.ptr, 32, "Stream %u", stridx);
-	}*/
+	stream = adbg_object_pdb70_stream_open(o, PdbStream.ipi);
+	if (stream == null)
+		panic_adbg("Failed to open Stream 4");
+	
+	print_section(PdbStream.ipi, pdb_stream_name(PdbStream.ipi));
+	
+	tpi = cast(pdb70_tpi_header_t*)stream.data;
+	
+	switch (tpi.Version) with (PdbRaw_TpiVer) {
+	case v40:	vcver = "v40"; break;
+	case v41:	vcver = "v41"; break;
+	case v50:	vcver = "v50"; break;
+	case v70:	vcver = "v70"; break;
+	case v80:	vcver = "v80"; break;
+	default:	vcver = "Unknown";
+	}
+	
+	print_u32("Version", tpi.Version, vcver);
+	print_u32("HeaderSize", tpi.HeaderSize);
+	print_u32("TypeIndexBegin", tpi.TypeIndexBegin);
+	print_u32("TypeIndexEnd", tpi.TypeIndexEnd);
+	print_u32("TypeRecordBytes", tpi.TypeRecordBytes);
+	print_u16("HashStreamIndex", tpi.HashStreamIndex);
+	print_u16("HashAuxStreamIndex", tpi.HashAuxStreamIndex);
+	print_u32("HashKeySize", tpi.HashKeySize);
+	print_u32("NumHashBuckets", tpi.NumHashBuckets);
+	print_u32("HashValueBufferOffset", tpi.HashValueBufferOffset);
+	print_u32("HashValueBufferLength", tpi.HashValueBufferLength);
+	print_u32("IndexOffsetBufferOffset", tpi.IndexOffsetBufferOffset);
+	print_u32("IndexOffsetBufferLength", tpi.IndexOffsetBufferLength);
+	print_u32("HashAdjBufferOffset", tpi.HashAdjBufferOffset);
+	print_u32("HashAdjBufferLength", tpi.HashAdjBufferLength);
+	
+	rec = cast(cv_record_t*)(stream.data + pdb70_tpi_header_t.sizeof);
+	
+	int ipioffset;
+	while (ipioffset < stream.size) {
+		print_u16("Length", rec.length);
+		print_x16("Kind", rec.kind, SAFEVAL( adbg_type_cv_leaf_enum_string(rec.kind) ));
+		
+		if (rec.kind == 0 || rec.length == 0)
+			break;
+		
+		rec = cast(cv_record_t*)(cast(void*)rec + rec.length + ushort.sizeof);
+		ipioffset += rec.length;
+	}
 }

@@ -11,6 +11,421 @@
 /// License: BSD-3-Clause-Clear
 module adbg.types.cv;
 
+// NOTE: CodeView Glossary
+//
+//       UDT
+//           Likely means User-Defined Type.
+
+enum CV_MMASK        = 0x700;       /// mode mask
+enum CV_TMASK        = 0x0f0;       /// type mask
+
+enum CV_SIGNATURE_C6         = 0;  // Actual signature is >64K
+enum CV_SIGNATURE_C7         = 1;  // First explicit signature
+enum CV_SIGNATURE_C11        = 2;  // C11 (vc5.x) 32-bit types
+enum CV_SIGNATURE_C13        = 4;  // C13 (vc7.x) zero terminated names
+enum CV_SIGNATURE_RESERVED   = 5;  // All signatures from 5 to 64K are reserved
+
+
+// At least Leaf Records
+struct cv_record_t {
+	ushort length;
+	ushort kind;
+}
+
+alias LEAF_ENUM_e = ushort;
+enum : LEAF_ENUM_e {
+	// leaf indices starting records but referenced from symbol records
+
+	LF_MODIFIER_16t     = 0x0001,
+	LF_POINTER_16t      = 0x0002,
+	LF_ARRAY_16t        = 0x0003,
+	LF_CLASS_16t        = 0x0004,
+	LF_STRUCTURE_16t    = 0x0005,
+	LF_UNION_16t        = 0x0006,
+	LF_ENUM_16t         = 0x0007,
+	LF_PROCEDURE_16t    = 0x0008,
+	LF_MFUNCTION_16t    = 0x0009,
+	LF_VTSHAPE          = 0x000a,
+	LF_COBOL0_16t       = 0x000b,
+	LF_COBOL1           = 0x000c,
+	LF_BARRAY_16t       = 0x000d,
+	LF_LABEL            = 0x000e,
+	LF_NULL             = 0x000f,
+	LF_NOTTRAN          = 0x0010,
+	LF_DIMARRAY_16t     = 0x0011,
+	LF_VFTPATH_16t      = 0x0012,
+	LF_PRECOMP_16t      = 0x0013,       // not referenced from symbol
+	LF_ENDPRECOMP       = 0x0014,       // not referenced from symbol
+	LF_OEM_16t          = 0x0015,       // oem definable type string
+	LF_TYPESERVER_ST    = 0x0016,       // not referenced from symbol
+
+	// leaf indices starting records but referenced only from type records
+
+	LF_SKIP_16t         = 0x0200,
+	LF_ARGLIST_16t      = 0x0201,
+	LF_DEFARG_16t       = 0x0202,
+	LF_LIST             = 0x0203,
+	LF_FIELDLIST_16t    = 0x0204,
+	LF_DERIVED_16t      = 0x0205,
+	LF_BITFIELD_16t     = 0x0206,
+	LF_METHODLIST_16t   = 0x0207,
+	LF_DIMCONU_16t      = 0x0208,
+	LF_DIMCONLU_16t     = 0x0209,
+	LF_DIMVARU_16t      = 0x020a,
+	LF_DIMVARLU_16t     = 0x020b,
+	LF_REFSYM           = 0x020c,
+
+	LF_BCLASS_16t       = 0x0400,
+	LF_VBCLASS_16t      = 0x0401,
+	LF_IVBCLASS_16t     = 0x0402,
+	LF_ENUMERATE_ST     = 0x0403,
+	LF_FRIENDFCN_16t    = 0x0404,
+	LF_INDEX_16t        = 0x0405,
+	LF_MEMBER_16t       = 0x0406,
+	LF_STMEMBER_16t     = 0x0407,
+	LF_METHOD_16t       = 0x0408,
+	LF_NESTTYPE_16t     = 0x0409,
+	LF_VFUNCTAB_16t     = 0x040a,
+	LF_FRIENDCLS_16t    = 0x040b,
+	LF_ONEMETHOD_16t    = 0x040c,
+	LF_VFUNCOFF_16t     = 0x040d,
+
+	// 32-bit type index versions of leaves, all have the 0x1000 bit set
+	//
+	LF_TI16_MAX         = 0x1000,
+
+	LF_MODIFIER         = 0x1001,
+	LF_POINTER          = 0x1002,
+	LF_ARRAY_ST         = 0x1003,
+	LF_CLASS_ST         = 0x1004,
+	LF_STRUCTURE_ST     = 0x1005,
+	LF_UNION_ST         = 0x1006,
+	LF_ENUM_ST          = 0x1007,
+	LF_PROCEDURE        = 0x1008,
+	LF_MFUNCTION        = 0x1009,
+	LF_COBOL0           = 0x100a,
+	LF_BARRAY           = 0x100b,
+	LF_DIMARRAY_ST      = 0x100c,
+	LF_VFTPATH          = 0x100d,
+	LF_PRECOMP_ST       = 0x100e,       // not referenced from symbol
+	LF_OEM              = 0x100f,       // oem definable type string
+	LF_ALIAS_ST         = 0x1010,       // alias (typedef) type
+	LF_OEM2             = 0x1011,       // oem definable type string
+
+	// leaf indices starting records but referenced only from type records
+
+	LF_SKIP             = 0x1200,
+	LF_ARGLIST          = 0x1201,
+	LF_DEFARG_ST        = 0x1202,
+	LF_FIELDLIST        = 0x1203,
+	LF_DERIVED          = 0x1204,
+	LF_BITFIELD         = 0x1205,
+	LF_METHODLIST       = 0x1206,
+	LF_DIMCONU          = 0x1207,
+	LF_DIMCONLU         = 0x1208,
+	LF_DIMVARU          = 0x1209,
+	LF_DIMVARLU         = 0x120a,
+
+	LF_BCLASS           = 0x1400,
+	LF_VBCLASS          = 0x1401,
+	LF_IVBCLASS         = 0x1402,
+	LF_FRIENDFCN_ST     = 0x1403,
+	LF_INDEX            = 0x1404,
+	LF_MEMBER_ST        = 0x1405,
+	LF_STMEMBER_ST      = 0x1406,
+	LF_METHOD_ST        = 0x1407,
+	LF_NESTTYPE_ST      = 0x1408,
+	LF_VFUNCTAB         = 0x1409,
+	LF_FRIENDCLS        = 0x140a,
+	LF_ONEMETHOD_ST     = 0x140b,
+	LF_VFUNCOFF         = 0x140c,
+	LF_NESTTYPEEX_ST    = 0x140d,
+	LF_MEMBERMODIFY_ST  = 0x140e,
+	LF_MANAGED_ST       = 0x140f,
+
+	// Types with SZ (null-terminated string) names
+
+	LF_ST_MAX           = 0x1500,
+
+	LF_TYPESERVER       = 0x1501,       // not referenced from symbol
+	LF_ENUMERATE        = 0x1502,
+	LF_ARRAY            = 0x1503,
+	LF_CLASS            = 0x1504,
+	LF_STRUCTURE        = 0x1505,
+	LF_UNION            = 0x1506,
+	LF_ENUM             = 0x1507,
+	LF_DIMARRAY         = 0x1508,
+	LF_PRECOMP          = 0x1509,       // not referenced from symbol
+	LF_ALIAS            = 0x150a,       // alias (typedef) type
+	LF_DEFARG           = 0x150b,
+	LF_FRIENDFCN        = 0x150c,
+	LF_MEMBER           = 0x150d,
+	LF_STMEMBER         = 0x150e,
+	LF_METHOD           = 0x150f,
+	LF_NESTTYPE         = 0x1510,
+	LF_ONEMETHOD        = 0x1511,
+	LF_NESTTYPEEX       = 0x1512,
+	LF_MEMBERMODIFY     = 0x1513,
+	LF_MANAGED          = 0x1514,
+	LF_TYPESERVER2      = 0x1515,
+
+	/// Same as LF_ARRAY, but with stride between adjacent elements
+	LF_STRIDED_ARRAY    = 0x1516,
+	LF_HLSL             = 0x1517,
+	LF_MODIFIER_EX      = 0x1518,
+	LF_INTERFACE        = 0x1519,
+	LF_BINTERFACE       = 0x151a,
+	LF_VECTOR           = 0x151b,
+	LF_MATRIX           = 0x151c,
+
+	LF_VFTABLE          = 0x151d,      // a virtual function table
+	LF_ENDOFLEAFRECORD  = LF_VFTABLE,
+
+	LF_TYPE_LAST,                    // one greater than the last type record
+	LF_TYPE_MAX         = LF_TYPE_LAST - 1,
+
+	LF_FUNC_ID          = 0x1601,    // global func ID
+	LF_MFUNC_ID         = 0x1602,    // member func ID
+	LF_BUILDINFO        = 0x1603,    // build info: tool, version, command line, src/pdb file
+	LF_SUBSTR_LIST      = 0x1604,    // similar to LF_ARGLIST, for list of sub strings
+	LF_STRING_ID        = 0x1605,    // string ID
+
+	/// Source and line on where an UDT is defined.
+	/// Only generated by the compiler.
+	LF_UDT_SRC_LINE     = 0x1606,
+
+	/// Module, source, and line where an UDT is defined.
+	/// Only generated by the linker.
+	LF_UDT_MOD_SRC_LINE = 0x1607,
+
+	/// one greater than the last ID record
+	LF_ID_LAST,
+	LF_ID_MAX           = LF_ID_LAST - 1,
+
+	LF_NUMERIC          = 0x8000,
+	LF_CHAR             = 0x8000,
+	LF_SHORT            = 0x8001,
+	LF_USHORT           = 0x8002,
+	LF_LONG             = 0x8003,
+	LF_ULONG            = 0x8004,
+	LF_REAL32           = 0x8005,
+	LF_REAL64           = 0x8006,
+	LF_REAL80           = 0x8007,
+	LF_REAL128          = 0x8008,
+	LF_QUADWORD         = 0x8009,
+	LF_UQUADWORD        = 0x800a,
+	LF_REAL48           = 0x800b,
+	LF_COMPLEX32        = 0x800c,
+	LF_COMPLEX64        = 0x800d,
+	LF_COMPLEX80        = 0x800e,
+	LF_COMPLEX128       = 0x800f,
+	LF_VARSTRING        = 0x8010,
+
+	LF_OCTWORD          = 0x8017,
+	LF_UOCTWORD         = 0x8018,
+
+	LF_DECIMAL          = 0x8019,
+	LF_DATE             = 0x801a,
+	LF_UTF8STRING       = 0x801b,
+
+	LF_REAL16           = 0x801c,
+
+	LF_PAD0             = 0xf0,
+	LF_PAD1             = 0xf1,
+	LF_PAD2             = 0xf2,
+	LF_PAD3             = 0xf3,
+	LF_PAD4             = 0xf4,
+	LF_PAD5             = 0xf5,
+	LF_PAD6             = 0xf6,
+	LF_PAD7             = 0xf7,
+	LF_PAD8             = 0xf8,
+	LF_PAD9             = 0xf9,
+	LF_PAD10            = 0xfa,
+	LF_PAD11            = 0xfb,
+	LF_PAD12            = 0xfc,
+	LF_PAD13            = 0xfd,
+	LF_PAD14            = 0xfe,
+	LF_PAD15            = 0xff,
+}
+
+const(char)* adbg_type_cv_leaf_enum_string(ushort val) {
+	switch (val) {
+	case LF_MODIFIER_16t:	return "LF_MODIFIER_16t";
+	case LF_POINTER_16t:	return "LF_POINTER_16t";
+	case LF_ARRAY_16t:	return "LF_ARRAY_16t";
+	case LF_CLASS_16t:	return "LF_CLASS_16t";
+	case LF_STRUCTURE_16t:	return "LF_STRUCTURE_16t";
+	case LF_UNION_16t:	return "LF_UNION_16t";
+	case LF_ENUM_16t:	return "LF_ENUM_16t";
+	case LF_PROCEDURE_16t:	return "LF_PROCEDURE_16t";
+	case LF_MFUNCTION_16t:	return "LF_MFUNCTION_16t";
+	case LF_VTSHAPE:	return "LF_VTSHAPE";
+	case LF_COBOL0_16t:	return "LF_COBOL0_16t";
+	case LF_COBOL1:	return "LF_COBOL1";
+	case LF_BARRAY_16t:	return "LF_BARRAY_16t";
+	case LF_LABEL:	return "LF_LABEL";
+	case LF_NULL:	return "LF_NULL";
+	case LF_NOTTRAN:	return "LF_NOTTRAN";
+	case LF_DIMARRAY_16t:	return "LF_DIMARRAY_16t";
+	case LF_VFTPATH_16t:	return "LF_VFTPATH_16t";
+	case LF_PRECOMP_16t:	return "LF_PRECOMP_16t";
+	case LF_ENDPRECOMP:	return "LF_ENDPRECOMP";
+	case LF_OEM_16t:	return "LF_OEM_16t";
+	case LF_TYPESERVER_ST:	return "LF_TYPESERVER_ST";
+	
+	case LF_SKIP_16t:	return "LF_SKIP_16t";
+	case LF_ARGLIST_16t:	return "LF_ARGLIST_16t";
+	case LF_DEFARG_16t:	return "LF_DEFARG_16t";
+	case LF_LIST:	return "LF_LIST";
+	case LF_FIELDLIST_16t:	return "LF_FIELDLIST_16t";
+	case LF_DERIVED_16t:	return "LF_DERIVED_16t";
+	case LF_BITFIELD_16t:	return "LF_BITFIELD_16t";
+	case LF_METHODLIST_16t:	return "LF_METHODLIST_16t";
+	case LF_DIMCONU_16t:	return "LF_DIMCONU_16t";
+	case LF_DIMCONLU_16t:	return "LF_DIMCONLU_16t";
+	case LF_DIMVARU_16t:	return "LF_DIMVARU_16t";
+	case LF_DIMVARLU_16t:	return "LF_DIMVARLU_16t";
+	case LF_REFSYM:	return "LF_REFSYM";
+	
+	case LF_BCLASS_16t:	return "LF_BCLASS_16t";
+	case LF_VBCLASS_16t:	return "LF_VBCLASS_16t";
+	case LF_IVBCLASS_16t:	return "LF_IVBCLASS_16t";
+	case LF_ENUMERATE_ST:	return "LF_ENUMERATE_ST";
+	case LF_FRIENDFCN_16t:	return "LF_FRIENDFCN_16t";
+	case LF_INDEX_16t:	return "LF_INDEX_16t";
+	case LF_MEMBER_16t:	return "LF_MEMBER_16t";
+	case LF_STMEMBER_16t:	return "LF_STMEMBER_16t";
+	case LF_METHOD_16t:	return "LF_METHOD_16t";
+	case LF_NESTTYPE_16t:	return "LF_NESTTYPE_16t";
+	case LF_VFUNCTAB_16t:	return "LF_VFUNCTAB_16t";
+	case LF_FRIENDCLS_16t:	return "LF_FRIENDCLS_16t";
+	case LF_ONEMETHOD_16t:	return "LF_ONEMETHOD_16t";
+	case LF_VFUNCOFF_16t:	return "LF_VFUNCOFF_16t";
+	
+	case LF_MODIFIER:	return "LF_MODIFIER";
+	case LF_POINTER:	return "LF_POINTER";
+	case LF_ARRAY_ST:	return "LF_ARRAY_ST";
+	case LF_CLASS_ST:	return "LF_CLASS_ST";
+	case LF_STRUCTURE_ST:	return "LF_STRUCTURE_ST";
+	case LF_UNION_ST:	return "LF_UNION_ST";
+	case LF_ENUM_ST:	return "LF_ENUM_ST";
+	case LF_PROCEDURE:	return "LF_PROCEDURE";
+	case LF_MFUNCTION:	return "LF_MFUNCTION";
+	case LF_COBOL0:	return "LF_COBOL0";
+	case LF_BARRAY:	return "LF_BARRAY";
+	case LF_DIMARRAY_ST:	return "LF_DIMARRAY_ST";
+	case LF_VFTPATH:	return "LF_VFTPATH";
+	case LF_PRECOMP_ST:	return "LF_PRECOMP_ST";
+	case LF_OEM:	return "LF_OEM";
+	case LF_ALIAS_ST:	return "LF_ALIAS_ST";
+	case LF_OEM2:	return "LF_OEM2";
+	
+	case LF_SKIP:	return "LF_SKIP";
+	case LF_ARGLIST:	return "LF_ARGLIST";
+	case LF_DEFARG_ST:	return "LF_DEFARG_ST";
+	case LF_FIELDLIST:	return "LF_FIELDLIST";
+	case LF_DERIVED:	return "LF_DERIVED";
+	case LF_BITFIELD:	return "LF_BITFIELD";
+	case LF_METHODLIST:	return "LF_METHODLIST";
+	case LF_DIMCONU:	return "LF_DIMCONU";
+	case LF_DIMCONLU:	return "LF_DIMCONLU";
+	case LF_DIMVARU:	return "LF_DIMVARU";
+	case LF_DIMVARLU:	return "LF_DIMVARLU";
+	
+	case LF_BCLASS:	return "LF_BCLASS";
+	case LF_VBCLASS:	return "LF_VBCLASS";
+	case LF_IVBCLASS:	return "LF_IVBCLASS";
+	case LF_FRIENDFCN_ST:	return "LF_FRIENDFCN_ST";
+	case LF_INDEX:	return "LF_INDEX";
+	case LF_MEMBER_ST:	return "LF_MEMBER_ST";
+	case LF_STMEMBER_ST:	return "LF_STMEMBER_ST";
+	case LF_METHOD_ST:	return "LF_METHOD_ST";
+	case LF_NESTTYPE_ST:	return "LF_NESTTYPE_ST";
+	case LF_VFUNCTAB:	return "LF_VFUNCTAB";
+	case LF_FRIENDCLS:	return "LF_FRIENDCLS";
+	case LF_ONEMETHOD_ST:	return "LF_ONEMETHOD_ST";
+	case LF_VFUNCOFF:	return "LF_VFUNCOFF";
+	case LF_NESTTYPEEX_ST:	return "LF_NESTTYPEEX_ST";
+	case LF_MEMBERMODIFY_ST:	return "LF_MEMBERMODIFY_ST";
+	case LF_MANAGED_ST:	return "LF_MANAGED_ST";
+	
+	case LF_TYPESERVER:	return "LF_TYPESERVER";
+	case LF_ENUMERATE:	return "LF_ENUMERATE";
+	case LF_ARRAY:	return "LF_ARRAY";
+	case LF_CLASS:	return "LF_CLASS";
+	case LF_STRUCTURE:	return "LF_STRUCTURE";
+	case LF_UNION:	return "LF_UNION";
+	case LF_ENUM:	return "LF_ENUM";
+	case LF_DIMARRAY:	return "LF_DIMARRAY";
+	case LF_PRECOMP:	return "LF_PRECOMP";
+	case LF_ALIAS:	return "LF_ALIAS";
+	case LF_DEFARG:	return "LF_DEFARG";
+	case LF_FRIENDFCN:	return "LF_FRIENDFCN";
+	case LF_MEMBER:	return "LF_MEMBER";
+	case LF_STMEMBER:	return "LF_STMEMBER";
+	case LF_METHOD:	return "LF_METHOD";
+	case LF_NESTTYPE:	return "LF_NESTTYPE";
+	case LF_ONEMETHOD:	return "LF_ONEMETHOD";
+	case LF_NESTTYPEEX:	return "LF_NESTTYPEEX";
+	case LF_MEMBERMODIFY:	return "LF_MEMBERMODIFY";
+	case LF_MANAGED:	return "LF_MANAGED";
+	case LF_TYPESERVER2:	return "LF_TYPESERVER2";
+	
+	case LF_STRIDED_ARRAY:	return "LF_STRIDED_ARRAY";
+	case LF_HLSL:	return "LF_HLSL";
+	case LF_MODIFIER_EX:	return "LF_MODIFIER_EX";
+	case LF_INTERFACE:	return "LF_INTERFACE";
+	case LF_BINTERFACE:	return "LF_BINTERFACE";
+	case LF_VECTOR:	return "LF_VECTOR";
+	case LF_MATRIX:	return "LF_MATRIX";
+	
+	case LF_VFTABLE:	return "LF_VFTABLE";
+	
+	case LF_FUNC_ID:	return "LF_FUNC_ID";
+	case LF_MFUNC_ID:	return "LF_MFUNC_ID";
+	case LF_BUILDINFO:	return "LF_BUILDINFO";
+	case LF_SUBSTR_LIST:	return "LF_SUBSTR_LIST";
+	case LF_STRING_ID:	return "LF_STRING_ID";
+	
+	case LF_UDT_SRC_LINE:	return "LF_UDT_SRC_LINE";
+	case LF_UDT_MOD_SRC_LINE:	return "LF_UDT_MOD_SRC_LINE";
+	
+	case LF_NUMERIC:	return "LF_NUMERIC";
+//	case LF_CHAR:	return "LF_CHAR"; - Duplicate of LF_NUMERIC
+	case LF_SHORT:	return "LF_SHORT";
+	case LF_USHORT:	return "LF_USHORT";
+	case LF_LONG:	return "LF_LONG";
+	case LF_ULONG:	return "LF_ULONG";
+	case LF_REAL32:	return "LF_REAL32";
+	case LF_REAL64:	return "LF_REAL64";
+	case LF_REAL80:	return "LF_REAL80";
+	case LF_REAL128:	return "LF_REAL128";
+	case LF_QUADWORD:	return "LF_QUADWORD";
+	case LF_UQUADWORD:	return "LF_UQUADWORD";
+	case LF_REAL48:	return "LF_REAL48";
+	case LF_COMPLEX32:	return "LF_COMPLEX32";
+	case LF_COMPLEX64:	return "LF_COMPLEX64";
+	case LF_COMPLEX80:	return "LF_COMPLEX80";
+	case LF_COMPLEX128:	return "LF_COMPLEX128";
+	case LF_VARSTRING:	return "LF_VARSTRING";
+	
+	case LF_OCTWORD:	return "LF_OCTWORD";
+	case LF_UOCTWORD:	return "LF_UOCTWORD";
+	
+	case LF_DECIMAL:	return "LF_DECIMAL";
+	case LF_DATE:	return "LF_DATE";
+	case LF_UTF8STRING:	return "LF_UTF8STRING";
+	
+	case LF_REAL16:	return "LF_REAL16";
+	
+	default:	return null;
+	}
+}
+
+enum {
+	CV_OEM_DIGITALMARS = 0x42,
+}
+
 alias SYM_ENUM_e = ushort;
 enum : SYM_ENUM_e {
 	S_COMPILE       =  0x0001,  // Compile flags symbol
@@ -76,6 +491,8 @@ enum : SYM_ENUM_e {
 	// care about 16-bit ones anymore.
 	S_TI16_MAX          =  0x1000,
 
+	// NOTE: DMD has S_REGISTER_V2 (same as S_REGISTER_ST)
+	//       and S_CONSTANT_V2 (same as S_CONSTANT_ST)
 	S_REGISTER_ST   =  0x1001,  // Register variable
 	S_CONSTANT_ST   =  0x1002,  // constant symbol
 	S_UDT_ST        =  0x1003,  // User defined type

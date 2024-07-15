@@ -19,6 +19,7 @@ import adbg.utils.bit;
 import adbg.utils.uid;
 import adbg.utils.math;
 import core.stdc.stdlib;
+import core.stdc.string : memset;
 
 extern (C):
 
@@ -115,38 +116,49 @@ pdb20_file_header_t* adbg_object_pdb20_header(adbg_object_t *o) {
 //
 // Blocks
 //  vvv
-// +---+ -+
-// |   |  +- B[0]: Superblock
-// +---+ -+        Contains FPM index used, BlockSize, and directory page offset
-// |   |  |
-// +---+  +- B[1..2]: Two FPM blocks, acts as a huge array of bitfields
-// |   |  |           1-bit/block: 0=unallocated/unused, 1=allocated/used
-// +---+ -+
-// |   |  |
-// +---+  +- B[3..4095]: Data blocks (1 or more or any block)
-// |   |  |              Stream 0 contains information to load streams
-// +---+  |
-// |   |  |
-// +---+ -+
-//  ...      If there are more than 4096 blocks:
-// +---+ -+
-// |   |  +- B[4096]: Data
-// +---+ -+
-// |   |  |
-// +---+  +- B[4097..4098]: FPM blocks. Kept for compatibility
-// |   |  |
-// +---+ -+
-// |   |  |
-// +---+  +- B[4099..8191]: Data blocks (1 or more)
-// |   |  |
-// +---+ -+
+// +---+  -+
+// |   |   +- B[0]: Superblock
+// +---+  -+        Contains FPM index used, BlockSize, and directory page offset
+// |   |   |
+// +---+   +- B[1..2]: Two FPM blocks, acts as a huge array of bitfields
+// |   |   |           1-bit/block: 0=unallocated/unused, 1=allocated/used
+// +---+  -+
+// |   |   |
+// +---+   +- B[3..4095]: Data blocks (1 or more or any block)
+// |   |   |              Stream 0 contains information to load streams
+// +---+   |
+// |   |   |
+// +---+  -+
+//  ...       If there are more than 4096 blocks:
+// +---+  -+
+// |   |   +- B[4096]: Data
+// +---+  -+
+// |   |   |
+// +---+   +- B[4097..4098]: FPM blocks. Kept for compatibility
+// |   |   |
+// +---+  -+
+// |   |   |
+// +---+   +- B[4099..8191]: Data blocks (1 or more)
+// |   |   |
+// +---+  -+
 //  ...
-// +---+ -+- Block directory and Stream 0 usually at the end.
-// |   |  |  Header points to block directory.
-// +---+  +  Block directory points to Stream 0.
-// |   |  |
-// +---+ -+
+// +---+  -+
+// |   |   |  Block directory and Stream 0 usually at the end.
+// +---+   +- Header points to block directory.
+// |   |   |  Block directory points to Stream 0.
+// +---+  -+
 //
+// Block    Description
+// 0        Contains PDB layout information. AKA SuperBlock
+// 1-2      FPM tables
+// last     Usually the directory for Stream 0
+//
+// Stream   Description
+// 0        List of blocks to streams.
+// 1 (PDB)  Holds basic PDB information
+// 2 (TPI)  Holds CodeView type records (< 0x1600 record types) for types
+// 3 (DBI)  Holds module information
+// 4 (IPI)  Holds CodeView type records (>=0x1600 record types) for module/line
 
 immutable string PDB70_MAGIC = "Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0";
 
@@ -372,7 +384,9 @@ struct pdb70_dbi_header_t {
 	uint Padding;
 }
 
-/// Follows the DBI header, substream information
+/// Follows the DBI header, substream information.
+///
+/// I think it is one per module.
 struct pdb70_dbi_modinfo_t {
 	/// 
 	uint Unused1;
@@ -389,11 +403,11 @@ struct pdb70_dbi_modinfo_t {
 	}
 	/// Matches Characteristics from IMAGE_SECTION_HEADER
 	pdb70_dbi_mod_contrib_entry SectionContr;
+	/// Flags.
 	// int16_t Dirty : 1;  // Likely due to incremental linking.
 	// int16_t EC : 1;     // Edit & Continue
 	// int16_t Unused : 6;
 	// int16_t TSM : 8;    // Type Server Index for module.
-	/// Flags.
 	ushort Flags;
 	ushort ModuleSysStream;
 	uint SymByteSize;
@@ -432,6 +446,7 @@ enum PdbSubsectionKind : uint {
 	coffSymbolRVA	= 0xfd,
 }
 
+/// Used for TPI (2) and IPI (4) streams, after the header.
 struct pdb70_subsection_header_t {
 	PdbSubsectionKind Kind;
 	uint Length;
@@ -730,14 +745,18 @@ uint* adbg_object_pdb70_stream_blocks(adbg_object_t *o, size_t i) {
 	return internal.stream_blocks[ i ];
 }
 
-// true=unallocated
+/// Get the status of a block.
+/// Params:
+/// 	o = Object instance.
+/// 	id = Block ID.
+/// Returns: True if block is either unallocated or unused.
 private
-bool adbg_object_pdb70_block_closed(adbg_object_t *o, uint num) {
+bool adbg_object_pdb70_is_block_free(adbg_object_t *o, uint id) {
 	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
 	
-	uint bi = num / 8; // block byte index
-	uint br = 7 - (num % 8); // block reminder shift
-	return (internal.fpm[bi] & (1 << br)) == 0; // set=free, so reverse that
+	uint bi = id >> 3; // block byte index (id / 8)
+	uint br = 7 - (id % 8); // block reminder shift
+	return (internal.fpm[bi] & (1 << br)) != 0; // set=free
 }
 
 // Open by stream number id
@@ -787,9 +806,16 @@ pdb70_stream_t* adbg_object_pdb70_stream_open(adbg_object_t *o, uint num) {
 	// Copy blocks into stream buffer
 	uint *blocks = internal.stream_blocks[num];
 	size_t of;
-	for (size_t b; b < blockcount; ++b, of += BlockSize) {
-		long boffset = blocks[b] * BlockSize;
+	for (size_t bidx; bidx < blockcount; ++bidx, of += BlockSize) {
+		// If block is unallocated/free, then there is no need to
+		// perform I/O.
+		if (adbg_object_pdb70_is_block_free(o, blocks[bidx])) {
+			memset(stream.data + of, 0, BlockSize);
+			continue;
+		}
 		
+		// Read block into stream data.
+		long boffset = blocks[bidx] * BlockSize;
 		if (adbg_object_read_at(o, boffset, stream.data + of, BlockSize)) {
 			free(buffer);
 			return null;
