@@ -156,9 +156,9 @@ pdb20_file_header_t* adbg_object_pdb20_header(adbg_object_t *o) {
 // Stream   Description
 // 0        List of blocks to streams.
 // 1 (PDB)  Holds basic PDB information
-// 2 (TPI)  Holds CodeView type records (< 0x1600 record types) for types
-// 3 (DBI)  Holds module information
-// 4 (IPI)  Holds CodeView type records (>=0x1600 record types) for module/line
+// 2 (TPI)  (CodeView) Type Indices (< 0x1600 record types) for types
+// 3 (DBI)  Debug Information
+// 4 (IPI)  (CodeView) Index Info? (>=0x1600 record types) for module/line?
 
 immutable string PDB70_MAGIC = "Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0";
 
@@ -256,7 +256,7 @@ enum PdbRaw_TpiVer : uint {
 	v80 = 20040203,
 }
 
-/// Stream 2 TPI header
+/// CodeView record header for Stream 2 (TPI) and Stream 4 (IPI)
 struct pdb70_tpi_header_t {
 	/// Maps to PdbRaw_TpiVer, usually v80.
 	uint Version;
@@ -409,6 +409,7 @@ struct pdb70_dbi_modinfo_t {
 	// int16_t Unused : 6;
 	// int16_t TSM : 8;    // Type Server Index for module.
 	ushort Flags;
+	/// Stream index to its symbols. -1 (0xffffffff) means no symbols.
 	ushort ModuleSysStream;
 	uint SymByteSize;
 	uint C11ByteSize;

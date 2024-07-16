@@ -47,6 +47,7 @@ immutable option_t[] options = [
 	option_t(0,   "relocs",       "Dump relocations", &cliopt_relocs),
 	option_t(0,   "debug",        "Dump debug information", &cliopt_debug),
 	option_t(0,   "everything",   "Dump everything except disassembly", &cliopt_everything),
+	option_t(0,   "pdb-stream",   "Dump given PDB stream", &cliopt_pdb_stream),
 	// settings
 	option_t(0,   "as-blob",           "Setting: Input is headless binary blob", &cliopt_as_blob),
 	option_t(0,   "disassemble",       "Setting: Disassemble executable sections", &cliopt_disasm),
@@ -114,6 +115,12 @@ int cliopt_everything() {
 	return 0;
 }
 
+int cliopt_pdb_stream(const(char) *num) {
+	opt_selected |= Select.any;
+	opt_pdb_stream = num;
+	return 0;
+}
+
 //
 // Settings
 //
@@ -172,11 +179,11 @@ int cliopt_help() {
 	"\n"~
 	"USAGE\n"~
 	"  Summarize object file:\n"~
-	"    alicedbg [OPTIONS...] FILE\n"~
-	"  Dump headers:\n"~
-	"    alicedbg {-H|--headers} [OPTIONS...] FILE\n"~
-	"  Show information page and exit:\n"~
-	"    alicedbg {-h|--help|--version|--ver|--license}\n"~
+	"    alicedump [OPTIONS...] FILE\n"~
+	"  Dump specific information:\n"~
+	"    alicedump {-H|--headers} {-S|--sections} {-I|--imports} {-E|--exports} [OPTIONS...] FILE\n"~
+	"  Show application information and exit:\n"~
+	"    alicedump {-h|--help|--version|--ver|--license}\n"~
 	"\n"~
 	"OPTIONS"
 	);

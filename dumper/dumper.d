@@ -57,7 +57,10 @@ enum Select {
 	/// PE32 load configuration
 	loadcfg	= BIT!25,
 	
-	/// 
+	/// This is a hack to let dumper avoid making a summary
+	any = BIT!31,
+	
+	/// Select everything to dump
 	all = 0xffff_ffff,
 }
 enum Setting {
@@ -93,6 +96,8 @@ int opt_settings;
 const(char)* opt_section_name;
 long opt_baseaddress;
 const(char)* opt_extractfile;
+
+const(char)* opt_pdb_stream;
 
 int SELECTED(Select selection) { return opt_selected & selection; }
 int SETTING(Setting setting)   { return opt_settings & setting; }
@@ -298,6 +303,13 @@ void print_x64(const(char)* name, ulong val, const(char) *meaning = null) {
 	printf("%*s: 0x%016llx", __field_padding, name, val);
 	if (meaning) printf(`\t(%s)`, meaning);
 	putchar('\n');
+}
+
+void print_char(const(char)* name, char c) {
+	char[8] b = void;
+	int l = realstring(b.ptr, 8, &c, 1, '\'', '\'');
+	b[l] = 0;
+	print_x8(name, c, b.ptr);
 }
 
 void print_f32(const(char)* name, float val, int pad = 2) {
