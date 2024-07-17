@@ -15,6 +15,9 @@ import adbg.objects.pdb;
 import adbg.objects.pe : adbg_object_pe_machine_value_string;
 import adbg.utils.uid;
 import adbg.utils.date;
+import adbg.utils.strings;
+import adbg.utils.math;
+import adbg.utils.bit;
 import adbg.include.c.stdio : printf, snprintf, putchar;
 import adbg.types.cv;
 import core.stdc.stdlib : atoi;
@@ -266,36 +269,79 @@ void dump_pdb70_stream_dbi(adbg_object_t *o) {
 	print_x16("Machine", dbi.Machine, adbg_object_pe_machine_value_string(dbi.Machine));
 	print_u32("Padding", dbi.Padding);
 	
-	if (dbi.ModInfoSize >= pdb70_dbi_modinfo_t.sizeof) {
-		pdb70_dbi_modinfo_t *mod = cast(pdb70_dbi_modinfo_t*)
-			(stream.data + pdb70_dbi_header_t.sizeof);
-		
+	// Module Info Substream containing object entries
+	if (dbi.ModInfoSize > pdb70_dbi_modinfo_t.sizeof) {
 		print_header("Module info");
 		
-		print_x32("Unused1", mod.Unused1);
-		print_x32("SectionContr.Section", mod.SectionContr.Section);
-		print_char("SectionContr.Padding1[0]", mod.SectionContr.Padding1[0]);
-		print_char("SectionContr.Padding1[1]", mod.SectionContr.Padding1[1]);
-		print_u32("SectionContr.Offset", mod.SectionContr.Offset);
-		print_u32("SectionContr.Size", mod.SectionContr.Size);
-		print_x32("SectionContr.Characteristics", mod.SectionContr.Characteristics);
-		print_x16("SectionContr.ModuleIndex", mod.SectionContr.ModuleIndex);
-		print_char("SectionContr.Padding2[0]", mod.SectionContr.Padding2[0]);
-		print_char("SectionContr.Padding2[1]", mod.SectionContr.Padding2[1]);
-		print_x32("SectionContr.DataCrc", mod.SectionContr.DataCrc);
-		print_x32("SectionContr.RelocCrc", mod.SectionContr.RelocCrc);
-		print_x16("Flags", mod.Flags);
-		print_x16("ModuleSysStream", mod.ModuleSysStream);
-		print_x32("SymByteSize", mod.SymByteSize);
-		print_x32("C11ByteSize", mod.C11ByteSize);
-		print_x32("C13ByteSize", mod.C13ByteSize);
-		print_u16("SourceFileCount", mod.SourceFileCount);
-		print_char("Padding[0]", mod.Padding[0]);
-		print_char("Padding[1]", mod.Padding[1]);
-		print_x32("Unused2", mod.Unused2);
-		print_x32("SourceFileNameIndex", mod.SourceFileNameIndex);
-		print_x32("PdbFilePathNameIndex", mod.PdbFilePathNameIndex);
+		uint count;
+		size_t size;
+		for (size_t offset; offset < dbi.ModInfoSize; offset += size) {
+			pdb70_dbi_modinfo_t *mod = cast(pdb70_dbi_modinfo_t*)
+				(stream.data + pdb70_dbi_header_t.sizeof + offset);
+			
+			print_section(count++);
+			print_x32("Unused1", mod.Unused1);
+			print_x32("SectionContr.Section", mod.SectionContr.Section);
+			print_char("SectionContr.Padding1[0]", mod.SectionContr.Padding1[0]);
+			print_char("SectionContr.Padding1[1]", mod.SectionContr.Padding1[1]);
+			print_u32("SectionContr.Offset", mod.SectionContr.Offset);
+			print_u32("SectionContr.Size", mod.SectionContr.Size);
+			print_x32("SectionContr.Characteristics", mod.SectionContr.Characteristics);
+			print_u16("SectionContr.ModuleIndex", mod.SectionContr.ModuleIndex);
+			print_char("SectionContr.Padding2[0]", mod.SectionContr.Padding2[0]);
+			print_char("SectionContr.Padding2[1]", mod.SectionContr.Padding2[1]);
+			print_x32("SectionContr.DataCrc", mod.SectionContr.DataCrc);
+			print_x32("SectionContr.RelocCrc", mod.SectionContr.RelocCrc);
+			print_flags16("Flags", mod.Flags,
+				"DIRTY".ptr, PDB_DBI_MOD_DIRTY,
+				"EC".ptr, PDB_DBI_MOD_EC,
+				null);
+			print_u16("ModuleSysStream", mod.ModuleSysStream);
+			print_u32("SymByteSize", mod.SymByteSize);
+			print_u32("C11ByteSize", mod.C11ByteSize);
+			print_u32("C13ByteSize", mod.C13ByteSize);
+			print_u16("SourceFileCount", mod.SourceFileCount);
+			print_char("Padding[0]", mod.Padding[0]);
+			print_char("Padding[1]", mod.Padding[1]);
+			print_x32("Unused2", mod.Unused2);
+			// NOTE: SourceFileNameIndex is usually zero these days.
+			print_u32("SourceFileNameIndex", mod.SourceFileNameIndex);
+			// NOTE: Usually only non-zero for "* Linker *" module
+			print_u32("PdbFilePathNameIndex", mod.PdbFilePathNameIndex);
+			
+			// TODO: min(4096, left) for nstrlen
+			
+			char *modname = cast(char*)mod + pdb70_dbi_modinfo_t.sizeof;
+			int modlen = cast(int)adbg_nstrlen(modname, 4096);
+			print_stringl("ModuleName", modname, modlen);
+			
+			// If non-zero, then it has null-terminator, include for total length
+			if (modlen) ++modlen;
+			
+			char* objname = modname + modlen;
+			int objlen = cast(int)adbg_nstrlen(objname, 4096);
+			print_stringl("ObjFileName", objname, objlen);
+			
+			// Ditto
+			if (objlen) ++objlen;
+			
+			size = adbg_alignup(pdb70_dbi_modinfo_t.sizeof + modlen + objlen, 4);
+		}
 	}
 	
-	// TODO: The rest of the sub-streams
+	// TODO: Section Contribution Substream
+	
+	// TODO: Section Map Substream
+	
+	// TODO: File Info Substream
+	/*
+	if (dbi.SourceInfoSize > pdb70_dbi_fileinfo_t.sizeof) {
+	}
+	*/
+	
+	// TODO: Type Server Map Substream
+	
+	// TODO: EC Substream
+	
+	// TODO: Optional Debug Header Stream
 }

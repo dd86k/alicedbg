@@ -10,6 +10,8 @@ import core.stdc.stdarg;
 import core.stdc.string;
 
 // TODO: adbg_str_readline: version without copying line to buffer, but modifies it
+// TODO: adbg_path_basename: Get filename from path.
+// TODO: adbg_path_basenamen: Get filename from path buffer with length.
 
 extern (C):
 

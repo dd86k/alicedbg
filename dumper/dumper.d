@@ -416,7 +416,6 @@ void print_data(const(char)* name, void *data, size_t size, ulong baseaddress = 
 
 // dump binary data to stdout, unformatted
 // if rawdump to file specified, write to file, otherwise stdout
-private
 void rawdump(const(char)* fname, void* data, size_t tsize, ulong baseaddress = 0) {
 	FILE* fd = fname ? fopen(fname, "wb") : stdout;
 	if (fd == null) {
@@ -433,7 +432,6 @@ void rawdump(const(char)* fname, void* data, size_t tsize, ulong baseaddress = 0
 }
 
 // pretty hex dump to stdout
-private
 void hexdump(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0) {
 	print_header(name);
 	

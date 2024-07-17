@@ -386,12 +386,12 @@ struct pdb70_dbi_header_t {
 
 /// Follows the DBI header, substream information.
 ///
-/// I think it is one per module.
-struct pdb70_dbi_modinfo_t {
+/// One per module.
+struct pdb70_dbi_modinfo_t { align(1):
 	/// 
 	uint Unused1;
-	struct pdb70_dbi_mod_contrib_entry {
-		uint Section;
+	struct pdb70_dbi_mod_contrib_entry { align(1):
+		ushort Section;
 		char[2] Padding1;
 		int Offset;
 		int Size;
@@ -421,6 +421,17 @@ struct pdb70_dbi_modinfo_t {
 	uint PdbFilePathNameIndex;
 	// char[] ModuleName
 	// char[] ObjFileName
+}
+
+enum {
+	PDB_DBI_MOD_DIRTY = 1,
+	PDB_DBI_MOD_EC = 2,
+}
+
+/// File information substream header.
+///
+/// One per file.
+struct pdb70_dbi_fileinfo_t {
 }
 
 //

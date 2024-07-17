@@ -51,8 +51,13 @@ extern (C):
 //       And would be beneficial when host has incompatible endianness.
 // TODO: adbg_object_open_process(int pid, ...)
 // TODO: adbg_object_open_buffer(void *buffer, size_t size, ...)
-// TODO: adbg_object_origin_string(o)
+// TODO: adbg_object_origin_string(adbg_object_t *o)
 //       Return string of how object was loaded, mainly for tracing purposes
+// TODO: adbg_object_load_debug(adbg_object_t *o)
+//       Attach debug object instance to this one. Likely to be used internally for stuff
+//       like getting symbols off memory addresses.
+//       PE32: Load PDB from debug entry (absolute or relative), try DWARF if previous fails
+//       ELF: Load embedded DWARF
 
 /// Executable or object file format.
 enum AdbgObject {
