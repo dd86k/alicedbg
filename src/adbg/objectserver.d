@@ -520,7 +520,7 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 						section_header = s64;
 						section_header_size = macho_section64_t.sizeof;
 						section_offset = s64.offset;
-						section_size = s64.size;
+						section_size = cast(size_t)s64.size;
 						break MACHO_FOR;
 					}
 				} else { // 32-bit
@@ -563,7 +563,7 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 					section_header = s;
 					section_header_size = Elf32_Shdr.sizeof;
 					section_offset = s.sh_offset;
-					section_size = s.sh_size;
+					section_size = cast(size_t)s.sh_size;
 					break;
 				}
 			}

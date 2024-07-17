@@ -1568,12 +1568,12 @@ const(char)* adbg_object_elf_shdr64_name(adbg_object_t *o, Elf64_Shdr *s) {
 			return null; // Function sets error
 		
 		// Load string table into memory
-		internal.strtable = malloc(s_strtbl.sh_size);
+		internal.strtable = malloc(cast(size_t)s_strtbl.sh_size);
 		if (internal.strtable == null) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
-		if (adbg_object_read_at(o, s_strtbl.sh_offset, internal.strtable, s_strtbl.sh_size))
+		if (adbg_object_read_at(o, s_strtbl.sh_offset, internal.strtable, cast(size_t)s_strtbl.sh_size))
 			return null; // Function sets error
 		
 		internal.strtable_size64 = s_strtbl.sh_size;
@@ -1582,7 +1582,7 @@ const(char)* adbg_object_elf_shdr64_name(adbg_object_t *o, Elf64_Shdr *s) {
 	// TODO: 3 minimum (".n\0") could be wrong, check strlen?
 	//       or make adbg_bits_strbounds variant?
 	void *str = internal.strtable + s.sh_name;
-	if (adbg_bits_ptrbounds(str, 3, internal.strtable, internal.strtable_size64)) {
+	if (adbg_bits_ptrbounds(str, 3, internal.strtable, cast(size_t)internal.strtable_size64)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
