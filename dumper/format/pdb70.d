@@ -105,22 +105,30 @@ const(char)* pdb_stream_name(size_t i) {
 	return StreamNames[i].ptr;
 }
 
-void dump_pdb70_stream(adbg_object_t *o, int stream) {
-	switch (stream) { // specific
+void dump_pdb70_stream(adbg_object_t *o, int num) {
+	switch (num) { // specific
 	case 1:    dump_pdb70_stream_pdb(o); return;
-	case 2, 4: dump_pdb70_stream_tpi_ipi(o, stream); return;
+	case 2, 4: dump_pdb70_stream_tpi_ipi(o, num); return;
 	case 3:    dump_pdb70_stream_dbi(o); return;
 	default:
 	}
 	
 	// Otherwise, generic
+	pdb70_stream_t *stream = adbg_object_pdb70_stream_open(o, num);
+	if (stream == null)
+		panic_adbg("Failed to open Stream 1");
+	scope(exit) adbg_object_pdb70_stream_close(stream);
+	
+	char[64] b = void;
+	snprintf(b.ptr, 64, "Stream %d", num);
+	print_data(b.ptr, stream.data, stream.size);
 }
 
 void dump_pdb70_stream_raw(pdb70_stream_t *stream, int num) {
 	print_data(pdb_stream_name(num), stream.data, stream.size);
 }
 
-void dump_pdb70_stream_pdb(adbg_object_t *o) {	
+void dump_pdb70_stream_pdb(adbg_object_t *o) {
 	pdb70_stream_t *stream = adbg_object_pdb70_stream_open(o, PdbStream.pdb);
 	if (stream == null)
 		panic_adbg("Failed to open Stream 1");
@@ -271,7 +279,7 @@ void dump_pdb70_stream_dbi(adbg_object_t *o) {
 	
 	// Module Info Substream containing object entries
 	if (dbi.ModInfoSize > pdb70_dbi_modinfo_t.sizeof) {
-		print_header("Module info");
+		print_header("Module info substream");
 		
 		uint count;
 		size_t size;
@@ -311,6 +319,7 @@ void dump_pdb70_stream_dbi(adbg_object_t *o) {
 			
 			// TODO: min(4096, left) for nstrlen
 			
+			// Print ModuleName, usually associated *.obj/*.exp files
 			char *modname = cast(char*)mod + pdb70_dbi_modinfo_t.sizeof;
 			int modlen = cast(int)adbg_nstrlen(modname, 4096);
 			print_stringl("ModuleName", modname, modlen);
@@ -318,6 +327,7 @@ void dump_pdb70_stream_dbi(adbg_object_t *o) {
 			// If non-zero, then it has null-terminator, include for total length
 			if (modlen) ++modlen;
 			
+			// Print ObjFileName, usually associated static library
 			char* objname = modname + modlen;
 			int objlen = cast(int)adbg_nstrlen(objname, 4096);
 			print_stringl("ObjFileName", objname, objlen);
@@ -333,11 +343,67 @@ void dump_pdb70_stream_dbi(adbg_object_t *o) {
 	
 	// TODO: Section Map Substream
 	
-	// TODO: File Info Substream
-	/*
+	// File Info Substream
 	if (dbi.SourceInfoSize > pdb70_dbi_fileinfo_t.sizeof) {
+		print_header("File Info substream");
+		
+		pdb70_dbi_fileinfo_t *fi = cast(pdb70_dbi_fileinfo_t*)(
+			stream.data +
+			dbi.ModInfoSize +
+			dbi.SectionContributionSize +
+			dbi.SectionMapSize);
+		
+		enum fimin = 20; // Some arbitrary amount for FileInfo minimum
+		if (adbg_bits_boundchk(fi, pdb70_dbi_fileinfo_t.sizeof + fimin, stream.data, stream.size)) {
+			print_warningf("FileInfo substream fileinfo outside stream data");
+			return;
+		}
+		
+		print_u16("NumModules", fi.NumModules);
+		print_u16("NumSourceFiles", fi.NumSourceFiles);
+		
+		ushort *ModIndices = cast(ushort*)(cast(void*)fi + pdb70_dbi_fileinfo_t.sizeof);
+		ushort *NumSourceFiles = ModIndices + fi.NumModules;
+		uint *FileNameOffsets = cast(uint*)(NumSourceFiles + fi.NumModules);
+		char *NamesBuffer = cast(char*)(FileNameOffsets + fi.NumSourceFiles);
+		
+		/+
+		// empty + null, only check last
+		if (adbg_bits_boundchk(NamesBuffer, fi.NumSourceFiles * 2, stream.data, stream.size)) {
+			print_warningf("FileInfo substream NamesBuffer outside stream data");
+			return;
+		}
+		
+		if (fi.NumModules) {
+			/*
+			print_name("ModIndices");
+			for (size_t i; i < fi.NumModules; ++i) {
+				if (i) printf(", ");
+				printf("%02x", ModIndices[i]);
+			}
+			putchar('\n');
+			*/
+			
+			uint tsrccnt; // total src count
+			print_name("NumSourceFiles");
+			for (size_t i; i < fi.NumModules; ++i) {
+				if (i) printf(", ");
+				//printf("%02x", NumSourceFiles[i]);
+				tsrccnt += NumSourceFiles[i];
+			}
+			putchar('\n');
+		}
+		
+		if (fi.NumSourceFiles) {
+			print_name("FileNameOffsets");
+			for (size_t i; i < tsrccnt; ++i) {
+				if (i) printf(", ");
+				printf("%04x:%s", FileNameOffsets[i], NamesBuffer + FileNameOffsets[i]);
+			}
+			putchar('\n');
+		}
+		+/
 	}
-	*/
 	
 	// TODO: Type Server Map Substream
 	

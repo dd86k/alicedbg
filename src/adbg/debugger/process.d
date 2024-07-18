@@ -680,6 +680,7 @@ L_DEBUG_LOOP:
 	
 	// Fixes access to debugger, thread context functions.
 	// Especially when attaching, but should be standard with spawned-in processes too.
+	// NOTE: There is no such 'CloseThread'
 	tracee.tid  = de.dwThreadId;
 	tracee.htid = OpenThread(
 		THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME,

@@ -1,5 +1,7 @@
 /// Windows Program Database (PDB), Portable PDB (.NET), and Mono Database (MDB).
 ///
+/// Supports Multi-Stream Format (MSF) Program Database (PDB) 7.0, known as the "Big MSF".
+///
 /// Sources:
 /// - https://llvm.org/docs/PDB/MsfFile.html
 /// - llvm/include/llvm/DebugInfo/PDB/
@@ -160,6 +162,7 @@ pdb20_file_header_t* adbg_object_pdb20_header(adbg_object_t *o) {
 // 3 (DBI)  Debug Information
 // 4 (IPI)  (CodeView) Index Info? (>=0x1600 record types) for module/line?
 
+/// "Big MSF" signature
 immutable string PDB70_MAGIC = "Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0";
 
 // MSF container
@@ -432,6 +435,12 @@ enum {
 ///
 /// One per file.
 struct pdb70_dbi_fileinfo_t {
+	ushort NumModules;
+	ushort NumSourceFiles;
+	//ushort[NumModules] ModIndices;
+	//ushort[NumModules] ModFileCounts;
+	//uint­[NumSourceFiles] FileNameOffsets;
+	//char*[NumSourceFiles] NamesBuffer;
 }
 
 //

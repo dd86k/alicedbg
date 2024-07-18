@@ -11,9 +11,9 @@ import adbg.include.c.stdlib;
 import adbg.error;
 import adbg.machines;
 
-//TODO: Support FPU registers
-//TODO: Thread struct type, to hold its context, and other info
-//TODO: Support f80 (x87)
+// TODO: Support FPU registers (f32, f64, f80 types)
+// TODO: Thread struct type, to hold its context, and other info
+// TODO: Either rename this module to context or separate thread/register into new modules
 
 version (Windows) {
 	import adbg.include.windows.wow64apiset;
@@ -25,9 +25,19 @@ version (Windows) {
 }
 
 /// Number of registers, used for buffer
-private enum REG_COUNT = 18; // Currently, x86-64 has highest number
+private enum REG_COUNT = 18; // Only x86 support for now
 
 extern (C):
+
+/*
+enum AdbgRegister {
+	unknown,
+	pc,
+	ip = pc,
+	eip = pc,
+	rip = pc,
+}
+*/
 
 /// Register size
 enum AdbgRegType : ubyte {
@@ -69,8 +79,13 @@ struct adbg_registers_t {
 	ushort count;
 	/// Register population, this may depends by platform.
 	adbg_register_t[REG_COUNT] items;
+	// Associated machine with register set.
+	//AdbgMachine machine;
 }
 
+/// Allocate a new set of registers to be populated.
+/// Params: mach = Machine type, determining which set to allocate.
+/// Returns: Register set, or null on errror.
 adbg_registers_t* adbg_registers_new(AdbgMachine mach) {
 	adbg_registers_t* regs = cast(adbg_registers_t*)malloc(adbg_registers_t.sizeof);
 	if (regs == null) {
@@ -82,6 +97,10 @@ adbg_registers_t* adbg_registers_new(AdbgMachine mach) {
 		return null;
 	}
 	return regs;
+}
+
+void adbg_registers_free(adbg_registers_t *regs) {
+	if (regs) free(regs);
 }
 
 int adbg_registers_config(adbg_registers_t *ctx, AdbgMachine mach) {
@@ -131,7 +150,7 @@ int adbg_registers_config(adbg_registers_t *ctx, AdbgMachine mach) {
 		regs = regs_x86_64;
 		break;
 	default:
-		return adbg_oops(AdbgError.objectInvalidMachine);
+		return adbg_oops(AdbgError.unimplemented);
 	}
 	
 	version (Trace) trace("regs.length=%d", cast(int)regs.length);
@@ -143,27 +162,11 @@ int adbg_registers_config(adbg_registers_t *ctx, AdbgMachine mach) {
 	return 0;
 }
 
-//TODO: Deprecate this in favor of adbg_register_list_init due to lack of flexibility
-/// Initiate register fields with their names and sizes.
-/// This is usually done by the debugger itself.
-void adbg_registers_init(adbg_registers_t *ctx, adbg_process_t *tracee) {
-	version (Trace) trace("tracee=%p ctx=%p", ctx, tracee);
-	if (tracee == null || ctx == null)
-		return;
+/*
+ulong* adbg_registers_get_u64(adbg_registers_t *ctx, AdbgRegister reg) {
 	
-	version (X86) {
-		adbg_registers_config(ctx, AdbgMachine.i386);
-	} else version (X86_64) {
-		version (Win64) { // Windows 64-bit
-			if (tracee.wow64)
-				adbg_registers_config(ctx, AdbgMachine.i386);
-			else
-				adbg_registers_config(ctx, AdbgMachine.amd64);
-		} else // Anything else 64-bit
-			adbg_registers_config(ctx, AdbgMachine.amd64);
-	} else
-		ctx.count = 0;
 }
+*/
 
 int adbg_registers_fill(adbg_registers_t *ctx, adbg_process_t *tracee) {
 	import adbg.debugger.process : AdbgCreation;
