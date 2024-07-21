@@ -749,6 +749,24 @@ macho_load_command_t* adbg_object_macho_load_command(adbg_object_t *o, size_t in
 	return command;
 }
 
+uint* adbg_object_macho_load_command_count(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	if (o.status & MACHO_IS_FAT) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
+	return &internal.header.ncmds;
+}
+
 void* adbg_object_macho_segment_section(adbg_object_t *o, macho_load_command_t *c, size_t index) {
 	if (o == null || c == null) {
 		adbg_oops(AdbgError.invalidArgument);
