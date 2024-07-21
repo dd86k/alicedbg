@@ -409,11 +409,11 @@ void dump_elf_section32(Elf32_Shdr *shdr, uint idx, const(char)* name, int nmax)
 		null);
 	print_x32("sh_addr", sh_addr);
 	print_x32("sh_offset", sh_offset);
-	print_x32("sh_size", sh_size);
+	print_u32("sh_size", sh_size);
 	print_x32("sh_link", sh_link);
 	print_x32("sh_info", sh_info);
-	print_x32("sh_addralign", sh_addralign);
-	print_x32("sh_entsize", sh_entsize);
+	print_u32("sh_addralign", sh_addralign);
+	print_u32("sh_entsize", sh_entsize);
 	}
 }
 void dump_elf_section64(Elf64_Shdr *shdr, uint idx, const(char)* name, int nmax) {
@@ -436,11 +436,11 @@ void dump_elf_section64(Elf64_Shdr *shdr, uint idx, const(char)* name, int nmax)
 		null);
 	print_x64("sh_addr", sh_addr);
 	print_x64("sh_offset", sh_offset);
-	print_x64("sh_size", sh_size);
+	print_u64("sh_size", sh_size);
 	print_x32("sh_link", sh_link);
 	print_x32("sh_info", sh_info);
-	print_x64("sh_addralign", sh_addralign);
-	print_x64("sh_entsize", sh_entsize);
+	print_u64("sh_addralign", sh_addralign);
+	print_u64("sh_entsize", sh_entsize);
 	}
 }
 
