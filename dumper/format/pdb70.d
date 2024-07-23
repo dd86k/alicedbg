@@ -353,6 +353,7 @@ void dump_pdb70_stream_dbi(adbg_object_t *o) {
 			dbi.SectionContributionSize +
 			dbi.SectionMapSize);
 		
+		// TODO: Fix hack with string-check-like function
 		enum fimin = 20; // Some arbitrary amount for FileInfo minimum
 		if (adbg_bits_boundchk(fi, pdb70_dbi_fileinfo_t.sizeof + fimin, stream.data, stream.size)) {
 			print_warningf("FileInfo substream fileinfo outside stream data");

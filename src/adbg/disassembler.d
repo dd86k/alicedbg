@@ -27,7 +27,7 @@ import core.stdc.stdlib : malloc, free;
 
 // NOTE: Longest architectural instruction contest
 //       x86: 15 bytes
-//       AArch32: 2 or 4 bytes
+//       AArch32: 2 (T32) or 4 (A32) bytes
 //       AArch64: 4 bytes
 //       Power: 4 bytes
 //       MIPS: 4 bytes
@@ -218,6 +218,17 @@ int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 	case aarch64:
 		cs_arch = CS_ARCH_ARM64;
 		cs_mode = CS_MODE_ARM | CS_MODE_V8;
+		break;
+	//
+	// PowerISA
+	//
+	case ppc:
+		cs_arch = CS_ARCH_PPC;
+		cs_mode = CS_MODE_32;
+		break;
+	case ppc64:
+		cs_arch = CS_ARCH_PPC;
+		cs_mode = CS_MODE_64;
 		break;
 	//
 	// Others

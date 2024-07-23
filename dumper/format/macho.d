@@ -107,7 +107,7 @@ void dump_macho_segments(adbg_object_t *o) {
 			macho_segment_command_t *seg = cast(macho_segment_command_t*)command;
 			print_stringl("segname", seg.segname.ptr, cast(uint)seg.segname.sizeof);
 			print_x32("vmaddr", seg.vmaddr);
-			print_x32("vmsize", seg.vmsize);
+			print_u32("vmsize", seg.vmsize);
 			print_x32("fileoff", seg.fileoff);
 			print_x32("filesize", seg.filesize);
 			print_u32("maxprot", seg.maxprot);
@@ -119,7 +119,7 @@ void dump_macho_segments(adbg_object_t *o) {
 			macho_segment_command_64_t *seg = cast(macho_segment_command_64_t*)command;
 			print_stringl("segname", seg.segname.ptr, cast(uint)seg.segname.sizeof);
 			print_x64("vmaddr", seg.vmaddr);
-			print_x64("vmsize", seg.vmsize);
+			print_u64("vmsize", seg.vmsize);
 			print_x64("fileoff", seg.fileoff);
 			print_x64("filesize", seg.filesize);
 			print_u32("maxprot", seg.maxprot);
@@ -157,7 +157,7 @@ void dump_macho_section32(macho_section_t *section) {
 	print_stringl("sectname", section.sectname.ptr, section.sectname.sizeof);
 	print_stringl("segname", section.segname.ptr, section.segname.sizeof);
 	print_x32("addr", section.addr);
-	print_x32("size", section.size);
+	print_u32("size", section.size);
 	print_x32("offset", section.offset);
 	print_x32("align", section.align_);
 	print_x32("reloff", section.reloff);
@@ -170,7 +170,7 @@ void dump_macho_section64(macho_section64_t *section) {
 	print_stringl("sectname", section.sectname.ptr, section.sectname.sizeof);
 	print_stringl("segname", section.segname.ptr, section.segname.sizeof);
 	print_x64("addr", section.addr);
-	print_x64("size", section.size);
+	print_u64("size", section.size);
 	print_x32("offset", section.offset);
 	print_x32("align", section.align_);
 	print_x32("reloff", section.reloff);

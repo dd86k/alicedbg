@@ -827,7 +827,7 @@ void dump_pe_disasm(adbg_object_t *o) {
 			panic_crt();
 		if (adbg_object_read_at(o, section.PointerToRawData, buffer, section.SizeOfRawData))
 			panic_adbg();
-		with (section) dump_disassemble_object(o, Name.ptr, Name.sizeof, buffer, SizeOfRawData, 0);
+		with (section) dump_disassemble_object(o, Name.ptr, Name.sizeof, buffer, SizeOfRawData, section.PointerToRawData);
 		free(buffer);
 	}
 }

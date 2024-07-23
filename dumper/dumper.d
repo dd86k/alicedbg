@@ -78,7 +78,7 @@ enum Setting {
 	extract	= BIT!16,
 	/// Dump binary information as hex dump
 	hexdump	= BIT!17,
-	/// Any sort of extracted is requested
+	/// Any sort of extraction is requested
 	extractAny = extract | hexdump,
 	
 	/// Disassemble selections (executable sections)
@@ -132,7 +132,9 @@ int dump_file(const(char)* path) {
 	if (o == null)
 		panic_adbg("Failed to open object");
 	
-	// If anything was selected to dump specifically
+	// MODE: Advanced
+	// If anything was selected to dump specifically, we'll proceed
+	// to dump object-specific information.
 	if (opt_selected || SETTING(Setting.disasmAny)) {
 		// If not in any "extract" mode, print file info
 		if (SETTING(Setting.extractAny) == 0) {
@@ -159,6 +161,11 @@ int dump_file(const(char)* path) {
 		case unknown:	assert(0, "Unknown object type"); // Raw/unknown
 		}
 	}
+	
+	// TODO: MODE: Section dump
+//	if (SETTING(Setting.extractAny | Setting.disasmAny))
+	
+	// MODE: Summary
 	
 	if (SETTING(Setting.noPrefix) == 0)
 		printf("%s: ", path);
@@ -475,8 +482,6 @@ int dump_disassemble_object(adbg_object_t *o,
 	const(char) *name, int namemax,
 	void* data, ulong size, ulong base_address) {
 	assert(data, "Data pointer null");
-	
-	print_header("Disassembly");
 	
 	if (name && namemax)
 		print_stringl("section", name, namemax);

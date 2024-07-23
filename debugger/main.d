@@ -73,7 +73,7 @@ int cli_help() {
 	"  Spawn new process to debug:\n"~
 	"    alicedbg FILE [OPTIONS...]\n"~
 	"  Attach debugger to existing process:\n"~
-	"    alicedbg --attach PID [OPTIONS...]\n"~
+	"    alicedbg --attach=PID [OPTIONS...]\n"~
 	"  Show information page and exit:\n"~
 	"    alicedbg {-h|--help|--version|--ver|--license}\n"~
 	"\n"~

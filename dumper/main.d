@@ -22,13 +22,13 @@ import common.utils : unformat64;
 
 private:
 
-//TODO: --dump-blob-offset/--dump-blob-seek/--dump-blob-start: Starting offset for raw blob
-//TODO: --dump-length/--dump-end: Length or end
-//TODO: --dump-stats: File statistics?
-//                    pdb: stream count, positions, etc.
-//TODO: --type-only: Returns short-name only for identification purposes
-//TODO: --name: Extract by section, import, export name (will replace --section?)
-//TODO: --all (to complement --headers)
+// TODO: --dump-blob-offset/--dump-blob-seek/--dump-blob-start: Starting offset for raw blob
+// TODO: --dump-length/--dump-end: Length or end
+// TODO: --dump-stats: File statistics?
+//                     pdb: stream count, positions, etc.
+// TODO: --type-only: Returns short-name only for identification purposes
+// TODO: --section-contains=name: Like --section=name, but not exact name, with search
+// TODO: --all (to complement --headers)
 immutable option_t[] options = [
 	// secrets
 	option_t(0,   "woof", null, &cliopt_woof),
