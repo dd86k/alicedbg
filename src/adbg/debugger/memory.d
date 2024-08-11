@@ -572,7 +572,9 @@ LRETRY:
 		
 		//TODO: Check for (deleted) column (last)
 		// NOTE: GDC (tested with 11.4) is likely getting the wrong types
-		//       D definitions aliases size_t (%zx) to uint/ulong.
+		//       Affects: Likely GDC 11 and earlier.
+		//       D definitions aliases size_t (%zx) to uint/ulong and
+		//       pointer types aren't properly passed.
 		if (sscanf(line.ptr, "%zx-%zx %4s %x %x:%x %u %512s",
 			&range_start, &range_end,
 			perms.ptr, &offset,

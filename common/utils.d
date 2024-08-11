@@ -5,7 +5,7 @@
 /// License: BSD-3-Clause-Clear
 module common.utils;
 
-import core.stdc.stdio : sscanf;
+import adbg.include.c.stdio : sscanf;
 import core.stdc.ctype : isprint;
 
 char hexc0(ubyte upper) {
@@ -143,18 +143,22 @@ unittest {
 ///   result = Long pointer.
 ///   str = Input.
 /// Returns: True if could not parse number.
-bool unformat(int *result, const(char) *str) {
+bool parse32(int *result, const(char) *str) {
 	return sscanf(str, "%i", result) != 1;
 }
+// Old alias
+alias unformat = parse32;
 
 /// Unformat text number.
 /// Params:
 ///   result = Long pointer.
 ///   str = Input.
 /// Returns: True if could not parse number.
-bool unformat64(long *result, const(char) *str) {
+bool parse64(long *result, const(char) *str) {
 	return sscanf(str, "%lli", result) != 1;
 }
+// Old alias
+alias unformat64 = parse64;
 
 /// Read entire file into memory using the C FILE API.
 ///
