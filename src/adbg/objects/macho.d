@@ -10,19 +10,51 @@
 /// License: BSD-3-Clause-Clear
 module adbg.objects.macho;
 
-// NOTE: Layout
-//       Header
-//       Load Commands (one or more)
-//         Segment (zero or one) (for LC_SEGMENT)
-//           Section (zero or more)
-//
-// Debug info in LC_DYSYMTAB
-
 import adbg.error;
 import adbg.objectserver;
 import adbg.machines : AdbgMachine;
 import adbg.utils.bit;
 import core.stdc.stdlib;
+
+// NOTE: Layout
+//
+//       +----------------------------------+
+//       | Header                           |
+//       +----------------------------------+
+//       | Load commands                    |
+//       | LC_SEGMENT (Segment command 1)   | --+
+//       | LC_SEGMENT (Segment command 2)   | - | -+
+//       +----------------------------------+   |  |
+//       | ...                              |   |  |
+//       +----------------------------------+   |  |
+//       | Segment 1 | Section 1 data       | <-+  |
+//       | Segment 1 | Section 2 data       | <-+  |
+//       +----------------------------------+      |
+//       | Segment 2 | Section 3 data       | <----+
+//       | Segment 2 | Section 4 data       | <----+
+//       +----------------------------------+
+//
+// NOTE: Load commands
+//
+//       +-------------------+-------------
+//       | Command           | Description
+//       +-------------------+-------------
+//       | LC_UUID           | 128-bit UUID for dSYM file
+//       | LC_SEGMENT        | Contains sections to map in memory
+//       | LC_SYMTAB         | Symbol table
+//       | LC_DYSYMTAB       | Additional dynamic symbols
+//       | LC_UNIXTHREAD     | Defines initial thread state
+//       | LC_THREAD         | Same as LC_UNIXTHREAD, but without a stack
+//       | LC_LOAD_DYLIB     | Dynamic shared library name
+//       | LC_ID_DYLIB       | Install name of a dynamic shared library
+//       | LC_PREBOUND_DYLIB | Prebound modules for executable shared library
+//       | LC_LOAD_DYLINKER  | Use dynamic linker
+//       | LC_ID_DYLINKER    | Identifies as a dynamic linker
+//       | LC_ROUTINES       | Addresses of shared library
+//       | LC_TWOLEVEL_HINTS | Two-level namespace lookups
+//       | LC_SUB_FRAMEWORK  | Identifies umbrella subframework
+//       | LC_SUB_LIBRARY    | Identifies umbrella sublibrary
+//       | LC_SUB_CLIENT     | Identifies umbrella sublibrary
 
 extern (C):
 
@@ -512,6 +544,15 @@ struct internal_macho_t {
 		bool *r_fat_entries;
 	}
 	bool *r_sections;
+	
+	// Precalculated section pointer positions
+	// Auto-reversed and does not depend on `r_sections`
+	size_t section_count;
+	union {
+		void *sections;
+		macho_section_t *sections32;
+		macho_section64_t *sections64;
+	}
 }
 private enum {
 	MACHO_IS_64  = 1 << 16,
@@ -583,6 +624,9 @@ void adbg_object_macho_unload(adbg_object_t *o) {
 	if (internal.commands) free(internal.commands); // and fat_entries
 	if (internal.r_commands) free(internal.r_commands); // and r_fat_entries
 	if (internal.r_sections) free(internal.r_sections);
+
+	// auto-reversed
+	if (internal.sections32) free(internal.sections32);
 	
 	free(o.internal);
 }
@@ -818,6 +862,125 @@ void* adbg_object_macho_segment_section(adbg_object_t *o, macho_load_command_t *
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
+}
+
+// TODO: Make system a little more flexible in the case there are both 32+64-bit commands
+
+private
+int adbg_object_macho__load_sections(adbg_object_t *o) {
+	int m64 = adbg_object_macho_is_64bit(o);
+	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
+	
+	// 1. Go through all segments to get total count
+	// TODO: Segments could be loaded in memory
+	//       Just the section data should still not use much memory
+	size_t totalcount;
+	macho_load_command_t *c = void;
+	for (size_t ci; (c = adbg_object_macho_load_command(o, ci)) != null; ++ci) {
+		switch (c.cmd) {
+		case MACHO_LC_SEGMENT_64:
+			macho_segment_command_64_t *seg64 = cast(macho_segment_command_64_t*)c;
+			totalcount += seg64.nsects;
+			break;
+		case MACHO_LC_SEGMENT:
+			macho_segment_command_t *seg32 = cast(macho_segment_command_t*)c;
+			totalcount += seg32.nsects;
+			break;
+		default: continue;
+		}
+	}
+	
+	// 2. Allocate buffer
+	size_t totalsize = totalcount * (m64 ? macho_section64_t.sizeof : macho_section_t.sizeof);
+	void *buffer = internal.sections = malloc(totalsize);
+	if (buffer == null)
+		return adbg_oops(AdbgError.crt);
+	
+	// 3. Go through segments again and copy section header data into buffer
+	internal.section_count = totalcount;
+	size_t soffset;
+	for (size_t ci; (c = adbg_object_macho_load_command(o, ci)) != null; ++ci) {
+		switch (c.cmd) {
+		case MACHO_LC_SEGMENT_64:
+			macho_segment_command_64_t *seg64 = cast(macho_segment_command_64_t*)c;
+			size_t ssize = macho_section64_t.sizeof * seg64.nsects;
+			if (adbg_object_read_at(o, seg64.fileoff, buffer + soffset, ssize)) {
+				free(buffer);
+				return adbg_errno();
+			}
+			soffset += ssize;
+			break;
+		case MACHO_LC_SEGMENT:
+			macho_segment_command_t *seg32 = cast(macho_segment_command_t*)c;
+			size_t ssize = macho_section_t.sizeof * seg32.nsects;
+			if (adbg_object_read_at(o, seg32.fileoff, buffer + soffset, ssize)) {
+				free(buffer);
+				return adbg_errno();
+			}
+			soffset += ssize;
+			break;
+		default: continue;
+		}
+	}
+	
+	return 0;
+}
+
+size_t* adbg_object_macho_section_count(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	if (o.status & MACHO_IS_FAT) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
+	
+	if (internal.sections32 == null) {
+		int e = adbg_object_macho__load_sections(o);
+		if (e) return null;
+	}
+	
+	return &internal.section_count;
+}
+
+// Optimized way to get section headers
+void* adbg_object_macho_section(adbg_object_t *o, size_t index) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	if (o.status & MACHO_IS_FAT) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
+	
+	// Load sections buffer
+	if (internal.sections32 == null) {
+		int e = adbg_object_macho__load_sections(o);
+		if (e) return null;
+	}
+	
+	if (index >= internal.section_count) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
+	
+	return o.status & MACHO_IS_64 ?
+		cast(void*)(internal.sections64 + index) :
+		cast(void*)(internal.sections32 + index);
 }
 
 const(char) *adbg_object_macho_magic_string(uint signature) {
