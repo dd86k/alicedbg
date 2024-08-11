@@ -22,8 +22,8 @@ version (Windows) {
 	import core.sys.windows.winnt;
 	import adbg.include.windows.psapi_dyn;
 } else version (Posix) {
-	import core.stdc.stdio : snprintf, sscanf;
 	import core.sys.posix.fcntl : open, O_RDWR;
+	import adbg.include.c.stdio : snprintf, sscanf;
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd : sysconf, read, write, ssize_t, _SC_PAGESIZE;
 	
@@ -571,6 +571,8 @@ LRETRY:
 		uint inode         = void;
 		
 		//TODO: Check for (deleted) column (last)
+		// NOTE: GDC (tested with 11.4) is likely getting the wrong types
+		//       D definitions aliases size_t (%zx) to uint/ulong.
 		if (sscanf(line.ptr, "%zx-%zx %4s %x %x:%x %u %512s",
 			&range_start, &range_end,
 			perms.ptr, &offset,
