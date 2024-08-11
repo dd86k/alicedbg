@@ -1030,7 +1030,7 @@ struct internal_elf_t {
 	union { align(1):
 		Elf32_Ehdr eheader32;
 		Elf64_Ehdr eheader64;
-		struct { align(1): // Same aligned members for all EHdr types
+		struct { align(1): // Same aligned members for all Ehdr types
 			ubyte ident_magic1;
 			ubyte ident_magic2;
 			ubyte ident_magic3;
@@ -1166,6 +1166,20 @@ int adbg_object_elf_class(adbg_object_t *o) {
 		return -1;
 	}
 	return (cast(internal_elf_t*)o.internal).ident_class;
+}
+
+int adbg_object_elf_section_count(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return -1;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return -1;
+	}
+	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
+	return internal.ident_class == ELF_CLASS_64 ?
+		internal.eheader64.e_shnum : internal.eheader32.e_shnum;
 }
 
 void* adbg_object_elf_phdr(adbg_object_t *o, size_t index) {

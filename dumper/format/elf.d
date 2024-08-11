@@ -447,10 +447,13 @@ void dump_elf_section64(Elf64_Shdr *shdr, uint idx, const(char)* name, int nmax)
 //TODO: Section machine-specific flags (like SHF_X86_64_LARGE)
 
 void dump_elf_exports(adbg_object_t *o) {
-	adbg_section_t *dynsym = adbg_object_search_section_by_name(o, ".dynsym");
+	adbg_section_t *dynsym =
+		adbg_object_search_section(o, AdbgObjectSearch.exactName, ".dynsym".ptr);
 	if (dynsym == null)
 		panic_adbg(".dynsym section missing");
-	adbg_section_t *dynstr = adbg_object_search_section_by_name(o, ".dynstr");
+	
+	adbg_section_t *dynstr =
+		adbg_object_search_section(o, AdbgObjectSearch.exactName, ".dynstr".ptr);
 	if (dynstr == null)
 		panic_adbg(".dynstr section missing");
 	
@@ -498,7 +501,6 @@ void dump_elf_exports(adbg_object_t *o) {
 	default:
 		panic_adbg();
 	}
-	
 }
 
 void dump_elf_disasm(adbg_object_t *o) {

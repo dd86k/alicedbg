@@ -28,7 +28,7 @@ import adbg.debugger.memory : adbg_memory_read;
 import adbg.debugger.process : adbg_process_t;
 import adbg.error;
 import adbg.machines : AdbgMachine, adbg_machine_name;
-import adbg.utils.math;	// For MiB template
+import adbg.utils.math;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import adbg.os.file;
@@ -37,15 +37,25 @@ import core.stdc.string;
 
 extern (C):
 
-// NOTE: Function names
-//       At best, prefer adbg_object_OBJECT_xyz where OBJECT is the type
-//       (e.g., pe, elf, etc.) to make things consistent. This is why
-//       auxiliary names are simply "adbg_object_offset", for example.
+// NOTE: For object submodule implementations.
+//
+//       Function names
+//         At best, prefer adbg_object_OBJECT_xyz where OBJECT is the type
+//         (e.g., pe, elf, etc.) to make things consistent. This is why
+//         auxiliary names are simply "adbg_object_offset", for example.
+//
+//       Performance
+//         Keeping crucial information, like the sectiontable, in memory,
+//         can greatly accelerate a lot of the operations, including section
+//         searches, but should only be allocated on-demand. Headers, program
+//         headers, and sections usually should be read when loading a new
+//         object instance.
 
+// TODO: Clean the section search functions
 // TODO: Consider structure definition, using a template
-//      Uses:
-//      - For swapping, uses less code than inlining it
-//      - For displaying and using field offsets
+//       Uses:
+//       - For swapping, uses less code than inlining it
+//       - For displaying and using field offsets
 // TODO: adbg_object_endiannes
 //       Why? Machine module do not include endianness.
 //       And would be beneficial when host has incompatible endianness.
@@ -56,8 +66,14 @@ extern (C):
 // TODO: adbg_object_load_debug(adbg_object_t *o)
 //       Attach debug object instance to this one. Likely to be used internally for stuff
 //       like getting symbols off memory addresses.
-//       PE32: Load PDB from debug entry (absolute or relative), try DWARF if previous fails
-//       ELF: Load embedded DWARF
+//       PE32:
+//         - Load PDB from debug entry (PDB absolute or try relative same folder)
+//       ELF:
+//         - DWARF (".debug_info" and others)
+//         - Compact C type Format (CTF, ".ctf"): https://github.com/lovasko/libctf
+//         - BPF Type Format (BTF)
+//       Mach-O:
+//         - uuid_command points to dSYM file
 
 /// Executable or object file format.
 enum AdbgObject {
@@ -480,11 +496,45 @@ int adbg_object_loadv(adbg_object_t *o) {
 	return adbg_oops(AdbgError.objectUnknownFormat);
 }
 
-//TODO: Flags: Contains (default: exact), case insensitive, executable only, etc.
-//TODO: unix archives (ar), by member name
-adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char) *name, int flags = 0) {
-	if (o == null || name == null) {
+/// Add a search parameter query to adbg_object_search_section.
+enum AdbgObjectSearch {
+	/// Get section exactly by this name. Case-sensitive.
+	/// Type: Null terminated string pointer (char*).
+	/// Default: null
+	exactName = 1,
+}
+
+// TODO: Flags: Contains (default: exact), case insensitive, executable only, etc.
+// TODO: unix archives (ar), by member name
+// TODO: Search Address: if address >= sectionAddress && address < sectionAddress + sectionSize
+
+/// Search and obtain one section from query.
+/// Params:
+/// 	o = Object instance.
+/// 	... = Search parameters (see AdbgObjectSearch).
+/// Returns: Allocated section instance.
+adbg_section_t* adbg_object_search_section(adbg_object_t *o, ...) {
+	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	va_list list = void;
+	va_start(list, o);
+	
+	const(char) *name;
+Loption:
+	switch (va_arg!int(list)) with (AdbgObjectSearch) {
+	case 0: break;
+	case exactName:
+		name = va_arg!(const(char)*)(list);
+		if (name == null) {
+			adbg_oops(AdbgError.invalidValue);
+			return null;
+		}
+		goto Loption;
+	default:
+		adbg_oops(AdbgError.invalidOption);
 		return null;
 	}
 	
@@ -498,7 +548,7 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 		size_t i;
 		for (pe_section_entry_t *s = void; (s = adbg_object_pe_section(o, i)) != null; ++i) {
 			//TODO: Section name function (in case of long section names)
-			if (strncmp(name, s.Name.ptr, s.Name.sizeof) == 0) {
+			if (name && strncmp(name, s.Name.ptr, s.Name.sizeof) == 0) {
 				section_header = s;
 				section_header_size = pe_section_entry_t.sizeof;
 				section_offset = s.PointerToRawData;
@@ -516,7 +566,7 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 				if (macho64) {
 					macho_section64_t *s64 = cast(macho_section64_t*)s;
 					
-					if (strncmp(name, s64.sectname.ptr, s64.sectname.sizeof) == 0) {
+					if (name && strncmp(name, s64.sectname.ptr, s64.sectname.sizeof) == 0) {
 						section_header = s64;
 						section_header_size = macho_section64_t.sizeof;
 						section_offset = s64.offset;
@@ -526,7 +576,7 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 				} else { // 32-bit
 					macho_section_t *s32 = cast(macho_section_t*)s;
 				
-					if (strncmp(name, s32.sectname.ptr, s32.sectname.sizeof) == 0) {
+					if (name && strncmp(name, s32.sectname.ptr, s32.sectname.sizeof) == 0) {
 						section_header = s32;
 						section_header_size = macho_section_t.sizeof;
 						section_offset = s32.offset;
@@ -542,10 +592,10 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 		switch (adbg_object_elf_class(o)) {
 		case ELF_CLASS_32:
 			for (Elf32_Shdr *s = void; (s = adbg_object_elf_shdr32(o, i)) != null; ++i) {
-				const(char) *sname = adbg_object_elf_shdr32_name(o, s);
-				if (sname == null)
+				const(char) *secname = adbg_object_elf_shdr32_name(o, s);
+				if (secname == null)
 					continue;
-				if (strcmp(name, sname) == 0) {
+				if (name && strcmp(name, secname) == 0) {
 					section_header = s;
 					section_header_size = Elf32_Shdr.sizeof;
 					section_offset = s.sh_offset;
@@ -556,10 +606,10 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 			break;
 		case ELF_CLASS_64:
 			for (Elf64_Shdr *s = void; (s = adbg_object_elf_shdr64(o, i)) != null; ++i) {
-				const(char) *sname = adbg_object_elf_shdr64_name(o, s);
-				if (sname == null)
+				const(char) *secname = adbg_object_elf_shdr64_name(o, s);
+				if (secname == null)
 					continue;
-				if (strcmp(name, sname) == 0) {
+				if (name && strcmp(name, secname) == 0) {
 					section_header = s;
 					section_header_size = Elf32_Shdr.sizeof;
 					section_offset = s.sh_offset;
@@ -569,6 +619,7 @@ adbg_section_t* adbg_object_search_section_by_name(adbg_object_t *o, const(char)
 			}
 			break;
 		default:
+			adbg_oops(AdbgError.objectInvalidClass);
 			return null;
 		}
 		break;
