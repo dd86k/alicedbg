@@ -5,11 +5,11 @@
 /// License: BSD-3-Clause-Clear
 module common.errormgmt;
 
-import adbg.debugger.exception;
 import adbg.self;
 import adbg.machines : adbg_machine_default;
 import adbg.disassembler;
-import adbg.debugger.process;
+import adbg.process.base;
+import adbg.process.exception;
 import adbg.error;
 import core.stdc.string : strerror;
 import core.stdc.errno : errno;

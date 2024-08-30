@@ -7,7 +7,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module adbg.debugger.exception;
+module adbg.process.exception;
 
 version (Windows) {
 	import core.sys.windows.winbase;
@@ -243,7 +243,6 @@ const(char) *adbg_exception_name(adbg_exception_t *ex) {
 }
 
 // Used internally for debugger
-package
 void adbg_exception_translate(adbg_exception_t *exception, void *os1, void *os2) {
 version (Windows) {
 	DEBUG_EVENT *de = cast(DEBUG_EVENT*)os1;

@@ -25,6 +25,9 @@ changes to the API.
 
 None of the functions are currently thread-safe.
 
+Compiling a static binary on one C runtime may not work on another due to
+specific behaviors when using ptrace(2).
+
 # Usage
 
 Usage for `alicedbg` (debugger) and `alicedump` (dumper) can be looked in the

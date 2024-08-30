@@ -3,9 +3,9 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module adbg.debugger.memory;
+module adbg.process.memory;
 
-import adbg.debugger.process : adbg_process_t;
+import adbg.process.base : AdbgProcStatus, adbg_process_t;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import core.stdc.string : memcpy;
@@ -254,8 +254,10 @@ int adbg_memory_maps(adbg_process_t *tracee, adbg_memory_map_t **mmaps, size_t *
 	// Get options
 	va_list list = void;
 	va_start(list, mcount);
+	/*
 	int options;
-L_OPTION:
+Loption:
+	*/
 	switch (va_arg!int(list)) {
 	case 0: break;
 	default:
@@ -764,8 +766,6 @@ struct adbg_scan_result_t {
 ///
 /// Returns: An instance of the scanner or null on error.
 adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t datasize, ...) {
-	import adbg.debugger.process : AdbgProcStatus;
-	
 	/// Until scanner gets better internals for variable-length
 	/// data types. Don't want to scan gigabyte-sized types now.
 	enum DATA_LIMIT = 4096;

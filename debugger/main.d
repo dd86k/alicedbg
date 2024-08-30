@@ -10,7 +10,7 @@ import adbg.self;
 import adbg.error;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.stdio;
-import debugger, shell;
+import shell;
 import common.errormgmt;
 import common.cli;
 import common.utils : unformat64;

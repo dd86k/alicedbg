@@ -24,8 +24,8 @@
 /// License: BSD-3-Clause-Clear
 module adbg.objectserver;
 
-import adbg.debugger.memory : adbg_memory_read;
-import adbg.debugger.process : adbg_process_t;
+import adbg.process.memory : adbg_memory_read;
+import adbg.process.base : adbg_process_t;
 import adbg.error;
 import adbg.machines : AdbgMachine, adbg_machine_name;
 import adbg.utils.math;

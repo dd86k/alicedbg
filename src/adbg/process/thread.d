@@ -3,9 +3,9 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module adbg.debugger.thread;
+module adbg.process.context;
 
-import adbg.debugger.process : adbg_process_t;
+import adbg.process.base : AdbgCreation, adbg_process_t;
 import adbg.include.c.stdio : snprintf;
 import adbg.include.c.stdlib;
 import adbg.error;
@@ -169,8 +169,6 @@ ulong* adbg_registers_get_u64(adbg_registers_t *ctx, AdbgRegister reg) {
 */
 
 int adbg_registers_fill(adbg_registers_t *ctx, adbg_process_t *tracee) {
-	import adbg.debugger.process : AdbgCreation;
-	
 	version (Trace) trace("tracee=%p ctx=%p", ctx, tracee);
 	
 	if (tracee == null || ctx == null)

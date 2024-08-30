@@ -7,6 +7,10 @@ module shell;
 
 import adbg;
 import adbg.machines;
+import adbg.process.context;
+import adbg.process.exception;
+import adbg.process.memory;
+import adbg.error;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
@@ -14,13 +18,17 @@ import core.stdc.string;
 import common.errormgmt;
 import common.cli : opt_syntax;
 import common.utils;
-import debugger;
 import term;
 
 // Enable new process name, although it is currently broken on Windows
 //version = UseNewProcessName
 
 extern (C):
+
+/// 
+int opt_pid;
+/// 
+const(char) **opt_file_argv;
 
 /// Application error
 enum ShellError {

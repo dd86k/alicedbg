@@ -12,9 +12,9 @@ module adbg.disassembler;
 import adbg.include.capstone;
 import adbg.include.c.stdarg;
 import adbg.error;
-import adbg.debugger.process : adbg_process_t;
+import adbg.process.base : adbg_process_t;
+import adbg.process.memory : adbg_memory_read;
 import adbg.machines : AdbgMachine;
-import adbg.debugger.memory : adbg_memory_read;
 import core.stdc.string : memcpy;
 import core.stdc.stdlib : malloc, free;
 

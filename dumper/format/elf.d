@@ -114,9 +114,10 @@ void dump_elf_ehdr(adbg_object_t *o) {
 }
 
 void dump_elf_e_flags(ushort e_machine, uint e_flags) {
+	static immutable const(char) *fname = "e_flags";
 	switch (e_machine) {
 	case ELF_EM_ARM:
-		print_flags32("e_flags", e_flags,
+		print_flags32(fname, e_flags,
 			"EF_ARM_RELEXEC".ptr,	ELF_EF_ARM_RELEXEC,
 			"EF_ARM_HASENTRY".ptr,	ELF_EF_ARM_HASENTRY,
 			"EF_ARM_INTERWORK".ptr,	ELF_EF_ARM_INTERWORK,
@@ -134,7 +135,7 @@ void dump_elf_e_flags(ushort e_machine, uint e_flags) {
 	case ELF_EM_SPARC:
 	case ELF_EM_SPARC32PLUS:
 	case ELF_EM_SPARCV9:
-		print_flags32("e_flags", e_flags,
+		print_flags32(fname, e_flags,
 			"EF_SPARC_32PLUS".ptr,	ELF_EF_SPARC_32PLUS,
 			"EF_SPARC_SUN_US1".ptr,	ELF_EF_SPARC_SUN_US1,
 			"EF_SPARC_HAL_R1".ptr,	ELF_EF_SPARC_HAL_R1,
@@ -144,6 +145,18 @@ void dump_elf_e_flags(ushort e_machine, uint e_flags) {
 			"EF_SPARCV9_RMO".ptr,	ELF_EF_SPARCV9_RMO,
 			null);
 		break;
+	case ELF_EM_MIPS:
+	case ELF_EM_MIPS_RS3_LE:
+	case ELF_EM_MIPS_X:
+		print_flags32(fname, e_flags,
+			"EF_MIPS_NOREORDER".ptr, ELF_EF_MIPS_NOREORDER,
+			"EF_MIPS_PIC".ptr, ELF_EF_MIPS_PIC,
+			"EF_MIPS_CPIC".ptr, ELF_EF_MIPS_CPIC,
+			"EF_MIPS_XGOT".ptr, ELF_EF_MIPS_XGOT,
+			"EF_MIPS_64BIT_WHIRL".ptr, ELF_EF_MIPS_64BIT_WHIRL,
+			"EF_MIPS_ABI2".ptr, ELF_EF_MIPS_ABI2,
+			"EF_MIPS_ABI_ON32".ptr, ELF_EF_MIPS_ABI_ON32,
+			null);
 	default:
 		print_x32("e_flags", e_flags);
 	}

@@ -7,8 +7,8 @@ module adbg.self;
 
 import adbg.include.c.stdlib; // malloc, calloc, free, exit;
 import adbg.error;
-import adbg.debugger.exception;
-import adbg.debugger.process;
+import adbg.process.base;
+import adbg.process.exception;
 
 //TODO: (Windows) Consider using RtlInstallFunctionTableCallback and RtlAddFunctionTable
 
