@@ -15,9 +15,7 @@ import adbg.include.c.stdio;
 extern (C):
 
 // Avoid some bad definitions.
-private int putchar(int);
 private int getchar();
-private int sscanf(const(char)* format, ...); // GDC specifically
 
 version (Windows) {
 	private import core.sys.windows.windows;
