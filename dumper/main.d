@@ -7,12 +7,12 @@ module main;
 
 import adbg.platform;
 import adbg.include.c.stdlib : exit;
-import adbg.debugger.exception : adbg_exception_t, adbg_exception_name;
+import adbg.process.base : adbg_process_t;
+import adbg.process.exception : adbg_exception_t, adbg_exception_name;
 import adbg.self;
 import adbg.machines : adbg_machine_default;
 import adbg.disassembler;
 import adbg.error;
-import adbg.debugger.process : adbg_process_t;
 import core.stdc.stdlib : EXIT_FAILURE;
 import core.stdc.stdio;
 import dumper;

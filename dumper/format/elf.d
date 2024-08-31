@@ -157,6 +157,7 @@ void dump_elf_e_flags(ushort e_machine, uint e_flags) {
 			"EF_MIPS_ABI2".ptr, ELF_EF_MIPS_ABI2,
 			"EF_MIPS_ABI_ON32".ptr, ELF_EF_MIPS_ABI_ON32,
 			null);
+		break;
 	default:
 		print_x32("e_flags", e_flags);
 	}
