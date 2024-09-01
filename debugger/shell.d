@@ -7,9 +7,7 @@ module shell;
 
 import adbg;
 import adbg.machines;
-import adbg.process.context;
-import adbg.process.exception;
-import adbg.process.memory;
+import adbg.process;
 import adbg.error;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib;

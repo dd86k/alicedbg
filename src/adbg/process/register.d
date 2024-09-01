@@ -1,9 +1,9 @@
-/// Thread context handling.
+/// Thread register and context handling.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module adbg.process.context;
+module adbg.process.register;
 
 import adbg.process.base : AdbgCreation, adbg_process_t;
 import adbg.include.c.stdio : snprintf;
@@ -13,7 +13,6 @@ import adbg.machines;
 
 // TODO: Support FPU registers (f32, f64, f80 types)
 // TODO: Thread struct type, to hold its context, and other info
-// TODO: Either rename this module to context or separate thread/register into new modules
 
 version (Windows) {
 	import adbg.include.windows.wow64apiset;

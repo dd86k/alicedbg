@@ -7,7 +7,7 @@ module adbg.process;
 
 public import
 	adbg.process.base,
-	adbg.process.context,
+	adbg.process.register,
 	adbg.process.exception,
 	adbg.process.breakpoint,
 	adbg.process.memory;
