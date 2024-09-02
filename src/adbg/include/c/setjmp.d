@@ -173,6 +173,8 @@ version (Windows) {
 	}
 	
 	alias jmp_buf = c_long[_JBLEN];
+} else version (FreeBSD) {
+	import core.sys.posix.setjmp : jmp_buf;
 } else static assert(0, "Missing setjmp definitions");
 
 version (Win32) { // Required by DMD, works with LDC

@@ -28,11 +28,6 @@ version (Windows) {
 	import core.sys.posix.signal;
 	
 	private enum SEGV_BNDERR = 3;
-	
-	version (linux)
-		import adbg.include.linux.user; // For USER area
-	else
-		static assert(0, "Include user area for POSIX environment");
 }
 
 extern (C):
