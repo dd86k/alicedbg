@@ -10,4 +10,5 @@ public import
 	adbg.process.register,
 	adbg.process.exception,
 	adbg.process.breakpoint,
-	adbg.process.memory;
+	adbg.process.memory,
+	adbg.process.thread;
