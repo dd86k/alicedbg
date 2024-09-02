@@ -12,5 +12,9 @@ module adbg.include.posix.ptrace;
 
 version (Posix):
 
-version (linux) public import adbg.include.linux.ptrace;
-version (OSX) public import adbg.include.macos.ptrace;
+version (linux)
+	public import adbg.include.linux.ptrace;
+else version (OSX)
+	public import adbg.include.macos.ptrace;
+else version (FreeBSD)
+	public import adbg.include.freebsd.ptrace;
