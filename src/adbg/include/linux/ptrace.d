@@ -130,7 +130,7 @@ enum {	// __ptrace_eventcodes
 /// 
 /// Params:
 /// 	req = PTRACE request
-/// 	pid = Process ID number
+/// 	pid = Process ID number (On Linux, that's a thread ID)
 /// 	addr = Memory pointer
 /// 	data = Data pointer
 /// 

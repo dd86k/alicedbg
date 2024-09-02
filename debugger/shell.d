@@ -24,9 +24,9 @@ import term;
 extern (C):
 
 /// 
-int opt_pid;
+__gshared int opt_pid;
 /// 
-const(char) **opt_file_argv;
+__gshared const(char) **opt_file_argv;
 
 /// Application error
 enum ShellError {
@@ -469,6 +469,21 @@ immutable command2_t[] shell_commands = [
 			}
 		],
 		&command_plist,
+	},
+	//
+	// Thread management
+	//
+	{
+		[ "t", "thread" ],
+		"Manage process threads.",
+		[ "ACTION" ],
+		MODULE_DEBUGGER, CATEGORY_PROCESS,
+		[
+			{ SECTION_DESCRIPTION,
+			[ "" ]
+			}
+		],
+		&command_thread,
 	},
 	//
 	// Shell
@@ -1195,6 +1210,31 @@ version (UseNewProcessName) {
 		printf("%10d  %s\n", proc.pid, proc.name.ptr);
 	}
 }
+	
+	return 0;
+}
+
+int command_thread(int argc, const(char) **argv) {
+	if (process == null)
+		return ShellError.pauseRequired;
+	if (argc < 2)
+		return ShellError.missingArgument;
+	
+	const(char) *action = argv[1];
+	if (strcmp(action, "list") == 0) {
+		void *list = adbg_thread_list(process);
+		if (list == null)
+			return ShellError.alicedbg;
+		
+		puts("Threads:");
+		int tid = void;
+		for (size_t i; (tid = adbg_thread_list_get(list, i)) != 0; ++i)
+			printf("%d\n", tid);
+		
+		adbg_thread_list_free(list);
+	} else {
+		return ShellError.invalidParameter;
+	}
 	
 	return 0;
 }

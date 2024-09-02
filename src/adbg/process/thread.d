@@ -22,9 +22,8 @@ version (Windows) {
 	import core.sys.posix.libgen : basename;
 }
 
-/// Get a list of threads for running process.
-/// Params:
-/// 	process = Process.
+/// Get a list of threads for target process.
+/// Params: process = Process.
 /// Returns: Thread list.
 void* adbg_thread_list(adbg_process_t *process) {
 version (Windows) {
@@ -127,6 +126,11 @@ version (Windows) {
 }
 }
 
+/// Get thread ID from list using index.
+/// Params:
+/// 	list = Thread list instance.
+/// 	index = Zero-based index.
+/// Returns: Thread ID. Zero means an error occured or end of list.
 int adbg_thread_list_get(void *list, size_t index) {
 	if (list == null)
 		return 0;
@@ -134,6 +138,8 @@ int adbg_thread_list_get(void *list, size_t index) {
 	return tid ? *tid : 0;
 }
 
+/// Close the thread list instance.
+/// Params: list = Thread list instance.
 void adbg_thread_list_free(void *list) {
 	if (list == null)
 		return;

@@ -183,6 +183,8 @@ version (Windows) {
 	//      GetProcessImageFileNameA
 	//      + cut string manually <- base=true
 	//      + PathGetDriveNumberA <- base=false
+	//
+	//      QueryFullProcessImageName
 	
 	DWORD needed = void;
 	DWORD pidlist = void;
@@ -304,6 +306,7 @@ AdbgMachine adbg_process_get_machine(adbg_process_t *tracee) {
 	return adbg_machine_default();
 }
 
+// TODO: Switch to adbg.utils.list
 /// Get a list of process IDs running.
 ///
 /// This function allocates memory. The list passed will need to be closed

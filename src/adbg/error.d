@@ -28,7 +28,7 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 //      adbg_ensure_params(lvalue, "name")
 //      - returns string if null found
 //      - automatically set error code
-//      adbg_oopsn(AdbgError)
+//      adbg_oops_p(AdbgError, void*)
 //      - returns null
 //TODO: Localize error messages as option (including system ones, when able)
 
@@ -237,16 +237,17 @@ void adbg_error_reset() {
 //       puts in the value of the callee instead. To prove this, __LINE__
 //       and __FUNCTION__ remains unchanged. To fix that, I'm supposed to
 //       use a template, but function templates pollute the final binary.
-/// Sets the last error code. The module path and line are automatically
-/// populated.
+/// Sets the last error code.
+///
+/// Used internally
 /// Params:
 /// 	e = Error code.
 /// 	extra = External resource (handle, code, etc.).
 /// 	f = Automatically set to `__FUNCTION__`.
 /// 	l = Automatically set to `__LINE__`.
 /// Returns: Error code
-int adbg_oops(AdbgError e,
-	void *extra = null, const(char)* f = __FUNCTION__.ptr, int l = __LINE__) {
+int adbg_oops(AdbgError e, void *extra = null,
+	const(char)* f = __FUNCTION__.ptr, int l = __LINE__) {
 	version (Trace) trace("code=%d extra=%p caller=%s@%d", e, extra, f, l);
 	error.func = f;
 	error.line = l;

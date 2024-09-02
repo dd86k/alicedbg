@@ -192,16 +192,14 @@ int cli_build_info() {
 //
 
 int cli_version() {
-	static immutable(char) *page_version =
+	__gshared immutable(char) *page_version = // avoid TLS
 	"Version     "~FULL_VERSION~"\n"~
 	"            Built "~__TIMESTAMP__~"\n"~
 	"            "~COPYRIGHT~"\n"~
 	"License     BSD-3-Clause-Clear\n"~
 	"            <https://opensource.org/licenses/BSD-3-Clause-Clear>\n"~
 	"Homepage    https://github.com/dd86k/alicedbg";
-	
 	puts(page_version);
-	
 	exit(0);
 	return 0;
 }
