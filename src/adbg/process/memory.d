@@ -13,6 +13,8 @@ import core.stdc.config : c_long;
 import adbg.error;
 import adbg.utils.math; // For MiB template
 
+// TODO: Minimum pagesize per platform enum
+
 // NOTE: Linux ptrace memory I/O based on https://www.linuxjournal.com/article/6100
 //       However, when possible, /proc/PID/mem is used.
 //       On BSD, PT_IO is used.
@@ -27,10 +29,8 @@ version (Windows) {
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd : sysconf, read, write, ssize_t, _SC_PAGESIZE;
 	
-	version (linux) {
-		import adbg.include.linux.user;
+	version (linux)
 		import core.stdc.errno : errno;
-	}
 }
 
 extern (C):
@@ -38,15 +38,15 @@ extern (C):
 /// Get the system configured size of a page, typically target's smallest size.
 /// Returns: Page size in bytes; Or 0 on error.
 size_t adbg_memory_pagesize() {
-	version (Windows) {
-		SYSTEM_INFO sysinfo = void;
-		GetSystemInfo(&sysinfo);
-		return sysinfo.dwPageSize;
-	} else version (Posix) {
-		// NOTE: sysconf, on error, returns -1
-		c_long r = sysconf(_SC_PAGESIZE);
-		return r < 0 ? 0 : r;
-	}
+version (Windows) {
+	SYSTEM_INFO sysinfo = void;
+	GetSystemInfo(&sysinfo);
+	return sysinfo.dwPageSize;
+} else version (Posix) {
+	// NOTE: sysconf, on error, returns -1
+	c_long r = sysconf(_SC_PAGESIZE);
+	return r < 0 ? 0 : r;
+} else assert(0, "adbg_memory_pagesize unimplemented for platform");
 }
 
 //TODO: adbg_memory_hugesize
@@ -58,7 +58,7 @@ size_t adbg_memory_pagesize() {
 //TODO: Provide a way to return number of bytes written/read
 //      1. Could make size parameter a pointer
 //      2. Could return a ptrdiff_t, -1 on error
-/// Read memory from child tracee.
+/// Read memory from tracee data memory area.
 /// Params:
 /// 	tracee = Reference to tracee instance.
 /// 	addr = Memory address (within the children address space).
@@ -68,36 +68,41 @@ size_t adbg_memory_pagesize() {
 int adbg_memory_read(adbg_process_t *tracee, size_t addr, void *data, uint size) {
 	if (tracee == null || data == null)
 		return adbg_oops(AdbgError.invalidArgument);
+	if (size == 0)
+		return 0;
 	
-//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
 version (Windows) {
 	if (ReadProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
 		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (linux) {
-	// /mem handle is set and ready to be used
-	if (tracee.mhandle > 0) {
-LREAD:
-		if (read(tracee.mhandle, data, size) < 1)
-			return adbg_oops(AdbgError.os);
-	}
-	// /mem handle is not opened, try to
-	else if (tracee.mhandle && tracee.memfailed == 0) {
-		char[32] pathbuf = void;
-		snprintf(pathbuf.ptr, 32, "/proc/%d/mem", tracee.pid);
-		tracee.mhandle = open(pathbuf.ptr, O_RDWR);
-		// Success? Try reading
-		if (tracee.mhandle)
-			goto LREAD;
-		// On failure, mark fail and proceed to try ptrace fallback
-		tracee.memfailed = 1;
+	// Try reading from mem if able
+	if (tracee.memfailed == false) {
+		if (tracee.mhandle) {
+		Lread:
+			if (read(tracee.mhandle, data, size) >= 0)
+				return 0;
+			
+			// Mark as failed and don't try again
+			tracee.memfailed = true;
+		} else { // open mem handle
+			char[32] pathbuf = void;
+			snprintf(pathbuf.ptr, 32, "/proc/%d/mem", tracee.pid);
+			tracee.mhandle = open(pathbuf.ptr, O_RDWR);
+			// Success? Try reading
+			if (tracee.mhandle)
+				goto Lread;
+			// On failure, mark fail and proceed to try ptrace fallback
+			tracee.memfailed = true;
+		}
 	}
 	
+	// If reading mem fails, try ptrace method
 	c_long *dest = cast(c_long*)data;	/// target
 	int r = size / c_long.sizeof;	/// number of "long"s to read
 	
 	for (; r > 0; --r, ++dest, addr += c_long.sizeof) {
-		errno = 0; // As manpage wants
+		errno = 0; // Clear errno on PT_PEEK*
 		*dest = ptrace(PT_PEEKDATA, tracee.pid, addr, null);
 		if (errno)
 			return adbg_oops(AdbgError.os);
@@ -105,7 +110,7 @@ LREAD:
 	
 	r = size % c_long.sizeof;
 	if (r) {
-		errno = 0;
+		errno = 0; // Clear errno on PT_PEEK*
 		c_long l = ptrace(PT_PEEKDATA, tracee.pid, addr, null);
 		if (errno)
 			return adbg_oops(AdbgError.os);
@@ -113,11 +118,16 @@ LREAD:
 		for (; r; --r) *dest8++ = *src8++; // inlined memcpy
 	}
 	return 0;
-} else // version (linux)
+} else version (FreeBSD) {
+	ptrace_io_desc io = ptrace_io_desc(PT_READ_D, cast(void*)addr, data, size);
+	if (ptrace(PT_IO, tracee.pid, &io, 0) < 0) // sets errno
+		return adbg_oops(AdbgError.crt);
+	return 0;
+} else // Unsupported
 	return adbg_oops(AdbgError.unimplemented);
 }
 
-/// Write memory to debuggee child.
+/// Write memory to tracee data memory area.
 /// Params:
 /// 	tracee = Reference to tracee instance.
 /// 	addr = Memory address (within the children address space).
@@ -127,38 +137,42 @@ LREAD:
 int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size) {
 	if (tracee == null || data == null)
 		return adbg_oops(AdbgError.invalidArgument);
+	if (size == 0)
+		return 0;
 	
-	//TODO: FreeBSD/NetBSD/OpenBSD: PT_IO
 version (Windows) {
 	if (WriteProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
 		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (linux) {
-	// /mem handle is set and ready to be used
-	if (tracee.mhandle > 0) {
-LWRITE:
-		if (write(tracee.mhandle, data, size) < 1)
-			return adbg_oops(AdbgError.os);
-	}
-	// /mem handle is not opened, try to
-	else if (tracee.mhandle && tracee.memfailed == 0) {
-		char[32] pathbuf = void;
-		snprintf(pathbuf.ptr, 32, "/proc/%d/mem", tracee.pid);
-		tracee.mhandle = open(pathbuf.ptr, O_RDWR);
-		// Success? Try reading
-		if (tracee.mhandle)
-			goto LWRITE;
-		// On failure, mark fail and proceed to try ptrace fallback
-		tracee.memfailed = 1;
+	// Try reading from mem if able
+	if (tracee.memfailed == false) {
+		if (tracee.mhandle) {
+		Lread:
+			if (write(tracee.mhandle, data, size) >= 0)
+				return 0;
+			
+			// Mark as failed and don't try again
+			tracee.memfailed = true;
+		} else { // open mem handle
+			char[32] pathbuf = void;
+			snprintf(pathbuf.ptr, 32, "/proc/%d/mem", tracee.pid);
+			tracee.mhandle = open(pathbuf.ptr, O_RDWR);
+			// Success? Try reading
+			if (tracee.mhandle)
+				goto Lread;
+			// On failure, mark fail and proceed to try ptrace fallback
+			tracee.memfailed = true;
+		}
 	}
 	
+	// If reading mem fails, try ptrace method
 	c_long *user = cast(c_long*)data;	/// user data pointer
 	int i;	/// offset index
 	int j = size / c_long.sizeof;	/// number of "blocks" to process
 	
 	for (; i < j; ++i, ++user) {
-		if (ptrace(PT_POKEDATA, tracee.pid,
-			addr + (i * c_long.sizeof), user) < 0)
+		if (ptrace(PT_POKEDATA, tracee.pid, addr + (i * c_long.sizeof), user) < 0)
 			return adbg_oops(AdbgError.os);
 	}
 	
@@ -170,7 +184,12 @@ LWRITE:
 			return adbg_oops(AdbgError.os);
 	}
 	return 0;
-} else // version (linux)
+} else version (FreeBSD) {
+	ptrace_io_desc io = ptrace_io_desc(PT_WRITE_D, cast(void*)addr, data, size);
+	if (ptrace(PT_IO, tracee.pid, &io, 0) < 0) // sets errno
+		return adbg_oops(AdbgError.crt);
+	return 0;
+} else // Unsupported
 	return adbg_oops(AdbgError.unimplemented);
 }
 

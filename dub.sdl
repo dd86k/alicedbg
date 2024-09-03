@@ -37,9 +37,6 @@ license "BSD-3-Clause-Clear"
 #       But since configurations do, they are defined here, this is important
 #       because on the reliance on betterC.
 
-# NOTE: Documentation (docs/ddox) builds
-#       Works best with the "library" configuration (-c|--configuration)
-
 #
 # ANCHOR Configurations
 #
@@ -204,6 +201,10 @@ buildType "readln" {
 
 #
 # ANCHOR Documentation build types
+#
+# NOTE: Documentation (docs/ddox) builds
+#       Works best with the "library" configuration (-c|--configuration)
+#       to avoid DUB peek in other import directories.
 #
 
 buildType "docs" {

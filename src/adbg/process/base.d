@@ -71,18 +71,18 @@ struct adbg_process_t {
 		int tid;	/// Thread identification number
 		HANDLE hpid;	/// Process handle
 		HANDLE htid;	/// Thread handle
-		//TODO: Deprecate and remove wow64 field
-		//      Promote AdbgMachine enum
-		version (Win64) int wow64; /// If running under WoW64
-		char *args;
+		char *args;	/// Saved arguments when process was launched
+		// TODO: Deprecate and remove wow64 field
+		//       Make function to query process machine type
+		version (Win64) int wow64;
 	}
 	version (Posix) {
-		pid_t pid;	/// Process ID // @suppress(dscanner.suspicious.label_var_same_name)
-		char **argv;
+		pid_t pid;	/// Process ID
+		char **argv;	/// Saved arguments when process was launched
 	}
 	version (linux) {
 		int mhandle;	/// Internal memory file handle to /proc/PID/mem
-		int memfailed;	/// Set if we fail to open /proc/PID/mem
+		bool memfailed;	/// Set if we fail to open /proc/PID/mem
 	}
 	/// Last known process status.
 	AdbgProcStatus status;
