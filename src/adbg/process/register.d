@@ -200,7 +200,8 @@ version (Windows) {
 		}
 		adbg_context_fill_win(ctx, &winctx);
 	}
-} else version (Posix) {
+	return 0;
+} else version (linux) {
 	//TODO: PT_GETFPREGS
 	//      PT_GETWMMXREGS
 	//      PT_GET_THREAD_AREA
@@ -208,12 +209,14 @@ version (Windows) {
 	//      PT_GETVFPREGS
 	//      PT_GETHBPREGS
 	user_regs_struct u = void;
-	if (ptrace(PT_GETREGS, tracee.pid, null, &u) < 0) {
+	if (ptrace(PT_GETREGS, tracee.pid, null, &u) < 0)
 		return adbg_oops(AdbgError.os);
-	}
+	
 	adbg_context_fill_linux(ctx, &u);
-} // version (Posix)
 	return 0;
+} else {
+	return adbg_oops(AdbgError.unimplemented);
+}
 }
 
 /// Format a register's value into a string buffer.

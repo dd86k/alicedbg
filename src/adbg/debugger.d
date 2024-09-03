@@ -333,10 +333,17 @@ private int __adbg_exec_child(void* arg) {
 	
 	// Baby, Please Trace Me
 	version (Trace) trace("PT_TRACEME...");
+version (linux) {
 	if (ptrace(PT_TRACEME, 0, null, null) < 0) {
 		version (Trace) trace("ptrace=%s", strerror(errno));
 		goto Lexit;
 	}
+} else {
+	if (ptrace(PT_TRACEME, 0, null, 0) < 0) {
+		version (Trace) trace("ptrace=%s", strerror(errno));
+		goto Lexit;
+	}
+}
 	version (Trace) trace("done");
 	
 	// If start directory requested, change to it
@@ -469,6 +476,7 @@ version (Windows) {
 	}
 } else version (Posix) {
 	version (Trace) if (options & OPT_STOP) trace("Sending break...");
+version (linux) {
 	if (ptrace(options & OPT_STOP ? PT_ATTACH : PT_SEIZE, pid, null, null) < 0) {
 		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
@@ -483,11 +491,22 @@ version (Windows) {
 		return null;
 	}
 	
+	proc.status = options & OPT_STOP ? AdbgProcStatus.paused : AdbgProcStatus.running;
+} else {
+	if (ptrace(PT_ATTACH, pid, null, 0) < 0) {
+		adbg_process_free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	}
+	
+	// TODO: Check if running under FreeBSD
+	proc.status = AdbgProcStatus.running;
+}
+	
 	proc.pid = cast(pid_t)pid;
 } // version (Posix)
 	
 	proc.creation = AdbgCreation.attached;
-	proc.status = options & OPT_STOP ? AdbgProcStatus.paused : AdbgProcStatus.running;
 	return proc;
 }
 
@@ -506,8 +525,13 @@ version (Windows) {
 		adbg_process_free(tracee);
 		return adbg_oops(AdbgError.os);
 	}
-} else version (Posix) {
+} else version (linux) {
 	if (ptrace(PT_DETACH, tracee.pid, null, null) < 0) {
+		adbg_process_free(tracee);
+		return adbg_oops(AdbgError.os);
+	}
+} else version (Posix) {
+	if (ptrace(PT_DETACH, tracee.pid, null, 0) < 0) {
 		adbg_process_free(tracee);
 		return adbg_oops(AdbgError.os);
 	}
@@ -618,6 +642,7 @@ L_DEBUG_LOOP:
 	stopsig = WEXITSTATUS(wstatus);
 	
 	// Get fault address
+version (linux) {
 	switch (stopsig) {
 	case SIGCONT: goto L_DEBUG_LOOP;
 	// NOTE: si_addr is NOT populated under ptrace for SIGTRAP
@@ -652,6 +677,9 @@ L_DEBUG_LOOP:
 	default:
 		exception.fault_address = 0;
 	}
+} else {
+	exception.fault_address = 0;
+}
 	
 	tracee.status = AdbgProcStatus.paused;
 	adbg_exception_translate(&exception, &tracee.pid, &stopsig);
@@ -712,8 +740,13 @@ version (Windows) {
 		tracee.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
-} else {
+} else version (linux) {
 	if (ptrace(PT_CONT, tracee.pid, null, null) < 0) {
+		tracee.status = AdbgProcStatus.unknown;
+		return adbg_oops(AdbgError.os);
+	}
+} else {
+	if (ptrace(PT_CONTINUE, tracee.pid, null, 0) < 0) {
 		tracee.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
@@ -756,8 +789,15 @@ version (Windows) {
 	FlushInstructionCache(tracee.hpid, null, 0);
 	
 	return adbg_debugger_continue(tracee);
-} else {
+} else version (linux) {
 	if (ptrace(PT_SINGLESTEP, tracee.pid, null, null) < 0) {
+		tracee.status = AdbgProcStatus.unknown;
+		return adbg_oops(AdbgError.os);
+	}
+	
+	return 0;
+} else {
+	if (ptrace(PT_SINGLESTEP, tracee.pid, null, 0) < 0) {
 		tracee.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}

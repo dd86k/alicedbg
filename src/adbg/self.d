@@ -65,14 +65,18 @@ version (Windows) {
 void adbg_self_break() {
 version (Windows) {
 	DebugBreak();
-} else version (Posix) {
+} else version (linux) {
 	ptrace(PT_TRACEME, 0, null, null);
 	raise(SIGSTOP);
-} else static assert(0, "Implement me");
+} else version (Posix) {
+	ptrace(PT_TRACEME, 0, null, 0);
+	raise(SIGSTOP);
+} else assert(0, "adbg_self_break unimplemented for platform");
 }
 
 /// Is this process being debugged?
 /// Returns: True if a debugger is attached to this process.
+/// Support: Windows and Linux
 bool adbg_self_is_debugged() {
 version (Windows) {
 	return IsDebuggerPresent() == TRUE;
@@ -116,7 +120,7 @@ version (Windows) {
 
 	return false;
 } else
-	static assert(0, "Implement me");
+	assert(0, "adbg_self_is_debugged unimplemented for platform");
 }
 
 /// Set a custom crash handler.
@@ -193,6 +197,7 @@ void adbg_internal_handler(int sig, siginfo_t *si, void *p) {
 	ex.type = adbg_exception_from_os(si.si_signo, si.si_code);
 	ex.pid = getpid();
 	ex.tid = 0; // NOTE: gettid(2) is only available on Linux
+version (linux) {
 	switch (sig) {
 	case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
 		ex.fault_address = cast(size_t)si._sifields._sigfault.si_addr;
@@ -200,6 +205,9 @@ void adbg_internal_handler(int sig, siginfo_t *si, void *p) {
 	default:
 		ex.fault_address = 0;
 	}
+} else {
+	ex.fault_address = 0;
+}
 	
 	// Setup register info
 	//adbg_registers_t regs = void;

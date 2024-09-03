@@ -143,6 +143,12 @@ version (Windows) {
 	if (position < 0)
 		return -1;
 	return position;
+} else version (FreeBSD) {
+	// NOTE: Darwin has set off_t as long and doesn't have lseek64
+	position = lseek(file.handle, position, origin);
+	if (position < 0)
+		return -1;
+	return position;
 } else version (Android) {
 	position = lseek(file.handle, position, origin);
 	if (position < 0)
@@ -162,6 +168,8 @@ version (Windows) {
 	SetFilePointerEx(file.handle, i, &i, FILE_CURRENT);
 	return i.QuadPart;
 } else version (OSX) {
+	return lseek(file.handle, 0, SEEK_CUR);
+} else version (FreeBSD) {
 	return lseek(file.handle, 0, SEEK_CUR);
 } else version (Android) {
 	return lseek(file.handle, 0, SEEK_CUR);

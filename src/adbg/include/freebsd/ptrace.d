@@ -1,5 +1,8 @@
 /// ptrace(3) bindings for FreeBSD.
 ///
+/// Sources:
+/// - freebsd-src/sys/sys/ptrace.h
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -8,7 +11,12 @@ module adbg.include.freebsd.ptrace;
 version (FreeBSD):
 
 import core.sys.posix.unistd : pid_t;
-import core.sys.posix.sys.types : caddr_t;
+
+// Defined for OpenBSD in core.sys.posix.sys.types, but not NetBSD and FreeBSD.
+// FreeBSD, if I looked at the source correctly, should be ubyte*.
+// But Linux have its ptrace addr type set as void*, so let's do just that,
+// it's just a pointer definition.
+alias caddr_t = void*;
 
 extern (C):
 
@@ -64,6 +72,11 @@ enum {
 
 	PT_FIRSTMACH    = 64,	/* for machine-specific requests */
 }
+
+// Linux aliases
+alias PT_TRACEME 	= PT_TRACE_ME;
+alias PT_CONT 	= PT_CONTINUE;
+alias PT_SINGLESTEP 	= PT_STEP;
 
 /* Events used with PT_GET_EVENT_MASK and PT_SET_EVENT_MASK */
 enum PTRACE_EXEC	= 0x0001;

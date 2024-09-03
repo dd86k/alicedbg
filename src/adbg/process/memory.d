@@ -298,7 +298,7 @@ version (Windows) {
 	// NOTE: NtPssCaptureVaSpaceBulk is only available since Windows 10 20H1
 	// This queries workset addresses regardless of size, page-bounded.
 	// e.g., it will add 0x30000 and 0x31000 as entries, despite being a 8K "block".
-LRETRY:
+Lretry:
 	uint r = QueryWorkingSet(tracee.hpid, mbinfo, bfsz);
 	switch (r) {
 	case 0:
@@ -308,10 +308,9 @@ LRETRY:
 		mbinfo = cast(PSAPI_WORKING_SET_INFORMATION*)realloc(mbinfo, bfsz);
 		if (mbinfo == null)
 			return adbg_oops(AdbgError.crt);
-		goto LRETRY;
+		goto Lretry;
 	default:
 	}
-	
 	scope(exit) free(mbinfo);
 	
 	size_t pagesize = adbg_memory_pagesize();
@@ -636,7 +635,7 @@ LRETRY:
 	// NetBSD: pmap(1) / uvm_map(9)
 	// OpenBSD: procmap(1)
 	// - kvm_open + kvm_getprocs + KERN_PROC_PID
-	return adbg_oops(AdbgError.notImplemented);
+	return adbg_oops(AdbgError.unimplemented);
 }
 
 /// Close the memory maps structure previously created by adbg_memory_maps.
