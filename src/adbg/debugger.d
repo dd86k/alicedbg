@@ -32,8 +32,9 @@ version (Windows) {
 	import adbg.platform : ADBG_CHILD_STACK_SIZE;
 }
 
-//version (CRuntime_Glibc)
-//	version = USE_CLONE;
+version (linux)
+	//version (CRuntime_Glibc)
+	enum USE_CLONE = false;
 
 extern (C):
 
@@ -245,6 +246,10 @@ version (Windows) {
 			return null;
 		}
 	}
+	
+	proc.status = AdbgProcStatus.standby;
+	proc.creation = AdbgCreation.spawned;
+	return proc;
 } else version (linux) {
 	// NOTE: Don't remember this check, but I think it was because of
 	//       an ambiguous error message
@@ -272,7 +277,7 @@ version (Windows) {
 		memcpy(proc.argv + 1, argv, argc * size_t.sizeof);
 	proc.argv[argc + 1] = null;
 	
-version (USE_CLONE) { // clone(2)
+static if (USE_CLONE) { // clone(2)
 	//TODO: get default stack size (glibc constant or function)
 	void *stack = mmap(null, ADBG_CHILD_STACK_SIZE,
 		PROT_READ | PROT_WRITE,
@@ -320,11 +325,63 @@ version (USE_CLONE) { // clone(2)
 	default: // This parent process
 	} // switch(fork(2))
 } // clone(2)/fork(2)
-} // version (linux)
 	
 	proc.status = AdbgProcStatus.standby;
 	proc.creation = AdbgCreation.spawned;
 	return proc;
+} else version (FreeBSD) {
+	// Verify if file exists and we has access to it
+	stat_t st = void;
+	if (stat(path, &st) == -1) {
+		adbg_process_free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	}
+	
+	// Allocate arguments, include space for program and null terminator
+	int argc;
+	while (argv[argc]) ++argc;
+	version(Trace) trace("argc=%d", argc);
+	proc.argv = cast(char**)malloc((argc + 2) * size_t.sizeof);
+	if (proc.argv == null) {
+		version(Trace) trace("mmap=%s", strerror(errno));
+		adbg_process_free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	}
+	proc.argv[0] = cast(char*)path;
+	if (argc && argv && *argv)
+		memcpy(proc.argv + 1, argv, argc * size_t.sizeof);
+	proc.argv[argc + 1] = null;
+	
+	switch (proc.pid = fork()) {
+	case -1: // Error
+		version(Trace) trace("fork=%s", strerror(errno));
+		adbg_process_free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
+	case 0: // New child process
+		version(Trace) for (int i; i < argc + 2; ++i)
+			trace("argv[%d]=%s", i, proc.argv[i]);
+		
+		__adbg_child_t chld = void;
+		chld.argv = cast(const(char)**)proc.argv;
+		chld.envp = envp;
+		chld.dir  = dir;
+		__adbg_exec_child(&chld); // If returns at all, error
+		adbg_process_free(proc);
+		_exit(errno);
+		return null; // Make compiler happy
+	default: // This parent process
+	} // switch(fork(2))
+
+	proc.status = AdbgProcStatus.standby;
+	proc.creation = AdbgCreation.spawned;
+	return proc;
+} else {
+	adbg_oops(AdbgError.unimplemented);
+	return null;
+}
 }
 
 version (Posix)
@@ -440,29 +497,29 @@ version (Windows) {
 		FALSE,
 		cast(DWORD)pid);
 	if (proc.hpid == null) {
-		free(proc);
 		adbg_oops(AdbgError.os);
+		free(proc);
 		return null;
 	}
 	
 	// Check if process already has an attached debugger
 	BOOL dbgpresent = void;
 	if (CheckRemoteDebuggerPresent(proc.hpid, &dbgpresent) == FALSE) {
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
+		adbg_process_free(proc);
 		return null;
 	}
 	if (dbgpresent) {
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.debuggerPresent);
+		adbg_process_free(proc);
 		return null;
 	}
 	
 	// Breaks into remote process and initiates break-in
 	//TODO: try NtContinue for continue option
 	if (DebugActiveProcess(proc.pid) == FALSE) {
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
+		adbg_process_free(proc);
 		return null;
 	}
 	
@@ -470,41 +527,40 @@ version (Windows) {
 	// Set exitkill unconditionalled
 	// Default: on
 	if (DebugSetProcessKillOnExit(options & OPT_EXITKILL) == FALSE) {
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
+		adbg_process_free(proc);
 		return null;
 	}
-} else version (Posix) {
+} else version (linux) {
 	version (Trace) if (options & OPT_STOP) trace("Sending break...");
-version (linux) {
 	if (ptrace(options & OPT_STOP ? PT_ATTACH : PT_SEIZE, pid, null, null) < 0) {
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
+		adbg_process_free(proc);
 		return null;
 	}
 	
 	// Set exitkill on if specified
 	// Default: off
 	if (options & OPT_EXITKILL && ptrace(PT_SETOPTIONS, pid, null, PT_O_EXITKILL) < 0) {
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
+		adbg_process_free(proc);
 		return null;
 	}
 	
 	proc.status = options & OPT_STOP ? AdbgProcStatus.paused : AdbgProcStatus.running;
-} else {
+	proc.pid = cast(pid_t)pid;
+} else version (Posix) {
+	version (Trace) if (options & OPT_STOP) trace("Sending break...");
 	if (ptrace(PT_ATTACH, pid, null, 0) < 0) {
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
+		adbg_process_free(proc);
 		return null;
 	}
 	
-	// TODO: Check if running under FreeBSD
+	// TODO: Check if paused under FreeBSD
 	proc.status = AdbgProcStatus.running;
-}
-	
 	proc.pid = cast(pid_t)pid;
-} // version (Posix)
+}
 	
 	proc.creation = AdbgCreation.attached;
 	return proc;
@@ -571,7 +627,7 @@ int adbg_debugger_wait(adbg_process_t *tracee,
 	
 version (Windows) {
 	DEBUG_EVENT de = void;
-L_DEBUG_LOOP:
+Lwait:
 	// Something bad happened
 	if (WaitForDebugEvent(&de, INFINITE) == FALSE) {
 		tracee.status = AdbgProcStatus.unloaded;
@@ -592,10 +648,10 @@ L_DEBUG_LOOP:
 	case RIP_EVENT:
 		goto default;*/
 	case EXIT_PROCESS_DEBUG_EVENT:
-		goto L_UNLOADED;
+		goto Lexited;
 	default:
 		ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
-		goto L_DEBUG_LOOP;
+		goto Lwait;
 	}
 	
 	// Fixes access to debugger, thread context functions.
@@ -607,10 +663,10 @@ L_DEBUG_LOOP:
 		FALSE, de.dwThreadId);
 	tracee.status = AdbgProcStatus.paused;
 	adbg_exception_translate(&exception, &de, null);
-} else version (Posix) {
+} else version (linux) {
 	int wstatus = void;
 	int stopsig = void;
-L_DEBUG_LOOP:
+Lwait:
 	tracee.pid = waitpid(-1, &wstatus, 0);
 	
 	version (Trace) trace("wstatus=%#x", wstatus);
@@ -624,14 +680,13 @@ L_DEBUG_LOOP:
 	
 	// If exited or killed by signal, it's gone.
 	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus))
-		goto L_UNLOADED;
+		goto Lexited;
 	
 	// Skip glibc "continue" signals.
 	version (CRuntime_Glibc)
 	if (WIFCONTINUED(wstatus))
-		goto L_DEBUG_LOOP;
+		goto Lwait;
 	
-	//TODO: Check waitpid status for BSDs
 	// Bits  Description (Linux)
 	// 6:0   Signo that caused child to exit
 	//       0x7f if child stopped/continued
@@ -642,9 +697,8 @@ L_DEBUG_LOOP:
 	stopsig = WEXITSTATUS(wstatus);
 	
 	// Get fault address
-version (linux) {
 	switch (stopsig) {
-	case SIGCONT: goto L_DEBUG_LOOP;
+	case SIGCONT: goto Lwait;
 	// NOTE: si_addr is NOT populated under ptrace for SIGTRAP
 	//       - linux does not fill si_addr on a SIGTRAP from a ptrace event
 	//         - see sigaction(2)
@@ -677,10 +731,32 @@ version (linux) {
 	default:
 		exception.fault_address = 0;
 	}
-} else {
-	exception.fault_address = 0;
-}
 	
+	tracee.status = AdbgProcStatus.paused;
+	adbg_exception_translate(&exception, &tracee.pid, &stopsig);
+} else version (Posix) {
+	int wstatus = void;
+	int stopsig = void;
+Lwait:
+	tracee.pid = waitpid(-1, &wstatus, 0);
+	
+	version (Trace) trace("wstatus=%#x", wstatus);
+	
+	// Something bad happened
+	if (tracee.pid < 0) {
+		tracee.status = AdbgProcStatus.unloaded;
+		tracee.creation = AdbgCreation.unloaded;
+		return adbg_oops(AdbgError.crt);
+	}
+	
+	// If exited or killed by signal, it's gone.
+	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus))
+		goto Lexited;
+	
+	//TODO: Check waitpid status for BSDs
+	stopsig = WEXITSTATUS(wstatus);
+
+	exception.fault_address = 0;	
 	tracee.status = AdbgProcStatus.paused;
 	adbg_exception_translate(&exception, &tracee.pid, &stopsig);
 }
@@ -688,7 +764,7 @@ version (linux) {
 	userfunc(tracee, AdbgEvent.exception, &exception);
 	return 0;
 
-L_UNLOADED:
+Lexited:
 	tracee.status = AdbgProcStatus.unloaded;
 	tracee.creation = AdbgCreation.unloaded;
 	return 0;
@@ -701,6 +777,8 @@ int adbg_debugger_terminate(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (tracee.creation == AdbgCreation.unloaded)
+		return adbg_oops(AdbgError.debuggerUnattached);
+	if (tracee.pid == 0)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
 	tracee.status = AdbgProcStatus.unloaded; // exited in any case
@@ -715,7 +793,7 @@ version (Windows) {
 	if (ContinueDebugEvent(tracee.pid, tracee.tid, DBG_TERMINATE_PROCESS) == FALSE)
 		return adbg_oops(AdbgError.os);
 } else {
-	if (kill(tracee.pid, SIGKILL) < 0) // PT_KILL is deprecated
+	if (kill(tracee.pid, SIGKILL) < 0) // PT_KILL is deprecated on Linux
 		return adbg_oops(AdbgError.os);
 }
 	
@@ -797,7 +875,7 @@ version (Windows) {
 	
 	return 0;
 } else {
-	if (ptrace(PT_SINGLESTEP, tracee.pid, null, 0) < 0) {
+	if (ptrace(PT_STEP, tracee.pid, null, 0) < 0) {
 		tracee.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
