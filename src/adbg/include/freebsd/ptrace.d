@@ -7,6 +7,9 @@ module adbg.include.freebsd.ptrace;
 
 version (FreeBSD):
 
+import core.sys.posix.unistd : pid_t;
+import core.sys.posix.sys.types : caddr_t;
+
 extern (C):
 
 enum {
@@ -213,6 +216,7 @@ ssize_t	proc_readmem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
 ssize_t	proc_writemem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
+
 #ifdef COMPAT_FREEBSD32
 struct reg32;
 struct fpreg32;
@@ -225,6 +229,7 @@ int	proc_read_dbregs32(struct thread *_td, struct dbreg32 *_dbreg32);
 int	proc_write_dbregs32(struct thread *_td, struct dbreg32 *_dbreg32);
 
 void	ptrace_unsuspend(struct proc *p);
+#endif
 +/
 
 int ptrace(int _request, pid_t _pid, caddr_t _addr, int _data);
