@@ -239,12 +239,11 @@ version (Windows) {
 	//      Introduced in Windows 10, version 1511
 	//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 	// NOTE: Could be moved to adbg_process_get_machine
-	version (Win64) {
-		if (IsWow64Process(proc.hpid, &proc.wow64) == FALSE) {
-			adbg_process_free(proc);
-			adbg_oops(AdbgError.os);
-			return null;
-		}
+	version (Win64)
+	if (IsWow64Process(proc.hpid, &proc.wow64) == FALSE) {
+		adbg_process_free(proc);
+		adbg_oops(AdbgError.os);
+		return null;
 	}
 	
 	proc.status = AdbgProcStatus.standby;
@@ -608,9 +607,11 @@ version (Windows) {
 /// Params:
 /// 	tracee = Tracee instance.
 /// 	userfunc = User function callback on event.
+/// 	udata = User data passed to callback. Can be used to identify requests, for example.
 /// Returns: Error code.
 int adbg_debugger_wait(adbg_process_t *tracee,
-	void function(adbg_process_t*, int, void*) userfunc) {
+	void function(adbg_process_t *proc, int type, void *data, void *user) userfunc,
+	void *udata) {
 	if (tracee == null || userfunc == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (tracee.creation == AdbgCreation.unloaded)
@@ -761,7 +762,7 @@ Lwait:
 	adbg_exception_translate(&exception, &tracee.pid, &stopsig);
 }
 	
-	userfunc(tracee, AdbgEvent.exception, &exception);
+	userfunc(tracee, AdbgEvent.exception, &exception, udata);
 	return 0;
 
 Lexited:
@@ -785,7 +786,7 @@ int adbg_debugger_terminate(adbg_process_t *tracee) {
 	tracee.creation = AdbgCreation.unloaded;
 	scope(exit) {
 		version (Windows) if (tracee.args) free(tracee.args);
-		//version (Posix) if (tracee.argv) close(tracee.argv);
+		version (Posix) if (tracee.argv) close(tracee.argv);
 		free(tracee);
 	}
 	

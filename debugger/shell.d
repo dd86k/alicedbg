@@ -636,48 +636,54 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 	}
 }
 
-void shell_event_exception(adbg_process_t *proc, int event, void* evdata) {
-	if (event != AdbgEvent.exception)
-		return;
-	
-	adbg_exception_t *ex = cast(adbg_exception_t*)evdata;
-	
-	printf("*	Process %d (thread %d) stopped\n"~
-		"	Reason  : %s ("~ADBG_OS_ERROR_FORMAT~")\n",
-		ex.pid, ex.tid,
-		adbg_exception_name(ex), ex.oscode);
-	
-	if (ex.faultz) {
+void shell_event_exception(adbg_process_t *proc, int event, void *edata, void *udata) {
+	switch (event) with (AdbgEvent) {
+	case exception:
+		adbg_exception_t *ex = cast(adbg_exception_t*)edata;
+		
+		printf("*	Process %d (thread %d) stopped\n"~
+			"	Reason  : %s ("~ADBG_OS_ERROR_FORMAT~")\n",
+			ex.pid, ex.tid,
+			adbg_exception_name(ex), ex.oscode);
+		
+		// No fault address available
+		if (ex.faultz == 0)
+			return;
+		
 		printf("	Address : 0x%llx\n", ex.fault_address);
 		
-		if (dis) {
-			printf("	Machine :");
-			
-			// Print machine bytes
-			ubyte[MAX_INSTR_SIZE] data = void;
-			if (adbg_memory_read(process, ex.faultz, data.ptr, MAX_INSTR_SIZE)) {
-				printf(" read error (%s)\n", adbg_error_message());
-				return; // Nothing else to do
-			}
-			
-			adbg_opcode_t op = void;
-			if (adbg_dis_once(dis, &op, data.ptr, MAX_INSTR_SIZE)) {
-				printf(" disassembly error (%s)\n", adbg_error_message());
-				return;
-			}
-			
-			// Print machine bytes
-			for (size_t bi; bi < op.size; ++bi) {
-				printf(" %02x", op.machine[bi]);
-			}
-			putchar('\n');
-			
-			// Print mnemonic
-			printf("	Mnemonic: %s", op.mnemonic);
-			if (op.operands)
-				printf(" %s", op.operands);
-			putchar('\n');
+		// No disassembler available
+		if (dis == null)
+			return;
+		
+		printf("	Machine :");
+		
+		// Print machine bytes
+		ubyte[MAX_INSTR_SIZE] data = void;
+		if (adbg_memory_read(process, ex.faultz, data.ptr, MAX_INSTR_SIZE)) {
+			printf(" read error (%s)\n", adbg_error_message());
+			return; // Nothing else to do
 		}
+		
+		adbg_opcode_t op = void;
+		if (adbg_dis_once(dis, &op, data.ptr, MAX_INSTR_SIZE)) {
+			printf(" disassembly error (%s)\n", adbg_error_message());
+			return;
+		}
+		
+		// Print machine bytes
+		for (size_t bi; bi < op.size; ++bi) {
+			printf(" %02x", op.machine[bi]);
+		}
+		putchar('\n');
+		
+		// Print mnemonic
+		printf("	Mnemonic: %s", op.mnemonic);
+		if (op.operands)
+			printf(" %s", op.operands);
+		putchar('\n');
+		return;
+	default:
 	}
 }
 
@@ -824,7 +830,7 @@ int command_restart(int argc, const(char) **argv) {
 int command_go(int argc, const(char) **argv) {
 	if (adbg_debugger_continue(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process, &shell_event_exception))
+	if (adbg_debugger_wait(process, &shell_event_exception, null))
 		return ShellError.alicedbg;
 	// Temporary: Cheap hack for process exit
 	if (adbg_process_status(process) == AdbgProcStatus.unloaded)
@@ -845,7 +851,7 @@ int command_kill(int argc, const(char) **argv) {
 int command_stepi(int argc, const(char) **argv) {
 	if (adbg_debugger_stepi(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process, &shell_event_exception))
+	if (adbg_debugger_wait(process, &shell_event_exception, null))
 		return ShellError.alicedbg;
 	return 0;
 }

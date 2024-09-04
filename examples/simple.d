@@ -29,11 +29,11 @@ LINPUT:	int c = getchar;
 	goto LINPUT;
 }
 
-void loop_handler(adbg_process_t *proc, int event, void *evdata) {
+void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
 	if (event != AdbgEvent.exception)
 		return;
 	
-	adbg_exception_t *ex = cast(adbg_exception_t*)evdata;
+	adbg_exception_t *ex = cast(adbg_exception_t*)edata;
 	printf(
 	"\n----------------------------------------\n"~
 	"* EXCEPTION ("~ADBG_OS_ERROR_FORMAT~"): %s\n"~
@@ -44,18 +44,20 @@ void loop_handler(adbg_process_t *proc, int event, void *evdata) {
 	ex.fault_address
 	);
 	
-	// Print disassembly if available
-	if (dis && ex.faultz) {
-		adbg_opcode_t op = void;
-		if (adbg_dis_process_once(dis, &op, proc, ex.fault_address)) {
-			printf("  (error:%s)\n", adbg_error_message);
-			return;
-		}
-		if (op.operands)
-			printf("  (%s %s)\n", op.mnemonic, op.operands);
-		else
-			printf("  (%s)\n", op.mnemonic);
+	// If disassembler and fault address unavailable,
+	// skip printing disassembly
+	if (dis == null || ex.faultz == 0)
+		return;
+	
+	adbg_opcode_t op = void;
+	if (adbg_dis_process_once(dis, &op, proc, ex.fault_address)) {
+		printf("  (error:%s)\n", adbg_error_message);
+		return;
 	}
+	if (op.operands)
+		printf("  (%s %s)\n", op.mnemonic, op.operands);
+	else
+		printf("  (%s)\n", op.mnemonic);
 }
 
 int main(int argc, const(char) **argv) {
