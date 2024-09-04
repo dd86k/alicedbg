@@ -786,7 +786,7 @@ int adbg_debugger_terminate(adbg_process_t *tracee) {
 	tracee.creation = AdbgCreation.unloaded;
 	scope(exit) {
 		version (Windows) if (tracee.args) free(tracee.args);
-		version (Posix) if (tracee.argv) close(tracee.argv);
+		version (Posix) if (tracee.argv) free(tracee.argv);
 		free(tracee);
 	}
 	
