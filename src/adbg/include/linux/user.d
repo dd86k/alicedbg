@@ -107,7 +107,7 @@ version (X86) {
 		/// 
 		int reserved;
 		/// 
-		user_regs*	u_ar0;
+		user_regs_struct*	u_ar0;
 		/// 
 		user_fpregs*	u_fpstate;
 		/// 
