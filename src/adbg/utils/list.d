@@ -7,21 +7,24 @@ module adbg.utils.list;
 
 import core.stdc.stdlib : malloc, calloc, realloc, free;
 import core.stdc.string : memcpy;
+import adbg.error : adbg_oops, AdbgError;
 
 extern (C):
 
 struct list_t {
 	size_t capacity; /// Capacity in number of items
 	size_t itemsize; /// Size of one item
-	size_t count; /// Current item count
+	size_t count;    /// Current item count
 	void *buffer;
 }
 
 list_t* adbg_list_new(size_t itemsize, size_t capacity) {
 	size_t isize = itemsize * capacity; // initial size
 	list_t *list = cast(list_t*)malloc(list_t.sizeof + isize);
-	if (list == null)
+	if (list == null) {
+		adbg_oops(AdbgError.crt);
 		return null;
+	}
 	list.capacity = capacity;
 	list.itemsize = itemsize;
 	list.count = 0;
@@ -40,15 +43,19 @@ list_t* adbg_list_new(size_t itemsize, size_t capacity) {
 /// 	item = Item.
 /// Returns: List instance pointer.
 list_t* adbg_list_add(list_t *list, void *item) {
-	if (list == null)
+	if (list == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return null;
+	}
 	
 	// Increase capacity
 	if (list.count >= list.capacity) {
 		size_t newcapacity = list.capacity << 1; // double capacity
 		list = cast(list_t*)realloc(list, list_t.sizeof + (list.itemsize * newcapacity));
-		if (list == null)
+		if (list == null) {
+			adbg_oops(AdbgError.crt);
 			return null;
+		}
 		
 		// Assuming realloc(3) copied data to new region if address changes...
 		// Only need to readjust buffer pointer
@@ -63,10 +70,14 @@ list_t* adbg_list_add(list_t *list, void *item) {
 }
 
 void* adbg_list_get(list_t *list, size_t index) {
-	if (list == null)
+	if (list == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return null;
-	if (index >= list.count)
+	}
+	if (index >= list.count) {
+		adbg_oops(AdbgError.indexBounds);
 		return null;
+	}
 	return list.buffer + (list.itemsize * index);
 }
 
