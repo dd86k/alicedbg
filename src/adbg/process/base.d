@@ -5,17 +5,18 @@
 /// License: BSD-3-Clause-Clear
 module adbg.process.base;
 
-//TODO: Process Pause/Resume
-//      Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
-//      Linux: Send SIGSTOP/SIGCONT signals via kill(2)
-//TODO: List threads of process (maybe in a module called threading.d)
+// TODO: Process Pause/Resume
+//       Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
+//       Linux: Send SIGSTOP/SIGCONT signals via kill(2)
+// TODO: List threads of process (maybe in a module called threading.d)
 
 import adbg.include.c.stdlib; // malloc, calloc, free, exit;
 import adbg.include.c.stdarg;
 import adbg.error;
-import adbg.utils.strings;
 import adbg.process.exception : adbg_exception_t, adbg_exception_translate;
 import adbg.machines;
+import adbg.utils.strings;
+import adbg.utils.list : list_t, adbg_list_free;
 import core.stdc.string;
 
 version (Windows) {
@@ -68,13 +69,13 @@ enum ADBG_PROCESS_NAME_LENGTH = 256;
 struct adbg_process_t {
 	version (Windows) { // Original identifiers; Otherwise informal
 		int pid;	/// Process identificiation number
-		int tid;	/// Thread identification number
+		deprecated int tid;	/// Thread identification number
 		HANDLE hpid;	/// Process handle
-		HANDLE htid;	/// Thread handle
+		deprecated HANDLE htid;	/// Thread handle
 		char *args;	/// Saved arguments when process was launched
 		// TODO: Deprecate and remove wow64 field
 		//       Make function to query process machine type
-		version (Win64) int wow64;
+		version (Win64) deprecated int wow64;
 	}
 	version (Posix) {
 		pid_t pid;	/// Process ID
@@ -88,6 +89,8 @@ struct adbg_process_t {
 	AdbgProcStatus status;
 	/// Process' creation source.
 	AdbgCreation creation;
+	/// List of threads
+	list_t *thread_list;
 	//TODO: Deprecate and remove static buffer in process struct
 	/// Process base module name.
 	char[ADBG_PROCESS_NAME_LENGTH] name;
@@ -102,6 +105,7 @@ void adbg_process_free(adbg_process_t *proc) {
 	version (Posix) {
 		if (proc.argv) free(proc.argv);
 	}
+	adbg_list_free(proc.thread_list);
 	free(proc);
 }
 
@@ -282,9 +286,6 @@ version (Windows) {
 	adbg_oops(AdbgError.unimplemented);
 	return 0;
 }
-}
-unittest {
-	//TODO: Test one character buffers
 }
 
 /// Get the current runtime machine platform.

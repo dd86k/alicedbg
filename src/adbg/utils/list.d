@@ -15,9 +15,14 @@ struct list_t {
 	size_t capacity; /// Capacity in number of items
 	size_t itemsize; /// Size of one item
 	size_t count;    /// Current item count
-	void *buffer;
+	void *buffer;    /// Item buffer
 }
 
+/// Allocate a new dynamic list.
+/// Params:
+/// 	itemsize = Size of one item, in bytes.
+/// 	capacity = Initial capacity size, in number of items.
+/// Returns: List instance. On error, null is returned.
 list_t* adbg_list_new(size_t itemsize, size_t capacity) {
 	size_t isize = itemsize * capacity; // initial size
 	list_t *list = cast(list_t*)malloc(list_t.sizeof + isize);
@@ -32,16 +37,28 @@ list_t* adbg_list_new(size_t itemsize, size_t capacity) {
 	return list;
 }
 
+/// Set the counter to zero.
+///
+/// For performance reasons, this function does not clear memory.
+/// Params: list = List instance.
+void adbg_list_clear(list_t *list) {
+	if (list == null)
+		return;
+	list.count = 0;
+}
+
 /// Add an item to the list.
 ///
 /// Item data is copied into the list.
 ///
 /// If the returned list pointer is null, no content was changed, but an error occured.
 /// You are free to either close the list or continue with the current, unchanged list.
+///
+/// Due to realloc(3), it is important to set the new list pointer.
 /// Params:
 /// 	list = List instance.
 /// 	item = Item.
-/// Returns: List instance pointer.
+/// Returns: List instance pointer. On error, null is returned.
 list_t* adbg_list_add(list_t *list, void *item) {
 	if (list == null) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -51,15 +68,15 @@ list_t* adbg_list_add(list_t *list, void *item) {
 	// Increase capacity
 	if (list.count >= list.capacity) {
 		size_t newcapacity = list.capacity << 1; // double capacity
+		// NOTE: MSVC will always assign a new memory block
 		list = cast(list_t*)realloc(list, list_t.sizeof + (list.itemsize * newcapacity));
 		if (list == null) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
 		
-		// Assuming realloc(3) copied data to new region if address changes...
+		// realloc(3) should have copied data to new block
 		// Only need to readjust buffer pointer
-		list.capacity = newcapacity;
 		list.buffer = cast(void*)list + list_t.sizeof;
 	}
 	
@@ -69,6 +86,11 @@ list_t* adbg_list_add(list_t *list, void *item) {
 	return list;
 }
 
+/// Get an item at this index.
+/// Params:
+/// 	list = List instance.
+/// 	index = Item index.
+/// Returns: Item pointer. On error, null is returned.
 void* adbg_list_get(list_t *list, size_t index) {
 	if (list == null) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -81,6 +103,8 @@ void* adbg_list_get(list_t *list, size_t index) {
 	return list.buffer + (list.itemsize * index);
 }
 
+/// Free the list.
+/// Params: list = List instance.
 void adbg_list_free(list_t *list) {
 	if (list == null)
 		return;

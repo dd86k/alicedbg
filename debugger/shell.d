@@ -165,7 +165,6 @@ __gshared:
 
 adbg_process_t *process;
 adbg_disassembler_t *dis;
-adbg_registers_t *registers;
 
 const(char)* last_spawn_exec;
 const(char)** last_spawn_argv;
@@ -378,22 +377,6 @@ immutable command2_t[] shell_commands = [
 		&command_stepi,
 	},
 	//
-	// Context
-	//
-	{
-		[ "regs" ],
-		"Lists register values.",
-		[ "[NAME]" ],
-		MODULE_DEBUGGER, CATEGORY_CONTEXT,
-		[
-			{
-				SECTION_DESCRIPTION,
-				[ "Get list of registers and values from process." ]
-			}
-		],
-		&command_regs,
-	},
-	//
 	// Memory
 	//
 	{
@@ -476,7 +459,7 @@ immutable command2_t[] shell_commands = [
 	{
 		[ "t", "thread" ],
 		"Manage process threads.",
-		[ "ACTION" ],
+		[ "list", "TID registers" ],
 		MODULE_DEBUGGER, CATEGORY_PROCESS,
 		[
 			{ SECTION_DESCRIPTION,
@@ -797,8 +780,6 @@ int command_detach(int argc, const(char) **argv) {
 		return ShellError.alicedbg;
 	}
 	adbg_dis_close(dis);
-	free(registers);
-	
 	return 0;
 }
 
@@ -843,7 +824,6 @@ int command_kill(int argc, const(char) **argv) {
 		return ShellError.alicedbg;
 	puts("Process killed");
 	adbg_dis_close(dis);
-	free(registers);
 	return 0;
 }
 
@@ -853,42 +833,6 @@ int command_stepi(int argc, const(char) **argv) {
 		return ShellError.alicedbg;
 	if (adbg_debugger_wait(process, &shell_event_exception, null))
 		return ShellError.alicedbg;
-	return 0;
-}
-
-int command_regs(int argc, const(char) **argv) {
-	if (process == null)
-		return ShellError.pauseRequired;
-	
-	if (registers == null) {
-		registers = adbg_registers_new(adbg_process_get_machine(process));
-		if (registers == null)
-			return ShellError.alicedbg;
-	}
-	
-	adbg_registers_fill(registers, process);
-	
-	if (registers.count == 0) {
-		logerror("No registers available");
-		return ShellError.unavailable;
-	}
-	
-	adbg_register_t *reg = registers.items.ptr;
-	const(char) *rselect = argc >= 2 ? argv[1] : null;
-	bool found;
-	for (size_t i; i < registers.count; ++i, ++reg) {
-		bool show = rselect == null || strcmp(rselect, reg.info.name) == 0;
-		if (show == false) continue;
-		char[20] normal = void, hexdec = void;
-		adbg_register_format(normal.ptr, 20, reg, AdbgRegFormat.dec);
-		adbg_register_format(hexdec.ptr, 20, reg, AdbgRegFormat.hexPadded);
-		printf("%-8s  0x%8s  %s\n", reg.info.name, hexdec.ptr, normal.ptr);
-		found = true;
-	}
-	if (rselect && found == false) {
-		logerror("Register not found");
-		return ShellError.invalidParameter;
-	}
 	return 0;
 }
 
@@ -991,27 +935,15 @@ int command_disassemble(int argc, const(char) **argv) {
 	if (dis == null)
 		return ShellError.unavailable;
 	
-	long uaddress = void;
-	if (argc > 1) { // Address given
-		if (unformat64(&uaddress, argv[1]))
-			return ShellError.unformat;
-	} else { // Address not given, get PC/eIP value
-		//TODO: dedicated function to get PC/IP/EIP/RIP value
-		// HACK: register list should be allocated on-demand in global space
-		AdbgMachine mach = adbg_process_get_machine(process);
-		adbg_registers_t regs = void;
-		//if (adbg_registers_config(&regs, ))
-		//	return ShellError.alicedbg;
-		if (adbg_registers_fill(&regs, process))
-			return ShellError.alicedbg;
-		// Assume EIP/RIP is in regs[0]
-		switch (mach) with (AdbgMachine) {
-		case i386:  uaddress = regs.items[0].u32; break;
-		case amd64: uaddress = regs.items[0].u64; break;
-		default:    return ShellError.unavailable;
-		}
-	}
+	// Need address
+	if (argc < 2)
+		return ShellError.missingArgument;
 	
+	long uaddress = void;
+	if (unformat64(&uaddress, argv[1]))
+		return ShellError.unformat;
+	
+	// Number of instruction, default to 10
 	int ucount = 10;
 	if (argc >= 3) {
 		if (unformat(&ucount, argv[2]))
@@ -1226,21 +1158,57 @@ int command_thread(int argc, const(char) **argv) {
 	if (argc < 2)
 		return ShellError.missingArgument;
 	
+	adbg_thread_t *thread = void;
+	
 	const(char) *action = argv[1];
+	// thread list - get a list of threads
 	if (strcmp(action, "list") == 0) {
-		void *list = adbg_thread_list(process);
-		if (list == null)
+		if (adbg_thread_list_update(process))
 			return ShellError.alicedbg;
 		
 		puts("Threads:");
-		int tid = void;
-		for (size_t i; (tid = adbg_thread_list_get(list, i)) != 0; ++i)
-			printf("%d\n", tid);
-		
-		adbg_thread_list_free(list);
-	} else {
-		return ShellError.invalidParameter;
+		size_t i;
+		while ((thread = adbg_thread_list_get(process, i++)) != null) {
+			printf("%*d\n", -10, adbg_thread_id(thread));
+		}
+		return 0;
 	}
+	
+	// Else: thread TID subcommand
+	if (argc < 3) // thread id
+		return ShellError.missingArgument;
+	
+	// Select thread
+	int tid = atoi(argv[1]);
+	size_t i;
+	adbg_thread_t *selected;
+	while ((thread = adbg_thread_list_get(process, i++)) != null) {
+		if (adbg_thread_id(thread) == tid) {
+			selected = thread;
+			break;
+		}
+	}
+	if (selected == null)
+		return ShellError.alicedbg;
+	
+	action = argv[2];
+	if (strcmp(action, "registers") == 0) {
+		// Update its context
+		adbg_thread_context_update(process, selected);
+		
+		i = 0;
+		adbg_register_t *register = void;
+		while ((register = adbg_register_get(thread, i++)) != null) {
+			char[20] dec = void, hex = void;
+			adbg_register_format(dec.ptr, 20, register, AdbgRegisterFormat.dec);
+			adbg_register_format(hex.ptr, 20, register, AdbgRegisterFormat.hexPadded);
+			printf("%*s  0x%*s  %s\n",
+				-8, adbg_register_name(register),
+				8, hex.ptr,
+				dec.ptr);
+		}
+	} else
+		return ShellError.invalidParameter;
 	
 	return 0;
 }
