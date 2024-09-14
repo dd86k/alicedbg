@@ -33,6 +33,8 @@ version (Windows) {
 
 extern (C):
 
+private enum INIT_COUNT = 32;
+
 struct adbg_thread_t {
 version (Windows) {
 	HANDLE handle;
@@ -55,7 +57,7 @@ version (Windows) {
 		return adbg_oops(AdbgError.uninitiated);
 	
 	if (process.thread_list == null)
-		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, 32);
+		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, INIT_COUNT);
 	if (process.thread_list == null)
 		return adbg_errno();
 	
@@ -102,35 +104,25 @@ version (Windows) {
 	
 	return 0;
 } else version (linux) {
-	if (process == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (process.pid == 0) {
-		adbg_oops(AdbgError.assertion);
-		return null;
-	}
+	if (process == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	if (process.pid == 0)
+		return adbg_oops(AdbgError.uninitiated);
 	
 	if (process.thread_list == null)
-		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, 32);
-	if (process.thread_list == null) {
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
+		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, INIT_COUNT);
+	if (process.thread_list == null)
+		return adbg_oops(AdbgError.crt);
 	
 	enum BSZ = 32; // "/proc/4294967295/task/".sizeof == 22
 	char[BSZ] path = void;
 	int l = snprintf(path.ptr, BSZ, "/proc/%u/task", process.pid);
-	if (l < 0) {
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
+	if (l < 0)
+		return adbg_oops(AdbgError.crt);
 	
 	DIR *procfd = opendir(path.ptr);
-	if (procfd == null) {
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
+	if (procfd == null)
+		return adbg_oops(AdbgError.crt);
 	scope(exit) closedir(procfd);
 	
 	// Go through kernel thread IDs
@@ -148,7 +140,7 @@ version (Windows) {
 		process.thread_list = adbg_list_add(process.thread_list, &tid);
 		if (process.thread_list == null) {
 			adbg_list_free(process.thread_list);
-			return null;
+			return adbg_errno();
 		}
 	}
 	
@@ -440,39 +432,39 @@ version (Win64) {
 	//      PT_GETVFPREGS
 	//      PT_GETHBPREGS
 	user_regs_struct u = void;
-	if (ptrace(PT_GETREGS, tracee.pid, null, &u) < 0)
+	if (ptrace(PT_GETREGS, thread.handle, null, &u) < 0)
 		return adbg_oops(AdbgError.os);
 	
 	version (X86) {
-		ctx.items[0].u32 = u.eip;
-		ctx.items[1].u32 = u.eflags;
-		ctx.items[2].u32 = u.eax;
-		ctx.items[3].u32 = u.ebx;
-		ctx.items[4].u32 = u.ecx;
-		ctx.items[5].u32 = u.edx;
-		ctx.items[6].u32 = u.esp;
-		ctx.items[7].u32 = u.ebp;
-		ctx.items[8].u32 = u.esi;
-		ctx.items[9].u32 = u.edi;
+		thread.context.items[0].u32 = u.eip;
+		thread.context.items[1].u32 = u.eflags;
+		thread.context.items[2].u32 = u.eax;
+		thread.context.items[3].u32 = u.ebx;
+		thread.context.items[4].u32 = u.ecx;
+		thread.context.items[5].u32 = u.edx;
+		thread.context.items[6].u32 = u.esp;
+		thread.context.items[7].u32 = u.ebp;
+		thread.context.items[8].u32 = u.esi;
+		thread.context.items[9].u32 = u.edi;
 	} else version (X86_64) {
-		ctx.items[0].u64 = u.rip;
-		ctx.items[1].u64 = u.eflags;
-		ctx.items[2].u64 = u.rax;
-		ctx.items[3].u64 = u.rbx;
-		ctx.items[4].u64 = u.rcx;
-		ctx.items[5].u64 = u.rdx;
-		ctx.items[6].u64 = u.rsp;
-		ctx.items[7].u64 = u.rbp;
-		ctx.items[8].u64 = u.rsi;
-		ctx.items[9].u64 = u.rdi;
-		ctx.items[10].u64 = u.r8;
-		ctx.items[11].u64 = u.r9;
-		ctx.items[12].u64 = u.r10;
-		ctx.items[13].u64 = u.r11;
-		ctx.items[14].u64 = u.r12;
-		ctx.items[15].u64 = u.r13;
-		ctx.items[16].u64 = u.r14;
-		ctx.items[17].u64 = u.r15;
+		thread.context.items[0].u64 = u.rip;
+		thread.context.items[1].u64 = u.eflags;
+		thread.context.items[2].u64 = u.rax;
+		thread.context.items[3].u64 = u.rbx;
+		thread.context.items[4].u64 = u.rcx;
+		thread.context.items[5].u64 = u.rdx;
+		thread.context.items[6].u64 = u.rsp;
+		thread.context.items[7].u64 = u.rbp;
+		thread.context.items[8].u64 = u.rsi;
+		thread.context.items[9].u64 = u.rdi;
+		thread.context.items[10].u64 = u.r8;
+		thread.context.items[11].u64 = u.r9;
+		thread.context.items[12].u64 = u.r10;
+		thread.context.items[13].u64 = u.r11;
+		thread.context.items[14].u64 = u.r12;
+		thread.context.items[15].u64 = u.r13;
+		thread.context.items[16].u64 = u.r14;
+		thread.context.items[17].u64 = u.r15;
 	}
 	return 0;
 } else {
