@@ -99,29 +99,26 @@ const(char) *shell_error_string(int code) {
 }
 
 int shell_start(int argc, const(char)** argv) {
-	int ecode = void;
-	
 	if (loginit(null))
-		return 1337;
+		return 2;
 	
 	// Start process if specified
 	if (argc > 0 && argv) {
 		// Assume argv is null-terminated as it is on msvcrt and glibc
-		ecode = shell_proc_spawn(*argv, argv + 1);
-		if (ecode) {
+		if (shell_proc_spawn(*argv, argv + 1)) {
 			printf("Error: %s\n", adbg_error_message());
-			return ecode;
+			return 1;
 		}
 	} else if (opt_pid) { // Or attach to process if specified
-		ecode = shell_proc_attach(opt_pid);
-		if (ecode) {
+		if (shell_proc_attach(opt_pid)) {
 			printf("Error: %s\n", adbg_error_message());
-			return ecode;
+			return 1;
 		}
 	}
 	
 	coninit();
 
+	int ecode = void;
 Lcommand:
 	printf("(adbg) ");
 	fflush(stdout);
@@ -175,21 +172,8 @@ const(char)** last_spawn_argv;
 
 FILE *logfd;
 int loginit(const(char) *path) {
-	version (Windows) {
-		// 1. HANDLE stdHandle = GetStdHandle(STD_ERROR_HANDLE);
-		// 2. int fileDescriptor = _open_osfhandle((intptr_t)stdHandle, _O_TEXT);
-		// 3. FILE* file = _fdopen(fileDescriptor, "w");
-		// 4. int dup2Result = _dup2(_fileno(file), _fileno(stderr));
-		// 5. setvbuf(stderr, NULL, _IONBF, 0);
-		if (path == null) path = "CONOUT$";
-	} else {
-		if (path == null) path = "/dev/stderr";
-	}
-	
-	logfd = fopen(path, "wb");
-	if (logfd) {
-		setvbuf(logfd, null, _IONBF, 0);
-	}
+	logfd = path ? fopen(path, "wb") : stderr;
+	if (path) setvbuf(logfd, null, _IONBF, 0);
 	return logfd == null;
 }
 void logerror(const(char) *fmt, ...) {
