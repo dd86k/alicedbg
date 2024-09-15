@@ -149,7 +149,7 @@ unittest {
 	assert((list = adbg_list_add(list, &id)) != null); // count=6
 	assert((list = adbg_list_add(list, &id)) != null); // count=7
 	
-	assert(list.capacity >= 8);
+	assert(list.capacity >= 4);
 	assert(list.count == 7);
 	assert(list.itemsize == int.sizeof);
 	

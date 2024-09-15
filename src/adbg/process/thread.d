@@ -535,11 +535,11 @@ int adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, AdbgReg
 }
 unittest {
 	adbg_register_t reg = void;
-	reg.info.type = AdbgRegType.u16;
+	reg.info.type = AdbgRegisterType.u16;
 	reg.u16  = 0x1234;
 	enum BUFSZ = 16;
 	char[BUFSZ] buffer = void;
-	int r = adbg_register_format(buffer.ptr, BUFSZ, &reg, AdbgRegFormat.hex);
+	int r = adbg_register_format(buffer.ptr, BUFSZ, &reg, AdbgRegisterFormat.hex);
 	assert(r == 4);
 	assert(buffer[r] == 0);
 	assert(buffer[0..r] == "1234");
