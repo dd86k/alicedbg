@@ -77,6 +77,7 @@ list_t* adbg_list_add(list_t *list, void *item) {
 		
 		// realloc(3) should have copied data to new block
 		// Only need to readjust buffer pointer
+		list.capacity = newcapacity;
 		list.buffer = cast(void*)list + list_t.sizeof;
 	}
 	
@@ -149,7 +150,7 @@ unittest {
 	assert((list = adbg_list_add(list, &id)) != null); // count=6
 	assert((list = adbg_list_add(list, &id)) != null); // count=7
 	
-	assert(list.capacity >= 4);
+	assert(list.capacity > 4);
 	assert(list.count == 7);
 	assert(list.itemsize == int.sizeof);
 	

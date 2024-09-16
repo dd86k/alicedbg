@@ -209,46 +209,25 @@ version (X86) {
 	
 	enum NGREG = 18;
 	
-	
-	/*#define ARM_cpsr	uregs[16]
-	#define ARM_pc		uregs[15]
-	#define ARM_lr		uregs[14]
-	#define ARM_sp		uregs[13]
-	#define ARM_ip		uregs[12]
-	#define ARM_fp		uregs[11]
-	#define ARM_r10		uregs[10]
-	#define ARM_r9		uregs[9]
-	#define ARM_r8		uregs[8]
-	#define ARM_r7		uregs[7]
-	#define ARM_r6		uregs[6]
-	#define ARM_r5		uregs[5]
-	#define ARM_r4		uregs[4]
-	#define ARM_r3		uregs[3]
-	#define ARM_r2		uregs[2]
-	#define ARM_r1		uregs[1]
-	#define ARM_r0		uregs[0]
-	#define ARM_ORIG_r0	uregs[17]*/
 	struct user_regs_struct {
-		c_ulongint r0;
-		c_ulongint r1;
-		c_ulongint r2;
-		c_ulongint r3;
-		c_ulongint r4;
-		c_ulongint r5;
-		c_ulongint r6;
-		c_ulongint r7;
-		c_ulongint r8;
-		c_ulongint r9;
-		c_ulongint r10;
-		c_ulongint fp;
-		c_ulongint ip;
-		c_ulongint sp;
-		c_ulongint lr;
-		c_ulongint pc;
-		c_ulongint orig_r0;
-	}
-	struct user_regs_struct {
-		c_ulongint[NGREG] uregs;	/// 
+		c_ulongint r0;	// ARM_r0
+		c_ulongint r1;	// ARM_r1
+		c_ulongint r2;	// ARM_r2
+		c_ulongint r3;	// ARM_r3
+		c_ulongint r4;	// ARM_r4
+		c_ulongint r5;	// ARM_r5
+		c_ulongint r6;	// ARM_r6
+		c_ulongint r7;	// ARM_r7
+		c_ulongint r8;	// ARM_r8
+		c_ulongint r9;	// ARM_r9
+		c_ulongint r10;	// ARM_r10
+		c_ulongint fp;	// ARM_fp
+		c_ulongint ip;	// ARM_ip
+		c_ulongint sp;	// ARM_sp
+		c_ulongint lr;	// ARM_lr
+		c_ulongint pc;	// ARM_pc
+		c_ulongint cpsr;	// ARM_cpsr
+		c_ulongint orig_r0;	// ARM_ORIG_r0
 	}
 	
 	struct fpregset_t {

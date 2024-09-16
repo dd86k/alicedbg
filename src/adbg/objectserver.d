@@ -320,7 +320,7 @@ int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rd
 /// 	flags = Additional settings.
 /// Returns: Null pointer on error.
 void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, int flags = 0) {
-	version (Trace) trace("location=%lld buffer=%p", location, rdsize);
+	version (Trace) trace("location=%lld rdsize=%zx", location, rdsize);
 	
 	if (o == null || rdsize == 0) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -384,7 +384,7 @@ int adbg_object_loadv(adbg_object_t *o) {
 		return adbg_object_pdb70_load(o);
 	
 	// 64-bit signature detection
-	version (Trace) trace("u64=%#x", sig.u64);
+	version (Trace) trace("u64=%#llx", sig.u64);
 	if (siglen > ulong.sizeof) switch (sig.u64) {
 	case AR_MAGIC:
 		return adbg_object_ar_load(o);

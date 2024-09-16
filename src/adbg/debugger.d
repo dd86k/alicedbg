@@ -714,6 +714,7 @@ Lwait:
 	//           - Windows does, though, and points to it
 	//       - gdbserver and lldb never attempt to do such thing anyway
 	//       - RIP-1 (x86) could *maybe* point to int3 or similar.
+	//       - User area might have DR3, it does have "fault_address"
 	// NOTE: Newer D compilers fixed siginfo_t as a whole
 	//       for version (linux). Noticed on DMD 2.103.1.
 	//       Old glibc: ._sifields._sigfault.si_addr
@@ -728,7 +729,7 @@ Lwait:
 		}
 		exception.fault_address = cast(size_t)sig._sifields._sigfault.si_addr;
 		break;
-//		case SIGINT, SIGTERM, SIGABRT: //TODO: Killed?
+//	case SIGINT, SIGTERM, SIGABRT: //TODO: Killed?
 	default:
 		exception.fault_address = 0;
 	}
