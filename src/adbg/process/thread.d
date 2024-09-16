@@ -22,13 +22,17 @@ version (Windows) {
 	import core.sys.windows.winbase;
 	import core.sys.windows.windef;
 } else version (linux) {
+	import adbg.include.linux.ptrace;
+	import adbg.include.linux.user;
 	import core.stdc.ctype : isdigit;
 	import core.stdc.stdio : snprintf;
 	import core.stdc.stdlib : atoi;
 	import core.sys.posix.dirent;
 	import core.sys.posix.libgen : basename;
-	import adbg.include.linux.user;
-	import adbg.include.posix.ptrace;
+} else version (FreeBSD) {
+	import adbg.include.freebsd.ptrace;
+	import adbg.include.freebsd.reg;
+	import core.sys.posix.sys.types : pid_t;
 }
 
 extern (C):
@@ -42,7 +46,10 @@ version (Windows) {
 	HANDLE handle;
 	int id;
 }
-version (Posix) {
+version (linux) {
+	pid_t handle;
+}
+version (FreeBSD) {
 	pid_t handle;
 }
 	adbg_thread_context_t context;
@@ -147,6 +154,7 @@ version (Windows) {
 	
 	return 0;
 } else {
+	// TODO: FreeBSD PT_GETLWPLIST
 	return adbg_oops(AdbgError.unimplemented);
 }
 }
@@ -171,24 +179,22 @@ adbg_thread_t* adbg_thread_list_get(adbg_process_t *process, size_t index) {
 /// Returns: Thread ID. On error, zero.
 int adbg_thread_id(adbg_thread_t *thread) {
 	version (Trace) trace("thread=%p", thread);
+version (Windows) {
 	if (thread == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
-	version (Windows)    return thread.id;
-	else version (linux) return cast(int)thread.handle;
-	else {
-		adbg_oops(AdbgError.unimplemented);
+	return thread.id;
+} else version (Posix) {
+	if (thread == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
+	return cast(int)thread.handle;
+} else {
+	adbg_oops(AdbgError.unimplemented);
+	return 0;
 }
-
-/// Close the thread list instance.
-/// Params: list = Thread list instance.
-void adbg_thread_list_free(void *list) {
-	if (list == null)
-		return;
-	adbg_list_free(cast(list_t*)list);
 }
 
 //
@@ -750,11 +756,6 @@ version (Win64) {
 		user_regs_struct u = void;
 		if (ptrace(PT_GETREGS, thread.handle, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
-		thread.context.items[AdbgRegister.arm_pc].u32   = u.pc;
-		thread.context.items[AdbgRegister.arm_fp].u32   = u.fp;
-		thread.context.items[AdbgRegister.arm_ip].u32   = u.ip;
-		thread.context.items[AdbgRegister.arm_sp].u32   = u.sp;
-		thread.context.items[AdbgRegister.arm_lr].u32   = u.lr;
 		thread.context.items[AdbgRegister.arm_r0].u32   = u.r0;
 		thread.context.items[AdbgRegister.arm_r1].u32   = u.r1;
 		thread.context.items[AdbgRegister.arm_r2].u32   = u.r2;
@@ -766,6 +767,11 @@ version (Win64) {
 		thread.context.items[AdbgRegister.arm_r8].u32   = u.r8;
 		thread.context.items[AdbgRegister.arm_r9].u32   = u.r9;
 		thread.context.items[AdbgRegister.arm_r10].u32  = u.r10;
+		thread.context.items[AdbgRegister.arm_fp].u32   = u.fp;
+		thread.context.items[AdbgRegister.arm_ip].u32   = u.ip;
+		thread.context.items[AdbgRegister.arm_sp].u32   = u.sp;
+		thread.context.items[AdbgRegister.arm_lr].u32   = u.lr;
+		thread.context.items[AdbgRegister.arm_pc].u32   = u.pc;
 		thread.context.items[AdbgRegister.arm_cpsr].u32 = u.cpsr;
 		return 0;
 	} else version (AArch64) {
@@ -805,6 +811,124 @@ version (Win64) {
 		thread.context.items[AdbgRegister.aarch64_x30].u64 = u.regs[30];
 		thread.context.items[AdbgRegister.aarch64_sp].u64 = u.sp;
 		thread.context.items[AdbgRegister.aarch64_pc].u64 = u.pc;
+		return 0;
+	} else {
+		return adbg_oops(AdbgError.unimplemented);
+	}
+} else version (FreeBSD) {
+	version (X86) {
+		reg u = void;
+		if (ptrace(PT_GETREGS, thread.handle, &u, 0) < 0)
+			return adbg_oops(AdbgError.os);
+		thread.context.items[AdbgRegister.x86_eip].u32    = u.r_eip;
+		thread.context.items[AdbgRegister.x86_eflags].u32 = u.r_eflags;
+		thread.context.items[AdbgRegister.x86_eax].u32    = u.r_eax;
+		thread.context.items[AdbgRegister.x86_ebx].u32    = u.r_ebx;
+		thread.context.items[AdbgRegister.x86_ecx].u32    = u.r_ecx;
+		thread.context.items[AdbgRegister.x86_edx].u32    = u.r_edx;
+		thread.context.items[AdbgRegister.x86_esp].u32    = u.r_esp;
+		thread.context.items[AdbgRegister.x86_ebp].u32    = u.r_ebp;
+		thread.context.items[AdbgRegister.x86_esi].u32    = u.r_esi;
+		thread.context.items[AdbgRegister.x86_edi].u32    = u.r_edi;
+		thread.context.items[AdbgRegister.x86_cs].u16     = cast(ushort)u.r_cs;
+		thread.context.items[AdbgRegister.x86_ds].u16     = cast(ushort)u.r_ds;
+		thread.context.items[AdbgRegister.x86_es].u16     = cast(ushort)u.r_es;
+		thread.context.items[AdbgRegister.x86_fs].u16     = cast(ushort)u.r_fs;
+		thread.context.items[AdbgRegister.x86_gs].u16     = cast(ushort)u.r_gs;
+		thread.context.items[AdbgRegister.x86_ss].u16     = cast(ushort)u.r_ss;
+		return 0;
+	} else version (X86_64) {
+		reg u = void;
+		if (ptrace(PT_GETREGS, thread.handle, &u, 0) < 0)
+			return adbg_oops(AdbgError.os);
+		thread.context.items[AdbgRegister.amd64_rip].u64    = u.r_rip;
+		thread.context.items[AdbgRegister.amd64_rflags].u64 = u.r_rflags;
+		thread.context.items[AdbgRegister.amd64_rax].u64    = u.r_rax;
+		thread.context.items[AdbgRegister.amd64_rbx].u64    = u.r_rbx;
+		thread.context.items[AdbgRegister.amd64_rcx].u64    = u.r_rcx;
+		thread.context.items[AdbgRegister.amd64_rdx].u64    = u.r_rdx;
+		thread.context.items[AdbgRegister.amd64_rsp].u64    = u.r_rsp;
+		thread.context.items[AdbgRegister.amd64_rbp].u64    = u.r_rbp;
+		thread.context.items[AdbgRegister.amd64_rsi].u64    = u.r_rsi;
+		thread.context.items[AdbgRegister.amd64_rdi].u64    = u.r_rdi;
+		thread.context.items[AdbgRegister.amd64_r8].u64     = u.r_r8;
+		thread.context.items[AdbgRegister.amd64_r9].u64     = u.r_r9;
+		thread.context.items[AdbgRegister.amd64_r10].u64    = u.r_r10;
+		thread.context.items[AdbgRegister.amd64_r11].u64    = u.r_r11;
+		thread.context.items[AdbgRegister.amd64_r12].u64    = u.r_r12;
+		thread.context.items[AdbgRegister.amd64_r13].u64    = u.r_r13;
+		thread.context.items[AdbgRegister.amd64_r14].u64    = u.r_r14;
+		thread.context.items[AdbgRegister.amd64_r15].u64    = u.r_r15;
+		thread.context.items[AdbgRegister.amd64_cs].u16     = cast(ushort)u.r_cs;
+		thread.context.items[AdbgRegister.amd64_ds].u16     = u.r_ds;
+		thread.context.items[AdbgRegister.amd64_es].u16     = u.r_es;
+		thread.context.items[AdbgRegister.amd64_fs].u16     = u.r_fs;
+		thread.context.items[AdbgRegister.amd64_gs].u16     = u.r_gs;
+		thread.context.items[AdbgRegister.amd64_ss].u16     = cast(ushort)u.r_ss;
+		return 0;
+	} else version (ARM) {
+		reg u = void;
+		if (ptrace(PT_GETREGS, thread.handle, &u, 0) < 0)
+			return adbg_oops(AdbgError.os);
+		thread.context.items[AdbgRegister.arm_r0].u32   = u.r[0];
+		thread.context.items[AdbgRegister.arm_r1].u32   = u.r[1];
+		thread.context.items[AdbgRegister.arm_r2].u32   = u.r[2];
+		thread.context.items[AdbgRegister.arm_r3].u32   = u.r[3];
+		thread.context.items[AdbgRegister.arm_r4].u32   = u.r[4];
+		thread.context.items[AdbgRegister.arm_r5].u32   = u.r[5];
+		thread.context.items[AdbgRegister.arm_r6].u32   = u.r[6];
+		thread.context.items[AdbgRegister.arm_r7].u32   = u.r[7];
+		thread.context.items[AdbgRegister.arm_r8].u32   = u.r[8];
+		thread.context.items[AdbgRegister.arm_r9].u32   = u.r[9];
+		thread.context.items[AdbgRegister.arm_r10].u32  = u.r[10];
+		thread.context.items[AdbgRegister.arm_fp].u32   = u.r[11];
+		thread.context.items[AdbgRegister.arm_ip].u32   = u.r[12];
+		thread.context.items[AdbgRegister.arm_sp].u32   = u.r_sp;
+		thread.context.items[AdbgRegister.arm_lr].u32   = u.r_lr;
+		thread.context.items[AdbgRegister.arm_pc].u32   = u.r_pc;
+		thread.context.items[AdbgRegister.arm_cpsr].u32 = u.r_cpsr;
+		return 0;
+	} else version (AArch64) {
+		reg u = void;
+		if (ptrace(PT_GETREGS, thread.handle, &u, 0) < 0)
+			return adbg_oops(AdbgError.os);
+		thread.context.items[AdbgRegister.aarch64_x0].u64  = u.x[0];
+		thread.context.items[AdbgRegister.aarch64_x1].u64  = u.x[1];
+		thread.context.items[AdbgRegister.aarch64_x2].u64  = u.x[2];
+		thread.context.items[AdbgRegister.aarch64_x3].u64  = u.x[3];
+		thread.context.items[AdbgRegister.aarch64_x4].u64  = u.x[4];
+		thread.context.items[AdbgRegister.aarch64_x5].u64  = u.x[5];
+		thread.context.items[AdbgRegister.aarch64_x6].u64  = u.x[6];
+		thread.context.items[AdbgRegister.aarch64_x7].u64  = u.x[7];
+		thread.context.items[AdbgRegister.aarch64_x8].u64  = u.x[8];
+		thread.context.items[AdbgRegister.aarch64_x9].u64  = u.x[9];
+		thread.context.items[AdbgRegister.aarch64_x10].u64 = u.x[10];
+		thread.context.items[AdbgRegister.aarch64_x11].u64 = u.x[11];
+		thread.context.items[AdbgRegister.aarch64_x12].u64 = u.x[12];
+		thread.context.items[AdbgRegister.aarch64_x13].u64 = u.x[13];
+		thread.context.items[AdbgRegister.aarch64_x14].u64 = u.x[14];
+		thread.context.items[AdbgRegister.aarch64_x15].u64 = u.x[15];
+		thread.context.items[AdbgRegister.aarch64_x16].u64 = u.x[16];
+		thread.context.items[AdbgRegister.aarch64_x17].u64 = u.x[17];
+		thread.context.items[AdbgRegister.aarch64_x18].u64 = u.x[18];
+		thread.context.items[AdbgRegister.aarch64_x19].u64 = u.x[19];
+		thread.context.items[AdbgRegister.aarch64_x20].u64 = u.x[20];
+		thread.context.items[AdbgRegister.aarch64_x21].u64 = u.x[21];
+		thread.context.items[AdbgRegister.aarch64_x22].u64 = u.x[22];
+		thread.context.items[AdbgRegister.aarch64_x23].u64 = u.x[23];
+		thread.context.items[AdbgRegister.aarch64_x24].u64 = u.x[24];
+		thread.context.items[AdbgRegister.aarch64_x25].u64 = u.x[25];
+		thread.context.items[AdbgRegister.aarch64_x26].u64 = u.x[26];
+		thread.context.items[AdbgRegister.aarch64_x27].u64 = u.x[27];
+		thread.context.items[AdbgRegister.aarch64_x28].u64 = u.x[28];
+		thread.context.items[AdbgRegister.aarch64_x29].u64 = u.x[29];
+		thread.context.items[AdbgRegister.aarch64_x30].u64 = u.x[30];
+		thread.context.items[AdbgRegister.aarch64_sp].u64 = u.sp;
+		// NOTE: PC substitution
+		//       FreeBSD's reg structure for AArch64 does not include PC.
+		//       While ELR holds the address to return to, it might not
+		//       always be present.
+		thread.context.items[AdbgRegister.aarch64_pc].u64 = u.lr;
 		return 0;
 	} else {
 		return adbg_oops(AdbgError.unimplemented);
