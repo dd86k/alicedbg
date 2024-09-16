@@ -5,6 +5,8 @@
 /// License: BSD-3-Clause-Clear
 module adbg.debugger;
 
+// TODO: adbg_debugger_spawn: Get default child stack size
+
 public import adbg.process.base;
 import adbg.process.exception;
 import adbg.error;
@@ -32,9 +34,10 @@ version (Windows) {
 	import adbg.platform : ADBG_CHILD_STACK_SIZE;
 }
 
-version (linux)
+version (linux) {
 	//version (CRuntime_Glibc)
-	enum USE_CLONE = false;
+		//version = USE_CLONE;
+}
 
 extern (C):
 
@@ -249,12 +252,12 @@ version (Windows) {
 	proc.status = AdbgProcStatus.standby;
 	proc.creation = AdbgCreation.spawned;
 	return proc;
-} else version (linux) {
+} else version (Posix) {
 	// NOTE: Don't remember this check, but I think it was because of
 	//       an ambiguous error message
 	// Verify if file exists and we has access to it
 	stat_t st = void;
-	if (stat(path, &st) == -1) {
+	if (stat(path, &st) < 0) {
 		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
 		return null;
@@ -276,8 +279,7 @@ version (Windows) {
 		memcpy(proc.argv + 1, argv, argc * size_t.sizeof);
 	proc.argv[argc + 1] = null;
 	
-static if (USE_CLONE) { // clone(2)
-	//TODO: get default stack size (glibc constant or function)
+version (USE_CLONE) { // clone(2)
 	void *stack = mmap(null, ADBG_CHILD_STACK_SIZE,
 		PROT_READ | PROT_WRITE,
 		MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
@@ -291,7 +293,6 @@ static if (USE_CLONE) { // clone(2)
 	void *stacktop = stack + ADBG_CHILD_STACK_SIZE;
 	
 	// Clone
-	//TODO: Get default stack size
 	__adbg_child_t chld = void;
 	chld.argv = cast(const(char)**)proc.argv;
 	chld.envp = envp;
@@ -325,55 +326,6 @@ static if (USE_CLONE) { // clone(2)
 	} // switch(fork(2))
 } // clone(2)/fork(2)
 	
-	proc.status = AdbgProcStatus.standby;
-	proc.creation = AdbgCreation.spawned;
-	return proc;
-} else version (FreeBSD) {
-	// Verify if file exists and we has access to it
-	stat_t st = void;
-	if (stat(path, &st) == -1) {
-		adbg_process_free(proc);
-		adbg_oops(AdbgError.os);
-		return null;
-	}
-	
-	// Allocate arguments, include space for program and null terminator
-	int argc;
-	while (argv[argc]) ++argc;
-	version(Trace) trace("argc=%d", argc);
-	proc.argv = cast(char**)malloc((argc + 2) * size_t.sizeof);
-	if (proc.argv == null) {
-		version(Trace) trace("mmap=%s", strerror(errno));
-		adbg_process_free(proc);
-		adbg_oops(AdbgError.os);
-		return null;
-	}
-	proc.argv[0] = cast(char*)path;
-	if (argc && argv && *argv)
-		memcpy(proc.argv + 1, argv, argc * size_t.sizeof);
-	proc.argv[argc + 1] = null;
-	
-	switch (proc.pid = fork()) {
-	case -1: // Error
-		version(Trace) trace("fork=%s", strerror(errno));
-		adbg_process_free(proc);
-		adbg_oops(AdbgError.os);
-		return null;
-	case 0: // New child process
-		version(Trace) for (int i; i < argc + 2; ++i)
-			trace("argv[%d]=%s", i, proc.argv[i]);
-		
-		__adbg_child_t chld = void;
-		chld.argv = cast(const(char)**)proc.argv;
-		chld.envp = envp;
-		chld.dir  = dir;
-		__adbg_exec_child(&chld); // If returns at all, error
-		adbg_process_free(proc);
-		_exit(errno);
-		return null; // Make compiler happy
-	default: // This parent process
-	} // switch(fork(2))
-
 	proc.status = AdbgProcStatus.standby;
 	proc.creation = AdbgCreation.spawned;
 	return proc;
@@ -548,7 +500,7 @@ version (Windows) {
 	
 	proc.status = options & OPT_STOP ? AdbgProcStatus.paused : AdbgProcStatus.running;
 	proc.pid = cast(pid_t)pid;
-} else version (Posix) {
+} else version (FreeBSD) {
 	version (Trace) if (options & OPT_STOP) trace("Sending break...");
 	if (ptrace(PT_ATTACH, pid, null, 0) < 0) {
 		adbg_oops(AdbgError.os);
@@ -556,8 +508,7 @@ version (Windows) {
 		return null;
 	}
 	
-	// TODO: Check if paused under FreeBSD
-	proc.status = AdbgProcStatus.running;
+	proc.status = AdbgProcStatus.paused;
 	proc.pid = cast(pid_t)pid;
 }
 	
@@ -580,11 +531,6 @@ version (Windows) {
 		adbg_process_free(tracee);
 		return adbg_oops(AdbgError.os);
 	}
-} else version (linux) {
-	if (ptrace(PT_DETACH, tracee.pid, null, null) < 0) {
-		adbg_process_free(tracee);
-		return adbg_oops(AdbgError.os);
-	}
 } else version (Posix) {
 	if (ptrace(PT_DETACH, tracee.pid, null, 0) < 0) {
 		adbg_process_free(tracee);
@@ -594,14 +540,11 @@ version (Windows) {
 	return 0;
 }
 
-/// Wait for a debug event.
-///
-/// Continues execution of the process until a new debug event occurs. When an
-/// exception occurs, the exception_t structure is populated with debugging information.
+/// Continue execution of the process until a new debug event occurs.
 ///
 /// This call is blocking.
 ///
-/// Windows: Uses WaitForDebugEvent, filters anything but EXCEPTION_DEBUG_EVENT.
+/// Windows: Uses WaitForDebugEvent.
 /// Posix: Uses ptrace(2) and waitpid(2), filters SIGCONT out.
 ///
 /// Params:
@@ -642,7 +585,6 @@ Lwait:
 	/*case CREATE_THREAD_DEBUG_EVENT:
 	case CREATE_PROCESS_DEBUG_EVENT:
 	case EXIT_THREAD_DEBUG_EVENT:
-	//case EXIT_PROCESS_DEBUG_EVENT:
 	case LOAD_DLL_DEBUG_EVENT:
 	case UNLOAD_DLL_DEBUG_EVENT:
 	case OUTPUT_DEBUG_STRING_EVENT:
@@ -664,7 +606,7 @@ Lwait:
 		FALSE, de.dwThreadId);
 	tracee.status = AdbgProcStatus.paused;
 	adbg_exception_translate(&exception, &de, null);
-} else version (linux) {
+} else version (Posix) {
 	int wstatus = void;
 	int stopsig = void;
 Lwait:
@@ -698,7 +640,7 @@ Lwait:
 	stopsig = WEXITSTATUS(wstatus);
 	
 	// Get fault address
-	switch (stopsig) {
+	version (linux) switch (stopsig) {
 	case SIGCONT: goto Lwait;
 	// NOTE: si_addr is NOT populated under ptrace for SIGTRAP
 	//       - linux does not fill si_addr on a SIGTRAP from a ptrace event
@@ -733,6 +675,7 @@ Lwait:
 	default:
 		exception.fault_address = 0;
 	}
+	else exception.fault_address = 0;
 	
 	tracee.status = AdbgProcStatus.paused;
 	adbg_exception_translate(&exception, &tracee.pid, &stopsig);
