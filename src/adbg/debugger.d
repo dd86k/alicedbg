@@ -501,25 +501,25 @@ version (Windows) {
 }
 
 /// Detach debugger from current process.
-int adbg_debugger_detach(adbg_process_t *tracee) {
-	if (tracee == null)
+/// Params: proc = Process instance being debugged.
+/// Returns: Error code.
+int adbg_debugger_detach(adbg_process_t *proc) {
+	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (tracee.creation != AdbgCreation.attached)
+	if (proc.creation != AdbgCreation.attached)
 		return adbg_oops(AdbgError.debuggerInvalidAction);
 	
-	tracee.creation = AdbgCreation.unloaded;
-	tracee.status = AdbgProcStatus.unloaded;
+	proc.creation = AdbgCreation.unloaded;
+	proc.status = AdbgProcStatus.unloaded;
+	
+	scope(exit) adbg_process_free(proc);
 	
 version (Windows) {
-	if (DebugActiveProcessStop(tracee.pid) == FALSE) {
-		adbg_process_free(tracee);
+	if (DebugActiveProcessStop(proc.pid) == FALSE)
 		return adbg_oops(AdbgError.os);
-	}
 } else version (Posix) {
-	if (ptrace(PT_DETACH, tracee.pid, null, 0) < 0) {
-		adbg_process_free(tracee);
+	if (ptrace(PT_DETACH, proc.pid, null, 0) < 0)
 		return adbg_oops(AdbgError.os);
-	}
 }
 	return 0;
 }
@@ -583,11 +583,13 @@ Lwait:
 	
 	// Fixes access to debugger, thread context functions.
 	// Especially when attaching, but should be standard with spawned-in processes too.
-	// NOTE: There is no such 'CloseThread'
+	// TODO: Get rid of hack, replace with refreshing thread list
+	//       or just opening/closing thread handle when needed
 	tracee.tid  = de.dwThreadId;
 	tracee.htid = OpenThread(
 		THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME,
 		FALSE, de.dwThreadId);
+	
 	tracee.status = AdbgProcStatus.paused;
 	adbg_exception_translate(&exception, &de, null);
 } else version (Posix) {
@@ -661,31 +663,6 @@ Lwait:
 	}
 	else exception.fault_address = 0;
 	
-	tracee.status = AdbgProcStatus.paused;
-	adbg_exception_translate(&exception, &tracee.pid, &stopsig);
-} else version (Posix) {
-	int wstatus = void;
-	int stopsig = void;
-Lwait:
-	tracee.pid = waitpid(-1, &wstatus, 0);
-	
-	version (Trace) trace("wstatus=%#x", wstatus);
-	
-	// Something bad happened
-	if (tracee.pid < 0) {
-		tracee.status = AdbgProcStatus.unloaded;
-		tracee.creation = AdbgCreation.unloaded;
-		return adbg_oops(AdbgError.crt);
-	}
-	
-	// If exited or killed by signal, it's gone.
-	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus))
-		goto Lexited;
-	
-	//TODO: Check waitpid status for BSDs
-	stopsig = WEXITSTATUS(wstatus);
-
-	exception.fault_address = 0;	
 	tracee.status = AdbgProcStatus.paused;
 	adbg_exception_translate(&exception, &tracee.pid, &stopsig);
 }
