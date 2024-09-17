@@ -5,6 +5,7 @@
 /// License: BSD-3-Clause-Clear
 module adbg.process.base;
 
+// TODO: Internal process flags (has pid, has thread list, etc.)
 // TODO: Process Pause/Resume
 //       Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
 //       Linux: Send SIGSTOP/SIGCONT signals via kill(2)
@@ -16,14 +17,15 @@ import adbg.error;
 import adbg.process.exception : adbg_exception_t, adbg_exception_translate;
 import adbg.machines;
 import adbg.utils.strings;
-import adbg.utils.list : list_t, adbg_list_free;
+import adbg.utils.list;
 import core.stdc.string;
 
 version (Windows) {
 	import adbg.include.windows.wow64apiset;
 	import adbg.include.windows.psapi_dyn;
 	import adbg.include.windows.winnt;
-	import core.sys.windows.winbase;
+	import adbg.include.windows.winbase;
+	import adbg.include.windows.tlhelp32;
 } else version (Posix) {
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
@@ -91,9 +93,6 @@ struct adbg_process_t {
 	AdbgCreation creation;
 	/// List of threads
 	list_t *thread_list;
-	//TODO: Deprecate and remove static buffer in process struct
-	/// Process base module name.
-	char[ADBG_PROCESS_NAME_LENGTH] name;
 }
 
 void adbg_process_free(adbg_process_t *proc) {
@@ -134,153 +133,68 @@ const(char)* adbg_process_status_string(adbg_process_t *tracee) pure {
 	return m;
 }
 
-/// Get the process' ID;
-/// Params: tracee = Debuggee process.
+/// Get the process ID.
+/// Params: proc = Process instance.
 /// Returns: PID or 0 on error.
-int adbg_process_get_pid(adbg_process_t *tracee) {
-	if (tracee == null) return 0;
-	return tracee.pid;
+int adbg_process_pid(adbg_process_t *proc) {
+	if (proc == null) return 0;
+	return proc.pid;
 }
 
-//TODO: Last parameter could be an enum
-//      AdbgProcNameInclude
-//      - program basename (only)
-//      - program full path
-//      - program full path and command-line arguments
 /// Get the process file path.
 ///
 /// The string is null-terminated.
-/// Bug: On Windows, GetModuleFileNameA causes a crash with MSVC malloc buffers.
 /// Params:
-/// 	pid = Process ID.
+/// 	proc = Process instance.
 /// 	buffer = Buffer.
 /// 	bufsize = Size of the buffer.
-/// 	absolute = Request for absolute path; Otherwise base filename.
 /// Returns: String length; Or zero on error.
-size_t adbg_process_get_name(int pid, char *buffer, size_t bufsize, bool absolute) {
+size_t adbg_process_path(adbg_process_t *proc, char *buffer, size_t bufsize) {
 	version (Trace)
 		trace("pid=%d buffer=%p bufsize=%zd base=%d", pid, buffer, bufsize, absolute);
 	
-	if (pid <= 0 || buffer == null || bufsize == 0) {
+	if (proc == null || buffer == null || bufsize == 0) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
 	
 version (Windows) {
-	if (__dynlib_psapi_load()) // Sets error
-		return 0;
-	
 	// Get process handle
-	HANDLE procHandle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, pid);
-	if (procHandle == null) {
+	HANDLE hproc = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, proc.pid);
+	if (hproc == null) {
 		adbg_oops(AdbgError.os);
 		return 0;
 	}
-	scope(exit) CloseHandle(procHandle);
+	scope(exit) CloseHandle(hproc);
 	
-	//TODO: Try with the following?
-	//      1. 
-	//      GetProcessImageFileNameA + GetModuleHandleA
-	//      + GetModuleBaseNameA <- base=true
-	//      + GetModuleFileNameA <- base=false
-	//      2. 
-	//      GetProcessImageFileNameA
-	//      + cut string manually <- base=true
-	//      + PathGetDriveNumberA <- base=false
-	//
-	//      QueryFullProcessImageName
+	// NOTE: Process path
+	//       GetModuleFileNameA: Requires module handle
+	//       GetProcessImageFileNameA: Returns native path (not Win32 path)
+	//       QueryFullProcessImageNameA: Works fine for now
 	
-	DWORD needed = void;
-	DWORD pidlist = void;
-	if (EnumProcesses(&pidlist, DWORD.sizeof, &needed) == FALSE) {
+	DWORD r = cast(DWORD)bufsize;
+	if (QueryFullProcessImageNameA(hproc, 0, buffer, &r) == FALSE) {
 		adbg_oops(AdbgError.os);
 		return 0;
 	}
-	//TODO: Check every PID to match?
-	HMODULE hmod = void;
-	if (absolute == false && EnumProcessModules(procHandle, &hmod, hmod.sizeof, &needed)) {
-		adbg_oops(AdbgError.os);
-		return 0;
-	}
-	
-	// NOTE: GetModuleFileNameA requires module handle
-	// NOTE: GetProcessImageFileNameA returns native path (not Win32 path)
-	// NOTE: QueryFullProcessImageNameA is Vista and later
-	// Get filename or basename
-	uint bf = cast(uint)bufsize;
-	uint r = absolute ?
-		GetModuleFileNameA(hmod, buffer, bf) :
-		GetModuleBaseNameA(procHandle, hmod, buffer, bf);
-	buffer[r] = 0;
-	if (r == 0) adbg_oops(AdbgError.os);
 	return r;
 } else version (linux) {
 	enum PATHBFSZ = 32; // int.min is "-2147483648", 11 chars
 	char[PATHBFSZ] pathbuf = void; // Path buffer
 	
-	// NOTE: readlink does not append null, this is done later
-	snprintf(pathbuf.ptr, PATHBFSZ, "/proc/%d/exe", pid);
+	// NOTE: procfs process paths
+	//       /exe: Link to executable
+	//       /cmdline: Process command line as invoked
+	//       /comm: Default program name or thread-set name
+	
+	// readlink does not append null, this is done later
+	snprintf(pathbuf.ptr, PATHBFSZ, "/proc/%d/exe", proc.pid);
 	ssize_t r = readlink(pathbuf.ptr, buffer, bufsize);
-	
-	// NOTE: cmdline arguments end with one null byte, and an extra null byte at the very end
-	/*snprintf(pathbuf.ptr, PATHBFSZ, "/proc/%d/cmdline", pid);
-	int cmdlinefd = open(pathbuf.ptr, O_RDONLY);
-	if (cmdlinefd > 0) {
-		r = read(cmdlinefd, buffer, bufsize);
-		if (r <= 0) {
-			adbg_oops(AdbgError.os);
-			return 0;
-		}
-		buffer[r] = 0;
-		close(cmdlinefd);
-	}*/
-	
-	// Error reading /cmdline, retry with /comm
-	// e.g., kthread
-	// NOTE: comm strings can only be up to 16 characters
-	if (r <= 0) {
-		snprintf(pathbuf.ptr, PATHBFSZ, "/proc/%d/comm", pid);
-		int commfd = open(pathbuf.ptr, O_RDONLY);
-		if (commfd == -1) {
-			adbg_oops(AdbgError.os);
-			return 0;
-		}
-		scope(exit) close(commfd);
-		
-		// Read into buffer
-		size_t rdsize = min(bufsize, 16); // Can only read up to 16 chars
-		r = read(commfd, buffer, rdsize);
-		if (r < 0) {
-			adbg_oops(AdbgError.os);
-			return 0;
-		}
-		buffer[r - 1] = 0; // Delete newline
-		
-		// Return now since comm values aren't worth path manipulation
-		return r;
+	if (r < 0) {
+		adbg_oops(AdbgError.crt);
+		return 0;
 	}
-	
-	// Base path requested and got absolute instead
-	// e.g. /usr/bin/cat to cat
-	if (absolute == false && buffer[0] == '/') {
-		// Find the last occurance of '/'
-		char *last = strrchr(buffer, '/');
-		if (last == null) {
-			adbg_oops(AdbgError.assertion);
-			return 0;
-		}
-		++last; // We're looking past '/'
-		
-		// Write into buffer
-		for (r = 0; last[r]; ++r)
-			buffer[r] = last[r];
-	} 
-	//TODO: Name is not absolute, search in PATH
-	/* else if (absolute && buffer[0] != '/') {
-		
-	}*/
-
-	buffer[r < bufsize ? r : r - 1] = 0;
+	buffer[r] = 0;
 	return r;
 } else {
 	adbg_oops(AdbgError.unimplemented);
@@ -307,65 +221,55 @@ AdbgMachine adbg_process_get_machine(adbg_process_t *tracee) {
 	return adbg_machine_default();
 }
 
-// TODO: Switch to adbg.utils.list
-/// Get a list of process IDs running.
-///
-/// This function allocates memory. The list passed will need to be closed
-/// using `free(3)`. To get the name of a process, call `adbg_process_get_name`.
-///
-/// Windows: The list is populated by system order using `EnumProcesses`.
-/// Linux: The list is populated by process ID using procfs.
-///
-/// Params:
-/// 	count = Process list structure instance.
-/// 	... = Options, terminated by 0.
-/// Returns: List of PIDs; Or null on error.
-int* adbg_process_list(size_t *count, ...) {
-	if (count == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	enum CAPACITY = 5_000; // * 4 = ~20K
-	
-	int *plist = void;
-	
+/// Create a list of processes running on the system.
+/// Returns: Internal list; Or null on error.
+void* adbg_process_list_new() {
+	enum INITCAP = 32;
 version (Windows) {
-	if (__dynlib_psapi_load())
+	list_t *list = adbg_list_new(adbg_process_t.sizeof, INITCAP);
+	if (list == null)
 		return null;
 	
-	// Allocate temp PID buffer
-	uint hsize = cast(uint)(CAPACITY * HMODULE.sizeof);
-	DWORD *pidlist = cast(DWORD*)malloc(hsize);
-	if (pidlist == null) {
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
-	scope(exit) free(pidlist);
-	
-	// Enumerate processes
-	// Note that "needed" is reusable after getting the count
-	//TODO: Adjust temporary buffer after calling this
-	DWORD needed = void;
-	if (EnumProcesses(pidlist, hsize, &needed) == FALSE) {
+	// NOTE: CreateToolhelp32Snapshot is preferred over EnumProcesses, because:
+	//       - There is no additional buffer to create.
+	//       - The list is already ordered.
+	//       - Using NtQuerySystemInformation would be clunky.
+	//         https://gist.github.com/hasherezade/c3f82fb3099fb5d1afd84c9e8831af1e
+	HANDLE hsnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+	if (hsnap == INVALID_HANDLE_VALUE) {
+		adbg_list_free(list);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
-	DWORD proccount = needed / DWORD.sizeof;
+	scope(exit) CloseHandle(hsnap);
 	
-	plist = cast(int*)malloc(proccount * int.sizeof);
-	if (plist == null) {
-		adbg_oops(AdbgError.crt);
+	PROCESSENTRY32 proc = void;
+	if (Process32First(hsnap, &proc) == FALSE) {
+		adbg_list_free(list);
+		adbg_oops(AdbgError.os);
 		return null;
 	}
 	
-	// Skip PID 0 (idle) and 4 (system)
-	enum SKIP = 2;
-	memcpy(plist, pidlist + SKIP, (proccount * DWORD.sizeof) - (SKIP * DWORD.sizeof));
-	*count = proccount - SKIP;
+	adbg_process_t t = void;
+	memset(&t, 0, adbg_process_t.sizeof);
+	do {
+		// Ignore Idle and System
+		switch (proc.th32ProcessID) {
+		case 0, 4: continue;
+		default:
+		}
+		
+		t.pid = proc.th32ProcessID;
+		t.hpid = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, proc.th32ProcessID);
+		list = adbg_list_add(list, &t);
+	} while (Process32Next(hsnap, &proc));
+	
+	return list;
 } else version (linux) {
-	// Count amount of entries to allocate
-	size_t cnt; // minimum amount of entries
+	list_t *list = adbg_list_new(adbg_process_t.sizeof, INITCAP);
+	if (list == null)
+		return null;
+	
 	DIR *procfd = opendir("/proc");
 	if (procfd == null) {
 		adbg_oops(AdbgError.crt);
@@ -373,6 +277,9 @@ version (Windows) {
 	}
 	scope (exit) closedir(procfd);
 	
+	// Populate list
+	adbg_process_t t = void;
+	memset(&t, 0, adbg_process_t.sizeof);
 	for (dirent *procent = void; (procent = readdir(procfd)) != null;) {
 		// If not directory starting with a digit, skip entry
 		if (procent.d_type != DT_DIR)
@@ -380,241 +287,31 @@ version (Windows) {
 		if (isdigit(procent.d_name[0]) == 0)
 			continue;
 		
-		++cnt;
+		t.pid = atoi(procent.d_name.ptr);
+		list = adbg_list_add(list, &t);
 	}
-	
-	// Allocate list
-	plist = cast(int*)malloc(cnt * int.sizeof);
-	if (plist == null) {
-		adbg_oops(AdbgError.crt);
+	return list;
+} else {
+	adbg_oops(AdbgError.unimplemented);
+	return null;
+}
+}
+
+/// Get a process out of a list created by `adbg_process_list_new`.
+/// Params:
+/// 	proclist = List instance.
+/// 	index = Item index.
+/// Returns: Process instance pointer; Or null on error.
+adbg_process_t* adbg_process_list_get(void *proclist, size_t index) {
+	if (proclist == null) {
+		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	*count = cnt;
-	
-	// Populate list
-	rewinddir(procfd);
-	size_t i;
-	for (dirent *procent = void; (procent = readdir(procfd)) != null;) {
-		// If not directory starting with a digit, skip entry
-		if (procent.d_type != DT_DIR)
-			continue;
-		if (isdigit(procent.d_name[0]) == 0)
-			continue;
-		
-		// Set PID
-		plist[i++] = atoi(procent.d_name.ptr);
-	}
+	return cast(adbg_process_t*)adbg_list_get(cast(list_t*)proclist, index);
 }
 
-	return plist;
-}
-
-//TODO: Deprecate process enumeration routines
-
-/// Options for adbg_process_enumerate.
-enum AdbgProcessEnumerateOption {
-	/// Set the size of the dynamic buffer for the list of processes.
-	/// Default: 1000
-	/// Type: uint
-	capcity = 1,
-	/// This option is not yet implemented.
-	sort = 2,
-}
-/// Sort option for AdbgProcessEnumerateOption.sort.
-enum AdbgProcessEnumerateSort {
-	/// Sort processes by system (Windows' default).
-	system,
-	/// Sort processes by ID (Linux's default).
-	id,
-	/// Sort processes by basename.
-	process,
-}
-
-/// Structure used with `adbg_process_enumerate`.
-///
-/// This holds the list of processes and a count.
-struct adbg_process_list_t {
-	/// Allocated list of processes.
-	adbg_process_t *processes;
-	/// Number of processes.
-	size_t count;
-}
-/// Enumerate running processes.
-///
-/// This function allocates memory. The list passed will need to be closed
-/// using `adbg_process_enumerate_close`.
-///
-/// On Windows, the list is populated by system order using `EnumProcesses`.
-/// On Linux, the list is populated by process ID using procfs.
-///
-/// Params:
-/// 	list = Process list structure instance.
-/// 	... = Options, terminated by 0.
-/// Returns: Zero for success; Or error code.
-int adbg_process_enumerate(adbg_process_list_t *list, ...) {
-	// NOTE: KEEP THIS FUNCTION AROUND AND DO NOT TOUCH IT
-	//
-	//       This function *must* be kept around until I understand why both
-	//       GetModuleBaseNameA and GetModuleFileNameA work here but not
-	//       when used separaterely from EnumProcesses/EnumProcessModules.
-	//
-	//       Also, on Linux, this somehow gets the comm value, while
-	//       the new function does not.
-	
-	if (list == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	
-	/// Default fixed buffer size.
-	enum DEFAULT_CAPACITY = 1000;
-	
-	va_list options = void;
-	va_start(options, list);
-	uint capacity = DEFAULT_CAPACITY;
-L_OPTION:
-	switch (va_arg!int(options)) {
-	case 0: break;
-	case AdbgProcessEnumerateOption.capcity:
-		capacity = va_arg!uint(options);
-		if (capacity <= 0)
-			return adbg_oops(AdbgError.invalidValue);
-		goto L_OPTION;
-	default:
-		return adbg_oops(AdbgError.invalidOption);
-	}
-	
-	// Allocate main buffer
-	list.processes = cast(adbg_process_t*)malloc(capacity * adbg_process_t.sizeof);
-	if (list.processes == null)
-		return adbg_oops(AdbgError.crt);
-	
-	version (Windows) {
-		if (__dynlib_psapi_load()) {
-			free(list.processes);
-			return adbg_errno();
-		}
-		
-		// Allocate temp PID buffer
-		uint hsize = cast(uint)(capacity * HMODULE.sizeof);
-		DWORD *pidlist = cast(DWORD*)malloc(hsize);
-		if (pidlist == null) {
-			free(list.processes);
-			return adbg_oops(AdbgError.crt);
-		}
-		scope(exit) free(pidlist);
-		
-		// Enumerate processes
-		// Note that "needed" is reusable after getting the count
-		DWORD needed = void;
-		if (EnumProcesses(pidlist, hsize, &needed) == FALSE) {
-			free(pidlist);
-			return adbg_oops(AdbgError.os);
-		}
-		DWORD proccount = needed / DWORD.sizeof;
-		size_t count; /// Final count
-		for (DWORD i; i < proccount && count < capacity; ++i) {
-			int pid = pidlist[i];
-			
-			HANDLE procHandle = OpenProcess(
-				PROCESS_QUERY_INFORMATION | PROCESS_VM_READ,
-				FALSE, pid);
-			if (procHandle == null)
-				continue;
-			
-			adbg_process_t *proc = &list.processes[count++];
-			proc.pid = pid;
-			proc.hpid = procHandle;
-			proc.tid = 0;
-			
-			//TODO: Is EnumProcessModules really necessary?
-			HMODULE hmod = void;
-			if (EnumProcessModules(procHandle, &hmod, hmod.sizeof, &needed)) {
-				proc.hpid = hmod;
-				
-				DWORD len = GetModuleBaseNameA(
-					procHandle, hmod, proc.name.ptr, ADBG_PROCESS_NAME_LENGTH);
-				if (len > 0) {
-					proc.name[len] = 0;
-				} else {
-					goto L_NONAME;
-				}
-			} else {
-			L_NONAME:
-				strcpy(proc.name.ptr, "<unknown>");
-				proc.hpid = null;
-			}
-			
-			CloseHandle(procHandle);
-		}
-		list.count = count;
-		return 0;
-	} else version (linux) {
-		//TODO: Consider pre-running /proc to get initial count
-		size_t count;
-		DIR *procfd = opendir("/proc");
-		for (dirent *procent = void; (procent = readdir(procfd)) != null;) {
-			// If not directory starting with a digit, skip entry
-			if (procent.d_type != DT_DIR)
-				continue;
-			if (isdigit(procent.d_name[0]) == 0)
-				continue;
-			
-			/// Minimum read size, avoid overwriting
-			enum READSZ = MIN!(adbg_process_t.name.sizeof, dirent.d_name.sizeof);
-			
-			// Set PID
-			adbg_process_t *proc = &list.processes[count++];
-			proc.pid = atoi(procent.d_name.ptr);
-			
-			// Read /cmdline into process.name buffer
-			enum TBUFSZ = 32;
-			char[TBUFSZ] proc_comm = void; // Path buffer
-			snprintf(proc_comm.ptr, TBUFSZ, "/proc/%s/cmdline", procent.d_name.ptr);
-			int cmdlinefd = open(proc_comm.ptr, O_RDONLY);
-			if (cmdlinefd == -1)
-				continue;
-			scope(exit) close(cmdlinefd);
-			ssize_t r = read(cmdlinefd, proc.name.ptr, READSZ);
-			
-			// Get a baseline from /cmdline or /comm
-			if (procent.d_name[0] && r > 0) { // /cmdline populated
-				// NOTE: Yes, dangerous, but works under Glibc and musl.
-				//TODO: Test under Bionic, uClibc, etc.
-				strcpy(proc.name.ptr, basename(proc.name.ptr));
-			} else { // /cmdline empty, retrying with /comm
-				snprintf(proc_comm.ptr, TBUFSZ, "/proc/%s/comm", procent.d_name.ptr);
-				int commfd = open(proc_comm.ptr, O_RDONLY);
-				if (commfd == -1)
-					continue;
-				scope(exit) close(commfd);
-				r = read(commfd, proc.name.ptr, READSZ);
-				if (r < 0)
-					continue;
-				proc.name[r - 1] = 0; // Delete newline
-			}
-		}
-		list.count = count;
-		return 0;
-	} else {
-		return adbg_oops(AdbgError.unimplemented);
-	}
-}
-
-unittest {
-	adbg_process_list_t list = void;
-	assert(adbg_process_enumerate(&list, 0) == 0);
-	version (TestVerbose) {
-		import core.stdc.stdio : printf;
-		foreach (adbg_process_t proc; list.processes[0..list.count]) {
-			printf("%5u %s\n",
-				adbg_process_get_pid(&proc),
-				proc.name.ptr);
-		}
-	}
-	assert(list.count);
-	adbg_process_enumerate_close(&list);
-}
-
-void adbg_process_enumerate_close(adbg_process_list_t *list) {
-	if (list == null) return;
-	if (list.processes) free(list.processes);
+/// Close the process list created by `adbg_process_list_new`.
+/// Params: proclist = List instance.
+void adbg_process_list_close(void *proclist) {
+	if (proclist) adbg_list_free(cast(list_t*)proclist);
 }

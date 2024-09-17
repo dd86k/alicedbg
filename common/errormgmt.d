@@ -70,7 +70,7 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 	printf(
 	"Exception  : %s\n"~
 	"PID        : %d\n",
-	adbg_exception_name(ex), adbg_process_get_pid(proc));
+	adbg_exception_name(ex), adbg_process_pid(proc));
 	
 	//TODO: Get thread context
 	

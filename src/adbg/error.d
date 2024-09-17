@@ -28,8 +28,7 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 //      adbg_ensure_params(lvalue, "name")
 //      - returns string if null found
 //      - automatically set error code
-//      adbg_oops_p(AdbgError, void*)
-//      - returns null
+//      adbg_oops_ptr(AdbgError, void*) to return null
 //TODO: Localize error messages as option (including system ones, when able)
 
 extern (C):

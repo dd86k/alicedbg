@@ -18,9 +18,6 @@ import common.cli : opt_syntax;
 import common.utils;
 import term;
 
-// Enable new process name, although it is currently broken on Windows
-//version = UseNewProcessName
-
 extern (C):
 
 /// 
@@ -1091,48 +1088,24 @@ int command_rescan(int argc, const(char) **argv) {
 }
 
 int command_plist(int argc, const(char) **argv) {
-	// Disabled until adbg_process_get_name works on Windows
-version (UseNewProcessName) {
-	size_t count = void;
-	int *plist = adbg_process_list(&count, 0);
-	if (plist == null)
+	void* proclist = adbg_process_list_new();
+	if (proclist == null)
 		return ShellError.alicedbg;
 	
+	puts("PID         Name");
 	enum BUFFERSIZE = 2048;
 	char[BUFFERSIZE] buffer = void;
-	
-	version (Trace)
-		trace("count=%zd", count);
-	
-	puts("PID         Name");
-	foreach (int pid; plist[0..count]) {
-		printf("%10d  ", pid);
-		if (adbg_process_get_name(pid, buffer.ptr, BUFFERSIZE, true)) {
-			puts(buffer.ptr);
+	adbg_process_t *proc = void;
+	for (size_t i; (proc = adbg_process_list_get(proclist, i)) != null; ++i) {
+		printf("%10d  ", adbg_process_pid(proc));
+		if (adbg_process_path(proc, buffer.ptr, BUFFERSIZE)) {
+			version (Trace) trace("error: %s", adbg_error_message());
+			else            putchar('\n');
 			continue;
 		}
-		if (adbg_process_get_name(pid, buffer.ptr, BUFFERSIZE, false)) {
-			puts(buffer.ptr);
-			continue;
-		}
-		version (Trace)
-			trace("error: %s", adbg_error_message());
-		putchar('\n');
+		puts(buffer.ptr);
 	}
-	
-	free(plist);
-} else {
-	adbg_process_list_t list = void;
-	if (adbg_process_enumerate(&list, 0)) {
-		return ShellError.alicedbg;
-	}
-	
-	puts("PID         Name");
-	foreach (adbg_process_t proc; list.processes[0..list.count]) {
-		printf("%10d  %s\n", proc.pid, proc.name.ptr);
-	}
-}
-	
+	adbg_process_list_close(proclist);
 	return 0;
 }
 

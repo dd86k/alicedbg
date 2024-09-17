@@ -89,6 +89,8 @@ version (Windows):
 
 public import core.sys.windows.winnt;
 
+enum PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
 align(16) struct M128A {
     ulong Low;
     long High;
