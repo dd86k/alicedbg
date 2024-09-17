@@ -721,27 +721,21 @@ Lexited:
 int adbg_debugger_terminate(adbg_process_t *tracee) {
 	if (tracee == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (tracee.creation == AdbgCreation.unloaded)
+	if (tracee.creation == AdbgCreation.unloaded || tracee.pid == 0)
 		return adbg_oops(AdbgError.debuggerUnattached);
-	if (tracee.pid == 0)
-		return adbg_oops(AdbgError.debuggerUnattached);
-	
-	tracee.status = AdbgProcStatus.unloaded; // exited in any case
-	tracee.creation = AdbgCreation.unloaded;
-	scope(exit) {
-		version (Windows) if (tracee.args) free(tracee.args);
-		version (Posix) if (tracee.argv) free(tracee.argv);
-		free(tracee);
-	}
 	
 version (Windows) {
-	if (ContinueDebugEvent(tracee.pid, tracee.tid, DBG_TERMINATE_PROCESS) == FALSE)
+	// NOTE: ContinueDebugEvent
+	//       Before using TerminateProcess,
+	//       ContinueDebugEvent(pid, tid, DBG_TERMINATE_PROCESS)
+	//       was used instead. I forgot where I saw that example. MSDN does not feature it.
+	if (TerminateProcess(tracee.hpid, DBG_TERMINATE_PROCESS) == FALSE)
 		return adbg_oops(AdbgError.os);
 } else {
 	if (kill(tracee.pid, SIGKILL) < 0) // PT_KILL is deprecated on Linux
 		return adbg_oops(AdbgError.os);
 }
-	
+	adbg_process_free(tracee);
 	return 0;
 }
 
