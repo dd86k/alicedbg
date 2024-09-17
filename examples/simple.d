@@ -68,7 +68,7 @@ int main(int argc, const(char) **argv) {
 	if (process == null)
 		die;
 	
-	dis = adbg_dis_open(adbg_process_get_machine(process));
+	dis = adbg_dis_open(adbg_process_machine(process));
 	if (dis == null)
 		printf("warning: Disassembler unavailable (%s)\n", adbg_error_message());
 	

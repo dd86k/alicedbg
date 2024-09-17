@@ -526,7 +526,7 @@ int shell_proc_spawn(const(char) *exec, const(char) **argv) {
 	putchar('\n');
 	
 	// Open disassembler for process machine type
-	dis = adbg_dis_open(adbg_process_get_machine(process));
+	dis = adbg_dis_open(adbg_process_machine(process));
 	if (dis == null)
 		logwarn("Disassembler not available (%s)", adbg_error_message());
 	
@@ -546,7 +546,7 @@ int shell_proc_attach(int pid) {
 	puts("Debugger attached.");
 	
 	// Open disassembler for process machine type
-	dis = adbg_dis_open(adbg_process_get_machine(process));
+	dis = adbg_dis_open(adbg_process_machine(process));
 	if (dis) {
 		if (opt_syntax)
 			adbg_dis_options(dis, AdbgDisOpt.syntax, opt_syntax, 0);

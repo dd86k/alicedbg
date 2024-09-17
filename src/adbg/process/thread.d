@@ -87,7 +87,7 @@ version (Windows) {
 	
 	adbg_list_clear(process.thread_list);
 	adbg_thread_t t = void;
-	adbg_thread_context_config(&t.context, adbg_process_get_machine(process));
+	adbg_thread_context_config(&t.context, adbg_process_machine(process));
 	do {
 		if (te32.th32OwnerProcessID != process.pid)
 			continue;
@@ -138,7 +138,7 @@ version (Windows) {
 	// Go through kernel thread IDs
 	adbg_list_clear(process.thread_list);
 	adbg_thread_t t = void;
-	adbg_thread_context_config(&t.context, adbg_process_get_machine(process));
+	adbg_thread_context_config(&t.context, adbg_process_machine(process));
 	for (dirent *entry = void; (entry = readdir(procfd)) != null;) {
 		// readdir() includes "." and "..", skip them
 		if (isdigit(entry.d_name[0]) == 0)
@@ -523,7 +523,7 @@ int adbg_thread_context_update(adbg_process_t *proc, adbg_thread_t *thread) {
 		return adbg_oops(AdbgError.invalidArgument);
 	
 version (Win64) {
-	AdbgMachine mach = adbg_process_get_machine(proc);
+	AdbgMachine mach = adbg_process_machine(proc);
 	version (X86_64) switch (mach) {
 	case AdbgMachine.amd64:
 		CONTEXT_X64 winctx = void; // CONTEXT

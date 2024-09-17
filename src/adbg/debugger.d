@@ -20,6 +20,7 @@ version (Windows) {
 	import adbg.include.windows.psapi_dyn;
 	import adbg.include.windows.winnt;
 	import core.sys.windows.winbase;
+	import adbg.machines;
 } else version (Posix) {
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
@@ -231,23 +232,6 @@ version (Windows) {
 	proc.htid = pi.hThread;
 	proc.pid = pi.dwProcessId;
 	proc.tid = pi.dwThreadId;
-	
-	// Microsoft recommends getting function pointer with
-	// GetProcAddress("kernel32", "IsWow64Process"), but so far
-	// all 64-bit versions of Windows have WOW64 (does Embedded too?).
-	// Nevertheless, required to support 32-bit processes under
-	// 64-bit builds.
-	//TODO: IsWow64Process2 support
-	//      with GetProcAddress("kernel32", "IsWow64Process2")
-	//      Introduced in Windows 10, version 1511
-	//      IsWow64Process: 32-bit proc. under aarch64 returns FALSE
-	// NOTE: Could be moved to adbg_process_get_machine
-	version (Win64)
-	if (IsWow64Process(proc.hpid, &proc.wow64) == FALSE) {
-		adbg_process_free(proc);
-		adbg_oops(AdbgError.os);
-		return null;
-	}
 	
 	proc.status = AdbgProcStatus.standby;
 	proc.creation = AdbgCreation.spawned;
@@ -773,12 +757,12 @@ version (Windows) {
 }
 
 /// Performs an instruction step for the debuggee process.
-/// Params: tracee = Process being debugged.
+/// Params: proc = Process being debugged.
 /// Returns: Error code.
-int adbg_debugger_stepi(adbg_process_t *tracee) {
-	if (tracee == null)
+int adbg_debugger_stepi(adbg_process_t *proc) {
+	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (tracee.creation == AdbgCreation.unloaded)
+	if (proc.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
 version (Windows) {
@@ -786,36 +770,36 @@ version (Windows) {
 	
 	// Enable single-stepping via Trap flag
 	version (Win64) 
-	if (tracee.wow64) {
+	if (adbg_process_machine(proc) == AdbgMachine.i386) {
 		WOW64_CONTEXT winctxwow64 = void;
 		winctxwow64.ContextFlags = CONTEXT_CONTROL;
-		Wow64GetThreadContext(tracee.htid, &winctxwow64);
+		Wow64GetThreadContext(proc.htid, &winctxwow64);
 		winctxwow64.EFlags |= EFLAGS_TF;
-		Wow64SetThreadContext(tracee.htid, &winctxwow64);
-		FlushInstructionCache(tracee.hpid, null, 0);
+		Wow64SetThreadContext(proc.htid, &winctxwow64);
+		FlushInstructionCache(proc.hpid, null, 0);
 		
-		return adbg_debugger_continue(tracee);
+		return adbg_debugger_continue(proc);
 	}
 	
 	// X86, AMD64
 	CONTEXT winctx = void;
 	winctx.ContextFlags = CONTEXT_ALL;
-	GetThreadContext(tracee.htid, cast(LPCONTEXT)&winctx);
+	GetThreadContext(proc.htid, cast(LPCONTEXT)&winctx);
 	winctx.EFlags |= EFLAGS_TF;
-	SetThreadContext(tracee.htid, cast(LPCONTEXT)&winctx);
-	FlushInstructionCache(tracee.hpid, null, 0);
+	SetThreadContext(proc.htid, cast(LPCONTEXT)&winctx);
+	FlushInstructionCache(proc.hpid, null, 0);
 	
-	return adbg_debugger_continue(tracee);
+	return adbg_debugger_continue(proc);
 } else version (linux) {
-	if (ptrace(PT_SINGLESTEP, tracee.pid, null, null) < 0) {
-		tracee.status = AdbgProcStatus.unknown;
+	if (ptrace(PT_SINGLESTEP, proc.pid, null, null) < 0) {
+		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 	
 	return 0;
 } else {
-	if (ptrace(PT_STEP, tracee.pid, null, 0) < 0) {
-		tracee.status = AdbgProcStatus.unknown;
+	if (ptrace(PT_STEP, proc.pid, null, 0) < 0) {
+		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 	

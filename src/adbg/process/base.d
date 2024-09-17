@@ -38,6 +38,7 @@ version (Windows) {
 	import core.sys.posix.libgen : basename;
 	import adbg.include.c.stdio;  // snprintf;
 	import adbg.platform : ADBG_CHILD_STACK_SIZE;
+	import adbg.include.linux.personality;
 }
 
 //version (CRuntime_Glibc)
@@ -71,13 +72,11 @@ enum ADBG_PROCESS_NAME_LENGTH = 256;
 struct adbg_process_t {
 	version (Windows) { // Original identifiers; Otherwise informal
 		int pid;	/// Process identificiation number
-		deprecated int tid;	/// Thread identification number
 		HANDLE hpid;	/// Process handle
-		deprecated HANDLE htid;	/// Thread handle
 		char *args;	/// Saved arguments when process was launched
-		// TODO: Deprecate and remove wow64 field
-		//       Make function to query process machine type
-		version (Win64) deprecated int wow64;
+		// TODO: Deprecate tid and htid to rely on adbg_thread_t
+		int tid;	/// Thread identification number
+		HANDLE htid;	/// Thread handle
 	}
 	version (Posix) {
 		pid_t pid;	/// Process ID
@@ -206,18 +205,37 @@ version (Windows) {
 ///
 /// This is useful when the debugger is dealing with a process running
 /// under a subsystem such as WoW or lib32-on-linux64 programs.
-/// Params: tracee = Debuggee process.
+/// Params: proc = Debuggee process.
 /// Returns: Machine platform.
-AdbgMachine adbg_process_get_machine(adbg_process_t *tracee) {
-	if (tracee == null)
+AdbgMachine adbg_process_machine(adbg_process_t *proc) {
+	if (proc == null)
 		return AdbgMachine.unknown;
 	
-	//TODO: There's probably a way to remotely check this
-	//      Windows: IsWow64Process/IsWow64Process2 with process handle
-	version (Win64) {
-		if (tracee.wow64) return AdbgMachine.i386;
-	}
-	
+version (Win64) {
+	// TODO: Check with IsWow64Process2 when able
+	//       Important for AArch32 support on AArch64
+	//       with GetProcAddress("kernel32", "IsWow64Process2")
+	//       Introduced in Windows 10, version 1511
+	//       IsWow64Process: 32-bit proc. under aarch64 returns FALSE
+	BOOL w64 = void;
+	version (X86_64)  if (IsWow64Process(proc.hpid, &w64) && w64) return AdbgMachine.i386;
+	version (AArch64) if (IsWow64Process(proc.hpid, &w64) && w64) return AdbgMachine.arm;
+}
+version (linux) {
+	char[64] path = void;
+	if (snprintf(path.ptr, 64, "/proc/%d/personality", proc.pid) <= 0)
+		return adbg_machine_default();
+	int fd = open(path.ptr, O_RDONLY);
+	if (fd < 0)
+		return adbg_machine_default();
+	if (read(fd, path.ptr, 8)) // re-use buffer that's no longer needed
+		return adbg_machine_default();
+	path[8] = 0;
+	char *end = void;
+	uint personality = cast(uint)strtol(path.ptr, &end, 16);
+	version (X86_64)  if (personality & ADDR_LIMIT_32BIT) return AdbgMachine.i386;
+	version (AArch64) if (personality & ADDR_LIMIT_32BIT) return AdbgMachine.arm;
+}
 	return adbg_machine_default();
 }
 
@@ -313,5 +331,15 @@ adbg_process_t* adbg_process_list_get(void *proclist, size_t index) {
 /// Close the process list created by `adbg_process_list_new`.
 /// Params: proclist = List instance.
 void adbg_process_list_close(void *proclist) {
-	if (proclist) adbg_list_free(cast(list_t*)proclist);
+	if (proclist == null) return;
+	
+version (Windows) {
+	list_t *list = cast(list_t*)proclist;
+	adbg_process_t *proc = void;
+	for (size_t i; (proc = cast(adbg_process_t*)adbg_list_get(list, i)) != null; ++i) {
+		CloseHandle(proc.hpid);
+	}
+}
+	
+	adbg_list_free(cast(list_t*)proclist);
 }
