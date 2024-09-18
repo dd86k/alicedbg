@@ -5,20 +5,13 @@ Aiming to be a simple cross-platform framework for debugging and object inspecti
 Fully written in D's [BetterC mode](https://dlang.org/spec/betterc.html),
 and available as a DUB package.
 
-Applications:
-- alicedbg: Debugger
-- alicedump: Object dumper
-
-Facilities:
-- Debugger: Exception handling
-- Disassembler: Capstone back-end
-- Object server: Right now, not so much
+It is currently available for Windows, Linux, and FreeBSD.
 
 Written from scratch for educational purposes.
 
 ## Warnings
 
-⚠️ This is a toy project with barely any features ⚠️
+⚠️ This is a toy project with barely any features! ⚠️
 
 There are currently no stable APIs. Every releases pre-1.0 will see frequent
 changes to the API.
