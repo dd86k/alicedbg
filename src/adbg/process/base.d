@@ -153,12 +153,15 @@ int adbg_process_pid(adbg_process_t *proc) {
 /// Returns: String length; Or zero on error.
 size_t adbg_process_path(adbg_process_t *proc, char *buffer, size_t bufsize) {
 	version (Trace)
-		trace("pid=%d buffer=%p bufsize=%zd base=%d", pid, buffer, bufsize, absolute);
+		trace("proc=%p buffer=%p bufsize=%zd", proc, buffer, bufsize);
 	
 	if (proc == null || buffer == null || bufsize == 0) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
+	
+	version (Trace)
+		trace("pd=%d", proc.pid);
 	
 version (Windows) {
 	// Get process handle
@@ -204,6 +207,17 @@ version (Windows) {
 }
 }
 
+version (X86_64) {
+	private enum PERSO32 = AdbgMachine.i386;
+	version (Win64) version = WinPersonality;
+	version (linux) version = LinuxPersonality;
+}
+version (AArch64) {
+	private enum PERSO32 = AdbgMachine.arm;
+	version (Win64) version = WinPersonality; // V2 when IsWow64Process2 avail
+	version (linux) version = LinuxPersonality;
+}
+
 /// Get the current runtime machine platform.
 ///
 /// This is useful when the debugger is dealing with a process running
@@ -214,30 +228,29 @@ AdbgMachine adbg_process_machine(adbg_process_t *proc) {
 	if (proc == null)
 		return AdbgMachine.unknown;
 	
-version (Win64) {
+version (WinPersonality) {
 	// TODO: Check with IsWow64Process2 when able
 	//       Important for AArch32 support on AArch64
 	//       with GetProcAddress("kernel32", "IsWow64Process2")
 	//       Introduced in Windows 10, version 1511
 	//       IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 	BOOL w64 = void;
-	version (X86_64)  if (IsWow64Process(proc.hpid, &w64) && w64) return AdbgMachine.i386;
-	version (AArch64) if (IsWow64Process(proc.hpid, &w64) && w64) return AdbgMachine.arm;
+	if (IsWow64Process(proc.hpid, &w64) && w64) return PERSO32;
 }
-version (linux) {
+version (LinuxPersonality) {
 	char[64] path = void;
 	if (snprintf(path.ptr, 64, "/proc/%d/personality", proc.pid) <= 0)
 		return adbg_machine_default();
 	int fd = open(path.ptr, O_RDONLY);
 	if (fd < 0)
 		return adbg_machine_default();
+	// TODO: Extend to 16 chars just in case
 	if (read(fd, path.ptr, 8)) // re-use buffer that's no longer needed
 		return adbg_machine_default();
 	path[8] = 0;
 	char *end = void;
 	uint personality = cast(uint)strtol(path.ptr, &end, 16);
-	version (X86_64)  if (personality & ADDR_LIMIT_32BIT) return AdbgMachine.i386;
-	version (AArch64) if (personality & ADDR_LIMIT_32BIT) return AdbgMachine.arm;
+	if (personality & ADDR_LIMIT_32BIT) return PERSO32;
 }
 	return adbg_machine_default();
 }
