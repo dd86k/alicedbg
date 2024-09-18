@@ -74,17 +74,33 @@ version (LittleEndian) {
 // ANCHOR Platform information
 //
 
-version (X86) {
+version (X86)
 	enum TARGET_PLATFORM = "x86";	/// Platform string
-} else version (X86_64) {
+else version (X86_64)
 	enum TARGET_PLATFORM = "x86_64";	/// Ditto
-} else version (ARM_Thumb) {
+else version (ARM_Thumb)
 	enum TARGET_PLATFORM = "arm_t32";	/// Ditto
-} else version (ARM) {
+else version (ARM)
 	enum TARGET_PLATFORM = "arm_a32";	/// Ditto
-} else version (AArch64) {
+else version (AArch64)
 	enum TARGET_PLATFORM = "arm_a64";	/// Ditto
-} else
+else version (PPC)
+	enum TARGET_PLATFORM = "powerpc";	/// Ditto
+else version (PPC64)
+	enum TARGET_PLATFORM = "powerpc64";	/// Ditto
+else version (SPARC)
+	enum TARGET_PLATFORM = "sparc";	/// Ditto
+else version (SPARC64)
+	enum TARGET_PLATFORM = "sparc64";	/// Ditto
+else version (S390)
+	enum TARGET_PLATFORM = "s390";	/// Ditto
+else version (SystemZ)
+	enum TARGET_PLATFORM = "systemz";	/// Ditto
+else version (RISCV32)
+	enum TARGET_PLATFORM = "riscv32";	/// Ditto
+else version (RISCV64)
+	enum TARGET_PLATFORM = "riscv64";	/// Ditto
+else
 	static assert(0, "Platform not supported.");
 
 //
@@ -176,14 +192,24 @@ static if (D_FEATURE_TARGETINFO) {
 	else
 		enum TARGET_FLTABI  = "unknown";	/// Ditto
 	
-	version (CppRuntime_Gcc)
-		enum TARGET_CPPRT = "libstdc++";	/// Target C++ Runtime string
-	else version (CppRuntime_Microsoft)
-		enum TARGET_CPPRT = "libcmt";	/// Ditto
-	else version (CppRuntime_Clang)
-		enum TARGET_CPPRT = "clang";	/// Ditto
-	else version (CppRuntime_DigitalMars)
-		enum TARGET_CPPRT = "dmc++";	/// Ditto
+	// NOTE: Deprecated CppRuntime values
+	//       "CppRuntime_Gcc" and "CppRuntime_Clang" version identifiers are
+	//       deprecated. They are now "CppRuntime_GNU" and "CppRuntime_LLVM"
+	//       respectively.
+	//
+	//       Since the old version identifiers are deprecated (2.110), but
+	//       newer than the "getTargetInfo" trait (2.083), the new versions
+	//       will not be used here.
+	//
+	//       However, for clarity, their new names are reflected here.
+	version (CppRuntime_Gcc)	// was "libstdc++"
+		enum TARGET_CPPRT = "gnu";	/// Target C++ Runtime string
+	else version (CppRuntime_Microsoft)	// was "libcmt"
+		enum TARGET_CPPRT = "microsoft";	/// Ditto
+	else version (CppRuntime_Clang)	// was "clang"
+		enum TARGET_CPPRT = "llvm";	/// Ditto
+	else version (CppRuntime_DigitalMars)	// was "dmc++"
+		enum TARGET_CPPRT = "digitalmars";	/// Ditto
 	else version (CppRuntime_Sun)
 		enum TARGET_CPPRT = "sun";	/// Ditto
 	else // assuming none
@@ -254,7 +280,7 @@ immutable(adbg_build_info_t)* adbg_build_info() {
 // See: https://learn.microsoft.com/en-us/windows/win32/dlls/dllmain
 // NOTE: This library avoids the use of TLS whenever possible,
 //       so the need of fixing up TLS entries for Win32 is not needed.
-//       It is performed in DRuntime (core.sys.windows.dll).
+//       Typically, it is performed by druntime (core.sys.windows.dll).
 // NOTE: TLSTable directory is not created for alicedbg.dll.
 version (Windows)
 version (SharedLib) {

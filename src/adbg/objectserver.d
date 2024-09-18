@@ -699,7 +699,7 @@ long adbg_object_filesize(adbg_object_t *o) {
 /// Returns: Machine value.
 AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	if (o == null)
-		return AdbgMachine.native;
+		return AdbgMachine.unknown;
 	
 	// TODO: Turn to function pointer
 	switch (o.format) with (AdbgObject) {
