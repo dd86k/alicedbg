@@ -82,11 +82,6 @@ struct adbg_exception_t {
 	AdbgException type;
 	/// Original OS code (exception or signal value).
 	uint oscode;
-	//TODO: Attach process instead of dedicated pid/tid.
-	/// Process ID.
-	int pid;
-	/// Thread ID, if available; Otherwise zero.
-	int tid;
 	union {
 		/// Faulting address, if available; Otherwise zero.
 		ulong fault_address;
@@ -240,10 +235,9 @@ const(char) *adbg_exception_name(adbg_exception_t *ex) {
 // Used internally for debugger
 void adbg_exception_translate(adbg_exception_t *exception, void *os1, void *os2) {
 version (Windows) {
+	assert(os1);
 	DEBUG_EVENT *de = cast(DEBUG_EVENT*)os1;
 	
-	exception.pid = de.dwProcessId;
-	exception.tid = de.dwThreadId;
 	exception.faultz = cast(size_t)de.Exception.ExceptionRecord.ExceptionAddress;
 	exception.oscode = de.Exception.ExceptionRecord.ExceptionCode;
 	
@@ -257,11 +251,50 @@ version (Windows) {
 		exception.type = adbg_exception_from_os(exception.oscode);
 	}
 } else {
+	assert(os1);
+	assert(os2);
 	int pid = *cast(int*)os1;
 	int signo = *cast(int*)os2;
 	
-	exception.pid = exception.tid = pid;
-	exception.tid = 0;
+	// Get fault address
+	version (linux) {
+		switch (signo) {
+		// NOTE: si_addr is NOT populated under ptrace for SIGTRAP
+		//       - linux does not fill si_addr on a SIGTRAP from a ptrace event
+		//         - see sigaction(2)
+		//       - linux *only* fills user_regs_struct for "user area"
+		//         - see arch/x86/include/asm/user_64.h
+		//         - "ptrace does not yet supply these.  Someday...."
+		//         - So yeah, debug registers and "fault_address" not filled
+		//           - No access to ucontext_t from ptrace either
+		//       - using EIP/RIP is NOT a good idea
+		//         - IP ALWAYS point to NEXT instruction
+		//         - First SIGTRAP does NOT contain int3
+		//           - Windows does, though, and points to it
+		//       - gdbserver and lldb never attempt to do such thing anyway
+		//       - RIP-1 (x86) could *maybe* point to int3 or similar.
+		//       - User area might have DR3, it does have "fault_address"
+		// NOTE: Newer D compilers fixed siginfo_t as a whole
+		//       for version (linux). Noticed on DMD 2.103.1.
+		//       Old glibc: ._sifields._sigfault.si_addr
+		//       Old musl: .__si_fields.__sigfault.si_addr
+		//       New: ._sifields._sigfault.si_addr & .si_addr()
+		// NOTE: .si_addr() emits linker errors on Musl platforms.
+		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
+			siginfo_t siginfo = void;
+			if (ptrace(PT_GETSIGINFO, pid, null, &siginfo) < 0) {
+				exception.fault_address = 0;
+				break;
+			}
+			event.exception.fault_address = cast(size_t)siginfo._sifields._sigfault.si_addr;
+			break;
+		default:
+			event.exception.fault_address = 0;
+		}
+	} else {
+		event.exception.fault_address = 0;
+	}
+	
 	exception.oscode = signo;
 	exception.type = adbg_exception_from_os(signo);
 }

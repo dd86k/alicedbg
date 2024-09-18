@@ -40,7 +40,7 @@ void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
 	"* PID=%u TID=%u\n"~
 	"* FAULT=%8llx",
 	ex.oscode, adbg_exception_name(ex),
-	ex.pid, ex.tid,
+	proc.pid, proc.tid,
 	ex.fault_address
 	);
 	
@@ -96,6 +96,6 @@ LOOP:	// Process input
 		goto LOOP;
 	}
 	
-	adbg_debugger_wait(process, &loop_handler);
+	adbg_debugger_wait(process, &loop_handler, null);
 	goto LOOP;
 }

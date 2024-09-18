@@ -5,7 +5,8 @@
 /// License: BSD-3-Clause-Clear
 module adbg.debugger;
 
-// TODO: adbg_debugger_spawn: Get default child stack size
+// TODO: adbg_debugger_spawn: Get/set default child stack size
+// TODO: High-level disassembly functions (e.g., from exception, etc.)
 
 public import adbg.process.base;
 import adbg.process.exception;
@@ -45,6 +46,7 @@ extern (C):
 /// Debugging events
 enum AdbgEvent {
 	exception,
+	processExit,
 }
 
 version (Posix)
@@ -524,34 +526,69 @@ version (Windows) {
 	return 0;
 }
 
+private struct adbg_debugger_event_t {
+	AdbgEvent type;
+	union {
+		adbg_exception_t exception;
+		int exitcode;
+	}
+}
+
+adbg_exception_t* adbg_debugger_event_exception(void *edata) {
+	if (edata == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	adbg_debugger_event_t *event = cast(adbg_debugger_event_t*)edata;
+	if (event.type != AdbgEvent.exception) {
+		adbg_oops(AdbgError.invalidValue);
+		return null;
+	}
+	
+	return &event.exception;
+}
+
+int* adbg_debugger_event_process_exitcode(void *edata) {
+	if (edata == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	adbg_debugger_event_t *event = cast(adbg_debugger_event_t*)edata;
+	if (event.type != AdbgEvent.exception) {
+		adbg_oops(AdbgError.invalidValue);
+		return null;
+	}
+	
+	return &event.exitcode;
+}
+
 /// Continue execution of the process until a new debug event occurs.
 ///
 /// This call is blocking.
 ///
-/// Windows: Uses WaitForDebugEvent.
-/// Posix: Uses ptrace(2) and waitpid(2), filters SIGCONT out.
+/// It is highly recommended to use the callback's process instance for
+/// debugging services, and to not call this function within the callback.
 ///
+/// After the callback, this function returns.
+///
+/// Windows: Uses WaitForDebugEvent.
+/// Posix: Uses waitpid(2) and ptrace(2), filters SIGCONT out.
 /// Params:
-/// 	tracee = Tracee instance.
-/// 	userfunc = User function callback on event.
+/// 	proc = Tracee instance.
+/// 	ufunc = User function callback on event.
 /// 	udata = User data passed to callback. Can be used to identify requests, for example.
 /// Returns: Error code.
-int adbg_debugger_wait(adbg_process_t *tracee,
-	void function(adbg_process_t *proc, int type, void *data, void *user) userfunc,
-	void *udata) {
-	if (tracee == null || userfunc == null)
+int adbg_debugger_wait(adbg_process_t *proc,
+	void function(adbg_process_t*, int, void*, void*) ufunc, void *udata) {
+	if (proc == null || ufunc == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (tracee.creation == AdbgCreation.unloaded)
+	if (proc.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
-	//TODO: Urgent: The process instance should ideally not be modified
-	//      Changing process information (e.g., PID) can in turn
-	//      be bad news for other API functions (e.g., breakpoints).
-	//
-	//      Children processes should be allocated and attached to exception
-	//      (via adbg_exception_get_process?).
+	adbg_process_t tracee = void;
+	adbg_debugger_event_t event = void;
 	
-	adbg_exception_t exception = void;
+	memset(&tracee, 0, adbg_process_t.sizeof);
 	
 version (Windows) {
 	DEBUG_EVENT de = void;
@@ -559,13 +596,23 @@ Lwait:
 	// Something bad happened
 	if (WaitForDebugEvent(&de, INFINITE) == FALSE) {
 		tracee.status = AdbgProcStatus.unloaded;
-		tracee.creation = AdbgCreation.unloaded;
 		return adbg_oops(AdbgError.os);
 	}
 	
+	version(Trace) trace("EventCode=%#x", de.dwDebugEventCode);
+	
 	// Filter events
 	switch (de.dwDebugEventCode) {
-	case EXCEPTION_DEBUG_EVENT: break;
+	case EXCEPTION_DEBUG_EVENT:
+		event.type = AdbgEvent.exception;
+		tracee.status = AdbgProcStatus.paused;
+		adbg_exception_translate(&event.exception, &de, null);
+		break;
+	case EXIT_PROCESS_DEBUG_EVENT:
+		event.type = AdbgEvent.processExit;
+		tracee.status = AdbgProcStatus.unknown;
+		event.exitcode = de.ExitProcess.dwExitCode;
+		break;
 	/*case CREATE_THREAD_DEBUG_EVENT:
 	case CREATE_PROCESS_DEBUG_EVENT:
 	case EXIT_THREAD_DEBUG_EVENT:
@@ -574,109 +621,63 @@ Lwait:
 	case OUTPUT_DEBUG_STRING_EVENT:
 	case RIP_EVENT:
 		goto default;*/
-	case EXIT_PROCESS_DEBUG_EVENT:
-		goto Lexited;
 	default:
 		ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
 		goto Lwait;
 	}
 	
+	tracee.pid = de.dwProcessId;
+	tracee.tid = de.dwThreadId;
+	
 	// Fixes access to debugger, thread context functions.
 	// Especially when attaching, but should be standard with spawned-in processes too.
-	// TODO: Get rid of hack, replace with refreshing thread list
-	//       or just opening/closing thread handle when needed
-	tracee.tid  = de.dwThreadId;
+	// TODO: Get rid of hack to help multiprocess support
+	//       By opening/closing process+thread handles per debugger function that need it:
+	//       - Help with leaking handles
+	//       - Permissions, since each OS function need different permissions
+	tracee.hpid = OpenProcess(
+		PROCESS_ALL_ACCESS,
+		FALSE, de.dwProcessId);
 	tracee.htid = OpenThread(
 		THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME,
 		FALSE, de.dwThreadId);
 	
-	tracee.status = AdbgProcStatus.paused;
-	adbg_exception_translate(&exception, &de, null);
 } else version (Posix) {
 	int wstatus = void;
-	int stopsig = void;
 Lwait:
 	tracee.pid = waitpid(-1, &wstatus, 0);
 	
-	version (Trace) trace("wstatus=%#x", wstatus);
-	
-	// Something bad happened
-	if (tracee.pid < 0) {
-		tracee.status = AdbgProcStatus.unloaded;
-		tracee.creation = AdbgCreation.unloaded;
+	// Something terrible happened
+	if (tracee.pid < 0)
 		return adbg_oops(AdbgError.crt);
-	}
 	
-	// If exited or killed by signal, it's gone.
-	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus))
-		goto Lexited;
+	version(Trace) trace("wstatus=%#x", wstatus);
 	
-	// Skip glibc "continue" signals.
-	version (CRuntime_Glibc)
-	if (WIFCONTINUED(wstatus))
+	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)) { // Process exited or killed
+		event.type = AdbgEvent.processExit;
+		event.exitcode = WTERMSIG(wstatus);
+	} else if (WIFSTOPPED(wstatus)) { // Process stopped by signal
+		event.type = AdbgEvent.exception;
+		tracee.status = AdbgProcStatus.paused;
+		int sig = WSTOPSIG(wstatus);
+		adbg_exception_translate(&exception, &tracee.pid, &sig);
+	/*
+	} else if (WIFCONTINUED(wstatus)) { // Process continues, ignore these
 		goto Lwait;
-	
-	// Bits  Description (Linux)
-	// 6:0   Signo that caused child to exit
-	//       0x7f if child stopped/continued
-	//       or zero if child exited without signal
-	//  7    Core dumped
-	// 15:8  exit value (or returned main value)
-	//       or signal that cause child to stop/continue
-	stopsig = WEXITSTATUS(wstatus);
-	
-	// Get fault address
-	version (linux) switch (stopsig) {
-	case SIGCONT: goto Lwait;
-	// NOTE: si_addr is NOT populated under ptrace for SIGTRAP
-	//       - linux does not fill si_addr on a SIGTRAP from a ptrace event
-	//         - see sigaction(2)
-	//       - linux *only* fills user_regs_struct for "user area"
-	//         - see arch/x86/include/asm/user_64.h
-	//         - "ptrace does not yet supply these.  Someday...."
-	//         - So yeah, debug registers and "fault_address" not filled
-	//           - No access to ucontext_t from ptrace either
-	//       - using EIP/RIP is NOT a good idea
-	//         - IP ALWAYS point to NEXT instruction
-	//         - First SIGTRAP does NOT contain int3
-	//           - Windows does, though, and points to it
-	//       - gdbserver and lldb never attempt to do such thing anyway
-	//       - RIP-1 (x86) could *maybe* point to int3 or similar.
-	//       - User area might have DR3, it does have "fault_address"
-	// NOTE: Newer D compilers fixed siginfo_t as a whole
-	//       for version (linux). Noticed on DMD 2.103.1.
-	//       Old glibc: ._sifields._sigfault.si_addr
-	//       Old musl: .__si_fields.__sigfault.si_addr
-	//       New: ._sifields._sigfault.si_addr & .si_addr()
-	// NOTE: .si_addr() emits linker errors on Musl platforms.
-	case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
-		siginfo_t sig = void;
-		if (ptrace(PT_GETSIGINFO, tracee.pid, null, &sig) < 0) {
-			exception.fault_address = 0;
-			break;
-		}
-		exception.fault_address = cast(size_t)sig._sifields._sigfault.si_addr;
-		break;
-//	case SIGINT, SIGTERM, SIGABRT: //TODO: Killed?
-	default:
-		exception.fault_address = 0;
+	*/
+	} else {
+		version (Trace) if (!WIFCONTINUED(wstatus)) trace("Unknown status code");
+		goto Lwait;
 	}
-	else exception.fault_address = 0;
-	
-	tracee.status = AdbgProcStatus.paused;
-	adbg_exception_translate(&exception, &tracee.pid, &stopsig);
-}
-	
-	userfunc(tracee, AdbgEvent.exception, &exception, udata);
-	return 0;
+} else static assert(0, "Implement adbg_debugger_wait");
 
-Lexited:
-	tracee.status = AdbgProcStatus.unloaded;
-	tracee.creation = AdbgCreation.unloaded;
+	ufunc(&tracee, event.type, &event, udata);
 	return 0;
 }
 
 /// Disconnect and terminate the debuggee process.
+///
+/// This function frees the process instance on success.
 /// Params: tracee = Process.
 /// Returns: Error code.
 int adbg_debugger_terminate(adbg_process_t *tracee) {
@@ -692,10 +693,11 @@ version (Windows) {
 	//       was used instead. I forgot where I saw that example. MSDN does not feature it.
 	if (TerminateProcess(tracee.hpid, DBG_TERMINATE_PROCESS) == FALSE)
 		return adbg_oops(AdbgError.os);
-} else {
+} else version (Posix) {
 	if (kill(tracee.pid, SIGKILL) < 0) // PT_KILL is deprecated on Linux
 		return adbg_oops(AdbgError.os);
-}
+} else static assert(0, "Implement adbg_debugger_terminate");
+
 	adbg_process_free(tracee);
 	return 0;
 }
@@ -723,12 +725,12 @@ version (Windows) {
 		tracee.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
-} else {
+} else version (Posix) {
 	if (ptrace(PT_CONTINUE, tracee.pid, null, 0) < 0) {
 		tracee.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
-}
+} else static assert(0, "Implement adbg_debugger_continue");
 	
 	return 0;
 }

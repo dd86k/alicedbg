@@ -603,11 +603,12 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 void shell_event_exception(adbg_process_t *proc, int event, void *edata, void *udata) {
 	switch (event) with (AdbgEvent) {
 	case exception:
-		adbg_exception_t *ex = cast(adbg_exception_t*)edata;
+		adbg_exception_t *ex = adbg_debugger_event_exception(edata);
+		assert(ex);
 		
 		printf("*	Process %d (thread %d) stopped\n"~
 			"	Reason  : %s ("~ADBG_OS_ERROR_FORMAT~")\n",
-			ex.pid, ex.tid,
+			proc.pid, proc.tid,
 			adbg_exception_name(ex), ex.oscode);
 		
 		// No fault address available
@@ -647,13 +648,18 @@ void shell_event_exception(adbg_process_t *proc, int event, void *edata, void *u
 			printf(" %s", op.operands);
 		putchar('\n');
 		return;
+	case processExit:
+		int *exitcode = adbg_debugger_event_process_exitcode(edata);
+		assert(exitcode);
+		printf("* Process exited with code %d\n", *exitcode);
+		return;
 	default:
 	}
 }
 
 void shell_event_help(immutable(command2_t) *command) {
 	// Print header
-	int p = 34;
+	int p = 34; // horizontal alignment padding
 	for (size_t i; i < command.names.length; ++i) {
 		if (i) {
 			printf(", ");

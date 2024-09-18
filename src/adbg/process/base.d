@@ -5,7 +5,8 @@
 /// License: BSD-3-Clause-Clear
 module adbg.process.base;
 
-// TODO: Internal process flags (has pid, has thread list, etc.)
+// TODO: Internal process flags
+//       Has memory handle, process-debugger relation, debugger/process options, etc.
 // TODO: Process Pause/Resume
 //       Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
 //       Linux: Send SIGSTOP/SIGCONT signals via kill(2)
@@ -41,9 +42,6 @@ version (Windows) {
 	import adbg.include.linux.personality;
 }
 
-//version (CRuntime_Glibc)
-//	version = USE_CLONE;
-
 extern (C):
 
 /// Process status
@@ -65,27 +63,29 @@ enum AdbgCreation : ubyte {
 	spawned,
 }
 
-//TODO: Deprecate and remove static buffer in process struct
-enum ADBG_PROCESS_NAME_LENGTH = 256;
-
 /// Represents an instance of a process.
 struct adbg_process_t {
-	version (Windows) { // Original identifiers; Otherwise informal
-		int pid;	/// Process identificiation number
-		HANDLE hpid;	/// Process handle
-		char *args;	/// Saved arguments when process was launched
-		// TODO: Deprecate tid and htid to rely on adbg_thread_t
-		int tid;	/// Thread identification number
-		HANDLE htid;	/// Thread handle
-	}
-	version (Posix) {
-		pid_t pid;	/// Process ID
-		char **argv;	/// Saved arguments when process was launched
-	}
-	version (linux) {
-		int mhandle;	/// Internal memory file handle to /proc/PID/mem
-		bool memfailed;	/// Set if we fail to open /proc/PID/mem
-	}
+version (Windows) { // Original identifiers; Otherwise informal
+	// NOTE: PID and TID usage
+	//       The Process and Thread IDs are used to open handles
+	//       This is done on a per-function basis for permissions
+	//       and memory management (opening and closing handles)
+	//       purposes.
+	int pid;	/// Process identificiation number
+	int tid;	/// Thread identification number
+	char *args;	/// Saved arguments when process was launched
+	// TODO: Deprecate hpid and htid
+	HANDLE htid;	/// Thread handle
+	HANDLE hpid;	/// Process handle
+}
+version (Posix) {
+	pid_t pid;	/// Process ID
+	char **argv;	/// Saved arguments when process was launched
+}
+version (linux) {
+	int mhandle;	/// Internal memory file handle to /proc/PID/mem
+	bool memfailed;	/// Set if we fail to open /proc/PID/mem
+}
 	/// Last known process status.
 	AdbgProcStatus status;
 	/// Process' creation source.
@@ -99,9 +99,12 @@ void adbg_process_free(adbg_process_t *proc) {
 		return;
 	version (Windows) {
 		if (proc.args) free(proc.args);
+		CloseHandle(proc.hpid);
+		CloseHandle(proc.htid);
 	}
 	version (Posix) {
 		if (proc.argv) free(proc.argv);
+		version (linux) if (proc.mhandle) close(proc.mhandle);
 	}
 	adbg_list_free(proc.thread_list);
 	free(proc);
