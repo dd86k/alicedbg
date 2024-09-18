@@ -181,7 +181,7 @@ enum AdbgDisOpt {
 private
 int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 	switch (platform) with (AdbgMachine) {
-	case native: // equals 0
+	case unknown: // No explicit choice, use target defaults
 		cs_arch = CS_DEFAULT_PLATFORM;
 		cs_mode = CS_DEFAULT_MODE;
 		break;
@@ -243,7 +243,7 @@ int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 /// Params:
 ///   machine = Machine architecture.
 /// Returns: Error code.
-adbg_disassembler_t* adbg_dis_open(AdbgMachine machine = AdbgMachine.native) {
+adbg_disassembler_t* adbg_dis_open(AdbgMachine machine = AdbgMachine.unknown) {
 	//TODO: static if (CAPSTONE_DYNAMIC)
 	if (libcapstone_dynload())
 		return null;

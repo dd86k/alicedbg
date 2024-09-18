@@ -14,15 +14,12 @@ import adbg.error;
 // NOTE: Machine enum names are the same as their alias name.
 //       This avoids (mostly) possible collisions.
 
-//TODO: Consider removing "native" as it just confused me with a process function.
-//      There is now a function to get the default machine.
+// TODO: Remove "riscv" value, and force a way to check for bitness (class)
 
 /// Object machine type.
 enum AdbgMachine {
 	/// Unknown.
 	unknown,
-	/// Alias to unknown, used for disassembler, to use default platform.
-	native = unknown,
 	
 	/// Intel x86 16-bit (8086)
 	i8086,
@@ -73,6 +70,8 @@ enum AdbgMachine {
 	spu,
 	/// IBM RS/6000
 	rs6000,
+	/// z/Architecture
+	systemz,
 	
 	/// SPARC
 	sparc,
@@ -510,6 +509,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.s390,   "s390", null, "IBM System/390" },
 	{ AdbgMachine.spu,    "spu", null, "IBM SPU/SPC" },
 	{ AdbgMachine.rs6000, "rs6000", null, "IBM RS/6000" },
+	{ AdbgMachine.systemz,"systemz", null, "IBM z/Architecture" },
 	
 	// Sun Microsystems
 	{ AdbgMachine.sparc,   "sparc", null, "SPARC" },
@@ -750,37 +750,42 @@ immutable adbg_machine_t[] machines = [
 // Target default machine
 //
 
-version (X86) {
-	private enum DEFAULT_MACHINE = AdbgMachine.i386;
-} else version (X86_64) {
-	private enum DEFAULT_MACHINE = AdbgMachine.amd64;
-} else version (Arm) {
-	private enum DEFAULT_MACHINE = AdbgMachine.arm;
-} else version (AArch64) {
-	private enum DEFAULT_MACHINE = AdbgMachine.aarch64;
-} else
-	static assert(false, "Add default machine for target");
+version (X86)		private enum CURRENT_MACHINE = AdbgMachine.i386;
+else version (X86_64)	private enum CURRENT_MACHINE = AdbgMachine.amd64;
+else version (Arm)	private enum CURRENT_MACHINE = AdbgMachine.arm;
+else version (AArch64)	private enum CURRENT_MACHINE = AdbgMachine.aarch64;
+else version (PPC)	private enum CURRENT_MACHINE = AdbgMachine.ppc;
+else version (PPC_SoftFloat)	private enum CURRENT_MACHINE = AdbgMachine.ppcfpu;
+else version (PPC_HardFloat)	private enum CURRENT_MACHINE = AdbgMachine.ppcfpu;
+else version (PPC64)	private enum CURRENT_MACHINE = AdbgMachine.ppc64;
+else version (SPARC)	private enum CURRENT_MACHINE = AdbgMachine.sparc;
+else version (SPARC_V8Plus)	private enum CURRENT_MACHINE = AdbgMachine.sparc8p;
+else version (SPARC64)	private enum CURRENT_MACHINE = AdbgMachine.sparc9;
+else version (S390)	private enum CURRENT_MACHINE = AdbgMachine.s390;
+else version (SystemZ)	private enum CURRENT_MACHINE = AdbgMachine.systemz;
+else version (RISCV32)	private enum CURRENT_MACHINE = AdbgMachine.riscv32;
+else version (RISCV64)	private enum CURRENT_MACHINE = AdbgMachine.riscv64;
+else static assert(false, "Add CURRENT_MACHINE for target");
 
-/// Return the target machine default.
+/// Return the current machine target type.
 ///
-/// For example, if this binary was compiled on and AMD64 machine,
-/// then this function returns the amd64 value.
+/// For example, if this binary was compiled targetting AMD64 machines,
+/// it will return amd64. If it targetted RISC-V 32-bit, then riscv32
+/// will be returned
 /// Returns: Machine value.
-AdbgMachine adbg_machine_default() {
-	return DEFAULT_MACHINE;
-}
+AdbgMachine adbg_machine_current() { return CURRENT_MACHINE; }
+// Old alias
+alias adbg_machine_default = adbg_machine_current;
 
 /// Get the number of registered machine platforms.
 /// Returns: Count.
-size_t adbg_machine_count() {
-	return machines.length;
-}
+size_t adbg_machine_count() { return machines.length; }
 
 /// Select a machine architecture from an machine enum value.
 /// Params: mach = Machine enumeration value.
 /// Returns: Machine pointer or null.
 immutable(adbg_machine_t)* adbg_machine(AdbgMachine mach) {
-	size_t i = cast(size_t)(mach - 1);
+	size_t i = cast(size_t)(mach - 1); // Skip "unknown"
 	if (i >= machines.length) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
