@@ -660,7 +660,7 @@ Lwait:
 		event.type = AdbgEvent.exception;
 		tracee.status = AdbgProcStatus.paused;
 		int sig = WSTOPSIG(wstatus);
-		adbg_exception_translate(&exception, &tracee.pid, &sig);
+		adbg_exception_translate(&event.exception, &tracee.pid, &sig);
 	/*
 	} else if (WIFCONTINUED(wstatus)) { // Process continues, ignore these
 		goto Lwait;

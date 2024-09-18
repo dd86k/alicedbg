@@ -26,6 +26,7 @@ version (Windows) {
 	}
 } else version (Posix) {
 	import core.sys.posix.signal;
+	import adbg.include.posix.ptrace;
 	
 	private enum SEGV_BNDERR = 3;
 }
@@ -286,13 +287,13 @@ version (Windows) {
 				exception.fault_address = 0;
 				break;
 			}
-			event.exception.fault_address = cast(size_t)siginfo._sifields._sigfault.si_addr;
+			exception.fault_address = cast(size_t)siginfo._sifields._sigfault.si_addr;
 			break;
 		default:
-			event.exception.fault_address = 0;
+			exception.fault_address = 0;
 		}
 	} else {
-		event.exception.fault_address = 0;
+		exception.fault_address = 0;
 	}
 	
 	exception.oscode = signo;

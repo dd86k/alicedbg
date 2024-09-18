@@ -606,10 +606,18 @@ void shell_event_exception(adbg_process_t *proc, int event, void *edata, void *u
 		adbg_exception_t *ex = adbg_debugger_event_exception(edata);
 		assert(ex);
 		
+		// HACK: Currently have no way to determine remote associated thread
+		version (Windows)
 		printf("*	Process %d (thread %d) stopped\n"~
 			"	Reason  : %s ("~ADBG_OS_ERROR_FORMAT~")\n",
 			proc.pid, proc.tid,
 			adbg_exception_name(ex), ex.oscode);
+		else
+		printf("*	Process %d stopped\n"~
+			"	Reason  : %s ("~ADBG_OS_ERROR_FORMAT~")\n",
+			proc.pid,
+			adbg_exception_name(ex), ex.oscode);
+		
 		
 		// No fault address available
 		if (ex.faultz == 0)
