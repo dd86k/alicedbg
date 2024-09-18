@@ -417,7 +417,7 @@ int adbg_dis_step(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	//TODO: disasm modes
 	opcode.size = dasm.cs_inst.size;
 	opcode.mnemonic = cs_insn_name(dasm.cs_handle, dasm.cs_inst.id);
-	opcode.operands = dasm.cs_inst.op_str.ptr;
+	opcode.operands = dasm.cs_inst.op_str[0] ? dasm.cs_inst.op_str.ptr : null;
 	memcpy(opcode.machine.ptr, dasm.buffer - opcode.size, opcode.size);
 	return 0;
 }
