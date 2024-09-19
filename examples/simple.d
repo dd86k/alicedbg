@@ -1,4 +1,4 @@
-/// Loop on exceptions and continue whenever possible.
+/// Minimal example that loops until the first fault is fault.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -6,13 +6,12 @@
 module examples.simple;
 
 import core.stdc.stdio;
-import core.stdc.stdlib;
-import core.stdc.ctype : isprint;
+import core.stdc.stdlib : exit;
 import adbg;
 
-extern (C):
-__gshared:
-private: // Shuts up dscanner
+extern (C): __gshared: private:
+
+int putchar(int);
 
 adbg_disassembler_t *dis;
 
@@ -22,49 +21,62 @@ void die(int code = 0, const(char) *reason = null) {
 	exit(code);
 }
 
-int choice(const(char) *msg) {
-	printf("\n%s: ", msg);
-LINPUT:	int c = getchar;
-	if (isprint(c)) return c;
-	goto LINPUT;
-}
-
 void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
-	if (event != AdbgEvent.exception)
+	switch (event) {
+	case AdbgEvent.exception:
+		adbg_exception_t *ex = adbg_debugger_event_exception(edata);
+		assert(ex, "exception is null?");
+		
+		// Assume one process, so don't print its PID
+		printf(`* exception="%s" oscode=`~ADBG_OS_ERROR_FORMAT,
+			adbg_exception_name(ex), ex.oscode);
+		
+		// Print fault address if available
+		if (ex.faultz)
+			printf(" address=%#llx", ex.fault_address);
+		
+		// If disassembler is available, disassemble one instruction
+		if (ex.faultz && dis) {
+			adbg_opcode_t op = void;
+			if (adbg_dis_process_once(dis, &op, proc, ex.fault_address))
+				printf(` nodisasm=%s`, adbg_error_message);
+			else if (op.operands)
+				printf(` disasm="%s %s"`, op.mnemonic, op.operands);
+			else
+				printf(` disasm="%s"`, op.mnemonic);
+		}
+		
+		putchar('\n');
+		
+		switch (ex.type) with (AdbgException) {
+		case Breakpoint, Step:
+			adbg_debugger_continue(proc);
+			return;
+		default: // Quit at first fault
+			*(cast(int*)udata) = 0;
+		}
 		return;
-	
-	adbg_exception_t *ex = cast(adbg_exception_t*)edata;
-	printf(
-	"\n----------------------------------------\n"~
-	"* EXCEPTION ("~ADBG_OS_ERROR_FORMAT~"): %s\n"~
-	"* PID=%u TID=%u\n"~
-	"* FAULT=%8llx",
-	ex.oscode, adbg_exception_name(ex),
-	proc.pid, proc.tid,
-	ex.fault_address
-	);
-	
-	// If disassembler and fault address unavailable,
-	// skip printing disassembly
-	if (dis == null || ex.faultz == 0)
+	case AdbgEvent.processExit:
+		int *oscode = adbg_debugger_event_process_exitcode(edata);
+		assert(oscode, "oscode is null?");
+		printf("* exited with code %d\n", *oscode);
+		*(cast(int*)udata) = 0;
 		return;
-	
-	adbg_opcode_t op = void;
-	if (adbg_dis_process_once(dis, &op, proc, ex.fault_address)) {
-		printf("  (error:%s)\n", adbg_error_message);
-		return;
+	default:
 	}
-	if (op.operands)
-		printf("  (%s %s)\n", op.mnemonic, op.operands);
-	else
-		printf("  (%s)\n", op.mnemonic);
 }
 
 int main(int argc, const(char) **argv) {
 	if (argc < 2)
 		die(1, "Missing path to executable");
 	
-	adbg_process_t *process = adbg_debugger_spawn(argv[1], 0);
+	// if additional arguments, they are for process to debug
+	const(char) **pargv = argc > 2 ? argv + 2 : null;
+	
+	adbg_process_t *process =
+		adbg_debugger_spawn(argv[1],
+			AdbgSpawnOpt.argv, pargv,
+			0);
 	if (process == null)
 		die;
 	
@@ -72,30 +84,10 @@ int main(int argc, const(char) **argv) {
 	if (dis == null)
 		printf("warning: Disassembler unavailable (%s)\n", adbg_error_message());
 	
-LOOP:	// Process input
-	switch (choice("Action [?=Help]")) {
-	case '?':
-		puts(
-		"s - Instruction step.\n"~
-		"c - Continue.\n"~
-		"q - Quit."
-		);
-		goto LOOP;
-	case 's':
-		puts("Stepping...");
-		adbg_debugger_stepi(process);
-		break;
-	case 'c':
-		puts("Continuing...");
-		adbg_debugger_continue(process);
-		break;
-	case 'q':
-		puts("Quitting...");
-		return 0;
-	default:
-		goto LOOP;
-	}
-	
-	adbg_debugger_wait(process, &loop_handler, null);
-	goto LOOP;
+	int flags = 1;
+Lcontinue:
+	if (adbg_debugger_wait(process, &loop_handler, &flags))
+		die;
+	if (flags) goto Lcontinue;
+	return 0;
 }

@@ -95,6 +95,7 @@ version (linux) {
 }
 
 void adbg_process_free(adbg_process_t *proc) {
+	version(Trace) trace("proc=%p", proc);
 	if (proc == null)
 		return;
 	version (Windows) {
@@ -102,9 +103,11 @@ void adbg_process_free(adbg_process_t *proc) {
 		CloseHandle(proc.hpid);
 		CloseHandle(proc.htid);
 	}
+	version (linux) {
+		if (proc.mhandle) close(proc.mhandle);
+	}
 	version (Posix) {
 		if (proc.argv) free(proc.argv);
-		version (linux) if (proc.mhandle) close(proc.mhandle);
 	}
 	adbg_list_free(proc.thread_list);
 	free(proc);

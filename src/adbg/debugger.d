@@ -8,6 +8,13 @@ module adbg.debugger;
 // TODO: adbg_debugger_spawn: Get/set default child stack size
 // TODO: High-level disassembly functions (e.g., from exception, etc.)
 
+/*
+version (linux) {
+	version (CRuntime_Glibc)
+		version = USE_CLONE;
+}
+*/
+
 public import adbg.process.base;
 import adbg.process.exception;
 import adbg.error;
@@ -34,11 +41,9 @@ version (Windows) {
 	import core.sys.posix.libgen : basename;
 	import adbg.include.c.stdio;  // snprintf;
 	import adbg.platform : ADBG_CHILD_STACK_SIZE;
-}
-
-version (linux) {
-	//version (CRuntime_Glibc)
-		//version = USE_CLONE;
+	
+	version (USE_CLONE)
+		import adbg.include.posix.mann;
 }
 
 extern (C):
@@ -163,7 +168,8 @@ version (Windows) {
 	//       need to be filled. If the former is null, this acts as a shell, and
 	//       Windows will search for the external command, which is unwanted.
 	
-	// Add argv is specified, we'll have to cram it into args
+	// Add argv is specified, and first item is set,
+	// we'll have to cram it into args
 	if (argv && *argv) {
 		// Get minimum total buffer size required
 		int argc;
@@ -212,8 +218,10 @@ version (Windows) {
 	memset(&si, 0, si.sizeof);
 	memset(&pi, 0, pi.sizeof);
 	si.cb = STARTUPINFOA.sizeof;
-	DWORD flags = options & OPT_DEBUG_ALL ? DEBUG_PROCESS : DEBUG_PROCESS | DEBUG_ONLY_THIS_PROCESS;
-	flags |= CREATE_DEFAULT_ERROR_MODE;
+	// CREATE_DEFAULT_ERROR_MODE
+	//   The new process should not inherit the error mode of the caller.
+	DWORD flags = DEBUG_PROCESS | CREATE_DEFAULT_ERROR_MODE;
+	if (options & OPT_DEBUG_ALL) flags |= DEBUG_ONLY_THIS_PROCESS;
 	
 	// Create process
 	if (CreateProcessA(
@@ -226,8 +234,8 @@ version (Windows) {
 		envp,	// lpEnvironment
 		dir,	// lpCurrentDirectory
 		&si, &pi) == FALSE) {
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
+		adbg_process_free(proc);
 		return null;
 	}
 	proc.hpid = pi.hProcess;
@@ -251,13 +259,13 @@ version (Windows) {
 	
 	// Allocate arguments, include space for program and null terminator
 	int argc;
-	while (argv[argc]) ++argc;
+	if (argv) while (argv[argc]) ++argc;
 	version(Trace) trace("argc=%d", argc);
 	proc.argv = cast(char**)malloc((argc + 2) * size_t.sizeof);
 	if (proc.argv == null) {
 		version(Trace) trace("mmap=%s", strerror(errno));
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
+		adbg_process_free(proc);
 		return null;
 	}
 	proc.argv[0] = cast(char*)path;
@@ -514,8 +522,6 @@ int adbg_debugger_detach(adbg_process_t *proc) {
 	proc.creation = AdbgCreation.unloaded;
 	proc.status = AdbgProcStatus.unloaded;
 	
-	scope(exit) adbg_process_free(proc);
-	
 version (Windows) {
 	if (DebugActiveProcessStop(proc.pid) == FALSE)
 		return adbg_oops(AdbgError.os);
@@ -554,7 +560,7 @@ int* adbg_debugger_event_process_exitcode(void *edata) {
 		return null;
 	}
 	adbg_debugger_event_t *event = cast(adbg_debugger_event_t*)edata;
-	if (event.type != AdbgEvent.exception) {
+	if (event.type != AdbgEvent.processExit) {
 		adbg_oops(AdbgError.invalidValue);
 		return null;
 	}
@@ -580,6 +586,8 @@ int* adbg_debugger_event_process_exitcode(void *edata) {
 /// Returns: Error code.
 int adbg_debugger_wait(adbg_process_t *proc,
 	void function(adbg_process_t*, int, void*, void*) ufunc, void *udata) {
+	version(Trace) trace("proc=%p ufunc=%p udata=%p", proc, ufunc, udata);
+	
 	if (proc == null || ufunc == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (proc.creation == AdbgCreation.unloaded)
@@ -589,6 +597,7 @@ int adbg_debugger_wait(adbg_process_t *proc,
 	adbg_debugger_event_t event = void;
 	
 	memset(&tracee, 0, adbg_process_t.sizeof);
+	tracee.creation = proc.creation;
 	
 version (Windows) {
 	DEBUG_EVENT de = void;
@@ -629,18 +638,13 @@ Lwait:
 	tracee.pid = de.dwProcessId;
 	tracee.tid = de.dwThreadId;
 	
-	// Fixes access to debugger, thread context functions.
-	// Especially when attaching, but should be standard with spawned-in processes too.
 	// TODO: Get rid of hack to help multiprocess support
 	//       By opening/closing process+thread handles per debugger function that need it:
 	//       - Help with leaking handles
 	//       - Permissions, since each OS function need different permissions
-	tracee.hpid = OpenProcess(
-		PROCESS_ALL_ACCESS,
-		FALSE, de.dwProcessId);
-	tracee.htid = OpenThread(
-		THREAD_GET_CONTEXT | THREAD_QUERY_INFORMATION | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME,
-		FALSE, de.dwThreadId);
+	// HACK: To have access to debugger API
+	tracee.hpid = proc.hpid;
+	tracee.htid = proc.htid;
 	
 } else version (Posix) {
 	int wstatus = void;
@@ -676,14 +680,12 @@ Lwait:
 }
 
 /// Disconnect and terminate the debuggee process.
-///
-/// This function frees the process instance on success.
-/// Params: tracee = Process.
+/// Params: proc = Process.
 /// Returns: Error code.
-int adbg_debugger_terminate(adbg_process_t *tracee) {
-	if (tracee == null)
+int adbg_debugger_terminate(adbg_process_t *proc) {
+	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (tracee.creation == AdbgCreation.unloaded || tracee.pid == 0)
+	if (proc.creation == AdbgCreation.unloaded || proc.pid == 0)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
 version (Windows) {
@@ -691,47 +693,53 @@ version (Windows) {
 	//       Before using TerminateProcess,
 	//       ContinueDebugEvent(pid, tid, DBG_TERMINATE_PROCESS)
 	//       was used instead. I forgot where I saw that example. MSDN does not feature it.
-	if (TerminateProcess(tracee.hpid, DBG_TERMINATE_PROCESS) == FALSE)
+	if (TerminateProcess(proc.hpid, DBG_TERMINATE_PROCESS) == FALSE)
 		return adbg_oops(AdbgError.os);
 } else version (Posix) {
-	if (kill(tracee.pid, SIGKILL) < 0) // PT_KILL is deprecated on Linux
+	if (kill(proc.pid, SIGKILL) < 0) // PT_KILL is deprecated on Linux
 		return adbg_oops(AdbgError.os);
 } else static assert(0, "Implement adbg_debugger_terminate");
 
-	adbg_process_free(tracee);
+	proc.status = AdbgProcStatus.unknown;
+	proc.creation = AdbgCreation.unloaded;
 	return 0;
 }
 
 /// Make the debuggee process continue from its currently stopped state.
-/// Params: tracee = Process.
+/// Params: proc = Process.
 /// Returns: Error code.
-int adbg_debugger_continue(adbg_process_t *tracee) {
-	if (tracee == null)
+int adbg_debugger_continue(adbg_process_t *proc) {
+	version(Trace) trace("proc=%p", proc);
+	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (tracee.creation == AdbgCreation.unloaded)
-		return adbg_oops(AdbgError.debuggerUnattached);
-	if (tracee.status != AdbgProcStatus.paused)
-		return 0;
 	
-	tracee.status = AdbgProcStatus.running;
+	version(Trace) trace("pid=%d state=%d", proc.pid, proc.status);
+	if (proc.creation == AdbgCreation.unloaded)
+		return adbg_oops(AdbgError.debuggerUnattached);
+	
+	switch (proc.status) with (AdbgProcStatus) {
+	case loaded, paused: break;
+	default: return adbg_oops(AdbgError.debuggerUnpaused);
+	}
 	
 version (Windows) {
-	if (ContinueDebugEvent(tracee.pid, tracee.tid, DBG_CONTINUE) == FALSE) {
-		tracee.status = AdbgProcStatus.unknown;
+	if (ContinueDebugEvent(proc.pid, proc.tid, DBG_CONTINUE) == FALSE) {
+		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 } else version (linux) {
-	if (ptrace(PT_CONT, tracee.pid, null, null) < 0) {
-		tracee.status = AdbgProcStatus.unknown;
+	if (ptrace(PT_CONT, proc.pid, null, null) < 0) {
+		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 } else version (Posix) {
-	if (ptrace(PT_CONTINUE, tracee.pid, null, 0) < 0) {
-		tracee.status = AdbgProcStatus.unknown;
+	if (ptrace(PT_CONTINUE, proc.pid, null, 0) < 0) {
+		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 } else static assert(0, "Implement adbg_debugger_continue");
 	
+	proc.status = AdbgProcStatus.running;
 	return 0;
 }
 
@@ -776,12 +784,14 @@ version (Windows) {
 	}
 	
 	return 0;
-} else {
+} else version (Posix) {
 	if (ptrace(PT_STEP, proc.pid, null, 0) < 0) {
 		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 	
 	return 0;
+} else {
+	return adbg_oops(AdbgError.unimplemented);
 }
 }
