@@ -17,19 +17,22 @@ import core.stdc.errno : errno;
 import core.stdc.string : strerror;
 import adbg.include.capstone : csh, cs_errno, cs_strerror;
 
-//TODO: Make module thread-safe
-//      Either via TLS and/or atomic operations
-//TODO: More error should have context parameters
-//      invalidArgument: string stating which argument
-//TODO: adbg_error_source -> alicedbg/crt/os/capstone, etc.
-//      adbg_error_is_external -> bool
-//TODO: Maybe redo error code functions to reduce confusion between errno/external/system/current
-//TODO: Error utils
-//      adbg_ensure_params(lvalue, "name")
-//      - returns string if null found
-//      - automatically set error code
-//      adbg_oops_ptr(AdbgError, void*) to return null
-//TODO: Localize error messages as option (including system ones, when able)
+// TODO: Make module thread-safe
+//       Either via TLS and/or atomic operations
+// TODO: More error should have context parameters
+//       invalidArgument: string stating which argument
+// TODO: adbg_error_source -> alicedbg/crt/os/capstone, etc.
+//       adbg_error_is_external -> bool
+// TODO: Maybe redo error code functions to reduce confusion between errno/external/system/current
+// TODO: Error utils
+//       adbg_ensure_params(lvalue, "name")
+//       - returns string if null found
+//       - automatically set error code
+//       adbg_oops_ptr(AdbgError, void*) to return null
+// TODO: Localize error messages as option (including system ones, when able)
+// TODO: Add additional "os" codes or bit
+//       Like "osProcessTerminate", in addition with OS message:
+//         "Failed to terminate process: ..."
 
 extern (C):
 

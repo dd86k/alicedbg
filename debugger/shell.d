@@ -96,13 +96,15 @@ const(char) *shell_error_string(int code) {
 }
 
 int shell_start(int argc, const(char)** argv) {
-	if (loginit(null))
+	if (loginit(null)) {
+		perror("Failed to setup logger");
 		return 2;
+	}
 	
 	// Start process if specified
 	if (argc > 0 && argv) {
 		// Assume argv is null-terminated as it is on msvcrt and glibc
-		if (shell_proc_spawn(*argv, argv + 1)) {
+		if (shell_proc_spawn(*argv, argc > 1 ? argv + 1 : null)) {
 			printf("Error: %s\n", adbg_error_message());
 			return 1;
 		}
@@ -114,7 +116,7 @@ int shell_start(int argc, const(char)** argv) {
 	}
 	
 	coninit();
-
+	
 	int ecode = void;
 Lcommand:
 	printf("(adbg) ");
@@ -148,15 +150,16 @@ int shell_execv(int argc, const(char) **argv) {
 	
 	const(char) *ucommand = argv[0];
 	immutable(command2_t) *command = shell_findcommand(ucommand);
-	if (command == null) {
+	if (command == null)
 		return ShellError.invalidCommand;
-	}
 	return command.entry(argc, argv);
 }
 
 private:
 __gshared:
 
+// NOTE: Process management
+//       Right now the shell is only capable of dealing with one process
 adbg_process_t *process;
 adbg_disassembler_t *dis;
 
@@ -600,11 +603,12 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 	}
 }
 
-void shell_event_exception(adbg_process_t *proc, int event, void *edata, void *udata) {
+void shell_debugger_event(adbg_process_t *proc, int event, void *edata, void *udata) {
+	process = proc;
+	
 	switch (event) with (AdbgEvent) {
 	case exception:
-		adbg_exception_t *ex = adbg_debugger_event_exception(edata);
-		assert(ex);
+		adbg_exception_t *ex = cast(adbg_exception_t*)edata;
 		
 		// HACK: Currently have no way to determine remote associated thread
 		version (Windows)
@@ -618,7 +622,6 @@ void shell_event_exception(adbg_process_t *proc, int event, void *edata, void *u
 			proc.pid,
 			adbg_exception_name(ex), ex.oscode);
 		
-		
 		// No fault address available
 		if (ex.faultz == 0)
 			return;
@@ -631,7 +634,7 @@ void shell_event_exception(adbg_process_t *proc, int event, void *edata, void *u
 		
 		printf("	Machine :");
 		
-		// Print machine bytes
+		// Ready memory
 		ubyte[MAX_INSTR_SIZE] data = void;
 		if (adbg_memory_read(process, ex.faultz, data.ptr, MAX_INSTR_SIZE)) {
 			printf(" read error (%s)\n", adbg_error_message());
@@ -657,8 +660,7 @@ void shell_event_exception(adbg_process_t *proc, int event, void *edata, void *u
 		putchar('\n');
 		return;
 	case processExit:
-		int *exitcode = adbg_debugger_event_process_exitcode(edata);
-		assert(exitcode);
+		int *exitcode = cast(int*)(edata);
 		printf("* Process exited with code %d\n", *exitcode);
 		return;
 	default:
@@ -806,11 +808,8 @@ int command_restart(int argc, const(char) **argv) {
 int command_go(int argc, const(char) **argv) {
 	if (adbg_debugger_continue(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process, &shell_event_exception, null))
+	if (adbg_debugger_wait(process, &shell_debugger_event, null))
 		return ShellError.alicedbg;
-	// Temporary: Cheap hack for process exit
-	if (adbg_process_status(process) == AdbgProcStatus.unloaded)
-		printf("*\tProcess %d exited\n", process.pid);
 	return 0;
 }
 
@@ -826,7 +825,7 @@ int command_kill(int argc, const(char) **argv) {
 int command_stepi(int argc, const(char) **argv) {
 	if (adbg_debugger_stepi(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process, &shell_event_exception, null))
+	if (adbg_debugger_wait(process, &shell_debugger_event, null))
 		return ShellError.alicedbg;
 	return 0;
 }

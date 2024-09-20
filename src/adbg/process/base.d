@@ -6,7 +6,9 @@
 module adbg.process.base;
 
 // TODO: Internal process flags
-//       Has memory handle, process-debugger relation, debugger/process options, etc.
+//       - Debugger is active on this process
+//       - Debugger was attached to this process
+//       - Memory handle is opened
 // TODO: Process Pause/Resume
 //       Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
 //       Linux: Send SIGSTOP/SIGCONT signals via kill(2)
@@ -47,11 +49,12 @@ extern (C):
 /// Process status
 enum AdbgProcStatus : ubyte {
 	unknown,	/// Process status is not known.
-	unloaded = unknown,	/// Process is unloaded.
+	unloaded = unknown,	/// Alias for 'unknown'.
 	loaded,	/// Process is loaded and waiting to run.
-	standby = loaded,	/// Alias for loaded.
+	standby = loaded,	/// Alias for 'loaded'.
 	running,	/// Process is running.
-	paused,	/// Process is paused due to an exception or by the debugger.
+	stopped,	/// Process is paused due to an exception or by the debugger.
+	paused = stopped,	/// Alias for 'stopped'.
 }
 
 //TODO: Rename to AdbgDebuggerRelation
@@ -92,12 +95,28 @@ version (linux) {
 	AdbgCreation creation;
 	/// List of threads
 	list_t *thread_list;
+	
+	// HACK: Some client debuggers, like the shell, will save the stopped
+	//       process pointer in global memory. Because stack memory references
+	//       will be invalid by the time the wait function quits, it is
+	//       saved here instead.
+	//
+	//       Also, because we cannot have a definition of the structure
+	//       inside this structure, so a pointer is defined instead.
+	//       Memory will be allocated for it.
+	//
+	//       This is to avoid touching the caller process IDs and handles,
+	//       until a better solution is found for multiprocess handling.
+	//
+	//       Maybe have some handle duplication function?
+	adbg_process_t *tracee;
 }
 
 void adbg_process_free(adbg_process_t *proc) {
 	version(Trace) trace("proc=%p", proc);
 	if (proc == null)
 		return;
+	if (proc.tracee) adbg_process_free(proc.tracee);
 	version (Windows) {
 		if (proc.args) free(proc.args);
 		CloseHandle(proc.hpid);
@@ -155,16 +174,14 @@ int adbg_process_pid(adbg_process_t *proc) {
 /// 	bufsize = Size of the buffer.
 /// Returns: String length; Or zero on error.
 size_t adbg_process_path(adbg_process_t *proc, char *buffer, size_t bufsize) {
-	version (Trace)
-		trace("proc=%p buffer=%p bufsize=%zd", proc, buffer, bufsize);
+	version(Trace) trace("proc=%p buffer=%p bufsize=%zd", proc, buffer, bufsize);
 	
 	if (proc == null || buffer == null || bufsize == 0) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
 	
-	version (Trace)
-		trace("pd=%d", proc.pid);
+	version(Trace) trace("pid=%d", proc.pid);
 	
 version (Windows) {
 	// Get process handle

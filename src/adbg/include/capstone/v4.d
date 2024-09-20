@@ -884,7 +884,7 @@ bool libcapstone_dynload()
     
     version (Trace)
     {
-        trace("libcapstone loaded");
+        trace("load libcapstone");
     }
     
     return false;

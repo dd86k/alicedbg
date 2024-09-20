@@ -120,36 +120,36 @@ adbg_process_t* adbg_debugger_spawn(const(char) *path, ...) {
 	va_list list = void;
 	va_start(list, path);
 	
-	const(char)  *args;
-	const(char) **argv;
-	const(char)  *dir;
-	const(char) **envp;
+	const(char)  *oargs;
+	const(char) **oargv;
+	const(char)  *odir;
+	const(char) **oenvp;
 	int options;
-LOPT:
+Loption:
 	switch (va_arg!int(list)) {
 	case 0: break;
 	// Temporary until reworked
 	/*case AdbgSpawnOpt.args:
 		args = va_arg!(const(char)*)(list);
-		version (Trace) trace("args=%p", args);
-		goto LOPT;*/
+		version (Trace) trace("args=%p", oargs);
+		goto Loption;*/
 	case AdbgSpawnOpt.argv:
-		argv = va_arg!(const(char)**)(list);
-		version (Trace) trace("argv=%p", argv);
-		goto LOPT;
+		oargv = va_arg!(const(char)**)(list);
+		version (Trace) trace("argv=%p", oargv);
+		goto Loption;
 	// Temporary until implemented
 	case AdbgSpawnOpt.directory:
-		dir = va_arg!(const(char)*)(list);
-		version (Trace) trace("dir=%p", dir);
-		goto LOPT;
+		odir = va_arg!(const(char)*)(list);
+		version (Trace) trace("dir=%p", odir);
+		goto Loption;
 	// Temporary until reworked
 	/*case AdbgSpawnOpt.environment:
 		envp = va_arg!(const(char)**)(list);
 		version (Trace) trace("envp=%p", envp);
-		goto LOPT;*/
+		goto Loption;*/
 	case AdbgSpawnOpt.debugChildren:
 		if (va_arg!(int)(list)) options |= OPT_DEBUG_ALL;
-		goto LOPT;
+		goto Loption;
 	default:
 		adbg_oops(AdbgError.invalidOption);
 		return null;
@@ -161,6 +161,9 @@ LOPT:
 		return null;
 	}
 	
+	version(Trace) trace("spawn path='%s' argv=%p dir='%s' o=%#x",
+		path, oargv, odir, options);
+	
 version (Windows) {
 	// NOTE: CreateProcessW modifies lpCommandLine
 	// NOTE: lpCommandLine is maximum 32,767 bytes including null Unicode character
@@ -170,13 +173,13 @@ version (Windows) {
 	
 	// Add argv is specified, and first item is set,
 	// we'll have to cram it into args
-	if (argv && *argv) {
+	if (oargv && *oargv) {
 		// Get minimum total buffer size required
 		int argc;
 		size_t commlen = strlen(path);
 		size_t argslen;
-		while (argv[argc])
-			argslen += strlen(argv[argc++]);
+		while (oargv[argc])
+			argslen += strlen(oargv[argc++]);
 		
 		// Allocate argument line space
 		size_t minlen = commlen + 2 + argslen + argc + 1; // + quotes and spaces
@@ -201,7 +204,7 @@ version (Windows) {
 			adbg_oops(AdbgError.assertion);
 			return null;
 		}
-		size_t o = adbg_strings_flatten(proc.args + i, cl, argc, argv, 1);
+		size_t o = adbg_strings_flatten(proc.args + i, cl, argc, oargv, 1);
 		if (o == 0) {
 			adbg_process_free(proc);
 			adbg_oops(AdbgError.assertion);
@@ -231,8 +234,8 @@ version (Windows) {
 		null,	// lpThreadAttributes
 		FALSE,	// bInheritHandles
 		flags,	// dwCreationFlags
-		envp,	// lpEnvironment
-		dir,	// lpCurrentDirectory
+		oenvp,	// lpEnvironment
+		odir,	// lpCurrentDirectory
 		&si, &pi) == FALSE) {
 		adbg_oops(AdbgError.os);
 		adbg_process_free(proc);
@@ -259,7 +262,7 @@ version (Windows) {
 	
 	// Allocate arguments, include space for program and null terminator
 	int argc;
-	if (argv) while (argv[argc]) ++argc;
+	if (oargv) while (oargv[argc]) ++argc;
 	version(Trace) trace("argc=%d", argc);
 	proc.argv = cast(char**)malloc((argc + 2) * size_t.sizeof);
 	if (proc.argv == null) {
@@ -269,8 +272,8 @@ version (Windows) {
 		return null;
 	}
 	proc.argv[0] = cast(char*)path;
-	if (argc && argv && *argv)
-		memcpy(proc.argv + 1, argv, argc * size_t.sizeof);
+	if (argc && oargv && *oargv)
+		memcpy(proc.argv + 1, oargv, argc * size_t.sizeof);
 	proc.argv[argc + 1] = null;
 	
 version (USE_CLONE) { // clone(2)
@@ -301,8 +304,8 @@ version (USE_CLONE) { // clone(2)
 	switch (proc.pid = fork()) {
 	case -1: // Error
 		version(Trace) trace("fork=%s", strerror(errno));
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
+		adbg_process_free(proc);
 		return null;
 	case 0: // New child process
 		version(Trace) for (int i; i < argc + 2; ++i)
@@ -310,14 +313,14 @@ version (USE_CLONE) { // clone(2)
 		
 		__adbg_child_t chld = void;
 		chld.argv = cast(const(char)**)proc.argv;
-		chld.envp = envp;
-		chld.dir  = dir;
-		__adbg_exec_child(&chld); // If returns at all, error
-		adbg_process_free(proc);
+		chld.envp = oenvp;
+		chld.dir  = odir;
+		if (__adbg_exec_child(&chld) < 0)
+			adbg_process_free(proc);
 		_exit(errno);
 		return null; // Make compiler happy
 	default: // This parent process
-	} // switch(fork(2))
+	}
 } // clone(2)/fork(2)
 	
 	proc.status = AdbgProcStatus.standby;
@@ -332,38 +335,36 @@ version (USE_CLONE) { // clone(2)
 version (Posix)
 private int __adbg_exec_child(void* arg) {
 	__adbg_child_t *chld = cast(__adbg_child_t*)arg;
+	assert(chld, "chld is null");
+	assert(chld.argv, "argv is null");
+	assert(*chld.argv, "argv[0] is null");
 	
 	// Baby, Please Trace Me
-	version (Trace) trace("PT_TRACEME...");
+	version (Trace) with (chld) trace("chld=%p argv=%p dir=%p envp=%p", argv, dir, envp);
 version (linux) {
 	if (ptrace(PT_TRACEME, 0, null, null) < 0) {
 		version (Trace) trace("ptrace=%s", strerror(errno));
-		goto Lexit;
+		return -1;
 	}
 } else {
 	if (ptrace(PT_TRACEME, 0, null, 0) < 0) {
 		version (Trace) trace("ptrace=%s", strerror(errno));
-		goto Lexit;
+		return -1;
 	}
 }
-	version (Trace) trace("done");
-	
 	// If start directory requested, change to it
 	if (chld.dir && chdir(chld.dir) < 0) {
 		version (Trace) trace("ptrace=%s", strerror(errno));
-		goto Lexit;
+		return -1;
 	}
 	
 	// Start specified process
-	version (Trace) trace("execve...");
 	if (execve(*chld.argv, chld.argv, chld.envp) < 0) {
 		version (Trace) trace("execve=%s", strerror(errno));
-		goto Lexit;
+		return -1;
 	}
-	version (Trace) trace("done");
 	
-Lexit:
-	return -1;
+	return 0;
 }
 
 /// Debugger process attachment options
@@ -401,22 +402,21 @@ adbg_process_t* adbg_debugger_attach(int pid, ...) {
 	va_list list = void;
 	va_start(list, pid);
 	int options;
-L_OPTION:
+Loption:
 	switch (va_arg!int(list)) {
 	case 0: break;
 	case AdbgAttachOpt.stop:
 		if (va_arg!int(list)) options |= OPT_STOP;
-		goto L_OPTION;
+		goto Loption;
 	case AdbgAttachOpt.exitkill:
 		if (va_arg!int(list)) options |= OPT_EXITKILL;
-		goto L_OPTION;
+		goto Loption;
 	default:
 		adbg_oops(AdbgError.invalidOption);
 		return null;
 	}
 	
 	version (Trace) trace("pid=%d options=%#x", pid, options);
-	
 	adbg_process_t *proc = cast(adbg_process_t*)calloc(1, adbg_process_t.sizeof);
 	if (proc == null) {
 		adbg_oops(AdbgError.crt);
@@ -532,40 +532,9 @@ version (Windows) {
 	return 0;
 }
 
-private struct adbg_debugger_event_t {
-	AdbgEvent type;
-	union {
-		adbg_exception_t exception;
-		int exitcode;
-	}
-}
-
-adbg_exception_t* adbg_debugger_event_exception(void *edata) {
-	if (edata == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	adbg_debugger_event_t *event = cast(adbg_debugger_event_t*)edata;
-	if (event.type != AdbgEvent.exception) {
-		adbg_oops(AdbgError.invalidValue);
-		return null;
-	}
-	
-	return &event.exception;
-}
-
-int* adbg_debugger_event_process_exitcode(void *edata) {
-	if (edata == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	adbg_debugger_event_t *event = cast(adbg_debugger_event_t*)edata;
-	if (event.type != AdbgEvent.processExit) {
-		adbg_oops(AdbgError.invalidValue);
-		return null;
-	}
-	
-	return &event.exitcode;
+private union adbg_debugger_event_t {
+	adbg_exception_t exception;
+	int exitcode;
 }
 
 /// Continue execution of the process until a new debug event occurs.
@@ -593,33 +562,38 @@ int adbg_debugger_wait(adbg_process_t *proc,
 	if (proc.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
-	adbg_process_t tracee = void;
+	// See HACK in adbg_process_t
+	if (proc.tracee == null)
+		proc.tracee = cast(adbg_process_t*)calloc(1, adbg_process_t.sizeof);
+	if (proc.tracee == null)
+		return adbg_oops(AdbgError.crt);
+	
+	AdbgEvent type = void;
 	adbg_debugger_event_t event = void;
 	
-	memset(&tracee, 0, adbg_process_t.sizeof);
-	tracee.creation = proc.creation;
+	proc.tracee.creation = proc.creation;
 	
 version (Windows) {
 	DEBUG_EVENT de = void;
 Lwait:
-	// Something bad happened
 	if (WaitForDebugEvent(&de, INFINITE) == FALSE) {
-		tracee.status = AdbgProcStatus.unloaded;
+		proc.tracee.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 	
-	version(Trace) trace("EventCode=%#x", de.dwDebugEventCode);
+	version(Trace) trace("EventCode=%#x pid=%d tid=%d",
+		de.dwDebugEventCode, de.dwProcessId, de.dwThreadId);
 	
 	// Filter events
 	switch (de.dwDebugEventCode) {
 	case EXCEPTION_DEBUG_EVENT:
-		event.type = AdbgEvent.exception;
-		tracee.status = AdbgProcStatus.paused;
+		proc.tracee.status = AdbgProcStatus.stopped;
+		type = AdbgEvent.exception;
 		adbg_exception_translate(&event.exception, &de, null);
 		break;
 	case EXIT_PROCESS_DEBUG_EVENT:
-		event.type = AdbgEvent.processExit;
-		tracee.status = AdbgProcStatus.unknown;
+		proc.tracee.status = AdbgProcStatus.unknown;
+		type = AdbgEvent.processExit;
 		event.exitcode = de.ExitProcess.dwExitCode;
 		break;
 	/*case CREATE_THREAD_DEBUG_EVENT:
@@ -635,47 +609,46 @@ Lwait:
 		goto Lwait;
 	}
 	
-	tracee.pid = de.dwProcessId;
-	tracee.tid = de.dwThreadId;
+	proc.tracee.pid = de.dwProcessId;
+	proc.tracee.tid = de.dwThreadId;
 	
 	// TODO: Get rid of hack to help multiprocess support
 	//       By opening/closing process+thread handles per debugger function that need it:
 	//       - Help with leaking handles
 	//       - Permissions, since each OS function need different permissions
-	// HACK: To have access to debugger API
-	tracee.hpid = proc.hpid;
-	tracee.htid = proc.htid;
-	
+	// HACK: To have access to Debug API
+	proc.tracee.hpid = proc.hpid;
+	proc.tracee.htid = proc.htid;
 } else version (Posix) {
+	version (linux) enum WBASE = __WALL; // all threads
+	else            enum WBASE = 0;
 	int wstatus = void;
 Lwait:
-	tracee.pid = waitpid(-1, &wstatus, 0);
-	
-	// Something terrible happened
-	if (tracee.pid < 0)
+	if ((proc.tracee.pid = waitpid(-1, &wstatus, WBASE)) < 0) {
+		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.crt);
+	}
 	
-	version(Trace) trace("wstatus=%#x", wstatus);
+	version(Trace) trace("wstatus=%#x pid=%d", wstatus, proc.tracee.pid);
 	
 	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)) { // Process exited or killed
-		event.type = AdbgEvent.processExit;
+		type = AdbgEvent.processExit;
+		proc.tracee.status = AdbgProcStatus.unknown;
 		event.exitcode = WTERMSIG(wstatus);
 	} else if (WIFSTOPPED(wstatus)) { // Process stopped by signal
-		event.type = AdbgEvent.exception;
-		tracee.status = AdbgProcStatus.paused;
+		proc.tracee.status = AdbgProcStatus.stopped;
+		type = AdbgEvent.exception;
 		int sig = WSTOPSIG(wstatus);
-		adbg_exception_translate(&event.exception, &tracee.pid, &sig);
-	/*
-	} else if (WIFCONTINUED(wstatus)) { // Process continues, ignore these
-		goto Lwait;
-	*/
+		adbg_exception_translate(&event.exception, &proc.tracee.pid, &sig);
+	/*} else if (WIFCONTINUED(wstatus)) { // Process continues, ignore these
+		goto Lwait;*/
 	} else {
 		version (Trace) if (!WIFCONTINUED(wstatus)) trace("Unknown status code");
 		goto Lwait;
 	}
 } else static assert(0, "Implement adbg_debugger_wait");
 
-	ufunc(&tracee, event.type, &event, udata);
+	ufunc(proc.tracee, type, &event, udata);
 	return 0;
 }
 
@@ -709,33 +682,47 @@ version (Windows) {
 /// Params: proc = Process.
 /// Returns: Error code.
 int adbg_debugger_continue(adbg_process_t *proc) {
-	version(Trace) trace("proc=%p", proc);
 	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	
-	version(Trace) trace("pid=%d state=%d", proc.pid, proc.status);
 	if (proc.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
+version (Windows) {
+	version(Trace) trace("pid=%d tid=%d state=%d", proc.pid, proc.tid, proc.status);
+	// NOTE: ContinueDebugEvent
+	//       ContinueDebugEvent can only be called when the debugged
+	//       process was stopped.
 	switch (proc.status) with (AdbgProcStatus) {
-	case loaded, paused: break;
+	case loaded: break;
+	case stopped:
+		if (ContinueDebugEvent(proc.pid, proc.tid, DBG_CONTINUE) == FALSE) {
+			proc.status = AdbgProcStatus.unknown;
+			return adbg_oops(AdbgError.os);
+		}
+		break;
 	default: return adbg_oops(AdbgError.debuggerUnpaused);
 	}
-	
-version (Windows) {
-	if (ContinueDebugEvent(proc.pid, proc.tid, DBG_CONTINUE) == FALSE) {
-		proc.status = AdbgProcStatus.unknown;
-		return adbg_oops(AdbgError.os);
-	}
 } else version (linux) {
-	if (ptrace(PT_CONT, proc.pid, null, null) < 0) {
-		proc.status = AdbgProcStatus.unknown;
-		return adbg_oops(AdbgError.os);
+	version(Trace) trace("pid=%d state=%d", proc.pid, proc.status);
+	switch (proc.status) with (AdbgProcStatus) {
+	case loaded, stopped:
+		if (ptrace(PT_CONT, proc.pid, null, null) < 0) {
+			proc.status = AdbgProcStatus.unknown;
+			return adbg_oops(AdbgError.os);
+		}
+		break;
+	default: return adbg_oops(AdbgError.debuggerUnpaused);
 	}
 } else version (Posix) {
-	if (ptrace(PT_CONTINUE, proc.pid, null, 0) < 0) {
-		proc.status = AdbgProcStatus.unknown;
-		return adbg_oops(AdbgError.os);
+	version(Trace) trace("pid=%d state=%d", proc.pid, proc.status);
+	switch (proc.status) with (AdbgProcStatus) {
+	case loaded, stopped:
+		if (ptrace(PT_CONTINUE, proc.pid, null, 0) < 0) {
+			proc.status = AdbgProcStatus.unknown;
+			return adbg_oops(AdbgError.os);
+		}
+		break;
+	default: return adbg_oops(AdbgError.debuggerUnpaused);
 	}
 } else static assert(0, "Implement adbg_debugger_continue");
 	

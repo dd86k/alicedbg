@@ -24,8 +24,7 @@ void die(int code = 0, const(char) *reason = null) {
 void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
 	switch (event) {
 	case AdbgEvent.exception:
-		adbg_exception_t *ex = adbg_debugger_event_exception(edata);
-		assert(ex, "exception is null?");
+		adbg_exception_t *ex = cast(adbg_exception_t*)edata;
 		
 		// Assume one process, so don't print its PID
 		printf(`* exception="%s" oscode=`~ADBG_OS_ERROR_FORMAT,
@@ -57,8 +56,7 @@ void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
 		}
 		return;
 	case AdbgEvent.processExit:
-		int *oscode = adbg_debugger_event_process_exitcode(edata);
-		assert(oscode, "oscode is null?");
+		int *oscode = cast(int*)edata;
 		printf("* exited with code %d\n", *oscode);
 		*(cast(int*)udata) = 0;
 		return;
@@ -85,6 +83,8 @@ int main(int argc, const(char) **argv) {
 		printf("warning: Disassembler unavailable (%s)\n", adbg_error_message());
 	
 	int flags = 1;
+	if (adbg_debugger_continue(process))
+		die;
 Lcontinue:
 	if (adbg_debugger_wait(process, &loop_handler, &flags))
 		die;
