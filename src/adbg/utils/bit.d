@@ -180,6 +180,33 @@ long adbg_alignup64(long x, int s) {
 	return (x + mask) & (~mask);
 }
 
+size_t adbg_aligndown(size_t x, int s) {
+	size_t mask = s - 1;
+	return x - (x & mask);
+}
+unittest {
+	assert(adbg_aligndown(0, uint.sizeof) == 0);
+	assert(adbg_aligndown(1, uint.sizeof) == 0);
+	assert(adbg_aligndown(2, uint.sizeof) == 0);
+	assert(adbg_aligndown(3, uint.sizeof) == 0);
+	assert(adbg_aligndown(4, uint.sizeof) == 4);
+	assert(adbg_aligndown(5, uint.sizeof) == 4);
+	assert(adbg_aligndown(6, uint.sizeof) == 4);
+	assert(adbg_aligndown(7, uint.sizeof) == 4);
+	assert(adbg_aligndown(8, uint.sizeof) == 8);
+	assert(adbg_aligndown(9, uint.sizeof) == 8);
+	assert(adbg_aligndown(0, ulong.sizeof) == 0);
+	assert(adbg_aligndown(1, ulong.sizeof) == 0);
+	assert(adbg_aligndown(2, ulong.sizeof) == 0);
+	assert(adbg_aligndown(3, ulong.sizeof) == 0);
+	assert(adbg_aligndown(4, ulong.sizeof) == 0);
+	assert(adbg_aligndown(5, ulong.sizeof) == 0);
+	assert(adbg_aligndown(6, ulong.sizeof) == 0);
+	assert(adbg_aligndown(7, ulong.sizeof) == 0);
+	assert(adbg_aligndown(8, ulong.sizeof) == 8);
+	assert(adbg_aligndown(9, ulong.sizeof) == 8);
+}
+
 /// Ensure that a pointer instance with its size is situated inside an allocated buffer.
 /// Params:
 /// 	ptr = Pointer of instance.
