@@ -59,17 +59,11 @@ struct mz_header_t {
 }
 static assert(mz_header_t.e_lfanew.offsetof == LFANEW_OFFSET);
 
-// old alias
-public alias mz_hdr_ext = mz_header_t;
-
 /// MZ relocation entry
 struct mz_reloc_t {
 	ushort offset;
 	ushort segment;
 }
-
-// old alias
-alias mz_reloc = mz_reloc_t;
 
 private enum {
 	S_RELOCS_REVERSED = 1,
@@ -78,7 +72,7 @@ private
 struct internal_mz_t {
 	mz_header_t header;
 	bool *r_relocs; /// Reversed relocations
-	mz_reloc *relocs;
+	mz_reloc_t *relocs;
 }
 
 int adbg_object_mz_load(adbg_object_t *o) {

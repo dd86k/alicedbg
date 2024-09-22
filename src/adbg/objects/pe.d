@@ -15,11 +15,14 @@
 module adbg.objects.pe;
 
 import core.stdc.stdlib;
+import core.stdc.string : memcpy;
 import adbg.error;
 import adbg.objectserver;
 import adbg.machines : AdbgMachine;
 import adbg.utils.uid : UID;
 import adbg.utils.bit;
+import adbg.utils.math : min, MiB;
+import adbg.objects.mz : mz_header_t;
 
 // NOTE: Avoid the Windows base types as they are not defined outside "version (Windows)"
 // NOTE: Microsoft loader limits sections to 96 maximum
@@ -29,6 +32,10 @@ extern (C):
 
 /// Magic number for PE32 object files.
 enum MAGIC_PE32 = CHAR32!"PE\0\0";
+/// Rich PE Header start ID
+enum MAGIC_RICH_BEGID = CHAR32!"DanS";
+/// Rich PE Header end ID
+enum MAGIC_RICH_ENDID = CHAR32!"Rich";
 
 private enum {
 	/// Minimum file size for PE32.
@@ -804,6 +811,22 @@ struct pe_section_entry_t { align(1):
 }
 alias PE_SECTION_ENTRY = pe_section_entry_t;
 
+struct pe_rich_header_item_t {
+	union {
+		uint id;
+		struct {
+			ushort buildId;
+			ushort prodId;
+		}
+	}
+	uint count;
+}
+struct pe_rich_header_t {
+	uint[4] magic; // and padding
+	size_t itemcount;
+	pe_rich_header_item_t *items;
+}
+
 private
 struct internal_pe_t {
 	pe_header_t header;
@@ -812,6 +835,9 @@ struct internal_pe_t {
 		pe_optional_header64_t optheader64;
 		pe_optional_headerrom_t optheaderrom;
 	}
+	
+	mz_header_t mz_header;
+	
 	pe_image_data_directory_t directory;
 	uint locsections;
 	pe_section_entry_t *sections;
@@ -836,24 +862,31 @@ struct internal_pe_t {
 		pe_load_config_dir64_t *load64_directory;
 	}
 	bool r_loaddir;
+	
+	void *rich_header_buffer;
+	size_t rich_buffer_size;
+	pe_rich_header_t rich_header;
 }
 
 /// (Internal) Called by the server to preload a PE object.
 /// Params:
 /// 	o = Object instance.
-/// 	e_lfanew = Location of PE COFF Header.
+/// 	mzhdr = MZ Header instance.
 /// Returns: Error code.
-int adbg_object_pe_load(adbg_object_t *o, uint e_lfanew) {
+int adbg_object_pe_load(adbg_object_t *o, mz_header_t *mzhdr) {
+	assert(o);
+	assert(mzhdr);
 	o.internal = calloc(1, internal_pe_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, e_lfanew, o.internal, pe_header_t.sizeof)) {
+	if (adbg_object_read_at(o, mzhdr.e_lfanew, o.internal, pe_header_t.sizeof)) {
 		free(o.internal);
 		o.internal = null;
 		return adbg_errno();
 	}
+	internal_pe_t* internal = cast(internal_pe_t*)o.internal;
 	
-	pe_header_t *header = cast(pe_header_t*)o.internal;
+	pe_header_t *header = &internal.header;
 	with (header)
 	if (o.status & AdbgObjectInternalFlags.reversed) {
 		Signature32	= adbg_bswap32(Signature32);
@@ -866,7 +899,7 @@ int adbg_object_pe_load(adbg_object_t *o, uint e_lfanew) {
 		Characteristics	= adbg_bswap16(Characteristics);
 	}
 	
-	e_lfanew += pe_header_t.sizeof; // adjust to optional header
+	long e_lfanew = mzhdr.e_lfanew + pe_header_t.sizeof; // adjust to optional header
 	ushort optmagic = void;
 	if (adbg_object_read_at(o, e_lfanew, &optmagic, ushort.sizeof)) {
 		free(o.internal);
@@ -874,7 +907,6 @@ int adbg_object_pe_load(adbg_object_t *o, uint e_lfanew) {
 		return adbg_errno();
 	}
 	
-	internal_pe_t* internal = cast(internal_pe_t*)o.internal;
 	switch (optmagic) {
 	case PE_CLASS_32:
 		if (adbg_object_read_at(o, e_lfanew, &internal.optheader, pe_optional_header_t.sizeof)) {
@@ -995,7 +1027,7 @@ int adbg_object_pe_load(adbg_object_t *o, uint e_lfanew) {
 		return adbg_oops(AdbgError.objectInvalidClass);
 	}
 	
-	internal.locsections = e_lfanew; // updated to point at section headers
+	internal.locsections = mzhdr.e_lfanew; // updated to point at section headers
 	
 	// If reversed and it's not a "rom" image, swap dictionary entries
 	if (o.status & AdbgObjectInternalFlags.reversed && optmagic != PE_CLASS_ROM) with (internal.directory) {
@@ -1033,6 +1065,8 @@ int adbg_object_pe_load(adbg_object_t *o, uint e_lfanew) {
 		Reserved.size	= adbg_bswap32(Reserved.size);
 	}
 	
+	memcpy(&internal.mz_header, mzhdr, mz_header_t.sizeof);
+	
 	adbg_object_postload(o, AdbgObject.pe, &adbg_object_pe_unload);
 	
 	return 0;
@@ -1042,20 +1076,22 @@ void adbg_object_pe_unload(adbg_object_t *o) {
 	if (o == null) return;
 	if (o.internal == null) return;
 	
-	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+	with (cast(internal_pe_t*)o.internal) {
+	if (sections) free(sections);
+	if (r_sections) free(r_sections);
 	
-	if (internal.sections) free(internal.sections);
-	if (internal.r_sections) free(internal.r_sections);
+	if (export_directory) free(export_directory);
+	if (r_export_entries) free(r_export_entries);
 	
-	if (internal.export_directory) free(internal.export_directory);
-	if (internal.r_export_entries) free(internal.r_export_entries);
+	if (import_buffer) free(import_buffer);
 	
-	if (internal.import_buffer) free(internal.import_buffer);
+	if (debug_buffer) free(debug_buffer);
+	if (r_debug_entries) free(r_debug_entries);
 	
-	if (internal.debug_buffer) free(internal.debug_buffer);
-	if (internal.r_debug_entries) free(internal.r_debug_entries);
+	if (load32_directory) free(load32_directory);
 	
-	if (internal.load32_directory) free(internal.load32_directory);
+	if (rich_header_buffer) free(rich_header_buffer);
+	}
 	
 	free(o.internal);
 }
@@ -1166,6 +1202,129 @@ pe_image_data_directory_t* adbg_object_pe_directories(adbg_object_t *o) {
 		return null;
 	}
 	return &internal.directory;
+}
+
+mz_header_t* adbg_object_pe_mz_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	internal_pe_t* internal = cast(internal_pe_t*)o.internal;
+	return &internal.mz_header;
+}
+
+// NOTE: Observed offsets are all 4-byte aligned compatible
+pe_rich_header_t* adbg_object_pe_rich_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	internal_pe_t* internal = cast(internal_pe_t*)o.internal;
+	if (internal.rich_buffer_size)
+		return &internal.rich_header;
+	
+	// The rich signature is in-between the DOS stub and the PE header.
+	// We'll need at least that much memory, but usually not after 1.5 KiB.
+	with (internal) {
+		size_t bsize = adbg_aligndown(mz_header.e_lfanew - mz_header_t.sizeof, uint.sizeof);
+		rich_buffer_size = min(bsize, MiB!1);
+		version(Trace) trace("bsize=%zu ebsize=%zu", bsize, rich_buffer_size);
+		rich_header_buffer = adbg_object_readalloc_at(o, mz_header_t.sizeof, rich_buffer_size, 0);
+		if (rich_header_buffer == null)
+			return null;
+	}
+	
+	// 1. Starting from the DOS stub, go upwards to locate header end
+	// 2. Downwards, try the XOR key on 4-byte values until we find header start
+	// 3. Verify NULL padding
+	// 4. Get entries by XOR'ing the key
+	uint *p = cast(uint*)internal.rich_header_buffer;
+	uint *max = cast(uint*)(internal.rich_header_buffer + internal.rich_buffer_size);
+	void *min = void;
+	size_t c = void;
+	
+	// Find end of header
+	uint k; // xor key
+	for (; p < max; ++p) {
+		if (*p != MAGIC_RICH_ENDID)
+			continue;
+		if (p + 3 >= max) // key position + padding
+			goto Lnotfound;
+		if (p[2] || p[3]) continue; // padding must be null
+		k = p[1];
+		version(Trace) trace("k=%x", k);
+		break;
+	}
+	
+	if (k == 0)
+		goto Lnotfound;
+	
+	// Find start of header
+	min = cast(uint*)internal.rich_header_buffer;
+	for (c = 0, p -= 2; p >= min; p -= 2, ++c) {
+		// Match signature and 3 null paddings
+		version(Trace) trace("m=%x p1=%x p2=%x p3=%x xor m=%x p1=%x p2=%x p3=%x",
+			*p, p[1], p[2], p[3],
+			(*p ^ k), p[1]^k, p[2]^k, p[3]^k);
+		if ((*p ^ k) != MAGIC_RICH_BEGID || p[1] ^ k || p[2] ^ k || p[3] ^ k)
+			continue;
+		
+		// Found starting signature
+		version(Trace) trace("count=%zu", c);
+		internal.rich_header.itemcount = c;
+		internal.rich_header.items = cast(pe_rich_header_item_t*)(p + 4);
+		
+		// Pass XOR key to values
+		pe_rich_header_item_t *item = internal.rich_header.items;
+		for (size_t i; i < c; ++i, ++item) {
+			item.id    ^= k;
+			item.count ^= k;
+		}
+		
+		return &internal.rich_header;
+	}
+	
+Lnotfound:
+	adbg_oops(AdbgError.objectItemNotFound);
+	free(internal.rich_header_buffer);
+	internal.rich_header_buffer = null;
+	return null;
+}
+
+const(char)* adbg_object_pe_rich_prodid_string(ushort prodid) {
+	switch (prodid) {
+	case 0x0001:	return "Linker generated import object version 0";
+	case 0x0002:	return "LINK 5.10 (Visual Studio 97 SP3)";
+	case 0x0003:	return "LINK 5.10 (Visual Studio 97 SP3) OMF to COFF conversion";
+	case 0x0004:	return "LINK 6.00 (Visual Studio 98)";
+	case 0x0005:	return "LINK 6.00 (Visual Studio 98) OMF to COFF conversion";
+	case 0x0006:	return "CVTRES 5.00";
+	case 0x0007:	return "VB 5.0 native code";
+	case 0x0008:	return "VC++ 5.0 C/C++";
+	case 0x0009:	return "VB 6.0 native code";
+	case 0x000A:	return "VC++ 6.0 C";
+	case 0x000B:	return "VC++ 6.0 C++";
+	case 0x000C:	return "ALIASOBJ.EXE (CRT Tool that builds OLDNAMES.LIB)";
+	case 0x000D:	return "VB 6.0 generated object";
+	case 0x000E:	return "MASM 6.13";
+	case 0x000F:	return "MASM 7.01";
+	case 0x0010:	return "LINK 5.11";
+	case 0x0011:	return "LINK 5.11 OMF to COFF conversion";
+	case 0x0012:	return "MASM 6.14 (MMX2 support)";
+	case 0x0013:	return "LINK 5.12";
+	case 0x0014:	return "LINK 5.12 OMF to COFF conversion";
+	default:	return null;
+	}
 }
 
 pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {

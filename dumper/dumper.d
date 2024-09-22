@@ -341,11 +341,22 @@ void print_stringf(const(char)* name, const(char)* fmt, ...) {
 }
 
 void print_warningf(const(char)* fmt, ...) {
-	printf("%*s: ", __field_padding, "warning".ptr);
+	printf("\nwarning: ");
 	va_list list = void;
 	va_start(list, fmt);
 	vprintf(fmt, list);
 	putchar('\n');
+}
+
+void printf_x16(const(char) *fmt, ushort val, ...) {
+	// Format field
+	va_list list = void;
+	va_start(list, val);
+	char[128] b = void;
+	vsnprintf(b.ptr, 128, fmt, list);
+	
+	// Print field and value
+	printf("%*s: 0x%04x\n", __field_padding, b.ptr, val);
 }
 
 // exists due to int promotion

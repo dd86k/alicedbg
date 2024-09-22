@@ -164,7 +164,6 @@ struct adbg_object_t {
 	/// Loaded object format.
 	AdbgObject format;
 	
-	// NOTE: Sub modules are free to use upper 16 bits
 	/// Internal status flags. (e.g., swapping required)
 	int status;
 	
@@ -432,8 +431,9 @@ int adbg_object_loadv(adbg_object_t *o) {
 		if (sig.mzheader.e_lfanew <= mz_header_t.sizeof)
 			return adbg_object_mz_load(o);
 		
-		// ReactOS checks if NtHeaderOffset is not higher than 256 MiB
-		//TODO: Consider if malformed.
+		// ReactOS checks if NtHeaderOffset is not higher than 256 MiB.
+		// See: sdk/lib/rtl/image.c:RtlpImageNtHeaderEx
+		//TODO: Consider if object malformed.
 		if (sig.mzheader.e_lfanew >= MiB!256)
 			return adbg_object_mz_load(o);
 		
@@ -441,12 +441,11 @@ int adbg_object_loadv(adbg_object_t *o) {
 		if (adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof))
 			return adbg_errno();
 		
-		version (Trace) trace("newsig=%#x", newsig);
-		
 		// 32-bit signature check
+		version (Trace) trace("newsig=%#x", newsig);
 		switch (newsig) {
 		case MAGIC_PE32:
-			return adbg_object_pe_load(o, sig.mzheader.e_lfanew);
+			return adbg_object_pe_load(o, &sig.mzheader);
 		default:
 		}
 		

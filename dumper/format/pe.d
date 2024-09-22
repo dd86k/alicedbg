@@ -9,7 +9,7 @@ import adbg.disassembler;
 import adbg.objectserver;
 import adbg.machines : AdbgMachine;
 import adbg.objects.pe;
-import adbg.objects.mz : mz_hdr_ext;
+import adbg.objects.mz : mz_header_t;
 import adbg.utils.date : ctime32;
 import adbg.utils.uid, adbg.utils.bit;
 import adbg.error;
@@ -55,6 +55,29 @@ void dump_pe_hdr(adbg_object_t *o) {
 		return;
 	}
 	
+	
+	print_header("Legacy Header");
+	
+	mz_header_t* mzheader = adbg_object_pe_mz_header(o);
+	with (mzheader) {
+	print_u16("e_cblp", e_cblp);
+	print_u16("e_cp", e_cp);
+	print_u16("e_crlc", e_crlc);
+	print_u16("e_cparh", e_cparh);
+	print_u16("e_minalloc", e_minalloc);
+	print_u16("e_maxalloc", e_maxalloc);
+	print_x16("e_ss", e_ss);
+	print_x16("e_sp", e_sp);
+	print_x16("e_csum", e_csum);
+	print_x16("e_ip", e_ip);
+	print_x16("e_cs", e_cs);
+	print_x16("e_lfarlc", e_lfarlc);
+	print_u16("e_ovno", e_ovno);
+	for (size_t i; i < e_res.length; ++i)
+		printf_x16("e_res[%u]", e_res[i], cast(uint)i);
+	print_x32("e_lfanew", e_lfanew);
+	}
+	
 	print_header("Header");
 	
 	with (header) {
@@ -85,6 +108,7 @@ void dump_pe_hdr(adbg_object_t *o) {
 	}
 	
 	dump_pe_opthdr(o);
+	dump_pe_richhdr(o);
 }
 
 void dump_pe_opthdr(adbg_object_t *o) {
@@ -201,6 +225,21 @@ void dump_pe_dllcharactiristics(ushort dllchars) {
 		"GUARD_CF".ptr,	PE_DLLCHARACTERISTICS_GUARD_CF,
 		"TERMINAL_SERVER_AWARE".ptr,	PE_DLLCHARACTERISTICS_TERMINAL_SERVER_AWARE,
 		null);
+}
+
+void dump_pe_richhdr(adbg_object_t *o) {
+	pe_rich_header_t *rich = adbg_object_pe_rich_header(o);
+	if (rich == null) {
+		debug print_warningf("Cannot get rich header: %s", adbg_error_message());
+		return;
+	}
+	
+	print_header("Rich Header");
+	for (size_t i; i < rich.itemcount; ++i) with (rich.items[i]) {
+		print_x16("buildId", buildId);
+		print_x16("prodId", prodId, adbg_object_pe_rich_prodid_string(prodId));
+		print_u32("count", count);
+	}
 }
 
 void dump_pe_dirs(adbg_object_t *o) {
