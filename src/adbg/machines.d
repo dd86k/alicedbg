@@ -85,9 +85,7 @@ enum AdbgMachine {
 	sparc8p,
 	/// SPARC Version 9
 	sparc9,
-	
-	/// RISC-V (any)
-	riscv,
+
 	/// RISC-V RV32
 	riscv32,
 	/// RISC-V RV64
@@ -528,7 +526,6 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.sparc9,  "sparc9", "sparc64", "SPARC Version 9" },
 	
 	// RISC-V
-	{ AdbgMachine.riscv,    "riscv", null, "RISC-V" },
 	{ AdbgMachine.riscv32,  "riscv32", null, "RISC-V 32-bit" },
 	{ AdbgMachine.riscv64,  "riscv64", null, "RISC-V 64-bit" },
 	{ AdbgMachine.riscv128, "riscv128", null, "RISC-V 128-bit" },
@@ -858,4 +855,5 @@ immutable(adbg_machine_t)* adbg_machine_select(const(char) *alias_) {
 	assert(adbg_machine_select("i386").machine == AdbgMachine.i386);
 	assert(adbg_machine_select("amd64").machine == AdbgMachine.amd64);
 	assert(adbg_machine_select("mips").machine == AdbgMachine.mips);
+	assert(adbg_machine_select("sparc64").machine == AdbgMachine.sparc9);
 }

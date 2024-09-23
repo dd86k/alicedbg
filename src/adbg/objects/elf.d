@@ -1797,7 +1797,13 @@ AdbgMachine adbg_object_elf_machine(adbg_object_t *o) {
 	case ELF_EM_FT32:	return AdbgMachine.ftdi;
 	case ELF_EM_MOXIE:	return AdbgMachine.moxie;
 	case ELF_EM_AMDGPU:	return AdbgMachine.amdgpu;
-	case ELF_EM_RISCV:	return AdbgMachine.riscv;
+	case ELF_EM_RISCV:
+		switch (internal.eheader32.e_ident[ELF_EI_CLASS]) {
+		case ELF_CLASS_32: return AdbgMachine.riscv32;
+		case ELF_CLASS_64: return AdbgMachine.riscv64;
+		default:
+		}
+		goto default;
 	case ELF_EM_LOONGARCH:
 		switch (internal.eheader32.e_ident[ELF_EI_CLASS]) {
 		case ELF_CLASS_32: return AdbgMachine.loongarch32;

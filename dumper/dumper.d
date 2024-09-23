@@ -507,7 +507,8 @@ int dump_disassemble_object(adbg_object_t *o,
 }
 
 int dump_disassemble(AdbgMachine machine, void* data, ulong size, ulong base_address) {
-	adbg_disassembler_t *dis = adbg_dis_open(machine);
+	// Overrides
+	adbg_disassembler_t *dis = adbg_dis_open(opt_machine ? opt_machine : machine);
 	if (dis == null)
 		panic_adbg();
 	scope(exit) adbg_dis_close(dis);

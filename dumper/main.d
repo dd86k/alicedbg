@@ -10,7 +10,6 @@ import adbg.include.c.stdlib : exit;
 import adbg.process.base : adbg_process_t;
 import adbg.process.exception : adbg_exception_t, adbg_exception_name;
 import adbg.self;
-import adbg.machines : adbg_machine_default;
 import adbg.disassembler;
 import adbg.error;
 import core.stdc.stdlib : EXIT_FAILURE;

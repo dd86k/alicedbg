@@ -36,8 +36,13 @@ import core.stdc.stdlib : malloc, free;
 //       IA64: 16 bytes
 //       Alpha: 4 bytes
 
+// NOTE: Instruction buffer
+//       Some decoders, like Capstone, is keen to go over architectural
+//       limits in some cases. Like with x86, where its architectural limit
+//       is 15 Bytes, CS might act weird and go over that, so we bump the
+//       buffer when this happens.
 /// Maximum instruction size in bytes.
-enum MAX_INSTR_SIZE = 16;
+enum MAX_INSTR_SIZE = 24;
 
 version (X86) { // CS_OPT_SYNTAX_DEFAULT
 	private enum {
@@ -177,71 +182,58 @@ enum AdbgDisOpt {
 	//mode = 3,
 }
 
+private
+struct dismachine_t {
+	AdbgMachine mach;
+	int cs_arch;
+	int cs_mode;
+}
+
+// TODO: Machine aliases?
+//       like sparc8p to sparc9
+private // "tested" here means that the MODE values work for CS with a sample
+immutable dismachine_t[] machmap_capstone = [
+	{ AdbgMachine.i8086,	CS_ARCH_X86,	CS_MODE_16 }, // tested
+	{ AdbgMachine.i386,	CS_ARCH_X86,	CS_MODE_32 }, // tested
+	{ AdbgMachine.amd64,	CS_ARCH_X86,	CS_MODE_64 }, // tested
+	{ AdbgMachine.thumb,	CS_ARCH_ARM,	CS_MODE_THUMB },
+	{ AdbgMachine.thumb32,	CS_ARCH_ARM,	CS_MODE_THUMB | CS_MODE_V8 },
+	{ AdbgMachine.arm,	CS_ARCH_ARM,	CS_MODE_ARM | CS_MODE_V8 }, // tested
+	{ AdbgMachine.aarch64,	CS_ARCH_ARM64,	0 }, // tested
+	{ AdbgMachine.ppc,	CS_ARCH_PPC,	CS_MODE_32 | CS_MODE_BIG_ENDIAN }, // tested
+	{ AdbgMachine.ppcle,	CS_ARCH_PPC,	CS_MODE_32 | CS_MODE_LITTLE_ENDIAN }, // tested
+	{ AdbgMachine.ppc64,	CS_ARCH_PPC,	CS_MODE_64 | CS_MODE_BIG_ENDIAN },
+	{ AdbgMachine.ppc64le,	CS_ARCH_PPC,	CS_MODE_64 | CS_MODE_LITTLE_ENDIAN },
+	{ AdbgMachine.mips,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_BIG_ENDIAN }, // tested
+	{ AdbgMachine.mipsle,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_LITTLE_ENDIAN },
+	{ AdbgMachine.mipsii,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_MIPS2 | CS_MODE_BIG_ENDIAN },
+	{ AdbgMachine.mipsiii,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_MIPS3 | CS_MODE_BIG_ENDIAN },
+	{ AdbgMachine.mipsiv,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_MIPS32 | CS_MODE_BIG_ENDIAN },
+	{ AdbgMachine.sparc,	CS_ARCH_SPARC,	0 },
+	{ AdbgMachine.sparc9,	CS_ARCH_SPARC,	CS_MODE_V9 }, // tested
+	{ AdbgMachine.systemz,	CS_ARCH_SYSZ,	0 }, // tested
+];
+
 // Platform to CS' ARCH and MODE types
 private
 int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
-	switch (platform) with (AdbgMachine) {
-	case unknown: // No explicit choice, use target defaults
+	if (platform == AdbgMachine.unknown) {
 		cs_arch = CS_DEFAULT_PLATFORM;
 		cs_mode = CS_DEFAULT_MODE;
-		break;
-	//
-	// x86
-	//
-	case i8086:
-		cs_arch = CS_ARCH_X86;
-		cs_mode = CS_MODE_16;
-		break;
-	case i386:
-		cs_arch = CS_ARCH_X86;
-		cs_mode = CS_MODE_32;
-		break;
-	case amd64:
-		cs_arch = CS_ARCH_X86;
-		cs_mode = CS_MODE_64;
-		break;
-	//
-	// Arm
-	//
-	case thumb:
-		cs_arch = CS_ARCH_ARM;
-		cs_mode = CS_MODE_THUMB;
-		break;
-	case thumb32:
-		cs_arch = CS_ARCH_ARM;
-		cs_mode = CS_MODE_THUMB | CS_MODE_V8;
-		break;
-	case arm:
-		cs_arch = CS_ARCH_ARM;
-		cs_mode = CS_MODE_ARM | CS_MODE_V8;
-		break;
-	case aarch64:
-		cs_arch = CS_ARCH_ARM64;
-		cs_mode = CS_MODE_ARM | CS_MODE_V8;
-		break;
-	//
-	// PowerISA
-	//
-	case ppc:
-		cs_arch = CS_ARCH_PPC;
-		cs_mode = CS_MODE_32;
-		break;
-	case ppc64:
-		cs_arch = CS_ARCH_PPC;
-		cs_mode = CS_MODE_64;
-		break;
-	//
-	// Others
-	//
-	default:
-		return adbg_oops(AdbgError.disasmUnsupportedMachine);
+		return 0;
 	}
-	return 0;
+	foreach (ref immutable(dismachine_t) dismach; machmap_capstone) {
+		if (platform != dismach.mach)
+			continue;
+		cs_arch = dismach.cs_arch;
+		cs_mode = dismach.cs_mode;
+		return 0;
+	}
+	return adbg_oops(AdbgError.disasmUnsupportedMachine);
 }
 
 /// Open a disassembler instance.
-/// Params:
-///   machine = Machine architecture.
+/// Params: machine = Machine architecture.
 /// Returns: Error code.
 adbg_disassembler_t* adbg_dis_open(AdbgMachine machine = AdbgMachine.unknown) {
 	//TODO: static if (CAPSTONE_DYNAMIC)
@@ -259,15 +251,15 @@ adbg_disassembler_t* adbg_dis_open(AdbgMachine machine = AdbgMachine.unknown) {
 	}
 	
 	if (cs_open(cs_arch, cs_mode, &dasm.cs_handle)) {
-		free(dasm);
 		adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
+		free(dasm);
 		return null;
 	}
 	
 	dasm.cs_inst = cs_malloc(dasm.cs_handle);
 	if (dasm.cs_inst == null) {
-		free(dasm);
 		adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
+		free(dasm);
 		return null;
 	}
 	
@@ -290,20 +282,13 @@ void adbg_dis_close(adbg_disassembler_t *dasm) {
 	free(dasm);
 }
 
+// HACK: Index parameter since I cannot simply give list linearly
 /// Returns a null-terminated list of machines that the disassembler supports.
 /// Returns: Pointer to null-terminated list.
-immutable(AdbgMachine)* adbg_dis_machines() {
-	static immutable AdbgMachine[] mlist = [
-		AdbgMachine.i8086,
-		AdbgMachine.i386,
-		AdbgMachine.amd64,
-		AdbgMachine.thumb,
-		AdbgMachine.thumb32,
-		AdbgMachine.arm,
-		AdbgMachine.aarch64,
-		AdbgMachine.unknown, // null-terminator
-	];
-	return mlist.ptr;
+immutable(AdbgMachine)* adbg_dis_machines(size_t i) {
+	if (i >= machmap_capstone.length)
+		return null;
+	return &machmap_capstone[i].mach;
 }
 
 /// Configure an option to the disassembler.

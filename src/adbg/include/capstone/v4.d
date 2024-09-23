@@ -17,8 +17,6 @@ import adbg.include.capstone.tms320c64x;
 import adbg.include.capstone.x86;
 import adbg.include.capstone.xcore;
 
-extern (C):
-
 /* Capstone Disassembly Engine */
 /* By Nguyen Anh Quynh <aquynh@gmail.com>, 2013-2016 */
 
@@ -37,10 +35,12 @@ enum CS_VERSION_EXTRA = 0;
 
 /// Macro to create combined version which can be compared to
 /// result of cs_version() API.
-extern (D) auto CS_MAKE_VERSION(T0, T1)(auto ref T0 major, auto ref T1 minor)
+template CS_MAKE_VERSION(int T0, int T1)
 {
-    return (major << 8) + minor;
+    enum CS_MAKE_VERSION = (major << 8) + minor;
 }
+
+extern (C):
 
 /// Maximum size of an instruction mnemonic string.
 enum CS_MNEMONIC_SIZE = 32;
@@ -51,18 +51,18 @@ alias csh = size_t;
 /// Architecture type
 enum
 {
-    CS_ARCH_ARM = 0,    ///< ARM architecture (including Thumb, Thumb-2)
-    CS_ARCH_ARM64 = 1,  ///< ARM-64, also called AArch64
-    CS_ARCH_MIPS = 2,   ///< Mips architecture
-    CS_ARCH_X86 = 3,    ///< X86 architecture (including x86 & x86-64)
-    CS_ARCH_PPC = 4,    ///< PowerPC architecture
-    CS_ARCH_SPARC = 5,  ///< Sparc architecture
-    CS_ARCH_SYSZ = 6,   ///< SystemZ architecture
-    CS_ARCH_XCORE = 7,  ///< XCore architecture
-    CS_ARCH_M68K = 8,   ///< 68K architecture
-    CS_ARCH_TMS320C64X = 9, ///< TMS320C64x architecture
-    CS_ARCH_M680X = 10, ///< 680X architecture
-    CS_ARCH_EVM = 11,   ///< Ethereum architecture
+    CS_ARCH_ARM = 0,    /// ARM architecture (including Thumb, Thumb-2)
+    CS_ARCH_ARM64 = 1,  /// ARM-64, also called AArch64
+    CS_ARCH_MIPS = 2,   /// Mips architecture
+    CS_ARCH_X86 = 3,    /// X86 architecture (including x86 & x86-64)
+    CS_ARCH_PPC = 4,    /// PowerPC architecture
+    CS_ARCH_SPARC = 5,  /// Sparc architecture
+    CS_ARCH_SYSZ = 6,   /// SystemZ architecture
+    CS_ARCH_XCORE = 7,  /// XCore architecture
+    CS_ARCH_M68K = 8,   /// 68K architecture
+    CS_ARCH_TMS320C64X = 9, /// TMS320C64x architecture
+    CS_ARCH_M680X = 10, /// 680X architecture
+    CS_ARCH_EVM = 11,   /// Ethereum architecture
     CS_ARCH_MAX = 12,
     CS_ARCH_ALL = 0xFFFF // All architectures - for cs_support()
 }
