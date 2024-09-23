@@ -15,6 +15,8 @@ import adbg.error;
 //       This avoids (mostly) possible collisions.
 
 // TODO: Remove "riscv" value, and force a way to check for bitness (class)
+// TODO: Replace alias1/alias2
+//       with either static or immutable dynamic array
 
 /// Object machine type.
 enum AdbgMachine {
@@ -58,10 +60,14 @@ enum AdbgMachine {
 	romp,
 	/// PowerPC/PowerISA
 	ppc,
+	/// PowerPC/PowerISA Little-Endian
+	ppcle,
 	/// PowerPC with FPU
 	ppcfpu,
 	/// PowerPC64/PowerISA 64-bit
 	ppc64,
+	/// PowerPC64/PowerISA 64-bit Little-Endian
+	ppc64le,
 	/// IBM System/370
 	s370,
 	/// IBM System/390
@@ -89,23 +95,26 @@ enum AdbgMachine {
 	/// RISC-V RV128
 	riscv128,
 	
+	// NOTE: MIPS32 is based on MIPS II with features from III, IV, and V
+	// NOTE: MIPS64 support could be added with, for example, "mipsii64"
+	
 	/// Stanford MIPS-X
 	mipsx,
-	/// MIPS I (R3000)
+	/// MIPS I (R2000)
 	mips,
-	/// MIPS I (R3000) with FPU
+	/// MIPS I with FPU
 	mipsfpu,
-	/// MIPS I (R3000) Little-Endian
+	/// MIPS I Little-Endian
 	mipsle,
-	/// MIPS16
+	/// MIPS16 (microMIPS related?)
 	mips16,
 	/// MIPS16 with FPU
 	mips16fpu,
-	/// MIPS II (R4000)
+	/// MIPS II (R6000)
 	mipsii,
-	/// MIPS III (R4000)
+	/// MIPS III (R4000), support for 64-bit
 	mipsiii,
-	/// MIPS IV (R10000)
+	/// MIPS IV (R8000)
 	mipsiv,
 	/// MIPS little-endian WCE v2
 	mipswcele,
@@ -354,7 +363,7 @@ enum AdbgMachine {
 	/// Ubicom IP2xxx
 	ip2k,
 	/// MAX
-	max,
+	max_,
 	/// Analog Devices Blackfin DSP
 	blackfin,
 	/// Sharp
@@ -503,18 +512,20 @@ immutable adbg_machine_t[] machines = [
 	// IBM
 	{ AdbgMachine.romp,   "romp", null, "IBM ROMP" },
 	{ AdbgMachine.ppc,    "ppc", null, "IBM PowerPC" },
+	{ AdbgMachine.ppcle,  "ppcle", null, "IBM PowerPC Little-Endian" },
 	{ AdbgMachine.ppcfpu, "ppcfpu", null, "IBM PowerPC with FPU" },
 	{ AdbgMachine.ppc64,  "ppc64", null, "IBM PowerPC 64-bit" },
+	{ AdbgMachine.ppc64le,"ppc64le", null, "IBM PowerPC 64-bit Little-Endian" },
 	{ AdbgMachine.s370,   "s370", null, "IBM System/370" },
 	{ AdbgMachine.s390,   "s390", null, "IBM System/390" },
 	{ AdbgMachine.spu,    "spu", null, "IBM SPU/SPC" },
 	{ AdbgMachine.rs6000, "rs6000", null, "IBM RS/6000" },
-	{ AdbgMachine.systemz,"systemz", null, "IBM z/Architecture" },
+	{ AdbgMachine.systemz,"systemz", "s390x", "IBM z/Architecture" },
 	
 	// Sun Microsystems
 	{ AdbgMachine.sparc,   "sparc", null, "SPARC" },
 	{ AdbgMachine.sparc8p, "sparc8p", null, "Enhanced SPARC Version 8+" },
-	{ AdbgMachine.sparc9,  "sparc9", null, "SPARC Version 9" },
+	{ AdbgMachine.sparc9,  "sparc9", "sparc64", "SPARC Version 9" },
 	
 	// RISC-V
 	{ AdbgMachine.riscv,    "riscv", null, "RISC-V" },
@@ -525,8 +536,8 @@ immutable adbg_machine_t[] machines = [
 	// MIPS
 	{ AdbgMachine.mipsx,     "mipsx", null, "Stanford MIPS-X" },
 	{ AdbgMachine.mips,      "mips", "rs3000", "MIPS I RS3000" },
-	{ AdbgMachine.mipsfpu,   "mipsfpu", "rs3000", "MIPS I RS3000 with FPU" },
-	{ AdbgMachine.mipsle,    "mipsle", "rs3000", "MIPS I RS3000 Little-Endian" },
+	{ AdbgMachine.mipsfpu,   "mipsfpu", null, "MIPS I RS3000 with FPU" },
+	{ AdbgMachine.mipsle,    "mipsle", null, "MIPS I RS3000 Little-Endian" },
 	{ AdbgMachine.mips16,    "mips16", null, "MIPS16" },
 	{ AdbgMachine.mips16fpu, "mips16fpu", null, "MIPS16 with FPU" },
 	{ AdbgMachine.mipsii,    "mipsii", "r3000", "MIPS II R3000" },
@@ -691,7 +702,7 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.tpc,	"tpc", null, "Tenor Network TPC" },
 	{ AdbgMachine.snp1k,	"snp1k", null, "Trebia SNP 1000" },
 	{ AdbgMachine.ip2k,	"ip2k", null, "Ubicom IP2xxx" },
-	{ AdbgMachine.max,	"max", null, "MAX" },
+	{ AdbgMachine.max_,	"max", null, "MAX" }, // overrides .max property...
 	{ AdbgMachine.blackfin,	"blackfin", null, "Analog Devices Blackfin DSP" },
 	{ AdbgMachine.sep,	"sep", null, "Sharp" },
 	{ AdbgMachine.arca,	"arca", null, "Arca RISC" },
@@ -746,17 +757,14 @@ immutable adbg_machine_t[] machines = [
 	{ AdbgMachine.veo,	"veo", null, "VEO" },
 ];
 
-//
-// Target default machine
-//
+static assert(cast(int)machines.length == AdbgMachine.max, "Count mistmatch");
 
+// Target default machine
 version (X86)		private enum CURRENT_MACHINE = AdbgMachine.i386;
 else version (X86_64)	private enum CURRENT_MACHINE = AdbgMachine.amd64;
 else version (Arm)	private enum CURRENT_MACHINE = AdbgMachine.arm;
 else version (AArch64)	private enum CURRENT_MACHINE = AdbgMachine.aarch64;
 else version (PPC)	private enum CURRENT_MACHINE = AdbgMachine.ppc;
-else version (PPC_SoftFloat)	private enum CURRENT_MACHINE = AdbgMachine.ppcfpu;
-else version (PPC_HardFloat)	private enum CURRENT_MACHINE = AdbgMachine.ppcfpu;
 else version (PPC64)	private enum CURRENT_MACHINE = AdbgMachine.ppc64;
 else version (SPARC)	private enum CURRENT_MACHINE = AdbgMachine.sparc;
 else version (SPARC_V8Plus)	private enum CURRENT_MACHINE = AdbgMachine.sparc8p;
@@ -774,8 +782,6 @@ else static assert(false, "Add CURRENT_MACHINE for target");
 /// will be returned
 /// Returns: Machine value.
 AdbgMachine adbg_machine_current() { return CURRENT_MACHINE; }
-// Old alias
-alias adbg_machine_default = adbg_machine_current;
 
 /// Get the number of registered machine platforms.
 /// Returns: Count.
@@ -795,9 +801,10 @@ immutable(adbg_machine_t)* adbg_machine(AdbgMachine mach) {
 @system unittest {
 	assert(adbg_machine(cast(AdbgMachine)-1) == null);
 	assert(adbg_machine(cast(AdbgMachine)0)  == null);
+	assert(adbg_machine(AdbgMachine.i8086).machine  == AdbgMachine.i8086);
+	assert(adbg_machine(AdbgMachine.am33).machine   == AdbgMachine.am33);
 	for (size_t i = 1; i < machines.length; ++i) {
-		immutable(adbg_machine_t)* m =
-			adbg_machine(cast(AdbgMachine)i);
+		immutable(adbg_machine_t)* m = adbg_machine(cast(AdbgMachine)i);
 		assert(m);
 		assert(m.machine == cast(AdbgMachine)i);
 	}
@@ -823,21 +830,21 @@ const(char)* adbg_machine_name(AdbgMachine mach) {
 	return m.name;
 }
 
-/// Select a machine architecture from an alias name.
+/// Search a machine architecture by one of its alias name.
 /// Params: alias_ = Alias string.
 /// Returns: Machine pointer or null.
 immutable(adbg_machine_t)* adbg_machine_select(const(char) *alias_) {
-	// NOTE: strcmp is unlikely to check for null pointers.
-	//       Checked under musl 1.20.
-	for (size_t i = 1; i < machines.length; ++i) {
+	if (alias_ == null) return null;
+	
+	for (size_t i; i < machines.length; ++i) {
 		immutable(adbg_machine_t)* machine = &machines[i];
 		
-		if (machine.alias1 == null) continue;
-		if (strcmp(machine.alias1, alias_) == 0)
+		assert(machine.alias1);
+		if (strcmp(alias_, machine.alias1) == 0)
 			return machine;
 		
 		if (machine.alias2 == null) continue;
-		if (strcmp(machine.alias2, alias_) == 0)
+		if (strcmp(alias_, machine.alias2) == 0)
 			return machine;
 	}
 	
@@ -845,7 +852,10 @@ immutable(adbg_machine_t)* adbg_machine_select(const(char) *alias_) {
 	return null;
 }
 @system unittest {
-	assert(adbg_machine_select("I do not exist") == null);
+	assert(adbg_machine_select(null) == null);
+	assert(adbg_machine_select("I do not exist!") == null);
+	assert(adbg_machine_select("8086").machine == AdbgMachine.i8086);
 	assert(adbg_machine_select("i386").machine == AdbgMachine.i386);
 	assert(adbg_machine_select("amd64").machine == AdbgMachine.amd64);
+	assert(adbg_machine_select("mips").machine == AdbgMachine.mips);
 }

@@ -260,19 +260,19 @@ version (WinPersonality) {
 version (LinuxPersonality) {
 	char[64] path = void;
 	if (snprintf(path.ptr, 64, "/proc/%d/personality", proc.pid) <= 0)
-		return adbg_machine_default();
+		return adbg_machine_current();
 	int fd = open(path.ptr, O_RDONLY);
 	if (fd < 0)
-		return adbg_machine_default();
+		return adbg_machine_current();
 	// TODO: Extend to 16 chars just in case
 	if (read(fd, path.ptr, 8)) // re-use buffer that's no longer needed
-		return adbg_machine_default();
+		return adbg_machine_current();
 	path[8] = 0;
 	char *end = void;
 	uint personality = cast(uint)strtol(path.ptr, &end, 16);
 	if (personality & ADDR_LIMIT_32BIT) return PERSO32;
 }
-	return adbg_machine_default();
+	return adbg_machine_current();
 }
 
 /// Create a list of processes running on the system.

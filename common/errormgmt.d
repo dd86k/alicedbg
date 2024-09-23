@@ -6,7 +6,7 @@
 module common.errormgmt;
 
 import adbg.self;
-import adbg.machines : adbg_machine_default;
+import adbg.machines : adbg_machine_current;
 import adbg.disassembler;
 import adbg.process.base;
 import adbg.process.exception;
@@ -79,7 +79,7 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 		printf("Address    : %#zx\n", ex.faultz);
 		
 		adbg_opcode_t op = void;
-		adbg_disassembler_t *dis = adbg_dis_open(adbg_machine_default());
+		adbg_disassembler_t *dis = adbg_dis_open(adbg_machine_current());
 		printf("Instruction:");
 		if (dis && adbg_dis_process_once(dis, &op, proc, ex.fault_address) == 0) {
 			// Print machine bytes
