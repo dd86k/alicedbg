@@ -20,11 +20,11 @@ import common.errormgmt;
 import common.cli : opt_machine, opt_syntax;
 import common.utils;
 
-//TODO: Like print_flagsX, something for bit masks: print_mask
-//      signature: print_mask(name, flags, values...);
-//      usage: print_mask("something", "something", FLAGS, MASK, FLAG1, FLAG2, etc.)
-//TODO: print_wstringl (wide-string)
-//TODO: (disassembly) attach shortest and longuest instructions found to buffers
+// TODO: Like print_flagsX, something for bit masks: print_mask
+//       signature: print_mask(name, flags, values...);
+//       usage: print_mask("something", "something", FLAGS, MASK, FLAG1, FLAG2, etc.)
+// TODO: print_wstringl (wide-string)
+// TODO: (disassembly) attach shortest and longuest instructions found to buffers
 
 extern (C):
 __gshared:
@@ -249,14 +249,17 @@ void print_disasm_line(adbg_opcode_t *op, const(char)* msg = null) {
 		left -= l;
 	}
 	machine[tl] = 0;
-	printf(" %*s ", -24, machine.ptr);
+	printf("%*s ", -24, machine.ptr);
 	
-	// Print message or mnemonics
+	// Print the more important message
 	if (msg) {
 		puts(msg);
 		return;
 	}
-	printf("%*s %s\n", -10, op.mnemonic, op.operands);
+	
+	printf(op.mnemonic);
+	if (op.operands) printf("\t%s", op.operands);
+	putchar('\n');
 }
 
 void print_u8(const(char)* name, ubyte val, const(char) *meaning = null) {
