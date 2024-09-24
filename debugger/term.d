@@ -1,4 +1,4 @@
-/// In-house console/terminal library
+/// Terminal utility.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -7,8 +7,6 @@ module term;
 
 import core.stdc.stdlib;
 import adbg.include.c.stdio;
-
-//TODO: Consider using PDCurses instead
 
 // NOTE: Functions prefixed with "con" to avoid clashing with the "tc" POSIX stuff
 
@@ -21,7 +19,8 @@ version (Windows) {
 	private import core.sys.windows.windows;
 	private enum ALT_PRESSED =  RIGHT_ALT_PRESSED  | LEFT_ALT_PRESSED;
 	private enum CTRL_PRESSED = RIGHT_CTRL_PRESSED | LEFT_CTRL_PRESSED;
-	private __gshared HANDLE handleIn, handleOut, handleOld;
+	private __gshared HANDLE handleIn, handleOut, handleErr;
+	private __gshared ushort defaultColor;
 } else version (Posix) {
 	private import core.sys.posix.sys.ioctl;
 	private import core.sys.posix.unistd;
@@ -93,31 +92,97 @@ version (Posix) {
 } else {
 	handleOut = GetStdHandle(STD_OUTPUT_HANDLE);
 	handleIn  = GetStdHandle(STD_INPUT_HANDLE);
+	handleErr = GetStdHandle(STD_ERROR_HANDLE);
 	
 	// Disable annoying mouse mode.
 	DWORD mode = void;
 	GetConsoleMode(handleIn, &mode);
 	mode &= ~ENABLE_MOUSE_INPUT;
 	SetConsoleMode(handleIn, mode);
+	
+	CONSOLE_SCREEN_BUFFER_INFO csbi = void;
+	GetConsoleScreenBufferInfo(handleOut, &csbi);
+	defaultColor = csbi.wAttributes;
 }
 	return 0;
 }
 
-// Invert console color with defaultColor
-/*void thcolin() {
-	version (Windows)
-		SetConsoleTextAttribute(hOut, COMMON_LVB_REVERSE_VIDEO | defaultColor);
-	version (Posix)
-		fputs("\033[7m", stdout);
+/* windows:
+FOREGROUND_BLUE
+FOREGROUND_GREEN
+FOREGROUND_RED
+FOREGROUND_INTENSITY
+BACKGROUND_BLUE
+BACKGROUND_GREEN
+BACKGROUND_RED
+BACKGROUND_INTENSITY
+*/
+
+enum TextColor {
+	red,
+	yellow,
 }
 
-// Reset console color to defaultColor
-void thcolrst() {
-	version (Windows)
-		SetConsoleTextAttribute(hOut, defaultColor);
-	version (Posix)
-		fputs("\033[0m", stdout);
-}*/
+// https://ss64.com/nt/syntax-ansi.html
+// https://ss64.com/nt/color.html
+
+version (Windows)
+ushort concolor(TextColor color) {
+	final switch (color) {
+	case TextColor.red:    return FOREGROUND_RED;
+	case TextColor.yellow: return FOREGROUND_GREEN | FOREGROUND_RED;
+	}
+}
+
+version (Windows)
+HANDLE conhandle(FILE *stream) {
+	if (stream == stdout)
+		return handleOut;
+	else if (stream == stderr)
+		return handleErr;
+	assert(false, "no stream map");
+}
+
+version (Posix)
+const(char)* concolor(TextColor color) {
+	final switch (color) {
+	case TextColor.red   : return "\033[31m";
+	case TextColor.yellow: return "\033[33m";
+	}
+}
+
+// Set foreground text color for stdout
+void concoltext(TextColor color, FILE *stream = stdout) {
+version (Windows) {
+	ushort c = concolor(color);
+	HANDLE h = conhandle(stream);
+	SetConsoleTextAttribute(h, (defaultColor & 0xfff0) | c);
+}
+version (Posix) {
+	const(char) *c = concolor(color);
+	fputs(c, stream);
+}
+}
+
+// Invert console color with default color
+void concolinv(FILE *stream = stdout) {
+version (Windows) {
+	HANDLE h = conhandle(stream);
+	SetConsoleTextAttribute(h, COMMON_LVB_REVERSE_VIDEO | defaultColor);
+}
+version (Posix)
+	fputs("\033[7m", stream);
+}
+
+// Reset console color to default color
+void concolrst(FILE *stream = stdout) {
+version (Windows) {
+	HANDLE h = conhandle(stream);
+	SetConsoleTextAttribute(h, defaultColor);
+}
+version (Posix)
+	fputs("\033[0m", stream);
+}
 
 /// Clear screen
 void conclear() {
@@ -320,16 +385,14 @@ L_DEFAULT:
 char[] conrdln() {
 	import core.stdc.ctype : isprint;
 	
-	// GNU readline has this set to 512
-	enum BUFFERSIZE = 1024;
+	enum BUFFERSIZE = 512; // GNU readline has this set to 512
 	
 	__gshared char* buffer;
 	
-	if (buffer == null) {
+	if (buffer == null)
 		buffer = cast(char*)malloc(BUFFERSIZE);
-		if (buffer == null)
-			return null;
-	}
+	if (buffer == null)
+		return null;
 	
 	// NOTE: stdin is line-buffered by the host console in their own buffer.
 	//       Hitting return or enter makes the console write its buffer to stdin.
@@ -337,7 +400,7 @@ char[] conrdln() {
 	size_t len;
 	while (len < BUFFERSIZE) {
 		int c = getchar();
-		if (c == '\n' || c == EOF)
+		if (c == '\n' || c == EOF || c == 0)
 			break;
 		buffer[len++] = cast(char)c;
 	}

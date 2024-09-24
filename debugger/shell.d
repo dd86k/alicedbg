@@ -5,6 +5,8 @@
 /// License: BSD-3-Clause-Clear
 module shell;
 
+// TODO: Pre-load/Exit event handlers (e.g., closing disassembler) functions
+
 import adbg;
 import adbg.machines;
 import adbg.process;
@@ -20,6 +22,10 @@ import common.utils;
 import term;
 
 extern (C):
+
+enum { // Shell options
+	SHELL_NOCOLORS = 1, /// Disable colors for logger
+}
 
 /// 
 __gshared int opt_pid;
@@ -102,21 +108,17 @@ int shell_start(int argc, const(char)** argv) {
 		return 2;
 	}
 	
-	// Start process if specified
-	if (argc > 0 && argv) {
-		// Assume argv is null-terminated as it is on msvcrt and glibc
-		if (shell_proc_spawn(*argv, argc > 1 ? argv + 1 : null)) {
-			printf("Error: %s\n", adbg_error_message());
-			return 1;
-		}
-	} else if (opt_pid) { // Or attach to process if specified
-		if (shell_proc_attach(opt_pid)) {
-			printf("Error: %s\n", adbg_error_message());
-			return 1;
-		}
-	}
-	
 	coninit();
+	
+	// TODO: Use commands directly?
+	// Start or attach to process if specified
+	if (argc > 0 && argv && shell_spawn(*argv, argc > 1 ? argv + 1 : null)) {
+		logerror("Could not spawn process: %s", adbg_error_message());
+		return 1;
+	} else if (opt_pid && shell_attach(opt_pid)) {
+		logerror("Could not attach to process: %s", adbg_error_message());
+		return 1;
+	}
 	
 	int ecode = void;
 Lcommand:
@@ -127,8 +129,8 @@ Lcommand:
 	// also make its pointer null.
 	char* line = conrdln().ptr;
 	
-	// Invalid line or 
-	if (line == null || line[0] == 4) // 4 == ^D
+	// Invalid line or CTRL+D
+	if (line == null || line[0] == 4)
 		return 0;
 	
 	// External shell command
@@ -160,12 +162,15 @@ int shell_execv(int argc, const(char) **argv) {
 	immutable(command2_t) *command = shell_findcommand(ucommand);
 	if (command == null)
 		return ShellError.invalidCommand;
-	assert(command.entry);
+	
+	assert(command.entry, "Command missing entry function");
 	return command.entry(argc, argv);
 }
 
 private:
 __gshared:
+
+int shellflags;
 
 // NOTE: Process management
 //       Right now the shell is only capable of dealing with one process
@@ -182,29 +187,45 @@ const(char)** last_spawn_argv;
 FILE *logfd;
 int loginit(const(char) *path) {
 	logfd = path ? fopen(path, "wb") : stderr;
-	if (path) setvbuf(logfd, null, _IONBF, 0);
+	if (path) {
+		shellflags |= SHELL_NOCOLORS; // Override choice
+		setvbuf(logfd, null, _IONBF, 0);
+	}
 	return logfd == null;
 }
 void logerror(const(char) *fmt, ...) {
 	va_list args = void;
 	va_start(args, fmt);
-	logwrite("error", fmt, args);
+	
+	if ((shellflags & SHELL_NOCOLORS) == 0)
+		concoltext(TextColor.red, logfd);
+	fputs("error", logfd);
+	if ((shellflags & SHELL_NOCOLORS) == 0)
+		concolrst(logfd);
+	fputs(": ", logfd);
+	
+	logwrite(fmt, args);
 }
 void logwarn(const(char) *fmt, ...) {
 	va_list args = void;
 	va_start(args, fmt);
-	logwrite("warning", fmt, args);
+	
+	if ((shellflags & SHELL_NOCOLORS) == 0)
+		concoltext(TextColor.yellow, logfd);
+	fputs("warning", logfd);
+	if ((shellflags & SHELL_NOCOLORS) == 0)
+		concolrst(logfd);
+	fputs(": ", logfd);
+	
+	logwrite(fmt, args);
 }
 void loginfo(const(char) *fmt, ...) {
 	va_list args = void;
 	va_start(args, fmt);
-	logwrite(null, fmt, args);
+	
+	logwrite(fmt, args);
 }
-void logwrite(const(char) *level, const(char) *fmt, va_list args) {
-	if (level) {
-		fputs(level, logfd);
-		fputs(": ", logfd);
-	}
+void logwrite(const(char) *fmt, va_list args) {
 	vfprintf(logfd, fmt, args);
 	putchar('\n');
 }
@@ -509,8 +530,7 @@ immutable command2_t[] shell_commands = [
 ];
 
 immutable(command2_t)* shell_findcommand(const(char) *ucommand) {
-debug { // Crash command
-	static immutable(command2_t) ucommand_crash = {
+	debug static immutable(command2_t) ucommand_crash = {
 		[ "crash" ],
 		null,
 		[],
@@ -518,10 +538,9 @@ debug { // Crash command
 		[],
 		&command_crash
 	};
-	
-	if (strcmp(ucommand, ucommand_crash.names[0].ptr) == 0)
+	debug if (strcmp(ucommand, ucommand_crash.names[0].ptr) == 0)
 		return &ucommand_crash;
-} // debug
+	
 	// NOTE: Can't use foreach for local var escape
 	for (size_t i; i < shell_commands.length; ++i) {
 		immutable(command2_t) *cmd = &shell_commands[i];
@@ -535,7 +554,7 @@ debug { // Crash command
 	return null;
 }
 
-int shell_proc_spawn(const(char) *exec, const(char) **argv) {
+int shell_spawn(const(char) *exec, const(char) **argv) {
 	// Save for restart
 	last_spawn_exec = exec;
 	last_spawn_argv = argv;
@@ -563,7 +582,7 @@ int shell_proc_spawn(const(char) *exec, const(char) **argv) {
 	return 0;
 }
 
-int shell_proc_attach(int pid) {
+int shell_attach(int pid) {
 	// Save for restart
 	opt_pid = pid;
 	
@@ -787,15 +806,14 @@ int command_spawn(int argc, const(char) **argv) {
 	if (argc < 2)
 		return ShellError.missingArgument;
 	
-	// Assume argv is null-terminated
-	return shell_proc_spawn(argv[1], argv + 2);
+	return shell_spawn(argv[1], argv + 2);
 }
 
 int command_attach(int argc, const(char) **argv) {
 	if (argc < 2)
 		return ShellError.invalidParameter;
 	
-	return shell_proc_attach(atoi(argv[1]));
+	return shell_attach(atoi(argv[1]));
 }
 
 int command_detach(int argc, const(char) **argv) {
@@ -809,20 +827,21 @@ int command_detach(int argc, const(char) **argv) {
 int command_restart(int argc, const(char) **argv) {
 	int e;
 	
+	// TODO: Use commands directly?
 	switch (process.creation) with (AdbgCreation) {
 	case spawned:
 		// Terminate first, ignore on error (e.g., already gone)
 		adbg_debugger_terminate(process);
 		
 		// Spawn, shell still messages status
-		e = shell_proc_spawn(last_spawn_exec, last_spawn_argv);
+		e = shell_spawn(last_spawn_exec, last_spawn_argv);
 		break;
 	case attached:
 		// Detach first, ignore on error (e.g., already detached)
 		adbg_debugger_detach(process);
 		
 		// Attach, shell still messages status
-		e = shell_proc_attach(opt_pid);
+		e = shell_attach(opt_pid);
 		break;
 	default:
 		return ShellError.unattached;
