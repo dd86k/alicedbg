@@ -12,6 +12,7 @@ import adbg.error;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
+import adbg.os.path;
 import core.stdc.string;
 import common.errormgmt;
 import common.cli : opt_syntax;
@@ -159,6 +160,7 @@ int shell_execv(int argc, const(char) **argv) {
 	immutable(command2_t) *command = shell_findcommand(ucommand);
 	if (command == null)
 		return ShellError.invalidCommand;
+	assert(command.entry);
 	return command.entry(argc, argv);
 }
 
@@ -462,6 +464,24 @@ immutable command2_t[] shell_commands = [
 	//
 	// Shell
 	//
+	{
+		[ "pwd" ],
+		"Print the current working directory.",
+		[],
+		MODULE_SHELL, CATEGORY_SHELL,
+		[
+		],
+		&command_pwd,
+	},
+	{
+		[ "cd" ],
+		"Change current directory.",
+		[ "PATH" ],
+		MODULE_SHELL, CATEGORY_SHELL,
+		[
+		],
+		&command_cd,
+	},
 	{
 		[ "help" ],
 		"Show help or a command's help article.",
@@ -1188,6 +1208,23 @@ int command_thread(int argc, const(char) **argv) {
 	} else
 		return ShellError.invalidParameter;
 	
+	return 0;
+}
+
+int command_cd(int argc, const(char) **argv) {
+	if (argc < 2)
+		return ShellError.missingArgument;
+	if (adbg_os_chdir(argv[1]))
+		return ShellError.alicedbg;
+	return 0;
+}
+
+int command_pwd(int argc, const(char) **argv) {
+	char[4096] b = void;
+	const(char) *path = adbg_os_pwd(b.ptr, 4096);
+	if (path == null)
+		return ShellError.alicedbg;
+	puts(path);
 	return 0;
 }
 
