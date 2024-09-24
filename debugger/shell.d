@@ -126,8 +126,15 @@ Lcommand:
 	// also make its pointer null.
 	char* line = conrdln().ptr;
 	
-	if (line == null || line[0] == 4) { // 4 == ^D
+	// Invalid line or 
+	if (line == null || line[0] == 4) // 4 == ^D
 		return 0;
+	
+	// External shell command
+	if (line[0] == '!') {
+		if (line[1]) // has something
+			printf("Command exited with code %d\n", system(line + 1));
+		goto Lcommand;
 	}
 	
 	ecode = shell_exec(line);
@@ -542,9 +549,8 @@ int shell_proc_attach(int pid) {
 	
 	// Attach to process
 	process = adbg_debugger_attach(pid, 0);
-	if (process == null) {
+	if (process == null)
 		return ShellError.alicedbg;
-	}
 	
 	puts("Debugger attached.");
 	
@@ -594,7 +600,7 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 		
 		// Print operands, if any
 		if (op.operands)
-			printf(" %s", op.operands);
+			printf("\t%s", op.operands);
 		
 		// Terminate line
 		putchar('\n');
@@ -929,6 +935,8 @@ int command_disassemble(int argc, const(char) **argv) {
 	if (dis == null)
 		return ShellError.unavailable;
 	
+	// TODO: Add default address to PC/RIP
+	//       Once Posix side gets thread id matching
 	// Need address
 	if (argc < 2)
 		return ShellError.missingArgument;
