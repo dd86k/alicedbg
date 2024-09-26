@@ -8,13 +8,12 @@ module shell;
 // TODO: Pre-load/Exit event handlers (e.g., closing disassembler) functions
 
 import adbg;
-import adbg.machines;
-import adbg.process;
 import adbg.error;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import adbg.os.path;
+import adbg.utils.strings : adbg_util_expand;
 import core.stdc.string;
 import common.errormgmt;
 import common.cli : opt_syntax;
@@ -102,14 +101,40 @@ const(char) *shell_error_string(int code) {
 	}
 }
 
-int shell_start(int argc, const(char)** argv) {
-	if (loginit(null)) {
-		perror("Failed to setup logger");
-		return 2;
+private __gshared int shellflags;
+private __gshared int logflags;
+void logerror(const(char) *fmt, ...) {
+	va_list args = void;
+	va_start(args, fmt);
+	logwrite("error", TextColor.red, fmt, args);
+}
+void logwarn(const(char) *fmt, ...) {
+	va_list args = void;
+	va_start(args, fmt);
+	logwrite("warning", TextColor.yellow, fmt, args);
+}
+void loginfo(const(char) *fmt, ...) {
+	va_list args = void;
+	va_start(args, fmt);
+	
+	logwrite(null, 0, fmt, args);
+}
+private
+void logwrite(const(char) *pre, int color, const(char) *fmt, va_list args) {
+	if (pre) {
+		if ((shellflags & SHELL_NOCOLORS) == 0)
+			concoltext(cast(TextColor)color, stderr);
+		fputs(pre, stderr);
+		if ((shellflags & SHELL_NOCOLORS) == 0)
+			concolrst(stderr);
+		fputs(": ", stderr);
 	}
 	
-	coninit();
-	
+	vfprintf(stderr, fmt, args);
+	putchar('\n');
+}
+
+int shell_start(int argc, const(char)** argv) {
 	// TODO: Use commands directly?
 	// Start or attach to process if specified
 	if (argc > 0 && argv && shell_spawn(*argv, argc > 1 ? argv + 1 : null)) {
@@ -120,9 +145,8 @@ int shell_start(int argc, const(char)** argv) {
 		return 1;
 	}
 	
-	int ecode = void;
 Lcommand:
-	printf("(adbg) ");
+	fputs("(adbg) ", stdout);
 	fflush(stdout);
 	
 	// .ptr is temporary because a slice with a length of 0
@@ -136,18 +160,17 @@ Lcommand:
 	// External shell command
 	if (line[0] == '!') {
 		if (line[1]) // has something
-			printf("Command exited with code %d\n", system(line + 1));
+			loginfo("Command exited with code %d\n", system(line + 1));
 		goto Lcommand;
 	}
 	
-	ecode = shell_exec(line);
-	if (ecode)
-		logerror(shell_error_string(ecode));
+	int e = shell_exec(line);
+	if (e)
+		logerror(shell_error_string(e));
 	goto Lcommand;
 }
 
 int shell_exec(const(char) *command) {
-	import adbg.utils.strings : adbg_util_expand;
 	if (command == null) return 0;
 	int argc = void;
 	char** argv = adbg_util_expand(command, &argc);
@@ -170,8 +193,6 @@ int shell_execv(int argc, const(char) **argv) {
 private:
 __gshared:
 
-int shellflags;
-
 // NOTE: Process management
 //       Right now the shell is only capable of dealing with one process
 adbg_process_t *process;
@@ -179,58 +200,6 @@ adbg_disassembler_t *dis;
 
 const(char)* last_spawn_exec;
 const(char)** last_spawn_argv;
-
-// NOTE: BetterC stderr bindings on Windows are broken
-//       And don't allow re-opening the streams, so screw it
-//       Fixed since DMD 1.103.1 and LDC 1.32.1?
-
-FILE *logfd;
-int loginit(const(char) *path) {
-	logfd = path ? fopen(path, "wb") : stderr;
-	if (path) {
-		shellflags |= SHELL_NOCOLORS; // Override choice
-		setvbuf(logfd, null, _IONBF, 0);
-	}
-	return logfd == null;
-}
-void logerror(const(char) *fmt, ...) {
-	va_list args = void;
-	va_start(args, fmt);
-	
-	if ((shellflags & SHELL_NOCOLORS) == 0)
-		concoltext(TextColor.red, logfd);
-	fputs("error", logfd);
-	if ((shellflags & SHELL_NOCOLORS) == 0)
-		concolrst(logfd);
-	fputs(": ", logfd);
-	
-	logwrite(fmt, args);
-}
-void logwarn(const(char) *fmt, ...) {
-	va_list args = void;
-	va_start(args, fmt);
-	
-	if ((shellflags & SHELL_NOCOLORS) == 0)
-		concoltext(TextColor.yellow, logfd);
-	fputs("warning", logfd);
-	if ((shellflags & SHELL_NOCOLORS) == 0)
-		concolrst(logfd);
-	fputs(": ", logfd);
-	
-	logwrite(fmt, args);
-}
-void loginfo(const(char) *fmt, ...) {
-	va_list args = void;
-	va_start(args, fmt);
-	
-	logwrite(fmt, args);
-}
-void logwrite(const(char) *fmt, va_list args) {
-	vfprintf(logfd, fmt, args);
-	putchar('\n');
-}
-
-immutable string RCFILE = ".adbgrc";
 
 immutable string MODULE_SHELL = "Shell";
 immutable string MODULE_DEBUGGER = "Debugger";
@@ -591,7 +560,7 @@ int shell_attach(int pid) {
 	if (process == null)
 		return ShellError.alicedbg;
 	
-	puts("Debugger attached.");
+	loginfo("Debugger attached.");
 	
 	// Open disassembler for process machine type
 	dis = adbg_dis_open(adbg_process_machine(process));
@@ -599,7 +568,7 @@ int shell_attach(int pid) {
 		if (opt_syntax)
 			adbg_dis_options(dis, AdbgDisOpt.syntax, opt_syntax, 0);
 	} else {
-		printf("warning: Disassembler not available (%s)\n",
+		logwarn("Disassembler not available (%s)\n",
 			adbg_error_message());
 	}
 	
@@ -776,9 +745,8 @@ int command_help(int argc, const(char) **argv) {
 	if (argc > 1) { // Requesting help article for command
 		const(char) *ucommand = argv[1];
 		immutable(command2_t) *command = shell_findcommand(ucommand);
-		if (command == null) {
+		if (command == null)
 			return ShellError.invalidParameter;
-		}
 		
 		shell_event_help(command);
 		return 0;
@@ -817,16 +785,14 @@ int command_attach(int argc, const(char) **argv) {
 }
 
 int command_detach(int argc, const(char) **argv) {
-	if (adbg_debugger_detach(process)) {
+	if (adbg_debugger_detach(process))
 		return ShellError.alicedbg;
-	}
+	
 	adbg_dis_close(dis);
 	return 0;
 }
 
 int command_restart(int argc, const(char) **argv) {
-	int e;
-	
 	// TODO: Use commands directly?
 	switch (process.creation) with (AdbgCreation) {
 	case spawned:
@@ -834,20 +800,16 @@ int command_restart(int argc, const(char) **argv) {
 		adbg_debugger_terminate(process);
 		
 		// Spawn, shell still messages status
-		e = shell_spawn(last_spawn_exec, last_spawn_argv);
-		break;
+		return shell_spawn(last_spawn_exec, last_spawn_argv);
 	case attached:
 		// Detach first, ignore on error (e.g., already detached)
 		adbg_debugger_detach(process);
 		
 		// Attach, shell still messages status
-		e = shell_attach(opt_pid);
-		break;
+		return shell_attach(opt_pid);
 	default:
 		return ShellError.unattached;
 	}
-	
-	return e;
 }
 
 int command_go(int argc, const(char) **argv) {
@@ -861,7 +823,7 @@ int command_go(int argc, const(char) **argv) {
 int command_kill(int argc, const(char) **argv) {
 	if (adbg_debugger_terminate(process))
 		return ShellError.alicedbg;
-	puts("Process killed");
+	loginfo("Process killed");
 	adbg_dis_close(dis);
 	return 0;
 }
@@ -1097,7 +1059,7 @@ int command_scan(int argc, const(char) **argv) {
 		0)) == null)
 		return ShellError.alicedbg;
 	
-	printf("Scan completed with %u results.\n", cast(uint)last_scan.result_count);
+	loginfo("Scan completed with %u results.\n", cast(uint)last_scan.result_count);
 	return 0;
 }
 
@@ -1143,7 +1105,7 @@ int command_rescan(int argc, const(char) **argv) {
 	
 	last_scan_data = user.data64;
 	
-	printf("Scan completed with %u results.\n", cast(uint)last_scan.result_count);
+	loginfo("Scan completed with %u results.\n", cast(uint)last_scan.result_count);
 	return 0;
 }
 

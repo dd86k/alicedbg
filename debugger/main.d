@@ -10,7 +10,7 @@ import adbg.self;
 import adbg.error;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
 import core.stdc.stdio;
-import shell;
+import shell, term;
 import common.errormgmt;
 import common.cli;
 import common.utils : unformat64;
@@ -109,11 +109,13 @@ int main(int argc, const(char)** argv) {
 	// Could do a warning, but it might be a little confusing
 	adbg_self_set_crashhandler(&crashed);
 	
-	int cnt = getoptions(argc, argv, options);
-	if (cnt < 0) {
-		puts(getopterror());
+	coninit();
+	
+	argc = getoptions(argc, argv, options);
+	if (argc < 0) {
+		logerror(getopterror());
 		return EXIT_FAILURE;
 	}
 	
-	return shell_start(cnt, getoptleftovers());
+	return shell_start(argc, getoptleftovers());
 }
