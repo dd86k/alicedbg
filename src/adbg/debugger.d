@@ -165,7 +165,21 @@ Loption:
 		path, oargv, odir, options);
 	
 version (Windows) {
-	// NOTE: CreateProcessW modifies lpCommandLine
+	// Verify if file exists and we has access to it
+	// This is to avoid a confusing error message ("Invalid descriptor")
+	DWORD fflags = GetFileAttributesA(path);
+	if (fflags == INVALID_FILE_ATTRIBUTES) {
+		adbg_oops(AdbgError.os);
+		free(proc);
+		return null;
+	}
+	if (fflags & FILE_ATTRIBUTE_DIRECTORY) {
+		adbg_oops(AdbgError.debuggerNeedFile);
+		free(proc);
+		return null;
+	}
+	
+	// NOTE: CreateProcessW modifies lpCommandLine, copy it!
 	// NOTE: lpCommandLine is maximum 32,767 bytes including null Unicode character
 	// NOTE: When given arguments, both lpApplicationName and lpCommandLine
 	//       need to be filled. If the former is null, this acts as a shell, and
@@ -250,13 +264,17 @@ version (Windows) {
 	proc.creation = AdbgCreation.spawned;
 	return proc;
 } else version (Posix) {
-	// NOTE: Don't remember this check, but I think it was because of
-	//       an ambiguous error message
 	// Verify if file exists and we has access to it
+	// This is to avoid a confusing error message
 	stat_t st = void;
 	if (stat(path, &st) < 0) {
-		adbg_process_free(proc);
 		adbg_oops(AdbgError.os);
+		adbg_process_free(proc);
+		return null;
+	}
+	if (st.st_mode & S_IFDIR) {
+		adbg_oops(AdbgError.debuggerNeedFile);
+		adbg_process_free(proc);
 		return null;
 	}
 	
@@ -441,6 +459,9 @@ version (Windows) {
 		PROCESS_QUERY_INFORMATION,
 		FALSE,
 		cast(DWORD)pid);
+	// TODO: Better error message on invalid PID number
+	//       On an invalid PID, we get "Invalid parameter", which is confusing
+	//       Filter by ERROR_INVALID_PARAMETER/ERROR_ACCESS_DENIED?
 	if (proc.hpid == null) {
 		adbg_oops(AdbgError.os);
 		free(proc);

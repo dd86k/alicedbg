@@ -60,6 +60,7 @@ enum AdbgError {
 	debuggerUnpaused	= 101,
 	debuggerInvalidAction	= 102,	/// Wrong action from creation method
 	debuggerPresent	= 103,	/// Debugger already present in remote process
+	debuggerNeedFile	= 104,	/// File path not given (e.g., directory)
 	//
 	// 200-299: Disasembler
 	//
@@ -145,6 +146,7 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.debuggerUnpaused,	"Debugger needs the process to be paused for this feature." },
 	{ AdbgError.debuggerInvalidAction,	"Debugger was given a wrong action for this process." },
 	{ AdbgError.debuggerPresent,	"Debugger already present on remote process." },
+	{ AdbgError.debuggerNeedFile,	"Debugger received a path that does not point to a file." },
 	//
 	// Disassembler
 	//
