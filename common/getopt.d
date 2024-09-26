@@ -45,9 +45,9 @@ struct option_t { align(1):
 }
 
 private
-immutable(option_t)* getoptlong(const(char)* arg, size_t arglen, immutable(option_t)[] options) {
+immutable(option_t)* getoptlong(const(char)* arg, immutable(option_t)[] options) {
 	foreach (ref o; options) {
-		if (strncmp(arg, o.longname.ptr, arglen) == 0)
+		if (strncmp(arg, o.longname.ptr, o.longname.length) == 0)
 			return &o;
 	}
 	return null;
@@ -107,24 +107,21 @@ int getoptions(int argc, const(char) **argv, immutable(option_t)[] options) {
 		const(char) *value;
 		immutable(option_t) *option = void;
 		if (arg[1] == '-') { // "--" -> Long option
-			const(char) *argLong = arg + 2;
+			const(char) *argLong = arg + 2; // start after "--"
 			
 			// Test for "--" (do not process options anymore)
 			if (argLong[0] == 0)
-				goto Lskip;
+				goto Lstop;
 			
 			// Get value in advance, if possible
 			ptrdiff_t optpos = strsrch(argLong, '=');
-			if (optpos == 0) // --=example is invalid
+			if (optpos == 0) // "--=example" is invalid
 				return getoptEmalformatted(argLong);
-			
-			if (optpos > 0) // --e=example means "example" is value
+			else if (optpos > 0) // "--e=a" means "e" is switch and "a" is value
 				value = argLong + 1 + optpos; // skip '=' char
-			else // '=' not found
-				optpos = strlen(argLong);
 			
 			// Get corresponding option
-			option = getoptlong(argLong, optpos, options);
+			option = getoptlong(argLong, options);
 		} else if (arg[0] == '-') { // "-" Short option
 			char argShort = arg[1];
 			
@@ -159,7 +156,7 @@ int getoptions(int argc, const(char) **argv, immutable(option_t)[] options) {
 	
 	return getoptleftcount();
 	
-Lskip:	// When '--' is given, add the rest of arguments as "extras"
+Lstop:	// When '--' is given, add the rest of arguments as "extras"
 	for (++i; i < argc; ++i)
 		getoptaddextra(argc, argv[i]);
 	return getoptleftcount();
