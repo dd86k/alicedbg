@@ -176,13 +176,12 @@ int dump_file(const(char)* path) {
 	}
 	
 	// Otherwise, make a basic summary
-	printf("%s, %s",
-		adbg_object_type_name(o), adbg_object_kind_string(o));
+	printf("%s, %s", adbg_object_type_name(o), adbg_object_kind_string(o));
 	
 	// Print machine type used for object
-	AdbgMachine mach = adbg_object_machine(o);
-	if (mach)
-		printf(", %s", adbg_object_machine_string(o));
+	const(char)* machstr = adbg_object_machine_string(o);
+	if (machstr)
+		printf(", %s", machstr);
 	
 	putchar('\n');
 	return 0;

@@ -38,7 +38,7 @@ void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
 		if (ex.faultz && dis) {
 			adbg_opcode_t op = void;
 			if (adbg_dis_process_once(dis, &op, proc, ex.fault_address))
-				printf(` nodisasm=%s`, adbg_error_message);
+				printf(` nodisasm="%s"`, adbg_error_message);
 			else if (op.operands)
 				printf(` disasm="%s %s"`, op.mnemonic, op.operands);
 			else

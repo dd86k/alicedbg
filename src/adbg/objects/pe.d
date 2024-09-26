@@ -1121,7 +1121,7 @@ pe_section_entry_t* adbg_object_pe_directory_section(adbg_object_t *o, uint rva)
 		if (section == null) return null;
 		
 		// If RVA is outside section's VA and range
-		with (section) if (rva < VirtualAddress || rva > VirtualAddress + SizeOfRawData)
+		with (section) if (rva <= VirtualAddress || rva > VirtualAddress + SizeOfRawData)
 			continue;
 		
 		return section;
@@ -1134,7 +1134,7 @@ pe_section_entry_t* adbg_object_pe_directory_section(adbg_object_t *o, uint rva)
 // Given a section and directory RVA, return absolute file offset
 private
 uint adbg_object_pe_directory_offset_section(pe_section_entry_t *section, uint dirrva) {
-	version (Trace) trace("dir_rva=%#x", dirrva);
+	version (Trace) trace("rva=%#x", dirrva);
 	if (section == null) return 0;
 	with (section) return PointerToRawData + (dirrva - VirtualAddress);
 }
@@ -1142,7 +1142,7 @@ uint adbg_object_pe_directory_offset_section(pe_section_entry_t *section, uint d
 // Given a directory RVA, return absolute file offset
 private
 uint adbg_object_pe_directory_offset(adbg_object_t *o, uint dirrva) {
-	version (Trace) trace("dir_rva=%#x", dirrva);
+	version (Trace) trace("rva=%#x", dirrva);
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
@@ -1328,7 +1328,7 @@ const(char)* adbg_object_pe_rich_prodid_string(ushort prodid) {
 }
 
 pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {
-	version (Trace) trace("o=%p index=%u", o, cast(uint)index);
+	version (Trace) trace("o=%p index=%zu", o, index);
 	
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -1473,7 +1473,8 @@ pe_export_descriptor_t* adbg_object_pe_export(adbg_object_t *o) {
 	}
 	
 	// ExportFlags must be zero
-	if (internal.export_directory.ExportFlags != 0) {
+	version(Trace) trace("ExportFlags=%#x", internal.export_directory.ExportFlags);
+	if (internal.export_directory.ExportFlags) {
 		adbg_oops(AdbgError.unavailable);
 		free(internal.export_directory);
 		internal.export_directory = null;

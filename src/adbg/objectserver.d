@@ -715,8 +715,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	return AdbgMachine.unknown;
 }
 const(char)* adbg_object_machine_string(adbg_object_t *o) {
-	AdbgMachine mach = adbg_object_machine(o);
-	return mach ? adbg_machine_name(mach) : `Unknown`;
+	return adbg_machine_name( adbg_object_machine(o) );
 }
 
 /// Get the short name of the loaded object type.
