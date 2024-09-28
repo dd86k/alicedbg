@@ -46,11 +46,8 @@ version (Windows) {
 	HANDLE handle;
 	int id;
 }
-version (linux) {
-	pid_t handle;
-}
-version (FreeBSD) {
-	pid_t handle;
+version (Posix) {
+	pid_t id;
 }
 	adbg_thread_context_t context;
 }
@@ -144,7 +141,7 @@ version (Windows) {
 		if (isdigit(entry.d_name[0]) == 0)
 			continue;
 		
-		t.handle = cast(pid_t)atoi( basename(entry.d_name.ptr) );
+		t.id = cast(pid_t)atoi( basename(entry.d_name.ptr) );
 		process.thread_list = adbg_list_add(process.thread_list, &t);
 		if (process.thread_list == null) {
 			adbg_list_free(process.thread_list);
@@ -159,19 +156,48 @@ version (Windows) {
 }
 }
 
-/// Get thread from list using index.
+/// Get thread from list by an index.
 /// Params:
 /// 	process = Process instance.
 /// 	index = Zero-based index.
 /// Returns: Thread instance. On error, null.
-adbg_thread_t* adbg_thread_list_get(adbg_process_t *process, size_t index) {
+adbg_thread_t* adbg_thread_list_by_index(adbg_process_t *process, size_t index) {
 	version (Trace) trace("process=%p index=%zu", process, index);
 	if (process == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
+	
+	// Init thread list if empty, just in case
+	if (process.thread_list == null && adbg_thread_list_update(process))
+		return null;
+	
 	// NOTE: adbg_list_get checks both list pointer and index and sets error
 	return cast(adbg_thread_t*)adbg_list_get(process.thread_list, index);
+}
+
+/// Get a thread from list by its ID.
+/// Params:
+/// 	process = Process instance.
+/// 	id = Thread ID
+/// Returns: Thread instance. On error, null.
+adbg_thread_t* adbg_thread_list_by_id(adbg_process_t *process, int id) {
+	version (Trace) trace("process=%p id=%d", process, id);
+	if (process == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	// Init thread list if empty, just in case
+	if (process.thread_list == null && adbg_thread_list_update(process))
+		return null;
+	
+	adbg_thread_t *t = void;
+	size_t i;
+	while ((t = cast(adbg_thread_t*)adbg_list_get(process.thread_list, i++)) != null)
+		if (t.id == id) return t;
+	adbg_oops(AdbgError.unfindable);
+	return null;
 }
 
 /// Get the thread ID out of this thread instance.
@@ -190,7 +216,7 @@ version (Windows) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
-	return cast(int)thread.handle;
+	return cast(int)thread.id;
 } else {
 	adbg_oops(AdbgError.unimplemented);
 	return 0;
@@ -469,13 +495,14 @@ else
 	/// Ditto
 	private enum REG_COUNT = 0;
 
-adbg_register_t* adbg_register_get(adbg_thread_t *thread, size_t index) {
-	version (Trace) trace("thread=%p index=%zu", thread, index);
+adbg_register_t* adbg_register_by_id(adbg_thread_t *thread, int id) {
+	version (Trace) trace("thread=%p index=%u", thread, id);
 	if (thread == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
+	size_t index = cast(size_t)id;
 	if (index >= thread.context.count) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
@@ -704,7 +731,7 @@ version (Win64) {
 	
 	version (X86) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, thread.handle, null, &u) < 0)
+		if (ptrace(PT_GETREGS, thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.x86_eip].u32    = u.eip;
 		thread.context.items[AdbgRegister.x86_eflags].u32 = u.eflags;
@@ -725,7 +752,7 @@ version (Win64) {
 		return 0;
 	} else version (X86_64) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, thread.handle, null, &u) < 0)
+		if (ptrace(PT_GETREGS, thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.amd64_rip].u64    = u.rip;
 		thread.context.items[AdbgRegister.amd64_rflags].u64 = u.eflags;
@@ -754,7 +781,7 @@ version (Win64) {
 		return 0;
 	} else version (ARM) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, thread.handle, null, &u) < 0)
+		if (ptrace(PT_GETREGS, thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.arm_r0].u32   = u.r0;
 		thread.context.items[AdbgRegister.arm_r1].u32   = u.r1;
@@ -776,7 +803,7 @@ version (Win64) {
 		return 0;
 	} else version (AArch64) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, thread.handle, null, &u) < 0)
+		if (ptrace(PT_GETREGS, thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.aarch64_x0].u64  = u.regs[0];
 		thread.context.items[AdbgRegister.aarch64_x1].u64  = u.regs[1];
@@ -818,7 +845,7 @@ version (Win64) {
 } else version (FreeBSD) {
 	version (X86) {
 		reg u = void;
-		if (ptrace(PT_GETREGS, thread.handle, &u, 0) < 0)
+		if (ptrace(PT_GETREGS, thread.id, &u, 0) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.x86_eip].u32    = u.r_eip;
 		thread.context.items[AdbgRegister.x86_eflags].u32 = u.r_eflags;
@@ -839,7 +866,7 @@ version (Win64) {
 		return 0;
 	} else version (X86_64) {
 		reg u = void;
-		if (ptrace(PT_GETREGS, thread.handle, &u, 0) < 0)
+		if (ptrace(PT_GETREGS, thread.id, &u, 0) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.amd64_rip].u64    = u.r_rip;
 		thread.context.items[AdbgRegister.amd64_rflags].u64 = u.r_rflags;
@@ -868,7 +895,7 @@ version (Win64) {
 		return 0;
 	} else version (ARM) {
 		reg u = void;
-		if (ptrace(PT_GETREGS, thread.handle, &u, 0) < 0)
+		if (ptrace(PT_GETREGS, thread.id, &u, 0) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.arm_r0].u32   = u.r[0];
 		thread.context.items[AdbgRegister.arm_r1].u32   = u.r[1];
@@ -890,7 +917,7 @@ version (Win64) {
 		return 0;
 	} else version (AArch64) {
 		reg u = void;
-		if (ptrace(PT_GETREGS, thread.handle, &u, 0) < 0)
+		if (ptrace(PT_GETREGS, thread.id, &u, 0) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.aarch64_x0].u64  = u.x[0];
 		thread.context.items[AdbgRegister.aarch64_x1].u64  = u.x[1];

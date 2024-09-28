@@ -83,6 +83,8 @@ version (Windows) { // Original identifiers; Otherwise informal
 }
 version (Posix) {
 	pid_t pid;	/// Process ID
+	pid_t tid;	/// HACK: Thread ID
+			// On Linux, the starting thread ID is the same as the process ID
 	char **argv;	/// Saved arguments when process was launched
 }
 version (linux) {

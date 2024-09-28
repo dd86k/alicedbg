@@ -11,12 +11,17 @@ import adbg;
 
 extern (C): __gshared: private:
 
+enum {
+	SIMPLE_STOP = 0,
+	SIMPLE_CONTINUE = 1,
+}
+
 int putchar(int);
 
 adbg_disassembler_t *dis;
 
-void die(int code = 0, const(char) *reason = null) {
-	printf("error: %s\n", reason ? reason : adbg_error_message);
+void oops(int code = 0, const(char) *reason = null) {
+	printf("* error=\"%s\"\n", reason ? reason : adbg_error_message());
 	if (code == 0) code = adbg_errno;
 	exit(code);
 }
@@ -26,9 +31,9 @@ void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
 	case AdbgEvent.exception:
 		adbg_exception_t *ex = cast(adbg_exception_t*)edata;
 		
-		// Assume one process, so don't print its PID
-		printf(`* exception="%s" oscode=`~ADBG_OS_ERROR_FORMAT,
-			adbg_exception_name(ex), ex.oscode);
+		// Assume singleprocess, so don't print its PID
+		printf(`* tid=%d exception="%s" oscode=`~ERR_OSFMT,
+			proc.tid, adbg_exception_name(ex), ex.oscode);
 		
 		// Print fault address if available
 		if (ex.faultz)
@@ -45,20 +50,33 @@ void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
 				printf(` disasm="%s"`, op.mnemonic);
 		}
 		
-		putchar('\n');
-		
 		switch (ex.type) with (AdbgException) {
 		case Breakpoint, Step:
 			adbg_debugger_continue(proc);
+			putchar('\n');
 			return;
 		default: // Quit at first fault
-			*(cast(int*)udata) = 0;
+			*(cast(int*)udata) = SIMPLE_STOP;
 		}
+		
+		// If available, print register data
+		adbg_thread_t *thread = adbg_thread_list_by_id(proc, proc.tid);
+		if (thread && adbg_thread_context_update(proc, thread) == 0) {
+			int id;
+			adbg_register_t *reg = void;
+			while ((reg = adbg_register_by_id(thread, id++)) != null) {
+				char[20] hex = void;
+				adbg_register_format(hex.ptr, 20, reg, AdbgRegisterFormat.hexPadded);
+				printf(` %s=0x%s`, adbg_register_name(reg), hex.ptr);
+			}
+		}
+		
+		putchar('\n');
 		return;
 	case AdbgEvent.processExit:
 		int *oscode = cast(int*)edata;
 		printf("* exited with code %d\n", *oscode);
-		*(cast(int*)udata) = 0;
+		*(cast(int*)udata) = SIMPLE_STOP;
 		return;
 	default:
 	}
@@ -66,7 +84,7 @@ void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
 
 int main(int argc, const(char) **argv) {
 	if (argc < 2)
-		die(1, "Missing path to executable");
+		oops(1, "Missing path to executable");
 	
 	// if additional arguments, they are for process to debug
 	const(char) **pargv = argc > 2 ? argv + 2 : null;
@@ -76,18 +94,18 @@ int main(int argc, const(char) **argv) {
 			AdbgSpawnOpt.argv, pargv,
 			0);
 	if (process == null)
-		die;
+		oops;
 	
 	dis = adbg_dis_open(adbg_process_machine(process));
 	if (dis == null)
-		printf("warning: Disassembler unavailable (%s)\n", adbg_error_message());
+		printf("* warning=\"Disassembler unavailable: %s\"\n", adbg_error_message());
 	
-	int flags = 1;
+	int state = SIMPLE_CONTINUE;
 	if (adbg_debugger_continue(process))
-		die;
+		oops;
 Lcontinue:
-	if (adbg_debugger_wait(process, &loop_handler, &flags))
-		die;
-	if (flags) goto Lcontinue;
+	if (adbg_debugger_wait(process, &loop_handler, &state))
+		oops;
+	if (state) goto Lcontinue;
 	return 0;
 }

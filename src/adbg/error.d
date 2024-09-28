@@ -10,8 +10,10 @@ version (Windows) {
 	import core.sys.windows.winbase : GetLastError, FormatMessageA,
 		FORMAT_MESSAGE_FROM_SYSTEM, FORMAT_MESSAGE_MAX_WIDTH_MASK;
 	enum ADBG_OS_ERROR_FORMAT = "%08X"; /// Error code format
+	enum ERR_OSFMT = "%#x"; /// Error code format
 } else {
 	enum ADBG_OS_ERROR_FORMAT = "%d"; /// Error code format
+	enum ERR_OSFMT = "%d"; /// Error code format
 }
 import core.stdc.errno : errno;
 import core.stdc.string : strerror;

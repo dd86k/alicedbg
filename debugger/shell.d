@@ -617,7 +617,7 @@ void shell_event_disassemble(size_t address, int count = 1, bool showAddress = t
 	}
 }
 
-void shell_debugger_event(adbg_process_t *proc, int event, void *edata, void *udata) {
+void shell_event_debugger(adbg_process_t *proc, int event, void *edata, void *udata) {
 	process = proc;
 	
 	switch (event) with (AdbgEvent) {
@@ -815,7 +815,7 @@ int command_restart(int argc, const(char) **argv) {
 int command_go(int argc, const(char) **argv) {
 	if (adbg_debugger_continue(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process, &shell_debugger_event, null))
+	if (adbg_debugger_wait(process, &shell_event_debugger, null))
 		return ShellError.alicedbg;
 	return 0;
 }
@@ -832,7 +832,7 @@ int command_kill(int argc, const(char) **argv) {
 int command_stepi(int argc, const(char) **argv) {
 	if (adbg_debugger_stepi(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process, &shell_debugger_event, null))
+	if (adbg_debugger_wait(process, &shell_event_debugger, null))
 		return ShellError.alicedbg;
 	return 0;
 }
@@ -1147,7 +1147,7 @@ int command_thread(int argc, const(char) **argv) {
 		
 		puts("Threads:");
 		size_t i;
-		while ((thread = adbg_thread_list_get(process, i++)) != null) {
+		while ((thread = adbg_thread_list_by_index(process, i++)) != null) {
 			printf("%*d\n", -10, adbg_thread_id(thread));
 		}
 		return 0;
@@ -1158,15 +1158,7 @@ int command_thread(int argc, const(char) **argv) {
 		return ShellError.missingArgument;
 	
 	// Select thread
-	int tid = atoi(argv[1]);
-	size_t i;
-	adbg_thread_t *selected;
-	while ((thread = adbg_thread_list_get(process, i++)) != null) {
-		if (adbg_thread_id(thread) == tid) {
-			selected = thread;
-			break;
-		}
-	}
+	adbg_thread_t *selected = adbg_thread_list_by_id(process, atoi(argv[1]));
 	if (selected == null)
 		return ShellError.alicedbg;
 	
@@ -1175,9 +1167,9 @@ int command_thread(int argc, const(char) **argv) {
 		// Update its context
 		adbg_thread_context_update(process, selected);
 		
-		i = 0;
+		int id;
 		adbg_register_t *register = void;
-		while ((register = adbg_register_get(thread, i++)) != null) {
+		while ((register = adbg_register_by_id(thread, id++)) != null) {
 			char[20] dec = void, hex = void;
 			adbg_register_format(dec.ptr, 20, register, AdbgRegisterFormat.dec);
 			adbg_register_format(hex.ptr, 20, register, AdbgRegisterFormat.hexPadded);

@@ -7,6 +7,9 @@ module adbg.debugger;
 
 // TODO: adbg_debugger_spawn: Get/set default child stack size
 // TODO: High-level disassembly functions (e.g., from exception, etc.)
+// TODO: Consider debugger or debug_session struct type
+//       Could contain process list
+//       However, this might removes flexbility from the client
 
 /*
 version (linux) {
@@ -29,6 +32,13 @@ version (Windows) {
 	import adbg.include.windows.winnt;
 	import core.sys.windows.winbase;
 	import adbg.machines;
+
+	private enum EFLAGS_TF = 0x100;
+
+	version (X86)
+		version = WINTEL;
+	version (X86_64)
+		version = WINTEL;
 } else version (Posix) {
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
@@ -64,7 +74,7 @@ private struct __adbg_child_t {
 //      Windows: CREATE_SUSPENDED
 //      Posix:
 //TODO: Stack size in KiB
-//      Default should still be 8 MiB (Windows and Linux)
+//      Default should still be 8192 KiB (recent Windows and Linux defaults)
 /// Options for adbg_spawn.
 enum AdbgSpawnOpt {
 	/// Pass args line to tracee.
@@ -649,22 +659,25 @@ Lwait:
 		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.crt);
 	}
-	
 	version(Trace) trace("wstatus=%#x pid=%d", wstatus, proc.tracee.pid);
 	
-	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)) { // Process exited or killed
-		type = AdbgEvent.processExit;
+	// HACK: 
+	proc.tracee.tid = proc.tracee.pid;
+	
+	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)) { // exited or killed
 		proc.tracee.status = AdbgProcStatus.unknown;
+		type = AdbgEvent.processExit;
 		event.exitcode = WTERMSIG(wstatus);
-	} else if (WIFSTOPPED(wstatus)) { // Process stopped by signal
+	} else if (WIFSTOPPED(wstatus)) { // stopped by signal
 		proc.tracee.status = AdbgProcStatus.stopped;
 		type = AdbgEvent.exception;
 		int sig = WSTOPSIG(wstatus);
 		adbg_exception_translate(&event.exception, &proc.tracee.pid, &sig);
-	/*} else if (WIFCONTINUED(wstatus)) { // Process continues, ignore these
-		goto Lwait;*/
+	} else if (WIFCONTINUED(wstatus)) { // continuing
+		version (Trace) trace("Continuing...");
+		goto Lwait;
 	} else {
-		version (Trace) if (!WIFCONTINUED(wstatus)) trace("Unknown status code");
+		version (Trace) trace("Unknown status code");
 		goto Lwait;
 	}
 } else static assert(0, "Implement adbg_debugger_wait");
@@ -760,29 +773,35 @@ int adbg_debugger_stepi(adbg_process_t *proc) {
 	if (proc.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
-version (Windows) {
-	enum EFLAGS_TF = 0x100;
-	
+version (WINTEL) {
 	// Enable single-stepping via Trap flag
-	version (Win64) 
+	
+	// AMD64 with a 32-bit process
+	version (Win64)
 	if (adbg_process_machine(proc) == AdbgMachine.i386) {
-		WOW64_CONTEXT winctxwow64 = void;
-		winctxwow64.ContextFlags = CONTEXT_CONTROL;
-		Wow64GetThreadContext(proc.htid, &winctxwow64);
-		winctxwow64.EFlags |= EFLAGS_TF;
-		Wow64SetThreadContext(proc.htid, &winctxwow64);
-		FlushInstructionCache(proc.hpid, null, 0);
+		WOW64_CONTEXT wow64ctx = void;
+		wow64ctx.ContextFlags = CONTEXT_CONTROL;
+		if (Wow64GetThreadContext(proc.htid, &wow64ctx) == FALSE)
+			return adbg_oops(AdbgError.os);
+		wow64ctx.EFlags |= EFLAGS_TF;
+		if (Wow64SetThreadContext(proc.htid, &wow64ctx) == FALSE)
+			return adbg_oops(AdbgError.os);
+		if (FlushInstructionCache(proc.hpid, null, 0) == FALSE)
+			return adbg_oops(AdbgError.os);
 		
 		return adbg_debugger_continue(proc);
 	}
 	
 	// X86, AMD64
-	CONTEXT winctx = void;
-	winctx.ContextFlags = CONTEXT_ALL;
-	GetThreadContext(proc.htid, cast(LPCONTEXT)&winctx);
-	winctx.EFlags |= EFLAGS_TF;
-	SetThreadContext(proc.htid, cast(LPCONTEXT)&winctx);
-	FlushInstructionCache(proc.hpid, null, 0);
+	CONTEXT ctx = void;
+	ctx.ContextFlags = CONTEXT_CONTROL;
+	if (GetThreadContext(proc.htid, cast(LPCONTEXT)&ctx) == FALSE)
+		return adbg_oops(AdbgError.os);
+	ctx.EFlags |= EFLAGS_TF;
+	if (SetThreadContext(proc.htid, cast(LPCONTEXT)&ctx) == FALSE)
+		return adbg_oops(AdbgError.os);
+	if (FlushInstructionCache(proc.hpid, null, 0) == FALSE)
+		return adbg_oops(AdbgError.os);
 	
 	return adbg_debugger_continue(proc);
 } else version (linux) {
