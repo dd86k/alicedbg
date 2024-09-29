@@ -74,16 +74,16 @@ version (Windows) { // Original identifiers; Otherwise informal
 	//       This is done on a per-function basis for permissions
 	//       and memory management (opening and closing handles)
 	//       purposes.
-	int pid;	/// Process identificiation number
-	int tid;	/// Thread identification number
+	int pid;	/// Event Process ID
+	int tid;	/// Event Thread ID
 	char *args;	/// Saved arguments when process was launched
 	// TODO: Deprecate hpid and htid
 	HANDLE htid;	/// Thread handle
 	HANDLE hpid;	/// Process handle
 }
 version (Posix) {
-	pid_t pid;	/// Process ID
-	pid_t tid;	/// HACK: Thread ID
+	pid_t pid;	/// Event Process ID
+	pid_t tid;	/// HACK: Event Thread ID
 			// On Linux, the starting thread ID is the same as the process ID
 	char **argv;	/// Saved arguments when process was launched
 }
@@ -95,8 +95,10 @@ version (linux) {
 	AdbgProcStatus status;
 	/// Process' creation source.
 	AdbgCreation creation;
-	/// List of threads
+	/// List of threads.
 	list_t *thread_list;
+	/// List of breakpoints.
+	list_t *breakpoint_list;
 	
 	// HACK: Some client debuggers, like the shell, will save the stopped
 	//       process pointer in global memory. Because stack memory references
@@ -272,7 +274,8 @@ version (LinuxPersonality) {
 	path[8] = 0;
 	char *end = void;
 	uint personality = cast(uint)strtol(path.ptr, &end, 16);
-	if (personality & ADDR_LIMIT_32BIT) return PERSO32;
+	enum LINUX32 = PER_LINUX_32BIT | PER_LINUX32 | PER_LINUX32_3GB;
+	if (personality & LINUX32) return PERSO32;
 }
 	return adbg_machine_current();
 }

@@ -105,14 +105,16 @@ enum {	// __ptrace_setoptions
 	PT_O_SUSPEND_SECCOMP	= 0x00200000,	/// syspend on seccomp
 	PT_O_MASK	= 0x003000ff	/// mask
 }
-enum {	// __ptrace_eventcodes
+enum {	// __ptrace_eventcodes (used with PTRACE_GETEVENTMSG)
 	PT_EVENT_FORK	= 1,	/// fork event
 	PT_EVENT_VFORK	= 2,	/// vfork event
 	PT_EVENT_CLONE	= 3,	/// clone event
 	PT_EVENT_EXEC	= 4,	/// exec event
-	PT_EVENT_VFORK_DONE = 5,	/// vfork done event
+	PT_EVENT_VFORK_DONE	= 5,	/// vfork done event
 	PT_EVENT_EXIT	= 6,	/// exit event
-	PT_EVENT_SECCOMP  = 7	/// seccomp event
+	PT_EVENT_SECCOMP	= 7,	/// seccomp event
+	/// Extended result codes which enabled by means other than options.
+	PT_EVENT_STOP	= 128,
 }
 
 /// The ptrace() system call provides a means by which one process (the
