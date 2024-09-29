@@ -119,7 +119,7 @@ version (Windows) {
 	}
 	return 0;
 } else version (FreeBSD) {
-	ptrace_io_desc io = ptrace_io_desc(PT_READ_D, cast(void*)addr, data, size);
+	ptrace_io_desc io = ptrace_io_desc(PIOD_READ_D, cast(void*)addr, data, size);
 	if (ptrace(PT_IO, tracee.pid, &io, 0) < 0) // sets errno
 		return adbg_oops(AdbgError.crt);
 	return 0;
@@ -185,7 +185,7 @@ version (Windows) {
 	}
 	return 0;
 } else version (FreeBSD) {
-	ptrace_io_desc io = ptrace_io_desc(PT_WRITE_D, cast(void*)addr, data, size);
+	ptrace_io_desc io = ptrace_io_desc(PIOD_WRITE_D, cast(void*)addr, data, size);
 	if (ptrace(PT_IO, tracee.pid, &io, 0) < 0) // sets errno
 		return adbg_oops(AdbgError.crt);
 	return 0;
@@ -256,6 +256,7 @@ struct adbg_memory_map_t {
 //TODO: Process name hash (here cached in structure or on stack)
 //      Function will eventually have to filter out of a lot of entries
 //      Especially on Linux.
+// TODO: use list_t
 /// Obtain the memory map of modules for the current process.
 ///
 /// To close, call adbg_memory_maps_close. On error, all memory buffers
