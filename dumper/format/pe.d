@@ -15,6 +15,7 @@ import adbg.utils.uid, adbg.utils.bit;
 import adbg.error;
 import core.stdc.stdlib;
 import core.stdc.string : strncmp;
+import core.stdc.stdio : snprintf;
 import dumper;
 import common.errormgmt;
 
@@ -236,9 +237,10 @@ void dump_pe_richhdr(adbg_object_t *o) {
 	
 	print_header("Rich Header");
 	for (size_t i; i < rich.itemcount; ++i) with (rich.items[i]) {
-		print_x16("buildId", buildId);
+		char[32] b = void;
+		snprintf(b.ptr, 32, "count=%u", count);
+		print_u16("buildId", buildId, b.ptr);
 		print_x16("prodId", prodId, adbg_object_pe_rich_prodid_string(prodId));
-		print_u32("count", count);
 	}
 }
 
