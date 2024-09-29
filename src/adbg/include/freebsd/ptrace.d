@@ -105,48 +105,60 @@ enum PIOD_READ_I	= 3;	/* Read from I space */
 enum PIOD_WRITE_I	= 4;	/* Write to I space */
 
 /* Argument structure for PT_LWPINFO. */
-/+
-struct ptrace_lwpinfo {
+// .pl_flags
+/*PL_EVENT_NONE	0
+PL_EVENT_SIGNAL	1*/
+// .pl_sigmask
+/*PL_FLAG_SA	0x01	// M:N thread
+PL_FLAG_BOUND	0x02	// M:N bound thread
+PL_FLAG_SCE	0x04	// syscall enter point
+PL_FLAG_SCX	0x08	// syscall leave point
+PL_FLAG_EXEC	0x10	// exec(2) succeeded
+PL_FLAG_SI	0x20	// siginfo is valid
+PL_FLAG_FORKED	0x40	// new child
+PL_FLAG_CHILD	0x80	// I am from child
+PL_FLAG_BORN	0x100	// new LWP
+PL_FLAG_EXITED	0x200	// exiting LWP
+PL_FLAG_VFORKED	0x400	// new child via vfork
+PL_FLAG_VFORK_DONE 0x800 // vfork parent has resumed */
+enum MAXCOMLEN = 19;		/* max command name remembered */ // param.h
+alias int lwpid_t;	// sys/sys/_types.h
+enum _SIG_WORDS = 4;	// sys/sys/_sigset.h
+struct sigset_t { uint[_SIG_WORDS] __bits; }
+import core.sys.posix.signal : siginfo_t;
+struct ptrace_lwpinfo64 {
 	lwpid_t	pl_lwpid;	/* LWP described. */
 	int	pl_event;	/* Event that stopped the LWP. */
-PL_EVENT_NONE	0
-PL_EVENT_SIGNAL	1
 	int	pl_flags;	/* LWP flags. */
-PL_FLAG_SA	0x01	/* M:N thread */
-PL_FLAG_BOUND	0x02	/* M:N bound thread */
-PL_FLAG_SCE	0x04	/* syscall enter point */
-PL_FLAG_SCX	0x08	/* syscall leave point */
-PL_FLAG_EXEC	0x10	/* exec(2) succeeded */
-PL_FLAG_SI	0x20	/* siginfo is valid */
-PL_FLAG_FORKED	0x40	/* new child */
-PL_FLAG_CHILD	0x80	/* I am from child */
-PL_FLAG_BORN	0x100	/* new LWP */
-PL_FLAG_EXITED	0x200	/* exiting LWP */
-PL_FLAG_VFORKED	0x400	/* new child via vfork */
-PL_FLAG_VFORK_DONE 0x800 /* vfork parent has resumed */
 	sigset_t	pl_sigmask;	/* LWP signal mask */
 	sigset_t	pl_siglist;	/* LWP pending signal */
-	struct __siginfo pl_siginfo;	/* siginfo for signal */
-	char		pl_tdname[MAXCOMLEN + 1]; /* LWP name */
+	siginfo_t	pl_siginfo;	/* siginfo for signal */ // __siginfo
+	char[MAXCOMLEN + 1]	pl_tdname; /* LWP name */
 	pid_t		pl_child_pid;	/* New child pid */
-	u_int		pl_syscall_code;
-	u_int		pl_syscall_narg;
-};
+	uint		pl_syscall_code;
+	uint		pl_syscall_narg;
+}
 
-#if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
+//#if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
 struct ptrace_lwpinfo32 {
 	lwpid_t	pl_lwpid;	/* LWP described. */
 	int	pl_event;	/* Event that stopped the LWP. */
 	int	pl_flags;	/* LWP flags. */
 	sigset_t	pl_sigmask;	/* LWP signal mask */
 	sigset_t	pl_siglist;	/* LWP pending signal */
-	struct __siginfo32 pl_siginfo;	/* siginfo for signal */
-	char		pl_tdname[MAXCOMLEN + 1]; /* LWP name. */
-	pid_t		pl_child_pid;	/* New child pid */
-	u_int		pl_syscall_code;
-	u_int		pl_syscall_narg;
-};
+	siginfo_t	pl_siginfo;	/* siginfo for signal */ // __siginfo32
+	char[MAXCOMLEN + 1]	pl_tdname; /* LWP name. */
+	pid_t	pl_child_pid;	/* New child pid */
+	uint	pl_syscall_code;
+	uint	pl_syscall_narg;
+}
 
+version (LP32)
+	alias ptrace_lwpinfo = ptrace_lwpinfo32;
+else
+	alias ptrace_lwpinfo = ptrace_lwpinfo64;
+
+/+
 /* Argument structure for PT_GET_SC_RET. */
 struct ptrace_sc_ret {
 	syscallarg_t	sr_retval[2];	/* Only valid if sr_error == 0. */

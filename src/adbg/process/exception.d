@@ -29,6 +29,11 @@ version (Windows) {
 	import adbg.include.posix.ptrace;
 	
 	private enum SEGV_BNDERR = 3;
+	
+	version (linux)
+		import adbg.include.linux.user;
+	version (FreeBSD)
+		import adbg.include.freebsd.reg;
 }
 
 extern (C):
@@ -257,8 +262,8 @@ version (Windows) {
 	int pid = *cast(int*)os1;
 	int signo = *cast(int*)os2;
 	
-	// Get fault address
 	version (linux) {
+		// Get fault address
 		switch (signo) {
 		// NOTE: si_addr is NOT populated under ptrace for SIGTRAP
 		//       - linux does not fill si_addr on a SIGTRAP from a ptrace event
@@ -292,6 +297,11 @@ version (Windows) {
 		default:
 			exception.fault_address = 0;
 		}
+	} else version (FreeBSD) {
+		ptrace_lwpinfo lwp = void;
+		exception.fault_address =
+			ptrace(PT_LWPINFO, pid, &lwp, 0) < 0 ?
+			0 : cast(ulong)lwp.pl_siginfo.si_addr;
 	} else {
 		exception.fault_address = 0;
 	}
