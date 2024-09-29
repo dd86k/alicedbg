@@ -28,18 +28,43 @@ extern (C):
 /// Params: n = Bit position (0-based)
 template BIT(int n) if (n < 32) { enum { BIT = 1 << n } }
 @system unittest {
-	assert(BIT!0 == 1);
-	assert(BIT!1 == 0b10);
-	assert(BIT!2 == 0b100);
+	assert(BIT!0 == 1 << 0);
+	assert(BIT!1 == 1 << 1);
+	assert(BIT!2 == 1 << 2);
+	assert(BIT!4 == 1 << 4);
 	assert(BIT!4 == 0b1_0000);
+	assert(BIT!4 == 16);
 }
 
+// Form a ushort from byte values
 template I16(ubyte b1, ubyte b2) {
 	version (BigEndian)
 		enum ushort I16 = (b1 << 8) | b2;
 	else
 		enum ushort I16 = (b2 << 8) | b1;
 }
+version (BigEndian) unittest { assert(I16!(0xaa, 0xbb) == 0xaabb); }
+else                unittest { assert(I16!(0xaa, 0xbb) == 0xbbaa); }
+
+// Form an array using a 16-bit number
+template ARRAY16(ushort n) {
+	version (BigEndian)
+		enum ubyte[2] ARRAY16 = [ n >> 8, n & 255 ];
+	else
+		enum ubyte[2] ARRAY16 = [ n & 255, n >> 8 ];
+}
+version (BigEndian) unittest { assert(ARRAY16!(0xaabb) == [ 0xaa, 0xbb ]); }
+else                unittest { assert(ARRAY16!(0xaabb) == [ 0xbb, 0xaa ]); }
+
+// Form an array using a 32-bit number
+template ARRAY32(uint n) {
+	version (BigEndian)
+		enum ubyte[4] ARRAY32 = [ n >> 24, (n >> 16) & 255, (n >> 8) & 255, n & 255 ];
+	else
+		enum ubyte[4] ARRAY32 = [ n & 255, (n >> 8) & 255, (n >> 16) & 255, n >> 24 ];
+}
+version (BigEndian) unittest { assert(ARRAY32!(0xaabbccdd) == [ 0xaa, 0xbb, 0xcc, 0xdd ]); }
+else                unittest { assert(ARRAY32!(0xaabbccdd) == [ 0xdd, 0xcc, 0xbb, 0xaa ]); }
 
 /// Turn a 2-character string into a 2-byte number
 /// Params: s = 2-character string
@@ -125,7 +150,7 @@ ulong adbg_bswap64(ulong v) pure {
 }
 
 /// 
-unittest {
+@system unittest {
 	enum N16 = 0xAABB; enum R16 = 0xBBAA;
 	enum N32 = 0xAABBCCDD; enum R32 = 0xDDCCBBAA;
 	enum N64 = 0xAABBCCDD_11223344; enum R64 = 0x44332211_DDCCBBAA;
@@ -138,7 +163,7 @@ unittest {
 uint adbg_bits_extract32(uint v, uint len, uint pos) {
 	return (v >> pos) & ((1 << len) - 1);
 }
-unittest {
+@system unittest {
 	uint flags = 0b1010_1111_0000_0011_0000;
 	assert(adbg_bits_extract32(flags, 1, 0) == 0);
 	assert(adbg_bits_extract32(flags, 1, 1) == 0);
@@ -151,7 +176,7 @@ size_t adbg_alignup(size_t x, int s) {
 	size_t mask = s - 1;
 	return (x + mask) & (~mask);
 }
-unittest {
+@system unittest {
 	assert(adbg_alignup(0, uint.sizeof) == 0);
 	assert(adbg_alignup(1, uint.sizeof) == 4);
 	assert(adbg_alignup(2, uint.sizeof) == 4);
@@ -184,7 +209,7 @@ size_t adbg_aligndown(size_t x, int s) {
 	size_t mask = s - 1;
 	return x - (x & mask);
 }
-unittest {
+@system unittest {
 	assert(adbg_aligndown(0, uint.sizeof) == 0);
 	assert(adbg_aligndown(1, uint.sizeof) == 0);
 	assert(adbg_aligndown(2, uint.sizeof) == 0);
@@ -219,7 +244,7 @@ bool adbg_bits_boundchk(void *ptr, size_t sizeof, void *buffer, size_t bufsize) 
 	// ptr + sizeof might overflow
 	return ptr < buffer || ptr >= buffer + bufsize || ptr + sizeof > buffer + bufsize;
 }
-unittest {
+@system unittest {
 	template P(size_t n) { enum P = cast(void*)n; }
 	// Typical usage, check if pointer instance and size within buffer
 	assert(adbg_bits_ptrbounds(P!20, uint.sizeof, P!10, 30) == false);
