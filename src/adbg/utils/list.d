@@ -24,8 +24,11 @@ struct list_t {
 /// 	capacity = Initial capacity size, in number of items.
 /// Returns: List instance. On error, null is returned.
 list_t* adbg_list_new(size_t itemsize, size_t capacity) {
-	size_t isize = itemsize * capacity; // initial size
-	list_t *list = cast(list_t*)malloc(list_t.sizeof + isize);
+	if (itemsize == 0) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	list_t *list = cast(list_t*)malloc(list_t.sizeof + (itemsize * capacity));
 	if (list == null) {
 		adbg_oops(AdbgError.crt);
 		return null;
@@ -36,15 +39,15 @@ list_t* adbg_list_new(size_t itemsize, size_t capacity) {
 	list.buffer = cast(void*)list + list_t.sizeof;
 	return list;
 }
-
-/// Set the counter to zero.
-///
-/// For performance reasons, this function does not clear memory.
-/// Params: list = List instance.
-void adbg_list_clear(list_t *list) {
-	if (list == null)
-		return;
-	list.count = 0;
+unittest {
+	// new
+	list_t *list = adbg_list_new(int.sizeof, 4);
+	assert(list);
+	assert(list.capacity == 4);
+	assert(list.count == 0);
+	assert(list.itemsize == int.sizeof);
+	assert(adbg_list_get(list, 0) == null);
+	adbg_list_free(list);
 }
 
 /// Add an item to the list.
@@ -64,6 +67,8 @@ list_t* adbg_list_add(list_t *list, void *item) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
+	assert(list.buffer);
+	assert(list.itemsize);
 	
 	// Increase capacity
 	if (list.count >= list.capacity) {
@@ -86,6 +91,36 @@ list_t* adbg_list_add(list_t *list, void *item) {
 	memcpy(loc, item, list.itemsize);
 	return list;
 }
+unittest {
+	// new
+	list_t *list = adbg_list_new(int.sizeof, 4);
+	
+	// add
+	int id = 25;
+	adbg_list_add(list, &id); // count=1
+	assert(list.capacity == 4);
+	assert(list.count == 1);
+	assert(list.itemsize == int.sizeof);
+	assert(adbg_list_get(list, 0));
+	assert(*cast(int*)adbg_list_get(list, 0) == 25);
+	assert((list = adbg_list_add(list, &id)) != null); // count=2
+	assert((list = adbg_list_add(list, &id)) != null); // count=3
+	assert((list = adbg_list_add(list, &id)) != null); // count=4
+	assert(list.capacity == 4);
+	assert(list.count == 4);
+	assert(list.itemsize == int.sizeof);
+	
+	// more add+get
+	id = 333;
+	assert((list = adbg_list_add(list, &id)) != null); // count=5
+	assert((list = adbg_list_add(list, &id)) != null); // count=6
+	assert((list = adbg_list_add(list, &id)) != null); // count=7
+	assert(list.capacity > 4);
+	assert(list.count == 7);
+	assert(list.itemsize == int.sizeof);
+	
+	adbg_list_free(list);
+}
 
 /// Get an item at this index.
 /// Params:
@@ -101,7 +136,107 @@ void* adbg_list_get(list_t *list, size_t index) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
+	assert(list.buffer);
 	return list.buffer + (list.itemsize * index);
+}
+unittest {
+	// new
+	list_t *list = adbg_list_new(int.sizeof, 4);
+	
+	int a = 1; list = adbg_list_add(list, &a);
+	a = 2;     list = adbg_list_add(list, &a);
+	int *a1p = cast(int*)adbg_list_get(list, 0);
+	int *a2p = cast(int*)adbg_list_get(list, 1);
+	int *anp = cast(int*)adbg_list_get(list, 2);
+	assert(a1p);
+	assert(a2p);
+	assert(anp == null);
+	assert(*a1p == 1);
+	assert(*a2p == 2);
+	
+	adbg_list_free(list);
+}
+
+/// Set the counter to zero.
+///
+/// For performance reasons, this function does not clear memory.
+/// Params: list = List instance.
+void adbg_list_clear(list_t *list) {
+	if (list == null)
+		return;
+	list.count = 0;
+}
+unittest {
+	// new
+	list_t *list = adbg_list_new(int.sizeof, 4);
+	
+	adbg_list_clear(list);
+	assert(list.count == 0);
+	
+	adbg_list_free(list);
+}
+
+/// Remove an item from the list by its index.
+/// Params:
+/// 	list = List instance.
+/// 	index = Index.
+/// Returns: List instance, in case its memory location changes.
+list_t* adbg_list_remove_at(list_t *list, size_t index) {
+	if (list == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	assert(list.buffer);
+	assert(list.itemsize);
+	
+	if (list.count == 0) // Nothing to remove
+		return list;
+	if (index >= list.count) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
+	
+	// Decrement entry count
+	list.count--;
+	
+	// Move items if necessary
+	// This means if there are items higher in the buffer than the index
+	// Since count was decreased, it is a soft guarantee that we won't run it over
+	if (index < list.count) { // 0 < 0 -> false
+		void *buffer = list.buffer + (list.itemsize * index);
+		for (size_t i = index; i < list.count; ++i) {
+			memcpy(buffer, buffer + list.itemsize, list.itemsize);
+			buffer += list.itemsize;
+		}
+	}
+	
+	return list;
+}
+unittest {
+	// new
+	list_t *list = adbg_list_new(int.sizeof, 4);
+	
+	int a = 5; list = adbg_list_add(list, &a); // 0
+	a = 10;    list = adbg_list_add(list, &a); // 1
+	a = 15;    list = adbg_list_add(list, &a); // 2
+	a = 20;    list = adbg_list_add(list, &a); // 3
+	
+	list = adbg_list_remove_at(list, 3);
+	
+	assert(adbg_list_get(list, 3) == null); // No longer available
+	assert(adbg_list_get(list, 2));         // Still available
+	
+	list = adbg_list_remove_at(list, 0);
+	
+	assert(adbg_list_get(list, 2) == null); // No longer available
+	assert(adbg_list_get(list, 1));         // Still available
+	
+	// So far, values 20 and 5 have been removed,
+	// so only 10 and 15 should be here at positions 0 and 1
+	assert(*cast(int*)adbg_list_get(list, 0) == 10);
+	assert(*cast(int*)adbg_list_get(list, 1) == 15);
+	
+	adbg_list_free(list);
 }
 
 /// Free the list.
@@ -110,55 +245,4 @@ void adbg_list_free(list_t *list) {
 	if (list == null)
 		return;
 	free(list);
-}
-
-unittest {
-	list_t *list = adbg_list_new(int.sizeof, 4);
-	assert(list);
-	assert(list.capacity == 4);
-	assert(list.count == 0);
-	assert(list.itemsize == int.sizeof);
-	
-	assert(adbg_list_get(list, 0) == null);
-	
-	int id = 25;
-	adbg_list_add(list, &id); // count=1
-	assert(list.capacity == 4);
-	assert(list.count == 1);
-	assert(list.itemsize == int.sizeof);
-	assert(adbg_list_get(list, 0));
-	assert(*cast(int*)adbg_list_get(list, 0) == 25);
-	
-	assert((list = adbg_list_add(list, &id)) != null); // count=2
-	assert((list = adbg_list_add(list, &id)) != null); // count=3
-	assert((list = adbg_list_add(list, &id)) != null); // count=4
-	
-	assert(list.capacity == 4);
-	assert(list.count == 4);
-	assert(list.itemsize == int.sizeof);
-	
-	assert(adbg_list_get(list, 1));
-	assert(adbg_list_get(list, 2));
-	assert(adbg_list_get(list, 3));
-	
-	assert(*cast(int*)adbg_list_get(list, 1) == 25);
-	assert(*cast(int*)adbg_list_get(list, 2) == 25);
-	assert(*cast(int*)adbg_list_get(list, 3) == 25);
-	
-	id = 333;
-	assert((list = adbg_list_add(list, &id)) != null); // count=5
-	assert((list = adbg_list_add(list, &id)) != null); // count=6
-	assert((list = adbg_list_add(list, &id)) != null); // count=7
-	
-	assert(list.capacity > 4);
-	assert(list.count == 7);
-	assert(list.itemsize == int.sizeof);
-	
-	assert(adbg_list_get(list, 4));
-	assert(adbg_list_get(list, 5));
-	assert(adbg_list_get(list, 6));
-	
-	assert(*cast(int*)adbg_list_get(list, 4) == 333);
-	assert(*cast(int*)adbg_list_get(list, 5) == 333);
-	assert(*cast(int*)adbg_list_get(list, 6) == 333);
 }
