@@ -66,7 +66,7 @@ void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
 			adbg_register_t *reg = void;
 			while ((reg = adbg_register_by_id(thread, id++)) != null) {
 				char[20] hex = void;
-				adbg_register_format(hex.ptr, 20, reg, AdbgRegisterFormat.hexPadded);
+				adbg_register_format(hex.ptr, 20, reg, AdbgRegisterFormat.hex);
 				printf(` %s=0x%s`, adbg_register_name(reg), hex.ptr);
 			}
 		}
