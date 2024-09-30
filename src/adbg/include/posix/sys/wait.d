@@ -53,8 +53,8 @@ version (linux) {
 	int WCOREDUMP(int s)	{ return s & 0x80; }
 	
 	version (CRuntime_Glibc) {
-		// Source: bits/waitstatus.h
-		//         sysdeps/unix/sysv/linux/bits/waitflags.h
+		// bits/waitstatus.h
+		// sysdeps/unix/sysv/linux/bits/waitflags.h
 		
 		bool WIFEXITED(int s)	{ return WTERMSIG(s) == 0; }
 		bool WIFSIGNALED(int s)	{ return (cast(byte)((s & 0x7f) + 1) >> 1) > 0; }
@@ -65,11 +65,17 @@ version (linux) {
 		#define	__W_STOPCODE(sig)	((sig) << 8 | 0x7f)
 		*/
 	} else version (CRuntime_Musl) {
-		// Source: include/sys/wait.h
+		// include/sys/wait.h
 		
 		bool WIFEXITED(int s)	{ return !WTERMSIG(s); }
 		bool WIFSIGNALED(int s)	{ return (s&0xffff)-1U < 0xffu; }
 		bool WIFSTOPPED(int s)	{ return cast(short)(((s&0xffff)*0x10001U)>>8) > 0x7f00; }
+	} else version (CRuntime_Bionic) {
+		// libc/include/bits/wait.h
+		
+		bool WIFEXITED(int s)	{ return WTERMSIG(s) == 0; }
+		bool WIFSIGNALED(int s)	{ return WTERMSIG(s+1) >= 2; }
+		bool WIFSTOPPED(int s)	{ return WTERMSIG(s) == 0x7f; }
 	} else static assert(0, "Define wait.h macros (Linux)");
 } else version (FreeBSD) {
 	// Source: sys/sys/wait.h
