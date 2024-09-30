@@ -751,7 +751,10 @@ version (Windows) {
 	version(Trace) trace("pid=%d state=%d", proc.pid, proc.status);
 	switch (proc.status) with (AdbgProcStatus) {
 	case loaded, stopped:
-		if (ptrace(PT_CONTINUE, proc.pid, null, 0) < 0) {
+		// NOTE: FreeBSD/NetBSD/OpenBSD PT_CONTINUE
+		//       addr can be an address to resume at, or 1
+		//       data can be a signal number, or 0
+		if (ptrace(PT_CONTINUE, proc.pid, cast(caddr_t)1, 0) < 0) {
 			proc.status = AdbgProcStatus.unknown;
 			return adbg_oops(AdbgError.os);
 		}
