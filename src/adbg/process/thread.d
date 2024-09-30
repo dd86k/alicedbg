@@ -1017,8 +1017,9 @@ int adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, AdbgReg
 	return snprintf(buffer, len, sformat, n);
 }
 unittest {
+	static immutable adbg_register_info_t info = { "example", AdbgRegisterType.u16 };
 	adbg_register_t reg = void;
-	reg.info.type = AdbgRegisterType.u16;
+	reg.info = &info;
 	reg.u16  = 0x1234;
 	enum BUFSZ = 16;
 	char[BUFSZ] buffer = void;

@@ -526,7 +526,6 @@ version (Windows) {
 	proc.status = options & OPT_STOP ? AdbgProcStatus.paused : AdbgProcStatus.running;
 	proc.pid = cast(pid_t)pid;
 } else version (FreeBSD) {
-	version (Trace) if (options & OPT_STOP) trace("Sending break...");
 	if (ptrace(PT_ATTACH, pid, null, 0) < 0) {
 		adbg_oops(AdbgError.os);
 		adbg_process_free(proc);
@@ -741,6 +740,7 @@ version (Windows) {
 	switch (proc.status) with (AdbgProcStatus) {
 	case loaded, stopped:
 		if (ptrace(PT_CONT, proc.pid, null, null) < 0) {
+			version (Trace) trace("ptrace=%s", strerror(errno));
 			proc.status = AdbgProcStatus.unknown;
 			return adbg_oops(AdbgError.os);
 		}
@@ -755,6 +755,7 @@ version (Windows) {
 		//       addr can be an address to resume at, or 1
 		//       data can be a signal number, or 0
 		if (ptrace(PT_CONTINUE, proc.pid, cast(caddr_t)1, 0) < 0) {
+			version (Trace) trace("ptrace=%s", strerror(errno));
 			proc.status = AdbgProcStatus.unknown;
 			return adbg_oops(AdbgError.os);
 		}
