@@ -39,8 +39,6 @@ extern (C):
 
 private enum THREAD_LIST_CAPACITY = 32;
 
-// TODO: Move regset fat pointer in thread
-
 struct adbg_thread_t {
 version (Windows) {
 	HANDLE handle;
@@ -288,16 +286,16 @@ enum AdbgRegister {
 	arm_r9	= 9,	/// (Arm) 
 	arm_r10	= 10,	/// (Arm) 
 	arm_r11	= 11,	/// (Arm) 
-	arm_fp	= arm_r11,	/// (Arm) Frame Pointer (R11)
 	arm_r12	= 12,	/// (Arm) 
-	arm_ip	= arm_r12,	/// (Arm) (R12)
 	arm_r13	= 13,	/// (Arm) 
-	arm_sp	= arm_r13,	/// (Arm) Stack Pointer (R13)
 	arm_r14	= 14,	/// (Arm) 
-	arm_lr	= arm_r14,	/// (Arm) Link Register (R14)
 	arm_r15	= 15,	/// (Arm) 
-	arm_pc	= arm_r15,	/// (Arm) Program Counter (R15)
 	arm_cpsr	= 16,	/// (Arm) Current Program Status Register (System)
+	arm_fp	= arm_r11,	/// (Arm) Frame Pointer (R11)
+	arm_ip	= arm_r12,	/// (Arm) (R12)
+	arm_sp	= arm_r13,	/// (Arm) Stack Pointer (R13)
+	arm_lr	= arm_r14,	/// (Arm) Link Register (R14)
+	arm_pc	= arm_r15,	/// (Arm) Program Counter (R15)
 	
 	// AArch64 (A64)
 	aarch64_x0	= 0,	/// (AArch64) 
@@ -330,11 +328,11 @@ enum AdbgRegister {
 	aarch64_x27	= 27,	/// (AArch64) 
 	aarch64_x28	= 28,	/// (AArch64) 
 	aarch64_x29	= 29,	/// (AArch64) 
-	aarch64_fp	= aarch64_x29,	/// (AArch64) Frame Pointer (X29)
 	aarch64_x30	= 30,	/// (AArch64) 
-	aarch64_lr	= aarch64_x30,	/// (AArch64) Link Register (X30)
 	aarch64_sp	= 31,	/// (AArch64) Stack Pointer
 	aarch64_pc	= 32,	/// (AArch64) Program Counter
+	aarch64_fp	= aarch64_x29,	/// (AArch64) Frame Pointer (X29)
+	aarch64_lr	= aarch64_x30,	/// (AArch64) Link Register (X30)
 }
 
 /// Register size
@@ -359,7 +357,7 @@ struct adbg_register_info_t {
 /// Register structure, designs a single register for UI ends to understand
 struct adbg_register_t {
 	/// Register name and type.
-	adbg_register_info_t info;
+	immutable(adbg_register_info_t) *info;
 	union { // Data
 		ulong  u64;	/// Register data: ulong (u64)
 		uint   u32;	/// Register data: uint (u32)
@@ -373,8 +371,6 @@ struct adbg_register_t {
 /// Represents a thread context structure with the register values once a
 /// process is paused.
 struct adbg_thread_context_t {
-	/// Register count in registers field.
-	size_t count;
 	/// Register population, this may depends by platform.
 	adbg_register_t[REG_COUNT] items;
 }
@@ -480,20 +476,17 @@ private immutable adbg_register_info_t[] regset_aarch64 = [
 ];
 
 version (X86)
-	/// Buffer size for register set.
-	private enum REG_COUNT = regset_x86.length;
+	private enum REG_COUNT = regset_x86.length;	/// Buffer size for register set.
 else version (X86_64)
-	/// Ditto
-	private enum REG_COUNT = regset_x86_64.length;
+	private enum REG_COUNT = regset_x86_64.length;	/// Ditto
 else version (ARM)
-	/// Ditto
-	private enum REG_COUNT = regset_arm.length;
+	private enum REG_COUNT = regset_arm.length;	/// Ditto
 else version (AArch64)
-	/// Ditto
-	private enum REG_COUNT = regset_aarch64.length;
+	private enum REG_COUNT = regset_aarch64.length;	/// Ditto
 else
-	/// Ditto
-	private enum REG_COUNT = 0;
+	private enum REG_COUNT = 0;	/// Ditto
+
+version(PrintTargetInfo) pragma(msg, "REG_COUNT\t", REG_COUNT);
 
 adbg_register_t* adbg_register_by_id(adbg_thread_t *thread, int id) {
 	version (Trace) trace("thread=%p index=%u", thread, id);
@@ -503,7 +496,7 @@ adbg_register_t* adbg_register_by_id(adbg_thread_t *thread, int id) {
 	}
 	
 	size_t index = cast(size_t)id;
-	if (index >= thread.context.count) {
+	if (index >= thread.context.items.length) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
@@ -517,6 +510,8 @@ const(char)* adbg_register_name(adbg_register_t *register) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
+	assert(register.info);
+	assert(register.info.name);
 	return register.info.name;
 }
 
@@ -538,8 +533,7 @@ void adbg_thread_context_config(adbg_thread_context_t *ctx, AdbgMachine mach) {
 	
 	version (Trace) trace("regs.length=%d", cast(int)regs.length);
 	for (size_t i; i < regs.length; ++i)
-		ctx.items[i].info = regs[i];
-	ctx.count = regs.length;
+		ctx.items[i].info = &regs[i];
 }
 
 // Update the context for thread
@@ -555,9 +549,8 @@ version (Win64) {
 	case AdbgMachine.amd64:
 		CONTEXT_X64 winctx = void; // CONTEXT
 		winctx.ContextFlags = CONTEXT_ALL;
-		if (GetThreadContext(thread.handle, cast(LPCONTEXT)&winctx) == FALSE) {
+		if (GetThreadContext(thread.handle, cast(LPCONTEXT)&winctx) == FALSE)
 			return adbg_oops(AdbgError.os);
-		}
 		thread.context.items[AdbgRegister.amd64_rip].u64    = winctx.Rip;
 		thread.context.items[AdbgRegister.amd64_rflags].u64 = winctx.EFlags;
 		thread.context.items[AdbgRegister.amd64_rax].u64    = winctx.Rax;
@@ -586,9 +579,8 @@ version (Win64) {
 	case AdbgMachine.i386: // WoW64 process
 		WOW64_CONTEXT winctxwow64 = void;
 		winctxwow64.ContextFlags = CONTEXT_ALL;
-		if (Wow64GetThreadContext(thread.handle, &winctxwow64) == FALSE) {
+		if (Wow64GetThreadContext(thread.handle, &winctxwow64) == FALSE)
 			return adbg_oops(AdbgError.os);
-		}
 		thread.context.items[AdbgRegister.x86_eip].u32    = winctxwow64.Eip;
 		thread.context.items[AdbgRegister.x86_eflags].u32 = winctxwow64.EFlags;
 		thread.context.items[AdbgRegister.x86_eax].u32    = winctxwow64.Eax;
@@ -613,9 +605,8 @@ version (Win64) {
 	case AdbgMachine.aarch64:
 		ARM64_NT_CONTEXT winctx = void; // CONTEXT
 		winctx.ContextFlags = CONTEXT_ALL;
-		if (GetThreadContext(thread.handle, cast(LPCONTEXT)&winctx) == FALSE) {
+		if (GetThreadContext(thread.handle, cast(LPCONTEXT)&winctx) == FALSE)
 			return adbg_oops(AdbgError.os);
-		}
 		thread.context.items[AdbgRegister.aarch64_x0].u64  = winctx.X0;
 		thread.context.items[AdbgRegister.aarch64_x1].u64  = winctx.X1;
 		thread.context.items[AdbgRegister.aarch64_x2].u64  = winctx.X2;
@@ -653,9 +644,8 @@ version (Win64) {
 	case AdbgMachine.arm: // WoW64 process
 		ARM_NT_CONTEXT winctxwow64 = void;
 		winctxwow64.ContextFlags = CONTEXT_ALL;
-		if (Wow64GetThreadContext(thread.handle, &winctxwow64) == FALSE) {
+		if (Wow64GetThreadContext(thread.handle, &winctxwow64) == FALSE)
 			return adbg_oops(AdbgError.os);
-		}
 		thread.context.items[AdbgRegister.arm_r0].u32   = winctxwow64.r0;
 		thread.context.items[AdbgRegister.arm_r1].u32   = winctxwow64.r1;
 		thread.context.items[AdbgRegister.arm_r2].u32   = winctxwow64.r2;

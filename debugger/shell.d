@@ -1158,14 +1158,14 @@ int command_thread(int argc, const(char) **argv) {
 		return ShellError.missingArgument;
 	
 	// Select thread
-	adbg_thread_t *selected = adbg_thread_list_by_id(process, atoi(argv[1]));
-	if (selected == null)
+	thread = adbg_thread_list_by_id(process, atoi(argv[1]));
+	if (thread == null)
 		return ShellError.alicedbg;
 	
 	action = argv[2];
 	if (strcmp(action, "registers") == 0) {
 		// Update its context
-		adbg_thread_context_update(process, selected);
+		adbg_thread_context_update(process, thread);
 		
 		int id;
 		adbg_register_t *register = void;
