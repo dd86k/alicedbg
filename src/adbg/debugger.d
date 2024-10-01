@@ -329,13 +329,15 @@ version (USE_CLONE) { // clone(2)
 		return null;
 	}
 } else { // fork(2)
-	switch (proc.pid = fork()) {
-	case -1: // Error
+	pid_t pid = fork();
+	if (pid < 0) { // error
 		version(Trace) trace("fork=%s", strerror(errno));
 		adbg_oops(AdbgError.os);
 		adbg_process_free(proc);
 		return null;
-	case 0: // New child process
+	}
+	
+	if (pid == 0) { // sub process
 		version(Trace) for (int i; i < argc + 2; ++i)
 			trace("argv[%d]=%s", i, proc.argv[i]);
 		
@@ -345,12 +347,14 @@ version (USE_CLONE) { // clone(2)
 		chld.dir  = odir;
 		if (__adbg_exec_child(&chld) < 0)
 			adbg_process_free(proc);
+		version(Trace) trace("fork=%s", strerror(errno));
 		_exit(errno);
-		return null; // Make compiler happy
-	default: // This parent process
 	}
+	
+	proc.pid = pid;
 } // clone(2)/fork(2)
 	
+	version(Trace) trace("pid=%d", proc.pid);
 	proc.status = AdbgProcStatus.standby;
 	proc.creation = AdbgCreation.spawned;
 	return proc;
@@ -750,7 +754,17 @@ version (Windows) {
 } else version (Posix) {
 	version(Trace) trace("pid=%d state=%d", proc.pid, proc.status);
 	switch (proc.status) with (AdbgProcStatus) {
-	case loaded, stopped:
+	case loaded:
+		// TODO: Test HACK on NetBSD, OpenBSD
+		// HACK: FreeBSD: PT_TRACEME and stop state.
+		//       Because the PT_TRACEME does not seem to mark the tracee
+		//       as stopped, calling PT_CONTINUE after execve will return
+		//       errno=13 (Device Busy). raise(SIGSTOP) does nothing.
+		//       This workaround forces waiting a stop state.
+		int w = void;
+		waitpid(proc.pid, &w, 0);
+		goto case;
+	case stopped:
 		// NOTE: FreeBSD/NetBSD/OpenBSD PT_CONTINUE
 		//       addr can be an address to resume at, or 1
 		//       data can be a signal number, or 0
