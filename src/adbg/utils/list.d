@@ -50,6 +50,74 @@ unittest {
 	adbg_list_free(list);
 }
 
+/// Increase or decrease the capacity of the list.
+///
+/// If the new capacity is lower than the number of items currently
+/// in the list, an error is thrown.
+/// Params:
+/// 	list = List instance.
+/// 	newcapacity = New capacity, in number of items.
+/// Returns: List instance; Or null on error.
+list_t* adbg_list_reserve(list_t *list, size_t newcapacity) {
+	if (list == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	assert(list.buffer);
+	assert(list.itemsize);
+	
+	if (newcapacity == list.capacity)
+		return list;
+	
+	// Can't afford to lose items in this economy
+	if (newcapacity < list.count) {
+		adbg_oops(AdbgError.invalidValue);
+		return null;
+	}
+	
+	// NOTE: MSVC will always assign a new memory block
+	list = cast(list_t*)realloc(list, list_t.sizeof + (list.itemsize * newcapacity));
+	if (list == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	
+	// realloc(3) should have copied data to new block
+	// Only need to readjust buffer pointer
+	list.capacity = newcapacity;
+	list.buffer = cast(void*)list + list_t.sizeof;
+	return list;
+}
+
+/// Get the list buffer space.
+///
+/// Useful when another program is expecting to fill the buffer.
+/// Params: list = List instance.
+/// Returns: Buffer; Or null on error.
+void* adbg_list_buffer(list_t *list) {
+	if (list == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	assert(list.buffer);
+	assert(list.itemsize);
+	return list.buffer;
+}
+/// Get the list's current capacity.
+///
+/// Useful when another program is expecting to fill the buffer.
+/// Params: list = List instance.
+/// Returns: Capacity size in number of items; Or zero on error.
+size_t adbg_list_capacity(list_t *list) {
+	if (list == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
+	assert(list.buffer);
+	assert(list.itemsize);
+	return list.capacity;
+}
+
 /// Add an item to the list.
 ///
 /// Item data is copied into the list.
@@ -72,18 +140,9 @@ list_t* adbg_list_add(list_t *list, void *item) {
 	
 	// Increase capacity
 	if (list.count >= list.capacity) {
-		size_t newcapacity = list.capacity << 1; // double capacity
-		// NOTE: MSVC will always assign a new memory block
-		list = cast(list_t*)realloc(list, list_t.sizeof + (list.itemsize * newcapacity));
-		if (list == null) {
-			adbg_oops(AdbgError.crt);
+		list = adbg_list_reserve(list, list.capacity << 1); // double its capacity
+		if (list == null)
 			return null;
-		}
-		
-		// realloc(3) should have copied data to new block
-		// Only need to readjust buffer pointer
-		list.capacity = newcapacity;
-		list.buffer = cast(void*)list + list_t.sizeof;
 	}
 	
 	// Copy item into buffer
