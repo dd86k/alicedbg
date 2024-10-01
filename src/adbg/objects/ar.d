@@ -198,7 +198,7 @@ int atoint(const(char)* p, size_t s) {
 	}
 	return v;
 }
-unittest {
+extern (D) unittest {
 	assert(atoint("0", 10) == 0);
 	assert(atoint("1", 10) == 1);
 	assert(atoint("2", 10) == 2);

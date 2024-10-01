@@ -143,7 +143,7 @@ size_t adbg_symbol_demangle_guess(char* buffer, size_t bufsize, const(char)* sym
 	buffer[bi] = 0;
 	return bi;
 }
-unittest {
+extern (D) unittest {
 	import core.stdc.string : strncmp;
 	import std.stdio : stderr, writefln;
 	struct symtest {

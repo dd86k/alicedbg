@@ -81,7 +81,7 @@ ptrdiff_t strsrch(const(char) *hay, int needle) {
 			return i;
 	return -1;
 }
-unittest {
+extern (D) unittest {
 	assert(strsrch("hello", 'q')  < 0); // not found
 	assert(strsrch("hello", 'h') == 0);
 	assert(strsrch("hello", 'e') == 1);
@@ -161,7 +161,7 @@ Lstop:	// When '--' is given, add the rest of arguments as "extras"
 		getoptaddextra(argc, argv[i]);
 	return getoptleftcount();
 }
-unittest {
+extern (D) unittest {
 	__gshared int hit;
 	static int opttest() {
 		++hit;
@@ -184,7 +184,7 @@ unittest {
 	assert(strcmp(*leftovers, "argument") == 0);
 	assert(strcmp(*(leftovers + 1), "--test") == 0);
 }
-unittest {
+extern (D) unittest {
 	__gshared int hit;
 	static int opttest() {
 		++hit;
@@ -207,7 +207,7 @@ unittest {
 	assert(strcmp(*leftovers, "alicedbg.exe") == 0);
 	assert(strcmp(*(leftovers + 1), "--version") == 0);
 }
-unittest {
+extern (D) unittest {
 	__gshared const(char)* hit;
 	static int opttest(const(char)* arg) {
 		hit = arg;
@@ -229,7 +229,7 @@ unittest {
 	const(char) **leftovers = getoptleftovers();
 	assert(leftovers == null);
 }
-unittest {
+extern (D) unittest {
 	__gshared bool hit;
 	static int opttest() {
 		return 0;
@@ -246,7 +246,7 @@ unittest {
 	assert(e < 0);   // Option -E not found
 	assert(hit == false); // 
 }
-unittest {
+extern (D) unittest {
 	__gshared bool hit;
 	static int opttest() {
 		return 0;
@@ -268,7 +268,7 @@ unittest {
 	assert(*(leftovers + 1) == null);
 }
 /// Test similar switch names
-unittest {
+extern (D) unittest {
 	__gshared bool dotest;
 	static int opttests() {
 		dotest = true;
@@ -296,7 +296,7 @@ unittest {
 	const(char) **leftovers = getoptleftovers();
 	assert(leftovers == null);
 }
-unittest {
+extern (D) unittest {
 	__gshared bool dotest;
 	static int opttests() {
 		dotest = true;

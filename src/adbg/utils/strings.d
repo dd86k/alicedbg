@@ -25,7 +25,7 @@ size_t adbg_nstrlen(const(char) *s, size_t max) {
 	while (s[l] && l < max) ++l;
 	return l;
 }
-unittest {
+extern (D) unittest {
 	assert(adbg_nstrlen("", 10) == 0);
 	assert(adbg_nstrlen("", 0) == 0);
 	assert(adbg_nstrlen("hello", 0) == 0);
@@ -42,7 +42,7 @@ size_t adbg_nstrlenw(const(wchar) *s, size_t max) {
 	while (s[l] && l < max) ++l;
 	return l;
 }
-unittest {
+extern (D) unittest {
 	assert(adbg_nstrlenw(""w.ptr, 10) == 0);
 	assert(adbg_nstrlenw(""w.ptr, 0) == 0);
 	assert(adbg_nstrlenw("hello"w.ptr, 0) == 0);
@@ -81,8 +81,7 @@ size_t adbg_util_getlinef(char *bf, size_t bfsz, size_t *lnsz, FILE *file) {
 	*lnsz = i;
 	return i;
 }
-
-unittest {
+extern (D) unittest {
 	import std.stdio : writefln;
 	import std.file : write, tempDir, remove;
 	import std.path : buildPath;
@@ -141,8 +140,7 @@ size_t adbg_util_getline(char *bf, size_t bfsz, size_t *lnsz, const(char) *src, 
 	*lnsz = i;
 	return i;
 }
-
-unittest {
+extern (D) unittest {
 	const(char) *src = "123\n\nabc";
 	char[16] line = void;
 	size_t linesz = void;
@@ -199,7 +197,7 @@ int adbg_strings_flatten(char *buf, int buflen, int argc, const(char) **argv, in
 	buf[bufidx] = 0;
 	return bufidx;
 }
-unittest {
+extern (D) unittest {
 	static int argc = 3;
 	static const(char)** argv = ["one", "two", "three"];
 	
@@ -288,8 +286,7 @@ L_RETURN:
 	if (argc) *argc = _argc;
 	return _argc ? cast(char**)_argv : null;
 }
-
-unittest {
+extern (D) unittest {
 	struct Test {
 		string input;
 		const(char)*[] output;

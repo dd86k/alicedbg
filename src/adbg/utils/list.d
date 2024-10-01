@@ -39,7 +39,7 @@ list_t* adbg_list_new(size_t itemsize, size_t capacity) {
 	list.buffer = cast(void*)list + list_t.sizeof;
 	return list;
 }
-unittest {
+extern (D) unittest {
 	// new
 	list_t *list = adbg_list_new(int.sizeof, 4);
 	assert(list);
@@ -150,7 +150,7 @@ list_t* adbg_list_add(list_t *list, void *item) {
 	memcpy(loc, item, list.itemsize);
 	return list;
 }
-unittest {
+extern (D) unittest {
 	// new
 	list_t *list = adbg_list_new(int.sizeof, 4);
 	
@@ -198,7 +198,7 @@ void* adbg_list_get(list_t *list, size_t index) {
 	assert(list.buffer);
 	return list.buffer + (list.itemsize * index);
 }
-unittest {
+extern (D) unittest {
 	// new
 	list_t *list = adbg_list_new(int.sizeof, 4);
 	
@@ -225,7 +225,7 @@ void adbg_list_clear(list_t *list) {
 		return;
 	list.count = 0;
 }
-unittest {
+extern (D) unittest {
 	// new
 	list_t *list = adbg_list_new(int.sizeof, 4);
 	
@@ -271,7 +271,7 @@ list_t* adbg_list_remove_at(list_t *list, size_t index) {
 	
 	return list;
 }
-unittest {
+extern (D) unittest {
 	// new
 	list_t *list = adbg_list_new(int.sizeof, 4);
 	

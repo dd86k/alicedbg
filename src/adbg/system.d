@@ -150,7 +150,7 @@ const(char)* adbg_system_library_missing(adbg_system_library_t *lib, size_t inde
 	if (lib == null || index >= lib.missingcnt) return null;
 	return cast(const(char)*)&lib.missing[index];
 }
-unittest {
+extern (D) unittest {
 	adbg_system_library_t lib;
 	adbg_system_library_addmissing(&lib, "test");
 	adbg_system_library_addmissing(&lib, "some_long_name_that_should_fit_the_buffer_anyway");

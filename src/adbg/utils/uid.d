@@ -96,7 +96,7 @@ void uid_swap(ref UID uid) {
 	uid.time_ver = adbg_bswap16(uid.time_ver);
 	uid.clock    = adbg_bswap16(uid.clock);
 }
-@system unittest {
+extern (D) unittest {
 	UID uid;
 	uid.time_low = 0x01_000000;
 	uid.time_mid = 0x02_00;
@@ -115,7 +115,7 @@ void uid_swap(ref UID uid) {
 bool uid_nil(ref UID uid) {
 	return uid.u64[0] == 0 && uid.u64[1] == 0;
 }
-@system unittest {
+extern (D) unittest {
 	UID uid;
 	assert(uid_nil(uid));
 }

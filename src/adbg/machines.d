@@ -795,7 +795,7 @@ immutable(adbg_machine_t)* adbg_machine(AdbgMachine mach) {
 	}
 	return &machines[i];
 }
-@system unittest {
+extern (D) unittest {
 	assert(adbg_machine(cast(AdbgMachine)-1) == null);
 	assert(adbg_machine(cast(AdbgMachine)0)  == null);
 	assert(adbg_machine(AdbgMachine.i8086).machine  == AdbgMachine.i8086);
@@ -848,7 +848,7 @@ immutable(adbg_machine_t)* adbg_machine_select(const(char) *alias_) {
 	adbg_oops(AdbgError.unfindable);
 	return null;
 }
-@system unittest {
+extern (D) unittest {
 	assert(adbg_machine_select(null) == null);
 	assert(adbg_machine_select("I do not exist!") == null);
 	assert(adbg_machine_select("8086").machine == AdbgMachine.i8086);

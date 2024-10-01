@@ -12,7 +12,7 @@ char hexc0(ubyte upper) {
 	ubyte h = upper >> 4;
 	return cast(char)(h >= 0xa ? h + ('a' - 0xa) : h + '0');
 }
-unittest {
+extern (D) unittest {
 	assert(hexc0(0x00) == '0');
 	assert(hexc0(0x10) == '1');
 	assert(hexc0(0x20) == '2');
@@ -34,7 +34,7 @@ char hexc1(ubyte lower) {
 	ubyte l = lower & 15;
 	return cast(char)(l >= 0xa ? l + ('a' - 0xa) : l + '0');
 }
-unittest {
+extern (D) unittest {
 	assert(hexc1(0) == '0');
 	assert(hexc1(1) == '1');
 	assert(hexc1(2) == '2');
@@ -68,7 +68,7 @@ int hexstr(char *buffer, size_t bsize, ubyte *data, size_t dsize, char sep = 0) 
 	}
 	return len;
 }
-unittest {
+extern (D) unittest {
 	ubyte[4] data = [ 0x12, 0x34, 0x56, 0x78 ];
 	char[8] buf = void;
 	int len = hexstr(buf.ptr, 8, data.ptr, 4);
@@ -127,7 +127,7 @@ int realstring(char *buffer, size_t bsize, const(char)* str, size_t ssize,
 	
 	return len;
 }
-unittest {
+extern (D) unittest {
 	char[2]  bi = "`\n";
 	char[10] bo = void; // '`' '\\x0a'
 	assert(realstring(bo.ptr, 10, bi.ptr, 2) == 5);
@@ -210,7 +210,7 @@ const(char)* basename(const(char) *path) {
 	// "test/" -> invalid
 	return last >= i ? path : path + last;
 }
-unittest {
+extern (D) unittest {
 	import core.stdc.string : strcmp;
 	const(char) *path = "test/file.lib";
 	const(char) *base = basename(path);

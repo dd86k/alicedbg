@@ -304,7 +304,7 @@ ubyte adbg_object_omf_chksum(void* data, int length) {
 		r += (cast(ubyte*)data)[i];
 	return r;
 }
-unittest {
+extern (D) unittest {
 	static immutable ubyte[] a1 = [ 0x31 ];
 	assert(adbg_object_omf_chksum(cast(void*)a1.ptr, a1.length) == 0x31);
 	static immutable ubyte[] a2 = [ 0x31, 0x31 ];

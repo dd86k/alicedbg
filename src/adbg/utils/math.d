@@ -13,7 +13,7 @@ template MAX(size_t a, size_t b) {
 template MIN(size_t a, size_t b) {
 	enum MIN = a <= b ? a : b;
 }
-@system unittest {
+extern (D) unittest {
 	static assert(MAX!(1, 2) == 2);
 	static assert(MAX!(2, 2) == 2);
 	static assert(MIN!(1, 2) == 1);
@@ -23,7 +23,7 @@ template MIN(size_t a, size_t b) {
 size_t max(size_t a, size_t b) {
 	return a >= b ? a : b;
 }
-@system unittest {
+extern (D) unittest {
 	assert(max(1, 3) == 3);
 	assert(max(2, 3) == 3);
 	assert(max(3, 3) == 3);
@@ -32,7 +32,7 @@ size_t max(size_t a, size_t b) {
 size_t min(size_t a, size_t b) {
 	return a <= b ? a : b;
 }
-@system unittest {
+extern (D) unittest {
 	assert(min(1, 3) == 1);
 	assert(min(2, 3) == 2);
 	assert(min(3, 3) == 3);
@@ -52,7 +52,7 @@ template KiB(int a) {
 	enum ulong KiB = a * 1024L;
 }
 
-@system unittest {
+extern (D) unittest {
 	static assert(KiB!1 == 1024);
 	static assert(KiB!2 == 1024 * 2);
 	static assert(MiB!1 == 1024 * 1024);
@@ -71,7 +71,7 @@ template KiB(int a) {
 uint ceildiv32(uint a, uint b) pure {
 	return (a + b + 1) / b;
 }
-@system unittest {
+extern (D) unittest {
 	assert(ceildiv32(0, 512) == 1);
 	assert(ceildiv32(50, 512) == 1);
 	assert(ceildiv32(512, 512) == 2);

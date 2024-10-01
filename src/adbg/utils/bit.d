@@ -27,7 +27,7 @@ extern (C):
 /// Create a 1-bit bitmask with a bit position (0-based, 1 << a).
 /// Params: n = Bit position (0-based)
 template BIT(int n) if (n < 32) { enum { BIT = 1 << n } }
-@system unittest {
+extern (D) unittest {
 	assert(BIT!0 == 1 << 0);
 	assert(BIT!1 == 1 << 1);
 	assert(BIT!2 == 1 << 2);
@@ -43,8 +43,10 @@ template I16(ubyte b1, ubyte b2) {
 	else
 		enum ushort I16 = (b2 << 8) | b1;
 }
-version (BigEndian) unittest { assert(I16!(0xaa, 0xbb) == 0xaabb); }
-else                unittest { assert(I16!(0xaa, 0xbb) == 0xbbaa); }
+extern (D) unittest {
+	version (BigEndian) assert(I16!(0xaa, 0xbb) == 0xaabb);
+	else                assert(I16!(0xaa, 0xbb) == 0xbbaa);
+}
 
 // Form an array using a 16-bit number
 template ARRAY16(ushort n) {
@@ -53,8 +55,10 @@ template ARRAY16(ushort n) {
 	else
 		enum ubyte[2] ARRAY16 = [ n & 255, n >> 8 ];
 }
-version (BigEndian) unittest { assert(ARRAY16!(0xaabb) == [ 0xaa, 0xbb ]); }
-else                unittest { assert(ARRAY16!(0xaabb) == [ 0xbb, 0xaa ]); }
+extern (D) unittest {
+	version (BigEndian) assert(ARRAY16!(0xaabb) == [ 0xaa, 0xbb ]);
+	else                assert(ARRAY16!(0xaabb) == [ 0xbb, 0xaa ]);
+}
 
 // Form an array using a 32-bit number
 template ARRAY32(uint n) {
@@ -63,8 +67,10 @@ template ARRAY32(uint n) {
 	else
 		enum ubyte[4] ARRAY32 = [ n & 255, (n >> 8) & 255, (n >> 16) & 255, n >> 24 ];
 }
-version (BigEndian) unittest { assert(ARRAY32!(0xaabbccdd) == [ 0xaa, 0xbb, 0xcc, 0xdd ]); }
-else                unittest { assert(ARRAY32!(0xaabbccdd) == [ 0xdd, 0xcc, 0xbb, 0xaa ]); }
+extern (D) unittest {
+	version (BigEndian) assert(ARRAY32!(0xaabbccdd) == [ 0xaa, 0xbb, 0xcc, 0xdd ]);
+	else                assert(ARRAY32!(0xaabbccdd) == [ 0xdd, 0xcc, 0xbb, 0xaa ]);
+}
 
 /// Turn a 2-character string into a 2-byte number
 /// Params: s = 2-character string
