@@ -5,7 +5,7 @@ Aiming to be a simple cross-platform framework for debugging and object inspecti
 Fully written in D's [BetterC mode](https://dlang.org/spec/betterc.html),
 and available as a DUB package.
 
-It is currently available for Windows, Linux, and FreeBSD.
+It is currently available for Windows, Linux, and FreeBSD, under x86, x86-64, Armv7, and AArch64.
 
 Written from scratch for educational purposes.
 
@@ -41,7 +41,7 @@ Capstone is licensed under the BSD 3-Clause license.
 # Hacking
 
 There are two main branches:
-- `master`: Main development branch. Very unstable.
+- `marisa`: Main development branch. Very unstable.
 - `stable`: Last released branch.
 
 This project primarily uses [DUB](https://dub.pm/cli-reference/dub/)
