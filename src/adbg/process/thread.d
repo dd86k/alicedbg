@@ -37,34 +37,29 @@ version (Windows) {
 
 extern (C):
 
-private enum THREAD_LIST_CAPACITY = 32;
-
 struct adbg_thread_t {
 version (Windows) {
 	HANDLE handle;
 	int id;
-}
-version (Posix) {
+} else version (Posix) {
 	pid_t id;
 }
 	adbg_thread_context_t context;
 }
 
-/// Get a list of threads for target process.
-/// Params: process = Process.
-/// Returns: Thread list.
+/// Update the list of threads for the target process.
+/// Params: process = Process instance.
+/// Returns: Error code.
 int adbg_thread_list_update(adbg_process_t *process) {
 	version (Trace) trace("process=%p", process);
+	
+	enum LISTINIT = 32;
+	
 version (Windows) {
 	if (process == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (process.pid == 0)
 		return adbg_oops(AdbgError.uninitiated);
-	
-	if (process.thread_list == null)
-		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, THREAD_LIST_CAPACITY);
-	if (process.thread_list == null)
-		return adbg_errno();
 	
 	HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, process.pid);
 	if (snap == INVALID_HANDLE_VALUE) {
@@ -72,6 +67,11 @@ version (Windows) {
 		return adbg_oops(AdbgError.os);
 	}
 	scope(exit) CloseHandle(snap);
+	
+	if (process.thread_list == null)
+		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, LISTINIT);
+	if (process.thread_list == null)
+		return adbg_errno();
 	
 	THREADENTRY32 te32 = void;
 	te32.dwSize = THREADENTRY32.sizeof;
@@ -114,11 +114,6 @@ version (Windows) {
 	if (process.pid == 0)
 		return adbg_oops(AdbgError.uninitiated);
 	
-	if (process.thread_list == null)
-		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, THREAD_LIST_CAPACITY);
-	if (process.thread_list == null)
-		return adbg_oops(AdbgError.crt);
-	
 	enum BSZ = 32; // "/proc/4294967295/task/".sizeof == 22
 	char[BSZ] path = void;
 	int l = snprintf(path.ptr, BSZ, "/proc/%u/task", process.pid);
@@ -129,6 +124,11 @@ version (Windows) {
 	if (procfd == null)
 		return adbg_oops(AdbgError.crt);
 	scope(exit) closedir(procfd);
+	
+	if (process.thread_list == null)
+		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, LISTINIT);
+	if (process.thread_list == null)
+		return adbg_errno();
 	
 	// Go through kernel thread IDs
 	adbg_list_clear(process.thread_list);
@@ -148,8 +148,73 @@ version (Windows) {
 	}
 	
 	return 0;
+} else version (FreeBSD) {
+	if (process == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	if (process.pid == 0)
+		return adbg_oops(AdbgError.uninitiated);
+	
+	// Get thread count
+	int cap = ptrace(PT_GETNUMLWPS, process.pid, null, 0);
+	if (cap < 0) {
+		if (process.thread_list) {
+			adbg_list_free(process.thread_list);
+			process.thread_list = null;
+		}
+		return adbg_oops(AdbgError.crt);
+	}
+	if (cap == 0) {
+		if (process.thread_list) {
+			adbg_list_free(process.thread_list);
+			process.thread_list = null;
+		}
+		return adbg_oops(AdbgError.unavailable);
+	}
+	
+	// Allocate temporary list
+	lwpid_t *list = cast(lwpid_t*)malloc(lwpid_t.sizeof * cap);
+	if (list == null) {
+		if (process.thread_list) {
+			adbg_list_free(process.thread_list);
+			process.thread_list = null;
+		}
+		return adbg_oops(AdbgError.crt);
+	}
+	scope(exit) free(list);
+	
+	// Get list from kernel
+	int count = ptrace(PT_GETLWPLIST, process.pid, list, cap);
+	version(Trace) trace("count=%d cap=%d", count, cap);
+	if (count < 0) {
+		if (process.thread_list) {
+			adbg_list_free(process.thread_list);
+			process.thread_list = null;
+		}
+		return adbg_oops(AdbgError.crt);
+	}
+	if (count != cap) { // we didn't get everything, why?
+		if (process.thread_list) {
+			adbg_list_free(process.thread_list);
+			process.thread_list = null;
+		}
+		return adbg_oops(AdbgError.assertion);
+	}
+	
+	// Copy list into our own
+	if (process.thread_list == null)
+		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, count);
+	if (process.thread_list == null)
+		return adbg_errno();
+	adbg_list_clear(process.thread_list);
+	adbg_thread_t t = void;
+	adbg_thread_context_config(&t.context, adbg_process_machine(process));
+	for (int i; i < count; ++i) {
+		t.id = cast(int)list[i];
+		process.thread_list = adbg_list_add(process.thread_list, &t);
+	}
+	
+	return 0;
 } else {
-	// TODO: FreeBSD PT_GETLWPLIST
 	return adbg_oops(AdbgError.unimplemented);
 }
 }
@@ -517,7 +582,7 @@ const(char)* adbg_register_name(adbg_register_t *register) {
 
 // Configure register set, used internally
 private
-void adbg_thread_context_config(adbg_thread_context_t *ctx, AdbgMachine mach) {
+int adbg_thread_context_config(adbg_thread_context_t *ctx, AdbgMachine mach) {
 	version (Trace) trace("ctx=%p mach=%d", ctx, mach);
 	assert(ctx);
 	
@@ -528,12 +593,13 @@ void adbg_thread_context_config(adbg_thread_context_t *ctx, AdbgMachine mach) {
 	case amd64:	regs = regset_x86_64; break;
 	case arm:	regs = regset_arm; break;
 	case aarch64:	regs = regset_aarch64; break;
-	default:	regs = [];
+	default:	return adbg_oops(AdbgError.unavailable);
 	}
 	
 	version (Trace) trace("regs.length=%d", cast(int)regs.length);
 	for (size_t i; i < regs.length; ++i)
 		ctx.items[i].info = &regs[i];
+	return 0;
 }
 
 // Update the context for thread
@@ -964,6 +1030,7 @@ version (Win64) {
 /// 	format = String format.
 /// Returns: Number of characters written.
 int adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, AdbgRegisterFormat format) {
+	version(Trace) trace("buffer=%p len=%zu reg=%p format=%d", buffer, len, reg, format);
 	if (reg == null || buffer == null || len == 0)
 		return 0;
 	
@@ -1016,7 +1083,7 @@ int adbg_register_format(char *buffer, size_t len, adbg_register_t *reg, AdbgReg
 	
 	return snprintf(buffer, len, sformat, n);
 }
-unittest {
+extern (D) unittest {
 	static immutable adbg_register_info_t info = { "example", AdbgRegisterType.u16 };
 	adbg_register_t reg = void;
 	reg.info = &info;
