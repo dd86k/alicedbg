@@ -8,6 +8,7 @@ module shell;
 // TODO: Pre-load/Exit event handlers (e.g., closing disassembler) functions
 
 import adbg;
+import adbg.platform;
 import adbg.error;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib;
@@ -481,6 +482,16 @@ immutable command2_t[] shell_commands = [
 			
 		],
 		&command_help,
+	},
+	{
+		[ "version" ],
+		"Show Alicedbg version.",
+		[],
+		MODULE_SHELL, CATEGORY_SHELL,
+		[
+			
+		],
+		&command_version,
 	},
 	{
 		[ "q", "quit" ],
@@ -1137,6 +1148,9 @@ int command_thread(int argc, const(char) **argv) {
 	if (argc < 2)
 		return ShellError.missingArgument;
 	
+	// TODO: Being able to select thread
+	//       then prompt can be (adbg [thread 12345])
+	
 	adbg_thread_t *thread = void;
 	
 	const(char) *action = argv[1];
@@ -1145,11 +1159,12 @@ int command_thread(int argc, const(char) **argv) {
 		if (adbg_thread_list_update(process))
 			return ShellError.alicedbg;
 		
-		puts("Threads:");
-		size_t i;
-		while ((thread = adbg_thread_list_by_index(process, i++)) != null) {
-			printf("%*d\n", -10, adbg_thread_id(thread));
+		printf("Threads:");
+		for (size_t i; (thread = adbg_thread_list_by_index(process, i)) != null; ++i) {
+			if (i) putchar(',');
+			printf(" %d", adbg_thread_id(thread));
 		}
+		putchar('\n');
 		return 0;
 	}
 	
@@ -1163,19 +1178,19 @@ int command_thread(int argc, const(char) **argv) {
 		return ShellError.alicedbg;
 	
 	action = argv[2];
-	if (strcmp(action, "registers") == 0) {
+	if (strcmp(action, "registers") == 0 || strcmp(action, "regs") == 0) {
 		// Update its context
 		adbg_thread_context_update(process, thread);
 		
 		int id;
 		adbg_register_t *register = void;
 		while ((register = adbg_register_by_id(thread, id++)) != null) {
-			char[20] dec = void, hex = void;
-			adbg_register_format(dec.ptr, 20, register, AdbgRegisterFormat.dec);
-			adbg_register_format(hex.ptr, 20, register, AdbgRegisterFormat.hexPadded);
+			char[32] dec = void, hex = void;
+			adbg_register_format(dec.ptr, 32, register, AdbgRegisterFormat.dec);
+			adbg_register_format(hex.ptr, 32, register, AdbgRegisterFormat.hexPadded);
 			printf("%*s  0x%*s  %s\n",
-				-8, adbg_register_name(register),
-				8, hex.ptr,
+				-16, adbg_register_name(register),
+				-16, hex.ptr,
 				dec.ptr);
 		}
 	} else
@@ -1198,6 +1213,12 @@ int command_pwd(int argc, const(char) **argv) {
 	if (path == null)
 		return ShellError.alicedbg;
 	puts(path);
+	return 0;
+}
+
+int command_version(int argc, const(char) **argv) {
+	static immutable string LINE = `Alicedbg `~ADBG_VERSION~` `~TARGET_PLATFORM~`-`~TARGET_OS~`-`~TARGET_ENV;
+	puts(LINE.ptr);
 	return 0;
 }
 
