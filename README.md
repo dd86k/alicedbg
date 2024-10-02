@@ -5,7 +5,7 @@ Aiming to be a simple cross-platform framework for debugging and object inspecti
 Fully written in D's [BetterC mode](https://dlang.org/spec/betterc.html),
 and available as a DUB package.
 
-It is currently available for Windows, Linux, and FreeBSD.
+It is currently available for Windows, Linux, and FreeBSD, under x86, x86-64, Armv7, and AArch64.
 
 Written from scratch for educational purposes.
 
