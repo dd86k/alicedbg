@@ -755,7 +755,7 @@ version (Win64) {
 	version (X86) {
 		X86_NT_CONTEXT winctx = void; // CONTEXT
 		winctx.ContextFlags = CONTEXT_ALL;
-		if (GetThreadContext(tracee.htid, cast(LPCONTEXT)&winctx) == FALSE)
+		if (GetThreadContext(thread.handle, cast(LPCONTEXT)&winctx) == FALSE)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.x86_eip].u32    = winctx.Eip;
 		thread.context.items[AdbgRegister.x86_eflags].u32 = winctx.EFlags;
@@ -771,7 +771,7 @@ version (Win64) {
 	} else version (ARM) {
 		ARM_NT_CONTEXT winctx = void; // CONTEXT
 		winctx.ContextFlags = CONTEXT_ALL;
-		if (GetThreadContext(tracee.htid, cast(LPCONTEXT)&winctx) == FALSE)
+		if (GetThreadContext(thread.handle, cast(LPCONTEXT)&winctx) == FALSE)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.arm_r0].u32   = winctx.r0;
 		thread.context.items[AdbgRegister.arm_r1].u32   = winctx.r1;
