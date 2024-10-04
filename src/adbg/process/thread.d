@@ -436,6 +436,8 @@ struct adbg_register_t {
 /// Represents a thread context structure with the register values once a
 /// process is paused.
 struct adbg_thread_context_t {
+	/// Count of set registers for this instance.
+	size_t count;
 	/// Register population, this may depends by platform.
 	adbg_register_t[REG_COUNT] items;
 }
@@ -553,15 +555,27 @@ else
 
 version(PrintTargetInfo) pragma(msg, "REG_COUNT\t", REG_COUNT);
 
+/// Select a register from the thread context by its ID.
+///
+/// To obtain a list of registers, start iterating from 0, until
+/// null is reached.
+/// Params:
+/// 	thread = Thread instance.
+/// 	id = Register ID, or index.
+/// Returns: Register pointer; Or null on error.
 adbg_register_t* adbg_register_by_id(adbg_thread_t *thread, int id) {
 	version (Trace) trace("thread=%p index=%u", thread, id);
 	if (thread == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
+	if (thread.context.count == 0) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 	
 	size_t index = cast(size_t)id;
-	if (index >= thread.context.items.length) {
+	if (index >= thread.context.count) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
@@ -593,12 +607,15 @@ int adbg_thread_context_config(adbg_thread_context_t *ctx, AdbgMachine mach) {
 	case amd64:	regs = regset_x86_64; break;
 	case arm:	regs = regset_arm; break;
 	case aarch64:	regs = regset_aarch64; break;
-	default:	return adbg_oops(AdbgError.unavailable);
+	default:
+		ctx.count = 0;
+		return adbg_oops(AdbgError.unavailable);
 	}
 	
 	version (Trace) trace("regs.length=%d", cast(int)regs.length);
 	for (size_t i; i < regs.length; ++i)
 		ctx.items[i].info = &regs[i];
+	ctx.count = regs.length;
 	return 0;
 }
 
