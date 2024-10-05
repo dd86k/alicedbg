@@ -1223,8 +1223,16 @@ int command_version(int argc, const(char) **argv) {
 }
 
 int command_quit(int argc, const(char) **argv) {
-	//TODO: Quit confirmation if debuggee is alive
-	//      could do with optional "forced yes" type of optional
+	// Confirm quitting
+	if (process) {
+		printf("Process %d is running. Do you wish to quit? [Y/n] ",
+			adbg_process_pid(process));
+		fflush(stdout);
+		int c = getchar();
+		if (c == 'n' || c == 'N')
+			return 0;
+	}
+	
 	exit(0);
 	return 0;
 }
