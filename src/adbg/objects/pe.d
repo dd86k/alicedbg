@@ -839,7 +839,7 @@ struct internal_pe_t {
 	mz_header_t mz_header;
 	
 	pe_image_data_directory_t directory;
-	uint locsections;
+	size_t locsections;
 	pe_section_entry_t *sections;
 	bool *r_sections;
 	// export directory
@@ -899,7 +899,7 @@ int adbg_object_pe_load(adbg_object_t *o, mz_header_t *mzhdr) {
 		Characteristics	= adbg_bswap16(Characteristics);
 	}
 	
-	long e_lfanew = mzhdr.e_lfanew + pe_header_t.sizeof; // adjust to optional header
+	size_t e_lfanew = mzhdr.e_lfanew + pe_header_t.sizeof; // adjust to optional header
 	ushort optmagic = void;
 	if (adbg_object_read_at(o, e_lfanew, &optmagic, ushort.sizeof)) {
 		free(o.internal);
@@ -921,7 +921,6 @@ int adbg_object_pe_load(adbg_object_t *o, mz_header_t *mzhdr) {
 			o.internal = null;
 			return adbg_errno();
 		}
-		
 		e_lfanew += pe_image_data_directory_t.sizeof; // adjust to sections
 		
 		if (o.status & AdbgObjectInternalFlags.reversed) with (internal.optheader) {
@@ -967,7 +966,6 @@ int adbg_object_pe_load(adbg_object_t *o, mz_header_t *mzhdr) {
 			o.internal = null;
 			return adbg_errno();
 		}
-		
 		e_lfanew += pe_image_data_directory_t.sizeof; // adjust to sections
 		
 		if (o.status & AdbgObjectInternalFlags.reversed) with (internal.optheader64) {
@@ -1027,7 +1025,7 @@ int adbg_object_pe_load(adbg_object_t *o, mz_header_t *mzhdr) {
 		return adbg_oops(AdbgError.objectInvalidClass);
 	}
 	
-	internal.locsections = mzhdr.e_lfanew; // updated to point at section headers
+	internal.locsections = e_lfanew; // updated to point at section headers
 	
 	// If reversed and it's not a "rom" image, swap dictionary entries
 	if (o.status & AdbgObjectInternalFlags.reversed && optmagic != PE_CLASS_ROM) with (internal.directory) {
@@ -1344,9 +1342,8 @@ pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 	}
 	
 	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
-	
 	ushort count = internal.header.NumberOfSections;
-	if (index >= count || index >= MAXIMUM_SECTIONS) {
+	if (index >= count) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
