@@ -28,6 +28,30 @@ int dump_mz(adbg_object_t *o) {
 	return 0;
 }
 
+// Print extended MZ header for NE/LX/PE32
+void dump_mz_ext_header(mz_header_t *header) {
+	print_header("Legacy Header");
+	
+	with (header) {
+	print_u16("e_cblp", e_cblp);
+	print_u16("e_cp", e_cp);
+	print_u16("e_crlc", e_crlc);
+	print_u16("e_cparh", e_cparh);
+	print_u16("e_minalloc", e_minalloc);
+	print_u16("e_maxalloc", e_maxalloc);
+	print_x16("e_ss", e_ss);
+	print_x16("e_sp", e_sp);
+	print_x16("e_csum", e_csum);
+	print_x16("e_ip", e_ip);
+	print_x16("e_cs", e_cs);
+	print_x16("e_lfarlc", e_lfarlc);
+	print_u16("e_ovno", e_ovno);
+	for (size_t i; i < e_res.length; ++i)
+		printf_x16("e_res[%u]", e_res[i], cast(uint)i);
+	print_x32("e_lfanew", e_lfanew);
+	}
+}
+
 private:
 
 void dump_mz_hdr(adbg_object_t *o) {

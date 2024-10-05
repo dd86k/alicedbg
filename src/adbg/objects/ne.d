@@ -14,7 +14,9 @@ import adbg.objectserver;
 import adbg.machines : AdbgMachine;
 import adbg.error;
 import adbg.utils.bit;
+import adbg.objects.mz : mz_header_t;
 import core.stdc.stdlib;
+import core.stdc.string : memcpy;
 
 extern (C):
 
@@ -320,23 +322,26 @@ struct ne_resident_t {
 private
 struct internal_ne_t {
 	ne_header_t header;
+	mz_header_t mzheader;
 }
 
-int adbg_object_ne_load(adbg_object_t *o, uint e_lfanew) {
+int adbg_object_ne_load(adbg_object_t *o, mz_header_t *mzheader) {
 	version (Trace) trace("o=%p", o);
 	
 	o.internal = calloc(1, internal_ne_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, e_lfanew, o.internal, ne_header_t.sizeof)) {
+	if (adbg_object_read_at(o, mzheader.e_lfanew, o.internal, ne_header_t.sizeof)) {
 		free(o.internal);
 		o.internal = null;
 		return adbg_errno();
 	}
 	
-	adbg_object_postload(o, AdbgObject.ne, &adbg_object_ne_unload);
+	internal_ne_t *internal = cast(internal_ne_t*)o.internal;
 	
-	with (cast(ne_header_t*)o.internal)
+	memcpy(&internal.mzheader, mzheader, mz_header_t.sizeof);
+	
+	with (internal.header)
 	if (o.status & AdbgObjectInternalFlags.reversed) {
 		ne_enttab	= adbg_bswap16(ne_enttab);
 		ne_cbenttab	= adbg_bswap16(ne_cbenttab);
@@ -365,6 +370,7 @@ int adbg_object_ne_load(adbg_object_t *o, uint e_lfanew) {
 		ne_expver	= adbg_bswap16(ne_expver);
 	}
 	
+	adbg_object_postload(o, AdbgObject.ne, &adbg_object_ne_unload);
 	return 0;
 }
 
@@ -385,6 +391,18 @@ ne_header_t* adbg_object_ne_header(adbg_object_t *o) {
 		return null;
 	}
 	return cast(ne_header_t*)o.internal;
+}
+
+mz_header_t* adbg_object_ne_mz_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	return &(cast(internal_ne_t*)o.internal).mzheader;
 }
 
 AdbgMachine adbg_object_ne_machine(adbg_object_t *o) {

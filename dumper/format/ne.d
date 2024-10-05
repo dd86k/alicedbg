@@ -10,6 +10,7 @@ import adbg.objectserver;
 import adbg.machines : AdbgMachine;
 import adbg.objects.ne;
 import dumper;
+import format.mz : dump_mz_ext_header;
 
 extern (C):
 
@@ -22,10 +23,12 @@ int dump_ne(adbg_object_t *o) {
 private:
 
 void dump_ne_hdr(adbg_object_t *o) {
+	// Print legacy header
+	dump_mz_ext_header(adbg_object_ne_mz_header(o));
+	
 	print_header("Header");
 	
 	ne_header_t* header = adbg_object_ne_header(o);
-	
 	with (header) {
 	print_x16("ne_magic", ne_magic);
 	print_u8("ne_ver", ne_ver);

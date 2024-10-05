@@ -14,7 +14,9 @@ import adbg.error;
 import adbg.objectserver;
 import adbg.machines;
 import adbg.utils.bit;
+import adbg.objects.mz;
 import core.stdc.stdlib;
+import core.stdc.string : memcpy;
 
 // NOTE: LX is mainly 16-bit only and LE mixed 16/32-bit
 
@@ -366,24 +368,30 @@ enum {
 private
 struct internal_lx_t {
 	lx_header_t header;
+	mz_header_t mzheader;
 }
 
-int adbg_object_lx_load(adbg_object_t *o, uint e_lfanew) {
-	version (Trace) trace("o=%p", o);
+int adbg_object_lx_load(adbg_object_t *o, mz_header_t *mzhdr) {
+	version (Trace) trace("o=%p mz=%p", o, mzhdr);
+	assert(o);
+	assert(mzhdr);
 	
 	o.internal = calloc(1, internal_lx_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, e_lfanew, o.internal, lx_header_t.sizeof)) {
+	if (adbg_object_read_at(o, mzhdr.e_lfanew, o.internal, lx_header_t.sizeof)) {
 		free(o.internal);
 		o.internal = null;
 		return adbg_errno();
 	}
 	
-	adbg_object_postload(o, AdbgObject.lx, &adbg_object_lx_unload);
+	internal_lx_t *internal = cast(internal_lx_t*)o.internal;
+	
+	memcpy(&internal.mzheader, mzhdr, mz_header_t.sizeof);
 	
 	//TODO: Deal with word order
 	
+	adbg_object_postload(o, AdbgObject.lx, &adbg_object_lx_unload);
 	return 0;
 }
 
@@ -403,6 +411,18 @@ lx_header_t* adbg_object_lx_header(adbg_object_t *o) {
 		return null;
 	}
 	return cast(lx_header_t*)o.internal;
+}
+
+mz_header_t* adbg_object_lx_mz_header(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	return &(cast(internal_lx_t*)o.internal).mzheader;
 }
 
 AdbgMachine adbg_object_lx_machine(adbg_object_t *o) {

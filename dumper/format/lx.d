@@ -10,6 +10,7 @@ import adbg.objectserver;
 import adbg.machines : AdbgMachine;
 import adbg.objects.lx;
 import dumper;
+import format.mz;
 
 extern (C):
 
@@ -22,10 +23,12 @@ int dump_lx(adbg_object_t *o) {
 private:
 
 void dump_lx_hdr(adbg_object_t *o) {
+	// Print legacy header
+	dump_mz_ext_header(adbg_object_lx_mz_header(o));
+	
 	print_header("Header");
 	
 	lx_header_t* header = adbg_object_lx_header(o);
-	
 	with (header) {
 	print_x16("e32_magic", magic, magic == LE_MAGIC ? "LE" : "LX");
 	print_x8("e32_border", border);

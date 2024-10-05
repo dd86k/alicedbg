@@ -17,6 +17,7 @@ import core.stdc.stdlib;
 import core.stdc.string : strncmp;
 import core.stdc.stdio : snprintf;
 import dumper;
+import format.mz : dump_mz_ext_header;
 import common.errormgmt;
 
 extern (C):
@@ -50,34 +51,13 @@ void dump_pe_hdr(adbg_object_t *o) {
 	// NOTE: Optional header selection
 	//       This is kind of hard to fix without a dedicated switch
 	//       And the base address for e_lfanew is needed
-	// TODO: 
 	if (SETTING(Setting.extractAny)) {
 		print_data("Header", header, pe_header_t.sizeof, 0);
 		return;
 	}
 	
-	
-	print_header("Legacy Header");
-	
-	mz_header_t* mzheader = adbg_object_pe_mz_header(o);
-	with (mzheader) {
-	print_u16("e_cblp", e_cblp);
-	print_u16("e_cp", e_cp);
-	print_u16("e_crlc", e_crlc);
-	print_u16("e_cparh", e_cparh);
-	print_u16("e_minalloc", e_minalloc);
-	print_u16("e_maxalloc", e_maxalloc);
-	print_x16("e_ss", e_ss);
-	print_x16("e_sp", e_sp);
-	print_x16("e_csum", e_csum);
-	print_x16("e_ip", e_ip);
-	print_x16("e_cs", e_cs);
-	print_x16("e_lfarlc", e_lfarlc);
-	print_u16("e_ovno", e_ovno);
-	for (size_t i; i < e_res.length; ++i)
-		printf_x16("e_res[%u]", e_res[i], cast(uint)i);
-	print_x32("e_lfanew", e_lfanew);
-	}
+	// Print legacy header
+	dump_mz_ext_header(adbg_object_pe_mz_header(o));
 	
 	print_header("Header");
 	

@@ -418,7 +418,9 @@ int adbg_object_loadv(adbg_object_t *o) {
 			return adbg_object_mscoff_load(o);
 		break;
 	// MZ executables
-	case MAGIC_MZ:
+	case MAGIC_MZ, MAGIC_ZM: // ZM being the even older signature in some cases
+		// TODO: Move new header detection to MZ load function
+		// TODO: pre-checked if only the signature is swapped
 		version (Trace) trace("e_lfarlc=%#x", sig.mzheader.e_lfarlc);
 		
 		// If e_lfarlc (relocation table) starts lower than e_lfanew,
@@ -452,18 +454,14 @@ int adbg_object_loadv(adbg_object_t *o) {
 		// 16-bit signature check
 		switch (cast(ushort)newsig) {
 		case NE_MAGIC:
-			return adbg_object_ne_load(o, sig.mzheader.e_lfanew);
+			return adbg_object_ne_load(o, &sig.mzheader);
 		case LX_MAGIC, LE_MAGIC:
-			return adbg_object_lx_load(o, sig.mzheader.e_lfanew);
+			return adbg_object_lx_load(o, &sig.mzheader);
 		default:
 		}
 		
 		// If nothing matches, assume MZ
 		return adbg_object_mz_load(o);
-	// Old MZ magic or swapped
-	case MAGIC_ZM:
-		//TODO: pre-checked if only the signature is swapped
-		goto case MAGIC_MZ;
 	// COFF magics
 	case COFF_MAGIC_I386:
 	case COFF_MAGIC_I386_AIX:
