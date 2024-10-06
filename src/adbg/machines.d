@@ -14,7 +14,6 @@ import adbg.error;
 // NOTE: Machine enum names are the same as their alias name.
 //       This avoids (mostly) possible collisions.
 
-// TODO: Remove "riscv" value, and force a way to check for bitness (class)
 // TODO: Replace alias1/alias2
 //       with either static or immutable dynamic array
 
@@ -41,7 +40,7 @@ enum AdbgMachine {
 	l10m,
 	/// Intel K10M
 	k10m,
-	/// Intel Itanium (EPIC)
+	/// Intel Itanium (EPIC, IA-64)
 	ia64,
 	
 	/// Thumb 16-bit T16
@@ -52,8 +51,7 @@ enum AdbgMachine {
 	arm,
 	/// Arm AArch64/A64
 	aarch64,
-	/// Compiled-Hybrid Portable Executable,
-	/// a Microsoft extension
+	/// ARM64EC: Compiled-Hybrid Portable Executable, Microsoft extension
 	arm64x,
 	
 	/// IBM ROMP
@@ -84,7 +82,9 @@ enum AdbgMachine {
 	/// Enhanced SPARC
 	sparc8p,
 	/// SPARC Version 9
-	sparc9,
+	sparc64,
+	/// Alias for sparc64
+	sparc9 = sparc64,
 
 	/// RISC-V RV32
 	riscv32,
@@ -292,9 +292,9 @@ enum AdbgMachine {
 	/// NEC V850
 	v850,
 	
-	/// LoonArch32
+	/// LoonArch32 (Loongson)
 	loongarch32,
-	/// LoonArch64
+	/// LoonArch64 (Loongson)
 	loongarch64,
 	
 	/// SHARC
@@ -322,8 +322,10 @@ enum AdbgMachine {
 	
 	/// AT&T WE 32100
 	we32100,
-	/// Hewlett-Packard PA-RISC
-	parisc,
+	/// Hewlett-Packard PA-RISC / HP-PA / HPPA
+	hppa,
+	/// Alias to hppa
+	parisc = hppa,
 	/// TRW (RH32)
 	rh32,
 	/// Argonaut RISC Core
@@ -348,7 +350,7 @@ enum AdbgMachine {
 	zsp,
 	/// SiTera Prism
 	prism,
-	/// OpenRISC (32-bit)
+	/// OpenRISC (32-bit) (so far, OpenRISC 1000, "or1k")
 	openrisc,
 	/// Alphamosaic VideoCore
 	videocore,
@@ -361,7 +363,7 @@ enum AdbgMachine {
 	/// Ubicom IP2xxx
 	ip2k,
 	/// MAX
-	max_,
+	max_, // "max" would override .max property
 	/// Analog Devices Blackfin DSP
 	blackfin,
 	/// Sharp
@@ -757,6 +759,7 @@ immutable adbg_machine_t[] machines = [
 static assert(cast(int)machines.length == AdbgMachine.max, "Count mistmatch");
 
 // Target default machine
+// These are expected targets that this project supports
 version (X86)		private enum CURRENT_MACHINE = AdbgMachine.i386;
 else version (X86_64)	private enum CURRENT_MACHINE = AdbgMachine.amd64;
 else version (Arm)	private enum CURRENT_MACHINE = AdbgMachine.arm;
@@ -764,8 +767,7 @@ else version (AArch64)	private enum CURRENT_MACHINE = AdbgMachine.aarch64;
 else version (PPC)	private enum CURRENT_MACHINE = AdbgMachine.ppc;
 else version (PPC64)	private enum CURRENT_MACHINE = AdbgMachine.ppc64;
 else version (SPARC)	private enum CURRENT_MACHINE = AdbgMachine.sparc;
-else version (SPARC_V8Plus)	private enum CURRENT_MACHINE = AdbgMachine.sparc8p;
-else version (SPARC64)	private enum CURRENT_MACHINE = AdbgMachine.sparc9;
+else version (SPARC64)	private enum CURRENT_MACHINE = AdbgMachine.sparc64;
 else version (S390)	private enum CURRENT_MACHINE = AdbgMachine.s390;
 else version (SystemZ)	private enum CURRENT_MACHINE = AdbgMachine.systemz;
 else version (RISCV32)	private enum CURRENT_MACHINE = AdbgMachine.riscv32;

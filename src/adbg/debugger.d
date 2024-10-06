@@ -99,10 +99,12 @@ enum AdbgSpawnOpt {
 	//useShell	= 6,
 	// Tell debugger to use clone(2) instead of fork(2).
 	//useClone	= 7,
-	/// Debug child processes that the target process spawns.
+	/// Debug all sub processes that the target process spawns.
 	/// Type: int
 	/// Default: 0
-	debugChildren    = 10,
+	debugAll    = 10,
+	/// Alias to debugAll
+	debugChildren = debugAll,
 }
 
 /// Load executable image into the debugger.
@@ -157,7 +159,7 @@ Loption:
 		envp = va_arg!(const(char)**)(list);
 		version (Trace) trace("envp=%p", envp);
 		goto Loption;*/
-	case AdbgSpawnOpt.debugChildren:
+	case AdbgSpawnOpt.debugAll:
 		if (va_arg!(int)(list)) options |= OPT_DEBUG_ALL;
 		goto Loption;
 	default:
@@ -571,9 +573,7 @@ private union adbg_debugger_event_t {
 	int exitcode;
 }
 
-/// Continue execution of the process until a new debug event occurs.
-///
-/// This call is blocking.
+/// Wait until a new debug event occurs. This call is blocking.
 ///
 /// It is highly recommended to use the callback's process instance for
 /// debugging services, and to not call this function within the callback.
@@ -597,6 +597,8 @@ int adbg_debugger_wait(adbg_process_t *proc,
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
 	// See HACK in adbg_process_t
+	// Allocate process instance that will represent debugged process
+	// without modifying the one received
 	if (proc.tracee == null)
 		proc.tracee = cast(adbg_process_t*)calloc(1, adbg_process_t.sizeof);
 	if (proc.tracee == null)
@@ -658,13 +660,18 @@ Lwait:
 	else            enum WBASE = 0;
 	int wstatus = void;
 Lwait:
+	// TODO: Check process flag to debug all subprocesses
 	if ((proc.tracee.pid = waitpid(-1, &wstatus, WBASE)) < 0) {
 		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.crt);
 	}
 	version(Trace) trace("wstatus=%#x pid=%d", wstatus, proc.tracee.pid);
 	
-	// HACK: 
+	// HACK: To allow thread services, we assume that the TID is equal to PID.
+	//       This is partially true, the initial TID on Linux is the same as
+	//       of the PID, and while Linux ptrace calls refer to the TID,
+	//       this holds up for the moment being, but will fall short when
+	//       multiple processes and threads come into play.
 	proc.tracee.tid = proc.tracee.pid;
 	
 	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)) { // exited or killed
@@ -702,11 +709,13 @@ version (Windows) {
 	// NOTE: ContinueDebugEvent
 	//       Before using TerminateProcess,
 	//       ContinueDebugEvent(pid, tid, DBG_TERMINATE_PROCESS)
-	//       was used instead. I forgot where I saw that example. MSDN does not feature it.
+	//       was used instead. I forgot where I saw that example.
+	//       MSDN does not feature it.
 	if (TerminateProcess(proc.hpid, DBG_TERMINATE_PROCESS) == FALSE)
 		return adbg_oops(AdbgError.os);
 } else version (Posix) {
-	if (kill(proc.pid, SIGKILL) < 0) // PT_KILL is deprecated on Linux
+	// PT_KILL is deprecated on Linux, and likely elsewhere too
+	if (kill(proc.pid, SIGKILL) < 0)
 		return adbg_oops(AdbgError.os);
 } else static assert(0, "Implement adbg_debugger_terminate");
 
@@ -726,10 +735,8 @@ int adbg_debugger_continue(adbg_process_t *proc) {
 	
 version (Windows) {
 	version(Trace) trace("pid=%d tid=%d state=%d", proc.pid, proc.tid, proc.status);
-	// NOTE: ContinueDebugEvent
-	//       ContinueDebugEvent can only be called when the debugged
-	//       process was stopped.
 	switch (proc.status) with (AdbgProcStatus) {
+	// TODO: Check flags if process was created in stopped state
 	case loaded: break;
 	case stopped:
 		if (ContinueDebugEvent(proc.pid, proc.tid, DBG_CONTINUE) == FALSE) {
@@ -830,6 +837,15 @@ version (WINTEL) {
 	
 	return 0;
 } else version (Posix) {
+	switch (proc.status) with (AdbgProcStatus) {
+	case loaded:
+		// HACK: See HACK in continue function.
+		int w = void;
+		waitpid(proc.pid, &w, 0);
+		break;
+	default:
+	}
+	
 	if (ptrace(PT_STEP, proc.pid, null, 0) < 0) {
 		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.os);
