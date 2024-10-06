@@ -670,10 +670,10 @@ void dump_pe_debug(adbg_object_t *o) {
 			switch (sig) {
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV410: // PDB 2.0+ / CodeView 4.10
 				sigstr = "PDB 2.0+ / CodeView 4.10";
-				goto L_DEBUG_PDB20;
+				goto Lpdb20;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_PDB20PLUS: // PDB 2.0+
 				sigstr = "PDB 2.0+ / NB10";
-				goto L_DEBUG_PDB20;
+				goto Lpdb20;
 			case PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV500: // PDB 2.0+ / CodeView 5.0
 				if (debug_.SizeOfData < pe_debug_data_codeview_pdb20_t.sizeof) {
 					print_warningf("Size too small for pe_debug_data_codeview_pdb20_t (%u v. %u)",
@@ -681,7 +681,7 @@ void dump_pe_debug(adbg_object_t *o) {
 					continue;
 				}
 				sigstr = "PDB 2.0+ / CodeView 5.0";
-			L_DEBUG_PDB20:
+			Lpdb20:
 				pe_debug_data_codeview_pdb20_t* pdb = cast(pe_debug_data_codeview_pdb20_t*)data;
 				print_x32("Signature", sig, sigstr);
 				print_x32("Offset", pdb.Offset);

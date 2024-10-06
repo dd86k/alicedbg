@@ -2199,7 +2199,11 @@ AdbgMachine adbg_object_pe_machine(adbg_object_t *o) {
 		return AdbgMachine.unknown;
 	}
 	pe_header_t* header = cast(pe_header_t*)o.internal;
-	switch (header.Machine) {
+	return adbg_object_pe_machine_value(header.Machine);
+}
+
+AdbgMachine adbg_object_pe_machine_value(uint machine) {
+	switch (machine) {
 	case PE_MACHINE_I386:	return AdbgMachine.i386;
 	case PE_MACHINE_AMD64:	return AdbgMachine.amd64;
 	case PE_MACHINE_ALPHAOLD, PE_MACHINE_ALPHA:	return AdbgMachine.alpha;
@@ -2231,7 +2235,9 @@ AdbgMachine adbg_object_pe_machine(adbg_object_t *o) {
 	case PE_MACHINE_THUMB:	return AdbgMachine.thumb;
 	case PE_MACHINE_WCEMIPSV2:	return AdbgMachine.mipswcele;
 	case PE_MACHINE_CLR:	return AdbgMachine.clr;
-	default:	return AdbgMachine.unknown;
+	default:
+		adbg_oops(AdbgError.unavailable);
+		return AdbgMachine.unknown;
 	}
 }
 

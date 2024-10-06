@@ -698,7 +698,6 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	if (o == null)
 		return AdbgMachine.unknown;
 	
-	// TODO: Turn to function pointer
 	switch (o.format) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
 	case ne:	return adbg_object_ne_machine(o);
@@ -707,6 +706,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	case macho:	return adbg_object_macho_machine(o);
 	case elf:	return adbg_object_elf_machine(o);
 	case coff:	return adbg_object_coff_machine(o);
+	case dmp:	return adbg_object_dmp_machine(o);
 	// TODO: For UNIX archives, get first object and return machine of sub object instance
 	default:
 	}

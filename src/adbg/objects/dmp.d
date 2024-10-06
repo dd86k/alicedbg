@@ -10,9 +10,11 @@
 module adbg.objects.dmp;
 
 import adbg.error;
+import adbg.machines;
 import adbg.objectserver;
 import adbg.utils.bit;
 import adbg.utils.math : MAX;
+import adbg.objects.pe : adbg_object_pe_machine_value;
 import core.stdc.stdlib;
 
 extern (C):
@@ -320,4 +322,31 @@ const(char)* adbg_object_dmp_dumptype_string(uint type) {
 	case DUMP_TYPE_AUTOMATIC:	return "AUTOMATIC";
 	default:	return null;
 	}
+}
+
+AdbgMachine adbg_object_dmp_machine(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return AdbgMachine.unknown;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return AdbgMachine.unknown;
+	}
+	internal_dmp_t *internal = cast(internal_dmp_t*)o.internal;
+	
+	uint machine = void;
+	switch (internal.header32.ValidDump32) {
+	case PAGEDUMP32_VALID:
+		machine = internal.header32.MachineImageType;
+		break;
+	case PAGEDUMP64_VALID:
+		machine = internal.header64.MachineImageType;
+		break;
+	default:
+		adbg_oops(AdbgError.unavailable);
+		return AdbgMachine.unknown;
+	}
+	
+	return adbg_object_pe_machine_value(machine);
 }
