@@ -176,7 +176,6 @@ version (Windows) {
 			return adbg_oops(AdbgError.os);
 	}
 	
-	//TODO: Save remainder before writing
 	j = size % c_long.sizeof;
 	if (j) {
 		if (ptrace(PT_POKEDATA, tracee.pid,
@@ -337,8 +336,7 @@ Lretry:
 	if (pagesize == 0)
 		return adbg_oops(AdbgError.os);
 	
-	//TODO: Huge page support
-	//TODO: Use MEMORY_BASIC_INFORMATION32 or 64 depending on wow64
+	//TODO: If WoW64, use MEMORY_BASIC_INFORMATION32
 	
 	//PSAPI_WORKING_SET_EX_INFORMATION wsinfoex = void;
 	for (size_t i; i < mbinfo.NumberOfEntries; ++i) {
@@ -467,7 +465,7 @@ Lretry:
 			map.name[0] = 0;
 		}
 		
-		//TODO: version (Win64) if (proc.wow) use MEMORY_BASIC_INFORMATION32
+		//TODO: if WoW64, use MEMORY_BASIC_INFORMATION32
 		
 		MEMORY_BASIC_INFORMATION mem = void;
 		if (VirtualQueryEx(tracee.hpid, minfo.lpBaseOfDll, &mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
@@ -747,14 +745,6 @@ struct adbg_scan_result_t {
 	}
 }
 
-//TODO: For future types, len(data) * capacity
-//      Why? Data can be of any length (es. strings)
-//      Bit of a à la Windows stragegy:
-//      first buffer (uint.sizeof * capacity) is list of indexes
-//      second buffer (len(str) * capacity) is list of strings
-//      index points to list of strings
-//      could/should make functions to help with that
-
 /// Scan debuggee process memory for a specific value.
 ///
 /// This function allocates the list to contain a list of 2000 items.
@@ -877,7 +867,6 @@ L_OPT:
 	version (Trace) trace("modules=%u", cast(uint)scanner.map_count);
 	
 	// New scan: Scan per memory region
-	enum PERMS = AdbgMemPerm.readWrite; /// Minimum permission access
 	uint read_size = cast(uint)datasize;
 	size_t jmpsize = options & OPT_UNALIGNED ? 1 : datasize;
 	size_t modcount = scanner.map_count;

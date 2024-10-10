@@ -803,8 +803,7 @@ pdb70_stream_t* adbg_object_pdb70_stream_open(adbg_object_t *o, uint num) {
 	uint streamsize = internal.stream_sizes[num];
 	version (Trace) trace("stream size=%u", streamsize);
 	if (streamsize == 0 || streamsize == PDB_BLOCK_SIZE_UNUSED) {
-		//TODO: errorcode
-		adbg_oops(AdbgError.assertion);
+		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	

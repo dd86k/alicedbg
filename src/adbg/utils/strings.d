@@ -8,6 +8,7 @@ module adbg.utils.strings;
 import adbg.include.c.stdio;
 import core.stdc.stdarg;
 import core.stdc.string;
+import core.stdc.ctype;
 
 // TODO: adbg_str_readline: version without copying line to buffer, but modifies it
 // TODO: adbg_path_basename: Get filename from path.
@@ -70,11 +71,8 @@ size_t adbg_util_getlinef(char *bf, size_t bfsz, size_t *lnsz, FILE *file) {
 	for ( ; i < bfsz ; ++i) {
 		int c = fgetc(file);
 		
-		//TODO: Include tab as accepted character
-		if (isprint(c) == false)
-			break;
-		
-		bf[i] = cast(char)c;
+		if (isprint(c) || c == '\t')
+			bf[i] = cast(char)c;
 	}
 	
 	bf[i] = 0;
@@ -128,11 +126,8 @@ size_t adbg_util_getline(char *bf, size_t bfsz, size_t *lnsz, const(char) *src, 
 	for (; src[s] && i < bfsz; ++i) {
 		int c = src[s++]; // unconditionally prep next pos
 		
-		//TODO: Include tab as accepted character
-		if (isprint(c) == false)
-			break;
-		
-		bf[i] = cast(char)c;
+		if (isprint(c) || c == '\t')
+			bf[i] = cast(char)c;
 	}
 	
 	bf[i] = 0;

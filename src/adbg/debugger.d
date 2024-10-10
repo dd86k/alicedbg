@@ -6,10 +6,7 @@
 module adbg.debugger;
 
 // TODO: adbg_debugger_spawn: Get/set default child stack size
-// TODO: High-level disassembly functions (e.g., from exception, etc.)
-// TODO: Consider debugger or debug_session struct type
-//       Could contain process list
-//       However, this might removes flexbility from the client
+// TODO: High-level disassembly functions (e.g., from exception, process, etc.)
 
 /*
 version (linux) {

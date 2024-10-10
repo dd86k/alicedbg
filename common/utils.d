@@ -54,7 +54,8 @@ extern (D) unittest {
 }
 
 int hexstr(char *buffer, size_t bsize, ubyte *data, size_t dsize, char sep = 0) {
-	int min = sep ? 3 : 2;
+	int min = sep ? 3 : 2; // single byte size in characters
+	assert(min * dsize > bsize, "Buffer overflow");
 	int len;
 	for (size_t i; i < dsize; ++i) {
 		if (len + min > bsize)
@@ -62,7 +63,6 @@ int hexstr(char *buffer, size_t bsize, ubyte *data, size_t dsize, char sep = 0) 
 		
 		if (sep && len) buffer[len++] = sep;
 		ubyte b = data[i];
-		//TODO: handle buffer length
 		buffer[len++] = hexc0(b);
 		buffer[len++] = hexc1(b);
 	}

@@ -16,9 +16,6 @@ import core.stdc.stdlib;
 import core.stdc.string;
 public import getopt;
 
-//TODO: Consider separating getopt impl. to common.getopt,
-//      and leave common CLI options here
-
 /// Copyright string
 enum COPYRIGHT = "Copyright (c) 2019-2024 dd86k <dd@dax.moe>";
 

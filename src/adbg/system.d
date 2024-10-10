@@ -19,7 +19,6 @@ import core.stdc.string : strncpy;
 
 // NOTE: Calling dlerror(3) clears the last error
 
-//TODO: Move to adbg.os.dynlibs (or with similar name)
 //TODO: Consider versioning support
 //      Some libraries, like Capstone, can be found in various versions
 //      depending on the distrobution.

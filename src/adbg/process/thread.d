@@ -795,13 +795,6 @@ version (Win64) {
 		return adbg_oops(AdbgError.unimplemented);
 	}
 } else version (linux) {
-	//TODO: PT_GETFPREGS
-	//      PT_GETWMMXREGS
-	//      PT_GET_THREAD_AREA
-	//      PT_GETCRUNCHREGS
-	//      PT_GETVFPREGS
-	//      PT_GETHBPREGS
-	
 	version (X86) {
 		user_regs_struct u = void;
 		if (ptrace(PT_GETREGS, thread.id, null, &u) < 0)

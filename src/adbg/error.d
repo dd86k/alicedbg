@@ -23,9 +23,6 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 //       Either via TLS and/or atomic operations
 // TODO: More error should have context parameters
 //       invalidArgument: string stating which argument
-// TODO: adbg_error_source -> alicedbg/crt/os/capstone, etc.
-//       adbg_error_is_external -> bool
-// TODO: Maybe redo error code functions to reduce confusion between errno/external/system/current
 // TODO: Error utils
 //       adbg_ensure_params(lvalue, "name")
 //       - returns string if null found

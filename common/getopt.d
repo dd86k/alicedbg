@@ -354,15 +354,13 @@ private void getoptreset() {
 
 private __gshared const(char)** getoptextras;
 private __gshared int getoptextrascnt;
-//TODO: This should error out
 private void getoptaddextra(int argc, const(char)* extra) {
 	if (getoptextrascnt >= argc)
 		return;
-	if (getoptextras == null) {
+	if (getoptextras == null)
 		getoptextras = cast(const(char)**)malloc(argc * size_t.sizeof);
-		if (getoptextras == null)
-			return;
-	}
+	if (getoptextras == null)
+		assert(false, "Allocation failure");
 	getoptextras[getoptextrascnt++] = extra;
 	getoptextras[getoptextrascnt] = null;
 }

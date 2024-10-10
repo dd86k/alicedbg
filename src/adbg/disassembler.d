@@ -18,12 +18,18 @@ import adbg.machines : AdbgMachine;
 import core.stdc.string : memcpy;
 import core.stdc.stdlib : malloc, free;
 
-//TODO: Capstone CS_MODE_BIG_ENDIAN
-//      Depending on target endianness, Capstone may need this bit
-//TODO: Function to format machine code
-//TODO: Close function should close CS lib too
-//      Make sure we have a function to reconfigure machine
-//TODO: Rename functions from _dis_ to _dism_ (sounds cuter)
+// TODO: Function to format machine code
+// TODO: Redo Disassembler API
+//       - Rename prefix to adbg_disasm_
+//       - adbg_disasm_open
+//       - adbg_disasm_close
+//       - adbg_disasm_supported_machines
+//       - adbg_disasm_set_options
+//       - adbg_disasm_buffer_start
+//       - adbg_disasm_buffer_stepin
+//       - adbg_disasm (with buffer and its length)
+//       - Move process wrappers to debugger module
+//         - adbg_debugger_disassemble_at(memoryloc)
 
 // NOTE: Longest architectural instruction contest
 //       x86: 15 bytes
@@ -189,29 +195,27 @@ struct dismachine_t {
 	int cs_mode;
 }
 
-// TODO: Machine aliases?
-//       like sparc8p to sparc9
-private // "tested" here means that the MODE values work for CS with a sample
+private // "works" here means that the MODE values work for CS with a sample
 immutable dismachine_t[] machmap_capstone = [
-	{ AdbgMachine.i8086,	CS_ARCH_X86,	CS_MODE_16 }, // tested
-	{ AdbgMachine.i386,	CS_ARCH_X86,	CS_MODE_32 }, // tested
-	{ AdbgMachine.amd64,	CS_ARCH_X86,	CS_MODE_64 }, // tested
+	{ AdbgMachine.i8086,	CS_ARCH_X86,	CS_MODE_16 }, // works
+	{ AdbgMachine.i386,	CS_ARCH_X86,	CS_MODE_32 }, // works
+	{ AdbgMachine.amd64,	CS_ARCH_X86,	CS_MODE_64 }, // works
 	{ AdbgMachine.thumb,	CS_ARCH_ARM,	CS_MODE_THUMB },
 	{ AdbgMachine.thumb32,	CS_ARCH_ARM,	CS_MODE_THUMB | CS_MODE_V8 },
-	{ AdbgMachine.arm,	CS_ARCH_ARM,	CS_MODE_ARM | CS_MODE_V8 }, // tested
-	{ AdbgMachine.aarch64,	CS_ARCH_ARM64,	0 }, // tested
-	{ AdbgMachine.ppc,	CS_ARCH_PPC,	CS_MODE_32 | CS_MODE_BIG_ENDIAN }, // tested
-	{ AdbgMachine.ppcle,	CS_ARCH_PPC,	CS_MODE_32 | CS_MODE_LITTLE_ENDIAN }, // tested
+	{ AdbgMachine.arm,	CS_ARCH_ARM,	CS_MODE_ARM | CS_MODE_V8 }, // works
+	{ AdbgMachine.aarch64,	CS_ARCH_ARM64,	0 }, // works
+	{ AdbgMachine.ppc,	CS_ARCH_PPC,	CS_MODE_32 | CS_MODE_BIG_ENDIAN }, // works
+	{ AdbgMachine.ppcle,	CS_ARCH_PPC,	CS_MODE_32 | CS_MODE_LITTLE_ENDIAN }, // works
 	{ AdbgMachine.ppc64,	CS_ARCH_PPC,	CS_MODE_64 | CS_MODE_BIG_ENDIAN },
 	{ AdbgMachine.ppc64le,	CS_ARCH_PPC,	CS_MODE_64 | CS_MODE_LITTLE_ENDIAN },
-	{ AdbgMachine.mips,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_BIG_ENDIAN }, // tested
+	{ AdbgMachine.mips,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_BIG_ENDIAN }, // works
 	{ AdbgMachine.mipsle,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_LITTLE_ENDIAN },
 	{ AdbgMachine.mipsii,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_MIPS2 | CS_MODE_BIG_ENDIAN },
 	{ AdbgMachine.mipsiii,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_MIPS3 | CS_MODE_BIG_ENDIAN },
 	{ AdbgMachine.mipsiv,	CS_ARCH_MIPS,	CS_MODE_32 | CS_MODE_MIPS32 | CS_MODE_BIG_ENDIAN },
 	{ AdbgMachine.sparc,	CS_ARCH_SPARC,	0 },
-	{ AdbgMachine.sparc9,	CS_ARCH_SPARC,	CS_MODE_V9 }, // tested
-	{ AdbgMachine.systemz,	CS_ARCH_SYSZ,	0 }, // tested
+	{ AdbgMachine.sparc9,	CS_ARCH_SPARC,	CS_MODE_V9 }, // works
+	{ AdbgMachine.systemz,	CS_ARCH_SYSZ,	0 }, // works
 ];
 
 // Platform to CS' ARCH and MODE types

@@ -56,14 +56,14 @@ extern (C):
 //       Uses:
 //       - For swapping, uses less code than inlining it
 //       - For displaying and using field offsets
-// TODO: adbg_object_endiannes
+// TODO: adbg_object_endianness
 //       Why? Machine module do not include endianness.
-//       And would be beneficial when host has incompatible endianness.
+//       And would be beneficial when host has incompatible or both endianness.
 // TODO: adbg_object_open_process(int pid, ...)
 // TODO: adbg_object_open_buffer(void *buffer, size_t size, ...)
 // TODO: adbg_object_origin_string(adbg_object_t *o)
 //       Return string of how object was loaded, mainly for tracing purposes
-// TODO: adbg_object_load_debug(adbg_object_t *o)
+// TODO: internal: adbg_object_load_debug(adbg_object_t *o)
 //       Attach debug object instance to this one. Likely to be used internally for stuff
 //       like getting symbols off memory addresses.
 //       PE32:
@@ -74,6 +74,8 @@ extern (C):
 //         - BPF Type Format (BTF)
 //       Mach-O:
 //         - uuid_command points to dSYM file
+// TODO: Object read flags
+//       ALLOCBUF: Allocate buffer according to size automatically.
 
 /// Executable or object file format.
 enum AdbgObject {

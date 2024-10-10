@@ -68,11 +68,10 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 	);
 	
 	printf(
+	"Code       : "~ERR_OSFMT~"\n"~
 	"Exception  : %s\n"~
 	"PID        : %d\n",
-	adbg_exception_name(ex), adbg_process_pid(proc));
-	
-	//TODO: Get thread context
+	ex.oscode, adbg_exception_name(ex), adbg_process_pid(proc));
 	
 	// Fault address & disasm if available
 	if (ex.faultz) {
@@ -93,6 +92,8 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 			printf(" Disassembly unavailable (%s)\n", adbg_error_message());
 		}
 	}
+	
+	// TODO: Get thread context
 	
 	//TODO: Option to attach debugger to this process
 	exit(ex.oscode);

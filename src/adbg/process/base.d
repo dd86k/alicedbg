@@ -12,7 +12,6 @@ module adbg.process.base;
 // TODO: Process Pause/Resume
 //       Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
 //       Linux: Send SIGSTOP/SIGCONT signals via kill(2)
-// TODO: List threads of process (maybe in a module called threading.d)
 
 import adbg.include.c.stdlib; // malloc, calloc, free, exit;
 import adbg.include.c.stdarg;

@@ -5,8 +5,6 @@
 /// License: BSD-3-Clause-Clear
 module shell;
 
-// TODO: Pre-load/Exit event handlers (e.g., closing disassembler) functions
-
 import adbg;
 import adbg.platform;
 import adbg.error;
@@ -136,7 +134,6 @@ void logwrite(const(char) *pre, int color, const(char) *fmt, va_list args) {
 }
 
 int shell_start(int argc, const(char)** argv) {
-	// TODO: Use commands directly?
 	// Start or attach to process if specified
 	if (argc > 0 && argv && shell_spawn(*argv, argc > 1 ? argv + 1 : null)) {
 		logerror("Could not spawn process: %s", adbg_error_message());
@@ -243,11 +240,9 @@ struct command2_t {
 	int function(int, const(char)**) entry;
 }
 // NOTE: Called "commands_list" to avoid conflict with future "command_list" function
-//TODO: Commands
-// - !: Run host shell commands
-// - b|breakpoint: Breakpoint management
-// - t|thread: Thread management (e.g., selection, callstack)
-// - sym: Symbol management
+// TODO: New commands
+//       - b|breakpoint: Breakpoint management
+//       - sym: Symbol management
 immutable command2_t[] shell_commands = [
 	//
 	// Debugger
@@ -804,7 +799,6 @@ int command_detach(int argc, const(char) **argv) {
 }
 
 int command_restart(int argc, const(char) **argv) {
-	// TODO: Use commands directly?
 	switch (process.creation) with (AdbgCreation) {
 	case spawned:
 		// Terminate first, ignore on error (e.g., already gone)

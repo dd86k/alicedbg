@@ -332,7 +332,6 @@ void dump_pe_sections(adbg_object_t *o) {
 }
 
 // Weird contraption to auto cut off fields according to loadconfig size
-// TODO: could do with string mixin, but too lazy
 struct fieldt {
 	string name;
 	size_t foffset;
