@@ -37,6 +37,8 @@ int dump_pe(adbg_object_t *o) {
 		dump_pe_imports(o);
 	if (SELECTED(Select.debug_))
 		dump_pe_debug(o);
+	if (SELECTED(Select.loadconfig))
+		dump_pe_loadconfig(o);
 	if (SETTING(Setting.disasmAny))
 		dump_pe_disasm(o);
 	return 0;
@@ -252,7 +254,7 @@ void dump_pe_dirs(adbg_object_t *o) {
 void dump_pe_sections(adbg_object_t *o) {
 	print_header("Sections");
 	
-	PE_SECTION_ENTRY *section = void;
+	pe_section_entry_t *section = void;
 	size_t i;
 	while ((section = adbg_object_pe_section(o, i++)) != null) with (section) {
 		// If we're searching sections, match and don't print yet
@@ -329,245 +331,174 @@ void dump_pe_sections(adbg_object_t *o) {
 	}
 }
 
-/*void dump_pe_loadconfig(ref Dumper dump) {
+// Weird contraption to auto cut off fields according to loadconfig size
+// TODO: could do with string mixin, but too lazy
+struct fieldt {
+	string name;
+	size_t foffset;
+	size_t fsize;
+}
+template LC32(string f) {
+	enum LC32 = mixin("fieldt(pe_loadconfig32_t."~f~".stringof,"~
+		"pe_loadconfig32_t."~f~".offsetof,"~
+		"pe_loadconfig32_t."~f~".sizeof)");
+}
+static immutable fieldt[] lc32 = [
+	LC32!"Size",
+	LC32!"TimeDateStamp",
+	LC32!"MajorVersion",
+	LC32!"MinorVersion",
+	LC32!"GlobalFlagsClear",
+	LC32!"GlobalFlagsSet",
+	LC32!"CriticalSectionDefaultTimeout",
+	LC32!"DeCommitFreeBlockThreshold",
+	LC32!"DeCommitTotalBlockThreshold",
+	LC32!"LockPrefixTable",
+	LC32!"MaximumAllocationSize",
+	LC32!"VirtualMemoryThreshold",
+	LC32!"ProcessHeapFlags",
+	LC32!"ProcessAffinityMask",
+	LC32!"CSDVersion",
+	LC32!"Reserved1",
+	LC32!"EditList",
+	LC32!"SecurityCookie",
+	LC32!"SEHandlerTable",
+	LC32!"SEHandlerCount",
+	LC32!"GuardCFCheckFunctionPointer",
+	LC32!"GuardCFDispatchFunctionPointer",
+	LC32!"GuardCFFunctionTable",
+	LC32!"GuardCFFunctionCount",
+	LC32!"GuardFlags",
+	LC32!"CodeIntegrity",
+	LC32!"GuardAddressTakenIatEntryTable",
+	LC32!"GuardAddressTakenIatEntryCount",
+	LC32!"GuardLongJumpTargetTable",
+	LC32!"GuardLongJumpTargetCount",
+	LC32!"DynamicValueRelocTable",
+	LC32!"CHPEMetadataPointer",
+	LC32!"GuardRFFailureRoutine",
+	LC32!"GuardRFFailureRoutineFunctionPointer",
+	LC32!"DynamicValueRelocTableOffset",
+	LC32!"DynamicValueRelocTableSection",
+	LC32!"Reserved2",
+	LC32!"GuardRFVerifyStackPointerFunctionPointer",
+	LC32!"HotPatchTableOffset",
+	LC32!"Reserved3",
+	LC32!"EnclaveConfigurationPointer",
+	LC32!"VolatileMetadataPointer",
+	LC32!"GuardEHContinuationTable",
+	LC32!"GuardEHContinuationCount",
+	LC32!"GuardXFGCheckFunctionPointer",
+	LC32!"GuardXFGDispatchFunctionPointer",
+	LC32!"GuardXFGTableDispatchFunctionPointer",
+	LC32!"CastGuardOsDeterminedFailureMode",
+	LC32!"GuardMemcpyFunctionPointer",
+];
+template LC64(string f) {
+	enum LC64 = mixin("fieldt(pe_loadconfig64_t."~f~".stringof,"~
+		"pe_loadconfig64_t."~f~".offsetof,"~
+		"pe_loadconfig64_t."~f~".sizeof)");
+}
+static immutable fieldt[] lc64 = [
+	LC64!"Size",
+	LC64!"TimeDateStamp",
+	LC64!"MajorVersion",
+	LC64!"MinorVersion",
+	LC64!"GlobalFlagsClear",
+	LC64!"GlobalFlagsSet",
+	LC64!"CriticalSectionDefaultTimeout",
+	LC64!"DeCommitFreeBlockThreshold",
+	LC64!"DeCommitTotalBlockThreshold",
+	LC64!"LockPrefixTable",
+	LC64!"MaximumAllocationSize",
+	LC64!"VirtualMemoryThreshold",
+	LC64!"ProcessAffinityMask",
+	LC64!"ProcessHeapFlags",
+	LC64!"CSDVersion",
+	LC64!"Reserved1",
+	LC64!"EditList",
+	LC64!"SecurityCookie",
+	LC64!"SEHandlerTable",
+	LC64!"SEHandlerCount",
+	LC64!"GuardCFCheckFunctionPointer",
+	LC64!"GuardCFDispatchFunctionPointer",
+	LC64!"GuardCFFunctionTable",
+	LC64!"GuardCFFunctionCount",
+	LC64!"GuardFlags",
+	LC64!"CodeIntegrity",
+	LC64!"GuardAddressTakenIatEntryTable",
+	LC64!"GuardAddressTakenIatEntryCount",
+	LC64!"GuardLongJumpTargetTable",
+	LC64!"GuardLongJumpTargetCount",
+	LC64!"DynamicValueRelocTable",
+	LC64!"CHPEMetadataPointer",
+	LC64!"GuardRFFailureRoutine",
+	LC64!"GuardRFFailureRoutineFunctionPointer",
+	LC64!"DynamicValueRelocTableOffset",
+	LC64!"DynamicValueRelocTableSection",
+	LC64!"Reserved2",
+	LC64!"GuardRFVerifyStackPointerFunctionPointer",
+	LC64!"HotPatchTableOffset",
+	LC64!"Reserved3",
+	LC64!"EnclaveConfigurationPointer",
+	LC64!"VolatileMetadataPointer",
+	LC64!"GuardEHContinuationTable",
+	LC64!"GuardEHContinuationCount",
+	LC64!"GuardXFGCheckFunctionPointer",
+	LC64!"GuardXFGDispatchFunctionPointer",
+	LC64!"GuardXFGTableDispatchFunctionPointer",
+	LC64!"CastGuardOsDeterminedFailureMode",
+	LC64!"GuardMemcpyFunctionPointer",
+];
+int print_loadconfig_field(void *base, ref immutable(fieldt) field) {
+	assert(base);
+	uint *Size = cast(uint*)base; // first field is Size (of loadconfig struct)
+	if (field.foffset + field.fsize > *Size) return 0;
 	
-	dump_h1("Load Configuration");
+	const(char) *name = cast(const(char)*)field.name.ptr;
+	void *data = base + field.foffset;
+	switch (field.fsize) {
+	case ushort.sizeof:
+		print_x16(name, *cast(ushort*)data);
+		break;
+	case uint.sizeof:
+		print_x32(name, *cast(uint*)data);
+		break;
+	case ulong.sizeof:
+		print_x64(name, *cast(ulong*)data);
+		break;
+	default:
+		print_datainline(name, data, pe_load_config_code_integrity_t.sizeof);
+	}
+	return 1;
+}
+
+void dump_pe_loadconfig(adbg_object_t *o) {
+	print_header("Load Configuration");
 	
-	if (dump.obj.pe.loadconfig == null) { // LOAD_CONFIGURATION
-		puts("No 
+	void *lc = adbg_object_pe_loadconfig(o);
+	if (lc == null) {
+		debug print_warningf("%s", adbg_error_message());
+		return;
 	}
-		if (fseek(dump.obj.handle, fo_loadcf, SEEK_SET))
-			return EXIT_FAILURE;
-
-		PE_LOAD_CONFIG_META lconf = void;
-		char[32] lcbuffer = void;
-
-		if (fread(&lconf, 4, 1, obj.handle) == 0)
-			return EXIT_FAILURE;
-		if (fread(&lconf.dir32.TimeDateStamp, lconf.dir32.Size, 1, obj.handle) == 0)
-			return EXIT_FAILURE;
-
-		if (strftime(cast(char*)lcbuffer, 32, "%c",
-			localtime(cast(time_t*)&lconf.dir64.TimeDateStamp)) == 0) {
-			const(char)* l = cast(char*)&lcbuffer;
-			l = "strftime:err";
+	
+	pe_optional_header_t *opt = cast(pe_optional_header_t*)adbg_object_pe_optional_header(o);
+	switch (opt.Magic) {
+	case PE_CLASS_32:
+		foreach (ref immutable(fieldt) field; lc32) {
+			if (print_loadconfig_field(lc, field) == 0)
+				break;
 		}
-
-		with (lconf.dir32)
-		printf( // Same sizes/offsets
-		"\n*\n* Load Config\n*\n\n"~
-		"Size                            %08X\t(%u)\n"~
-		"TimeDateStamp                   %08X\t(%s)\n"~
-		"MajorVersion                    %04X\t(%u)\n"~
-		"MinorVersion                    %04X\t(%u)\n"~
-		"GlobalFlagsClear                %08X\n"~
-		"GlobalFlagsSet                  %08X\n"~
-		"CriticalSectionDefaultTimeout   %08X\n",
-		Size, Size,
-		TimeDateStamp, &lcbuffer,
-		MajorVersion, lconf.dir32.MajorVersion,
-		MinorVersion, lconf.dir32.MinorVersion,
-		GlobalFlagsClear,
-		GlobalFlagsSet,
-		CriticalSectionDefaultTimeout);
-
-		if (dump.optMagic != PE_FMT_64) { // 32
-			with (lconf.dir32)
-			printf(
-			"DeCommitFreeBlockThreshold      %08X\n"~
-			"DeCommitTotalBlockThreshold     %08X\n"~
-			"LockPrefixTable                 %08X\n"~
-			"MaximumAllocationSize           %08X\t(%u)\n"~
-			"VirtualMemoryThreshold          %08X\n"~
-			"ProcessHeapFlags                %08X\n"~
-			"ProcessAffinityMask             %08X\n"~
-			"CSDVersion                      %04X\n"~
-			"Reserved1                       %04X\n"~
-			"EditList                        %08X\n"~
-			"SecurityCookie                  %08X\n",
-			DeCommitFreeBlockThreshold,
-			DeCommitTotalBlockThreshold,
-			LockPrefixTable,
-			MaximumAllocationSize, lconf.dir32.MaximumAllocationSize,
-			VirtualMemoryThreshold,
-			ProcessHeapFlags,
-			ProcessAffinityMask,
-			CSDVersion,
-			Reserved1,
-			EditList,
-			SecurityCookie);
-
-			if (lconf.dir32.Size <= PE_LOAD_CONFIG32_LIMIT_XP)
-				goto L_LOADCFG_EXIT;
-
-			with (lconf.dir32)
-			printf(
-			"SEHandlerTable                  %08X\n"~
-			"SEHandlerCount                  %08X\n"~
-			"GuardCFCheckFunctionPointer     %08X\n"~
-			"GuardCFDispatchFunctionPointer  %08X\n"~
-			"GuardCFFunctionTable            %08X\n"~
-			"GuardCFFunctionCount            %08X\n"~
-			"GuardFlags                      %08X\n",
-			SEHandlerTable,
-			SEHandlerCount,
-			GuardCFCheckFunctionPointer,
-			GuardCFDispatchFunctionPointer,
-			GuardCFFunctionTable,
-			GuardCFFunctionCount,
-			GuardFlags);
-
-			if (lconf.dir32.Size <= PE_LOAD_CONFIG32_LIMIT_VI)
-				goto L_LOADCFG_EXIT;
-
-			with (lconf.dir32)
-			printf(
-			"CodeIntegrity.Flags             %04X\n"~
-			"CodeIntegrity.Catalog           %04X\n"~
-			"CodeIntegrity.CatalogOffset     %08X\n"~
-			"CodeIntegrity.Reserved          %08X\n"~
-			"GuardAddressTakenIatEntryTable  %08X\n"~
-			"GuardAddressTakenIatEntryCount  %08X\n"~
-			"GuardLongJumpTargetTable        %08X\n"~
-			"GuardLongJumpTargetCount        %08X\n",
-			CodeIntegrity.Flags,
-			CodeIntegrity.Catalog,
-			CodeIntegrity.CatalogOffset,
-			CodeIntegrity.Reserved,
-			GuardAddressTakenIatEntryTable,
-			GuardAddressTakenIatEntryCount,
-			GuardLongJumpTargetTable,
-			GuardLongJumpTargetCount);
-
-			if (lconf.dir32.Size <= PE_LOAD_CONFIG32_LIMIT_8)
-				goto L_LOADCFG_EXIT;
-
-			with (lconf.dir32)
-			printf(
-			"DynamicValueRelocTable                    %08X\n"~
-			"CHPEMetadataPointer                       %08X\n"~
-			"GuardRFFailureRoutine                     %08X\n"~
-			"GuardRFFailureRoutineFunctionPointer      %08X\n"~
-			"DynamicValueRelocTableOffset              %08X\n"~
-			"DynamicValueRelocTableSection             %04X\n"~
-			"Reserved2                                 %04X\n"~
-			"GuardRFVerifyStackPointerFunctionPointer  %08X\n"~
-			"HotPatchTableOffset                       %08X\n"~
-			"Reserved3                                 %08X\n"~
-			"EnclaveConfigurationPointer               %08X\n"~
-			"VolatileMetadataPointer                   %08X\n",
-			DynamicValueRelocTable,
-			CHPEMetadataPointer,
-			GuardRFFailureRoutine,
-			GuardRFFailureRoutineFunctionPointer,
-			DynamicValueRelocTableOffset,
-			DynamicValueRelocTableSection,
-			Reserved2,
-			GuardRFVerifyStackPointerFunctionPointer,
-			HotPatchTableOffset,
-			Reserved3,
-			EnclaveConfigurationPointer,
-			VolatileMetadataPointer);
-		} else { // 64
-			with (lconf.dir64)
-			printf(
-			"DeCommitFreeBlockThreshold      %016llX\n"~
-			"DeCommitTotalBlockThreshold     %016llX\n"~
-			"LockPrefixTable                 %016llX\n"~
-			"MaximumAllocationSize           %016llX\t(%u)\n"~
-			"VirtualMemoryThreshold          %016llX\n"~
-			"ProcessAffinityMask             %016llX\n"~
-			"ProcessHeapFlags                %08X\n"~
-			"CSDVersion                      %04X\n"~
-			"Reserved1                       %04X\n"~
-			"EditList                        %016llX\n"~
-			"SecurityCookie                  %016llX\n",
-			DeCommitFreeBlockThreshold,
-			DeCommitTotalBlockThreshold,
-			LockPrefixTable,
-			MaximumAllocationSize, MaximumAllocationSize,
-			VirtualMemoryThreshold,
-			ProcessAffinityMask,
-			ProcessHeapFlags,
-			CSDVersion,
-			Reserved1,
-			EditList,
-			SecurityCookie);
-
-			if (lconf.dir64.Size <= PE_LOAD_CONFIG64_LIMIT_XP)
-				goto L_LOADCFG_EXIT;
-
-			with (lconf.dir64)
-			printf(
-			"SEHandlerTable                  %016llX\n"~
-			"SEHandlerCount                  %016llX\n"~
-			"GuardCFCheckFunctionPointer     %016llX\n"~
-			"GuardCFDispatchFunctionPointer  %016llX\n"~
-			"GuardCFFunctionTable            %016llX\n"~
-			"GuardCFFunctionCount            %016llX\n"~
-			"GuardFlags                      %08X\n",
-			SEHandlerTable,
-			SEHandlerCount,
-			GuardCFCheckFunctionPointer,
-			GuardCFDispatchFunctionPointer,
-			GuardCFFunctionTable,
-			GuardCFFunctionCount,
-			GuardFlags);
-
-			if (lconf.dir64.Size <= PE_LOAD_CONFIG64_LIMIT_VI)
-				goto L_LOADCFG_EXIT;
-
-			with (lconf.dir64)
-			printf(
-			"CodeIntegrity.Flags             %04X\n"~
-			"CodeIntegrity.Catalog           %04X\n"~
-			"CodeIntegrity.CatalogOffset     %08X\n"~
-			"CodeIntegrity.Reserved          %08X\n"~
-			"GuardAddressTakenIatEntryTable  %016llX\n"~
-			"GuardAddressTakenIatEntryCount  %016llX\n"~
-			"GuardLongJumpTargetTable        %016llX\n"~
-			"GuardLongJumpTargetCount        %016llX\n",
-			CodeIntegrity.Flags,
-			CodeIntegrity.Catalog,
-			CodeIntegrity.CatalogOffset,
-			CodeIntegrity.Reserved,
-			GuardAddressTakenIatEntryTable,
-			GuardAddressTakenIatEntryCount,
-			GuardLongJumpTargetTable,
-			GuardLongJumpTargetCount);
-
-			if (lconf.dir64.Size <= PE_LOAD_CONFIG64_LIMIT_8)
-				goto L_LOADCFG_EXIT;
-
-			with (lconf.dir64)
-			printf(
-			"DynamicValueRelocTable                    %016llX\n"~
-			"CHPEMetadataPointer                       %016llX\n"~
-			"GuardRFFailureRoutine                     %016llX\n"~
-			"GuardRFFailureRoutineFunctionPointer      %016llX\n"~
-			"DynamicValueRelocTableOffset              %08X\n"~
-			"DynamicValueRelocTableSection             %04X\n"~
-			"Reserved2                                 %04X\n"~
-			"GuardRFVerifyStackPointerFunctionPointer  %08X\n"~
-			"HotPatchTableOffset                       %016llX\n"~
-			"Reserved3                                 %08X\n"~
-			"EnclaveConfigurationPointer               %016llX\n"~
-			"VolatileMetadataPointer                   %016llX\n",
-			DynamicValueRelocTable,
-			CHPEMetadataPointer,
-			GuardRFFailureRoutine,
-			GuardRFFailureRoutineFunctionPointer,
-			DynamicValueRelocTableOffset,
-			DynamicValueRelocTableSection,
-			Reserved2,
-			GuardRFVerifyStackPointerFunctionPointer,
-			HotPatchTableOffset,
-			Reserved3,
-			EnclaveConfigurationPointer,
-			VolatileMetadataPointer);
+		break;
+	case PE_CLASS_64:
+		foreach (ref immutable(fieldt) field; lc64) {
+			if (print_loadconfig_field(lc, field) == 0)
+				break;
 		}
+		break;
+	default:
 	}
-}*/
+}
 
 void dump_pe_exports(adbg_object_t *o) {
 	print_header("Exports");
@@ -590,7 +521,7 @@ void dump_pe_exports(adbg_object_t *o) {
 	print_x32("OrdinalTable", OrdinalTable);
 	}
 	
-	PE_EXPORT_ENTRY *entry = void;
+	pe_export_entry_t *entry = void;
 	size_t ie;
 	while ((entry = adbg_object_pe_export_entry_name(o, export_, ie++)) != null) {
 		print_x32("Export", entry.Export, adbg_object_pe_export_name_string(o, export_, entry));

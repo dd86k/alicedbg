@@ -25,8 +25,6 @@ import adbg.utils.math : min, MiB;
 import adbg.objects.mz : mz_header_t;
 
 // NOTE: Avoid the Windows base types as they are not defined outside "version (Windows)"
-// NOTE: Microsoft loader limits sections to 96 maximum
-// NOTE: Load Configuration depends on Linker version, Windows depend on that to load PE32 images
 
 extern (C):
 
@@ -199,7 +197,6 @@ struct pe_header_t { align(1):
 	ushort SizeOfOptionalHeader;
 	ushort Characteristics;
 }
-alias PE_HEADER = pe_header_t;
 
 // https://msdn.microsoft.com/en-us/library/windows/desktop/ms680339(v=vs.85).aspx
 // Image only
@@ -235,7 +232,6 @@ struct pe_optional_header_t { align(1):
 	uint LoaderFlags;	/// Obsolete
 	uint NumberOfRvaAndSizes;
 }
-alias PE_OPTIONAL_HEADER = pe_optional_header_t;
 
 struct pe_optional_header64_t { align(1):
 	ushort Magic; // "Format"
@@ -268,7 +264,6 @@ struct pe_optional_header64_t { align(1):
 	uint LoaderFlags; // Obsolete
 	uint NumberOfRvaAndSizes;
 }
-alias PE_OPTIONAL_HEADER64 = pe_optional_header64_t;
 
 struct pe_optional_headerrom_t {
 	ushort Magic;
@@ -285,13 +280,11 @@ struct pe_optional_headerrom_t {
 	uint[4] CprMask;
 	uint GpValue;
 }
-alias PE_OPTIONAL_HEADERROM = pe_optional_headerrom_t;
 
 struct pe_directory_entry_t { align(1):
 	uint rva;	/// Relative Virtual Address
 	uint size;	/// Size in bytes
 }
-alias PE_DIRECTORY_ENTRY = pe_directory_entry_t;
 
 // IMAGE_NUMBEROF_DIRECTORY_ENTRIES = 16
 // MS recommends checking NumberOfRvaAndSizes but it always been 16
@@ -313,7 +306,6 @@ struct pe_image_data_directory_t { align(1):
 	pe_directory_entry_t CLRHeader;	// Used to be (or alias to) COM+ Runtime Header
 	pe_directory_entry_t Reserved;
 }
-alias PE_IMAGE_DATA_DIRECTORY = pe_image_data_directory_t;
 
 //
 // ANCHOR Directory structures
@@ -332,13 +324,11 @@ struct pe_export_descriptor_t { align(1):
 	uint NamePointer;	/// RVA, "The address of the export name pointer table"
 	uint OrdinalTable;	/// RVA
 }
-alias PE_EXPORT_DESCRIPTOR = pe_export_descriptor_t;
 
 union pe_export_entry_t { align(1):
 	uint Export;	/// RVA
 	uint Forwarder;	/// RVA
 }
-alias PE_EXPORT_ENTRY = pe_export_entry_t;
 
 // IMAGE_IMPORT_DESCRIPTOR
 struct pe_import_descriptor_t { align(1):
@@ -348,7 +338,6 @@ struct pe_import_descriptor_t { align(1):
 	uint Name;
 	uint FirstThunk;
 }
-alias PE_IMPORT_DESCRIPTOR = pe_import_descriptor_t;
 
 /// Import Lookup Table entry structure
 struct pe_import_entry32_t { align(1):
@@ -358,7 +347,6 @@ struct pe_import_entry32_t { align(1):
 		uint rva;	/// Hint/Name Table RVA (val[31] is clear)
 	}
 }
-alias PE_IMPORT_ENTRY32 = pe_import_entry32_t;
 
 /// Import Lookup Table entry structure
 struct pe_import_entry64_t { align(1):
@@ -368,7 +356,6 @@ struct pe_import_entry64_t { align(1):
 		uint rva;	/// Hint/Name Table RVA (val2[31] is clear)
 	}
 }
-alias PE_IMPORT_ENTRY64 = pe_import_entry64_t;
 
 struct pe_debug_directory_entry_t { align(1):
 	uint Characteristics;	/// reserved, must be zero
@@ -380,7 +367,6 @@ struct pe_debug_directory_entry_t { align(1):
 	uint AddressOfRawData;	/// The address of the debug data relative to the image base
 	uint PointerToRawData;	/// The file pointer to the debug data
 }
-alias PE_DEBUG_DIRECTORY = pe_debug_directory_entry_t;
 
 // Debug Types
 enum : uint {
@@ -466,7 +452,6 @@ struct pe_debug_data_codeview_pdb20_t { align(1):
 	uint Age;	/// incremented each time the executable is remade by the linker
 	char[1] Path;	/// Path to PDB (0-terminated)
 }
-alias PE_DEBUG_DATA_CODEVIEW_PDB20 = pe_debug_data_codeview_pdb20_t;
 
 /// PDB 7.0
 struct pe_debug_data_codeview_pdb70_t { align(1):
@@ -475,7 +460,6 @@ struct pe_debug_data_codeview_pdb70_t { align(1):
 	uint Age;	/// incremented each time the executable is remade by the linker
 	char[1] Path;	/// Path to PDB (0-terminated UTF-8)
 }
-alias PE_DEBUG_DATA_CODEVIEW_PDB70 = pe_debug_data_codeview_pdb70_t;
 
 // Debug entry 3: The frame pointer omission (FPO) information.
 
@@ -511,7 +495,6 @@ struct pe_debug_data_misc_t { align(1):
 	byte[3] Reserved;
 	byte[1] Data;
 }
-alias PE_DEBUG_DATA_MISC = pe_debug_data_misc_t;
 
 // Debug entry 12: VC Features
 
@@ -523,7 +506,6 @@ struct pe_debug_data_vc_feat_t { align(1):
 	uint SDL;	/// /SDL
 	uint GuardN;	/// guardN
 }
-alias PE_DEBUG_DATA_VC_FEAT = pe_debug_data_vc_feat_t;
 
 // Debug entry 13: POGO
 
@@ -534,7 +516,6 @@ struct pe_debug_data_pogo_entry_t {
 	uint Size;
 	char[1] Name;
 }
-alias PE_DEBUG_POGO_ENTRY = pe_debug_data_pogo_entry_t;
 
 // Debug entry 17: Embedded PDB
 
@@ -548,7 +529,6 @@ struct pe_debug_data_embedded_t { align(1):
 	//                 Portable PDB image compressed using Deflate algorithm
 	ubyte[1] PortablePdbImage;
 }
-alias PE_DEBUG_DATA_EMBEDDED = pe_debug_data_embedded_t;
 
 // aka MetadataRootHeader
 struct pe_debug_data_ppdb_t {
@@ -570,21 +550,18 @@ struct pe_debug_data_ppdb_t {
 	// - "Standard CLI 2002" (17 chars, so rounded to 20 chars)
 	char[1] Version;
 }
-alias PE_DEBUG_DATA_PPDB = pe_debug_data_ppdb_t;
 
 // After MetadataRootHeader + Version string
 struct pe_debug_data_ppdb_flags_t {
 	ushort Flags;
 	ushort Streams;
 }
-alias PE_DEBUG_DATA_PPDB_FLAGS = pe_debug_data_ppdb_flags_t;
 
 struct pe_debug_data_ppdb_stream_t {
 	uint Offset;
 	uint Size;
 	char[1] Name;
 }
-alias PE_DEBUG_DATA_PPDB_STREAM = pe_debug_data_ppdb_stream_t;
 
 // Debug type 21: R2R PerfMap
 
@@ -603,7 +580,6 @@ struct pe_debug_data_r2r_perfmap_t { align(1):
 	/// UTF-8 NUL-terminated path to the associated .r2rmap file.
 	char[1] Path;
 }
-alias PE_DEBUG_DATA_R2R_PERFMAP = pe_debug_data_r2r_perfmap_t;
 
 //
 // Load configuration directory
@@ -615,12 +591,17 @@ struct pe_load_config_code_integrity_t { align(1):
 	uint CatalogOffset;
 	uint Reserved;	// Additional bitmask to be defined later
 }
-alias PE_LOAD_CONFIG_CODE_INTEGRITY = pe_load_config_code_integrity_t;
+
+// TODO: Find a way to map load configuration sizes to loadconfig version
+//       Exec         Version  Size  LCVersion
+//       putty-x86       0.60    72
+//       putty-x86       0.73    92
+//       putty-x86       0.81   192
+//       putty-amd64     0.73   148
+//       putty-amd64     0.81   320
 
 /// IMAGE_LOAD_CONFIG_DIRECTORY32
-//TODO: Map sizes to WindowsNT versions
-//      Or very likely MSVC linker versions
-struct pe_load_config_dir32_t { align(1):
+struct pe_loadconfig32_t { align(1):
 	// Windows XP and after
 	uint Size; // Doc: Characteristics, header: Size, Windows XP=64
 	uint TimeDateStamp; // time_t
@@ -649,7 +630,7 @@ struct pe_load_config_dir32_t { align(1):
 	uint GuardCFFunctionCount;
 	// Windows 8 and later?
 	uint GuardFlags;
-	PE_LOAD_CONFIG_CODE_INTEGRITY CodeIntegrity;
+	pe_load_config_code_integrity_t CodeIntegrity;
 	uint GuardAddressTakenIatEntryTable;
 	uint GuardAddressTakenIatEntryCount;
 	uint GuardLongJumpTargetTable;
@@ -676,12 +657,8 @@ struct pe_load_config_dir32_t { align(1):
 	uint CastGuardOsDeterminedFailureMode;	// VA
 	uint GuardMemcpyFunctionPointer;	// VA
 }
-alias PE_LOAD_CONFIG_DIR32 = pe_load_config_dir32_t;
-
 /// IMAGE_LOAD_CONFIG_DIRECTORY64
-//TODO: Map sizes to WindowsNT versions
-//      Or MSVC linker versions
-struct pe_load_config_dir64_t { align(1):
+struct pe_loadconfig64_t { align(1):
 	uint Size; // Characteristics
 	uint TimeDateStamp; // time_t
 	ushort MajorVersion;
@@ -709,7 +686,7 @@ struct pe_load_config_dir64_t { align(1):
 	ulong GuardCFFunctionCount;
 	uint GuardFlags;
 	// Windows 8 and later?
-	PE_LOAD_CONFIG_CODE_INTEGRITY CodeIntegrity;
+	pe_load_config_code_integrity_t CodeIntegrity;
 	ulong GuardAddressTakenIatEntryTable;
 	ulong GuardAddressTakenIatEntryCount;
 	ulong GuardLongJumpTargetTable;
@@ -736,7 +713,6 @@ struct pe_load_config_dir64_t { align(1):
 	ulong CastGuardOsDeterminedFailureMode;	// VA
 	ulong GuardMemcpyFunctionPointer;	// VA
 }
-alias PE_LOAD_CONFIG_DIR64 = pe_load_config_dir64_t;
 
 struct pe_section_entry_t { align(1):
 	/// An 8-byte, null-padded UTF-8 encoded string. If
@@ -809,7 +785,6 @@ struct pe_section_entry_t { align(1):
 	/// section.
 	uint Characteristics;
 }
-alias PE_SECTION_ENTRY = pe_section_entry_t;
 
 struct pe_rich_header_item_t {
 	union {
@@ -858,10 +833,9 @@ struct internal_pe_t {
 	bool *r_debug_entries;
 	// load configuration directory
 	union {
-		pe_load_config_dir32_t *load32_directory;
-		pe_load_config_dir64_t *load64_directory;
+		pe_loadconfig32_t *load32_directory;
+		pe_loadconfig64_t *load64_directory;
 	}
-	bool r_loaddir;
 	
 	void *rich_header_buffer;
 	size_t rich_buffer_size;
@@ -1510,7 +1484,7 @@ const(char)* adbg_object_pe_export_module_name(adbg_object_t *o, pe_export_descr
 	return cast(const(char)*)base;
 }
 
-pe_export_entry_t* adbg_object_pe_export_entry_name(adbg_object_t *o, PE_EXPORT_DESCRIPTOR *export_, size_t index) {
+pe_export_entry_t* adbg_object_pe_export_entry_name(adbg_object_t *o, pe_export_descriptor_t *export_, size_t index) {
 	if (o == null || export_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -2075,7 +2049,7 @@ pe_debug_directory_entry_t* adbg_object_pe_debug_directory(adbg_object_t *o, siz
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	size_t count = internal.directory.DebugDirectory.size / PE_DEBUG_DIRECTORY.sizeof;
+	size_t count = internal.directory.DebugDirectory.size / pe_debug_directory_entry_t.sizeof;
 	if (index >= count) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
@@ -2183,6 +2157,75 @@ void* adbg_object_pe_debug_directory_data(adbg_object_t *o, pe_debug_directory_e
 }
 void adbg_object_pe_debug_directory_data_close(void* entry) {
 	if (entry) free(entry);
+}
+
+void* adbg_object_pe_loadconfig(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (o.internal == null) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
+	
+	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
+
+	// If already loaded, return it
+	if (internal.load32_directory)
+		return internal.load32_directory;
+	
+	// Or, load it, check if it has a load config dir
+	if (internal.header.SizeOfOptionalHeader == 0 ||
+		internal.directory.LoadConfigurationTable.size < 4 ||
+		internal.directory.LoadConfigurationTable.rva == 0) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	// Load associated section
+	pe_section_entry_t *section = adbg_object_pe_directory_section(o,
+		internal.directory.LoadConfigurationTable.rva);
+	if (section == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+	
+	uint secsize = section.SizeOfRawData;
+	uint secoff = section.PointerToRawData;
+	
+	// Get file offset of load config descriptor
+	uint offset = adbg_object_pe_directory_offset_section(section,
+		internal.directory.LoadConfigurationTable.rva);
+	
+	version (Trace) trace("ssize=%u soff=%u off=%u", secsize, secoff, offset);
+	
+	// Load the section because debug table only contains descriptors
+	internal.load32_directory = cast(pe_loadconfig32_t*)malloc(secsize);
+	if (internal.load32_directory == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	if (adbg_object_read_at(o, secoff, internal.load32_directory, secsize)) {
+		free(internal.load32_directory);
+		internal.load32_directory = null;
+		return null;
+	}
+	
+	// Adjust offset to point from base of section to import descritor tables
+	internal.load32_directory = cast(pe_loadconfig32_t*)
+		(cast(void*)internal.load32_directory + (offset - secoff));
+	if (adbg_bits_ptrbounds(internal.load32_directory, pe_loadconfig32_t.sizeof,
+		internal.load32_directory, secsize)) {
+		adbg_oops(AdbgError.offsetBounds);
+		free(internal.load32_directory);
+		internal.load32_directory = null;
+		return null;
+	}
+	
+	// TODO: Check directory load config size with load config Size field
+	
+	return internal.load32_directory;
 }
 
 //
@@ -2384,10 +2427,3 @@ const(char)* adbg_object_pe_kind_string(adbg_object_t *o) {
 	return internal.header.Characteristics & PE_CHARACTERISTIC_DLL ?
 		`Dynamically Linked Library` : `Executable`;
 }
-
-private:
-
-//TODO: Map linker version with load configuration sizes
-// Exec        Version   Size
-// putty-x86      0.73     92
-// putty-amd64    0.73    148

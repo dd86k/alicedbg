@@ -41,7 +41,7 @@ immutable option_t[] options = [
 	option_t(0,   "segments",     "Dump segments", &cliopt_segments),
 	option_t('I', "imports",      "Dump import information", &cliopt_imports),
 	option_t('E', "exports",      "Dump export information", &cliopt_exports),
-//	option_t(0,   "loadcfg",      "Dump load configuration", &cliopt_loadcfg),
+	option_t(0,   "loadconfig",   "Dump load configuration", &cliopt_loadcfg),
 //	option_t(0,   "source",       "Dump source with disassembly", &cliopt_source),
 	option_t(0,   "relocs",       "Dump relocations", &cliopt_relocs),
 	option_t(0,   "debug",        "Dump debug information", &cliopt_debug),
@@ -97,7 +97,7 @@ int cliopt_exports() {
 	return 0;
 }
 int cliopt_loadcfg() {
-	opt_selected |= Select.loadcfg;
+	opt_selected |= Select.loadconfig;
 	return 0;
 }
 int cliopt_relocs() {

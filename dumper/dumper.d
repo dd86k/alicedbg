@@ -55,7 +55,7 @@ enum Select {
 	/// PE32 directories
 	dirs	= BIT!24,
 	/// PE32 load configuration
-	loadcfg	= BIT!25,
+	loadconfig	= BIT!25,
 	
 	/// This is a hack to let dumper avoid making a summary
 	any = BIT!31,
@@ -426,6 +426,17 @@ void print_reloc16(uint index, ushort seg, ushort off) {
 	printf("%4u. 0x%04x:0x%04x\n", index, seg, off);
 }
 
+void print_datainline(const(char)* name, void *data, size_t size) {
+	printf("%*s: ", __field_padding, name);
+	ubyte *u8 = void;
+	for (size_t i; i < size; ++i) {
+		if (i) putchar(',');
+		printf("%02x", u8[i]);
+	}
+	putchar('\n');
+}
+
+// TODO: Rename to print_dump
 void print_data(const(char)* name, void *data, size_t size, ulong baseaddress = 0) {
 	if (SETTING(Setting.hexdump))
 		hexdump(name, data, size, baseaddress);
