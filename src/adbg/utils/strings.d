@@ -70,8 +70,9 @@ size_t adbg_util_getlinef(char *bf, size_t bfsz, size_t *lnsz, FILE *file) {
 	// If fgetc return EOF, it is non-printable
 	for ( ; i < bfsz ; ++i) {
 		int c = fgetc(file);
-		
-		if (isprint(c) || c == '\t')
+		if (c == '\n')
+			break;
+		if (isprint(c))
 			bf[i] = cast(char)c;
 	}
 	
@@ -125,8 +126,9 @@ size_t adbg_util_getline(char *bf, size_t bfsz, size_t *lnsz, const(char) *src, 
 	// checking 0 in for-loop is important because somehow isprint might let it pass?
 	for (; src[s] && i < bfsz; ++i) {
 		int c = src[s++]; // unconditionally prep next pos
-		
-		if (isprint(c) || c == '\t')
+		if (c == '\n')
+			break;
+		if (isprint(c))
 			bf[i] = cast(char)c;
 	}
 	
