@@ -480,7 +480,7 @@ enum MACHO_S_MOD_INIT_FUNC_POINTERS	= 0x9;
 enum MACHO_S_MOD_TERM_FUNC_POINTERS	= 0xa;
 /// section contains symbols that are to be coalesced
 enum MACHO_S_COALESCED	= 0xb;
-/// zero fill on demand section (that can be larger than 4 gigabytes
+/// zero fill on demand section that can be larger than 4 gigabytes
 enum MACHO_S_GB_ZEROFILL	= 0xc;
 /// section with only pairs of function pointers for interposing
 enum MACHO_S_INTERPOSING	= 0xd;

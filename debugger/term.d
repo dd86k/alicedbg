@@ -81,7 +81,7 @@ private __gshared {
 
 /// Initiates terminal basics
 /// Returns: Error keyCode, non-zero on error
-int coninit(int flags = 0) {
+int coninit(/*int flags = 0*/) {
 version (Posix) {
 	tcgetattr(STDIN_FILENO, &old_tio);
 	new_tio = old_tio;

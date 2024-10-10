@@ -327,6 +327,7 @@ extern (D) unittest {
 }
 
 /// Print options
+/// Params: options = CLI options.
 void getoptprinter(immutable(option_t)[] options) {
 	static immutable int padding = -17;
 	foreach (ref option; options) { with (option)
@@ -365,10 +366,12 @@ private void getoptaddextra(int argc, const(char)* extra) {
 	getoptextras[getoptextrascnt] = null;
 }
 /// Get remaining arguments
+/// Returns: Extra arguments.
 const(char)** getoptleftovers() {
 	return getoptextras;
 }
 /// Get remaining argument count
+/// Returns: Extra argument count.
 int getoptleftcount() {
 	return getoptextrascnt;
 }
@@ -379,6 +382,7 @@ private enum GETOPTBFSZ = 256;
 private __gshared char* getopterrbuf;
 
 /// Get getopt error message
+/// Returns: Error message.
 const(char)* getopterror() {
 	return getopterrbuf ? getopterrbuf : "No errors occured";
 }

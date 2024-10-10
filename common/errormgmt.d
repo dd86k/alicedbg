@@ -43,7 +43,7 @@ void panic(int code, const(char)* message,
 void panic_crt(const(char)* prefix = null, const(char)* mod = __MODULE__.ptr, int line = __LINE__) {
 	panic(errno, strerror(errno), prefix, mod, line);
 }
-void panic_adbg(const(char)* prefix = null, const(char)* mod = __MODULE__.ptr, int line = __LINE__) {
+void panic_adbg(const(char)* prefix = null, const(char)* mod = __MODULE__.ptr) {
 	const(adbg_error_t)* e = adbg_error_current();
 	panic(adbg_errno(), adbg_error_message(), prefix, e.func, e.line);
 }

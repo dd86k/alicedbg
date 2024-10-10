@@ -85,6 +85,8 @@ enum option_ver        = option_t(0,   "ver",	"Show only the version string and 
 enum option_license    = option_t(0,   "license",	"Show the license page and exit", &cli_license);
 
 /// Is user asking for help with this option?
+/// Params: query = Value input.
+/// Returns: true on "help".
 bool wantsHelp(const(char) *query) {
 	return strcmp(query, "help") == 0;
 }

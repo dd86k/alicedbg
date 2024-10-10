@@ -6,10 +6,16 @@
 module adbg.utils.math;
 
 /// Choose the highest number.
+/// Params:
+/// 	a = Number 1.
+/// 	b = Number 2.
 template MAX(size_t a, size_t b) {
 	enum MAX = a >= b ? a : b;
 }
 /// Choose the lowest number.
+/// Params:
+/// 	a = Number 1.
+/// 	b = Number 2.
 template MIN(size_t a, size_t b) {
 	enum MIN = a <= b ? a : b;
 }
@@ -40,14 +46,17 @@ extern (D) unittest {
 }
 
 /// Make a constant binary size (base 1024^3).
+/// Params: a = Base size.
 template GiB(int a) {
 	enum ulong GiB = a * 1024L * 1024L * 1024L;
 }
 /// Make a constant binary size (base 1024^2).
+/// Params: a = Base size.
 template MiB(int a) {
 	enum ulong MiB = a * 1024L * 1024L;
 }
 /// Make a constant binary size (base 1024^1).
+/// Params: a = Base size.
 template KiB(int a) {
 	enum ulong KiB = a * 1024L;
 }
