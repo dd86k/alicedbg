@@ -9,7 +9,6 @@ import adbg.process.base : AdbgProcStatus, adbg_process_t;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import core.stdc.string : memcpy;
-import core.stdc.config : c_long;
 import adbg.error;
 import adbg.utils.math; // For MiB template
 
@@ -28,6 +27,7 @@ version (Windows) {
 	import adbg.include.c.stdio : snprintf, sscanf;
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd : sysconf, read, write, ssize_t, _SC_PAGESIZE;
+	import core.stdc.config : c_long;
 	
 	version (linux)
 		import core.stdc.errno : errno;

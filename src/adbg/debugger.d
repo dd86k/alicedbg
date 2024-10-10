@@ -25,7 +25,6 @@ import adbg.utils.strings;
 
 version (Windows) {
 	import adbg.include.windows.wow64apiset;
-	import adbg.include.windows.psapi_dyn;
 	import adbg.include.windows.winnt;
 	import core.sys.windows.winbase;
 	import adbg.machines;
@@ -40,14 +39,8 @@ version (Windows) {
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
 	import adbg.include.posix.sys.wait;
-	import adbg.utils.math;
-	import core.stdc.ctype : isdigit;
 	import core.stdc.errno;
 	import core.sys.posix.fcntl;
-	import core.sys.posix.dirent;
-	import core.sys.posix.libgen : basename;
-	import adbg.include.c.stdio;  // snprintf;
-	import adbg.platform : ADBG_CHILD_STACK_SIZE;
 	
 	version (USE_CLONE)
 		import adbg.include.posix.mann;

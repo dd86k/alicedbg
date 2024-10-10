@@ -11,21 +11,17 @@ import adbg.machines : AdbgMachine;
 import adbg.error;
 import adbg.process.base;
 import adbg.utils.list;
-import core.stdc.stdlib : malloc, free;
 import core.stdc.stdio : snprintf;
 
 version (Windows) {
 	import adbg.include.windows.tlhelp32;
 	import adbg.include.windows.wow64apiset;
 	import adbg.include.windows.winnt;
-	import core.sys.windows.basetsd;
 	import core.sys.windows.winbase;
-	import core.sys.windows.windef;
 } else version (linux) {
 	import adbg.include.linux.ptrace;
 	import adbg.include.linux.user;
 	import core.stdc.ctype : isdigit;
-	import core.stdc.stdio : snprintf;
 	import core.stdc.stdlib : atoi;
 	import core.sys.posix.dirent;
 	import core.sys.posix.libgen : basename;

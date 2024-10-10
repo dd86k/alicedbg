@@ -53,6 +53,7 @@ debug enum FULL_VERSION = ADBG_VERSION~"+"~__BUILDTYPE__; /// Full version strin
 else  enum FULL_VERSION = ADBG_VERSION; /// Ditto
 
 /// Turns a __VERSION__ number into a string constant
+/// Params: ver = version value
 template DSTRVER(uint ver) {
 	enum DSTRVER =
 		cast(char)((ver / 1000) + '0') ~ "." ~

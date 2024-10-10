@@ -16,30 +16,19 @@ module adbg.process.base;
 import adbg.include.c.stdlib; // malloc, calloc, free, exit;
 import adbg.include.c.stdarg;
 import adbg.error;
-import adbg.process.exception : adbg_exception_t, adbg_exception_translate;
 import adbg.machines;
-import adbg.utils.strings;
 import adbg.utils.list;
-import core.stdc.string;
+import core.stdc.string : memset;
 
 version (Windows) {
-	import adbg.include.windows.wow64apiset;
-	import adbg.include.windows.psapi_dyn;
-	import adbg.include.windows.winnt;
 	import adbg.include.windows.winbase;
 	import adbg.include.windows.tlhelp32;
 } else version (Posix) {
-	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
-	import adbg.include.posix.sys.wait;
-	import adbg.utils.math;
 	import core.stdc.ctype : isdigit;
-	import core.stdc.errno;
 	import core.sys.posix.fcntl;
 	import core.sys.posix.dirent;
-	import core.sys.posix.libgen : basename;
 	import adbg.include.c.stdio;  // snprintf;
-	import adbg.platform : ADBG_CHILD_STACK_SIZE;
 	import adbg.include.linux.personality;
 }
 
