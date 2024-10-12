@@ -64,12 +64,20 @@ private enum MINIMUM_SIZE = 0x1000; // Due to paging
 private enum LIMIT_FAT_ARCH = 200;
 private enum LIMIT_COMMANDS = 2000;
 
+/*
 enum MACHO_MAGIC	= 0xFEEDFACEu; /// Mach-O BE 32-bit magic
 enum MACHO_MAGIC64	= 0xFEEDFACFu; /// Mach-O BE 64-bit magic
 enum MACHO_CIGAM	= 0xCEFAEDFEu; /// Mach-O LE 32-bit magic
 enum MACHO_CIGAM64	= 0xCFFAEDFEu; /// Mach-O LE 64-bit magic
 enum MACHO_FATMAGIC	= 0xCAFEBABEu; /// Mach-O FAT BE magic
 enum MACHO_FATCIGAM	= 0xBEBAFECAu; /// Mach-O FAT LE magic
+*/
+enum MACHO_MAGIC	= I32!(0xfe, 0xed, 0xfa, 0xce); /// Mach-O 32-bit magic
+enum MACHO_MAGIC64	= I32!(0xfe, 0xed, 0xfa, 0xcf); /// Mach-O 64-bit magic
+enum MACHO_CIGAM	= I32!(0xce, 0xfa, 0xed, 0xfe); /// Mach-O 32-bit inverted magic
+enum MACHO_CIGAM64	= I32!(0xcf, 0xfa, 0xed, 0xfe); /// Mach-O 64-bit inverted magic
+enum MACHO_FATMAGIC	= I32!(0xca, 0xfe, 0xba, 0xbe); /// Mach-O FAT BE magic
+enum MACHO_FATCIGAM	= I32!(0xbe, 0xba, 0xfe, 0xca); /// Mach-O FAT LE magic
 
 alias cpu_type_t = int;
 enum {
@@ -564,31 +572,32 @@ int adbg_object_macho_load(adbg_object_t *o, uint magic) {
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
 	
+	// TODO: Fix dumb hack depending on endianness
 	// Bit messy but can be made better later
 	size_t size = void;
 	switch (magic) {
-	case MACHO_MAGIC:	// 32-bit LE
-		size = macho_header_t.sizeof;
-		break;
-	case MACHO_MAGIC64:	// 64-bit LE
-		size = macho_header_t.sizeof;
-		o.status |= MACHO_IS_64;
-		break;
-	case MACHO_CIGAM:	// 32-bit BE
+	case MACHO_MAGIC:	// 32-bit BE
 		size = macho_header_t.sizeof;
 		o.status |= AdbgObjectInternalFlags.reversed;
 		break;
-	case MACHO_CIGAM64:	// 64-bit BE
+	case MACHO_MAGIC64:	// 64-bit BE
 		size = macho_header_t.sizeof;
 		o.status |= AdbgObjectInternalFlags.reversed | MACHO_IS_64;
 		break;
+	case MACHO_CIGAM:	// 32-bit LE
+		size = macho_header_t.sizeof;
+		break;
+	case MACHO_CIGAM64:	// 64-bit LE
+		size = macho_header_t.sizeof;
+		o.status |= MACHO_IS_64;
+		break;
 	case MACHO_FATMAGIC:	// Fat LE
 		size = macho_fat_header_t.sizeof;
-		o.status |= MACHO_IS_FAT;
+		o.status |= AdbgObjectInternalFlags.reversed | MACHO_IS_FAT;
 		break;
 	case MACHO_FATCIGAM:	// Fat BE
 		size = macho_fat_header_t.sizeof;
-		o.status |= AdbgObjectInternalFlags.reversed | MACHO_IS_FAT;
+		o.status |= MACHO_IS_FAT;
 		break;
 	default: // Unless loader gave a new signature?
 		return adbg_oops(AdbgError.objectMalformed);
@@ -602,15 +611,18 @@ int adbg_object_macho_load(adbg_object_t *o, uint magic) {
 	
 	// If fields need to be swapped
 	with (cast(internal_macho_t*)o.internal)
-	if (o.status & (AdbgObjectInternalFlags.reversed | MACHO_IS_FAT)) {
-		fat_header.nfat_arch = adbg_bswap32(fat_header.nfat_arch);
-	} else if (o.status & AdbgObjectInternalFlags.reversed) {
-		header.cputype = adbg_bswap32(header.cputype);
-		header.subtype = adbg_bswap32(header.subtype);
-		header.filetype = adbg_bswap32(header.filetype);
-		header.ncmds = adbg_bswap32(header.ncmds);
-		header.sizeofcmds = adbg_bswap32(header.sizeofcmds);
-		header.flags = adbg_bswap32(header.flags);
+	if (o.status & AdbgObjectInternalFlags.reversed) {
+		if (o.status & MACHO_IS_FAT) {
+			fat_header.nfat_arch = adbg_bswap32(fat_header.nfat_arch);
+		} else {
+			header.cputype = adbg_bswap32(header.cputype);
+			header.subtype = adbg_bswap32(header.subtype);
+			header.filetype = adbg_bswap32(header.filetype);
+			header.ncmds = adbg_bswap32(header.ncmds);
+			header.sizeofcmds = adbg_bswap32(header.sizeofcmds);
+			header.flags = adbg_bswap32(header.flags);
+			
+		}
 	}
 	
 	return 0;
@@ -1267,7 +1279,6 @@ const(char)* adbg_object_macho_kind_string(adbg_object_t *o) {
 	}
 	
 	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
-	
 	if (o.status & MACHO_IS_FAT) return `Fat Executable`;
 	return adbg_object_macho_filetype_string(internal.header.filetype);
 }

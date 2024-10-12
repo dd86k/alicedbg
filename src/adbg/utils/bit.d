@@ -37,15 +37,22 @@ extern (D) unittest {
 }
 
 // Form a ushort from byte values
-template I16(ubyte b1, ubyte b2) {
+template I16(ubyte a, ubyte b) {
 	version (BigEndian)
-		enum ushort I16 = (b1 << 8) | b2;
+		enum ushort I16 = (a << 8) | b;
 	else
-		enum ushort I16 = (b2 << 8) | b1;
+		enum ushort I16 = (b << 8) | a;
 }
 extern (D) unittest {
 	version (BigEndian) assert(I16!(0xaa, 0xbb) == 0xaabb);
 	else                assert(I16!(0xaa, 0xbb) == 0xbbaa);
+}
+
+template I32(ubyte a, ubyte b, ubyte c, ubyte d) {
+	version (BigEndian)
+		enum uint I32 = (a << 24) | (b << 16) | (c << 8) | d;
+	else
+		enum uint I32 = (d << 24) | (c << 16) | (b << 8) | a;
 }
 
 // Form an array using a 16-bit number
