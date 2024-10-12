@@ -14,7 +14,7 @@ import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.process.base : adbg_process_t;
 import adbg.process.memory : adbg_memory_read;
-import adbg.machines : AdbgMachine;
+import adbg.machines : AdbgMachine, adbg_machine_current;
 import core.stdc.string : memcpy;
 import core.stdc.stdlib : malloc, free;
 
@@ -49,45 +49,6 @@ import core.stdc.stdlib : malloc, free;
 //       buffer when this happens.
 /// Maximum instruction size in bytes.
 enum MAX_INSTR_SIZE = 24;
-
-version (X86) { // CS_OPT_SYNTAX_DEFAULT
-	private enum {
-		CS_DEFAULT_PLATFORM = CS_ARCH_X86,	/// Platform default platform
-		CS_DEFAULT_MODE = CS_MODE_32,	/// Platform default platform
-	}
-} else version (X86_64) {
-	private enum {
-		CS_DEFAULT_PLATFORM = CS_ARCH_X86,	/// Ditto
-		CS_DEFAULT_MODE = CS_MODE_64,	/// Ditto
-	}
-} else version (Thumb) {
-	private enum {
-		CS_DEFAULT_PLATFORM = CS_ARCH_ARM,	/// Ditto
-		CS_DEFAULT_MODE = CS_MODE_THUMB,	/// Ditto
-	}
-} else version (ARM) {
-	private enum {
-		CS_DEFAULT_PLATFORM = CS_ARCH_ARM,	/// Ditto
-		CS_DEFAULT_MODE = CS_MODE_V8, // or CS_MODE_ARM?,	/// Ditto
-	}
-} else version (AArch64) {
-	private enum {
-		CS_DEFAULT_PLATFORM = CS_ARCH_ARM64,	/// Ditto
-		CS_DEFAULT_MODE = CS_MODE_ARM,	/// Ditto
-	}
-} else version (RISCV32) {
-	private enum {
-		CS_DEFAULT_PLATFORM = -3,	/// Ditto
-		CS_DEFAULT_MODE = -3,	/// Ditto
-	}
-} else version (RISCV64) {
-	private enum {
-		CS_DEFAULT_PLATFORM = -1,	/// Ditto
-		CS_DEFAULT_MODE = -3,	/// Ditto
-	}
-} else {
-	static assert(0, "Set DEFAULT_PLATFORM and DEFAULT_SYNTAX");
-}
 
 private {
 	enum ADBG_MAGIC = 0xcafebabe;
@@ -194,8 +155,7 @@ struct dismachine_t {
 	int cs_arch;
 	int cs_mode;
 }
-
-private // "works" here means that the MODE values work for CS with a sample
+private // "works": MODE values worked with a sample
 immutable dismachine_t[] machmap_capstone = [
 	{ AdbgMachine.i8086,	CS_ARCH_X86,	CS_MODE_16 }, // works
 	{ AdbgMachine.i386,	CS_ARCH_X86,	CS_MODE_32 }, // works
@@ -221,11 +181,11 @@ immutable dismachine_t[] machmap_capstone = [
 // Platform to CS' ARCH and MODE types
 private
 int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
-	if (platform == AdbgMachine.unknown) {
-		cs_arch = CS_DEFAULT_PLATFORM;
-		cs_mode = CS_DEFAULT_MODE;
-		return 0;
-	}
+	// If no architecture specified, get target default
+	if (platform == AdbgMachine.unknown)
+		platform = adbg_machine_current();
+	
+	// Get matching available architecture
 	foreach (ref immutable(dismachine_t) dismach; machmap_capstone) {
 		if (platform != dismach.mach)
 			continue;
@@ -233,6 +193,7 @@ int adbg_dis_lib_a2cs(ref int cs_arch, ref int cs_mode, AdbgMachine platform) {
 		cs_mode = dismach.cs_mode;
 		return 0;
 	}
+	
 	return adbg_oops(AdbgError.disasmUnsupportedMachine);
 }
 
