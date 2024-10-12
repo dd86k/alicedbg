@@ -20,7 +20,6 @@ import core.stdc.stdlib : malloc, free;
 
 // TODO: Function to format machine code
 // TODO: Redo Disassembler API
-//       - Rename prefix to adbg_disasm_
 //       - adbg_disasm_open
 //       - adbg_disasm_close
 //       - adbg_disasm_supported_machines
@@ -29,7 +28,7 @@ import core.stdc.stdlib : malloc, free;
 //       - adbg_disasm_buffer_stepin
 //       - adbg_disasm (with buffer and its length)
 //       - Move process wrappers to debugger module
-//         - adbg_debugger_disassemble_at(memoryloc)
+//         - adbg_debugger_disassemble_at(process, location, opcode)
 
 // NOTE: Longest architectural instruction contest
 //       x86: 15 bytes
@@ -338,7 +337,7 @@ int adbg_dis_step(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 	
 	version (Trace) trace("buffer_size=%u", cast(uint)dasm.buffer_size);
 	
-	opcode.address = dasm.address_base; // Save before CS modifies it
+	opcode.address = dasm.address_base; // Save address before CS modifies it
 	
 	//TODO: Consider replacing mnemonic by "error" or "illegal"
 	//      Needs to be something specific (e.g., .bytes 0x11 0x22)
@@ -352,11 +351,8 @@ int adbg_dis_step(adbg_disassembler_t *dasm, adbg_opcode_t *opcode) {
 		if (cs_errno(dasm.cs_handle) != CS_ERR_OK)
 			return adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
 		
-		// NOTE: Can't reliably check buffer_size left.
-		
-		// Can't decode instruction but no errors happened?
-		// If there were no other instructions decoded, must be illegal
-		if (dasm.decoded_count == 0)
+		// No length: Error.
+		if (dasm.cs_inst.size == 0)
 			return adbg_oops(AdbgError.disasmIllegalInstruction);
 		
 		return adbg_oops(AdbgError.disasmEndOfData);

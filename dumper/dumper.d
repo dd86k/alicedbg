@@ -571,7 +571,8 @@ Ldisasm:
 		goto Ldisasm;
 	case disasmIllegalInstruction:
 		print_disasm_line(&op, "illegal");
-		goto Ldisasm;
+		// NOTE: No instruction length on error, so exit.
+		return 0;
 	case disasmEndOfData:
 		return 0;
 	default:

@@ -2263,8 +2263,8 @@ AdbgMachine adbg_object_pe_machine_value(uint machine) {
 	case PE_MACHINE_MIPS16:	return AdbgMachine.mips16;
 	case PE_MACHINE_MIPSFPU:	return AdbgMachine.mipsfpu;
 	case PE_MACHINE_MIPSFPU16:	return AdbgMachine.mips16fpu;
-	case PE_MACHINE_POWERPC:	return AdbgMachine.ppc;
-	case PE_MACHINE_POWERPCFP:	return AdbgMachine.ppcfpu;
+	case PE_MACHINE_POWERPC, PE_MACHINE_POWERPCFP:
+		return AdbgMachine.ppcle;
 	case PE_MACHINE_R3000:	return AdbgMachine.mips;
 	case PE_MACHINE_R4000:	return AdbgMachine.mipsii;
 	case PE_MACHINE_R10000:	return AdbgMachine.mipsiv;
