@@ -26,6 +26,7 @@ version (Windows) {
 	import core.sys.posix.dirent;
 	import core.sys.posix.libgen : basename;
 } else version (FreeBSD) {
+	import core.stdc.stdlib : malloc, free;
 	import adbg.include.freebsd.ptrace;
 	import adbg.include.freebsd.reg;
 	import core.sys.posix.sys.types : pid_t;

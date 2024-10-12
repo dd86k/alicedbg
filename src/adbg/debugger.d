@@ -44,6 +44,12 @@ version (Windows) {
 	
 	version (USE_CLONE)
 		import adbg.include.posix.mann;
+	
+	version (FreeBSD) {
+		// pragma(mangle, "stat@FBSD_1.5")
+		// leads to incorrect linked version
+		extern (C) int stat(const scope char*, stat_t*);
+	}
 }
 
 extern (C):
