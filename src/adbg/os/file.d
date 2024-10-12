@@ -62,6 +62,12 @@ version (Windows) {
 	private extern (C) int ioctl(int,off_t,...);
 	
 	private alias OSHANDLE = int;
+	
+	version (FreeBSD) {
+		// pragma(mangle, "fstat@FBSD_1.5")
+		// leads to incorrect linked version
+		extern (C) int fstat(int, stat_t*);
+	}
 }
 
 import adbg.error;
