@@ -52,7 +52,8 @@ enum AdbgMachine {
 	/// Arm AArch64/A64
 	aarch64,
 	/// ARM64EC: Compiled-Hybrid Portable Executable, Microsoft extension
-	arm64x,
+	arm64ec,
+	arm64x = arm64ec, /// Alias for arm64ec
 	
 	/// IBM ROMP
 	romp,
@@ -93,8 +94,10 @@ enum AdbgMachine {
 	/// RISC-V RV128
 	riscv128,
 	
-	// NOTE: MIPS32 is based on MIPS II with features from III, IV, and V
-	// NOTE: MIPS64 support could be added with, for example, "mipsii64"
+	// Could consider adding the following:
+	// MIPS32 "mips32" is based on MIPS II with features from III, IV, and V
+	// MIPS64 "mips64"
+	// microMIPS "umips"
 	
 	/// Stanford MIPS-X
 	mipsx,
@@ -131,8 +134,7 @@ enum AdbgMachine {
 	/// Motorola 68000
 	m68k,
 	/// Motorola 88000
-	m88k,
-	// NOTE: MC98000 *is* PowerPC
+	m88k, // NOTE: MC98000 *is* PowerPC
 	/// Motorola 68HC05
 	m68hc05,
 	/// Motorola 68HC08

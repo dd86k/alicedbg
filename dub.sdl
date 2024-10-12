@@ -141,15 +141,15 @@ buildType "debug" {
 # Compile in release mode.
 buildType "release" {
 	versions "Release"
-	buildOptions "releaseMode" "optimize"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck"
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
 }
 
-# Compile in release mode with no bound checking.
-buildType "release-nobounds" {
-	versions "Release" "ReleaseNobounds"
-	buildOptions "releaseMode" "optimize" "noBoundsCheck"
+# Compile in release mode with debug info.
+buildType "release-debug" {
+	versions "Release"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck" "debugInfo"
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
 }
@@ -160,17 +160,17 @@ buildType "release-nobounds" {
 
 # Compile in release mode as statically linked.
 buildType "release-static" {
-	versions "Release" "ReleaseNobounds"
-	buildOptions "releaseMode" "optimize"
+	versions "Release"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck"
 	dflags "-betterC" "-L=-static" platform="dmd"
 	dflags "-fno-druntime" "-Wl,-static" platform="gdc"
 	dflags "-betterC" "--static" platform="ldc"
 }
 
-# Compile in release mode with no bound checking as statically linked.
-buildType "release-nobounds-static" {
-	versions "Release" "ReleaseNobounds"
-	buildOptions "releaseMode" "optimize" "noBoundsCheck"
+# Compile in release mode as statically linked.
+buildType "release-debug-static" {
+	versions "Release"
+	buildOptions "releaseMode" "optimize" "noBoundsCheck" "debugInfo"
 	dflags "-betterC" "-L=-static" platform="dmd"
 	dflags "-fno-druntime" "-Wl,-static" platform="gdc"
 	dflags "-betterC" "--static" platform="ldc"
