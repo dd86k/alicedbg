@@ -7,7 +7,7 @@ module common.cli;
 
 import adbg.platform;
 import adbg.machines;
-import adbg.disassembler : AdbgDisSyntax, adbg_dis_machines;
+import adbg.disassembler;
 import adbg.include.capstone : libcapstone_dynload, cs_version;
 import adbg.include.c.stdlib : exit;
 import adbg.include.d.config : GDC_VERSION, GDC_EXCEPTION_MODE, LLVM_VERSION;
@@ -68,7 +68,7 @@ __gshared {
 	/// Machine option
 	AdbgMachine opt_machine;
 	/// Disassembler syntax option
-	AdbgDisSyntax opt_syntax;
+	AdbgDisassemblerSyntax opt_syntax;
 }
 
 /// Default option for --machine
@@ -99,10 +99,10 @@ private:
 
 int cli_march(const(char) *val) {
 	if (wantsHelp(val)) {
-		puts("Available machine architectures:");
-		immutable(AdbgMachine)* mach = void;
-		for (size_t i; (mach = adbg_dis_machines(i++)) != null;) {
-			immutable(adbg_machine_t)* m = adbg_machine(*mach);
+		puts("Available machine architectures for disassembly:");
+		immutable(AdbgMachine)* mach = adbg_disassembler_machines();
+		for (size_t i; mach[i]; ++i) {
+			immutable(adbg_machine_t)* m = adbg_machine(mach[i]);
 			printf("- %*s", -8, m.alias1);
 			if (m.alias2) printf(" (%s)", m.alias2);
 			else          putchar('\t');
@@ -123,12 +123,12 @@ int cli_march(const(char) *val) {
 //
 
 struct setting_syntax_t {
-	AdbgDisSyntax val;
+	AdbgDisassemblerSyntax val;
 	const(char)* opt, desc;
 }
 immutable setting_syntax_t[] syntaxes = [
-	{ AdbgDisSyntax.att,   "att",   "AT&T syntax" },
-	{ AdbgDisSyntax.intel, "intel", "Intel syntax" },
+	{ AdbgDisassemblerSyntax.att,   "att",   "AT&T syntax" },
+	{ AdbgDisassemblerSyntax.intel, "intel", "Intel syntax" },
 ];
 
 int cli_syntax(const(char) *val) {

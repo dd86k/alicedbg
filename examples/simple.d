@@ -41,13 +41,22 @@ void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
 		
 		// If disassembler is available, disassemble one instruction
 		if (ex.faultz && dis) {
-			adbg_opcode_t op = void;
-			if (adbg_dis_process_once(dis, &op, proc, ex.fault_address))
-				printf(` nodisasm="%s"`, adbg_error_message);
-			else if (op.operands)
-				printf(` disasm="%s %s"`, op.mnemonic, op.operands);
-			else
-				printf(` disasm="%s"`, op.mnemonic);
+			adbg_opcode_t opcode = void;
+			enum BSZ = 32; ubyte[BSZ] buffer = void;
+			if (adbg_memory_read(proc, ex.faultz, buffer.ptr, BSZ))
+				goto Lnodisasm;
+			if (adbg_disassemble(dis, &opcode, buffer.ptr, BSZ, ex.fault_address))
+				goto Lnodisasm;
+			
+			goto Ldisasm;
+		Lnodisasm:
+			printf(` nodisasm="%s"`, adbg_error_message());
+			goto Ldone;
+		Ldisasm:
+			printf(` disasm="%s`, op.mnemonic);
+			if (op.operands) printf(` %s"`, op.operands);
+			putchar('"');
+		Ldone:
 		}
 		
 		switch (ex.type) with (AdbgException) {
@@ -96,7 +105,7 @@ int main(int argc, const(char) **argv) {
 	if (process == null)
 		oops;
 	
-	dis = adbg_dis_open(adbg_process_machine(process));
+	dis = adbg_disassembler_open(adbg_process_machine(process));
 	if (dis == null)
 		printf("* warning=\"Disassembler unavailable: %s\"\n", adbg_error_message());
 	

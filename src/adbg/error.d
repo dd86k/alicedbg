@@ -129,9 +129,9 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	{ AdbgError.invalidArgument,	"Invalid or missing parameter value." },
 	{ AdbgError.emptyArgument,	"Parameter is empty." },
-	{ AdbgError.uninitiated,	"Object or structure requires to be initialized first." },
-	{ AdbgError.invalidOption,	"Option unknown." },
-	{ AdbgError.invalidValue,	"Option received invalid value." },
+	{ AdbgError.uninitiated,	"Instance requires to be initialized first." },
+	{ AdbgError.invalidOption,	"Unknown option." },
+	{ AdbgError.invalidValue,	"Received invalid value for option." },
 	{ AdbgError.offsetBounds,	"Offset outside range." },
 	{ AdbgError.indexBounds,	"Index outside range." },
 	{ AdbgError.unavailable,	"Feature or item is unavailable." },

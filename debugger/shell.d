@@ -550,7 +550,7 @@ int shell_spawn(const(char) *exec, const(char) **argv) {
 	putchar('\n');
 	
 	// Open disassembler for process machine type
-	dis = adbg_dis_open(adbg_process_machine(process));
+	dis = adbg_disassembler_open(adbg_process_machine(process));
 	if (dis == null)
 		logwarn("Disassembler not available (%s)", adbg_error_message());
 	
@@ -569,10 +569,11 @@ int shell_attach(int pid) {
 	loginfo("Debugger attached.");
 	
 	// Open disassembler for process machine type
-	dis = adbg_dis_open(adbg_process_machine(process));
-	if (dis) {
-		if (opt_syntax)
-			adbg_dis_options(dis, AdbgDisOpt.syntax, opt_syntax, 0);
+	dis = adbg_disassembler_open(adbg_process_machine(process));
+	if (dis && opt_syntax) {
+		adbg_disassembler_options(dis,
+			AdbgDisassemblerOption.syntax, opt_syntax,
+			0);
 	} else {
 		logwarn("Disassembler not available (%s)\n",
 			adbg_error_message());
@@ -581,46 +582,38 @@ int shell_attach(int pid) {
 	return 0;
 }
 
-void shell_event_disassemble(size_t address, int count = 1, bool showAddress = true) {
-	if (dis == null)
-		return;
+// TODO: Move as common.disassembler module
+int shell_disassemble(size_t address, int *opsize,
+	char *addressbuf, size_t addresslen,
+	char *machinebuf, size_t machinelen,
+	const(char) **mnemonic, const(char) **operands) {
+	if (addressbuf)
+		snprintf(addressbuf, addresslen, "%#zx", address);
 	
-	enum MBUFSZ = 64; /// Machine string buffer size
+	// TODO: Maximum opcode size per architecture
+	ubyte[OPCODE_BUFSIZE] buffer = void;
+	if (adbg_memory_read(process, address, buffer.ptr, OPCODE_BUFSIZE))
+		return adbg_errno();
 	
-	ubyte[MAX_INSTR_SIZE] data = void; /// Main input buffer
-	char[MBUFSZ] machbuf = void; /// Formatted machine codes buffer
-	for (int i; i < count; ++i) {
-		if (adbg_memory_read(process, address, data.ptr, MAX_INSTR_SIZE)) {
-			print_error_adbg();
-			return;
+	adbg_opcode_t op = void;
+	int err = adbg_disassemble(dis, &op, buffer.ptr, OPCODE_BUFSIZE);
+	
+	if (opsize) *opsize = op.size;
+	
+	if (machinebuf) {
+		for (size_t i, b; i < op.size && b < machinelen; ++i) {
+			if (i) {
+				machinebuf[b++] = ' ';
+				if (b >= machinelen) break;
+			}
+			b += snprintf(machinebuf + b, machinelen - b, "%02x", op.machine[i]);
 		}
-		adbg_opcode_t op = void;
-		if (adbg_dis_once(dis, &op, data.ptr, MAX_INSTR_SIZE)) {
-			printf("%8llx (error:%s)\n", cast(ulong)address, adbg_error_message());
-			return;
-		}
-		
-		// Print address
-		if (showAddress)
-			printf("%zx ", address);
-		
-		// Print machine bytes into a dedicated buffer
-		size_t bo;
-		for (size_t bi; bi < op.size && bo < MBUFSZ; ++bi)
-			bo += snprintf(machbuf.ptr + bo, MBUFSZ - bo, " %02x", op.machine[bi]);
-		
-		// Print opcodes and mnemonic
-		printf("%*s  %s", -(10 * 3), machbuf.ptr, op.mnemonic);
-		
-		// Print operands, if any
-		if (op.operands)
-			printf("\t%s", op.operands);
-		
-		// Terminate line
-		putchar('\n');
-		
-		address += op.size;
 	}
+	
+	if (mnemonic) *mnemonic = op.mnemonic;
+	if (operands) *operands = op.operands ? op.operands : "";
+	
+	return err;
 }
 
 void shell_event_debugger(adbg_process_t *proc, int event, void *edata, void *udata) {
@@ -648,36 +641,14 @@ void shell_event_debugger(adbg_process_t *proc, int event, void *edata, void *ud
 		
 		printf("	Address : 0x%llx\n", ex.fault_address);
 		
-		// No disassembler available
-		if (dis == null)
+		char[32] machbuf = void;
+		const(char) *mnemonic = void;
+		const(char) *operands = void;
+		if (shell_disassemble(ex.faultz, null, null, 0, machbuf.ptr, 32, &mnemonic, &operands))
 			return;
 		
-		printf("	Machine :");
-		
-		// Ready memory
-		ubyte[MAX_INSTR_SIZE] data = void;
-		if (adbg_memory_read(process, ex.faultz, data.ptr, MAX_INSTR_SIZE)) {
-			printf(" read error (%s)\n", adbg_error_message());
-			return; // Nothing else to do
-		}
-		
-		adbg_opcode_t op = void;
-		if (adbg_dis_once(dis, &op, data.ptr, MAX_INSTR_SIZE)) {
-			printf(" disassembly error (%s)\n", adbg_error_message());
-			return;
-		}
-		
-		// Print machine bytes
-		for (size_t bi; bi < op.size; ++bi) {
-			printf(" %02x", op.machine[bi]);
-		}
-		putchar('\n');
-		
-		// Print mnemonic
-		printf("	Mnemonic: %s", op.mnemonic);
-		if (op.operands)
-			printf(" %s", op.operands);
-		putchar('\n');
+		printf("	Machine : %s\n", machbuf.ptr);
+		printf("	Mnemonic: %s %s\n", mnemonic, operands);
 		return;
 	case processExit:
 		int *exitcode = cast(int*)(edata);
@@ -794,7 +765,7 @@ int command_detach(int argc, const(char) **argv) {
 	if (adbg_debugger_detach(process))
 		return ShellError.alicedbg;
 	
-	adbg_dis_close(dis);
+	adbg_disassembler_close(dis);
 	return 0;
 }
 
@@ -829,7 +800,7 @@ int command_kill(int argc, const(char) **argv) {
 	if (adbg_debugger_terminate(process))
 		return ShellError.alicedbg;
 	loginfo("Process killed");
-	adbg_dis_close(dis);
+	adbg_disassembler_close(dis);
 	return 0;
 }
 
@@ -843,9 +814,8 @@ int command_stepi(int argc, const(char) **argv) {
 }
 
 int command_memory(int argc, const(char) **argv) {
-	if (argc < 2) {
+	if (argc < 2)
 		return ShellError.missingOption;
-	}
 	
 	long uaddress = void;
 	if (unformat64(&uaddress, argv[1]))
@@ -962,7 +932,25 @@ int command_disassemble(int argc, const(char) **argv) {
 	if (ucount < 1)
 		return ShellError.invalidCount;
 	
-	shell_event_disassemble(cast(size_t)uaddress, ucount);
+	int size = void;
+	enum ADSZ = 12; char[ADSZ] address = void;
+	enum MASZ = 24; char[MASZ] machine = void;
+	const(char) *mnemonic = void;
+	const(char) *operands = void;
+	int spacing = adbg_disassembler_max_opcode_size(dis) * 2;
+	assert(spacing > 0);
+	for (int c; c < ucount; ++c) {
+		printf("%8llx ", uaddress);
+		if (shell_disassemble(
+			cast(size_t)uaddress, &size,
+			address.ptr, ADSZ, machine.ptr, MASZ,
+			&mnemonic, &operands)) { // error
+			printf("%*s  %s\n", spacing, machine.ptr, adbg_error_message());
+			break;
+		}
+		printf("%*s  %s\t%s\n", spacing, machine.ptr, mnemonic, operands);
+		uaddress += size;
+	}
 	return 0;
 }
 

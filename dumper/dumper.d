@@ -226,15 +226,12 @@ void print_section(uint i, const(char) *name = null, int len = 0) {
 	putchar('\n');
 	len ? print_u32l("index", i, name, len) : print_u32("index", i, name);
 }
-void print_disasm_line(adbg_opcode_t *op, const(char)* msg = null) {
+void print_disasm_line(adbg_disassembler_t *dis, adbg_opcode_t *op) {
 	// Print address
 	printf("%12llx ", op.address);
 	
-	// If opcode is empty, somehow, print message if available
-	if (op.size == 0) {
-		puts(msg ? msg : "empty");
-		return;
-	}
+	int spacing = adbg_disassembler_max_opcode_size(dis) * 2;
+	assert(spacing > 0);
 	
 	// Format and print machine bytes
 	enum MBFSZ = (16 * 3) + 2; // Enough for 16 bytes and spaces
@@ -248,17 +245,9 @@ void print_disasm_line(adbg_opcode_t *op, const(char)* msg = null) {
 		left -= l;
 	}
 	machine[tl] = 0;
-	printf("%*s ", -24, machine.ptr);
-	
-	// Print the more important message
-	if (msg) {
-		puts(msg);
-		return;
-	}
-	
-	printf(op.mnemonic);
-	if (op.operands) printf("\t%s", op.operands);
-	putchar('\n');
+	printf("%*s  ", -spacing, machine.ptr);
+	if (op.operands) printf("%*s %s\n", -10, op.mnemonic, op.operands);
+	else             puts(op.mnemonic);
 }
 
 void print_u8(const(char)* name, ubyte val, const(char) *meaning = null) {
@@ -517,17 +506,20 @@ int dump_disassemble_object(adbg_object_t *o,
 }
 
 int dump_disassemble(AdbgMachine machine, void* data, ulong size, ulong base_address) {
-	// Overrides
-	adbg_disassembler_t *dis = adbg_dis_open(opt_machine ? opt_machine : machine);
+	// opt_machine acts as an override
+	adbg_disassembler_t *dis = adbg_disassembler_open(opt_machine ? opt_machine : machine);
 	if (dis == null)
 		panic_adbg();
-	scope(exit) adbg_dis_close(dis);
+	scope(exit) adbg_disassembler_close(dis);
 	
 	if (opt_syntax)
-		adbg_dis_options(dis, AdbgDisOpt.syntax, opt_syntax, 0);
+		adbg_disassembler_options(dis,
+			AdbgDisassemblerOption.syntax, opt_syntax,
+			0);
 	
 	adbg_opcode_t op = void;
-	adbg_dis_start(dis, data, cast(size_t)size, base_address);
+	if (adbg_disassembler_buffer_start(dis, data, cast(size_t)size, base_address))
+		panic_adbg();
 	
 	// stats mode
 	if (SETTING(Setting.disasmStats)) {
@@ -536,24 +528,22 @@ int dump_disassemble(AdbgMachine machine, void* data, ulong size, ulong base_add
 		uint stat_max;	/// longest instruction size
 		uint stat_total;	/// total instruction count
 		uint stat_illegal;	/// Number of illegal instructions
-Lstat:
-		switch (adbg_dis_step(dis, &op)) with (AdbgError) {
-		case success:
-			stat_avg += op.size;
-			++stat_total;
-			if (op.size > stat_max) stat_max = op.size;
-			if (op.size < stat_min) stat_min = op.size;
-			goto Lstat;
-		case disasmIllegalInstruction:
-			stat_avg += op.size;
-			++stat_total;
-			++stat_illegal;
-			goto Lstat;
-		case disasmEndOfData: break;
-		default:
-			panic_adbg();
+	Lstat:
+		// TODO: print location of error
+		if (adbg_disassembler_buffer_step(dis, &op)) {
+			print_warningf(adbg_error_message());
+			goto Ldone;
 		}
 		
+		stat_avg += op.size;
+		++stat_total;
+		if (op.size > stat_max) stat_max = op.size;
+		if (op.size < stat_min) stat_min = op.size;
+		
+		if (adbg_disassembler_buffer_left(dis))
+			goto Lstat;
+		
+	Ldone:
 		print_f32("average", cast(float)stat_avg / stat_total, 2);
 		print_u32("shortest", stat_min);
 		print_u32("largest", stat_max);
@@ -563,20 +553,13 @@ Lstat:
 		return 0;
 	}
 	
-	// normal disasm mode
 Ldisasm:
-	switch (adbg_dis_step(dis, &op)) with (AdbgError) {
-	case success:
-		print_disasm_line(&op);
-		goto Ldisasm;
-	case disasmIllegalInstruction:
-		print_disasm_line(&op, "illegal");
-		// NOTE: No instruction length on error, so exit.
-		return 0;
-	case disasmEndOfData:
-		return 0;
-	default:
+	if (adbg_disassembler_buffer_step(dis, &op))
 		panic_adbg();
-		return 0;
-	}
+	
+	print_disasm_line(dis, &op);
+	
+	if (adbg_disassembler_buffer_left(dis))
+		goto Ldisasm;
+	return 0;
 }

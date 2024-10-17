@@ -1,7 +1,7 @@
 /// ptrace(3) bindings for macOS.
 ///
 /// Sources:
-/// - https://github.com/opensource-apple/xnu/blob/master/bsd/sys/ptrace.h
+/// - https://github.com/apple-oss-distributions/xnu/blob/master/bsd/sys/ptrace.h
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>

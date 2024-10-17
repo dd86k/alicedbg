@@ -10,6 +10,7 @@ import adbg.machines : adbg_machine_current;
 import adbg.disassembler;
 import adbg.process.base;
 import adbg.process.exception;
+import adbg.process.memory;
 import adbg.error;
 import core.stdc.string : strerror;
 import core.stdc.errno : errno;
@@ -73,27 +74,35 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 	"PID        : %d\n",
 	ex.oscode, adbg_exception_name(ex), adbg_process_pid(proc));
 	
+	// TODO: Get thread context
+	
 	// Fault address & disasm if available
 	if (ex.faultz) {
 		printf("Address    : %#zx\n", ex.faultz);
 		
+		ubyte[OPCODE_BUFSIZE] buffer = void;
 		adbg_opcode_t op = void;
-		adbg_disassembler_t *dis = adbg_dis_open(adbg_machine_current());
-		printf("Instruction:");
-		if (dis && adbg_dis_process_once(dis, &op, proc, ex.fault_address) == 0) {
-			// Print machine bytes
-			for (size_t bi; bi < op.size; ++bi)
-				printf(" %02x", op.machine[bi]);
-			printf(" (%s", op.mnemonic);
-			if (op.operands)
-				printf(" %s", op.operands);
-			puts(")");
-		} else {
-			printf(" Disassembly unavailable (%s)\n", adbg_error_message());
-		}
+		adbg_disassembler_t *dis = adbg_disassembler_open(adbg_machine_current());
+		if (dis == null)
+			goto Lunavail;
+		if (adbg_memory_read(proc, ex.faultz, buffer.ptr, OPCODE_BUFSIZE))
+			goto Lunavail;
+		if (adbg_disassemble(dis, &op, buffer.ptr, OPCODE_BUFSIZE))
+			goto Lunavail;
+		
+		printf("Instruction: ");
+		for (size_t bi; bi < op.size; ++bi)
+			printf(" %02x", op.machine[bi]);
+		printf(" (%s", op.mnemonic);
+		if (op.operands) printf(" %s", op.operands);
+		puts(")");
+		
+		goto Lcont;
+		
+	Lunavail:
+		printf(" Disassembly unavailable (%s)\n", adbg_error_message());
+	Lcont:
 	}
-	
-	// TODO: Get thread context
 	
 	//TODO: Option to attach debugger to this process
 	exit(ex.oscode);
