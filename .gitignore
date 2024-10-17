@@ -49,3 +49,9 @@ MSG
 # AFL stuff
 /testcases/
 /findings/
+
+# Nix Stuff
+/.direnv/
+/result
+!dub-lock.json
+!dub-lock-docs.json

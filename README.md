@@ -50,6 +50,78 @@ for compilation and unittesting.
 Wiki contains more information on structure, features, and compilation
 instructions.
 
+## Nix
+
+this project's flake exposes the following:
+
+(note that all instances of `.#` can be replaced with `github:dd86k/alicedbg#` to do so without needing to have a local copy of the repository)
+
+### DevShell
+
+a devshell providing locked versions of `dub`, `gdc`, `ldc` and `dmd`, along with a nix lsp and formatter can be accessed with:
+
+```
+nix develop .
+```
+
+and will automatically be entered if you have `direnv` configured.
+
+### Packages
+
+packages built with locked versions of dependencies and toolchains are exposed and can be built using a common identifier:
+
+given any combination of:
+
+buildType:
+- debug
+- debugv
+- release
+- release-nobounds
+- docs
+
+config:
+- debugger
+- dumper
+- simple
+- library
+- shared
+
+compiler:
+- ldc
+- dmd
+- gdc
+
+then the appropriate output can be built with:
+
+`nix build .#alicedbg-<buildType>-<config>-<compiler>`
+
+with the results appearing in the `./result`
+
+the default output is `alicedbg-release-debugger-ldc`
+
+### Tests
+
+running `nix flake check` will compile all combinations above with unittests turned on.
+
+`nix flake check .#alicedbg-<buildType>-<config>-<compiler>` will do so for a single output
+
+### Overlay
+
+a nixos overlay is exposed as `.#overlays.default`, which can be used to build all outputs using your own toolchain and versions instead of the ones locked here, all packages are avaliable under `pkgs.alicedbg` with the above names.
+
+### Updating
+
+to update the dependencies nix uses, we must do the following:
+
+```
+dub upgrade --annotate  # generates dub.selections.json
+dub-to-nix > dub-lock.json  # updates lockfile nix uses
+```
+
+also remember to update the `version` attribute on line 19 of `flake.nix` (within the `buildDubPackage` invocation)
+
+the rest of the non-D dependencies can be updated with `nix flake update` which will update the checkout of nixpkgs used by the flake.
+
 # Contributing
 
 Because I'm not very good at managing people and I tend to be a little too
