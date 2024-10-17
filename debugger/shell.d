@@ -636,7 +636,7 @@ void shell_event_debugger(adbg_process_t *proc, int event, void *edata, void *ud
 			adbg_exception_name(ex), ex.oscode);
 		
 		// No fault address available
-		if (ex.faultz == 0)
+		if (ex.fault_address == 0)
 			return;
 		
 		printf("	Address : 0x%llx\n", ex.fault_address);
@@ -644,7 +644,7 @@ void shell_event_debugger(adbg_process_t *proc, int event, void *edata, void *ud
 		char[32] machbuf = void;
 		const(char) *mnemonic = void;
 		const(char) *operands = void;
-		if (shell_disassemble(ex.faultz, null, null, 0, machbuf.ptr, 32, &mnemonic, &operands))
+		if (shell_disassemble(cast(size_t)ex.fault_address, null, null, 0, machbuf.ptr, 32, &mnemonic, &operands))
 			return;
 		
 		printf("	Machine : %s\n", machbuf.ptr);

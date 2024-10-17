@@ -656,7 +656,8 @@ Lwait:
 	else            enum WBASE = 0;
 	int wstatus = void;
 Lwait:
-	// TODO: Check process flag to debug all subprocesses
+	// TODO: Check process flag to debug all subprocesses instead of -1
+	// TODO: Check process creation via checking given PID and returned pid
 	if ((proc.tracee.pid = waitpid(-1, &wstatus, WBASE)) < 0) {
 		proc.status = AdbgProcStatus.unknown;
 		return adbg_oops(AdbgError.crt);
@@ -690,6 +691,74 @@ Lwait:
 
 	ufunc(proc.tracee, type, &event, udata);
 	return 0;
+}
+
+// Used internally to translate OS codes into exception
+private
+void adbg_exception_translate(adbg_exception_t *exception, void *os1, void *os2) {
+version (Windows) {
+	assert(os1);
+	DEBUG_EVENT *de = cast(DEBUG_EVENT*)os1;
+	
+	exception.fault_address = cast(ulong)de.Exception.ExceptionRecord.ExceptionAddress;
+	exception.oscode = de.Exception.ExceptionRecord.ExceptionCode;
+	
+	switch (exception.oscode) {
+	case EXCEPTION_IN_PAGE_ERROR:
+	case EXCEPTION_ACCESS_VIOLATION:
+		exception.type = adbg_exception_from_os(exception.oscode,
+			cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]);
+		break;
+	default:
+		exception.type = adbg_exception_from_os(exception.oscode);
+	}
+} else version (linux) {
+	assert(os1);
+	assert(os2);
+	int pid = *cast(int*)os1;
+	int signo = *cast(int*)os2;
+	int si_code = void;
+	
+	siginfo_t siginfo = void;
+	if (ptrace(PT_GETSIGINFO, pid, null, &siginfo) < 0) {
+		si_code = 0;
+		exception.fault_address = 0;
+	} else {
+		si_code = siginfo.si_code;
+		// Get fault address
+		switch (signo) {
+		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
+			// NOTE: .si_addr() emits linker errors on Musl platforms.
+			exception.fault_address = cast(ulong)siginfo._sifields._sigfault.si_addr;
+			break;
+		default:
+			exception.fault_address = 0;
+		}
+	}
+	
+	exception.oscode = signo;
+	exception.type = adbg_exception_from_os(signo, si_code);
+} else version (FreeBSD) {
+	assert(os1);
+	assert(os2);
+	int pid = *cast(int*)os1;
+	int signo = *cast(int*)os2;
+	int si_code = void;
+	
+	ptrace_lwpinfo lwp = void;
+	if (ptrace(PT_LWPINFO, pid, &lwp, 0) < 0) {
+		si_code = 0;
+		exception.fault_address = 0;
+	} else {
+		si_code = lwp.pl_siginfo.si_code;
+		exception.fault_address = cast(ulong)lwp.pl_siginfo.si_addr;
+	}
+	
+	exception.oscode = signo;
+	exception.type = adbg_exception_from_os(signo, si_code);
+} else {
+	static assert(false, "Implement exception translation code");
+}
 }
 
 /// Disconnect and terminate the debuggee process.

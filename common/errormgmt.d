@@ -77,15 +77,15 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 	// TODO: Get thread context
 	
 	// Fault address & disasm if available
-	if (ex.faultz) {
-		printf("Address    : %#zx\n", ex.faultz);
+	if (ex.fault_address) {
+		printf("Address    : %#llx\n", ex.fault_address);
 		
 		ubyte[OPCODE_BUFSIZE] buffer = void;
 		adbg_opcode_t op = void;
 		adbg_disassembler_t *dis = adbg_disassembler_open(adbg_machine_current());
 		if (dis == null)
 			goto Lunavail;
-		if (adbg_memory_read(proc, ex.faultz, buffer.ptr, OPCODE_BUFSIZE))
+		if (adbg_memory_read(proc, cast(size_t)ex.fault_address, buffer.ptr, OPCODE_BUFSIZE))
 			goto Lunavail;
 		if (adbg_disassemble(dis, &op, buffer.ptr, OPCODE_BUFSIZE))
 			goto Lunavail;

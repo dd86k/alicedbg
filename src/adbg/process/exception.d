@@ -11,18 +11,25 @@ module adbg.process.exception;
 
 version (Windows) {
 	import core.sys.windows.winbase;
-	private enum {	// missing values for WoW64 (NTSTATUS, winbase.h)
+	private enum {
+		// ntstatus.h
+		// Missing WoW64 status codes
 		STATUS_WX86_UNSIMULATE	= 0x4000001C,	/// WOW64 exception code
-		STATUS_WX86_CONTINUE	= 0x4000001D,	/// WOW64 exception code
-		STATUS_WX86_SINGLE_STEP	= 0x4000001E,	/// WOW64 exception code
-		STATUS_WX86_BREAKPOINT	= 0x4000001F,	/// WOW64 exception code
-		STATUS_WX86_EXCEPTION_CONTINUE	= 0x40000020,	/// WOW64 exception code
-		STATUS_WX86_EXCEPTION_LASTCHANCE	= 0x40000021,	/// WOW64 exception code
-		STATUS_WX86_EXCEPTION_CHAIN	= 0x40000022,	/// WOW64 exception code
+		STATUS_WX86_CONTINUE	= 0x4000001D,	/// Ditto
+		STATUS_WX86_SINGLE_STEP	= 0x4000001E,	/// Ditto
+		STATUS_WX86_BREAKPOINT	= 0x4000001F,	/// Ditto
+		STATUS_WX86_EXCEPTION_CONTINUE	= 0x40000020,	/// Ditto
+		STATUS_WX86_EXCEPTION_LASTCHANCE	= 0x40000021,	/// Ditto
+		STATUS_WX86_EXCEPTION_CHAIN	= 0x40000022,	/// Ditto
+		// Thread Information Block?
+		STATUS_WX86_CREATEWX86TIB	= 0x40000028,	/// Ditto
+		STATUS_WX86_INTERNAL_ERROR	= 0xC000026F,	/// Ditto
+		STATUS_WX86_FLOAT_STACK_CHECK	= 0xC0000270,	/// Ditto
 		// See https://devblogs.microsoft.com/oldnewthing/20190108-00/?p=100655
 		// tl;dr: Soft stack overflow (with a cookie on stack) within MSCRT,
 		// for prevention measures. Implies /GS (MSVC)
 		STATUS_STACK_BUFFER_OVERRUN	= 0xC0000409,	/// Soft stack overflow
+		STATUS_EMULATION_BREAKPOINT	= 0x40000038,	/// ARM64EC Breakpoint
 	}
 } else version (Posix) {
 	import core.sys.posix.signal;
@@ -41,10 +48,10 @@ extern (C):
 /// Unhandled exception type of process/program
 enum AdbgException {
 	Unknown,	/// Unknown exception type.
-	Exit,	/// Program was terminated, typically by the user.
 	Breakpoint,	/// A software breakpoint was hint.
 	Step,	/// Single step was performed.
-	Fault,	/// An access violations or segmentation fault occured.
+	AccessViolation,	/// An access violations or segmentation fault occured.
+	Fault = AccessViolation,	/// Alias to AccessViolation.
 	BoundExceeded,	/// Array bounds exceeded.
 	Misalignment,	/// Data type misaligned.
 	IllegalInstruction,	/// Illegal opcode.
@@ -63,23 +70,7 @@ enum AdbgException {
 	FPUOverflow,	/// Overflow in FPU operation.
 	FPUUnderflow,	/// FPU's stack overflow.
 	FPUStackOverflow,	/// FPU's stack overflowed.
-	// OS specific-ish
-	Disposition,	/// OS reports invalid disposition to exception handler. Internal error.
-	NoContinue,	/// Debugger tried to continue on after non-continuable error.
 }
-
-//TODO: Severity levels depending on exception type
-//      Essentially it'll be for a "can or cannot continue"
-//      This would also allow the removal of Disposition/NoContinue
-//      OR
-//      Focus on providing "Exit" translations, which debugger should rely upon
-//TODO: Redo some of the codes (Disposition, NoContinue, PageError)
-//      - While POSIX environments have no such notion, it should still be
-//        translated in some other form.
-//      - It could be posible to provide a "second chance" system translating
-//        some of the signals (e.g., faults aren't illigeable, but page errors could).
-//      - Rename PageError to something else like IoError, or Paging
-//        Maybe some SIGBUS and SIGIO subcodes are meant for this
 
 /// Represents an exception. Upon creation, these are populated depending on
 /// the platform with their respective function.
@@ -88,15 +79,8 @@ struct adbg_exception_t {
 	AdbgException type;
 	/// Original OS code (exception or signal value).
 	uint oscode;
-	union {
-		/// Faulting address, if available; Otherwise zero.
-		ulong fault_address;
-		/// 32-bit Faulting address, if available; Otherwise zero.
-		/// Useful for LP32 environments.
-		uint fault_address32;
-		/// Used internally.
-		size_t faultz;
-	}
+	/// Faulting address, if available; Otherwise zero.
+	ulong fault_address;
 }
 
 /// (Internal) Translate an oscode to an ExceptionType enum value.
@@ -112,21 +96,20 @@ struct adbg_exception_t {
 ///
 /// Returns: Adjusted exception type.
 AdbgException adbg_exception_from_os(uint code, uint subcode = 0) {
-version (Windows) {
 	// NOTE: Prefer STATUS over EXCEPTION names when possible
+version (Windows) {
 	switch (code) with (AdbgException) {
 	// NOTE: A step may also indicate a trace operation
 	case STATUS_SINGLE_STEP, STATUS_WX86_SINGLE_STEP:
 		return Step;
-	// Instruction breakpoint
-	case STATUS_BREAKPOINT, STATUS_WX86_BREAKPOINT:
+	// Instruction
+	case STATUS_BREAKPOINT, STATUS_WX86_BREAKPOINT, STATUS_EMULATION_BREAKPOINT:
 		return Breakpoint;
 	case STATUS_ILLEGAL_INSTRUCTION:
 		return IllegalInstruction;
-	// Memory access violation
-	case STATUS_ACCESS_VIOLATION: // no similar sigcode for sub-operation
-		return Fault;
-	// Specifically to swap
+	// Memory
+	case STATUS_ACCESS_VIOLATION, STATUS_GUARD_PAGE_VIOLATION:
+		return AccessViolation;
 	case STATUS_IN_PAGE_ERROR: // no similar sigcode for sub-operation
 		// NOTE: The third array element specifies the underlying
 		//       NTSTATUS code that resulted in the exception.
@@ -148,9 +131,7 @@ version (Windows) {
 	case EXCEPTION_FLT_OVERFLOW:	return FPUOverflow;
 	case EXCEPTION_FLT_STACK_CHECK:	return FPUStackOverflow;
 	case EXCEPTION_FLT_UNDERFLOW:	return FPUUnderflow;
-	// Misc
-	case STATUS_INVALID_DISPOSITION:	return Disposition;
-	case STATUS_NONCONTINUABLE_EXCEPTION:	return NoContinue;
+	case STATUS_WX86_FLOAT_STACK_CHECK:	return FPUOverflow;
 	default:
 	}
 } else {
@@ -174,7 +155,7 @@ version (Windows) {
 		case SEGV_BNDERR: return BoundExceeded;
 		default:
 		}
-		return Fault;
+		return AccessViolation;
 	case SIGBUS:
 		switch (subcode) {
 		case BUS_ADRALN: return Misalignment;
@@ -185,18 +166,12 @@ version (Windows) {
 		return Breakpoint;
 	case SIGCHLD:
 		switch (subcode) {
-		case CLD_EXITED: return Exit;
-		case CLD_KILLED: return Exit;
-		case CLD_DUMPED: return Unknown;
 		case CLD_TRAPPED: return Breakpoint;
-		case CLD_STOPPED: return Unknown;
-		case CLD_CONTINUED: return Unknown;
 		default:
 		}
 		break;
 	// Because Windows' DebugBreak uses a regular breakpoint (int3)
 	case SIGSTOP: return Breakpoint;
-	case SIGKILL: return Exit;
 	default:
 	}
 } // Posix
@@ -206,17 +181,16 @@ version (Windows) {
 
 /// Get a short descriptive string for an exception type value.
 /// Params: ex = Exception.
-/// Returns: String or null. Names are uppercased.
-const(char) *adbg_exception_name(adbg_exception_t *ex) {
+/// Returns: String or null on error.
+const(char)* adbg_exception_name(adbg_exception_t *ex) {
 	if (ex == null) return null;
 	switch (ex.type) with (AdbgException) {
 	case Unknown:	return "UNKNOWN";
-	case Exit:	return "TERMINATED";
 	case Breakpoint:	return "BREAKPOINT";
 	case Step:	return "INSTRUCTION STEP";
 	// NOTE: Also known as a segmentation fault,
 	//       "access violation" remains a better term.
-	case Fault:	return "ACCESS VIOLATION";
+	case AccessViolation:	return "ACCESS VIOLATION";
 	case BoundExceeded:	return "INDEX OUT OF BOUNDS";
 	case Misalignment:	return "DATA MISALIGNMENT";
 	case IllegalInstruction:	return "ILLEGAL INSTRUCTION";
@@ -232,81 +206,6 @@ const(char) *adbg_exception_name(adbg_exception_t *ex) {
 	case FPUOverflow:	return "FPU: OVERFLOW";
 	case FPUUnderflow:	return "FPU: UNDERFLOW";
 	case FPUStackOverflow:	return "FPU: STACK OVERFLOW";
-	case Disposition:	return "OS: DISPOSITION";
-	case NoContinue:	return "OS: COULD NOT CONTINUE";
 	default:	return "UNKNOWN";
 	}
-}
-
-// Used internally for debugger
-void adbg_exception_translate(adbg_exception_t *exception, void *os1, void *os2) {
-version (Windows) {
-	assert(os1);
-	DEBUG_EVENT *de = cast(DEBUG_EVENT*)os1;
-	
-	exception.faultz = cast(size_t)de.Exception.ExceptionRecord.ExceptionAddress;
-	exception.oscode = de.Exception.ExceptionRecord.ExceptionCode;
-	
-	switch (exception.oscode) {
-	case EXCEPTION_IN_PAGE_ERROR:
-	case EXCEPTION_ACCESS_VIOLATION:
-		exception.type = adbg_exception_from_os(exception.oscode,
-			cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]);
-		break;
-	default:
-		exception.type = adbg_exception_from_os(exception.oscode);
-	}
-} else {
-	assert(os1);
-	assert(os2);
-	int pid = *cast(int*)os1;
-	int signo = *cast(int*)os2;
-	
-	version (linux) {
-		// Get fault address
-		switch (signo) {
-		// NOTE: si_addr is NOT populated under ptrace for SIGTRAP
-		//       - linux does not fill si_addr on a SIGTRAP from a ptrace event
-		//         - see sigaction(2)
-		//       - linux *only* fills user_regs_struct for "user area"
-		//         - see arch/x86/include/asm/user_64.h
-		//         - "ptrace does not yet supply these.  Someday...."
-		//         - So yeah, debug registers and "fault_address" not filled
-		//           - No access to ucontext_t from ptrace either
-		//       - using EIP/RIP is NOT a good idea
-		//         - IP ALWAYS point to NEXT instruction
-		//         - First SIGTRAP does NOT contain int3
-		//           - Windows does, though, and points to it
-		//       - gdbserver and lldb never attempt to do such thing anyway
-		//       - RIP-1 (x86) could *maybe* point to int3 or similar.
-		//       - User area might have DR3, it does have "fault_address"
-		// NOTE: Newer D compilers fixed siginfo_t as a whole
-		//       for version (linux). Noticed on DMD 2.103.1.
-		//       Old glibc: ._sifields._sigfault.si_addr
-		//       Old musl: .__si_fields.__sigfault.si_addr
-		//       New: ._sifields._sigfault.si_addr & .si_addr()
-		// NOTE: .si_addr() emits linker errors on Musl platforms.
-		case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
-			siginfo_t siginfo = void;
-			if (ptrace(PT_GETSIGINFO, pid, null, &siginfo) < 0) {
-				exception.fault_address = 0;
-				break;
-			}
-			exception.fault_address = cast(size_t)siginfo._sifields._sigfault.si_addr;
-			break;
-		default:
-			exception.fault_address = 0;
-		}
-	} else version (FreeBSD) {
-		ptrace_lwpinfo lwp = void;
-		exception.fault_address =
-			ptrace(PT_LWPINFO, pid, &lwp, 0) < 0 ?
-			0 : cast(ulong)lwp.pl_siginfo.si_addr;
-	} else {
-		exception.fault_address = 0;
-	}
-	
-	exception.oscode = signo;
-	exception.type = adbg_exception_from_os(signo);
-}
 }

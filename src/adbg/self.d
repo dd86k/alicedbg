@@ -169,7 +169,7 @@ uint adbg_internal_handler(EXCEPTION_POINTERS *e) {
 	// Setup exception info
 	adbg_exception_t ex = void;
 	ex.oscode = e.ExceptionRecord.ExceptionCode;
-	ex.faultz = cast(size_t)e.ExceptionRecord.ExceptionAddress;
+	ex.fault_address = cast(ulong)e.ExceptionRecord.ExceptionAddress;
 	with (e.ExceptionRecord) switch (ex.oscode) {
 	case EXCEPTION_IN_PAGE_ERROR:
 	case EXCEPTION_ACCESS_VIOLATION:
@@ -197,11 +197,13 @@ void adbg_internal_handler(int sig, siginfo_t *si, void *p) {
 version (linux) {
 	switch (sig) {
 	case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
-		ex.fault_address = cast(size_t)si._sifields._sigfault.si_addr;
+		ex.fault_address = cast(ulong)si._sifields._sigfault.si_addr;
 		break;
 	default:
 		ex.fault_address = 0;
 	}
+} else version (FreeBSD) {
+	ex.fault_address = cast(ulong)si.si_addr;
 } else {
 	ex.fault_address = 0;
 }
