@@ -9,10 +9,15 @@ import core.stdc.stdlib : malloc, calloc, realloc, free;
 import core.stdc.string : memcpy;
 import adbg.error : adbg_oops, AdbgError;
 
+// TODO: `find` function
+//       Using memcmp.
+// TODO: `empty` function
+//       Clear *and* free memory (or realloc to initial capacity
+
 extern (C):
 
 struct list_t {
-	size_t capacity; /// Capacity in number of items
+	size_t capacity; /// Currently capacity in number of items
 	size_t itemsize; /// Size of one item
 	size_t count;    /// Current item count
 	void *buffer;    /// Item buffer
@@ -66,6 +71,7 @@ list_t* adbg_list_reserve(list_t *list, size_t newcapacity) {
 	assert(list.buffer);
 	assert(list.itemsize);
 	
+	// The new capacity is already the current capacity, do nothing
 	if (newcapacity == list.capacity)
 		return list;
 	
@@ -100,7 +106,6 @@ void* adbg_list_buffer(list_t *list) {
 		return null;
 	}
 	assert(list.buffer);
-	assert(list.itemsize);
 	return list.buffer;
 }
 /// Get the list's current capacity.
@@ -113,8 +118,6 @@ size_t adbg_list_capacity(list_t *list) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
-	assert(list.buffer);
-	assert(list.itemsize);
 	return list.capacity;
 }
 

@@ -120,7 +120,7 @@ version (AArch64) { // defined(_ARM64_)
     alias PNEON128 = NEON128*;
 }
 
-// NOTE: It's the same layout
+// NOTE: It's the same layout, for now
 public alias WOW64_CONTEXT = X86_NT_CONTEXT;
 alias PWOW64_CONTEXT = WOW64_CONTEXT*;
 

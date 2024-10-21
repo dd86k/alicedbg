@@ -25,6 +25,7 @@ import adbg.utils.math : min, MiB;
 import adbg.objects.mz : mz_header_t;
 
 // NOTE: Avoid the Windows base types as they are not defined outside "version (Windows)"
+// NOTE: PE32 loader limits executable images to 4 GiB
 
 extern (C):
 

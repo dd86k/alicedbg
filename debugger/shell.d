@@ -790,7 +790,7 @@ int command_restart(int argc, const(char) **argv) {
 int command_go(int argc, const(char) **argv) {
 	if (adbg_debugger_continue(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process, null))
+	if (adbg_debugger_wait(process))
 		return ShellError.alicedbg;
 	return 0;
 }
@@ -807,7 +807,7 @@ int command_kill(int argc, const(char) **argv) {
 int command_stepi(int argc, const(char) **argv) {
 	if (adbg_debugger_stepi(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process, null))
+	if (adbg_debugger_wait(process))
 		return ShellError.alicedbg;
 	return 0;
 }

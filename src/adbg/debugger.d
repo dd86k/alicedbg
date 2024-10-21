@@ -642,6 +642,20 @@ int adbg_debugger_on(adbg_process_t *proc, AdbgEvent on, void *handler) {
 	return 0;
 }
 
+/// Attach user data when an event occurs.
+///
+/// This is useful to identify requests, for example.
+/// Params:
+/// 	proc = Process instance.
+/// 	udata = User data pointer. Passing null clears it.
+/// Returns: Error code.
+int adbg_debugger_udata(adbg_process_t *proc, void *udata) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	proc.udata = udata;
+	return 0;
+}
+
 /// Wait until a new debug event occurs. This call is blocking.
 ///
 /// The lifetime of the event callback parameters are not guaranteed.
@@ -650,11 +664,9 @@ int adbg_debugger_on(adbg_process_t *proc, AdbgEvent on, void *handler) {
 /// Windows: Uses WaitForDebugEvent.
 /// POSIX: Uses waitpid(2) and ptrace(2).
 ///
-/// Params:
-/// 	proc = Tracee instance.
-/// 	udata = User data passed to callback. Can be used to identify requests, for example.
+/// Params: proc = Process instancied by the debugger.
 /// Returns: Error code.
-int adbg_debugger_wait(adbg_process_t *proc, void *udata) {
+int adbg_debugger_wait(adbg_process_t *proc) {
 	version(Trace) trace("proc=%p udata=%p", proc, udata);
 	
 	if (proc == null)
@@ -669,10 +681,6 @@ Lwait:
 		proc.status = AdbgProcessState.unknown;
 		return adbg_oops(AdbgError.os);
 	}
-	
-	// In case either this or caller process is going to be used
-	// to send the event, put it in both, just in case.
-	proc.udata = udata;
 	
 	proc.pid = de.dwProcessId;
 	proc.tid = de.dwThreadId;
@@ -699,7 +707,7 @@ Lwait:
 		
 		adbg_exception_t exception = void;
 		adbg_translate_exception(&exception, proc, &de);
-		proc.event_exception(proc, udata, &exception);
+		proc.event_exception(proc, proc.udata, &exception);
 		break;
 	case EXIT_PROCESS_DEBUG_EVENT:
 		version(Trace) trace("ProcExit pid=%d tid=%d code=%u",
@@ -710,7 +718,7 @@ Lwait:
 		if (proc.event_process_exited == null)
 			goto Lcontinue;
 		
-		proc.event_process_exited(proc, udata, cast(int)de.ExitProcess.dwExitCode);
+		proc.event_process_exited(proc, proc.udata, cast(int)de.ExitProcess.dwExitCode);
 		break;
 	/*case CREATE_THREAD_DEBUG_EVENT:
 	case CREATE_PROCESS_DEBUG_EVENT:
