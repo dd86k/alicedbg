@@ -18,6 +18,7 @@ import adbg.include.c.stdarg;
 import adbg.error;
 import adbg.machines;
 import adbg.utils.list;
+import adbg.process.exception : adbg_exception_t;
 import core.stdc.string : memset;
 
 version (Windows) {
@@ -34,18 +35,22 @@ version (Windows) {
 
 extern (C):
 
+// TODO: Add `exited` (replacing `unknown`?)
+// TODO: Add `attached`
 /// Process status
-enum AdbgProcStatus : ubyte {
+enum AdbgProcessState : ubyte {
 	unknown,	/// Process status is not known.
 	unloaded = unknown,	/// Alias for 'unknown'.
-	loaded,	/// Process is loaded and waiting to run.
-	standby = loaded,	/// Alias for 'loaded'.
+	created,	/// Process was created by debugger and waiting to run.
+	loaded = created,	/// Alias for 'created'.
+	standby = created,	/// Alias for 'created'.
 	running,	/// Process is running.
 	stopped,	/// Process is paused due to an exception or by the debugger.
 	paused = stopped,	/// Alias for 'stopped'.
 }
+alias AdbgProcStatus = AdbgProcessState; // Old alias
 
-//TODO: Rename to AdbgDebuggerRelation
+// TODO: Remove this enum and rely on AdbgProcessState
 /// Process creation source.
 enum AdbgCreation : ubyte {
 	unattached,
@@ -54,9 +59,11 @@ enum AdbgCreation : ubyte {
 	spawned,
 }
 
+// TODO: Decouple thread info from process and rely on thread functions
 /// Represents an instance of a process.
 struct adbg_process_t {
 version (Windows) { // Original identifiers; Otherwise informal
+	int orig_pid;	/// Event Process ID
 	// NOTE: PID and TID usage
 	//       The Process and Thread IDs are used to open handles
 	//       This is done on a per-function basis for permissions
@@ -66,10 +73,11 @@ version (Windows) { // Original identifiers; Otherwise informal
 	int tid;	/// Event Thread ID
 	char *args;	/// Saved arguments when process was launched
 	// TODO: Deprecate hpid and htid
-	HANDLE htid;	/// Thread handle
-	HANDLE hpid;	/// Process handle
+	HANDLE hthread;	/// Thread handle
+	HANDLE hproc;	/// Process handle
 }
 version (Posix) {
+	pid_t orig_pid;	/// Original spawned PID
 	pid_t pid;	/// Event Process ID
 	pid_t tid;	/// HACK: Event Thread ID
 			// On Linux, the starting thread ID is the same as the process ID
@@ -80,7 +88,7 @@ version (linux) {
 	bool memfailed;	/// Set if we fail to open /proc/PID/mem
 }
 	/// Last known process status.
-	AdbgProcStatus status;
+	AdbgProcessState status;
 	/// Process' creation source.
 	AdbgCreation creation;
 	/// List of threads.
@@ -88,31 +96,24 @@ version (linux) {
 	/// List of breakpoints.
 	list_t *breakpoint_list;
 	
-	// HACK: Some client debuggers, like the shell, will save the stopped
-	//       process pointer in global memory. Because stack memory references
-	//       will be invalid by the time the wait function quits, it is
-	//       saved here instead.
-	//
-	//       Also, because we cannot have a definition of the structure
-	//       inside this structure, so a pointer is defined instead.
-	//       Memory will be allocated for it.
-	//
-	//       This is to avoid touching the caller process IDs and handles,
-	//       until a better solution is found for multiprocess handling.
-	//
-	//       Maybe have some handle duplication function?
-	adbg_process_t *tracee;
+	// HACK: Debugger event handlers
+	void function(adbg_process_t*, void *udata, adbg_exception_t *ex) event_exception;
+//	void function(adbg_process_t*, void *udata) event_process_created;
+	void function(adbg_process_t*, void *udata, int code) event_process_exited;
+	void function(adbg_process_t*, void *udata) event_process_continued;
+	
+	// HACK: Event user data (when attached in wait)
+	void *udata;
 }
 
 void adbg_process_free(adbg_process_t *proc) {
 	version(Trace) trace("proc=%p", proc);
 	if (proc == null)
 		return;
-	if (proc.tracee) adbg_process_free(proc.tracee);
 	version (Windows) {
 		if (proc.args) free(proc.args);
-		CloseHandle(proc.hpid);
-		CloseHandle(proc.htid);
+		CloseHandle(proc.hproc);
+		CloseHandle(proc.hthread);
 	}
 	version (linux) {
 		if (proc.mhandle) close(proc.mhandle);
@@ -127,8 +128,8 @@ void adbg_process_free(adbg_process_t *proc) {
 /// Get the debuggee's current status.
 /// Params: tracee = Debugged process.
 /// Returns: Debuggee status.
-AdbgProcStatus adbg_process_status(adbg_process_t *tracee) pure {
-	if (tracee == null) return AdbgProcStatus.unknown;
+AdbgProcessState adbg_process_status(adbg_process_t *tracee) pure {
+	if (tracee == null) return AdbgProcessState.unknown;
 	return tracee.status;
 }
 /// Get the debuggee current status as a string.
@@ -139,9 +140,9 @@ const(char)* adbg_process_status_string(adbg_process_t *tracee) pure {
 	if (tracee == null)
 		return default_;
 	const(char) *m = void;
-	switch (tracee.status) with (AdbgProcStatus) {
+	switch (tracee.status) with (AdbgProcessState) {
 	case unloaded:	m = "unloaded"; break;
-	case loaded:	m = "loaded"; break;
+	case created:	m = "created"; break;
 	case running:	m = "running"; break;
 	case paused:	m = "paused"; break;
 	default:	return default_;
@@ -247,7 +248,7 @@ version (WinPersonality) {
 	//       Introduced in Windows 10, version 1511
 	//       IsWow64Process: 32-bit proc. under aarch64 returns FALSE
 	BOOL w64 = void;
-	if (IsWow64Process(proc.hpid, &w64) && w64) return PERSO32;
+	if (IsWow64Process(proc.hproc, &w64) && w64) return PERSO32;
 }
 version (LinuxPersonality) {
 	char[64] path = void;
@@ -307,7 +308,7 @@ version (Windows) {
 		}
 		
 		t.pid = proc.th32ProcessID;
-		t.hpid = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, proc.th32ProcessID);
+		t.hproc = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, proc.th32ProcessID);
 		list = adbg_list_add(list, &t);
 	} while (Process32Next(hsnap, &proc));
 	
@@ -366,7 +367,7 @@ version (Windows) {
 	list_t *list = cast(list_t*)proclist;
 	adbg_process_t *proc = void;
 	for (size_t i; (proc = cast(adbg_process_t*)adbg_list_get(list, i)) != null; ++i) {
-		CloseHandle(proc.hpid);
+		CloseHandle(proc.hproc);
 	}
 }
 	

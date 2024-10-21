@@ -193,8 +193,8 @@ __gshared:
 
 // NOTE: Process management
 //       Right now the shell is only capable of dealing with one process
-adbg_process_t *process;
-adbg_disassembler_t *dis;
+adbg_process_t *process;	/// Process instance
+adbg_disassembler_t *disassembler;	/// Disassembler instance
 
 const(char)* last_spawn_exec;
 const(char)** last_spawn_argv;
@@ -549,12 +549,7 @@ int shell_spawn(const(char) *exec, const(char) **argv) {
 	}
 	putchar('\n');
 	
-	// Open disassembler for process machine type
-	dis = adbg_disassembler_open(adbg_process_machine(process));
-	if (dis == null)
-		logwarn("Disassembler not available (%s)", adbg_error_message());
-	
-	return 0;
+	return shell_setup();
 }
 
 int shell_attach(int pid) {
@@ -568,15 +563,26 @@ int shell_attach(int pid) {
 	
 	loginfo("Debugger attached.");
 	
+	return shell_setup();
+}
+
+// After 
+int shell_setup() {
+	if (adbg_debugger_on(process, AdbgEvent.exception, &shell_event_exception) ||
+		adbg_debugger_on(process, AdbgEvent.processExit, &shell_event_process_exit) ||
+		adbg_debugger_on(process, AdbgEvent.processContinue, &shell_event_process_continue))
+		return ShellError.alicedbg;
+	
 	// Open disassembler for process machine type
-	dis = adbg_disassembler_open(adbg_process_machine(process));
-	if (dis && opt_syntax) {
-		adbg_disassembler_options(dis,
-			AdbgDisassemblerOption.syntax, opt_syntax,
-			0);
-	} else {
-		logwarn("Disassembler not available (%s)\n",
+	disassembler = adbg_disassembler_open(adbg_process_machine(process));
+	if (disassembler == null) {
+		logwarn("Disassembler not available (%s)",
 			adbg_error_message());
+	} else if (opt_syntax) {
+		if (adbg_disassembler_options(disassembler,
+			AdbgDisassemblerOption.syntax, opt_syntax,
+			0))
+			return ShellError.alicedbg;
 	}
 	
 	return 0;
@@ -596,7 +602,7 @@ int shell_disassemble(size_t address, int *opsize,
 		return adbg_errno();
 	
 	adbg_opcode_t op = void;
-	int err = adbg_disassemble(dis, &op, buffer.ptr, OPCODE_BUFSIZE);
+	int err = adbg_disassemble(disassembler, &op, buffer.ptr, OPCODE_BUFSIZE);
 	
 	if (opsize) *opsize = op.size;
 	
@@ -616,46 +622,39 @@ int shell_disassemble(size_t address, int *opsize,
 	return err;
 }
 
-void shell_event_debugger(adbg_process_t *proc, int event, void *edata, void *udata) {
-	process = proc;
+void shell_event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *exception) {
+	// HACK: Currently have no way to determine remote associated thread
+	version (Windows)
+	printf("* Process %d (thread %d) stopped\n"~
+		"	Reason  : %s ("~ERR_OSFMT~")\n",
+		proc.pid, proc.tid,
+		adbg_exception_name(exception), exception.oscode);
+	else
+	printf("* Process %d stopped\n"~
+		"	Reason  : %s ("~ERR_OSFMT~")\n",
+		proc.pid,
+		adbg_exception_name(exception), exception.oscode);
 	
-	switch (event) with (AdbgEvent) {
-	case exception:
-		adbg_exception_t *ex = cast(adbg_exception_t*)edata;
-		
-		// HACK: Currently have no way to determine remote associated thread
-		version (Windows)
-		printf("*	Process %d (thread %d) stopped\n"~
-			"	Reason  : %s ("~ADBG_OS_ERROR_FORMAT~")\n",
-			proc.pid, proc.tid,
-			adbg_exception_name(ex), ex.oscode);
-		else
-		printf("*	Process %d stopped\n"~
-			"	Reason  : %s ("~ADBG_OS_ERROR_FORMAT~")\n",
-			proc.pid,
-			adbg_exception_name(ex), ex.oscode);
-		
-		// No fault address available
-		if (ex.fault_address == 0)
-			return;
-		
-		printf("	Address : 0x%llx\n", ex.fault_address);
-		
-		char[32] machbuf = void;
-		const(char) *mnemonic = void;
-		const(char) *operands = void;
-		if (shell_disassemble(cast(size_t)ex.fault_address, null, null, 0, machbuf.ptr, 32, &mnemonic, &operands))
-			return;
-		
-		printf("	Machine : %s\n", machbuf.ptr);
-		printf("	Mnemonic: %s %s\n", mnemonic, operands);
+	// No fault address available
+	if (exception.fault_address == 0)
 		return;
-	case processExit:
-		int *exitcode = cast(int*)(edata);
-		printf("* Process exited with code %d\n", *exitcode);
+	
+	printf("	Address : 0x%llx\n", exception.fault_address);
+	
+	char[32] machbuf = void;
+	const(char) *mnemonic = void;
+	const(char) *operands = void;
+	if (shell_disassemble(cast(size_t)exception.fault_address, null, null, 0, machbuf.ptr, 32, &mnemonic, &operands))
 		return;
-	default:
-	}
+	
+	printf("	Machine : %s\n", machbuf.ptr);
+	printf("	Mnemonic: %s %s\n", mnemonic, operands);
+}
+void shell_event_process_exit(adbg_process_t *proc, void *udata, int code) {
+	printf("* Process %d exited with code %d\n", adbg_process_pid(proc), code);
+}
+void shell_event_process_continue(adbg_process_t *proc, void *udata) {
+	printf("* Process %d continued\n", adbg_process_pid(proc));
 }
 
 void shell_event_help(immutable(command2_t) *command) {
@@ -765,7 +764,7 @@ int command_detach(int argc, const(char) **argv) {
 	if (adbg_debugger_detach(process))
 		return ShellError.alicedbg;
 	
-	adbg_disassembler_close(dis);
+	adbg_disassembler_close(disassembler);
 	return 0;
 }
 
@@ -791,7 +790,7 @@ int command_restart(int argc, const(char) **argv) {
 int command_go(int argc, const(char) **argv) {
 	if (adbg_debugger_continue(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process, &shell_event_debugger, null))
+	if (adbg_debugger_wait(process, null))
 		return ShellError.alicedbg;
 	return 0;
 }
@@ -800,7 +799,7 @@ int command_kill(int argc, const(char) **argv) {
 	if (adbg_debugger_terminate(process))
 		return ShellError.alicedbg;
 	loginfo("Process killed");
-	adbg_disassembler_close(dis);
+	adbg_disassembler_close(disassembler);
 	return 0;
 }
 
@@ -808,7 +807,7 @@ int command_kill(int argc, const(char) **argv) {
 int command_stepi(int argc, const(char) **argv) {
 	if (adbg_debugger_stepi(process))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process, &shell_event_debugger, null))
+	if (adbg_debugger_wait(process, null))
 		return ShellError.alicedbg;
 	return 0;
 }
@@ -908,7 +907,7 @@ int command_maps(int argc, const(char) **argv) {
 int command_disassemble(int argc, const(char) **argv) {
 	if (process == null)
 		return ShellError.unattached;
-	if (dis == null)
+	if (disassembler == null)
 		return ShellError.unavailable;
 	
 	// TODO: Add default address to PC/RIP
@@ -937,7 +936,7 @@ int command_disassemble(int argc, const(char) **argv) {
 	enum MASZ = 24; char[MASZ] machine = void;
 	const(char) *mnemonic = void;
 	const(char) *operands = void;
-	int spacing = adbg_disassembler_max_opcode_size(dis) * 2;
+	int spacing = adbg_disassembler_max_opcode_size(disassembler) * 2;
 	assert(spacing > 0);
 	for (int c; c < ucount; ++c) {
 		printf("%8llx ", uaddress);

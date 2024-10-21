@@ -5,7 +5,7 @@
 /// License: BSD-3-Clause-Clear
 module adbg.process.memory;
 
-import adbg.process.base : AdbgProcStatus, adbg_process_t;
+import adbg.process.base : AdbgProcessState, adbg_process_t;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import core.stdc.string : memcpy;
@@ -72,7 +72,7 @@ int adbg_memory_read(adbg_process_t *tracee, size_t addr, void *data, uint size)
 		return 0;
 	
 version (Windows) {
-	if (ReadProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
+	if (ReadProcessMemory(tracee.hproc, cast(void*)addr, data, size, null) == 0)
 		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (linux) {
@@ -141,7 +141,7 @@ int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size
 		return 0;
 	
 version (Windows) {
-	if (WriteProcessMemory(tracee.hpid, cast(void*)addr, data, size, null) == 0)
+	if (WriteProcessMemory(tracee.hproc, cast(void*)addr, data, size, null) == 0)
 		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (linux) {
@@ -318,7 +318,7 @@ version (Windows) {
 	// This queries workset addresses regardless of size, page-bounded.
 	// e.g., it will add 0x30000 and 0x31000 as entries, despite being a 8K "block".
 Lretry:
-	uint r = QueryWorkingSet(tracee.hpid, mbinfo, bfsz);
+	uint r = QueryWorkingSet(tracee.hproc, mbinfo, bfsz);
 	switch (r) {
 	case 0:
 		return adbg_oops(AdbgError.os);
@@ -346,7 +346,7 @@ Lretry:
 		/*TODO: Large page support + adjustment needed
 		
 		wsinfoex.VirtualAddress = cast(void*)blk.VirtualPage;
-		if (QueryWorkingSetEx(tracee.hpid, &wsinfoex,
+		if (QueryWorkingSetEx(tracee.hproc, &wsinfoex,
 			PSAPI_WORKING_SET_EX_INFORMATION.sizeof) == 0)
 			continue;
 		
@@ -368,7 +368,7 @@ Lretry:
 		
 		// Query with whatever page value
 		MEMORY_BASIC_INFORMATION mem = void;
-		if (VirtualQueryEx(tracee.hpid, cast(void*)blk.VirtualPage,
+		if (VirtualQueryEx(tracee.hproc, cast(void*)blk.VirtualPage,
 			&mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
 			continue;
 		}
@@ -379,8 +379,8 @@ Lretry:
 			continue;
 		
 		// Get mapped file
-		if (GetMappedFileNameA(tracee.hpid, mem.BaseAddress, map.name.ptr, MEM_MAP_NAME_LEN)) {
-			map.name[GetModuleFileNameExA(tracee.hpid, null, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
+		if (GetMappedFileNameA(tracee.hproc, mem.BaseAddress, map.name.ptr, MEM_MAP_NAME_LEN)) {
+			map.name[GetModuleFileNameExA(tracee.hproc, null, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
 		} else {
 			map.name[0] = 0;
 		}
@@ -426,7 +426,7 @@ Lretry:
 		void *end = mem.BaseAddress + mem.RegionSize;
 		while (i + 1 < mbinfo.NumberOfEntries) {
 			void *page = cast(void*)mbinfo.WorkingSetInfo.ptr[i + 1].VirtualPage;
-			if (VirtualQueryEx(tracee.hpid, page,
+			if (VirtualQueryEx(tracee.hproc, page,
 				&mem, MEMORY_BASIC_INFORMATION.sizeof) == 0)
 				break;
 			if (mem.BaseAddress > end) break;
@@ -447,20 +447,20 @@ Lretry:
 	
 	// Enum process modules
 	DWORD needed = void; //TODO: Could re-use this with option
-	if (EnumProcessModules(tracee.hpid, mods, buffersz, &needed) == FALSE)
+	if (EnumProcessModules(tracee.hproc, mods, buffersz, &needed) == FALSE)
 		return adbg_oops(AdbgError.os);
 	
 	DWORD modcount = needed / HMODULE.sizeof;
 	for (DWORD mod_i; mod_i < modcount; ++mod_i) {
 		HMODULE mod = mods[mod_i];
 		MODULEINFO minfo = void;
-		if (GetModuleInformation(tracee.hpid, mod, &minfo, MODULEINFO.sizeof) == FALSE) {
+		if (GetModuleInformation(tracee.hproc, mod, &minfo, MODULEINFO.sizeof) == FALSE) {
 			continue;
 		}
 		
 		// Get base name (e.g., from \Device\HarddiskVolume5\xyz.dll)
-		if (GetMappedFileNameA(tracee.hpid, minfo.lpBaseOfDll, map.name.ptr, MEM_MAP_NAME_LEN)) {
-			map.name[GetModuleFileNameExA(tracee.hpid, mod, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
+		if (GetMappedFileNameA(tracee.hproc, minfo.lpBaseOfDll, map.name.ptr, MEM_MAP_NAME_LEN)) {
+			map.name[GetModuleFileNameExA(tracee.hproc, mod, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
 		} else {
 			map.name[0] = 0;
 		}
@@ -468,7 +468,7 @@ Lretry:
 		//TODO: if WoW64, use MEMORY_BASIC_INFORMATION32
 		
 		MEMORY_BASIC_INFORMATION mem = void;
-		if (VirtualQueryEx(tracee.hpid, minfo.lpBaseOfDll, &mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
+		if (VirtualQueryEx(tracee.hproc, minfo.lpBaseOfDll, &mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
 			continue;
 		}
 		
@@ -799,7 +799,7 @@ adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t datasiz
 	}
 	
 	// Check debugger status
-	switch (tracee.status) with (AdbgProcStatus) {
+	switch (tracee.status) with (AdbgProcessState) {
 	case standby, paused, running: break;
 	default:
 		adbg_oops(AdbgError.debuggerUnpaused);

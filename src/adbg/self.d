@@ -49,10 +49,10 @@ extern (C):
 adbg_process_t* adbg_self_process() {
 	__gshared adbg_process_t proc;
 	proc.creation = AdbgCreation.unloaded;
-	proc.status = AdbgProcStatus.running;
+	proc.status = AdbgProcessState.running;
 version (Windows) {
-	proc.hpid = GetCurrentProcess();
-	proc.htid = GetCurrentThread();
+	proc.hproc = GetCurrentProcess();
+	proc.hthread = GetCurrentThread();
 	proc.pid = GetCurrentProcessId();
 	proc.tid = GetCurrentThreadId();
 } else version (Posix) {
