@@ -154,11 +154,15 @@ immutable libcsmachine_t[] machmap_capstone = [
 
 // Platform to CS' ARCH and MODE types
 private
-immutable(libcsmachine_t)* adbg_disassembler_liba2cs(AdbgMachine platform) {
+immutable(libcsmachine_t)* adbg_disassembler_liba2cs(AdbgMachine machine) {
+	// If no architecture specified, get target default
+	if (machine == AdbgMachine.unknown)
+		machine = adbg_machine_current();
+	
 	// Get matching available architecture
 	for (size_t i; i < machmap_capstone.length; ++i) {
 		immutable(libcsmachine_t)* info = &machmap_capstone[i];
-		if (platform != info.mach)
+		if (machine != info.mach)
 			continue;
 		return info;
 	}
@@ -172,10 +176,6 @@ adbg_disassembler_t* adbg_disassembler_open(AdbgMachine machine = AdbgMachine.un
 	//TODO: static if (CAPSTONE_DYNAMIC)
 	if (libcapstone_dynload())
 		return null;
-		
-	// If no architecture specified, get target default
-	if (machine == AdbgMachine.unknown)
-		machine = adbg_machine_current();
 	
 	// Get matching machine info
 	immutable(libcsmachine_t) *csinfo = adbg_disassembler_liba2cs(machine);
@@ -193,7 +193,7 @@ adbg_disassembler_t* adbg_disassembler_open(AdbgMachine machine = AdbgMachine.un
 	
 	// Open CS
 	if (cs_open(csinfo.cs_arch, csinfo.cs_mode, &dasm.cs_handle)) {
-		adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
+		adbg_oops(AdbgError.libCapstone);
 		free(dasm);
 		return null;
 	}
@@ -209,6 +209,34 @@ adbg_disassembler_t* adbg_disassembler_open(AdbgMachine machine = AdbgMachine.un
 	dasm.buffer_size   = 0;
 	dasm.buffer = null;
 	dasm.magic = ADBG_MAGIC;
+	return dasm;
+}
+
+/// Re-open the disassembler using another machine type.
+///
+/// On error, nothing is closed.
+/// Params:
+/// 	dasm = Disassembler instance.
+/// 	machine = Machine type.
+/// Returns: Disassembler instance; On error, null.
+adbg_disassembler_t* adbg_disassembler_reopen(adbg_disassembler_t *dasm, AdbgMachine machine) {
+	if (dasm == null)
+		return adbg_disassembler_open(machine);
+	
+	// Get matching machine info
+	immutable(libcsmachine_t) *csinfo = adbg_disassembler_liba2cs(machine);
+	if (csinfo == null) {
+		adbg_oops(AdbgError.disasmUnsupportedMachine);
+		return null;
+	}
+	
+	// Close and open CS handle
+	cs_close(&dasm.cs_handle);
+	if (cs_open(csinfo.cs_arch, csinfo.cs_mode, &dasm.cs_handle)) {
+		adbg_oops(AdbgError.libCapstone);
+		return null;
+	}
+	
 	return dasm;
 }
 

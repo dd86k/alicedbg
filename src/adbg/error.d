@@ -142,7 +142,7 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	// Debugger
 	//
 	{ AdbgError.debuggerUnattached,	"Debugger needs to be attached for this feature." },
-	{ AdbgError.debuggerUnpaused,	"Debugger needs the process to be paused for this feature." },
+	{ AdbgError.debuggerUnpaused,	"Debugger needs a stopped process for this feature." },
 	{ AdbgError.debuggerInvalidAction,	"Debugger was given a wrong action for this process." },
 	{ AdbgError.debuggerPresent,	"Debugger already present on remote process." },
 	{ AdbgError.debuggerNeedFile,	"Debugger received a path that does not point to a file." },
