@@ -759,7 +759,7 @@ Lwait:
 		proc.status = AdbgProcessState.unknown;
 		
 		if (proc.event_process_exited)
-			proc.event_process_exited(proc, udata, WTERMSIG(wstatus));
+			proc.event_process_exited(proc, proc.udata, WTERMSIG(wstatus));
 	// NOTE: WCONTINUED is not recommended
 	/*} else if (WIFCONTINUED(wstatus)) { // continuing
 		version (Trace) trace("Continued status=%#x pid=%d", wstatus, proc.pid);
@@ -782,7 +782,7 @@ Lwait:
 		int sig = WSTOPSIG(wstatus);
 		adbg_exception_t exception = void;
 		adbg_translate_exception(&exception, proc, &sig);
-		proc.event_exception(proc, udata, &exception);
+		proc.event_exception(proc, proc.udata, &exception);
 	} else {
 		version (Trace) trace("Unknown status=%d", wstatus);
 		goto Lwait;
