@@ -81,23 +81,28 @@ struct adbg_exception_t {
 	uint oscode;
 	/// Faulting address, if available; Otherwise zero.
 	ulong fault_address;
+	// NOTE: Associated PID and/or TID.
+	//       Windows: Thread ID.
+	//       Linux: Thread ID or thread group.
+	//       FreeBSD: PID or TID.
+	/// Associated thread ID or process ID.
+	long id;
 }
 
-/// (Internal) Translate an oscode to an ExceptionType enum value.
+/// Internal usage.
 ///
-/// Windows: `DEBUG_INFO.Exception.ExceptionRecord.ExceptionCode` and
-/// `cast(uint)de.Exception.ExceptionRecord.ExceptionInformation[0]` in certain
-/// cases.
-/// Posix: Signal number (`si_signo`) and its code (`si_code`) in certain cases.
+/// Used to translate OS status codes to an AdbgException enum value.
+///
+/// Windows: Uses `ExceptionCode` and `ExceptionInformation[0]`.
+/// Posix: Signal number `si_signo` and its code `si_code`.
 ///
 /// Params:
 /// 	code = OS code.
 /// 	subcode = OS sub-code.
-///
-/// Returns: Adjusted exception type.
-AdbgException adbg_exception_from_os(uint code, uint subcode = 0) {
-	// NOTE: Prefer STATUS over EXCEPTION names when possible
+/// Returns: AdbgException enumeration value.
+AdbgException adbg_exception_from_os(uint code, uint subcode) {
 version (Windows) {
+	// NOTE: Prefer STATUS over EXCEPTION names when possible
 	switch (code) with (AdbgException) {
 	// NOTE: A step may also indicate a trace operation
 	case STATUS_SINGLE_STEP, STATUS_WX86_SINGLE_STEP:
@@ -179,17 +184,19 @@ version (Windows) {
 	return AdbgException.Unknown;
 }
 
+AdbgException adbg_exception_type(adbg_exception_t *exception) {
+	if (exception == null) return AdbgException.Unknown;
+	return exception.type;
+}
+
 /// Get a short descriptive string for an exception type value.
-/// Params: ex = Exception.
+/// Params: exception = Exception instance.
 /// Returns: String or null on error.
-const(char)* adbg_exception_name(adbg_exception_t *ex) {
-	if (ex == null) return null;
-	switch (ex.type) with (AdbgException) {
-	case Unknown:	return "UNKNOWN";
+const(char)* adbg_exception_name(adbg_exception_t *exception) {
+	if (exception == null) return null;
+	final switch (exception.type) with (AdbgException) {
 	case Breakpoint:	return "BREAKPOINT";
 	case Step:	return "INSTRUCTION STEP";
-	// NOTE: Also known as a segmentation fault,
-	//       "access violation" remains a better term.
 	case AccessViolation:	return "ACCESS VIOLATION";
 	case BoundExceeded:	return "INDEX OUT OF BOUNDS";
 	case Misalignment:	return "DATA MISALIGNMENT";
@@ -206,6 +213,24 @@ const(char)* adbg_exception_name(adbg_exception_t *ex) {
 	case FPUOverflow:	return "FPU: OVERFLOW";
 	case FPUUnderflow:	return "FPU: UNDERFLOW";
 	case FPUStackOverflow:	return "FPU: STACK OVERFLOW";
-	default:	return "UNKNOWN";
+	case Unknown:	return "UNKNOWN";
 	}
+}
+
+ulong adbg_exception_fault_address(adbg_exception_t *exception) {
+	if (exception == null) return 0;
+	return exception.fault_address;
+}
+
+/// Get the original system error code from the exception.
+/// Params: exception = Exception instance.
+/// Returns: System code.
+int adbg_exception_orig_code(adbg_exception_t *exception) {
+	if (exception == null) return 0;
+	return exception.oscode;
+}
+
+long adbg_exception_tid(adbg_exception_t *exception) {
+	if (exception == null) return 0;
+	return exception.id;
 }

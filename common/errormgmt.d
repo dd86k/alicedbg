@@ -72,7 +72,7 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 	"Code       : "~ERR_OSFMT~"\n"~
 	"Exception  : %s\n"~
 	"PID        : %d\n",
-	ex.oscode, adbg_exception_name(ex), adbg_process_pid(proc));
+	ex.oscode, adbg_exception_name(ex), adbg_process_id(proc));
 	
 	// TODO: Get thread context
 	

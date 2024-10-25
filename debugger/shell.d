@@ -194,6 +194,8 @@ __gshared:
 // NOTE: Process management
 //       Right now the shell is only capable of dealing with one process
 adbg_process_t *process;	/// Process instance
+long event_tid;	/// Exception TID
+
 adbg_disassembler_t *disassembler;	/// Disassembler instance
 
 const(char)* last_spawn_exec;
@@ -623,17 +625,13 @@ int shell_disassemble(size_t address, int *opsize,
 }
 
 void shell_event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *exception) {
-	// HACK: Currently have no way to determine remote associated thread
-	version (Windows)
-	printf("* Process %d (thread %d) stopped\n"~
+	int pid = adbg_process_id(proc);
+	event_tid = adbg_exception_tid(exception);
+	
+	printf("* Process %d (thread %lld) stopped\n"~
 		"	Reason  : %s ("~ERR_OSFMT~")\n",
-		proc.pid, proc.tid,
-		adbg_exception_name(exception), exception.oscode);
-	else
-	printf("* Process %d stopped\n"~
-		"	Reason  : %s ("~ERR_OSFMT~")\n",
-		proc.pid,
-		adbg_exception_name(exception), exception.oscode);
+		pid, event_tid,
+		adbg_exception_name(exception), adbg_exception_orig_code(exception));
 	
 	// No fault address available
 	if (exception.fault_address == 0)
@@ -642,19 +640,22 @@ void shell_event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *
 	printf("	Address : 0x%llx\n", exception.fault_address);
 	
 	char[32] machbuf = void;
-	const(char) *mnemonic = void;
-	const(char) *operands = void;
-	if (shell_disassemble(cast(size_t)exception.fault_address, null, null, 0, machbuf.ptr, 32, &mnemonic, &operands))
+	const(char)* mnemonic = void, operands = void;
+	if (shell_disassemble(cast(size_t)exception.fault_address,
+		null,
+		null, 0,
+		machbuf.ptr, 32,
+		&mnemonic, &operands))
 		return;
 	
 	printf("	Machine : %s\n", machbuf.ptr);
 	printf("	Mnemonic: %s %s\n", mnemonic, operands);
 }
 void shell_event_process_exit(adbg_process_t *proc, void *udata, int code) {
-	printf("* Process %d exited with code %d\n", adbg_process_pid(proc), code);
+	printf("* Process %d exited with code %d\n", adbg_process_id(proc), code);
 }
 void shell_event_process_continue(adbg_process_t *proc, void *udata) {
-	printf("* Process %d continued\n", adbg_process_pid(proc));
+	printf("* Process %d continued\n", adbg_process_id(proc));
 }
 
 void shell_event_help(immutable(command2_t) *command) {
@@ -703,7 +704,7 @@ void shell_event_help(immutable(command2_t) *command) {
 	putchar('\n');
 }
 
-debug
+debug // This is only to test the crash handler
 int command_crash(int, const(char) **) {
 	void function() fnull;
 	fnull();
@@ -788,7 +789,7 @@ int command_restart(int argc, const(char) **argv) {
 }
 
 int command_go(int argc, const(char) **argv) {
-	if (adbg_debugger_continue(process))
+	if (event_tid && adbg_debugger_continue(process, event_tid))
 		return ShellError.alicedbg;
 	if (adbg_debugger_wait(process))
 		return ShellError.alicedbg;
@@ -805,7 +806,7 @@ int command_kill(int argc, const(char) **argv) {
 
 // NOTE: Can't simply execute stepi multiple times in a row
 int command_stepi(int argc, const(char) **argv) {
-	if (adbg_debugger_stepi(process))
+	if (adbg_debugger_stepi(process, event_tid))
 		return ShellError.alicedbg;
 	if (adbg_debugger_wait(process))
 		return ShellError.alicedbg;
@@ -1111,7 +1112,7 @@ int command_plist(int argc, const(char) **argv) {
 	char[BUFFERSIZE] buffer = void;
 	adbg_process_t *proc = void;
 	for (size_t i; (proc = adbg_process_list_get(proclist, i)) != null; ++i) {
-		printf("%10d  ", adbg_process_pid(proc));
+		printf("%10d  ", adbg_process_id(proc));
 		if (adbg_process_path(proc, buffer.ptr, BUFFERSIZE)) {
 			version (Trace) trace("error: %s", adbg_error_message());
 			else            putchar('\n');
@@ -1143,7 +1144,7 @@ int command_thread(int argc, const(char) **argv) {
 		printf("Threads:");
 		for (size_t i; (thread = adbg_thread_list_by_index(process, i)) != null; ++i) {
 			if (i) putchar(',');
-			printf(" %d", adbg_thread_id(thread));
+			printf(" %lld", adbg_thread_id(thread));
 		}
 		putchar('\n');
 		return 0;
@@ -1207,7 +1208,7 @@ int command_quit(int argc, const(char) **argv) {
 	// Confirm quitting
 	if (process) {
 		printf("Process %d is running. Do you wish to quit? [Y/n] ",
-			adbg_process_pid(process));
+			adbg_process_id(process));
 		fflush(stdout);
 		int c = getchar();
 		if (c == 'n' || c == 'N')

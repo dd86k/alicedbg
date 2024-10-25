@@ -13,6 +13,12 @@ import adbg.process.base;
 import adbg.utils.list;
 import core.stdc.stdio : snprintf;
 
+// TODO: Consider NOT attaching thread list to process
+//       Affects: adbg_thread_list_update
+//       Since they are potentially short-lived, returning a new list when
+//       needed should be just fine.
+// TODO: Thread ID type alias.
+
 version (Windows) {
 	import adbg.include.windows.tlhelp32;
 	import adbg.include.windows.wow64apiset;
@@ -35,11 +41,9 @@ version (Windows) {
 extern (C):
 
 struct adbg_thread_t {
+	long id;
 version (Windows) {
 	HANDLE handle;
-	int id;
-} else version (Posix) {
-	pid_t id;
 }
 	adbg_thread_context_t context;
 }
@@ -241,8 +245,8 @@ adbg_thread_t* adbg_thread_list_by_index(adbg_process_t *process, size_t index) 
 /// 	process = Process instance.
 /// 	id = Thread ID
 /// Returns: Thread instance. On error, null.
-adbg_thread_t* adbg_thread_list_by_id(adbg_process_t *process, int id) {
-	version (Trace) trace("process=%p id=%d", process, id);
+adbg_thread_t* adbg_thread_list_by_id(adbg_process_t *process, long id) {
+	version (Trace) trace("process=%p id=%lld", process, id);
 	if (process == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -263,7 +267,7 @@ adbg_thread_t* adbg_thread_list_by_id(adbg_process_t *process, int id) {
 /// Get the thread ID out of this thread instance.
 /// Params: thread = Thread instance.
 /// Returns: Thread ID. On error, zero.
-int adbg_thread_id(adbg_thread_t *thread) {
+long adbg_thread_id(adbg_thread_t *thread) {
 	version (Trace) trace("thread=%p", thread);
 version (Windows) {
 	if (thread == null) {
@@ -276,7 +280,7 @@ version (Windows) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
-	return cast(int)thread.id;
+	return thread.id;
 } else {
 	adbg_oops(AdbgError.unimplemented);
 	return 0;

@@ -49,18 +49,38 @@ extern (C):
 adbg_process_t* adbg_self_process() {
 	__gshared adbg_process_t proc;
 	proc.creation = AdbgCreation.unloaded;
-	proc.status = AdbgProcessState.running;
+	proc.state = AdbgProcessState.running;
 version (Windows) {
-	proc.hproc = GetCurrentProcess();
-	proc.hthread = GetCurrentThread();
 	proc.pid = GetCurrentProcessId();
-	proc.tid = GetCurrentThreadId();
-} else version (Posix) {
+	// GetCurrentThreadId();
+} else version (linux) {
 	proc.pid = getpid();
-	// TODO: (Linux) gettid(2)
+	// TODO: gettid(2)
+} else version (FreeBSD) {
+	proc.pid = getpid();
+	// TODO: int thr_self(c_long *tid);
+} else version (NetBSD) {
+	proc.pid = getpid();
+	// TODO: NetBSD: lwpid_t _lwp_self(void);
+} else version (OpenBSD) {
+	proc.pid = getpid();
+	// TODO: OpenBSD: pid_t getthrid(void);
+} else {
+	proc.pid = 0;
 }
 	return &proc;
 }
+
+int adbg_self_process_id() {
+version (Windows) {
+	return GetCurrentProcessId();
+} else version (Posix) {
+	return getpid();
+} else
+	return 0;
+}
+
+// TODO: int adbg_self_thread_id()
 
 /// Insert a tracee break.
 void adbg_self_break() {
@@ -129,7 +149,7 @@ version (Windows) {
 /// This is useful for catching critical exceptions gracefully before
 /// closing the application, such as writing a crash log or minidump.
 ///
-/// Note: Not respected by some exceptions, like buffer overruns.
+/// Some cases, like access violations, may not be caught.
 /// Params: func = User handler function.
 /// Returns: Zero on success; Non-zero on error.
 int adbg_self_set_crashhandler(void function(adbg_process_t*, adbg_exception_t*) func) {
@@ -170,14 +190,8 @@ uint adbg_internal_handler(EXCEPTION_POINTERS *e) {
 	adbg_exception_t ex = void;
 	ex.oscode = e.ExceptionRecord.ExceptionCode;
 	ex.fault_address = cast(ulong)e.ExceptionRecord.ExceptionAddress;
-	with (e.ExceptionRecord) switch (ex.oscode) {
-	case EXCEPTION_IN_PAGE_ERROR:
-	case EXCEPTION_ACCESS_VIOLATION:
+	with (e.ExceptionRecord)
 		ex.type = adbg_exception_from_os(ExceptionCode, cast(uint)ExceptionInformation[0]);
-		break;
-	default:
-		ex.type = adbg_exception_from_os(ExceptionCode);
-	}
 	
 	// Call user function
 	__ufunction(adbg_self_process(), &ex);

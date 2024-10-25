@@ -50,7 +50,6 @@ enum AdbgProcessState : ubyte {
 }
 alias AdbgProcStatus = AdbgProcessState; // Old alias
 
-// TODO: Remove this enum and rely on AdbgProcessState
 /// Process creation source.
 enum AdbgCreation : ubyte {
 	unattached,
@@ -59,36 +58,26 @@ enum AdbgCreation : ubyte {
 	spawned,
 }
 
-// TODO: Decouple thread info from process and rely on thread functions
 /// Represents an instance of a process.
 struct adbg_process_t {
-version (Windows) { // Original identifiers; Otherwise informal
+version (Windows) {
 	int orig_pid;	/// Event Process ID
-	// NOTE: PID and TID usage
-	//       The Process and Thread IDs are used to open handles
-	//       This is done on a per-function basis for permissions
-	//       and memory management (opening and closing handles)
-	//       purposes.
-	int pid;	/// Event Process ID
-	int tid;	/// Event Thread ID
-	char *args;	/// Saved arguments when process was launched
-	// TODO: Deprecate hpid and htid
-	HANDLE hthread;	/// Thread handle
-	HANDLE hproc;	/// Process handle
+	char *orig_args;	/// Saved arguments when process was launched
+	HANDLE orig_phandle;	/// Process handle
+	int pid;	/// Process ID
 }
 version (Posix) {
 	pid_t orig_pid;	/// Original spawned PID
+	char **orig_argv;	/// Saved arguments when process was launched
 	pid_t pid;	/// Event Process ID
-	pid_t tid;	/// HACK: Event Thread ID
 			// On Linux, the starting thread ID is the same as the process ID
-	char **argv;	/// Saved arguments when process was launched
 }
 version (linux) {
 	int mhandle;	/// Internal memory file handle to /proc/PID/mem
 	bool memfailed;	/// Set if we fail to open /proc/PID/mem
 }
 	/// Last known process status.
-	AdbgProcessState status;
+	AdbgProcessState state;
 	/// Process' creation source.
 	AdbgCreation creation;
 	/// List of threads.
@@ -111,15 +100,14 @@ void adbg_process_free(adbg_process_t *proc) {
 	if (proc == null)
 		return;
 	version (Windows) {
-		if (proc.args) free(proc.args);
-		CloseHandle(proc.hproc);
-		CloseHandle(proc.hthread);
+		if (proc.orig_args) free(proc.orig_args);
+		CloseHandle(proc.orig_phandle);
 	}
 	version (linux) {
 		if (proc.mhandle) close(proc.mhandle);
 	}
 	version (Posix) {
-		if (proc.argv) free(proc.argv);
+		if (proc.orig_argv) free(proc.orig_argv);
 	}
 	adbg_list_free(proc.thread_list);
 	free(proc);
@@ -130,7 +118,7 @@ void adbg_process_free(adbg_process_t *proc) {
 /// Returns: Debuggee status.
 AdbgProcessState adbg_process_status(adbg_process_t *tracee) pure {
 	if (tracee == null) return AdbgProcessState.unknown;
-	return tracee.status;
+	return tracee.state;
 }
 /// Get the debuggee current status as a string.
 /// Params: tracee = Debugged process.
@@ -140,7 +128,7 @@ const(char)* adbg_process_status_string(adbg_process_t *tracee) pure {
 	if (tracee == null)
 		return default_;
 	const(char) *m = void;
-	switch (tracee.status) with (AdbgProcessState) {
+	switch (tracee.state) with (AdbgProcessState) {
 	case unloaded:	m = "unloaded"; break;
 	case created:	m = "created"; break;
 	case running:	m = "running"; break;
@@ -153,7 +141,7 @@ const(char)* adbg_process_status_string(adbg_process_t *tracee) pure {
 /// Get the process ID.
 /// Params: proc = Process instance.
 /// Returns: PID or 0 on error.
-int adbg_process_pid(adbg_process_t *proc) {
+int adbg_process_id(adbg_process_t *proc) {
 	if (proc == null) return 0;
 	return proc.pid;
 }
@@ -235,20 +223,24 @@ version (AArch64) {
 ///
 /// This is useful when the debugger is dealing with a process running
 /// under a subsystem such as WoW or lib32-on-linux64 programs.
-/// Params: proc = Debuggee process.
+/// Params: proc = Process instance.
 /// Returns: Machine platform.
 AdbgMachine adbg_process_machine(adbg_process_t *proc) {
 	if (proc == null)
 		return AdbgMachine.unknown;
 	
 version (WinPersonality) {
-	// TODO: Check with IsWow64Process2 when able
-	//       Important for AArch32 support on AArch64
-	//       with GetProcAddress("kernel32", "IsWow64Process2")
-	//       Introduced in Windows 10, version 1511
-	//       IsWow64Process: 32-bit proc. under aarch64 returns FALSE
-	BOOL w64 = void;
-	if (IsWow64Process(proc.hproc, &w64) && w64) return PERSO32;
+	HANDLE phandle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, cast(DWORD)proc.pid);
+	if (phandle) {
+		scope(exit) CloseHandle(phandle);
+		// TODO: Check with IsWow64Process2 when able
+		//       Important for AArch32 support on AArch64
+		//       with GetProcAddress("kernel32", "IsWow64Process2")
+		//       Introduced in Windows 10, version 1511
+		//       IsWow64Process: 32-bit proc. under aarch64 returns FALSE
+		BOOL w64 = void;
+		if (IsWow64Process(phandle, &w64) && w64) return PERSO32;
+	}
 }
 version (LinuxPersonality) {
 	char[64] path = void;
@@ -291,26 +283,27 @@ version (Windows) {
 	}
 	scope(exit) CloseHandle(hsnap);
 	
-	PROCESSENTRY32 proc = void;
-	if (Process32First(hsnap, &proc) == FALSE) {
+	PROCESSENTRY32 entry = void;
+	if (Process32First(hsnap, &entry) == FALSE) {
 		adbg_list_free(list);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
 	
-	adbg_process_t t = void;
-	memset(&t, 0, adbg_process_t.sizeof);
+	adbg_process_t proc = void;
+	memset(&proc, 0, adbg_process_t.sizeof);
 	do {
 		// Ignore Idle and System
-		switch (proc.th32ProcessID) {
+		switch (entry.th32ProcessID) {
 		case 0, 4: continue;
 		default:
 		}
 		
-		t.pid = proc.th32ProcessID;
-		t.hproc = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, proc.th32ProcessID);
-		list = adbg_list_add(list, &t);
-	} while (Process32Next(hsnap, &proc));
+		proc.pid = entry.th32ProcessID;
+		list = adbg_list_add(list, &proc);
+		if (list == null)
+			return null;
+	} while (Process32Next(hsnap, &entry));
 	
 	return list;
 } else version (linux) {
@@ -337,6 +330,8 @@ version (Windows) {
 		
 		t.pid = atoi(procent.d_name.ptr);
 		list = adbg_list_add(list, &t);
+		if (list == null)
+			return null;
 	}
 	return list;
 } else {
@@ -362,14 +357,5 @@ adbg_process_t* adbg_process_list_get(void *proclist, size_t index) {
 /// Params: proclist = List instance.
 void adbg_process_list_close(void *proclist) {
 	if (proclist == null) return;
-	
-version (Windows) {
-	list_t *list = cast(list_t*)proclist;
-	adbg_process_t *proc = void;
-	for (size_t i; (proc = cast(adbg_process_t*)adbg_list_get(list, i)) != null; ++i) {
-		CloseHandle(proc.hproc);
-	}
-}
-	
 	adbg_list_free(cast(list_t*)proclist);
 }

@@ -55,45 +55,47 @@ version (Windows) {
 /*size_t adbg_memory_hugepagesize() {
 }*/
 
-//TODO: Provide a way to return number of bytes written/read
-//      1. Could make size parameter a pointer
-//      2. Could return a ptrdiff_t, -1 on error
-/// Read memory from tracee data memory area.
+// TODO: Provide parameter for memory type (data, instruction)
+/// Read memory from process data memory area.
 /// Params:
-/// 	tracee = Reference to tracee instance.
+/// 	proc = Process instannce.
 /// 	addr = Memory address (within the children address space).
 /// 	data = Pointer to data.
 /// 	size = Size of data.
 /// Returns: Error code.
-int adbg_memory_read(adbg_process_t *tracee, size_t addr, void *data, uint size) {
-	if (tracee == null || data == null)
+int adbg_memory_read(adbg_process_t *proc, size_t addr, void *data, uint size) {
+	if (proc == null || data == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (size == 0)
 		return 0;
 	
 version (Windows) {
-	if (ReadProcessMemory(tracee.hproc, cast(void*)addr, data, size, null) == 0)
+	HANDLE phandle = OpenProcess(PROCESS_VM_READ, FALSE, cast(DWORD)proc.pid);
+	if (phandle == null)
+		return adbg_oops(AdbgError.os);
+	scope(exit) CloseHandle(phandle);
+	
+	if (ReadProcessMemory(phandle, cast(void*)addr, data, size, null) == 0)
 		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (linux) {
-	// Try reading from mem if able
-	if (tracee.memfailed == false) {
-		if (tracee.mhandle) {
+	if (proc.memfailed == false) { // Try /proc/PID/mem if able
+		if (proc.mhandle) {
 		Lread:
-			if (read(tracee.mhandle, data, size) >= 0)
+			if (read(proc.mhandle, data, size) >= 0)
 				return 0;
 			
 			// Mark as failed and don't try again
-			tracee.memfailed = true;
+			proc.memfailed = true;
 		} else { // open mem handle
 			char[32] pathbuf = void;
-			snprintf(pathbuf.ptr, 32, "/proc/%d/mem", tracee.pid);
-			tracee.mhandle = open(pathbuf.ptr, O_RDWR);
+			snprintf(pathbuf.ptr, 32, "/proc/%d/mem", proc.pid);
+			proc.mhandle = open(pathbuf.ptr, O_RDWR);
 			// Success? Try reading
-			if (tracee.mhandle)
+			if (proc.mhandle)
 				goto Lread;
 			// On failure, mark fail and proceed to try ptrace fallback
-			tracee.memfailed = true;
+			proc.memfailed = true;
 		}
 	}
 	
@@ -103,7 +105,7 @@ version (Windows) {
 	
 	for (; r > 0; --r, ++dest, addr += c_long.sizeof) {
 		errno = 0; // Clear errno on PT_PEEK*
-		*dest = ptrace(PT_PEEKDATA, tracee.pid, addr, null);
+		*dest = ptrace(PT_PEEKDATA, proc.pid, addr, null);
 		if (errno)
 			return adbg_oops(AdbgError.os);
 	}
@@ -111,7 +113,7 @@ version (Windows) {
 	r = size % c_long.sizeof;
 	if (r) {
 		errno = 0; // Clear errno on PT_PEEK*
-		c_long l = ptrace(PT_PEEKDATA, tracee.pid, addr, null);
+		c_long l = ptrace(PT_PEEKDATA, proc.pid, addr, null);
 		if (errno)
 			return adbg_oops(AdbgError.os);
 		ubyte* dest8 = cast(ubyte*)dest, src8 = cast(ubyte*)&l;
@@ -120,49 +122,54 @@ version (Windows) {
 	return 0;
 } else version (FreeBSD) {
 	ptrace_io_desc io = ptrace_io_desc(PIOD_READ_D, cast(void*)addr, data, size);
-	if (ptrace(PT_IO, tracee.pid, &io, 0) < 0) // sets errno
+	if (ptrace(PT_IO, proc.pid, &io, 0) < 0) // sets errno
 		return adbg_oops(AdbgError.crt);
 	return 0;
 } else // Unsupported
 	return adbg_oops(AdbgError.unimplemented);
 }
 
-/// Write memory to tracee data memory area.
+/// Write memory to process data memory area.
 /// Params:
-/// 	tracee = Reference to tracee instance.
+/// 	proc = Process instance.
 /// 	addr = Memory address (within the children address space).
 /// 	data = Pointer to data.
 /// 	size = Size of data.
 /// Returns: Error code.
-int adbg_memory_write(adbg_process_t *tracee, size_t addr, void *data, uint size) {
-	if (tracee == null || data == null)
+int adbg_memory_write(adbg_process_t *proc, size_t addr, void *data, uint size) {
+	if (proc == null || data == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (size == 0)
 		return 0;
 	
 version (Windows) {
-	if (WriteProcessMemory(tracee.hproc, cast(void*)addr, data, size, null) == 0)
+	HANDLE phandle = OpenProcess(PROCESS_VM_WRITE, FALSE, cast(DWORD)proc.pid);
+	if (phandle == null)
+		return adbg_oops(AdbgError.os);
+	scope(exit) CloseHandle(phandle);
+	
+	if (WriteProcessMemory(phandle, cast(void*)addr, data, size, null) == 0)
 		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (linux) {
 	// Try reading from mem if able
-	if (tracee.memfailed == false) {
-		if (tracee.mhandle) {
+	if (proc.memfailed == false) {
+		if (proc.mhandle) {
 		Lread:
-			if (write(tracee.mhandle, data, size) >= 0)
+			if (write(proc.mhandle, data, size) >= 0)
 				return 0;
 			
 			// Mark as failed and don't try again
-			tracee.memfailed = true;
+			proc.memfailed = true;
 		} else { // open mem handle
 			char[32] pathbuf = void;
-			snprintf(pathbuf.ptr, 32, "/proc/%d/mem", tracee.pid);
-			tracee.mhandle = open(pathbuf.ptr, O_RDWR);
+			snprintf(pathbuf.ptr, 32, "/proc/%d/mem", proc.pid);
+			proc.mhandle = open(pathbuf.ptr, O_RDWR);
 			// Success? Try reading
-			if (tracee.mhandle)
+			if (proc.mhandle)
 				goto Lread;
 			// On failure, mark fail and proceed to try ptrace fallback
-			tracee.memfailed = true;
+			proc.memfailed = true;
 		}
 	}
 	
@@ -172,20 +179,20 @@ version (Windows) {
 	int j = size / c_long.sizeof;	/// number of "blocks" to process
 	
 	for (; i < j; ++i, ++user) {
-		if (ptrace(PT_POKEDATA, tracee.pid, addr + (i * c_long.sizeof), user) < 0)
+		if (ptrace(PT_POKEDATA, proc.pid, addr + (i * c_long.sizeof), user) < 0)
 			return adbg_oops(AdbgError.os);
 	}
 	
 	j = size % c_long.sizeof;
 	if (j) {
-		if (ptrace(PT_POKEDATA, tracee.pid,
+		if (ptrace(PT_POKEDATA, proc.pid,
 			addr + (i * c_long.sizeof), user) < 0)
 			return adbg_oops(AdbgError.os);
 	}
 	return 0;
 } else version (FreeBSD) {
 	ptrace_io_desc io = ptrace_io_desc(PIOD_WRITE_D, cast(void*)addr, data, size);
-	if (ptrace(PT_IO, tracee.pid, &io, 0) < 0) // sets errno
+	if (ptrace(PT_IO, proc.pid, &io, 0) < 0) // sets errno
 		return adbg_oops(AdbgError.crt);
 	return 0;
 } else // Unsupported
@@ -261,13 +268,13 @@ struct adbg_memory_map_t {
 /// To close, call adbg_memory_maps_close. On error, all memory buffers
 /// are cleaned.
 /// Params:
-/// 	tracee = Tracee, in the ready or paused state.
+/// 	proc = Process instance.
 /// 	mmaps = Reference to map list.
 /// 	mcount = Reference to map count.
 /// 	... = Options.
 /// Returns: Error code.
-int adbg_memory_maps(adbg_process_t *tracee, adbg_memory_map_t **mmaps, size_t *mcount, ...) {
-	if (tracee == null || mmaps == null || mcount == null)
+int adbg_memory_maps(adbg_process_t *proc, adbg_memory_map_t **mmaps, size_t *mcount, ...) {
+	if (proc == null || mmaps == null || mcount == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	// Get options
@@ -288,13 +295,15 @@ Loption:
 	// Failsafe
 	*mcount = 0;
 	
-	if (tracee.pid == 0)
-		return adbg_oops(AdbgError.debuggerUnattached);
-	
 	// Add EnumPageFilesA?
 version (Windows) {
 	if (__dynlib_psapi_load()) // EnumProcessModules, QueryWorkingSet
 		return adbg_errno();
+	
+	HANDLE phandle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, proc.pid);
+	if (phandle == null)
+		return adbg_oops(AdbgError.os);
+	scope(exit) CloseHandle(phandle);
 	
 	size_t uindex; /// (user) map index
 	
@@ -318,7 +327,7 @@ version (Windows) {
 	// This queries workset addresses regardless of size, page-bounded.
 	// e.g., it will add 0x30000 and 0x31000 as entries, despite being a 8K "block".
 Lretry:
-	uint r = QueryWorkingSet(tracee.hproc, mbinfo, bfsz);
+	uint r = QueryWorkingSet(phandle, mbinfo, bfsz);
 	switch (r) {
 	case 0:
 		return adbg_oops(AdbgError.os);
@@ -368,7 +377,7 @@ Lretry:
 		
 		// Query with whatever page value
 		MEMORY_BASIC_INFORMATION mem = void;
-		if (VirtualQueryEx(tracee.hproc, cast(void*)blk.VirtualPage,
+		if (VirtualQueryEx(phandle, cast(void*)blk.VirtualPage,
 			&mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
 			continue;
 		}
@@ -379,8 +388,8 @@ Lretry:
 			continue;
 		
 		// Get mapped file
-		if (GetMappedFileNameA(tracee.hproc, mem.BaseAddress, map.name.ptr, MEM_MAP_NAME_LEN)) {
-			map.name[GetModuleFileNameExA(tracee.hproc, null, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
+		if (GetMappedFileNameA(phandle, mem.BaseAddress, map.name.ptr, MEM_MAP_NAME_LEN)) {
+			map.name[GetModuleFileNameExA(phandle, null, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
 		} else {
 			map.name[0] = 0;
 		}
@@ -426,7 +435,7 @@ Lretry:
 		void *end = mem.BaseAddress + mem.RegionSize;
 		while (i + 1 < mbinfo.NumberOfEntries) {
 			void *page = cast(void*)mbinfo.WorkingSetInfo.ptr[i + 1].VirtualPage;
-			if (VirtualQueryEx(tracee.hproc, page,
+			if (VirtualQueryEx(phandle, page,
 				&mem, MEMORY_BASIC_INFORMATION.sizeof) == 0)
 				break;
 			if (mem.BaseAddress > end) break;
@@ -447,20 +456,20 @@ Lretry:
 	
 	// Enum process modules
 	DWORD needed = void; //TODO: Could re-use this with option
-	if (EnumProcessModules(tracee.hproc, mods, buffersz, &needed) == FALSE)
+	if (EnumProcessModules(phandle, mods, buffersz, &needed) == FALSE)
 		return adbg_oops(AdbgError.os);
 	
 	DWORD modcount = needed / HMODULE.sizeof;
 	for (DWORD mod_i; mod_i < modcount; ++mod_i) {
 		HMODULE mod = mods[mod_i];
 		MODULEINFO minfo = void;
-		if (GetModuleInformation(tracee.hproc, mod, &minfo, MODULEINFO.sizeof) == FALSE) {
+		if (GetModuleInformation(phandle, mod, &minfo, MODULEINFO.sizeof) == FALSE) {
 			continue;
 		}
 		
 		// Get base name (e.g., from \Device\HarddiskVolume5\xyz.dll)
-		if (GetMappedFileNameA(tracee.hproc, minfo.lpBaseOfDll, map.name.ptr, MEM_MAP_NAME_LEN)) {
-			map.name[GetModuleFileNameExA(tracee.hproc, mod, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
+		if (GetMappedFileNameA(phandle, minfo.lpBaseOfDll, map.name.ptr, MEM_MAP_NAME_LEN)) {
+			map.name[GetModuleFileNameExA(phandle, mod, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
 		} else {
 			map.name[0] = 0;
 		}
@@ -468,7 +477,7 @@ Lretry:
 		//TODO: if WoW64, use MEMORY_BASIC_INFORMATION32
 		
 		MEMORY_BASIC_INFORMATION mem = void;
-		if (VirtualQueryEx(tracee.hproc, minfo.lpBaseOfDll, &mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
+		if (VirtualQueryEx(phandle, minfo.lpBaseOfDll, &mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
 			continue;
 		}
 		
@@ -512,7 +521,7 @@ Lretry:
 	// Formulate proc map path
 	enum PROC_MAPS_LEN = 32;
 	char[PROC_MAPS_LEN] proc_maps = void;
-	snprintf(proc_maps.ptr, PROC_MAPS_LEN, "/proc/%u/maps", tracee.pid);
+	snprintf(proc_maps.ptr, PROC_MAPS_LEN, "/proc/%u/maps", proc.pid);
 	version (Trace) trace("maps: %s", proc_maps.ptr);
 	
 	// Open process maps
@@ -525,7 +534,7 @@ Lretry:
 	// Get proc exe path (e.g., /usr/bin/cat)
 	enum PROC_EXE_LEN = 32;
 	char[PROC_EXE_LEN] proc_exe = void;
-	snprintf(proc_exe.ptr, PROC_EXE_LEN, "/proc/%u/exe", tracee.pid);
+	snprintf(proc_exe.ptr, PROC_EXE_LEN, "/proc/%u/exe", proc.pid);
 	
 	// Read link from proc exe for process path
 	enum EXE_PATH_LEN = 256;
@@ -706,6 +715,8 @@ enum AdbgScanOpt {
 	/// Type: int
 	/// Default: false
 	unaligned	= 1,
+	// TODO: allModules
+	//allModules	= 2,
 	/// Set the initial capacity for results, other than the default.
 	///
 	/// Currently, the capacity does not increase dynamically.
@@ -799,7 +810,7 @@ adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t datasiz
 	}
 	
 	// Check debugger status
-	switch (tracee.status) with (AdbgProcessState) {
+	switch (tracee.state) with (AdbgProcessState) {
 	case standby, paused, running: break;
 	default:
 		adbg_oops(AdbgError.debuggerUnpaused);

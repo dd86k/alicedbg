@@ -18,7 +18,8 @@ enum {
 
 int putchar(int);
 
-adbg_disassembler_t *dis;
+adbg_disassembler_t *disassembler;
+int status = SIMPLE_CONTINUE;
 
 void oops(int code = 0, const(char) *reason = null) {
 	printf("* error=\"%s\"\n", reason ? reason : adbg_error_message());
@@ -26,95 +27,98 @@ void oops(int code = 0, const(char) *reason = null) {
 	exit(code);
 }
 
-void loop_handler(adbg_process_t *proc, int event, void *edata, void *udata) {
-	switch (event) {
-	case AdbgEvent.exception:
-		adbg_exception_t *ex = cast(adbg_exception_t*)edata;
+void event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *exception) {
+	long tid = adbg_exception_tid(exception);
+	printf(`* pid=%d tid=%lld event=\"exception\" name="%s" oscode=`~ERR_OSFMT,
+		adbg_process_id(proc), tid,
+		adbg_exception_name(exception), adbg_exception_orig_code(exception));
+	
+	// Print fault address if available
+	ulong faultaddr = adbg_exception_fault_address(exception);
+	if (faultaddr)
+		printf(" address=%#llx", faultaddr);
+	
+	// If disassembler is available, disassemble one instruction
+	if (faultaddr && disassembler) {
+		enum BSZ = 32;
+		ubyte[BSZ] buffer = void;
+		adbg_opcode_t opcode = void;
+		if (adbg_memory_read(proc, cast(size_t)faultaddr, buffer.ptr, BSZ) || 
+			adbg_disassemble(disassembler, &opcode, buffer.ptr, BSZ, faultaddr))
+			goto Lnodisasm;
 		
-		// Assume singleprocess, so don't print its PID
-		printf(`* tid=%d exception="%s" oscode=`~ERR_OSFMT,
-			proc.tid, adbg_exception_name(ex), ex.oscode);
-		
-		// Print fault address if available
-		if (ex.faultz)
-			printf(" address=%#llx", ex.fault_address);
-		
-		// If disassembler is available, disassemble one instruction
-		if (ex.faultz && dis) {
-			adbg_opcode_t opcode = void;
-			enum BSZ = 32; ubyte[BSZ] buffer = void;
-			if (adbg_memory_read(proc, ex.faultz, buffer.ptr, BSZ))
-				goto Lnodisasm;
-			if (adbg_disassemble(dis, &opcode, buffer.ptr, BSZ, ex.fault_address))
-				goto Lnodisasm;
-			
-			goto Ldisasm;
-		Lnodisasm:
-			printf(` nodisasm="%s"`, adbg_error_message());
-			goto Ldone;
-		Ldisasm:
-			printf(` disasm="%s`, op.mnemonic);
-			if (op.operands) printf(` %s"`, op.operands);
-			putchar('"');
-		Ldone:
-		}
-		
-		switch (ex.type) with (AdbgException) {
-		case Breakpoint, Step:
-			adbg_debugger_continue(proc);
-			putchar('\n');
-			return;
-		default: // Quit at first fault
-			*(cast(int*)udata) = SIMPLE_STOP;
-		}
-		
-		// If available, print register data
-		adbg_thread_t *thread = adbg_thread_list_by_id(proc, proc.tid);
-		if (thread && adbg_thread_context_update(proc, thread) == 0) {
-			int id;
-			adbg_register_t *reg = void;
-			while ((reg = adbg_register_by_id(thread, id++)) != null) {
-				char[20] hex = void;
-				adbg_register_format(hex.ptr, 20, reg, AdbgRegisterFormat.hex);
-				printf(` %s=0x%s`, adbg_register_name(reg), hex.ptr);
-			}
-		}
-		
-		putchar('\n');
-		return;
-	case AdbgEvent.processExit:
-		int *oscode = cast(int*)edata;
-		printf("* exited with code %d\n", *oscode);
-		*(cast(int*)udata) = SIMPLE_STOP;
-		return;
-	default:
+		goto Ldisasm;
+	Lnodisasm:
+		printf(` nodisasm="%s"`, adbg_error_message());
+		goto Ldone;
+	Ldisasm:
+		printf(` disasm="%s`, opcode.mnemonic);
+		if (opcode.operands) printf(` %s"`, opcode.operands);
+		putchar('"');
+	Ldone:
 	}
+	
+	// If available, print register data
+	/*
+	adbg_thread_t *thread = adbg_thread_list_by_id(proc, tid);
+	if (thread && adbg_thread_context_update(proc, thread) == 0) {
+		int rid;
+		adbg_register_t *reg = void;
+		while ((reg = adbg_register_by_id(thread, rid++)) != null) {
+			char[20] hex = void;
+			adbg_register_format(hex.ptr, 20, reg, AdbgRegisterFormat.hex);
+			printf(` %s=0x%s`, adbg_register_name(reg), hex.ptr);
+		}
+	}
+	*/
+	
+	putchar('\n');
+	
+	switch (adbg_exception_type(exception)) with (AdbgException) {
+	case Breakpoint, Step:
+		adbg_debugger_continue(proc, tid);
+		break;
+	default: // Quit at first fault
+		*(cast(int*)udata) = SIMPLE_STOP;
+	}
+}
+void event_process_continue(adbg_process_t *proc, void *udata) {
+	printf("* pid=%d event=\"continued\"\n", adbg_process_id(proc));
+}
+void event_process_exit(adbg_process_t *proc, void *udata, int code) {
+	printf("* pid=%d event=\"exited\" code=%d\n", adbg_process_id(proc), code);
+	*(cast(int*)udata) = SIMPLE_STOP;
 }
 
 int main(int argc, const(char) **argv) {
 	if (argc < 2)
 		oops(1, "Missing path to executable");
 	
-	// if additional arguments, they are for process to debug
+	// Additional arguments for debuggee
 	const(char) **pargv = argc > 2 ? argv + 2 : null;
 	
+	// Launch process
 	adbg_process_t *process =
 		adbg_debugger_spawn(argv[1],
 			AdbgSpawnOpt.argv, pargv,
 			0);
 	if (process == null)
 		oops;
+	adbg_debugger_on(process, AdbgEvent.exception, &event_exception);
+	adbg_debugger_on(process, AdbgEvent.processContinue, &event_process_continue);
+	adbg_debugger_on(process, AdbgEvent.processExit, &event_process_exit);
+	adbg_debugger_udata(process, &status);
 	
-	dis = adbg_disassembler_open(adbg_process_machine(process));
-	if (dis == null)
+	// New disassembler instance, if able
+	disassembler = adbg_disassembler_open(adbg_process_machine(process));
+	if (disassembler == null)
 		printf("* warning=\"Disassembler unavailable: %s\"\n", adbg_error_message());
 	
-	int state = SIMPLE_CONTINUE;
-	if (adbg_debugger_continue(process))
-		oops;
-Lcontinue:
-	if (adbg_debugger_wait(process, &loop_handler, &state))
-		oops;
-	if (state) goto Lcontinue;
+	// Start and listen to events
+	while (status) {
+		if (adbg_debugger_wait(process))
+			oops;
+	}
+	puts("* quitting");
 	return 0;
 }
