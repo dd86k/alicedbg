@@ -58,19 +58,21 @@ void event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *except
 	Ldone:
 	}
 	
-	// If available, print register data
-	/*
-	adbg_thread_t *thread = adbg_thread_list_by_id(proc, tid);
-	if (thread && adbg_thread_context_update(proc, thread) == 0) {
-		int rid;
-		adbg_register_t *reg = void;
-		while ((reg = adbg_register_by_id(thread, rid++)) != null) {
-			char[20] hex = void;
-			adbg_register_format(hex.ptr, 20, reg, AdbgRegisterFormat.hex);
-			printf(` %s=0x%s`, adbg_register_name(reg), hex.ptr);
+	// If available, print register data for thread
+	void *thrlist = adbg_thread_list_new(proc);
+	if (thrlist) {
+		adbg_thread_t *thread = adbg_thread_list_by_id(thrlist, tid);
+		if (thread && adbg_thread_context_update(proc, thread) == 0) {
+			int rid;
+			adbg_register_t *reg = void;
+			while ((reg = adbg_register_by_id(thread, rid++)) != null) {
+				char[20] hex = void;
+				adbg_register_format(hex.ptr, 20, reg, AdbgRegisterFormat.hex);
+				printf(` %s=0x%s`, adbg_register_name(reg), hex.ptr);
+			}
 		}
+		adbg_thread_list_close(thrlist);
 	}
-	*/
 	
 	putchar('\n');
 	

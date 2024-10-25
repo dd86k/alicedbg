@@ -80,10 +80,8 @@ version (linux) {
 	AdbgProcessState state;
 	/// Process' creation source.
 	AdbgCreation creation;
-	/// List of threads.
-	list_t *thread_list;
-	/// List of breakpoints.
-	list_t *breakpoint_list;
+	// List of breakpoints.
+	//list_t *breakpoint_list;
 	
 	// HACK: Debugger event handlers
 	void function(adbg_process_t*, void *udata, adbg_exception_t *ex) event_exception;
@@ -109,7 +107,6 @@ void adbg_process_free(adbg_process_t *proc) {
 	version (Posix) {
 		if (proc.orig_argv) free(proc.orig_argv);
 	}
-	adbg_list_free(proc.thread_list);
 	free(proc);
 }
 

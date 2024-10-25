@@ -1134,15 +1134,16 @@ int command_thread(int argc, const(char) **argv) {
 	//       then prompt can be (adbg [thread 12345])
 	
 	adbg_thread_t *thread = void;
+	void *thrlist = adbg_thread_list_new(process);
+	if (thrlist == null)
+		return ShellError.alicedbg;
+	scope(exit) adbg_thread_list_close(thrlist);
 	
 	const(char) *action = argv[1];
 	// thread list - get a list of threads
 	if (strcmp(action, "list") == 0) {
-		if (adbg_thread_list_update(process))
-			return ShellError.alicedbg;
-		
 		printf("Threads:");
-		for (size_t i; (thread = adbg_thread_list_by_index(process, i)) != null; ++i) {
+		for (size_t i; (thread = adbg_thread_list_get(process, i)) != null; ++i) {
 			if (i) putchar(',');
 			printf(" %lld", adbg_thread_id(thread));
 		}
@@ -1155,15 +1156,12 @@ int command_thread(int argc, const(char) **argv) {
 		return ShellError.missingArgument;
 	
 	// Select thread
-	thread = adbg_thread_list_by_id(process, atoi(argv[1]));
+	thread = adbg_thread_list_by_id(thrlist, atoi(argv[1]));
 	if (thread == null)
 		return ShellError.alicedbg;
 	
 	action = argv[2];
 	if (strcmp(action, "registers") == 0 || strcmp(action, "regs") == 0) {
-		// Update its context
-		adbg_thread_context_update(process, thread);
-		
 		int id;
 		adbg_register_t *register = void;
 		while ((register = adbg_register_by_id(thread, id++)) != null) {

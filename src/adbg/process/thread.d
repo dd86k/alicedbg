@@ -42,97 +42,84 @@ extern (C):
 
 struct adbg_thread_t {
 	long id;
-version (Windows) {
-	HANDLE handle;
-}
 	adbg_thread_context_t context;
 }
 
 /// Update the list of threads for the target process.
 /// Params: process = Process instance.
-/// Returns: Error code.
-int adbg_thread_list_update(adbg_process_t *process) {
+/// Returns: List instance; Otherwise null on error.
+void* adbg_thread_list_new(adbg_process_t *process) {
 	version (Trace) trace("process=%p", process);
 	
 	enum LISTINIT = 32;
 	
-version (Windows) {
-	if (process == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	if (process.pid == 0)
-		return adbg_oops(AdbgError.uninitiated);
+	if (process == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (process.pid == 0) {
+		adbg_oops(AdbgError.uninitiated);
+		return null;
+	}
 	
+version (Windows) {
 	HANDLE snap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, process.pid);
 	if (snap == INVALID_HANDLE_VALUE) {
-		adbg_list_free(process.thread_list);
-		return adbg_oops(AdbgError.os);
+		adbg_oops(AdbgError.os);
+		return null;
 	}
 	scope(exit) CloseHandle(snap);
 	
-	if (process.thread_list == null)
-		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, LISTINIT);
-	if (process.thread_list == null)
-		return adbg_errno();
+	list_t *list = adbg_list_new(adbg_thread_t.sizeof, LISTINIT);
+	if (list == null)
+		return null;
 	
 	THREADENTRY32 te32 = void;
 	te32.dwSize = THREADENTRY32.sizeof;
 	if (Thread32First(snap, &te32) == FALSE) {
-		adbg_list_free(process.thread_list);
-		return adbg_oops(AdbgError.os);
+		adbg_oops(AdbgError.os);
+		adbg_list_free(list);
+		return null;
 	}
 	
-	adbg_list_clear(process.thread_list);
 	adbg_thread_t t = void;
 	adbg_thread_context_config(&t.context, adbg_process_machine(process));
 	do {
 		if (te32.th32OwnerProcessID != process.pid)
 			continue;
 		
-		enum THREAD_ACCESS = SYNCHRONIZE | THREAD_QUERY_INFORMATION |
-			THREAD_GET_CONTEXT | THREAD_SET_CONTEXT |
-			THREAD_SUSPEND_RESUME;
-		
-		// Get thread handle
-		t.handle = OpenThread(THREAD_ACCESS, FALSE, te32.th32ThreadID);
-		if (t.handle == INVALID_HANDLE_VALUE) {
-			adbg_list_free(process.thread_list);
-			return adbg_oops(AdbgError.os);
-		}
-		
 		// Set thread ID
 		t.id = te32.th32ThreadID;
-		process.thread_list = adbg_list_add(process.thread_list, &t);
-		if (process.thread_list == null) {
-			adbg_list_free(process.thread_list);
-			return adbg_errno();
+		list = adbg_list_add(list, &t);
+		if (list == null) {
+			adbg_list_free(list);
+			return null;
 		}
 	} while (Thread32Next(snap, &te32));
 	
-	return 0;
+	return list;
 } else version (linux) {
-	if (process == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	if (process.pid == 0)
-		return adbg_oops(AdbgError.uninitiated);
-	
+	// Open process task directory to traverse
 	enum BSZ = 32; // "/proc/4294967295/task/".sizeof == 22
 	char[BSZ] path = void;
 	int l = snprintf(path.ptr, BSZ, "/proc/%u/task", process.pid);
-	if (l < 0)
-		return adbg_oops(AdbgError.crt);
-	
+	if (l < 0) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
 	DIR *procfd = opendir(path.ptr);
-	if (procfd == null)
-		return adbg_oops(AdbgError.crt);
+	if (procfd == null) {
+		adbg_oops(AdbgError.os);
+		return null;
+	}
 	scope(exit) closedir(procfd);
 	
-	if (process.thread_list == null)
-		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, LISTINIT);
-	if (process.thread_list == null)
-		return adbg_errno();
+	// New list
+	list_t *list = adbg_list_new(adbg_thread_t.sizeof, LISTINIT);
+	if (list == null)
+		return null;
 	
 	// Go through kernel thread IDs
-	adbg_list_clear(process.thread_list);
 	adbg_thread_t t = void;
 	adbg_thread_context_config(&t.context, adbg_process_machine(process));
 	for (dirent *entry = void; (entry = readdir(procfd)) != null;) {
@@ -140,126 +127,102 @@ version (Windows) {
 		if (isdigit(entry.d_name[0]) == 0)
 			continue;
 		
-		t.id = cast(pid_t)atoi( basename(entry.d_name.ptr) );
-		process.thread_list = adbg_list_add(process.thread_list, &t);
-		if (process.thread_list == null) {
-			adbg_list_free(process.thread_list);
-			return adbg_errno();
+		t.id = atoi( basename(entry.d_name.ptr) );
+		list = adbg_list_add(list, &t);
+		if (list == null) {
+			adbg_list_free(list);
+			return null;
 		}
 	}
 	
-	return 0;
+	return list;
 } else version (FreeBSD) {
-	if (process == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	if (process.pid == 0)
-		return adbg_oops(AdbgError.uninitiated);
-	
 	// Get thread count
 	int cap = ptrace(PT_GETNUMLWPS, process.pid, null, 0);
 	if (cap < 0) {
-		if (process.thread_list) {
-			adbg_list_free(process.thread_list);
-			process.thread_list = null;
-		}
-		return adbg_oops(AdbgError.crt);
+		adbg_oops(AdbgError.crt);
+		return null;
 	}
 	if (cap == 0) {
-		if (process.thread_list) {
-			adbg_list_free(process.thread_list);
-			process.thread_list = null;
-		}
-		return adbg_oops(AdbgError.unavailable);
+		adbg_oops(AdbgError.unavailable);
+		return null;
 	}
 	
 	// Allocate temporary list
-	lwpid_t *list = cast(lwpid_t*)malloc(lwpid_t.sizeof * cap);
-	if (list == null) {
-		if (process.thread_list) {
-			adbg_list_free(process.thread_list);
-			process.thread_list = null;
-		}
-		return adbg_oops(AdbgError.crt);
+	lwpid_t *lwlist = cast(lwpid_t*)malloc(lwpid_t.sizeof * cap);
+	if (lwlist == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
 	}
-	scope(exit) free(list);
+	scope(exit) free(lwlist);
 	
 	// Get list from kernel
-	int count = ptrace(PT_GETLWPLIST, process.pid, list, cap);
-	version(Trace) trace("count=%d cap=%d", count, cap);
+	int count = ptrace(PT_GETLWPLIST, process.pid, lwlist, cap);
 	if (count < 0) {
-		if (process.thread_list) {
-			adbg_list_free(process.thread_list);
-			process.thread_list = null;
-		}
-		return adbg_oops(AdbgError.crt);
+		adbg_oops(AdbgError.os);
+		return null;
 	}
 	if (count != cap) { // we didn't get everything, why?
-		if (process.thread_list) {
-			adbg_list_free(process.thread_list);
-			process.thread_list = null;
-		}
-		return adbg_oops(AdbgError.assertion);
+		adbg_oops(AdbgError.assertion);
+		return null;
 	}
 	
 	// Copy list into our own
-	if (process.thread_list == null)
-		process.thread_list = adbg_list_new(adbg_thread_t.sizeof, count);
-	if (process.thread_list == null)
-		return adbg_errno();
-	adbg_list_clear(process.thread_list);
+	list_t *list = adbg_list_new(adbg_thread_t.sizeof, count);
+	if (list == null)
+		return null;
 	adbg_thread_t t = void;
 	adbg_thread_context_config(&t.context, adbg_process_machine(process));
 	for (int i; i < count; ++i) {
-		t.id = cast(int)list[i];
-		process.thread_list = adbg_list_add(process.thread_list, &t);
+		t.id = lwlist[i];
+		list = adbg_list_add(list, &t);
 	}
 	
-	return 0;
+	return list;
 } else {
-	return adbg_oops(AdbgError.unimplemented);
+	adbg_oops(AdbgError.unimplemented);
+	return null;
 }
+}
+
+void adbg_thread_list_close(void *list) {
+	if (list == null) return;
+	adbg_list_free(cast(list_t*)list);
 }
 
 /// Get thread from list by an index.
 /// Params:
-/// 	process = Process instance.
+/// 	list = Thread list instance.
 /// 	index = Zero-based index.
 /// Returns: Thread instance. On error, null.
-adbg_thread_t* adbg_thread_list_by_index(adbg_process_t *process, size_t index) {
-	version (Trace) trace("process=%p index=%zu", process, index);
-	if (process == null) {
+adbg_thread_t* adbg_thread_list_get(void *list, size_t index) {
+	version (Trace) trace("list=%p index=%zu", list, index);
+	if (list == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	// Init thread list if empty, just in case
-	if (process.thread_list == null && adbg_thread_list_update(process))
-		return null;
-	
 	// NOTE: adbg_list_get checks both list pointer and index and sets error
-	return cast(adbg_thread_t*)adbg_list_get(process.thread_list, index);
+	return cast(adbg_thread_t*)adbg_list_get(cast(list_t*)list, index);
 }
 
 /// Get a thread from list by its ID.
 /// Params:
-/// 	process = Process instance.
+/// 	list = Thread list instance.
 /// 	id = Thread ID
 /// Returns: Thread instance. On error, null.
-adbg_thread_t* adbg_thread_list_by_id(adbg_process_t *process, long id) {
+adbg_thread_t* adbg_thread_list_by_id(void *list, long id) {
 	version (Trace) trace("process=%p id=%lld", process, id);
-	if (process == null) {
+	if (list == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	// Init thread list if empty, just in case
-	if (process.thread_list == null && adbg_thread_list_update(process))
-		return null;
-	
 	adbg_thread_t *t = void;
 	size_t i;
-	while ((t = cast(adbg_thread_t*)adbg_list_get(process.thread_list, i++)) != null)
-		if (t.id == id) return t;
+	while ((t = cast(adbg_thread_t*)adbg_list_get(cast(list_t*)list, i++)) != null)
+		if (t.id == id)
+			return t;
 	adbg_oops(AdbgError.unfindable);
 	return null;
 }
@@ -628,12 +591,17 @@ int adbg_thread_context_update(adbg_process_t *proc, adbg_thread_t *thread) {
 		return adbg_oops(AdbgError.invalidArgument);
 	
 version (Win64) {
+	HANDLE thandle = OpenThread(THREAD_GET_CONTEXT, FALSE, cast(DWORD)thread.id);
+	if (thandle == null)
+		return adbg_oops(AdbgError.os);
+	scope(exit) CloseHandle(thandle);
+	
 	AdbgMachine mach = adbg_process_machine(proc);
 	version (X86_64) switch (mach) {
 	case AdbgMachine.amd64:
 		CONTEXT_X64 winctx = void; // CONTEXT
 		winctx.ContextFlags = CONTEXT_ALL;
-		if (GetThreadContext(thread.handle, cast(LPCONTEXT)&winctx) == FALSE)
+		if (GetThreadContext(thandle, cast(LPCONTEXT)&winctx) == FALSE)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.amd64_rip].u64    = winctx.Rip;
 		thread.context.items[AdbgRegister.amd64_rflags].u64 = winctx.EFlags;
@@ -663,7 +631,7 @@ version (Win64) {
 	case AdbgMachine.i386: // WoW64 process
 		WOW64_CONTEXT winctxwow64 = void;
 		winctxwow64.ContextFlags = CONTEXT_ALL;
-		if (Wow64GetThreadContext(thread.handle, &winctxwow64) == FALSE)
+		if (Wow64GetThreadContext(thandle, &winctxwow64) == FALSE)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.x86_eip].u32    = winctxwow64.Eip;
 		thread.context.items[AdbgRegister.x86_eflags].u32 = winctxwow64.EFlags;
@@ -689,7 +657,7 @@ version (Win64) {
 	case AdbgMachine.aarch64:
 		ARM64_NT_CONTEXT winctx = void; // CONTEXT
 		winctx.ContextFlags = CONTEXT_ALL;
-		if (GetThreadContext(thread.handle, cast(LPCONTEXT)&winctx) == FALSE)
+		if (GetThreadContext(thandle, cast(LPCONTEXT)&winctx) == FALSE)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.aarch64_x0].u64  = winctx.X0;
 		thread.context.items[AdbgRegister.aarch64_x1].u64  = winctx.X1;
@@ -728,7 +696,7 @@ version (Win64) {
 	case AdbgMachine.arm: // WoW64 process
 		ARM_NT_CONTEXT winctxwow64 = void;
 		winctxwow64.ContextFlags = CONTEXT_ALL;
-		if (Wow64GetThreadContext(thread.handle, &winctxwow64) == FALSE)
+		if (Wow64GetThreadContext(thandle, &winctxwow64) == FALSE)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.arm_r0].u32   = winctxwow64.r0;
 		thread.context.items[AdbgRegister.arm_r1].u32   = winctxwow64.r1;
@@ -753,10 +721,15 @@ version (Win64) {
 	}
 	return 0;
 } else version (Win32) {
+	HANDLE thandle = OpenThread(THREAD_GET_CONTEXT, FALSE, cast(DWORD)thread.id);
+	if (thandle == null)
+		return adbg_oops(AdbgError.os);
+	scope(exit) CloseHandle(thandle);
+	
 	version (X86) {
 		X86_NT_CONTEXT winctx = void; // CONTEXT
 		winctx.ContextFlags = CONTEXT_ALL;
-		if (GetThreadContext(thread.handle, cast(LPCONTEXT)&winctx) == FALSE)
+		if (GetThreadContext(thandle, cast(LPCONTEXT)&winctx) == FALSE)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.x86_eip].u32    = winctx.Eip;
 		thread.context.items[AdbgRegister.x86_eflags].u32 = winctx.EFlags;
@@ -772,7 +745,7 @@ version (Win64) {
 	} else version (ARM) {
 		ARM_NT_CONTEXT winctx = void; // CONTEXT
 		winctx.ContextFlags = CONTEXT_ALL;
-		if (GetThreadContext(thread.handle, cast(LPCONTEXT)&winctx) == FALSE)
+		if (GetThreadContext(thandle, cast(LPCONTEXT)&winctx) == FALSE)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.arm_r0].u32   = winctx.r0;
 		thread.context.items[AdbgRegister.arm_r1].u32   = winctx.r1;
@@ -798,7 +771,7 @@ version (Win64) {
 } else version (linux) {
 	version (X86) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, thread.id, null, &u) < 0)
+		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.x86_eip].u32    = u.eip;
 		thread.context.items[AdbgRegister.x86_eflags].u32 = u.eflags;
@@ -819,7 +792,7 @@ version (Win64) {
 		return 0;
 	} else version (X86_64) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, thread.id, null, &u) < 0)
+		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.amd64_rip].u64    = u.rip;
 		thread.context.items[AdbgRegister.amd64_rflags].u64 = u.eflags;
@@ -848,7 +821,7 @@ version (Win64) {
 		return 0;
 	} else version (ARM) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, thread.id, null, &u) < 0)
+		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.arm_r0].u32   = u.r0;
 		thread.context.items[AdbgRegister.arm_r1].u32   = u.r1;
@@ -870,7 +843,7 @@ version (Win64) {
 		return 0;
 	} else version (AArch64) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, thread.id, null, &u) < 0)
+		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.aarch64_x0].u64  = u.regs[0];
 		thread.context.items[AdbgRegister.aarch64_x1].u64  = u.regs[1];
@@ -912,7 +885,7 @@ version (Win64) {
 } else version (FreeBSD) {
 	version (X86) {
 		reg u = void;
-		if (ptrace(PT_GETREGS, thread.id, &u, 0) < 0)
+		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, &u, 0) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.x86_eip].u32    = u.r_eip;
 		thread.context.items[AdbgRegister.x86_eflags].u32 = u.r_eflags;
@@ -933,7 +906,7 @@ version (Win64) {
 		return 0;
 	} else version (X86_64) {
 		reg u = void;
-		if (ptrace(PT_GETREGS, thread.id, &u, 0) < 0)
+		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, &u, 0) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.amd64_rip].u64    = u.r_rip;
 		thread.context.items[AdbgRegister.amd64_rflags].u64 = u.r_rflags;
@@ -962,7 +935,7 @@ version (Win64) {
 		return 0;
 	} else version (ARM) {
 		reg u = void;
-		if (ptrace(PT_GETREGS, thread.id, &u, 0) < 0)
+		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, &u, 0) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.arm_r0].u32   = u.r[0];
 		thread.context.items[AdbgRegister.arm_r1].u32   = u.r[1];
@@ -984,7 +957,7 @@ version (Win64) {
 		return 0;
 	} else version (AArch64) {
 		reg u = void;
-		if (ptrace(PT_GETREGS, thread.id, &u, 0) < 0)
+		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, &u, 0) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.aarch64_x0].u64  = u.x[0];
 		thread.context.items[AdbgRegister.aarch64_x1].u64  = u.x[1];
