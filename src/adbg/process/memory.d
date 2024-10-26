@@ -55,15 +55,32 @@ version (Windows) {
 /*size_t adbg_memory_hugepagesize() {
 }*/
 
-// TODO: Provide parameter for memory type (data, instruction)
-/// Read memory from process data memory area.
+/// Memory type
+enum AdbgMemory {
+	data,
+	instruction,
+}
+
+/// Read from process data memory area.
 /// Params:
-/// 	proc = Process instannce.
+/// 	proc = Process instance.
 /// 	addr = Memory address (within the children address space).
 /// 	data = Pointer to data.
 /// 	size = Size of data.
 /// Returns: Error code.
 int adbg_memory_read(adbg_process_t *proc, size_t addr, void *data, uint size) {
+	return adbg_memory_read2(proc, AdbgMemory.data, addr, data, size);
+}
+
+/// Read from process memory area.
+/// Params:
+/// 	proc = Process instance.
+/// 	type = Memory type (data, instruction, etc.), see AdbgMemory.
+/// 	addr = Memory address (within the children address space).
+/// 	data = Pointer to data.
+/// 	size = Size of data.
+/// Returns: Error code.
+int adbg_memory_read2(adbg_process_t *proc, int type, size_t addr, void *data, uint size) {
 	if (proc == null || data == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (size == 0)
@@ -99,13 +116,19 @@ version (Windows) {
 		}
 	}
 	
+	switch (type) {
+	case AdbgMemory.data: type = PT_PEEKDATA; break;
+	case AdbgMemory.instruction: type = PT_PEEKTEXT; break;
+	default: return adbg_oops(AdbgError.invalidOption);
+	}
+	
 	// If reading mem fails, try ptrace method
 	c_long *dest = cast(c_long*)data;	/// target
 	int r = size / c_long.sizeof;	/// number of "long"s to read
 	
 	for (; r > 0; --r, ++dest, addr += c_long.sizeof) {
 		errno = 0; // Clear errno on PT_PEEK*
-		*dest = ptrace(PT_PEEKDATA, proc.pid, addr, null);
+		*dest = ptrace(type, proc.pid, addr, null);
 		if (errno)
 			return adbg_oops(AdbgError.os);
 	}
@@ -113,7 +136,7 @@ version (Windows) {
 	r = size % c_long.sizeof;
 	if (r) {
 		errno = 0; // Clear errno on PT_PEEK*
-		c_long l = ptrace(PT_PEEKDATA, proc.pid, addr, null);
+		c_long l = ptrace(type, proc.pid, addr, null);
 		if (errno)
 			return adbg_oops(AdbgError.os);
 		ubyte* dest8 = cast(ubyte*)dest, src8 = cast(ubyte*)&l;
@@ -121,7 +144,13 @@ version (Windows) {
 	}
 	return 0;
 } else version (FreeBSD) {
-	ptrace_io_desc io = ptrace_io_desc(PIOD_READ_D, cast(void*)addr, data, size);
+	switch (type) {
+	case AdbgMemory.data: type = PIOD_READ_D; break;
+	case AdbgMemory.instruction: type = PIOD_READ_I; break;
+	default: return adbg_oops(AdbgError.invalidOption);
+	}
+	
+	ptrace_io_desc io = ptrace_io_desc(type, cast(void*)addr, data, size);
 	if (ptrace(PT_IO, proc.pid, &io, 0) < 0) // sets errno
 		return adbg_oops(AdbgError.crt);
 	return 0;
@@ -129,7 +158,7 @@ version (Windows) {
 	return adbg_oops(AdbgError.unimplemented);
 }
 
-/// Write memory to process data memory area.
+/// Write to process data memory area.
 /// Params:
 /// 	proc = Process instance.
 /// 	addr = Memory address (within the children address space).
@@ -137,6 +166,18 @@ version (Windows) {
 /// 	size = Size of data.
 /// Returns: Error code.
 int adbg_memory_write(adbg_process_t *proc, size_t addr, void *data, uint size) {
+	return adbg_memory_write2(proc, AdbgMemory.data, addr, data, size);
+}
+
+/// Write to process memory area.
+/// Params:
+/// 	proc = Process instance.
+/// 	type = Memory type (data, instruction, etc.), see AdbgMemory.
+/// 	addr = Memory address (within the children address space).
+/// 	data = Pointer to data.
+/// 	size = Size of data.
+/// Returns: Error code.
+int adbg_memory_write2(adbg_process_t *proc, int type, size_t addr, void *data, uint size) {
 	if (proc == null || data == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (size == 0)
@@ -173,27 +214,35 @@ version (Windows) {
 		}
 	}
 	
+	switch (type) {
+	case AdbgMemory.data: type = PT_PEEKDATA; break;
+	case AdbgMemory.instruction: type = PT_PEEKTEXT; break;
+	default: return adbg_oops(AdbgError.invalidOption);
+	}
+	
 	// If reading mem fails, try ptrace method
 	c_long *user = cast(c_long*)data;	/// user data pointer
 	int i;	/// offset index
 	int j = size / c_long.sizeof;	/// number of "blocks" to process
 	
-	for (; i < j; ++i, ++user) {
-		if (ptrace(PT_POKEDATA, proc.pid, addr + (i * c_long.sizeof), user) < 0)
+	for (; i < j; ++i, ++user)
+		if (ptrace(type, proc.pid, addr + (i * c_long.sizeof), user) < 0)
 			return adbg_oops(AdbgError.os);
-	}
 	
 	j = size % c_long.sizeof;
-	if (j) {
-		if (ptrace(PT_POKEDATA, proc.pid,
-			addr + (i * c_long.sizeof), user) < 0)
-			return adbg_oops(AdbgError.os);
-	}
+	if (j && ptrace(type, proc.pid, addr + (i * c_long.sizeof), user) < 0)
+		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (FreeBSD) {
+	switch (type) {
+	case AdbgMemory.data: type = PIOD_READ_D; break;
+	case AdbgMemory.instruction: type = PIOD_READ_I; break;
+	default: return adbg_oops(AdbgError.invalidOption);
+	}
+	
 	ptrace_io_desc io = ptrace_io_desc(PIOD_WRITE_D, cast(void*)addr, data, size);
-	if (ptrace(PT_IO, proc.pid, &io, 0) < 0) // sets errno
-		return adbg_oops(AdbgError.crt);
+	if (ptrace(PT_IO, proc.pid, &io, 0) < 0)
+		return adbg_oops(AdbgError.os);
 	return 0;
 } else // Unsupported
 	return adbg_oops(AdbgError.unimplemented);
