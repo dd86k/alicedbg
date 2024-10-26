@@ -117,8 +117,8 @@ version (Windows) {
 	}
 	
 	switch (type) {
-	case AdbgMemory.data: type = PT_PEEKDATA; break;
-	case AdbgMemory.instruction: type = PT_PEEKTEXT; break;
+	case AdbgMemory.data: type = PTRACE_PEEKDATA; break;
+	case AdbgMemory.instruction: type = PTRACE_PEEKTEXT; break;
 	default: return adbg_oops(AdbgError.invalidOption);
 	}
 	
@@ -215,8 +215,8 @@ version (Windows) {
 	}
 	
 	switch (type) {
-	case AdbgMemory.data: type = PT_PEEKDATA; break;
-	case AdbgMemory.instruction: type = PT_PEEKTEXT; break;
+	case AdbgMemory.data: type = PTRACE_PEEKDATA; break;
+	case AdbgMemory.instruction: type = PTRACE_PEEKTEXT; break;
 	default: return adbg_oops(AdbgError.invalidOption);
 	}
 	

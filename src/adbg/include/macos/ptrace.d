@@ -41,9 +41,4 @@ enum {
 deprecated("PT_ATTACH is deprecated. See PT_ATTACHEXC")
 enum PT_ATTACH	= 10;	/// Trace some running process
 
-// Linux aliases
-alias PT_TRACEME 	= PT_TRACE_ME;
-alias PT_CONT 	= PT_CONTINUE;
-alias PT_SINGLESTEP 	= PT_STEP;
-
 int ptrace(int _request, pid_t _pid, caddr_t _addr, int _data);

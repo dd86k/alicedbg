@@ -73,11 +73,6 @@ enum {
 	PT_FIRSTMACH    = 64,	/* for machine-specific requests */
 }
 
-// Linux aliases
-alias PT_TRACEME 	= PT_TRACE_ME;
-alias PT_CONT 	= PT_CONTINUE;
-alias PT_SINGLESTEP 	= PT_STEP;
-
 /* Events used with PT_GET_EVENT_MASK and PT_SET_EVENT_MASK */
 enum PTRACE_EXEC	= 0x0001;
 enum PTRACE_SCE	= 0x0002;

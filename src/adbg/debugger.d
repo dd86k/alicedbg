@@ -379,12 +379,12 @@ private int __adbg_exec_child(void* arg) {
 	// Baby, Please Trace Me
 	version (Trace) with (chld) trace("chld=%p argv=%p dir=%p envp=%p", argv, dir, envp);
 version (linux) {
-	if (ptrace(PT_TRACEME, 0, null, null) < 0) {
+	if (ptrace(PTRACE_TRACEME, 0, null, null) < 0) {
 		version (Trace) trace("ptrace=%s", strerror(errno));
 		return -1;
 	}
 } else {
-	if (ptrace(PT_TRACEME, 0, null, 0) < 0) {
+	if (ptrace(PT_TRACE_ME, 0, null, 0) < 0) {
 		version (Trace) trace("ptrace=%s", strerror(errno));
 		return -1;
 	}
@@ -517,14 +517,14 @@ version (Windows) {
 	// TODO: Continue process on OPT_STOP
 } else version (linux) {
 	version (Trace) if (options & OPT_STOP) trace("Sending break...");
-	if (ptrace(options & OPT_STOP ? PT_ATTACH : PT_SEIZE, pid, null, null) < 0) {
+	if (ptrace(options & OPT_STOP ? PTRACE_ATTACH : PTRACE_SEIZE, pid, null, null) < 0) {
 		adbg_oops(AdbgError.os);
 		adbg_process_free(proc);
 		return null;
 	}
 	
 	// Set exitkill on if specified, it is off by default
-	if (options & OPT_EXITKILL && ptrace(PT_SETOPTIONS, pid, null, PT_O_EXITKILL) < 0) {
+	if (options & OPT_EXITKILL && ptrace(PTRACE_SETOPTIONS, pid, null, PTRACE_O_EXITKILL) < 0) {
 		adbg_oops(AdbgError.os);
 		adbg_process_free(proc);
 		return null;
@@ -561,6 +561,9 @@ int adbg_debugger_detach(adbg_process_t *proc) {
 	
 version (Windows) {
 	if (DebugActiveProcessStop(proc.pid) == FALSE)
+		return adbg_oops(AdbgError.os);
+} else version (linux) {
+	if (ptrace(PTRACE_DETACH, proc.pid, null, null) < 0)
 		return adbg_oops(AdbgError.os);
 } else version (Posix) {
 	if (ptrace(PT_DETACH, proc.pid, null, 0) < 0)
@@ -798,7 +801,7 @@ version (Windows) {
 	int si_code = void;
 	
 	siginfo_t siginfo = void;
-	if (ptrace(PT_GETSIGINFO, proc.pid, null, &siginfo) < 0) {
+	if (ptrace(PTRACE_GETSIGINFO, proc.pid, null, &siginfo) < 0) {
 		si_code = 0;
 		exception.fault_address = 0;
 	} else {
@@ -902,7 +905,7 @@ version (Windows) {
 	version(Trace) trace("pid=%d state=%d", proc.pid, proc.state);
 	switch (proc.state) with (AdbgProcessState) {
 	case created, stopped:
-		if (ptrace(PT_CONT, proc.pid, null, null) < 0) {
+		if (ptrace(PTRACE_CONT, proc.pid, null, null) < 0) {
 			version (Trace) trace("ptrace=%s", strerror(errno));
 			proc.state = AdbgProcessState.unknown;
 			return adbg_oops(AdbgError.os);
@@ -1002,7 +1005,7 @@ version (Wintel) {
 	
 	return adbg_debugger_continue(proc, tid);
 } else version (linux) {
-	if (ptrace(PT_SINGLESTEP, tid, null, null) < 0) {
+	if (ptrace(PTRACE_SINGLESTEP, tid, null, null) < 0) {
 		proc.state = AdbgProcessState.unknown;
 		return adbg_oops(AdbgError.os);
 	}

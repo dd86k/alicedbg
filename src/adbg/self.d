@@ -71,6 +71,8 @@ version (Windows) {
 	return &proc;
 }
 
+/// Get the running process ID.
+/// Returns: Process ID; Or zero.
 int adbg_self_process_id() {
 version (Windows) {
 	return GetCurrentProcessId();
@@ -87,10 +89,10 @@ void adbg_self_break() {
 version (Windows) {
 	DebugBreak();
 } else version (linux) {
-	ptrace(PT_TRACEME, 0, null, null);
+	ptrace(PTRACE_TRACEME, 0, null, null);
 	raise(SIGSTOP);
 } else version (Posix) {
-	ptrace(PT_TRACEME, 0, null, 0);
+	ptrace(PT_TRACE_ME, 0, null, 0);
 	raise(SIGSTOP);
 } else assert(0, "adbg_self_break unimplemented for platform");
 }

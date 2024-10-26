@@ -771,7 +771,7 @@ version (Win64) {
 } else version (linux) {
 	version (X86) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
+		if (ptrace(PTRACE_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.x86_eip].u32    = u.eip;
 		thread.context.items[AdbgRegister.x86_eflags].u32 = u.eflags;
@@ -792,7 +792,7 @@ version (Win64) {
 		return 0;
 	} else version (X86_64) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
+		if (ptrace(PTRACE_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.amd64_rip].u64    = u.rip;
 		thread.context.items[AdbgRegister.amd64_rflags].u64 = u.eflags;
@@ -821,7 +821,7 @@ version (Win64) {
 		return 0;
 	} else version (ARM) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
+		if (ptrace(PTRACE_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.arm_r0].u32   = u.r0;
 		thread.context.items[AdbgRegister.arm_r1].u32   = u.r1;
@@ -843,7 +843,7 @@ version (Win64) {
 		return 0;
 	} else version (AArch64) {
 		user_regs_struct u = void;
-		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
+		if (ptrace(PTRACE_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
 		thread.context.items[AdbgRegister.aarch64_x0].u64  = u.regs[0];
 		thread.context.items[AdbgRegister.aarch64_x1].u64  = u.regs[1];
