@@ -752,7 +752,7 @@ Lunknown:
 export
 const(char)* adbg_object_type_name(adbg_object_t *o) {
 	if (o == null)
-		goto Lunknown;
+		Lunknown: return "Unknown";
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return `Mark Zbikowski`;
 	case ne:	return `New Executable`;
@@ -768,16 +768,15 @@ const(char)* adbg_object_type_name(adbg_object_t *o) {
 	case archive:	return `Library Archive`;
 	case coff:	return `Common Object File Format`;
 	case mscoff:	return `Microsoft Common Object File Format`;
-Lunknown:
-	case unknown:	return "Unknown";
+	case unknown:	goto Lunknown;
 	}
 }
 
 // Printing purposes only
 const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	if (o == null)
-		return null;
-	switch (o.format) with (AdbgObject) {
+		Lunknown: return "Unknown";
+	final switch (o.format) with (AdbgObject) {
 	case mz:	return adbg_object_mz_kind_string(o);
 	case ne:	return adbg_object_ne_kind_string(o);
 	case lx:	return adbg_object_lx_kind_string(o);
@@ -789,7 +788,33 @@ const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	case archive, mscoff:	return `Library`;
 	case omf:	return adbg_object_omf_is_library(o) ? `Library` : `Object`;
 	case coff:	return `Object`;
-	default:
+	case unknown:	goto Lunknown;
 	}
-	return null;
+}
+
+const(char)* adbg_object_osabi_string(adbg_object_t *o) {
+	if (o == null)
+		Lunknown: return null;
+	final switch (o.format) with (AdbgObject) {
+	case ne:
+		ne_header_t *nehdr = adbg_object_ne_header(o);
+		if (nehdr == null)
+			goto Lunknown;
+		return adbg_object_ne_type(nehdr.ne_exetyp);
+	case lx:
+		lx_header_t *lxhdr = adbg_object_lx_header(o);
+		if (lxhdr == null)
+			goto Lunknown;
+		return adbg_object_lx_ostype_string(lxhdr.os);
+	case pe:
+		return adbg_object_pe_subsys_string(o);
+	case macho:	return `macOS`;
+	case elf:
+		Elf32_Ehdr *ehdr = adbg_object_elf_ehdr32(o);
+		if (ehdr == null)
+			goto Lunknown;
+		return adbg_object_elf_abi_string(ehdr.e_ident[ELF_EI_OSABI]);
+	case pdb20, pdb70, mdmp, dmp, omf, archive, coff, mscoff, mz:
+	case unknown:	goto Lunknown;
+	}
 }

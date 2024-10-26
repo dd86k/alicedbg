@@ -182,6 +182,10 @@ int dump_file(const(char)* path) {
 	const(char)* machstr = adbg_object_machine_string(o);
 	if (machstr)
 		printf(", %s", machstr);
+	// Print OS ABI type used for object
+	const(char)* osabistr = adbg_object_osabi_string(o);
+	if (osabistr)
+		printf(", %s", osabistr);
 	
 	putchar('\n');
 	return 0;

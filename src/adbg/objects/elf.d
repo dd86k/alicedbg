@@ -1831,28 +1831,29 @@ const(char) *adbg_object_elf_data_string(ubyte data) {
 	}
 }
 
-const(char) *adbg_object_elf_abi_string(ubyte object_) {
+const(char) *adbg_object_elf_osabi_string(ubyte object_) {
 	switch (object_) {
-	case ELF_OSABI_NONE:	return "NONE";
-	case ELF_OSABI_HPUX:	return "HPUX";
-	case ELF_OSABI_NETBSD:	return "NETBSD";
+	case ELF_OSABI_NONE:	return "No ABI";
+	case ELF_OSABI_HPUX:	return "HP-UX";
+	case ELF_OSABI_NETBSD:	return "NetBSD";
 	case ELF_OSABI_GNU:	return "GNU";
-	case ELF_OSABI_SOLARIS:	return "SOLARIS";
+	case ELF_OSABI_SOLARIS:	return "Solaris";
 	case ELF_OSABI_AIX:	return "AIX";
 	case ELF_OSABI_IRIX:	return "IRIX";
-	case ELF_OSABI_FREEBSD:	return "FREEBSD";
-	case ELF_OSABI_TRU64:	return "TRU64";
-	case ELF_OSABI_MODESTO:	return "MODESTO";
-	case ELF_OSABI_OPENBSD:	return "OPENBSD";
-	case ELF_OSABI_OPENVMS:	return "OPENVMS";
-	case ELF_OSABI_NSK:	return "NSK";
-	case ELF_OSABI_AROS:	return "AROS";
-	case ELF_OSABI_FENIXOS:	return "FENIXOS";
-	case ELF_OSABI_CLOUDABI:	return "CLOUDABI";
-	case ELF_OSABI_OPENVOS:	return "OPENVOS";
+	case ELF_OSABI_FREEBSD:	return "FreeBSD";
+	case ELF_OSABI_TRU64:	return "Compaq Tru64 UNIX";
+	case ELF_OSABI_MODESTO:	return "Novell Modesto";
+	case ELF_OSABI_OPENBSD:	return "OpenBSD";
+	case ELF_OSABI_OPENVMS:	return "OpenVMS";
+	case ELF_OSABI_NSK:	return "Hewlett-Packard NonStop Kernel";
+	case ELF_OSABI_AROS:	return "Amiga Research OS";
+	case ELF_OSABI_FENIXOS:	return "FenixOS";
+	case ELF_OSABI_CLOUDABI:	return "Nuxi CloudABI";
+	case ELF_OSABI_OPENVOS:	return "Stratus Technologies OpenVOS";
 	default:	return null;
 	}
 }
+alias adbg_object_elf_abi_string = adbg_object_elf_osabi_string;
 
 const(char) *adbg_object_elf_et_string(ushort type) {
 	switch (type) {
