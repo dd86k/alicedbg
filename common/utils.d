@@ -146,8 +146,6 @@ extern (D) unittest {
 bool parse32(int *result, const(char) *str) {
 	return sscanf(str, "%i", result) != 1;
 }
-// Old alias
-alias unformat = parse32;
 
 /// Unformat text number.
 /// Params:
@@ -157,8 +155,6 @@ alias unformat = parse32;
 bool parse64(long *result, const(char) *str) {
 	return sscanf(str, "%lli", result) != 1;
 }
-// Old alias
-alias unformat64 = parse64;
 
 /// Read entire file into memory using the C FILE API.
 ///

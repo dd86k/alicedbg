@@ -266,7 +266,7 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 			return adbg_oops(AdbgError.partialRead);
 		return 0;
 	case process:
-		return adbg_memory_read(o.process, o.location, buffer, cast(uint)rdsize);
+		return adbg_memory_read(o.process, o.location, buffer, rdsize);
 	//case userbuffer:
 		//if (location + rsize >= o.buffer_size)
 		//	return adbg_oops(AdbgError.objectOutsideAccess);

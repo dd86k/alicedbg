@@ -13,7 +13,7 @@ import core.stdc.stdio;
 import shell, term;
 import common.errormgmt;
 import common.cli;
-import common.utils : unformat64;
+import common.utils;
 
 private:
 

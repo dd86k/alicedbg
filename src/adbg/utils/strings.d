@@ -59,6 +59,7 @@ extern (D) unittest {
 ///   lnsz = Line length reference.
 ///   file = File handle.
 /// Returns: Line length.
+deprecated("FILE is no longer used")
 size_t adbg_util_getlinef(char *bf, size_t bfsz, size_t *lnsz, FILE *file) {
 	if (bf == null || bfsz == 0 || lnsz == null || file == null)
 		return 0;

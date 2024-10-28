@@ -41,7 +41,7 @@ enum ShellError {
 	alreadyLoaded	= -6,
 	missingOption	= -7,
 	missingArgument	= -8,
-	unformat	= -9,
+	parse	= -9,	// parse error
 	invalidCount	= -10,
 	unattached	= -11,
 	
@@ -75,8 +75,8 @@ const(char) *shell_error_string(int code) {
 		return "Missing option for command.";
 	case missingArgument:
 		return "Missing argument.";
-	case unformat:
-		return "Input is not a number.";
+	case parse:
+		return "Could not parse input.";
 	case invalidCount:
 		return "Count must be 1 or higher.";
 	case unattached:
@@ -818,13 +818,13 @@ int command_memory(int argc, const(char) **argv) {
 		return ShellError.missingOption;
 	
 	long uaddress = void;
-	if (unformat64(&uaddress, argv[1]))
-		return ShellError.unformat;
+	if (parse64(&uaddress, argv[1]))
+		return ShellError.parse;
 	
 	int ulength = 64;
 	if (argc >= 3) {
-		if (unformat(&ulength, argv[2]))
-			return ShellError.unformat;
+		if (parse32(&ulength, argv[2]))
+			return ShellError.parse;
 		if (ulength <= 0)
 			return 0;
 	}
@@ -869,38 +869,34 @@ int command_memory(int argc, const(char) **argv) {
 	return 0;
 }
 
-//TODO: optional arg: filter module by name (contains string)
-//TODO: max count to show or option to filter modules out
+// TODO: optional arg: filter module by name (contains string)
 int command_maps(int argc, const(char) **argv) {
-	adbg_memory_map_t *mmaps = void;
-	size_t mcount = void;
-	
-	if (adbg_memory_maps(process, &mmaps, &mcount, 0))
+	void *maplist = adbg_memory_mapping(process, 0);
+	if (maplist == null)
 		return ShellError.alicedbg;
 	
 	puts("Region           Size       T Perm File");
-	for (size_t i; i < mcount; ++i) {
-		adbg_memory_map_t *map = &mmaps[i];
-		
+	adbg_memory_map_t *map = void;
+	for (size_t i; (map = adbg_memory_mapping_at(maplist, i)) != null; ++i) {
 		char[4] perms = void;
-		perms[0] = map.access & AdbgMemPerm.read  ? 'r' : '-';
-		perms[1] = map.access & AdbgMemPerm.write ? 'w' : '-';
-		perms[2] = map.access & AdbgMemPerm.exec  ? 'x' : '-';
+		perms[0] = map.access & AdbgMemPerm.read     ? 'r' : '-';
+		perms[1] = map.access & AdbgMemPerm.write    ? 'w' : '-';
+		perms[2] = map.access & AdbgMemPerm.exec     ? 'x' : '-';
 		perms[3] = map.access & AdbgMemPerm.private_ ? 'p' : 's';
 		
 		char t = void;
 		switch (map.type) {
-		case AdbgPageUse.resident: 	t = 'R'; break;
-		case AdbgPageUse.fileview: 	t = 'F'; break;
-		case AdbgPageUse.module_:	t = 'M'; break;
-		default:	t = '?';
+		case AdbgPageUse.resident: t = 'R'; break;
+		case AdbgPageUse.fileview: t = 'F'; break;
+		case AdbgPageUse.module_:  t = 'M'; break;
+		default:                   t = '?';
 		}
 		
 		with (map) printf("%16zx %10zd %c %.4s %s\n",
 			cast(size_t)base, size, t, perms.ptr, name.ptr);
 	}
 	
-	free(mmaps);
+	adbg_memory_mapping_close(maplist);
 	return 0;
 }
 
@@ -918,14 +914,14 @@ int command_disassemble(int argc, const(char) **argv) {
 		return ShellError.missingArgument;
 	
 	long uaddress = void;
-	if (unformat64(&uaddress, argv[1]))
-		return ShellError.unformat;
+	if (parse64(&uaddress, argv[1]))
+		return ShellError.parse;
 	
 	// Number of instruction, default to 10
 	int ucount = 10;
 	if (argc >= 3) {
-		if (unformat(&ucount, argv[2]))
-			return ShellError.unformat;
+		if (parse32(&ucount, argv[2]))
+			return ShellError.parse;
 		if (ucount <= 0)
 			return 0;
 	}
@@ -956,13 +952,14 @@ int command_disassemble(int argc, const(char) **argv) {
 
 size_t last_scan_size;
 ulong last_scan_data;
-adbg_scan_t *last_scan;
+adbg_scanner_t *scanner;
+size_t last_scan_results;
 
-void shell_event_list_scan_results() {
+void scanner_print_results() {
 	// super lazy hack
 	long mask = void;
 	switch (last_scan_size) {
-	case 8: mask = 0; break;
+	case 8: mask = 0xffff_ffff_ffff_ffff; break;
 	case 7: mask = 0xff_ffff_ffff_ffff; break;
 	case 6: mask = 0xffff_ffff_ffff; break;
 	case 5: mask = 0xff_ffff_ffff; break;
@@ -976,129 +973,110 @@ void shell_event_list_scan_results() {
 	}
 	//    0000. ffffffffffffffff  18446744073709551615
 	puts("No.   Address           Previous              Current");
-	adbg_scan_result_t *result = last_scan.results;
-	uint count = cast(uint)last_scan.result_count + 1; // temp cast until better z printf
-	for (uint i = 1; i < count; ++i, ++result) {
-		printf("%4u. %-16llx  %*llu  ", i, result.address, -20, result.value_u64 & mask);
+	size_t count = adbg_scanner_result_count(scanner);
+	for (size_t i; i < count; ++i) {
+		adbg_scanner_result_t *result = adbg_scanner_result(scanner, i);
+		printf("%4zu. %*llx  %*llu  ", i, -16, result.address, -20, result.u64 & mask);
 		ulong udata = void;
-		if (adbg_memory_read(process, cast(size_t)result.address, &udata, cast(uint)last_scan_size))
+		if (adbg_memory_read(process, cast(size_t)result.address, &udata, last_scan_size))
 			puts("???");
 		else
 			printf("%llu\n", udata & mask);
 	}
 }
 
+// parse type for scan/rescan commands
+int scanner_parse(const(char) *input, const(char) *type, long *data) {
+	assert(input);
+	assert(type);
+	assert(data);
+	
+	if (strcmp(type, "byte") == 0 || strcmp(type, "u8") == 0) {
+		if (parse64(data, input))
+			return ShellError.parse;
+		if (*data > ubyte.max)
+			return ShellError.scanInputOutOfRange;
+		last_scan_size = ubyte.sizeof;
+	} else if (strcmp(type, "short") == 0 || strcmp(type, "u16") == 0) {
+		if (parse64(data, input))
+			return ShellError.parse;
+		if (*data > ushort.max)
+			return ShellError.scanInputOutOfRange;
+		last_scan_size = ushort.sizeof;
+	} else if (strcmp(type, "int") == 0 || strcmp(type, "u32") == 0) {
+		if (parse64(data, input))
+			return ShellError.parse;
+		if (*data > uint.max)
+			return ShellError.scanInputOutOfRange;
+		last_scan_size = uint.sizeof;
+	} else if (strcmp(type, "long") == 0 || strcmp(type, "u64") == 0) {
+		if (parse64(data, input))
+			return ShellError.parse;
+		last_scan_size = ulong.sizeof;
+	} else
+		return ShellError.scanInvalidSubCommand;
+	
+	return 0;
+}
+
 int command_scan(int argc, const(char) **argv) {
 	if (argc < 2)
 		return ShellError.scanMissingType;
 	
-	const(char) *usub = argv[1];
+	const(char) *atype = argv[1];
 	
-	if (strcmp(usub, "show") == 0) {
-		if (last_scan == null)
+	// TODO: write subcommand NUMBER VALUE or rely on a memory write command
+	if (strcmp(atype, "show") == 0) {
+		if (scanner == null)
 			return ShellError.scanNoScan;
 		
-		shell_event_list_scan_results;
+		scanner_print_results();
 		return 0;
-	} else if (strcmp(usub, "reset") == 0) {
-		if (last_scan == null)
+	} else if (strcmp(atype, "rescan") == 0 || strcmp(atype, "update") == 0) {
+		if (scanner == null)
+			return ShellError.scanNoScan;
+		if (argc < 2)
+			return ShellError.scanMissingType;
+		if (argc < 3)
+			return ShellError.scanMissingValue;
+		
+		long data = void;
+		int e = scanner_parse(argv[2], argv[1], &data);
+		if (e)
+			return e;
+		
+		if (adbg_scanner_rescan(scanner, cast(void*)&last_scan_data))
+			return ShellError.alicedbg;
+		
+		size_t count = adbg_scanner_result_count(scanner);
+		loginfo("Rescan completed with %zu results, previously %zu.", count, last_scan_results);
+		last_scan_results = count;
+		return 0;
+	} else if (strcmp(atype, "close") == 0) {
+		if (scanner == null)
 			return 0;
 		
-		adbg_memory_scan_close(last_scan);
-		last_scan = null;
+		adbg_scanner_close(scanner);
+		scanner = null;
 		return 0;
 	}
 	
 	if (argc < 3)
 		return ShellError.scanMissingValue;
 	
-	const(char) *uin = argv[2];
+	long data = void;
+	int e = scanner_parse(argv[2], atype, &data);
+	if (e)
+		return e;
+	if (scanner)
+		adbg_scanner_close(scanner);
 	
-	union u {
-		long data64;
-		int data;
-	}
-	u user = void;
-	if (strcmp(usub, "byte") == 0) {
-		last_scan_size = ubyte.sizeof;
-		if (unformat(&user.data, uin))
-			return ShellError.unformat;
-		if (user.data > ubyte.max)
-			return ShellError.scanInputOutOfRange;
-	} else if (strcmp(usub, "short") == 0) {
-		last_scan_size = short.sizeof;
-		if (unformat(&user.data, uin))
-			return ShellError.unformat;
-		if (user.data > short.max)
-			return ShellError.scanInputOutOfRange;
-	} else if (strcmp(usub, "int") == 0) {
-		last_scan_size = int.sizeof;
-		if (unformat(&user.data, uin))
-			return ShellError.unformat;
-	} else if (strcmp(usub, "long") == 0) {
-		last_scan_size = long.sizeof;
-		if (unformat64(&user.data64, uin))
-			return ShellError.unformat;
-	} else
-		return ShellError.scanInvalidSubCommand;
-	
-	if (last_scan)
-		adbg_memory_scan_close(last_scan);
-	
-	last_scan_data = user.data64;
-	
-	if ((last_scan = adbg_memory_scan(process, &user, last_scan_size,
-		AdbgScanOpt.capacity, 100,
-		0)) == null)
+	last_scan_data = data;
+	if ((scanner = adbg_scanner_scan(process, &data, last_scan_size, 0)) == null)
 		return ShellError.alicedbg;
 	
-	loginfo("Scan completed with %u results.\n", cast(uint)last_scan.result_count);
-	return 0;
-}
-
-int command_rescan(int argc, const(char) **argv) {
-	if (argc < 2)
-		return ShellError.scanMissingType;
-	if (argc < 3)
-		return ShellError.scanMissingValue;
-	
-	const(char) *usub = argv[1];
-	const(char) *uin = argv[2];
-	
-	union u {
-		long data64;
-		int data;
-	}
-	u user = void;
-	if (strcmp(usub, "byte") == 0) {
-		last_scan_size = ubyte.sizeof;
-		if (unformat(&user.data, uin))
-			return ShellError.unformat;
-		if (user.data > ubyte.max)
-			return ShellError.scanInputOutOfRange;
-	} else if (strcmp(usub, "short") == 0) {
-		last_scan_size = short.sizeof;
-		if (unformat(&user.data, uin))
-			return ShellError.unformat;
-		if (user.data > short.max)
-			return ShellError.scanInputOutOfRange;
-	} else if (strcmp(usub, "int") == 0) {
-		last_scan_size = int.sizeof;
-		if (unformat(&user.data, uin))
-			return ShellError.unformat;
-	} else if (strcmp(usub, "long") == 0) {
-		last_scan_size = long.sizeof;
-		if (unformat64(&user.data64, uin))
-			return ShellError.unformat;
-	} else
-		return ShellError.scanInvalidSubCommand;
-	
-	if (adbg_memory_rescan(last_scan, &user, last_scan_size))
-		return ShellError.alicedbg;
-	
-	last_scan_data = user.data64;
-	
-	loginfo("Scan completed with %u results.\n", cast(uint)last_scan.result_count);
+	last_scan_results = adbg_scanner_result_count(scanner);
+	loginfo("Scan completed with %zu results.", last_scan_results);
 	return 0;
 }
 
@@ -1203,14 +1181,18 @@ int command_version(int argc, const(char) **argv) {
 }
 
 int command_quit(int argc, const(char) **argv) {
-	// Confirm quitting
+	// Confirm quit
 	if (process) {
-		printf("Process %d is running. Do you wish to quit? [Y/n] ",
+		printf("Process %d is still running. Quit and terminate? [Y/n] ",
 			adbg_process_id(process));
 		fflush(stdout);
+	Lgetchar:
 		int c = getchar();
-		if (c == 'n' || c == 'N')
-			return 0;
+		switch (c) {
+		case 'n', 'N': return 0;
+		case 'y', 'Y', '\n': break;
+		default: goto Lgetchar;
+		}
 	}
 	
 	exit(0);

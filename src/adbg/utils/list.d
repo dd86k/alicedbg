@@ -9,10 +9,8 @@ import core.stdc.stdlib : malloc, calloc, realloc, free;
 import core.stdc.string : memcpy;
 import adbg.error : adbg_oops, AdbgError;
 
-// TODO: `find` function
-//       Using memcmp.
 // TODO: `empty` function
-//       Clear *and* free memory (or realloc to initial capacity
+//       Clear *and* free memory (or realloc to initial capacity)
 
 extern (C):
 
@@ -82,11 +80,12 @@ list_t* adbg_list_reserve(list_t *list, size_t newcapacity) {
 	}
 	
 	// NOTE: MSVC will always assign a new memory block
-	list = cast(list_t*)realloc(list, list_t.sizeof + (list.itemsize * newcapacity));
-	if (list == null) {
+	void *t = realloc(list, list_t.sizeof + (list.itemsize * newcapacity));
+	if (t == null) { // leave allocation untouched
 		adbg_oops(AdbgError.crt);
 		return null;
 	}
+	list = cast(list_t*)t;
 	
 	// realloc(3) should have copied data to new block
 	// Only need to readjust buffer pointer
@@ -119,6 +118,14 @@ size_t adbg_list_capacity(list_t *list) {
 		return 0;
 	}
 	return list.capacity;
+}
+/// Get the list's current item count (length).
+/// Params: list = List instance.
+/// Returns: Length size in number of items.
+size_t adbg_list_count(list_t *list) {
+	if (list == null)
+		return 0;
+	return list.count;
 }
 
 /// Add an item to the list.

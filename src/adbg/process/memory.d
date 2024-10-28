@@ -11,6 +11,7 @@ import adbg.include.c.stdarg;
 import core.stdc.string : memcpy;
 import adbg.error;
 import adbg.utils.math; // For MiB template
+import adbg.utils.list;
 
 // TODO: Minimum pagesize per platform enum
 
@@ -45,7 +46,11 @@ version (Windows) {
 } else version (Posix) {
 	// NOTE: sysconf, on error, returns -1
 	c_long r = sysconf(_SC_PAGESIZE);
-	return r < 0 ? 0 : r;
+	if (r < 0) {
+		adbg_oops(AdbgError.os);
+		return 0;
+	}
+	return cast(size_t)r;
 } else assert(0, "adbg_memory_pagesize unimplemented for platform");
 }
 
@@ -68,7 +73,7 @@ enum AdbgMemory {
 /// 	data = Pointer to data.
 /// 	size = Size of data.
 /// Returns: Error code.
-int adbg_memory_read(adbg_process_t *proc, size_t addr, void *data, uint size) {
+int adbg_memory_read(adbg_process_t *proc, size_t addr, void *data, size_t size) {
 	return adbg_memory_read2(proc, AdbgMemory.data, addr, data, size);
 }
 
@@ -80,7 +85,7 @@ int adbg_memory_read(adbg_process_t *proc, size_t addr, void *data, uint size) {
 /// 	data = Pointer to data.
 /// 	size = Size of data.
 /// Returns: Error code.
-int adbg_memory_read2(adbg_process_t *proc, int type, size_t addr, void *data, uint size) {
+int adbg_memory_read2(adbg_process_t *proc, int type, size_t addr, void *data, size_t size) {
 	if (proc == null || data == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (size == 0)
@@ -124,7 +129,7 @@ version (Windows) {
 	
 	// If reading mem fails, try ptrace method
 	c_long *dest = cast(c_long*)data;	/// target
-	int r = size / c_long.sizeof;	/// number of "long"s to read
+	int r = cast(int)(size / c_long.sizeof);	/// number of "long"s to read
 	
 	for (; r > 0; --r, ++dest, addr += c_long.sizeof) {
 		errno = 0; // Clear errno on PT_PEEK*
@@ -165,7 +170,7 @@ version (Windows) {
 /// 	data = Pointer to data.
 /// 	size = Size of data.
 /// Returns: Error code.
-int adbg_memory_write(adbg_process_t *proc, size_t addr, void *data, uint size) {
+int adbg_memory_write(adbg_process_t *proc, size_t addr, void *data, size_t size) {
 	return adbg_memory_write2(proc, AdbgMemory.data, addr, data, size);
 }
 
@@ -177,7 +182,7 @@ int adbg_memory_write(adbg_process_t *proc, size_t addr, void *data, uint size) 
 /// 	data = Pointer to data.
 /// 	size = Size of data.
 /// Returns: Error code.
-int adbg_memory_write2(adbg_process_t *proc, int type, size_t addr, void *data, uint size) {
+int adbg_memory_write2(adbg_process_t *proc, int type, size_t addr, void *data, size_t size) {
 	if (proc == null || data == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (size == 0)
@@ -223,7 +228,7 @@ version (Windows) {
 	// If reading mem fails, try ptrace method
 	c_long *user = cast(c_long*)data;	/// user data pointer
 	int i;	/// offset index
-	int j = size / c_long.sizeof;	/// number of "blocks" to process
+	int j = cast(int)(size / c_long.sizeof);	/// number of "blocks" to process
 	
 	for (; i < j; ++i, ++user)
 		if (ptrace(type, proc.pid, addr + (i * c_long.sizeof), user) < 0)
@@ -298,120 +303,119 @@ struct adbg_memory_map_t {
 //TODO: Options for process modules and process memory regions separatively
 //TODO: Option to include free/reserved memory regions (linux: ---p)
 // Memory options for adbg_memory_maps.
-/*enum AdbgMapOpt {
-	// Only get the memory regions for this process.
-	// Type: int
-	// Default: 0 (false)
-	//processOnly	= 2,
-	// With given Process ID instead
-	// Permission issues may be raised
-	//pid = 2,
-}*/
+enum AdbgMappingOption {
+	/// Get all modules.
+	/// Type: int
+	/// Default: 0 (false)
+	allModules	= 2,
+}
 
-//TODO: Process name hash (here cached in structure or on stack)
-//      Function will eventually have to filter out of a lot of entries
-//      Especially on Linux.
-// TODO: use list_t
-/// Obtain the memory map of modules for the current process.
-///
-/// To close, call adbg_memory_maps_close. On error, all memory buffers
-/// are cleaned.
-/// Params:
-/// 	proc = Process instance.
-/// 	mmaps = Reference to map list.
-/// 	mcount = Reference to map count.
-/// 	... = Options.
-/// Returns: Error code.
-int adbg_memory_maps(adbg_process_t *proc, adbg_memory_map_t **mmaps, size_t *mcount, ...) {
-	if (proc == null || mmaps == null || mcount == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	
-	// Get options
-	va_list list = void;
-	va_start(list, mcount);
-	/*
-	int options;
-Loption:
-	*/
-	switch (va_arg!int(list)) {
-	case 0: break;
-	default:
-		return adbg_oops(AdbgError.invalidOption);
+void* adbg_memory_mapping(adbg_process_t *proc, ...) {
+	if (proc == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
 	}
 	
-	version (Trace) trace("tracee=%p mmaps=%p mcount=%p", tracee, mmaps, mcount);
+	enum {
+		OPTION_ALLMODULES = 2,
+	}
 	
-	// Failsafe
-	*mcount = 0;
+	// Get options
+	va_list valist = void;
+	va_start(valist, proc);
+	int options;
+Loption:
+	switch (va_arg!int(valist)) {
+	case 0: break;
+	case AdbgMappingOption.allModules:
+		if (va_arg!int(valist)) options |= OPTION_ALLMODULES;
+		goto Loption;
+	default:
+		adbg_oops(AdbgError.invalidOption);
+		return null;
+	}
 	
-	// Add EnumPageFilesA?
 version (Windows) {
 	if (__dynlib_psapi_load()) // EnumProcessModules, QueryWorkingSet
-		return adbg_errno();
+		return null;
 	
-	HANDLE phandle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, proc.pid);
-	if (phandle == null)
-		return adbg_oops(AdbgError.os);
+	HANDLE phandle = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, proc.pid);
+	if (phandle == null) {
+		adbg_oops(AdbgError.os);
+		return null;
+	}
 	scope(exit) CloseHandle(phandle);
 	
-	size_t uindex; /// (user) map index
-	
-	// Create user buffer
-	adbg_memory_map_t *map = *mmaps = cast(adbg_memory_map_t*)malloc(2048 * adbg_memory_map_t.sizeof);
-	if (map == null)
-		return adbg_oops(AdbgError.os);
-	
+	// NOTE: Windows memory mappings
 	//
-	// Query memory regions for process
-	//
+	//       There are two parts to this rather length block of code.
+	//       1. The first one are about the working sets
+	//       2. The second are loaded modules
 	
-	// NOTE: Putty 0.80 will have around 1095 entries
+	// Don't use scope(exit), because this is a two-part process, and this
+	// allocated is cleared before allocating the second portion
 	uint bfsz = MiB!1;
-	PSAPI_WORKING_SET_INFORMATION *mbinfo =
-		cast(PSAPI_WORKING_SET_INFORMATION*)malloc(bfsz);
-	if (mbinfo == null)
-		return adbg_oops(AdbgError.crt);
+	PSAPI_WORKING_SET_INFORMATION *mbinfo = cast(PSAPI_WORKING_SET_INFORMATION*)malloc(bfsz);
+	if (mbinfo == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	
+	// Part 1. Working Sets
 	
 	// NOTE: NtPssCaptureVaSpaceBulk is only available since Windows 10 20H1
+	// Should we use EnumPageFilesA?
 	// This queries workset addresses regardless of size, page-bounded.
 	// e.g., it will add 0x30000 and 0x31000 as entries, despite being a 8K "block".
 Lretry:
-	uint r = QueryWorkingSet(phandle, mbinfo, bfsz);
-	switch (r) {
-	case 0:
-		return adbg_oops(AdbgError.os);
-	case ERROR_BAD_LENGTH:
-		bfsz = cast(uint)(mbinfo.NumberOfEntries * ULONG_PTR.sizeof);
-		mbinfo = cast(PSAPI_WORKING_SET_INFORMATION*)realloc(mbinfo, bfsz);
-		if (mbinfo == null)
-			return adbg_oops(AdbgError.crt);
-		goto Lretry;
-	default:
+	uint setcnt = QueryWorkingSet(phandle, mbinfo, bfsz);
+	if (setcnt == 0) {
+		if (GetLastError() == ERROR_BAD_LENGTH) {
+			bfsz = cast(uint)(mbinfo.NumberOfEntries * ULONG_PTR.sizeof);
+			mbinfo = cast(PSAPI_WORKING_SET_INFORMATION*)realloc(mbinfo, bfsz);
+			if (mbinfo == null) {
+				adbg_oops(AdbgError.crt);
+				free(mbinfo);
+				return null;
+			}
+			goto Lretry;
+		}
+		
+		adbg_oops(AdbgError.os);
+		free(mbinfo);
+		return null;
 	}
-	scope(exit) free(mbinfo);
 	
+	// Needed to group working sets
 	size_t pagesize = adbg_memory_pagesize();
-	if (pagesize == 0)
-		return adbg_oops(AdbgError.os);
+	if (pagesize == 0) {
+		free(mbinfo);
+		return null;
+	}
 	
-	//TODO: If WoW64, use MEMORY_BASIC_INFORMATION32
+	// Create new list
+	// While it'd be clever to reserve an initial capacity of the return
+	// value of QueryWorkingSet's NumberOfEntries, many entries are grouped/duplicates
+	// NOTE: Putty 0.80 will have around 1095 entries
+	list_t *list = adbg_list_new(adbg_memory_map_t.sizeof, 64);
+	if (list == null)
+		return list;
+	
+	// TODO: If WoW64, use MEMORY_BASIC_INFORMATION32
 	
 	//PSAPI_WORKING_SET_EX_INFORMATION wsinfoex = void;
+	adbg_memory_map_t map = void;
 	for (size_t i; i < mbinfo.NumberOfEntries; ++i) {
 		// NOTE: Win64 doesn't populate block flag bits
 		PSAPI_WORKING_SET_BLOCK *blk = &mbinfo.WorkingSetInfo.ptr[i];
 		
 		/*TODO: Large page support + adjustment needed
-		
 		wsinfoex.VirtualAddress = cast(void*)blk.VirtualPage;
 		if (QueryWorkingSetEx(tracee.hproc, &wsinfoex,
 			PSAPI_WORKING_SET_EX_INFORMATION.sizeof) == 0)
 			continue;
-		
 		import adbg.utils.bit : adbg_bits_extract32;
-		
 		uint pageflags = cast(uint)wsinfoex.VirtualAttributes.Flags;
-		
 		version (Trace) trace("page=%zx attr=%zx valid=%d share=%d prot=%d shared=%d node=%d locked=%d large=%d bad=%d",
 			cast(size_t)wsinfoex.VirtualAddress,
 			wsinfoex.VirtualAttributes.Flags,
@@ -472,7 +476,11 @@ Lretry:
 		map.base = mem.BaseAddress;
 		map.size = mem.RegionSize;
 		
-		++uindex; ++map;
+		list = adbg_list_add(list, &map);
+		if (list == null) {
+			adbg_list_free(list);
+			return null;
+		}
 		
 		// Memory region is less or equal to pagesize?
 		// No further adjustments to do
@@ -492,29 +500,51 @@ Lretry:
 		}
 	}
 	
-	//
-	// Query modules for process
-	//
+	// Free temporary PSAPI_WORKING_SET_INFORMATION buffer
+	free(mbinfo);
+	
+	// Part 2. Modules
+	if ((options & OPTION_ALLMODULES) == 0)
+		return list;
 	
 	// Allocate temp buffer for module handles
-	uint buffersz = cast(uint)(512 * HMODULE.sizeof);
+	uint buffersz = cast(uint)(pagesize / HMODULE.sizeof);
 	HMODULE *mods = cast(HMODULE*)malloc(buffersz);
-	if (mods == null)
-		return adbg_oops(AdbgError.crt);
-	scope(exit) free(mods);
+	if (mods == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
 	
 	// Enum process modules
 	DWORD needed = void; //TODO: Could re-use this with option
-	if (EnumProcessModules(phandle, mods, buffersz, &needed) == FALSE)
-		return adbg_oops(AdbgError.os);
+	bool tried = false;
+Lenum:
+	if (EnumProcessModules(phandle, mods, buffersz, &needed) == FALSE) {
+		if (tried == false && buffersz > needed) {
+			void *t = realloc(mods, needed);
+			if (t == null) {
+				adbg_oops(AdbgError.crt);
+				free(mods);
+				return null;
+			}
+			mods = cast(HMODULE*)t;
+			tried = true;
+			goto Lenum;
+		}
+		adbg_oops(AdbgError.os);
+		free(mods);
+		return null;
+	}
+	scope(exit) free(mods);
 	
+	// Module information
 	DWORD modcount = needed / HMODULE.sizeof;
 	for (DWORD mod_i; mod_i < modcount; ++mod_i) {
 		HMODULE mod = mods[mod_i];
+		
 		MODULEINFO minfo = void;
-		if (GetModuleInformation(phandle, mod, &minfo, MODULEINFO.sizeof) == FALSE) {
+		if (GetModuleInformation(phandle, mod, &minfo, MODULEINFO.sizeof) == FALSE)
 			continue;
-		}
 		
 		// Get base name (e.g., from \Device\HarddiskVolume5\xyz.dll)
 		if (GetMappedFileNameA(phandle, minfo.lpBaseOfDll, map.name.ptr, MEM_MAP_NAME_LEN)) {
@@ -526,9 +556,8 @@ Lretry:
 		//TODO: if WoW64, use MEMORY_BASIC_INFORMATION32
 		
 		MEMORY_BASIC_INFORMATION mem = void;
-		if (VirtualQueryEx(phandle, minfo.lpBaseOfDll, &mem, MEMORY_BASIC_INFORMATION.sizeof) == 0) {
+		if (VirtualQueryEx(phandle, minfo.lpBaseOfDll, &mem, MEMORY_BASIC_INFORMATION.sizeof) == 0)
 			continue;
-		}
 		
 		// Adjust protection bits
 		map.access = mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : 0;
@@ -550,22 +579,22 @@ Lretry:
 		map.type = AdbgPageUse.module_;
 		map.base = minfo.lpBaseOfDll;
 		map.size = minfo.SizeOfImage;
-		
-		++uindex; ++map;
+		list = adbg_list_add(list, &map);
+		if (list == null) {
+			adbg_list_free(list);
+			return null;
+		}
 	}
 	
-	*mcount = uindex;
-	return 0;
+	return list;
 } else version (linux) {
 	// Inspired by libscanmem
 	// https://github.com/scanmem/scanmem/blob/main/maps.c
 	
 	import core.sys.linux.unistd : readlink;
-	import adbg.utils.strings : adbg_util_getline, adbg_util_getlinef;
+	import adbg.utils.strings : adbg_util_getline;
 	import core.sys.linux.unistd : read, close;
 	import core.sys.linux.fcntl : open, O_RDONLY;
-	
-	*mcount = 0;
 	
 	// Formulate proc map path
 	enum PROC_MAPS_LEN = 32;
@@ -575,13 +604,17 @@ Lretry:
 	
 	// Open process maps
 	int fd_maps = open(proc_maps.ptr, O_RDONLY);
-	if (fd_maps == -1)
-		return adbg_oops(AdbgError.os);
+	if (fd_maps == -1) {
+		adbg_oops(AdbgError.os);
+		return null;
+	}
 	scope(exit) close(fd_maps);
 	
+	// TODO: Implement allModules (Linux)
+	//       Use process path to distinguish modules v. this process
 	/*
 	// Get proc exe path (e.g., /usr/bin/cat)
-	enum PROC_EXE_LEN = 32;
+	enum PROC_EXE_LEN = 256;
 	char[PROC_EXE_LEN] proc_exe = void;
 	snprintf(proc_exe.ptr, PROC_EXE_LEN, "/proc/%u/exe", proc.pid);
 	
@@ -596,33 +629,34 @@ Lretry:
 		exe_path[0] = 0;
 	}*/
 	
+	// TODO: Redo line-reading part
+	//       While a little slower (due to I/O), reading a character
+	//       at a time for each line will be more future proof than
+	//       allocating a fixed-sized buffer and filling it.
+	
 	// Allocate enough for maps buffer
 	// For example: One Firefox process has around 149 KiB worth of
 	// maps data with 1953 entries.
-	enum READSZ = MiB!1;
+	enum READSZ = MiB!2;
 	char *procbuf = cast(char*)malloc(READSZ);
-	if (procbuf == null)
-		return adbg_oops(AdbgError.crt);
+	if (procbuf == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
 	scope(exit) free(procbuf);
 	
 	// Read maps, as much as possible
 	ssize_t readsz = read(fd_maps, procbuf, READSZ);
-	if (readsz == -1)
-		return adbg_oops(AdbgError.os);
+	if (readsz < 0) {
+		adbg_oops(AdbgError.os);
+		return null;
+	}
 	version (Trace) trace("flen=%zu", readsz);
 	
-	// Count number of newlines for number of items to allocate
-	// Cut lines don't have newlines, so no worries here
-	size_t itemcnt;
-	for (size_t i; i < readsz; ++i)
-		if (procbuf[i] == '\n') ++itemcnt;
-	
-	// Allocate map items
-	version (Trace) trace("allocating %zu items", itemcnt);
-	adbg_memory_map_t *map = *mmaps =
-		cast(adbg_memory_map_t*)malloc(itemcnt * adbg_memory_map_t.sizeof);
-	if (map == null)
-		return adbg_oops(AdbgError.crt);
+	// Allocate list
+	list_t *list = adbg_list_new(adbg_memory_map_t.sizeof, 64);
+	if (list == null)
+		return null;
 	
 	// Go through each entry, which may look like this (without header):
 	// Address range             Perm Offset   Dev   inode      Path
@@ -631,13 +665,13 @@ Lretry:
 	// Path: Path or [stack], [stack:%id] (3.4 to 4.4), [heap]
 	//       [vdso]: virtual dynamic shared object: https://lwn.net/Articles/615809/
 	//       [vvar]: Stores a "mirror" of kernel variables required by virt syscalls
-	//       [vsyscall]: Legacy user-kernel (jump?) tables for some syscalls
+	//       [vsyscall]: Legacy user-kernel (jump?) table for some syscalls
 	enum LINE_LEN = 256;
 	char[LINE_LEN] line = void;
 	size_t linesz = void; /// line size
 	size_t srcidx; /// maps source buffer index
 	size_t i; /// maps index
-	//TODO: use a variant with mutable string and actively cuts lines
+	adbg_memory_map_t map = void;
 	while (adbg_util_getline(line.ptr, LINE_LEN, &linesz, procbuf, &srcidx)) {
 		size_t range_start = void;
 		size_t range_end   = void;
@@ -694,13 +728,15 @@ Lretry:
 		if (perms[1] == 'w') map.access |= AdbgMemPerm.write;
 		if (perms[2] == 'x') map.access |= AdbgMemPerm.exec;
 		
-		++i; ++map;
+		list = adbg_list_add(list, &map);
+		if (list == null) {
+			adbg_list_free(list);
+			return null;
+		}
 	}
 	
-	version (Trace) trace("finished");
-	*mcount = i;
-	return 0;
-} else
+	return list;
+} else {
 	// FreeBSD: procstat(1) / pmap(9)
 	// - https://man.freebsd.org/cgi/man.cgi?query=vm_map
 	// - https://github.com/freebsd/freebsd-src/blob/main/lib/libutil/kinfo_getvmmap.c
@@ -711,335 +747,20 @@ Lretry:
 	// NetBSD: pmap(1) / uvm_map(9)
 	// OpenBSD: procmap(1)
 	// - kvm_open + kvm_getprocs + KERN_PROC_PID
-	return adbg_oops(AdbgError.unimplemented);
+	adbg_oops(AdbgError.unimplemented);
+	return null;
+}
 }
 
-/// Close the memory maps structure previously created by adbg_memory_maps.
-/// Params: maps = Maps array.
-void adbg_memory_maps_close(adbg_memory_map_t *maps) {
-	if (maps) free(maps);
-}
-
-private bool adbg_mem_cmp_u8(void *v, void *c, size_t l) pure {
-	return *cast(ubyte*)v != *cast(ubyte*)c;
-}
-private bool adbg_mem_cmp_u16(void *v, void *c, size_t l) pure {
-	return *cast(ushort*)v != *cast(ushort*)c;
-}
-private bool adbg_mem_cmp_u32(void *v, void *c, size_t l) pure {
-	return *cast(uint*)v != *cast(uint*)c;
-}
-private bool adbg_mem_cmp_u64(void *v, void *c, size_t l) pure {
-	return *cast(ulong*)v != *cast(ulong*)c;
-}
-/*private bool adbg_mm_scan_u128(void *v, void *c, size_t l) {
-	version (DigitalMars) {
-		import core.simd : ubyte16, __simd, XMM, prefetch;
-		ubyte16 v1 = void;
-		ubyte16 v2 = void;
-		prefetch!(false, 3)(v);
-		prefetch!(false, 3)(c);
-		v1 = *cast(ubyte16*)v;
-		v2 = *cast(ubyte16*)c;
-		return (cast(ubyte16)__simd(XMM.CMPSS, v1, v2, 0)).ptr[0] != 0;
-	} else version (GNU) {
-		
-	} else version (LDC) {
-		
-	}
-	version (D_SIMD) {
-	} else {
-		import core.stdc.string : memcmp;
-		return memcmp(v, c, l) == 0;
-	}
-}*/
-private bool adbg_mem_cmp_other(void *v, void *c, size_t l) pure {
-	import core.stdc.string : memcmp;
-	return memcmp(v, c, l) != 0;
-}
-
-/// Options for adbg_memory_scan.
-enum AdbgScanOpt {
-	/// Unaligned memory scans take a lot more time.
-	/// Type: int
-	/// Default: false
-	unaligned	= 1,
-	// TODO: allModules
-	//allModules	= 2,
-	/// Set the initial capacity for results, other than the default.
-	///
-	/// Currently, the capacity does not increase dynamically.
-	///
-	/// Note: Currently, one entry is 24 Bytes.
-	/// Type: int
-	/// Default: 20_000
-	capacity	= 3,
-	// Report progress to callback.
-	// Callback will report: stage name and a percentage on modules scanned.
-	//progress_cb
-	// Rescan this list instead. Don't forget to pass rescanListCount too.
-	// Type: Internal
-	//rescanList
-	// Use this mmap list instead. Don't forget to pass customMMapCount too.
-	//customMMap
-	// To be used with customMMap.
-	//customMMapCount
-}
-
-struct adbg_scan_t {
-	adbg_process_t *process;
-	adbg_scan_result_t *results;
-	size_t result_count;
-	
-	adbg_memory_map_t *maps;
-	size_t map_count;
-}
-struct adbg_scan_result_t {
-	ulong address;
-	adbg_memory_map_t *map; // base address
-	union {
-		ulong	value_u64;
-		uint	value_u32;
-		ushort	value_u16;
-		ubyte	value_u8;
-	}
-}
-
-/// Scan debuggee process memory for a specific value.
-///
-/// This function allocates the list to contain a list of 2000 items.
-/// Memory allocated by this function can be freed using free(3).
-/// This behavior may change in the future.
-///
-/// Example:
-/// ---
-/// adbg_scan_t scan;
-/// int data = 42; // input
-/// // Assume tracee is paused.
-/// if (adbg_memory_scan(tracee, &scan, &data, int.sizeof, 0)) {
-///     return; // Error
-/// }
-///
-/// for (size_t i; i < count; ++i) {
-///     printf("0x%llx", results[i]);
-/// }
-/// 
-/// free(results);
-/// ---
-///
-/// Params:
-/// 	tracee = Tracee, in the ready or paused state.
-/// 	data = Reference to user data.
-/// 	datasize = Reference to user data size.
-/// 	... = Options.
-///
-/// Returns: An instance of the scanner or null on error.
-adbg_scan_t* adbg_memory_scan(adbg_process_t *tracee, void* data, size_t datasize, ...) {
-	/// Until scanner gets better internals for variable-length
-	/// data types. Don't want to scan gigabyte-sized types now.
-	enum DATA_LIMIT = 4096;
-	
-	/// Default amount of items to allocate.
-	enum DEFAULT_CAPACITY = 20_000;
-	
-	enum OPT_UNALIGNED = 1;
-	
-	// Initial check and setup
-	if (tracee == null || data == null) {
+adbg_memory_map_t* adbg_memory_mapping_at(void *list, size_t index) {
+	if (list == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (datasize == 0) {
-		adbg_oops(AdbgError.scannerDataEmpty);
-		return null;
-	}
-	if (datasize > DATA_LIMIT) {
-		adbg_oops(AdbgError.scannerDataLimit);
-		return null;
-	}
-	
-	// Check debugger status
-	switch (tracee.state) with (AdbgProcessState) {
-	case standby, paused, running: break;
-	default:
-		adbg_oops(AdbgError.debuggerUnpaused);
-		return null;
-	}
-	
-	// Get options
-	va_list list = void;
-	va_start(list, datasize);
-	int options;
-	int capacity = DEFAULT_CAPACITY; // For results
-L_OPT:
-	switch (va_arg!int(list)) {
-	case 0: break;
-	case AdbgScanOpt.unaligned:
-		if (va_arg!int(list)) options |= OPT_UNALIGNED;
-		goto L_OPT;
-	case AdbgScanOpt.capacity:
-		capacity = va_arg!int(list);
-		goto L_OPT;
-	default:
-		adbg_oops(AdbgError.invalidOption);
-		return null;
-	}
-	
-	// Initial setup
-	adbg_scan_t *scanner = cast(adbg_scan_t*)malloc(adbg_scan_t.sizeof);
-	if (scanner == null) {
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
-	scanner.process = tracee;
-	
-	// Get memory maps
-	if (adbg_memory_maps(tracee, &scanner.maps, &scanner.map_count, 0))
-		return null;
-	
-	// Get optimized compare func if able
-	extern (C) bool function(void*, void*, size_t) cmp = void;
-	switch (datasize) {
-	case ulong.sizeof:	cmp = &adbg_mem_cmp_u64; break;
-	case uint.sizeof:	cmp = &adbg_mem_cmp_u32; break;
-	case ushort.sizeof:	cmp = &adbg_mem_cmp_u16; break;
-	case ubyte.sizeof:	cmp = &adbg_mem_cmp_u8; break;
-	default:		cmp = &adbg_mem_cmp_other;
-	}
-	
-	// Make result list
-	scanner.results = cast(adbg_scan_result_t*)malloc(capacity * adbg_scan_result_t.sizeof);
-	if (scanner.results == null) {
-		adbg_memory_scan_close(scanner);
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
-	
-	// Make read buffer
-	ubyte *read_buffer = cast(ubyte*)malloc(datasize);
-	if (read_buffer == null) {
-		adbg_memory_scan_close(scanner);
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
-	scope(exit) free(read_buffer);
-	
-	version (Trace) trace("modules=%u", cast(uint)scanner.map_count);
-	
-	// New scan: Scan per memory region
-	uint read_size = cast(uint)datasize;
-	size_t jmpsize = options & OPT_UNALIGNED ? 1 : datasize;
-	size_t modcount = scanner.map_count;
-	size_t i;
-	scanner.result_count = 0;
-	//TODO: Consider reading a page's worth instead of T.sizeof
-	//TODO: Skip non-residential entries (waiting on Linux fix)
-LENTRY:	for (size_t mi; mi < modcount; ++mi) {
-		adbg_memory_map_t *map = &scanner.maps[mi];
-		
-		version (Trace) trace("perms=%x", map.access);
-		
-		//if ((map.access & PERMS) != PERMS)
-		//	continue;
-		
-		void* start = map.base;
-		void* end   = start + map.size;
-		
-		version (Trace) trace("start=%p end=%p", start, end);
-		
-		// Aligned reads for now
-		for (; start + datasize < end; start += jmpsize) {
-			// Read into buffer
-			if (adbg_memory_read(tracee, cast(size_t)start, read_buffer, read_size)) {
-				version (Trace)
-					trace("read failed for %.512s", map.name.ptr);
-				continue LENTRY;
-			}
-			
-			// Different data
-			if (cmp(read_buffer, data, datasize)) {
-				continue;
-			}
-			
-			// Add result
-			adbg_scan_result_t *result = &scanner.results[i++];
-			result.address = cast(ulong)start;
-			result.map = map;
-			memcpy(&result.value_u64, read_buffer, datasize);
-			
-			// No more entries can be inserted
-			if (i >= capacity)
-				break LENTRY;
-		}
-	}
-	scanner.result_count = i;
-	
-	version (Trace) trace("results=%u", cast(uint)i);
-	
-	return scanner;
+	return cast(adbg_memory_map_t*)adbg_list_get(cast(list_t*)list, index);
 }
 
-int adbg_memory_rescan(adbg_scan_t *scanner, void* data, size_t size) {
-	// Initial check and setup
-	if (scanner == null || data == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	if (size == 0)
-		return adbg_oops(AdbgError.scannerDataEmpty);
-	if (size > 8)
-		return adbg_oops(AdbgError.scannerDataLimit);
-	if (scanner.result_count == 0)
-		return 0;
-	// No prior scan performed
-	if (scanner.process == null || scanner.map_count == 0) {
-		scanner.result_count = 0;
-		return 0;
-	}
-	
-	// Make read buffer
-	ubyte *read_buffer = cast(ubyte*)malloc(size);
-	if (read_buffer == null)
-		return adbg_oops(AdbgError.crt);
-	
-	// Get optimized compare func if able
-	extern (C) bool function(void*, void*, size_t) cmp = void;
-	switch (size) {
-	case ulong.sizeof:	cmp = &adbg_mem_cmp_u64; break;
-	case uint.sizeof:	cmp = &adbg_mem_cmp_u32; break;
-	case ushort.sizeof:	cmp = &adbg_mem_cmp_u16; break;
-	case ubyte.sizeof:	cmp = &adbg_mem_cmp_u8; break;
-	default:		cmp = &adbg_mem_cmp_other;
-	}
-	
-	uint read_size = cast(uint)size;
-	// Strategy is to move items if we find a different value
-	for (size_t i; i < scanner.result_count; ++i) {
-		adbg_scan_result_t *result = &scanner.results[i];
-		
-		// Read into buffer
-		// On fail: Could be that module was unloaded
-		if (adbg_memory_read(scanner.process, cast(size_t)result.address, read_buffer, read_size)) {
-			//TODO: trace()
-			goto L_MOVE;
-		}
-		
-		// Same data?
-		if (cmp(read_buffer, &result.value_u64, size) == 0) {
-			continue;
-		}
-		
-	L_MOVE: // If data couldn't be read, or is different, then move results
-		size_t c = --scanner.result_count;
-		for (size_t ri = i; ri < c; ++ri) {
-			memcpy(result, result + 1, adbg_scan_result_t.sizeof);
-		}
-	}
-	
-	return adbg_oops(AdbgError.unimplemented);
-}
-
-void adbg_memory_scan_close(adbg_scan_t *scanner) {
-	if (scanner == null) return;
-	if (scanner.maps) free(scanner.maps);
-	if (scanner.results) free(scanner.results);
-	free(scanner);
+void adbg_memory_mapping_close(void *list) {
+	if (list == null) return;
+	adbg_list_free(cast(list_t*)list);
 }

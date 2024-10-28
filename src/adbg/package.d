@@ -10,4 +10,5 @@ public import
 	adbg.process,
 	adbg.debugger,
 	adbg.disassembler,
-	adbg.objectserver;
+	adbg.objectserver,
+	adbg.scanner;
