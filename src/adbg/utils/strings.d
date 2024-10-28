@@ -57,61 +57,6 @@ extern (D) unittest {
 ///   bf = Line buffer input.
 ///   bfsz = Line buffer input size.
 ///   lnsz = Line length reference.
-///   file = File handle.
-/// Returns: Line length.
-deprecated("FILE is no longer used")
-size_t adbg_util_getlinef(char *bf, size_t bfsz, size_t *lnsz, FILE *file) {
-	if (bf == null || bfsz == 0 || lnsz == null || file == null)
-		return 0;
-	
-	import core.stdc.ctype : isprint;
-	
-	size_t i; /// Line buffer index
-	
-	// If fgetc return EOF, it is non-printable
-	for ( ; i < bfsz ; ++i) {
-		int c = fgetc(file);
-		if (c == '\n')
-			break;
-		if (isprint(c))
-			bf[i] = cast(char)c;
-	}
-	
-	bf[i] = 0;
-	*lnsz = i;
-	return i;
-}
-extern (D) unittest {
-	import std.stdio : writefln;
-	import std.file : write, tempDir, remove;
-	import std.path : buildPath;
-	import std.string : toStringz;
-	
-	string tmppath = buildPath(tempDir, "alicedbg_unittest");
-	write(tmppath, "123\n\nabc");
-	FILE *fd = fopen(tmppath.toStringz, "r");
-	
-	char[16] line = void;
-	size_t linesz = void;
-	size_t i;
-	while (adbg_util_getlinef(line.ptr, 16, &linesz, fd)) {
-		final switch (++i) {
-		case 1: assert(strncmp(line.ptr, "123", linesz) == 0); break;
-		case 2: assert(strncmp(line.ptr, "abc", linesz) == 0); break;
-		}
-	}
-	
-	fclose(fd);
-	remove(tmppath);
-}
-
-/// Gets the next line out of a file stream.
-/// This skips empty lines.
-/// The extracted line is null-terminated.
-/// Params:
-///   bf = Line buffer input.
-///   bfsz = Line buffer input size.
-///   lnsz = Line length reference.
 ///   src = Null-terminated buffer source.
 ///   srcidx = Index reminder. It's best advised you don't touch this variable between calls.
 /// Returns: Line length.
