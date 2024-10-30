@@ -107,6 +107,7 @@ enum AdbgError {
 	libCapstone	= 3002,	/// Capstone
 }
 
+// TODO: Make adbg_error_t struct private after removing adbg_error_current()
 /// Represents an error in alicedbg.
 struct adbg_error_t {
 	int code;	/// Error code
@@ -116,6 +117,16 @@ struct adbg_error_t {
 }
 /// Last error in alicedbg.
 private __gshared adbg_error_t error;
+
+int adbg_error_code() {
+	return error.code;
+}
+int adbg_error_line() {
+	return error.line;
+}
+const(char)* adbg_error_function() {
+	return error.func;
+}
 
 //TODO: Strongly consider string, provides .ptr and .length
 private struct adbg_error_msg_t {
@@ -189,6 +200,7 @@ private immutable adbg_error_msg_t[] errors_msg = [
 /// Returns: Pointer to the only error instance.
 //TODO: Deprecate as dangerous
 //      Getting extra info such as source (string) and al. should be via functions
+deprecated("Use adbg_error_function, adbg_error_line")
 const(adbg_error_t)* adbg_error_current() {
 	return &error;
 }

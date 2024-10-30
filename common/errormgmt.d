@@ -32,8 +32,7 @@ void print_error(const(char) *message, int code,
 void print_error_adbg(
 	const(char)* mod = __FILE__.ptr, int line = __LINE__) {
 	debug printf("[%s@%d] ", mod, line);
-	const(adbg_error_t)* e = adbg_error_current();
-	print_error(adbg_error_message(), e.code, null, e.func, e.line);
+	print_error(adbg_error_message(), adbg_error_code(), null, adbg_error_function(), adbg_error_line());
 }
 
 void panic(int code, const(char)* message,
@@ -45,8 +44,7 @@ void panic_crt(const(char)* prefix = null, const(char)* mod = __MODULE__.ptr, in
 	panic(errno, strerror(errno), prefix, mod, line);
 }
 void panic_adbg(const(char)* prefix = null, const(char)* mod = __MODULE__.ptr) {
-	const(adbg_error_t)* e = adbg_error_current();
-	panic(adbg_errno(), adbg_error_message(), prefix, e.func, e.line);
+	panic(adbg_errno(), adbg_error_message(), prefix, adbg_error_function(), adbg_error_line());
 }
 
 void reset_error() {
