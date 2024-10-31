@@ -241,10 +241,9 @@ struct command2_t {
 	command2_help_section_t[] doc_sections;
 	int function(int, const(char)**) entry;
 }
-// NOTE: Called "commands_list" to avoid conflict with future "command_list" function
 // TODO: New commands
 //       - b|breakpoint: Breakpoint management
-//       - sym: Symbol management
+//       - sym|symbols: Symbol management
 immutable command2_t[] shell_commands = [
 	//
 	// Debugger
@@ -476,9 +475,17 @@ immutable command2_t[] shell_commands = [
 		[ "[ITEM]" ],
 		MODULE_SHELL, CATEGORY_SHELL,
 		[
-			
 		],
 		&command_help,
+	},
+	{
+		[ "error" ],
+		"Show last error in greater details",
+		[],
+		MODULE_SHELL, CATEGORY_SHELL,
+		[
+		],
+		&command_error,
 	},
 	{
 		[ "version" ],
@@ -486,7 +493,6 @@ immutable command2_t[] shell_commands = [
 		[],
 		MODULE_SHELL, CATEGORY_SHELL,
 		[
-			
 		],
 		&command_version,
 	},
@@ -629,27 +635,39 @@ void shell_event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *
 	event_tid = adbg_exception_tid(exception);
 	
 	printf("* Process %d (thread %lld) stopped\n"~
-		"	Reason  : %s ("~ERR_OSFMT~")\n",
+		"* Reason  : %s ("~ERR_OSFMT~")\n",
 		pid, event_tid,
 		adbg_exception_name(exception), adbg_exception_orig_code(exception));
 	
-	// No fault address available
-	if (exception.fault_address == 0)
-		return;
+	// Fault address available, print it
+	if (exception.fault_address) {
+		printf("	Address : 0x%llx\n", exception.fault_address);
+		char[32] machbuf = void;
+		const(char)* mnemonic = void, operands = void;
+		// Disassembling instruction at fault address passed
+		if (shell_disassemble(cast(size_t)exception.fault_address,
+			null,
+			null, 0,
+			machbuf.ptr, 32,
+			&mnemonic, &operands) == 0) {
+			printf("* Machine : %s\n", machbuf.ptr);
+			printf("* Mnemonic: %s %s\n", mnemonic, operands);
+		}
+	}
 	
-	printf("	Address : 0x%llx\n", exception.fault_address);
-	
-	char[32] machbuf = void;
-	const(char)* mnemonic = void, operands = void;
-	if (shell_disassemble(cast(size_t)exception.fault_address,
-		null,
-		null, 0,
-		machbuf.ptr, 32,
-		&mnemonic, &operands))
-		return;
-	
-	printf("	Machine : %s\n", machbuf.ptr);
-	printf("	Mnemonic: %s %s\n", mnemonic, operands);
+	// Print callstack, if available
+	adbg_thread_t *thread = adbg_thread_new(event_tid);
+	if (thread) {
+		void *frames = adbg_frame_list(process, thread);
+		if (frames) {
+			puts("\n* Callstack (WIP):");
+			adbg_stackframe_t *frame = void;
+			for (size_t i; (frame = adbg_frame_list_at(frames, i)) != null; ++i) {
+				printf("%3zu. %llx\n", i, frame.address);
+			}
+			adbg_frame_list_close(frames);
+		}
+	}
 }
 void shell_event_process_exit(adbg_process_t *proc, void *udata, int code) {
 	printf("* Process %d exited with code %d\n", adbg_process_id(proc), code);
@@ -1121,7 +1139,7 @@ int command_thread(int argc, const(char) **argv) {
 	// thread list - get a list of threads
 	if (strcmp(action, "list") == 0) {
 		printf("Threads:");
-		for (size_t i; (thread = adbg_thread_list_get(process, i)) != null; ++i) {
+		for (size_t i; (thread = adbg_thread_list_get(thrlist, i)) != null; ++i) {
 			if (i) putchar(',');
 			printf(" %lld", adbg_thread_id(thread));
 		}
@@ -1139,7 +1157,7 @@ int command_thread(int argc, const(char) **argv) {
 		return ShellError.alicedbg;
 	
 	action = argv[2];
-	if (strcmp(action, "registers") == 0 || strcmp(action, "regs") == 0) {
+	if (*action == 'r' || strcmp(action, "registers") == 0) {
 		int id;
 		adbg_register_t *register = void;
 		while ((register = adbg_register_by_id(thread, id++)) != null) {
@@ -1151,10 +1169,28 @@ int command_thread(int argc, const(char) **argv) {
 				-16, hex.ptr,
 				dec.ptr);
 		}
-	} else
-		return ShellError.invalidParameter;
+		return 0;
+	} else if (*action == 's' || strcmp(action, "stack") == 0) {
+		if (argc < 4) // stack action
+			return ShellError.missingArgument;
+		
+		action = argv[3];
+		if (strcmp(action, "show") == 0) { // show thread id stack
+			void *frames = adbg_frame_list(process, thread);
+			if (frames == null)
+				return ShellError.alicedbg;
+			
+			adbg_stackframe_t *frame = void;
+			for (size_t i; (frame = adbg_frame_list_at(frames, i)) != null; ++i) {
+				printf("%3zu. %llx\n", i, frame.address);
+			}
+			
+			adbg_frame_list_close(frames);
+			return 0;
+		}
+	}
 	
-	return 0;
+	return ShellError.invalidCommand;
 }
 
 int command_cd(int argc, const(char) **argv) {
@@ -1171,6 +1207,17 @@ int command_pwd(int argc, const(char) **argv) {
 	if (path == null)
 		return ShellError.alicedbg;
 	puts(path);
+	return 0;
+}
+
+int command_error(int argc, const(char) **argv) {
+	printf(
+		"Message : %s\n"~
+		"Code    : %d\n"~
+		"Caller  : %s:L%d\n",
+		adbg_error_message(),
+		adbg_error_code(),
+		adbg_error_function(), adbg_error_line());
 	return 0;
 }
 

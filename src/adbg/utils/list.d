@@ -310,8 +310,9 @@ extern (D) unittest {
 
 /// Free the list.
 /// Params: list = List instance.
-void adbg_list_free(list_t *list) {
+void adbg_list_close(list_t *list) {
 	if (list == null)
 		return;
 	free(list);
 }
+alias adbg_list_free = adbg_list_close;

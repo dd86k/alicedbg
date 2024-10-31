@@ -238,7 +238,7 @@ version (Windows) {
 			adbg_oops(AdbgError.assertion);
 			return null;
 		}
-		version(Trace) trace("args='%s'", proc.args);
+		version(Trace) trace("args='%s'", proc.orig_args);
 	}
 	
 	// TODO: Parse envp
@@ -664,7 +664,7 @@ int adbg_debugger_udata(adbg_process_t *proc, void *udata) {
 /// Params: proc = Process instancied by the debugger.
 /// Returns: Error code.
 int adbg_debugger_wait(adbg_process_t *proc) {
-	version(Trace) trace("proc=%p udata=%p", proc, udata);
+	version(Trace) trace("proc=%p", proc);
 	
 	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);

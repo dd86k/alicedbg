@@ -11,7 +11,8 @@ import adbg.machines : AdbgMachine;
 import adbg.error;
 import adbg.process.base;
 import adbg.utils.list;
-import core.stdc.stdio : snprintf;
+import core.stdc.stdio; // snprintf
+import core.stdc.stdlib;
 
 // TODO: Consider NOT attaching thread list to process
 //       Affects: adbg_thread_list_update
@@ -43,6 +44,47 @@ extern (C):
 struct adbg_thread_t {
 	long id;
 	adbg_thread_context_t context;
+}
+
+/// Make a new single thread instance by its id.
+/// Params: id = Thread ID.
+/// Returns: New thread instance
+adbg_thread_t* adbg_thread_new(long id) {
+	adbg_thread_t *thread = cast(adbg_thread_t*)malloc(adbg_thread_t.sizeof);
+	if (thread == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	thread.id = id;
+	return thread;
+}
+
+void adbg_thread_close(adbg_thread_t *thread) {
+	if (thread == null) return;
+	free(thread);
+}
+
+/// Get the thread ID out of this thread instance.
+/// Params: thread = Thread instance.
+/// Returns: Thread ID. On error, zero.
+long adbg_thread_id(adbg_thread_t *thread) {
+	version (Trace) trace("thread=%p", thread);
+version (Windows) {
+	if (thread == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
+	return thread.id;
+} else version (Posix) {
+	if (thread == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
+	return thread.id;
+} else {
+	adbg_oops(AdbgError.unimplemented);
+	return 0;
+}
 }
 
 /// Update the list of threads for the target process.
@@ -212,7 +254,7 @@ adbg_thread_t* adbg_thread_list_get(void *list, size_t index) {
 /// 	id = Thread ID
 /// Returns: Thread instance. On error, null.
 adbg_thread_t* adbg_thread_list_by_id(void *list, long id) {
-	version (Trace) trace("process=%p id=%lld", process, id);
+	version (Trace) trace("list=%p id=%lld", list, id);
 	if (list == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -225,29 +267,6 @@ adbg_thread_t* adbg_thread_list_by_id(void *list, long id) {
 			return t;
 	adbg_oops(AdbgError.unfindable);
 	return null;
-}
-
-/// Get the thread ID out of this thread instance.
-/// Params: thread = Thread instance.
-/// Returns: Thread ID. On error, zero.
-long adbg_thread_id(adbg_thread_t *thread) {
-	version (Trace) trace("thread=%p", thread);
-version (Windows) {
-	if (thread == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return 0;
-	}
-	return thread.id;
-} else version (Posix) {
-	if (thread == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return 0;
-	}
-	return thread.id;
-} else {
-	adbg_oops(AdbgError.unimplemented);
-	return 0;
-}
 }
 
 //
@@ -366,6 +385,7 @@ enum AdbgRegister {
 
 /// Register size
 enum AdbgRegisterType : ubyte {
+	none,
 	u8, u16, u32, u64,
 	f32, f64
 }
@@ -547,6 +567,7 @@ adbg_register_t* adbg_register_by_id(adbg_thread_t *thread, int id) {
 	return &thread.context.items[index];
 }
 
+// get register name
 const(char)* adbg_register_name(adbg_register_t *register) {
 	version (Trace) trace("register=%p", register);
 	if (register == null) {
@@ -556,6 +577,28 @@ const(char)* adbg_register_name(adbg_register_t *register) {
 	assert(register.info);
 	assert(register.info.name);
 	return register.info.name;
+}
+
+// get register data type
+AdbgRegisterType adbg_register_type(adbg_register_t *register) {
+	version (Trace) trace("register=%p", register);
+	if (register == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return AdbgRegisterType.none;
+	}
+	assert(register.info);
+	assert(register.info.type);
+	return register.info.type;
+}
+
+// get register data value
+void* adbg_register_value(adbg_register_t *register) {
+	version (Trace) trace("register=%p", register);
+	if (register == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	return &register.u64;
 }
 
 // Configure register set, used internally
