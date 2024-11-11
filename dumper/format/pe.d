@@ -12,6 +12,7 @@ import adbg.objects.pe;
 import adbg.objects.mz : mz_header_t;
 import adbg.utils.date : ctime32;
 import adbg.utils.uid, adbg.utils.bit;
+import adbg.utils.strings;
 import adbg.error;
 import core.stdc.stdlib;
 import core.stdc.string : strncmp;
@@ -717,9 +718,13 @@ void dump_pe_debug(adbg_object_t *o) {
 					debug_.SizeOfData, cast(uint)pe_debug_data_pogo_entry_t.sizeof);
 				continue;
 			}
-			uint sig = *cast(uint*)data;
+			
+			void *pogomax = data + debug_.SizeOfData;
+			
+			pe_debug_data_pogo_entry_t* pogo = cast(pe_debug_data_pogo_entry_t*)data;
+			
 			const(char) *pgotypestr = void;
-			switch (sig) {
+			switch (pogo.Magic) {
 			case PE_IMAGE_DEBUG_MAGIC_POGO_LTCG:
 				pgotypestr = "POGO LTCG (Link-Time Code Generation)";
 				break;
@@ -729,14 +734,23 @@ void dump_pe_debug(adbg_object_t *o) {
 			default:
 				pgotypestr = "POGO (Unknown)";
 			}
-			print_x32("Signature", sig, pgotypestr);
-			
-			//TODO: Check if multiple entries.
-			pe_debug_data_pogo_entry_t* pogo = cast(pe_debug_data_pogo_entry_t*)data;
+			print_x32("Signature", pogo.Magic, pgotypestr);
 			print_x32("RVA", pogo.Rva);
 			print_x32("Size", pogo.Size);
-			print_stringl("Size", pogo.Name.ptr,
-				cast(int)(debug_.SizeOfData - pe_debug_data_pogo_entry_t.sizeof));
+			
+			// Temporary
+			hexdump("POGO data", pogo.Name.ptr, debug_.SizeOfData - pe_debug_data_pogo_entry_t.sizeof - 1);
+			/*
+			size_t pogoleft = debug_.SizeOfData - pe_debug_data_pogo_entry_t.sizeof - 1;
+			const(char) *pogoname = pogo.Name.ptr;
+		Lpogostr: // multiple string entries
+			size_t strl = adbg_nstrlen(pogoname, pogoleft);
+			print_stringl("Name", pogoname, cast(int)strl);
+			
+			pogoname += strl + 1;
+			if (pogoname < pogomax)
+				goto Lpogostr;
+			*/
 			break;
 		case PE_IMAGE_DEBUG_TYPE_R2R_PERFMAP:
 			if (debug_.SizeOfData < pe_debug_data_r2r_perfmap_t.sizeof) {

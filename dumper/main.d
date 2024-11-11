@@ -17,7 +17,7 @@ import core.stdc.stdio;
 import dumper;
 import common.errormgmt;
 import common.cli;
-import common.utils : unformat64;
+import common.utils;
 
 private:
 
@@ -141,7 +141,7 @@ int cliopt_disasm_stats() {
 	return 0;
 }
 int cliopt_origin(const(char) *val) {
-	return unformat64(&opt_baseaddress, val);
+	return parse64(&opt_baseaddress, val);
 }
 
 int cliopt_extract() {

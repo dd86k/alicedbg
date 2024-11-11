@@ -358,6 +358,10 @@ struct pe_import_entry64_t { align(1):
 	}
 }
 
+//
+// ANCHOR Debug information
+//
+
 struct pe_debug_directory_entry_t { align(1):
 	uint Characteristics;	/// reserved, must be zero
 	uint TimeDateStamp;	/// time and date that the debug data was created
@@ -406,7 +410,7 @@ enum : uint {
 	/// Incremental Link Time Code Generation.
 	/// See: https://devblogs.microsoft.com/cppblog/speeding-up-the-incremental-developer-build-scenario/
 	PE_IMAGE_DEBUG_TYPE_ILTCG	= 14,
-	/// Uses Intel MPX
+	/// Intel MPX
 	PE_IMAGE_DEBUG_TYPE_MPX	= 15,
 	/// PE determinism or reproducibility.
 	PE_IMAGE_DEBUG_TYPE_REPRO	= 16,
@@ -437,14 +441,13 @@ enum : uint {
 	// Mono source has it set as 0x4244504d
 	PE_IMAGE_DEBUG_MAGIC_EMBEDDED_PPDB	= CHAR32!"MPDB", /// Portable PDB
 	PE_IMAGE_DEBUG_MAGIC_PPDB	= CHAR32!"BSJB", /// Portable PDB
-	// Source: SystemInformer, except for full names
+	// Source: SystemInformer, except for descriptive names
 	PE_IMAGE_DEBUG_MAGIC_POGO_LTCG	= CHAR32!"LTCG",  /// Link-Time Code Generation
 	PE_IMAGE_DEBUG_MAGIC_POGO_PGU	= CHAR32!"PGU\0", /// Profile Guided Update (/LTCG:PGUPDATE)
 }
 
 /// PDB 2.0 and above
 struct pe_debug_data_codeview_pdb20_t { align(1):
-	// Old PE32 doc mentions "NB05" -- CodeView 4.0 or earlier?
 	char[4] Signature;	/// Magic: "NB09"/"NB10"/"NB11" bytes
 	/// Offset to the start of the actual debug information from the
 	/// beginning of the CodeView data. Zero if it's another file.
@@ -466,13 +469,17 @@ struct pe_debug_data_codeview_pdb70_t { align(1):
 
 // This information tells the debugger how to interpret nonstandard stack frames,
 // which use the EBP register for a purpose other than as a frame pointer. 
-enum FRAME_FPO  = 0;
-enum FRAME_TRAP = 1;
-enum FRAME_TSS  = 2; // i286 Task Switch
+enum {
+	FRAME_FPO  = 0,
+	FRAME_TRAP = 1,
+	FRAME_TSS  = 2, // i286 Task Switch
+	FRAME_NONFPO 	= 3,
+}
+enum SIZEOF_RFPO_DATA = 16;
 struct pe_debug_data_fpo_t { // struct _FPO_DATA
-	uint ulOffStart; // offset 1st byte of function code
-	uint cbProcSize; // # bytes in function
-	uint cdwLocals; // # bytes in locals/4
+	uint ulOffStart;  // offset 1st byte of function code
+	uint cbProcSize;  // # bytes in function
+	uint cdwLocals;   // # bytes in locals/4
 	ushort cdwParams; // # bytes in params/4
 	ushort Flags;
 	//WORD cbProlog : 8; // # bytes in prolog
@@ -485,7 +492,7 @@ struct pe_debug_data_fpo_t { // struct _FPO_DATA
 
 // Debug entry 4: The location of a DBG file.
 
-struct pe_debug_data_misc_t { align(1):
+struct pe_debug_data_misc_t { align(1): // _IMAGE_DEBUG_MISC
 	union {
 		char[4] Signature;	/// 
 		uint Signature32;
@@ -493,9 +500,51 @@ struct pe_debug_data_misc_t { align(1):
 	uint DataType;	/// Must be 1
 	uint Length;	/// Multiple of four; Total length of data block
 	bool Unicode;	/// If true, Unicode string
-	byte[3] Reserved;
-	byte[1] Data;
+	ubyte[3] Reserved;
+	ubyte[1] Data;	// Data pointer
 }
+
+/// Header of .DBG files
+struct pe_debug_data_header_t { // _IMAGE_SEPARATE_DEBUG_HEADER
+    ushort  Signature;
+    ushort  Flags;
+    ushort  Machine;
+    ushort  Characteristics;
+    uint    TimeDateStamp;
+    uint    CheckSum;
+    uint    ImageBase;
+    uint    SizeOfImage;
+    uint    NumberOfSections;
+    uint    ExportedNamesSize;
+    uint    DebugDirectorySize;
+    uint    SectionAlignment;
+    uint[2] Reserved;
+}
+/// 
+struct pe_debug_data_non_paged_header_t { // _NON_PAGED_DEBUG_INFO
+    ushort Signature;
+    ushort Flags;
+    uint   Size;
+    ushort Machine;
+    ushort Characteristics;
+    uint   TimeDateStamp;
+    uint   CheckSum;
+    uint   SizeOfImage;
+    ulong  ImageBase; // ULONGLONG
+    //DebugDirectorySize
+    //IMAGE_DEBUG_DIRECTORY
+}
+
+version (LittleEndian) { // #ifndef _MAC
+	enum PE_IMAGE_SEPARATE_DEBUG_SIGNATURE = 0x4944;
+	enum PE_NON_PAGED_DEBUG_SIGNATURE      = 0x494E;
+} else {
+	enum PE_IMAGE_SEPARATE_DEBUG_SIGNATURE = 0x4449;  // DI
+	enum PE_NON_PAGED_DEBUG_SIGNATURE      = 0x4E49;  // NI
+}
+
+enum PE_IMAGE_SEPARATE_DEBUG_FLAGS_MASK = 0x8000;
+enum PE_IMAGE_SEPARATE_DEBUG_MISMATCH   = 0x8000;
 
 // Debug entry 12: VC Features
 
@@ -509,6 +558,17 @@ struct pe_debug_data_vc_feat_t { align(1):
 }
 
 // Debug entry 13: POGO
+
+enum { // POGO SubTypes
+	// POGOTypePGU represents a signature for an undocumented PGO sub type.
+	POGOTypePGU = CHAR32!"PGU\0", // 0x50475500
+	// POGOTypePGI represents a signature for an undocumented PGO sub type.
+	POGOTypePGI = CHAR32!"PGI\0", // 0x50474900,
+	// POGOTypePGO represents a signature for an undocumented PGO sub type.
+	POGOTypePGO = CHAR32!"PGO\0", // 0x50474F00,
+	// POGOTypeLTCG represents a signature for an undocumented PGO sub type.
+	POGOTypeLTCG = CHAR32!"LTCG", // 0x4c544347,
+}
 
 /// POGO Entry containing filename. Should be ending with .PGD (Profile-Guided Database).
 struct pe_debug_data_pogo_entry_t {
@@ -564,7 +624,16 @@ struct pe_debug_data_ppdb_stream_t {
 	char[1] Name;
 }
 
-// Debug type 21: R2R PerfMap
+// Debug entry 20: Extended DLL characteristics bits.
+//                 IMAGE_DEBUG_TYPE_EX_DLLCHARACTERISTICS
+
+// Indicates that the image is CET compatible.
+enum PE_IMAGE_DLLCHARACTARISTICS_EX_CET_COMPAT = 0x01;
+enum PE_IMAGE_DLLCHARACTERISTICS_EX_CET_COMPAT_STRICT_MODE = 0x02;
+enum PE_IMAGE_DLLCHARACTERISTICS_EX_CET_SET_CONTEXT_IP_VALIDATION_RELAXED_MODE = 0x04;
+enum PE_IMAGE_DLLCHARACTERISTICS_EX_CET_DYNAMIC_APIS_ALLOW_IN_PROC = 0x08;
+
+// Debug entry 21: R2R PerfMap
 
 /// Declares that the image has an associated PerfMap file containing a table
 /// mapping symbols to offsets for ready to run compilations.
@@ -583,7 +652,7 @@ struct pe_debug_data_r2r_perfmap_t { align(1):
 }
 
 //
-// Load configuration directory
+// ANCHOR Load configuration directory
 //
 
 struct pe_load_config_code_integrity_t { align(1):
@@ -815,23 +884,28 @@ struct internal_pe_t {
 	mz_header_t mz_header;
 	
 	pe_image_data_directory_t directory;
+	
 	size_t locsections;
 	pe_section_entry_t *sections;
 	bool *r_sections;
+	
 	// export directory
 	pe_export_descriptor_t *export_directory;
 	bool *r_export_entries;
+	
 	// import directory
 	pe_import_descriptor_t *import_directory; // not allocated
 	pe_section_entry_t *import_section; // associated section, not allocated
 	void *import_buffer; // section buffer
 	//bool *r_import_desc;
 	//bool *r_import_entries; // Current only, cleared when selecting other descriptor
+	
 	// debug directory
 	pe_debug_directory_entry_t *debug_directory; // not allocated
 	pe_section_entry_t *debug_section;
 	void *debug_buffer; // section buffer
 	bool *r_debug_entries;
+	
 	// load configuration directory
 	union {
 		pe_loadconfig32_t *load32_directory;
@@ -1386,7 +1460,7 @@ pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 // - [ ] CLRHeader
 
 //
-// Export directory functions
+// ANCHOR Export directory functions
 //
 
 // One descriptor table, multiple entries, because one module emits one table.
@@ -1572,7 +1646,7 @@ const(char)* adbg_object_pe_export_name_string(adbg_object_t *o,
 }
 
 //
-// Import directory functions
+// ANCHOR Import directory functions
 //
 
 // NOTE: Import directory handling
@@ -1709,7 +1783,7 @@ const(char)* adbg_object_pe_import_module_name(adbg_object_t *o, pe_import_descr
 	return cast(const(char)*)name;
 }
 
-//TODO: Byte-swap import look-up table entries
+// TODO: Byte-swap import look-up table entries
 
 pe_import_entry32_t* adbg_object_pe_import_entry32(adbg_object_t *o, pe_import_descriptor_t *import_, size_t index) {
 	if (o == null || import_ == null) {
@@ -2030,6 +2104,7 @@ const(char)* adbg_object_pe_import_entry_string(adbg_object_t *o, pe_import_desc
 	
 	return cast(const(char)*)hint;
 }
+
 //
 // Debug directory functions
 //
@@ -2227,6 +2302,83 @@ void* adbg_object_pe_loadconfig(adbg_object_t *o) {
 	// TODO: Check directory load config size with load config Size field
 	
 	return internal.load32_directory;
+}
+
+//
+// ANCHOR CLR/COM+ directory stuff
+//
+
+enum  {// ReplacesCorHdrNumericDefines
+	// COM+ Header entry point flags.
+	COMIMAGE_FLAGS_ILONLY               = 0x00000001,
+	COMIMAGE_FLAGS_32BITREQUIRED        = 0x00000002,
+	COMIMAGE_FLAGS_IL_LIBRARY           = 0x00000004,
+	COMIMAGE_FLAGS_STRONGNAMESIGNED     = 0x00000008,
+	COMIMAGE_FLAGS_NATIVE_ENTRYPOINT    = 0x00000010,
+	COMIMAGE_FLAGS_TRACKDEBUGDATA       = 0x00010000,
+	COMIMAGE_FLAGS_32BITPREFERRED       = 0x00020000,
+
+	// Version flags for image.
+	COR_VERSION_MAJOR_V2                = 2,
+	COR_VERSION_MAJOR                   = COR_VERSION_MAJOR_V2,
+	COR_VERSION_MINOR                   = 5,
+	COR_DELETED_NAME_LENGTH             = 8,
+	COR_VTABLEGAP_NAME_LENGTH           = 8,
+
+	// Maximum size of a NativeType descriptor.
+	NATIVE_TYPE_MAX_CB                  = 1,
+	COR_ILMETHOD_SECT_SMALL_MAX_DATASIZE= 0xFF,
+
+	// #defines for the MIH FLAGS
+	IMAGE_COR_MIH_METHODRVA             = 0x01,
+	IMAGE_COR_MIH_EHRVA                 = 0x02,
+	IMAGE_COR_MIH_BASICBLOCK            = 0x08,
+
+	// V-table constants
+	COR_VTABLE_32BIT                    = 0x01,          // V-table slots are 32-bits in size.
+	COR_VTABLE_64BIT                    = 0x02,          // V-table slots are 64-bits in size.
+	COR_VTABLE_FROM_UNMANAGED           = 0x04,          // If set, transition from unmanaged.
+	COR_VTABLE_FROM_UNMANAGED_RETAIN_APPDOMAIN  = 0x08,  // If set, transition from unmanaged with keeping the current appdomain.
+	COR_VTABLE_CALL_MOST_DERIVED        = 0x10,          // Call most derived method described by
+
+	// EATJ constants
+	IMAGE_COR_EATJ_THUNK_SIZE           =32,            // Size of a jump thunk reserved range.
+
+	// Max name lengths
+	//@todo: Change to unlimited name lengths.
+	MAX_CLASS_NAME                      = 1024,
+	MAX_PACKAGE_NAME                    = 1024,
+}
+
+// CLR 2.0 header structure.
+struct pe_cor20_header_t { align(1): // IMAGE_COR20_HEADER
+    // Header versioning
+    uint   cb;
+    ushort MajorRuntimeVersion;
+    ushort MinorRuntimeVersion;
+
+    // Symbol table and startup information
+    pe_image_data_directory_t MetaData;
+    uint                      Flags;
+
+    // If COMIMAGE_FLAGS_NATIVE_ENTRYPOINT is not set, EntryPointToken represents a managed entrypoint.
+    // If COMIMAGE_FLAGS_NATIVE_ENTRYPOINT is set, EntryPointRVA represents an RVA to a native entrypoint.
+    union {
+        uint EntryPointToken;
+        uint EntryPointRVA;
+    }
+
+    // Binding information
+    pe_image_data_directory_t    Resources;
+    pe_image_data_directory_t    StrongNameSignature;
+
+    // Regular fixup and binding information
+    pe_image_data_directory_t    CodeManagerTable;
+    pe_image_data_directory_t    VTableFixups;
+    pe_image_data_directory_t    ExportAddressTableJumps;
+
+    // Precompiled image info (internal use only - set to zero)
+    pe_image_data_directory_t    ManagedNativeHeader;
 }
 
 //
