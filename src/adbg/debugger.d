@@ -758,8 +758,8 @@ Lwait:
 		proc.state = AdbgProcessState.stopped;
 		
 		if (proc.event_exception == null) {
-			if (adbg_debugger_continue(proc, proc.pid))
-				return adbg_errno();
+			int e = adbg_debugger_continue(proc, proc.pid);
+			if (e) return e;
 			goto Lwait;
 		}
 		
@@ -1058,7 +1058,7 @@ version (WinTel) {
 		return adbg_oops(AdbgError.os);
 	}
 	if (proc.event_process_continued)
-		proc.event_process_continued(proc, proc.udata);
+		proc.event_process_continued(proc, proc.udata, tid);
 	
 	return 0;
 } else version (Posix) {
@@ -1076,7 +1076,7 @@ version (WinTel) {
 		return adbg_oops(AdbgError.os);
 	}
 	if (proc.event_process_continued)
-		proc.event_process_continued(proc, proc.udata);
+		proc.event_process_continued(proc, proc.udata, tid);
 	
 	return 0;
 } else {
