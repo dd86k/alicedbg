@@ -14,33 +14,34 @@ import adbg.utils.list;
 import core.stdc.stdio; // snprintf
 import core.stdc.stdlib;
 
-// TODO: Consider NOT attaching thread list to process
-//       Affects: adbg_thread_list_update
-//       Since they are potentially short-lived, returning a new list when
-//       needed should be just fine.
-// TODO: Thread ID type alias.
-
 version (Windows) {
+	import core.sys.windows.winbase;
 	import adbg.include.windows.tlhelp32;
 	import adbg.include.windows.wow64apiset;
 	import adbg.include.windows.winnt;
-	import core.sys.windows.winbase;
 } else version (linux) {
-	import adbg.include.linux.ptrace;
-	import adbg.include.linux.user;
 	import core.stdc.ctype : isdigit;
 	import core.stdc.stdlib : atoi;
 	import core.sys.posix.dirent;
 	import core.sys.posix.libgen : basename;
+	import adbg.include.linux.ptrace;
+	import adbg.include.linux.user;
 } else version (FreeBSD) {
 	import core.stdc.stdlib : malloc, free;
+	import core.sys.posix.sys.types : pid_t;
 	import adbg.include.freebsd.ptrace;
 	import adbg.include.freebsd.reg;
-	import core.sys.posix.sys.types : pid_t;
 }
 
 extern (C):
 
+// TODO: Thread models and types, for unwinding, SP context manipulation
+//       Helps interfacing with ELF coredumps, Windows Minidumps, FreeBSD LWPs, etc.
+//       e.g., a "Minidump thread" would get frames in its own way
+//       "OS" would be Win32/pthreads, then implementation can go by machine type
+
+// TODO: status flags?
+//       - context initialized
 struct adbg_thread_t {
 	long id;
 	adbg_thread_context_t context;

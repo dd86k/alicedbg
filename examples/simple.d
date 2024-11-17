@@ -84,7 +84,7 @@ void event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *except
 		*(cast(int*)udata) = SIMPLE_STOP;
 	}
 }
-void event_process_continue(adbg_process_t *proc, void *udata) {
+void event_process_continue(adbg_process_t *proc, void *udata, long tid) {
 	printf("* pid=%d event=\"continued\"\n", adbg_process_id(proc));
 }
 void event_process_exit(adbg_process_t *proc, void *udata, int code) {

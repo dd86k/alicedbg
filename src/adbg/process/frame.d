@@ -13,42 +13,44 @@ import adbg.process.base; // for machine info
 import adbg.process.thread; // for accessing thread information
 import adbg.utils.list;
 
-// NOTE: Stack frame layouts
+// Stack frame layouts
 //
-//       # Windows
+// # x86-32
 //
-//       There are basically two layouts: EBP frames and FPO frames.
+// ## Frame Pointers
+// 
+// ### Windows
 //
-//       With EBP, EBP points to the previous value, EBP+4 points to the return
-//       address, and EBP+8 points to the first stack argument.
+// With EBP, [EBP] points to the previous EBP value, [EBP+4] points to the return
+// address, and [EBP+8] points to the first stack argument. [EBP-n] have function
+// parameters.
 //
-//       With FPO (POGO?)... To find out.
+// ## FPO
 //
-//       # Linux
+// TODO
 //
 
 extern (C):
 
 struct adbg_stackframe_t {
 	int level;
+	// TODO: Frame type/function (e.g., points to memory, register, etc.)
 	ulong address;
-	// TODO: Function information
-	// TODO: Line information
 }
 
 private
 struct __machine_pc_reg {
 	AdbgMachine machine;
-	AdbgRegister[] set;
+	AdbgRegister reg;
 }
 // Level 0: Current location, typically Program Counter
 // Level 1: Frame Pointer if available
 private
 static immutable __machine_pc_reg[] stackregs = [
-	{ AdbgMachine.i386,	[ AdbgRegister.x86_eip,	AdbgRegister.x86_ebp ] },
-	{ AdbgMachine.amd64,	[ AdbgRegister.amd64_rip,	AdbgRegister.amd64_rbp ] },
-	{ AdbgMachine.arm,	[ AdbgRegister.arm_pc,	AdbgRegister.arm_fp ] },
-	{ AdbgMachine.aarch64,	[ AdbgRegister.aarch64_pc,	AdbgRegister.aarch64_fp ] },
+	{ AdbgMachine.i386,	AdbgRegister.x86_eip },
+	{ AdbgMachine.amd64,	AdbgRegister.amd64_rip },
+	{ AdbgMachine.arm,	AdbgRegister.arm_pc },
+	{ AdbgMachine.aarch64,	AdbgRegister.aarch64_pc },
 ];
 
 void* adbg_frame_list(adbg_process_t *process, adbg_thread_t *thread) {
@@ -62,17 +64,16 @@ void* adbg_frame_list(adbg_process_t *process, adbg_thread_t *thread) {
 	
 	// Map a set of registers to use at primary stackframe levels
 	AdbgMachine mach = adbg_process_machine(process);
-	immutable(AdbgRegister)[] registers;
+	AdbgRegister register;
 	foreach (ref regs; stackregs) {
 		if (mach == regs.machine) {
-			registers = regs.set;
-			break;
+			register = regs.reg;
+			goto Lfound;
 		}
 	}
-	if (registers.length == 0) {
-		adbg_oops(AdbgError.unavailable);
-		return null;
-	}
+	adbg_oops(AdbgError.unavailable);
+	return null;
+Lfound:
 	
 	// New frame list
 	list_t *list = adbg_list_new(adbg_stackframe_t.sizeof, 8);
@@ -81,7 +82,7 @@ void* adbg_frame_list(adbg_process_t *process, adbg_thread_t *thread) {
 	
 	// Start with the first frame, which is always PC
 	// If we can't have that, then we cannot even obtain frames at all
-	adbg_register_t *reg = adbg_register_by_id(thread, registers[0]);
+	adbg_register_t *reg = adbg_register_by_id(thread, register);
 	if (reg == null) {
 		adbg_oops(AdbgError.unavailable);
 		adbg_list_close(list);
@@ -99,25 +100,6 @@ void* adbg_frame_list(adbg_process_t *process, adbg_thread_t *thread) {
 	if (list == null) {
 		adbg_list_close(list);
 		return null;
-	}
-	
-	// Add additional frames from additional registers
-	// As best as we can, otherwise just return the list
-	foreach (AdbgRegister r; registers[1..$]) {
-		reg = adbg_register_by_id(thread, r);
-		if (reg == null)
-			break;
-		address = cast(ulong*)adbg_register_value(reg);
-		if (address == null || *address == 0)
-			break;
-		
-		++frame.level; // frame[0] is level=0, so increment
-		frame.address = *address;
-		list = adbg_list_add(list, &frame);
-		if (list == null) {
-			adbg_list_close(list);
-			return null;
-		}
 	}
 	
 	return list;

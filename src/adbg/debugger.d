@@ -577,7 +577,7 @@ version (Windows) {
 private alias cbexeception = void function(adbg_process_t*, void*, adbg_exception_t*);
 //private alias cbproccreate = void function(adbg_process_t*, void*);
 private alias cbprocexited = void function(adbg_process_t*, void*, int);
-private alias cbproccontinued = void function(adbg_process_t*, void*);
+private alias cbproccontinued = void function(adbg_process_t*, void*, long);
 
 /// Set an event handler for a particular debugging event for this process.
 ///
@@ -902,7 +902,7 @@ version (Windows) {
 	}
 	
 	if (proc.event_process_continued)
-		proc.event_process_continued(proc, proc.udata);
+		proc.event_process_continued(proc, proc.udata, tid);
 } else version (linux) {
 	version(Trace) trace("pid=%d state=%d", proc.pid, proc.state);
 	switch (proc.state) with (AdbgProcessState) {
@@ -913,7 +913,7 @@ version (Windows) {
 			return adbg_oops(AdbgError.os);
 		}
 		if (proc.event_process_continued)
-			proc.event_process_continued(proc, proc.udata);
+			proc.event_process_continued(proc, proc.udata, tid);
 		break;
 	default: return adbg_oops(AdbgError.debuggerUnpaused);
 	}
@@ -940,7 +940,7 @@ version (Windows) {
 			return adbg_oops(AdbgError.os);
 		}
 		if (proc.event_process_continued)
-			proc.event_process_continued(proc, proc.udata);
+			proc.event_process_continued(proc, proc.udata, tid);
 		break;
 	default: return adbg_oops(AdbgError.debuggerUnpaused);
 	}

@@ -7,8 +7,11 @@ module adbg.process.base;
 
 // TODO: Internal process flags
 //       - Debugger is active on this process
-//       - Debugger was attached to this process
-//       - Memory handle is opened
+//       - Debugger is attached to this process
+//       - Process is stopped from an external event (one or more threads are stopped)
+//       - Process is paused from debugger
+//       - Process exited
+//       - Memory handle is opened on this process
 // TODO: Process Pause/Resume
 //       Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
 //       Linux: Send SIGSTOP/SIGCONT signals via kill(2)
@@ -35,8 +38,6 @@ version (Windows) {
 
 extern (C):
 
-// TODO: Add `exited` (replacing `unknown`?)
-// TODO: Add `attached`
 /// Process status
 enum AdbgProcessState : ubyte {
 	unknown,	/// Process status is not known.
@@ -87,7 +88,7 @@ version (linux) {
 	void function(adbg_process_t*, void *udata, adbg_exception_t *ex) event_exception;
 //	void function(adbg_process_t*, void *udata) event_process_created;
 	void function(adbg_process_t*, void *udata, int code) event_process_exited;
-	void function(adbg_process_t*, void *udata) event_process_continued;
+	void function(adbg_process_t*, void *udata, long tid) event_process_continued;
 	
 	// HACK: Event user data (when attached in wait)
 	void *udata;

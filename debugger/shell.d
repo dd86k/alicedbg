@@ -672,7 +672,7 @@ void shell_event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *
 void shell_event_process_exit(adbg_process_t *proc, void *udata, int code) {
 	printf("* Process %d exited with code %d\n", adbg_process_id(proc), code);
 }
-void shell_event_process_continue(adbg_process_t *proc, void *udata) {
+void shell_event_process_continue(adbg_process_t *proc, void *udata, int tid) {
 	printf("* Process %d continued\n", adbg_process_id(proc));
 }
 
