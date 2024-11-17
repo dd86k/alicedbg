@@ -606,8 +606,8 @@ int shell_disassemble(size_t address, int *opsize,
 	
 	// TODO: Maximum opcode size per architecture
 	ubyte[OPCODE_BUFSIZE] buffer = void;
-	if (adbg_memory_read(process, address, buffer.ptr, OPCODE_BUFSIZE))
-		return adbg_errno();
+	int e = adbg_memory_read(process, address, buffer.ptr, OPCODE_BUFSIZE);
+	if (e) return e;
 	
 	adbg_opcode_t op = void;
 	int err = adbg_disassemble(disassembler, &op, buffer.ptr, OPCODE_BUFSIZE);

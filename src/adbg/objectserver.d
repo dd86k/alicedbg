@@ -442,8 +442,8 @@ int adbg_object_loadv(adbg_object_t *o) {
 			return adbg_object_mz_load(o);
 		
 		uint newsig = void;
-		if (adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof))
-			return adbg_errno();
+		int e = adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof);
+		if (e) return e;
 		
 		// 32-bit signature check
 		version (Trace) trace("newsig=%#x", newsig);

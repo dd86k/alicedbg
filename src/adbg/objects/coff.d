@@ -105,8 +105,8 @@ int adbg_object_coff_load(adbg_object_t *o) {
 	
 	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
 	
-	if (adbg_object_read_at(o, 0, &internal.header, coff_header_t.sizeof))
-		return adbg_errno();
+	int e = adbg_object_read_at(o, 0, &internal.header, coff_header_t.sizeof);
+	if (e) return e;
 	
 	adbg_object_postload(o, AdbgObject.coff, &adbg_object_coff_unload);
 	

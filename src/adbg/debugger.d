@@ -31,8 +31,10 @@ version (Windows) {
 	import core.sys.windows.winbase;
 	import adbg.machines;
 
-	version (X86)	version = Wintel;
-	version (X86_64)	version = Wintel;
+	version (X86)	version = WinTel;
+	version (X86_64)	version = WinTel;
+	
+	version (Thumb)	version = WinArm;
 	version (ARM)	version = WinArm;
 	version (AArch64)	version = WinArm;
 } else version (Posix) {
@@ -961,7 +963,7 @@ int adbg_debugger_stepi(adbg_process_t *proc, long tid) {
 	if (proc.creation == AdbgCreation.unloaded)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
-version (Wintel) {
+version (WinTel) {
 	enum EFLAGS_TF = 0x100;
 	
 	HANDLE thandle = OpenThread(THREAD_SET_CONTEXT | THREAD_GET_CONTEXT, FALSE, cast(DWORD)tid);
@@ -998,6 +1000,52 @@ version (Wintel) {
 	if (GetThreadContext(thandle, cast(LPCONTEXT)&ctx) == FALSE)
 		return adbg_oops(AdbgError.os);
 	ctx.EFlags |= EFLAGS_TF;
+	if (SetThreadContext(thandle, cast(LPCONTEXT)&ctx) == FALSE)
+		return adbg_oops(AdbgError.os);
+	if (FlushInstructionCache(phandle, null, 0) == FALSE)
+		return adbg_oops(AdbgError.os);
+	
+	return adbg_debugger_continue(proc, tid);
+} else version (WinArm) {
+	enum PSTATE_SS = 0x200000;
+	
+	// TODO: Confirm Cpsr |= PSTATE_SS is correct
+	
+	HANDLE thandle = OpenThread(THREAD_SET_CONTEXT | THREAD_GET_CONTEXT, FALSE, cast(DWORD)tid);
+	if (thandle == null)
+		return adbg_oops(AdbgError.os);
+	scope(exit) CloseHandle(thandle);
+
+	HANDLE phandle = OpenProcess(PROCESS_SET_INFORMATION, FALSE, cast(DWORD)proc.pid);
+	if (phandle == null)
+		return adbg_oops(AdbgError.os);
+	scope(exit) CloseHandle(phandle);
+	
+	// AArch64 with a 32-bit process
+	// Enable single-stepping via SS bit
+	version (AArch64)
+	switch (adbg_process_machine(proc)) with (AdbgMachine) {
+	case arm, thumb, thumb32:
+		WOW64_CONTEXT wow64ctx = void;
+		wow64ctx.ContextFlags = CONTEXT_CONTROL;
+		if (Wow64GetThreadContext(thandle, &wow64ctx) == FALSE)
+			return adbg_oops(AdbgError.os);
+		wow64ctx.Cpsr |= PSTATE_SS;
+		if (Wow64SetThreadContext(thandle, &wow64ctx) == FALSE)
+			return adbg_oops(AdbgError.os);
+		if (FlushInstructionCache(phandle, null, 0) == FALSE)
+			return adbg_oops(AdbgError.os);
+		
+		return adbg_debugger_continue(proc, tid);
+	}
+	
+	// AArch64, AArch32
+	// Enable single-stepping via SS bit
+	CONTEXT ctx = void;
+	ctx.ContextFlags = CONTEXT_CONTROL;
+	if (GetThreadContext(thandle, cast(LPCONTEXT)&ctx) == FALSE)
+		return adbg_oops(AdbgError.os);
+	ctx.Cpsr |= PSTATE_SS;
 	if (SetThreadContext(thandle, cast(LPCONTEXT)&ctx) == FALSE)
 		return adbg_oops(AdbgError.os);
 	if (FlushInstructionCache(phandle, null, 0) == FALSE)

@@ -58,9 +58,10 @@ int adbg_object_pdb20_load(adbg_object_t *o) {
 	o.internal = calloc(1, internal_pdb20_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, 0, o.internal, pdb20_file_header_t.sizeof)) {
+	int e = adbg_object_read_at(o, 0, o.internal, pdb20_file_header_t.sizeof);
+	if (e) {
 		free(o.internal);
-		return adbg_errno();
+		return e;
 	}
 	
 	adbg_object_postload(o, AdbgObject.pdb20, &adbg_object_pdb20_unload);
@@ -501,9 +502,10 @@ int adbg_object_pdb70_load(adbg_object_t *o) {
 	o.internal = calloc(1, internal_pdb70_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, 0, o.internal, pdb70_file_header_t.sizeof)) {
+	int e = adbg_object_read_at(o, 0, o.internal, pdb70_file_header_t.sizeof);
+	if (e) {
 		free(o.internal);
-		return adbg_errno();
+		return e;
 	}
 	
 	internal_pdb70_t *internal = cast(internal_pdb70_t*)o.internal;
@@ -511,7 +513,8 @@ int adbg_object_pdb70_load(adbg_object_t *o) {
 	
 	// Check SuperBlock
 	// header.BlockCount * header.BlockSize must be file length, but can't have that yet
-	if (header.BlockSize < 512 || header.BlockSize > 4096 || // Not observed to be higher than 4,096 bytes
+	if (header.BlockSize < 512 || // Minimum of 512 bytes
+		header.BlockSize > 4096 || // Not observed to be higher than 4,096 bytes
 		header.BlockSize % 512 != 0 || // Multiple of "sector"
 		header.Unknown || // This must be empty
 		header.FreeIndex < 1 || header.FreeIndex > 2) { // 1 or 2 only
@@ -529,10 +532,11 @@ int adbg_object_pdb70_load(adbg_object_t *o) {
 		free(o.internal);
 		return adbg_oops(AdbgError.crt);
 	}
-	if (adbg_object_read_at(o, internal.fpmoffset, internal.fpm, header.BlockSize)) {
+	e = adbg_object_read_at(o, internal.fpmoffset, internal.fpm, header.BlockSize);
+	if (e) {
 		free(internal.fpm);
 		free(o.internal);
-		return adbg_errno();
+		return e;
 	}
 	
 	// Load block directory, we'll need this to load Stream 0
@@ -566,7 +570,7 @@ int adbg_object_pdb70_load(adbg_object_t *o) {
 	if (dir == null) {
 		free(internal.fpm);
 		free(o.internal);
-		return adbg_errno();
+		return adbg_error_code();
 	}
 	scope(exit) free(dir); // Since it is a temp buffer
 	
@@ -593,10 +597,11 @@ int adbg_object_pdb70_load(adbg_object_t *o) {
 		bool last = o0 + header.BlockSize >= header.DirectorySize;
 		size_t rdsize = last ? header.DirectorySize - o0 : header.BlockSize;
 		
-		if (adbg_object_read_at(o, blkoffset, internal.stream0 + o0, rdsize)) {
+		e = adbg_object_read_at(o, blkoffset, internal.stream0 + o0, rdsize);
+		if (e) {
 			free(internal.fpm);
 			free(o.internal);
-			return adbg_errno();
+			return e;
 		}
 		
 		if (last) break;

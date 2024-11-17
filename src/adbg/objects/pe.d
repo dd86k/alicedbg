@@ -928,10 +928,11 @@ int adbg_object_pe_load(adbg_object_t *o, mz_header_t *mzhdr) {
 	o.internal = calloc(1, internal_pe_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, mzhdr.e_lfanew, o.internal, pe_header_t.sizeof)) {
+	int e = adbg_object_read_at(o, mzhdr.e_lfanew, o.internal, pe_header_t.sizeof);
+	if (e) {
 		free(o.internal);
 		o.internal = null;
-		return adbg_errno();
+		return e;
 	}
 	internal_pe_t* internal = cast(internal_pe_t*)o.internal;
 	
@@ -950,25 +951,28 @@ int adbg_object_pe_load(adbg_object_t *o, mz_header_t *mzhdr) {
 	
 	size_t e_lfanew = mzhdr.e_lfanew + pe_header_t.sizeof; // adjust to optional header
 	ushort optmagic = void;
-	if (adbg_object_read_at(o, e_lfanew, &optmagic, ushort.sizeof)) {
+	e = adbg_object_read_at(o, e_lfanew, &optmagic, ushort.sizeof);
+	if (e) {
 		free(o.internal);
 		o.internal = null;
-		return adbg_errno();
+		return e;
 	}
 	
 	switch (optmagic) {
 	case PE_CLASS_32:
-		if (adbg_object_read_at(o, e_lfanew, &internal.optheader, pe_optional_header_t.sizeof)) {
+		e = adbg_object_read_at(o, e_lfanew, &internal.optheader, pe_optional_header_t.sizeof);
+		if (e) {
 			free(o.internal);
 			o.internal = null;
-			return adbg_errno();
+			return e;
 		}
 		
 		e_lfanew += pe_optional_header_t.sizeof; // adjust to directory
-		if (adbg_object_read_at(o, e_lfanew, &internal.directory, pe_image_data_directory_t.sizeof)) {
+		e = adbg_object_read_at(o, e_lfanew, &internal.directory, pe_image_data_directory_t.sizeof);
+		if (e) {
 			free(o.internal);
 			o.internal = null;
-			return adbg_errno();
+			return e;
 		}
 		e_lfanew += pe_image_data_directory_t.sizeof; // adjust to sections
 		
@@ -1003,17 +1007,19 @@ int adbg_object_pe_load(adbg_object_t *o, mz_header_t *mzhdr) {
 		}
 		break;
 	case PE_CLASS_64:
-		if (adbg_object_read_at(o, e_lfanew, &internal.optheader64, pe_optional_header64_t.sizeof)) {
+		e = adbg_object_read_at(o, e_lfanew, &internal.optheader64, pe_optional_header64_t.sizeof);
+		if (e) {
 			free(o.internal);
 			o.internal = null;
-			return adbg_errno();
+			return e;
 		}
 		
 		e_lfanew += pe_optional_header64_t.sizeof; // adjust to directory
-		if (adbg_object_read_at(o, e_lfanew, &internal.directory, pe_image_data_directory_t.sizeof)) {
+		e = adbg_object_read_at(o, e_lfanew, &internal.directory, pe_image_data_directory_t.sizeof);
+		if (e) {
 			free(o.internal);
 			o.internal = null;
-			return adbg_errno();
+			return e;
 		}
 		e_lfanew += pe_image_data_directory_t.sizeof; // adjust to sections
 		
@@ -1047,10 +1053,11 @@ int adbg_object_pe_load(adbg_object_t *o, mz_header_t *mzhdr) {
 		}
 		break;
 	case PE_CLASS_ROM: // NOTE: ROM have no optional header and directories
-		if (adbg_object_read_at(o, e_lfanew, &internal.optheaderrom, pe_optional_headerrom_t.sizeof)) {
+		e = adbg_object_read_at(o, e_lfanew, &internal.optheaderrom, pe_optional_headerrom_t.sizeof);
+		if (e) {
 			free(o.internal);
 			o.internal = null;
-			return adbg_errno();
+			return e;
 		}
 		e_lfanew += pe_optional_headerrom_t.sizeof; // adjust to sections, no directories
 		

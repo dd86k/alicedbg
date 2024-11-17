@@ -157,9 +157,10 @@ int adbg_object_omf_load(adbg_object_t *o, ubyte first) {
 	
 	switch (first) with (OMFRecord) {
 	case LIBRARY: // Check library header
-		if (adbg_object_read_at(o, 0, &internal.header, omf_lib_header_t.sizeof)) {
+		int e = adbg_object_read_at(o, 0, &internal.header, omf_lib_header_t.sizeof);
+		if (e) {
 			free(o.internal);
-			return adbg_errno();
+			return e;
 		}
 		
 		// Legal values at >=4 and <=15, typically 0xd (13), since 13+3=16

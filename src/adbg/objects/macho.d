@@ -602,8 +602,8 @@ int adbg_object_macho_load(adbg_object_t *o, uint magic) {
 	default: // Unless loader gave a new signature?
 		return adbg_oops(AdbgError.objectMalformed);
 	}
-	if (adbg_object_read_at(o, 0, o.internal, size))
-		return adbg_errno();
+	int e = adbg_object_read_at(o, 0, o.internal, size);
+	if (e) return e;
 	
 	adbg_object_postload(o, AdbgObject.macho, &adbg_object_macho_unload);
 	
@@ -916,18 +916,20 @@ int adbg_object_macho__load_sections(adbg_object_t *o) {
 		case MACHO_LC_SEGMENT_64:
 			macho_segment_command_64_t *seg64 = cast(macho_segment_command_64_t*)c;
 			size_t ssize = macho_section64_t.sizeof * seg64.nsects;
-			if (adbg_object_read_at(o, seg64.fileoff, buffer + soffset, ssize)) {
+			int e = adbg_object_read_at(o, seg64.fileoff, buffer + soffset, ssize);
+			if (e) {
 				free(buffer);
-				return adbg_errno();
+				return e;
 			}
 			soffset += ssize;
 			break;
 		case MACHO_LC_SEGMENT:
 			macho_segment_command_t *seg32 = cast(macho_segment_command_t*)c;
 			size_t ssize = macho_section_t.sizeof * seg32.nsects;
-			if (adbg_object_read_at(o, seg32.fileoff, buffer + soffset, ssize)) {
+			int e = adbg_object_read_at(o, seg32.fileoff, buffer + soffset, ssize);
+			if (e) {
 				free(buffer);
-				return adbg_errno();
+				return e;
 			}
 			soffset += ssize;
 			break;

@@ -379,10 +379,11 @@ int adbg_object_lx_load(adbg_object_t *o, mz_header_t *mzhdr) {
 	o.internal = calloc(1, internal_lx_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, mzhdr.e_lfanew, o.internal, lx_header_t.sizeof)) {
+	int e = adbg_object_read_at(o, mzhdr.e_lfanew, o.internal, lx_header_t.sizeof);
+	if (e) {
 		free(o.internal);
 		o.internal = null;
-		return adbg_errno();
+		return e;
 	}
 	
 	internal_lx_t *internal = cast(internal_lx_t*)o.internal;

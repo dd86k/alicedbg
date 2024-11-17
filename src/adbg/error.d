@@ -21,17 +21,12 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 
 // TODO: Make module thread-safe
 //       Either via TLS and/or atomic operations
-// TODO: More error should have context parameters
-//       invalidArgument: string stating which argument
 // TODO: Error utils
 //       adbg_ensure_params(lvalue, "name")
 //       - returns string if null found
 //       - automatically set error code
 //       adbg_oops_ptr(AdbgError, void*) to return null
 // TODO: Localize error messages as option (including system ones, when able)
-// TODO: Add additional "os" codes or bit
-//       Like "osProcessTerminate", in addition with OS message:
-//         "Failed to terminate process: ..."
 
 extern (C):
 
@@ -110,28 +105,112 @@ enum AdbgError {
 // TODO: Make adbg_error_t struct private after removing adbg_error_current()
 /// Represents an error in alicedbg.
 struct adbg_error_t {
-	int code;	/// Error code
-	void *handle;	/// External handle or code
+	int srccode;	/// Error code from Alicedbg
+	int modcode;	/// Error code for module
 	const(char)* func;	/// Source function
 	int line;	/// Line source
 }
 /// Last error in alicedbg.
 private __gshared adbg_error_t error;
 
+/// Get last Alicedbg error code.
+/// Returns: Error code (AdbgError).
 int adbg_error_code() {
-	return error.code;
+	return error.srccode;
 }
+/// Get the last error from the associated module.
+/// Returns: Error code (submodule).
+int adbg_error_code_external() {
+	return error.modcode;
+}
+/// Get the line of the error code initiator.
+/// Returns: Line number.
 int adbg_error_line() {
 	return error.line;
 }
+/// Get the function of the error code initiator.
+/// Returns: Function name.
 const(char)* adbg_error_function() {
 	return error.func;
 }
 
-//TODO: Strongly consider string, provides .ptr and .length
+/// Get error message from the OS (or CRT) by providing the error code
+/// Params: code = Error code number from OS
+/// Returns: String
+private
+const(char)* adbg_error_system_message(int code) {
+	version (Windows) {
+		//TODO: Handle NTSTATUS codes
+		enum ERR_BUF_SZ = 256;
+		__gshared char [ERR_BUF_SZ]buffer = void;
+		size_t len = FormatMessageA(
+			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_MAX_WIDTH_MASK,
+			null,
+			code,
+			0,	// Default
+			buffer.ptr,
+			ERR_BUF_SZ,
+			null);
+		return len ? cast(char*)buffer : "Unknown error";
+	} else {
+		return strerror(code);
+	}
+}
+
+//
+// ANCHOR Error setters
+//
+
+/// Reset the last set error code.
+void adbg_error_reset() {
+	// NOTE: Code is enough. Other fields are purely internal.
+	error.srccode = 0;
+}
+
+// NOTE: D compilers changed how __MODULE__ and __FILE__ are evaluated.
+//       It used so that the caller evaluated those but now the front-end
+//       puts in the value of the callee instead. To prove this, __LINE__
+//       and __FUNCTION__ remains unchanged. To fix that, I'm supposed to
+//       use a template, but function templates pollute the final binary.
+/// Sets the last error code.
+///
+/// Used internally.
+/// Params:
+/// 	e = Error code.
+/// 	handle = External resource (handle, code, etc.).
+/// 	f = Automatically set to `__FUNCTION__`.
+/// 	l = Automatically set to `__LINE__`.
+/// Returns: Error code
+int adbg_oops(AdbgError e, void *handle = null,
+	const(char)* f = __FUNCTION__.ptr, int l = __LINE__) {
+	version (Trace) trace("code=%d extra=%p caller=%s@%d", e, extra, f, l);
+	error.func = f;
+	error.line = l;
+	// To avoid additional errors, such as formatting,
+	// get the underlying error code now and save it.
+	switch (error.srccode = e) {
+	case AdbgError.os:
+		version (Windows)
+			error.modcode = GetLastError();
+		else
+			error.modcode = errno;
+		break;
+	case AdbgError.crt:
+		error.modcode = errno;
+		break;
+	case AdbgError.libCapstone:
+		assert(handle, "oops, no handles");
+		error.modcode = cs_errno(cast(csh)handle);
+		break;
+	default:
+		error.modcode = 0;
+	}
+	return e;
+}
+
 private struct adbg_error_msg_t {
 	int code;
-	const(char) *msg;
+	string msg;
 }
 private immutable const(char) *defaultMsg = "Unknown error occured.";
 private immutable adbg_error_msg_t[] errors_msg = [
@@ -196,130 +275,23 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.success,	"No errors occured." },
 ];
 
-/// Get error state instance.
-/// Returns: Pointer to the only error instance.
-//TODO: Deprecate as dangerous
-//      Getting extra info such as source (string) and al. should be via functions
-deprecated("Use adbg_error_function, adbg_error_line")
-const(adbg_error_t)* adbg_error_current() {
-	return &error;
-}
-
-/// Get error message from the OS (or CRT) by providing the error code
-/// Params: code = Error code number from OS
-/// Returns: String
-const(char)* adbg_error_system_message(int code) {
-	version (Windows) {
-		//TODO: Handle NTSTATUS codes
-		enum ERR_BUF_SZ = 256;
-		__gshared char [ERR_BUF_SZ]buffer = void;
-		size_t len = FormatMessageA(
-			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_MAX_WIDTH_MASK,
-			null,
-			code,
-			0,	// Default
-			buffer.ptr,
-			ERR_BUF_SZ,
-			null);
-		return len ? cast(char*)buffer : "Unknown error";
-	} else {
-		return strerror(code);
-	}
-}
-
-/// Get the last error code from the OS (or CRT).
-/// Returns: GetLastError from Windows, otherwise errno.
-private
-int adbg_error_system() {
-	version (Windows) {
-		return error.handle ? cast(uint)error.handle : GetLastError();
-	} else
-		return errno;
-}
-
-//
-// ANCHOR Error setters
-//
-
-/// Reset the last set error code.
-void adbg_error_reset() {
-	// NOTE: Code is enough. Other fields are purely internal.
-	error.code = 0;
-}
-
-// NOTE: D compilers changed how __MODULE__ and __FILE__ are evaluated.
-//       It used so that the caller evaluated those but now the front-end
-//       puts in the value of the callee instead. To prove this, __LINE__
-//       and __FUNCTION__ remains unchanged. To fix that, I'm supposed to
-//       use a template, but function templates pollute the final binary.
-/// Sets the last error code.
-///
-/// Used internally
-/// Params:
-/// 	e = Error code.
-/// 	extra = External resource (handle, code, etc.).
-/// 	f = Automatically set to `__FUNCTION__`.
-/// 	l = Automatically set to `__LINE__`.
-/// Returns: Error code
-int adbg_oops(AdbgError e, void *extra = null,
-	const(char)* f = __FUNCTION__.ptr, int l = __LINE__) {
-	version (Trace) trace("code=%d extra=%p caller=%s@%d", e, extra, f, l);
-	error.func = f;
-	error.line = l;
-	error.handle = extra;
-	return error.code = e;
-}
-
-//
-// ANCHOR Error getters
-//
-
-/// Obtain the last set code.
-/// Returns: Error code.
-export
-int adbg_errno() {
-	return error.code;
-}
-
-/// Obtain the external error code.
-/// Returns: Subsystem, library, or OS error code.
-int adbg_errno_extern() {
-	switch (error.code) with (AdbgError) {
-	case crt:	return errno;
-	case os:	return adbg_error_system;
-	case libCapstone:
-		return error.handle ? cs_errno(*cast(csh*)error.handle) : 0;
-	default:	return error.code;
-	}
-}
-
-/// Obtain an error message with code.
-/// Params: code = Error code.
-/// Returns: Error message.
-export
-const(char)* adbg_error_msg(int code) {
-	switch (code) with (AdbgError) {
-	case crt:
-		return strerror(errno);
-	case os:
-		return adbg_error_system_message(adbg_error_system());
-	case libCapstone:
-		if (error.handle == null)
-			break;
-		return cs_strerror(cs_errno(*cast(csh*)error.handle));
-	default:
-		foreach (ref e; errors_msg)
-			if (code == e.code)
-				return e.msg;
-	}
-	return defaultMsg;
-}
-
 /// Get the last set error message.
 /// Returns: Error message.
 export
 const(char)* adbg_error_message() {
-	return adbg_error_msg(error.code);
+	switch (error.srccode) with (AdbgError) {
+	case crt:
+		return strerror(error.modcode);
+	case os:
+		return adbg_error_system_message(error.modcode);
+	case libCapstone:
+		return cs_strerror(error.modcode);
+	default:
+		foreach (ref e; errors_msg)
+			if (error.srccode == e.code)
+				return e.msg.ptr;
+	}
+	return defaultMsg;
 }
 
 version (Trace) {

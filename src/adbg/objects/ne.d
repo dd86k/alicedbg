@@ -331,10 +331,11 @@ int adbg_object_ne_load(adbg_object_t *o, mz_header_t *mzheader) {
 	o.internal = calloc(1, internal_ne_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, mzheader.e_lfanew, o.internal, ne_header_t.sizeof)) {
+	int e = adbg_object_read_at(o, mzheader.e_lfanew, o.internal, ne_header_t.sizeof);
+	if (e) {
 		free(o.internal);
 		o.internal = null;
-		return adbg_errno();
+		return e;
 	}
 	
 	internal_ne_t *internal = cast(internal_ne_t*)o.internal;

@@ -159,8 +159,8 @@ int adbg_object_mscoff_load(adbg_object_t *o) {
 	o.internal = calloc(1, internal_mscoff_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, 0, o.internal, MAX2))
-		return adbg_errno();
+	int e = adbg_object_read_at(o, 0, o.internal, MAX2);
+	if (e) return e;
 	
 	adbg_object_postload(o, AdbgObject.mscoff, &adbg_object_mscoff_unload);
 	

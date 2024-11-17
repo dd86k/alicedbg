@@ -82,9 +82,10 @@ int adbg_object_mz_load(adbg_object_t *o) {
 	o.internal = calloc(1, internal_mz_t.sizeof);
 	if (o.internal == null)
 		return adbg_oops(AdbgError.crt);
-	if (adbg_object_read_at(o, 0, o.internal, mz_header_t.sizeof)) {
+	int e = adbg_object_read_at(o, 0, o.internal, mz_header_t.sizeof);
+	if (e) {
 		free(o.internal);
-		return adbg_errno();
+		return e;
 	}
 	
 	adbg_object_postload(o, AdbgObject.mz, &adbg_object_mz_unload);

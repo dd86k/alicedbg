@@ -1068,8 +1068,8 @@ int adbg_object_elf_load(adbg_object_t *o) {
 		return adbg_oops(AdbgError.crt);
 	
 	// Read much of the header as possible
-	if (adbg_object_read_at(o, 0, o.internal, MAX!(Elf32_Ehdr.sizeof, Elf64_Ehdr.sizeof)))
-		return adbg_errno();
+	int e = adbg_object_read_at(o, 0, o.internal, MAX!(Elf32_Ehdr.sizeof, Elf64_Ehdr.sizeof));
+	if (e) return e;
 	
 	adbg_object_postload(o, AdbgObject.elf, &adbg_object_elf_unload);
 	
