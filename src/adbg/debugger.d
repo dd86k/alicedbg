@@ -271,7 +271,7 @@ version (Windows) {
 		adbg_process_free(proc);
 		return null;
 	}
-	proc.orig_phandle = pi.hProcess;
+	proc.orig_handle = pi.hProcess;
 	proc.orig_pid = proc.pid = pi.dwProcessId;
 	
 	proc.state = AdbgProcessState.standby;
@@ -468,30 +468,23 @@ version (Windows) {
 	//TODO: Integrate ObRegisterCallbacks?
 	//      https://blog.xpnsec.com/anti-debug-openprocess/
 	
-	// NOTE: Emulate ProcessIdToHandle
-	//       Uses NtOpenProcess with ClientId.UniqueProcess=PID
-	//       Uses PROCESS_ALL_ACCESS, but let's start with the basics
 	proc.orig_pid = proc.pid = cast(DWORD)pid;
-	proc.orig_phandle = OpenProcess(
-		PROCESS_VM_OPERATION |
-		PROCESS_VM_WRITE |
-		PROCESS_VM_READ |
-		PROCESS_SUSPEND_RESUME |
-		PROCESS_QUERY_INFORMATION,
-		FALSE,
-		cast(DWORD)pid);
-	// TODO: Better error message on invalid PID number
-	//       On an invalid PID, we get "Invalid parameter", which is confusing
-	//       Filter by ERROR_INVALID_PARAMETER/ERROR_ACCESS_DENIED?
-	if (proc.orig_phandle == null) {
-		adbg_oops(AdbgError.os);
+	proc.orig_handle = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, cast(DWORD)pid);
+	if (proc.orig_handle == null) {
+		switch (GetLastError()) {
+		case ERROR_INVALID_PARAMETER: // Must be invalid PID
+			adbg_oops(AdbgError.unfindable);
+			break;
+		default: // ERROR_ACCESS_DENIED is a clear message
+			adbg_oops(AdbgError.os);
+		}
 		free(proc);
 		return null;
 	}
 	
 	// Check if process already has an attached debugger
 	BOOL dbgpresent = void;
-	if (CheckRemoteDebuggerPresent(proc.orig_phandle, &dbgpresent) == FALSE) {
+	if (CheckRemoteDebuggerPresent(proc.orig_handle, &dbgpresent) == FALSE) {
 		adbg_oops(AdbgError.os);
 		adbg_process_free(proc);
 		return null;
@@ -502,15 +495,15 @@ version (Windows) {
 		return null;
 	}
 	
-	// DebugActiveProcess, by default, kills the process on exit.
-	if (DebugSetProcessKillOnExit(options & OPT_EXITKILL) == FALSE) {
+	// Breaks into remote process and initiates break-in
+	if (DebugActiveProcess(proc.pid) == FALSE) {
 		adbg_oops(AdbgError.os);
 		adbg_process_free(proc);
 		return null;
 	}
 	
-	// Breaks into remote process and initiates break-in
-	if (DebugActiveProcess(proc.pid) == FALSE) {
+	// DebugActiveProcess, by default, kills the process on exit.
+	if (DebugSetProcessKillOnExit(options & OPT_EXITKILL) == FALSE) {
 		adbg_oops(AdbgError.os);
 		adbg_process_free(proc);
 		return null;

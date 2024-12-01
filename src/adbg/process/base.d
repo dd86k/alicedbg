@@ -62,10 +62,10 @@ enum AdbgCreation : ubyte {
 /// Represents an instance of a process.
 struct adbg_process_t {
 version (Windows) {
-	int orig_pid;	/// Event Process ID
+	DWORD orig_pid;	/// Original Process ID
+	HANDLE orig_handle;	/// Original Process Handle
 	char *orig_args;	/// Saved arguments when process was launched
-	HANDLE orig_phandle;	/// Process handle
-	int pid;	/// Process ID
+	DWORD pid;	/// Process ID
 }
 version (Posix) {
 	pid_t orig_pid;	/// Original spawned PID
@@ -100,7 +100,7 @@ void adbg_process_free(adbg_process_t *proc) {
 		return;
 	version (Windows) {
 		if (proc.orig_args) free(proc.orig_args);
-		CloseHandle(proc.orig_phandle);
+		CloseHandle(proc.orig_handle);
 	}
 	version (linux) {
 		if (proc.mhandle) close(proc.mhandle);
