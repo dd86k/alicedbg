@@ -117,5 +117,14 @@ int main(int argc, const(char)** argv) {
 		return EXIT_FAILURE;
 	}
 	
+	// Start or attach to process if specified
+	if (argc > 0 && argv && shell_spawn(*argv, argc > 1 ? argv + 1 : null)) {
+		logerror("Could not spawn process: %s", adbg_error_message());
+		return 1;
+	} else if (opt_pid && shell_attach(opt_pid)) {
+		logerror("Could not attach to process: %s", adbg_error_message());
+		return 1;
+	}
+	
 	return shell_start(argc, getoptleftovers());
 }

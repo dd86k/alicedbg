@@ -134,15 +134,6 @@ void logwrite(const(char) *pre, int color, const(char) *fmt, va_list args) {
 }
 
 int shell_start(int argc, const(char)** argv) {
-	// Start or attach to process if specified
-	if (argc > 0 && argv && shell_spawn(*argv, argc > 1 ? argv + 1 : null)) {
-		logerror("Could not spawn process: %s", adbg_error_message());
-		return 1;
-	} else if (opt_pid && shell_attach(opt_pid)) {
-		logerror("Could not attach to process: %s", adbg_error_message());
-		return 1;
-	}
-	
 Lcommand:
 	fputs("(adbg) ", stdout);
 	fflush(stdout);
@@ -186,6 +177,43 @@ int shell_execv(int argc, const(char) **argv) {
 	
 	assert(command.entry, "Command missing entry function");
 	return command.entry(argc, argv);
+}
+
+int shell_spawn(const(char) *exec, const(char) **argv) {
+	// Save for restart
+	last_spawn_exec = exec;
+	last_spawn_argv = argv;
+	
+	// Spawn process
+	process = adbg_debugger_spawn(exec,
+		AdbgSpawnOpt.argv, argv,
+		0);
+	if (process == null)
+		return ShellError.alicedbg;
+	
+	printf("Process '%s' created", exec);
+	if (argv && *argv) {
+		printf(" with arguments:");
+		for (int i; argv[i]; ++i)
+			printf(" '%s'", argv[i]);
+	}
+	putchar('\n');
+	
+	return shell_setup();
+}
+
+int shell_attach(int pid) {
+	// Save for restart
+	opt_pid = pid;
+	
+	// Attach to process
+	process = adbg_debugger_attach(pid, 0);
+	if (process == null)
+		return ShellError.alicedbg;
+	
+	loginfo("Debugger attached.");
+	
+	return shell_setup();
 }
 
 private:
@@ -535,43 +563,6 @@ immutable(command2_t)* shell_findcommand(const(char) *ucommand) {
 	}
 	
 	return null;
-}
-
-int shell_spawn(const(char) *exec, const(char) **argv) {
-	// Save for restart
-	last_spawn_exec = exec;
-	last_spawn_argv = argv;
-	
-	// Spawn process
-	process = adbg_debugger_spawn(exec,
-		AdbgSpawnOpt.argv, argv,
-		0);
-	if (process == null)
-		return ShellError.alicedbg;
-	
-	printf("Process '%s' created", exec);
-	if (argv && *argv) {
-		printf(" with arguments:");
-		for (int i; argv[i]; ++i)
-			printf(" '%s'", argv[i]);
-	}
-	putchar('\n');
-	
-	return shell_setup();
-}
-
-int shell_attach(int pid) {
-	// Save for restart
-	opt_pid = pid;
-	
-	// Attach to process
-	process = adbg_debugger_attach(pid, 0);
-	if (process == null)
-		return ShellError.alicedbg;
-	
-	loginfo("Debugger attached.");
-	
-	return shell_setup();
 }
 
 // After 
