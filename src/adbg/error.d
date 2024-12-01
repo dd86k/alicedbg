@@ -183,24 +183,27 @@ void adbg_error_reset() {
 /// Returns: Error code
 int adbg_oops(AdbgError e, void *handle = null,
 	const(char)* f = __FUNCTION__.ptr, int l = __LINE__) {
-	version (Trace) trace("code=%d extra=%p caller=%s@%d", e, extra, f, l);
+	version(Trace) trace("code=%d handle=%p caller=%s@%d", e, handle, f, l);
 	error.func = f;
 	error.line = l;
 	// To avoid additional errors, such as formatting,
-	// get the underlying error code now and save it.
+	// get the underlying error code now for later.
 	switch (error.srccode = e) {
 	case AdbgError.os:
 		version (Windows)
 			error.modcode = GetLastError();
 		else
 			error.modcode = errno;
+		version(Trace) trace("oscode="~ERR_OSFMT, error.modcode);
 		break;
 	case AdbgError.crt:
 		error.modcode = errno;
+		version(Trace) trace("crt=%d", error.modcode);
 		break;
 	case AdbgError.libCapstone:
 		assert(handle, "oops, no handles");
 		error.modcode = cs_errno(cast(csh)handle);
+		version(Trace) trace("capstone_error=%d", error.modcode);
 		break;
 	default:
 		error.modcode = 0;
