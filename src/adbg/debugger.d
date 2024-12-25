@@ -606,6 +606,7 @@ private alias cbproccontinued = void function(adbg_process_t*, void*, long);
 /// 	proc = Process instance. It must be spawned or attached by the debugger.
 /// 	handler = Event handler. Setting it to `null` disables it, skipping it.
 /// Returns: Error code.
+deprecated("Use adbg_debugger_on_* functions")
 int adbg_debugger_on(adbg_process_t *proc, AdbgEvent on, void *handler) {
 	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);
@@ -634,9 +635,68 @@ int adbg_debugger_on(adbg_process_t *proc, AdbgEvent on, void *handler) {
 	return 0;
 }
 
-/// Attach user data when an event occurs.
+// NOTE: adbg_debugger_on_* advantages vs. adbg_debugger_on(enum)
+//       - callback type checking (when source compiling)
+//       - access to attributes (like `deprecated`)
+//       - no need to map/update enums
+//       - Better documentation solely for the event
+
+/// Set an event handler for handling exceptions when they occur for
+/// an attached process.
 ///
-/// This is useful to identify requests, for example.
+/// The callback will receive the active process (`adbg_process_t*`),
+/// user data (`void*`), and the exception (`adbg_exception_t*`).
+/// It must not return (`void`).
+/// Params:
+/// 	proc = Active process instance.
+/// 	callback = Callback function. Set to null to disable.
+/// Returns: Error code.
+int adbg_debugger_on_exception(adbg_process_t *proc,
+	void function(adbg_process_t*, void*, adbg_exception_t*) callback) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	proc.event_exception = callback;
+	return 0;
+}
+/// Set an event handler to know when the attached process exits.
+///
+/// The callback will receive the active process (`adbg_process_t*`),
+/// user data (`void*`), and the exit code (`int`).
+/// It must not return (`void`).
+/// Params:
+/// 	proc = Active process instance.
+/// 	callback = Callback function. Set to null to disable.
+/// Returns: Error code.
+int adbg_debugger_on_process_exit(adbg_process_t *proc,
+	void function(adbg_process_t*, void*, int) callback) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	proc.event_process_exited = callback;
+	return 0;
+}
+/// Set an event handler to know when the attached process continues.
+///
+/// This includes continue and step events.
+///
+/// The callback will receive the active process (`adbg_process_t*`),
+/// user data (`void*`), and thread/job ID (`long`).
+/// It must not return (`void`).
+/// Params:
+/// 	proc = Active process instance.
+/// 	callback = Callback function. Set to null to disable.
+/// Returns: Error code.
+int adbg_debugger_on_process_continue(adbg_process_t *proc,
+	void function(adbg_process_t*, void*, long) callback) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	proc.event_process_continued = callback;
+	return 0;
+}
+
+/// Attach user data when an event occurs.
+/// Useful to identify requests for example.
+///
+/// User data is sent to event callback functions.
 /// Params:
 /// 	proc = Process instance.
 /// 	udata = User data pointer. Passing null clears it.

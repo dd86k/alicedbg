@@ -567,9 +567,9 @@ immutable(command2_t)* shell_findcommand(const(char) *ucommand) {
 
 // After 
 int shell_setup() {
-	if (adbg_debugger_on(process, AdbgEvent.exception, &shell_event_exception) ||
-		adbg_debugger_on(process, AdbgEvent.processExit, &shell_event_process_exit) ||
-		adbg_debugger_on(process, AdbgEvent.processContinue, &shell_event_process_continue))
+	if (adbg_debugger_on_exception(process, &shell_event_exception) ||
+		adbg_debugger_on_process_exit(process, &shell_event_process_exit) ||
+		adbg_debugger_on_process_continue(process, &shell_event_process_continue))
 		return ShellError.alicedbg;
 	
 	// Open disassembler for process machine type
@@ -663,7 +663,7 @@ void shell_event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *
 void shell_event_process_exit(adbg_process_t *proc, void *udata, int code) {
 	printf("* Process %d exited with code %d\n", adbg_process_id(proc), code);
 }
-void shell_event_process_continue(adbg_process_t *proc, void *udata, int tid) {
+void shell_event_process_continue(adbg_process_t *proc, void *udata, long tid) {
 	printf("* Process %d continued\n", adbg_process_id(proc));
 }
 
