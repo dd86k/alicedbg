@@ -200,7 +200,7 @@ export
 adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 	version (Trace) trace("path=%s", path);
 	
-	adbg_object_t *o = cast(adbg_object_t*)malloc(adbg_object_t.sizeof);
+	adbg_object_t *o = cast(adbg_object_t*)calloc(1, adbg_object_t.sizeof);
 	if (o == null) {
 		adbg_oops(AdbgError.crt);
 		return null;
