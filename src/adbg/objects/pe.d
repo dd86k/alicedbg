@@ -358,6 +358,11 @@ struct pe_import_entry64_t { align(1):
 	}
 }
 
+union pe_import_entry_t { align(1):
+	pe_import_entry32_t entry32;
+	pe_import_entry64_t entry64;
+}
+
 //
 // ANCHOR Debug information
 //
@@ -1537,7 +1542,7 @@ pe_export_descriptor_t* adbg_object_pe_export(adbg_object_t *o) {
 	return internal.export_directory;
 }
 
-const(char)* adbg_object_pe_export_module_name(adbg_object_t *o, pe_export_descriptor_t *export_) {
+const(char)* adbg_object_pe_export_name(adbg_object_t *o, pe_export_descriptor_t *export_) {
 	if (o == null || export_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -1566,7 +1571,7 @@ const(char)* adbg_object_pe_export_module_name(adbg_object_t *o, pe_export_descr
 	return cast(const(char)*)base;
 }
 
-pe_export_entry_t* adbg_object_pe_export_entry_name(adbg_object_t *o, pe_export_descriptor_t *export_, size_t index) {
+pe_export_entry_t* adbg_object_pe_export_entry(adbg_object_t *o, pe_export_descriptor_t *export_, size_t index) {
 	if (o == null || export_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -1604,7 +1609,9 @@ pe_export_entry_t* adbg_object_pe_export_entry_name(adbg_object_t *o, pe_export_
 		return null;
 	}
 	
-	if (o.status & AdbgObjectInternalFlags.reversed && internal.r_export_entries[index] == false) with (entry) {
+	// Bswap entry if necessary
+	if (o.status & AdbgObjectInternalFlags.reversed &&
+		internal.r_export_entries[index] == false) with (entry) {
 		entry.Export = adbg_bswap32(entry.Export);
 		internal.r_export_entries[index] = true;
 	}
@@ -1612,7 +1619,7 @@ pe_export_entry_t* adbg_object_pe_export_entry_name(adbg_object_t *o, pe_export_
 	return entry;
 }
 
-const(char)* adbg_object_pe_export_name_string(adbg_object_t *o,
+const(char)* adbg_object_pe_export_entry_symbol(adbg_object_t *o,
 	pe_export_descriptor_t *export_, pe_export_entry_t *entry) {
 	if (o == null || export_ == null || entry == null) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -1761,7 +1768,7 @@ pe_import_descriptor_t* adbg_object_pe_import(adbg_object_t *o, size_t index) {
 }
 
 // get module name out of import descriptor
-const(char)* adbg_object_pe_import_module_name(adbg_object_t *o, pe_import_descriptor_t *import_) {
+const(char)* adbg_object_pe_import_name(adbg_object_t *o, pe_import_descriptor_t *import_) {
 	if (o == null || import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -1928,7 +1935,7 @@ pe_import_entry64_t* adbg_object_pe_import_entry64(adbg_object_t *o, pe_import_d
 // Classless functions
 // TODO: Optimize these, maybe cache the last result in internals
 
-void* adbg_object_pe_import_entry(adbg_object_t *o, pe_import_descriptor_t *import_, size_t index) {
+pe_import_entry_t* adbg_object_pe_import_entry(adbg_object_t *o, pe_import_descriptor_t *import_, size_t index) {
 	if (o == null || import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -1947,9 +1954,9 @@ void* adbg_object_pe_import_entry(adbg_object_t *o, pe_import_descriptor_t *impo
 	
 	switch (internal.optheader.Magic) {
 	case PE_CLASS_32:
-		return adbg_object_pe_import_entry32(o, import_, index);
+		return cast(pe_import_entry_t*)adbg_object_pe_import_entry32(o, import_, index);
 	case PE_CLASS_64:
-		return adbg_object_pe_import_entry64(o, import_, index);
+		return cast(pe_import_entry_t*)adbg_object_pe_import_entry64(o, import_, index);
 	default:
 		adbg_oops(AdbgError.objectInvalidClass);
 		return null;
@@ -2047,7 +2054,7 @@ ushort adbg_object_pe_import_entry_hint(adbg_object_t *o, pe_import_descriptor_t
 	return *hint;
 }
 
-const(char)* adbg_object_pe_import_entry_string(adbg_object_t *o, pe_import_descriptor_t *import_, void *entry) {
+const(char)* adbg_object_pe_import_entry_symbol(adbg_object_t *o, pe_import_descriptor_t *import_, void *entry) {
 	if (o == null || import_ == null || entry == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;

@@ -718,6 +718,18 @@ const(char)* adbg_object_machine_string(adbg_object_t *o) {
 	return adbg_machine_name( adbg_object_machine(o) );
 }
 
+/// Get the object format.
+/// Params: o = Object instance.
+/// Returns: Object format, see AdbgObject enum.
+int adbg_object_format(adbg_object_t *o) {
+	if (o == null)
+		return 0;
+	return o.format;
+}
+
+// TODO: Rename to adbg_object_format_shortname
+//       "Type" is better attributed to object type,
+//       as in "executable", "dynamic library", etc.
 /// Get the short name of the loaded object type.
 /// Params: o = Object instance.
 /// Returns: Object type name.
@@ -746,6 +758,7 @@ Lunknown:
 	}
 }
 
+// TODO: Rename to adbg_object_format_name
 /// Get the full name of the loaded object type.
 /// Params: o = Object instance.
 /// Returns: Object type name.

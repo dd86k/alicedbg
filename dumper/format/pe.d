@@ -512,7 +512,7 @@ void dump_pe_exports(adbg_object_t *o) {
 	print_x32("Timestamp", Timestamp);
 	print_x16("MajorVersion", MajorVersion);
 	print_x16("MinorVersion", MinorVersion);
-	print_x32("Name", Name, adbg_object_pe_export_module_name(o, export_));
+	print_x32("Name", Name, adbg_object_pe_export_name(o, export_));
 	print_x32("OrdinalBase", OrdinalBase);
 	print_x32("AddressTableEntries", AddressTableEntries);
 	print_x32("NumberOfNamePointers", NumberOfNamePointers);
@@ -523,8 +523,8 @@ void dump_pe_exports(adbg_object_t *o) {
 	
 	pe_export_entry_t *entry = void;
 	size_t ie;
-	while ((entry = adbg_object_pe_export_entry_name(o, export_, ie++)) != null) {
-		print_x32("Export", entry.Export, adbg_object_pe_export_name_string(o, export_, entry));
+	while ((entry = adbg_object_pe_export_entry(o, export_, ie++)) != null) {
+		print_x32("Export", entry.Export, adbg_object_pe_export_entry_symbol(o, export_, entry));
 	}
 }
 
@@ -534,7 +534,7 @@ void dump_pe_imports(adbg_object_t *o) {
 	size_t i;
 	while ((import_ = adbg_object_pe_import(o, i)) != null) with (import_) {
 		i++;
-		const(char)* module_name = adbg_object_pe_import_module_name(o, import_);
+		const(char)* module_name = adbg_object_pe_import_name(o, import_);
 		if (module_name == null)
 			panic_adbg();
 		
@@ -554,7 +554,7 @@ void dump_pe_imports(adbg_object_t *o) {
 			print_stringf("Import", "0x%08x 0x%04x %s",
 				adbg_object_pe_import_entry_rva(o, import_, entry),
 				adbg_object_pe_import_entry_hint(o, import_, entry),
-				adbg_object_pe_import_entry_string(o, import_, entry));
+				adbg_object_pe_import_entry_symbol(o, import_, entry));
 		}
 		// A PE32 image with an import table and no symbols would be weird
 		if (i2 == 0)
