@@ -95,10 +95,8 @@ enum AdbgObject {
 	elf,
 	/// Mach Object format.
 	macho,
-	/// Microsoft Program Database format 2.0. (.pdb)
-	pdb20,
-	/// Microsoft Program Database format 7.0. (.pdb)
-	pdb70,
+	/// Microsoft Program Database format (.pdb)
+	pdb,
 	/// Windows memory dump format. (.dmp)
 	dmp,
 	/// Windows Minidump format. (.mdmp)
@@ -162,20 +160,24 @@ struct adbg_object_t {
 	}
 	
 	/// Object's loading origin.
+	///
+	/// Stuff like disk or in-memory, allowing to select which I/O functions
+	/// to be used when interacting with its source material.
 	AdbgObjectOrigin origin;
 	/// Loaded object format.
 	AdbgObject format;
-	
 	/// Internal status flags. (e.g., swapping required)
 	int status;
-	
-	// NOTE: This can be turned into a static buffer.
-	/// Managed by the object handler.
+	/// Internal buffer used by the module responsible of handling
+	/// the specific object format.
 	void *internal;
-	
 	/// Used to attach the unload function
 	void function(adbg_object_t*) func_unload;
 }
+
+// TODO: "adbg_object_register" function to replace adbg_object_postload
+//       - signature/magic, type, initial internal buffer size, unload callback, flags, etc.
+//       - register defaults (on first load)
 
 // Internal function for submodules to setup internals
 package
@@ -365,10 +367,11 @@ int adbg_object_loadv(adbg_object_t *o) {
 	
 	o.status = 0;
 	
-	// Load enough for signature detection
+	// Load buffer for variable-length signature detection
 	SIGNATURE sig = void;
 	int siglen = osfread(o.file, &sig, SIGNATURE.sizeof); /// signature size
 	version (Trace) trace("siglen=%d sigmax=%u", siglen, cast(uint)SIGMAX);
+	// TODO: Use object I/O functions in case process is being loaded
 	if (siglen < 0)
 		return adbg_oops(AdbgError.os);
 	if (siglen <= uint.sizeof)
@@ -734,10 +737,9 @@ int adbg_object_format(adbg_object_t *o) {
 /// Params: o = Object instance.
 /// Returns: Object type name.
 export
-const(char)* adbg_object_type_shortname(adbg_object_t *o) {
+const(char)* adbg_object_format_shortname(adbg_object_t *o) {
 	if (o == null)
 		goto Lunknown;
-	//TODO: Consider merging pdb20 and pdb70 to only "pdb"
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return "mz";
 	case ne:	return "ne";
@@ -745,8 +747,7 @@ const(char)* adbg_object_type_shortname(adbg_object_t *o) {
 	case pe:	return "pe32";
 	case macho:	return "macho";
 	case elf:	return "elf";
-	case pdb20:	return "pdb20";
-	case pdb70:	return "pdb70";
+	case pdb:	return "pdb";
 	case mdmp:	return "mdmp";
 	case dmp:	return "dmp";
 	case omf:	return "omf";
@@ -758,12 +759,11 @@ Lunknown:
 	}
 }
 
-// TODO: Rename to adbg_object_format_name
 /// Get the full name of the loaded object type.
 /// Params: o = Object instance.
 /// Returns: Object type name.
 export
-const(char)* adbg_object_type_name(adbg_object_t *o) {
+const(char)* adbg_object_format_name(adbg_object_t *o) {
 	if (o == null)
 		Lunknown: return "Unknown";
 	final switch (o.format) with (AdbgObject) {
@@ -773,8 +773,7 @@ const(char)* adbg_object_type_name(adbg_object_t *o) {
 	case pe:	return `Portable Executable`;
 	case macho:	return `Mach-O`;
 	case elf:	return `Executable and Linkable Format`;
-	case pdb20:	return `Program Database 2.0`;
-	case pdb70:	return `Program Database 7.0`;
+	case pdb:	return `Program Database`;
 	case mdmp:	return `Windows Minidump`;
 	case dmp:	return `Windows Memory Dump`;
 	case omf:	return `Relocatable Object Module Format`;
@@ -796,7 +795,7 @@ const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	case pe:	return adbg_object_pe_kind_string(o);
 	case macho:	return adbg_object_macho_kind_string(o);
 	case elf:	return adbg_object_elf_kind_string(o);
-	case pdb20, pdb70:	return `Debug Database`;
+	case pdb:	return `Debug Database`;
 	case mdmp, dmp:	return `Memory Dump`;
 	case archive, mscoff:	return `Library`;
 	case omf:	return adbg_object_omf_is_library(o) ? `Library` : `Object`;
@@ -827,7 +826,7 @@ const(char)* adbg_object_osabi_string(adbg_object_t *o) {
 		if (ehdr == null)
 			goto Lunknown;
 		return adbg_object_elf_abi_string(ehdr.e_ident[ELF_EI_OSABI]);
-	case pdb20, pdb70, mdmp, dmp, omf, archive, coff, mscoff, mz:
+	case pdb, mdmp, dmp, omf, archive, coff, mscoff, mz:
 	case unknown:	goto Lunknown;
 	}
 }

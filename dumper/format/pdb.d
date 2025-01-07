@@ -8,7 +8,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module format.pdb70;
+module format.pdb;
 
 import adbg.objectserver;
 import adbg.objects.pdb;
@@ -26,68 +26,85 @@ import common.errormgmt;
 
 extern (C):
 
-int dump_pdb70(adbg_object_t *o) {
+int dump_pdb(adbg_object_t *o) {
 	if (SELECTED(Select.headers))
-		dump_pdb70_header(o);
+		dump_pdb_header(o);
 	if (opt_pdb_stream)
-		dump_pdb70_stream(o, atoi(opt_pdb_stream));
+		dump_pdb_stream(o, atoi(opt_pdb_stream));
 	return 0;
 }
 
 private:
 
-void dump_pdb70_header(adbg_object_t *o) {
+void dump_pdb_header(adbg_object_t *o) {
 	print_header("Header");
 	
-	pdb70_file_header_t *header = adbg_object_pdb70_header(o);
-	
-	print_stringl("Magic", header.Magic.ptr, 24);
-	print_u32("BlockSize", header.BlockSize);
-	print_u32("FreeIndex", header.FreeIndex);
-	print_u32("BlockCount", header.BlockCount);
-	print_u32("DirectorySize", header.DirectorySize);
-	print_x32("Unknown", header.Unknown);
-	print_x32("DirectoryOffset", header.DirectoryOffset);
-	
-	//TODO: Consider moving this information to another selector
-	print_header("FPM information");
-	ubyte *fpm      = adbg_object_pdb70_fpm(o);
-	size_t fpmcount = adbg_object_pdb70_fpmcount(o);
-	for (size_t fpmi; fpmi < fpmcount; ++fpmi) {
-		char[48] buf = void;
-		uint blocknum = cast(uint)fpmi * 8;
-		snprintf(buf.ptr, 48, "Block %u-%u", blocknum, blocknum + 7);
-		print_x8(buf.ptr, fpm[fpmi]);
-	}
-	
-	print_header("Stream information");
-	uint count = adbg_object_pdb70_total_count(o);
-	print_columns("Stream Number", "Size".ptr, "BlockIDs".ptr);
-	//print_u32("Stream count", count);
-	for (uint i; i < count; ++i, putchar('\n')) {
-		// Print stream number
-		char[48] buf = void;
-		snprintf(buf.ptr, 48, "Stream %u", i);
-		print_name(buf.ptr);
+	final switch (adbg_object_pdb_version(o)) with(PdbVersion) {
+	case pdb20:
+		pdb20_file_header_t *header = adbg_object_pdb20_header(o);
 		
-		uint size = adbg_object_pdb70_stream_size(o, i);
-		
-		// Skip if empty
-		if (size == 0 || size == PDB_BLOCK_SIZE_UNUSED)
-			continue;
-		
-		uint *blocks  = adbg_object_pdb70_stream_blocks(o, i);
-		if (blocks == null)
-			continue;
-		
-		// Print stream size + associated blocks
-		uint blkcount = adbg_object_pdb70_stream_block_count(o, i);
-		printf("%u\t(", size);
-		for (uint bi; bi < blkcount; ++bi) {
-			if (bi) putchar(',');
-			printf("%u", blocks[bi]);
+		with (header) {
+		print_stringl("Magic", header.Magic.ptr, 37);
+		print_u32("BlockSize", BlockSize);
+		print_u16("StartPage", StartPage);
+		print_u16("BlockCount", BlockCount);
+		print_u32("RootSize", RootSize);
+		print_x32("Reserved", Reserved);
+		print_u16("RootNumber", RootNumber);
 		}
-		printf(")");
+		break;
+	case pdb70:
+		pdb70_file_header_t *header = adbg_object_pdb70_header(o);
+		
+		print_stringl("Magic", header.Magic.ptr, 24);
+		print_u32("BlockSize", header.BlockSize);
+		print_u32("FreeIndex", header.FreeIndex);
+		print_u32("BlockCount", header.BlockCount);
+		print_u32("DirectorySize", header.DirectorySize);
+		print_x32("Unknown", header.Unknown);
+		print_x32("DirectoryOffset", header.DirectoryOffset);
+		
+		//TODO: Consider moving this information to another selector/option
+		print_header("FPM information");
+		ubyte *fpm      = adbg_object_pdb70_fpm(o);
+		size_t fpmcount = adbg_object_pdb70_fpmcount(o);
+		for (size_t fpmi; fpmi < fpmcount; ++fpmi) {
+			char[48] buf = void;
+			uint blocknum = cast(uint)fpmi * 8;
+			snprintf(buf.ptr, 48, "Block %u-%u", blocknum, blocknum + 7);
+			print_x8(buf.ptr, fpm[fpmi]);
+		}
+		
+		print_header("Stream information");
+		uint count = adbg_object_pdb70_total_count(o);
+		print_columns("Stream Number", "Size".ptr, "BlockIDs".ptr);
+		//print_u32("Stream count", count);
+		for (uint i; i < count; ++i, putchar('\n')) {
+			// Print stream number
+			char[48] buf = void;
+			snprintf(buf.ptr, 48, "Stream %u", i);
+			print_name(buf.ptr);
+			
+			uint size = adbg_object_pdb70_stream_size(o, i);
+			
+			// Skip if empty
+			if (size == 0 || size == PDB_BLOCK_SIZE_UNUSED)
+				continue;
+			
+			uint *blocks  = adbg_object_pdb70_stream_blocks(o, i);
+			if (blocks == null)
+				continue;
+			
+			// Print stream size + associated blocks
+			uint blkcount = adbg_object_pdb70_stream_block_count(o, i);
+			printf("%u\t(", size);
+			for (uint bi; bi < blkcount; ++bi) {
+				if (bi) putchar(',');
+				printf("%u", blocks[bi]);
+			}
+			printf(")");
+		}
+		break;
 	}
 }
 
@@ -105,7 +122,7 @@ const(char)* pdb_stream_name(size_t i) {
 	return StreamNames[i].ptr;
 }
 
-void dump_pdb70_stream(adbg_object_t *o, int num) {
+void dump_pdb_stream(adbg_object_t *o, int num) {
 	switch (num) { // specific
 	case 1:    dump_pdb70_stream_pdb(o); return;
 	case 2, 4: dump_pdb70_stream_tpi_ipi(o, num); return;

@@ -140,8 +140,8 @@ int dump_file(const(char)* path) {
 		if (SETTING(Setting.extractAny) == 0) {
 			print_string("filename", path);
 			print_u64("filesize", adbg_object_filesize(o));
-			print_string("type", adbg_object_type_name(o));
-			print_string("shortname", adbg_object_type_shortname(o));
+			print_string("type", adbg_object_format_name(o));
+			print_string("shortname", adbg_object_format_shortname(o));
 		}
 		final switch (o.format) with (AdbgObject) {
 		case mz:	return dump_mz(o);
@@ -150,15 +150,14 @@ int dump_file(const(char)* path) {
 		case lx:	return dump_lx(o);
 		case elf:	return dump_elf(o);
 		case macho:	return dump_macho(o);
-		case pdb20:	return dump_pdb20(o);
-		case pdb70:	return dump_pdb70(o);
+		case pdb:	return dump_pdb(o);
 		case archive:	return dump_archive(o);
 		case mdmp:	return dump_minidump(o);
 		case dmp:	return dump_dmp(o);
 		case omf:	return dump_omf(o);
 		case coff:	return dump_coff(o);
 		case mscoff:	return dump_mscoff(o);
-		case unknown:	assert(0, "Unknown object type"); // Raw/unknown
+		case unknown:	assert(0, "Unsupported object type");
 		}
 	}
 	
@@ -171,21 +170,20 @@ int dump_file(const(char)* path) {
 		printf("%s: ", path);
 	
 	if (SETTING(Setting.shortName)) {
-		puts(SAFEVAL(adbg_object_type_shortname(o)));
+		puts(SAFEVAL(adbg_object_format_shortname(o)));
 		return 0;
 	}
 	
 	// Otherwise, make a basic summary
-	printf("%s, %s", adbg_object_type_name(o), adbg_object_kind_string(o));
+	printf("%s, %s", adbg_object_format_name(o), adbg_object_kind_string(o));
 	
 	// Print machine type used for object
 	const(char)* machstr = adbg_object_machine_string(o);
-	if (machstr)
-		printf(", %s", machstr);
+	if (machstr) printf(", %s", machstr);
+	
 	// Print OS ABI type used for object
 	const(char)* osabistr = adbg_object_osabi_string(o);
-	if (osabistr)
-		printf(", %s", osabistr);
+	if (osabistr) printf(", %s", osabistr);
 	
 	putchar('\n');
 	return 0;
@@ -197,7 +195,7 @@ const(char)* SAFEVAL(const(char)* value) {
 
 private immutable {
 	/// Padding spacing to use in characters
-	// PE32 has fields like MinorOperatingSystemVersion (27 chars)
+	// PE32 has long field names like MinorOperatingSystemVersion (27 chars)
 	int __field_padding = -28;
 	/// Number of columns to produce in hexdumps, in bytes.
 	int __columns = 16;
