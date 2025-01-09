@@ -1,12 +1,13 @@
 /// UNIX library archive format.
 ///
 /// Sources:
-/// - gdb/include/aout/ar.h
 /// - Microsoft Portable Executable and Common Object File Format Specification
 /// - Microsoft Corporation, Revision 6.0 - February 1999
 /// - Microsoft Corporation, Revision 8.3 - February 2013
 /// - Microsoft Corporation, Revision 11 - February 2013
-/// - winnt.h (10.0.22621.0)
+/// - Windows SDK: winnt.h (10.0.22621.0)
+/// - GDB (gdb/include/aout/ar.h)
+/// - LLVM (llvm/lib/Object/Archive.cpp)
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -17,8 +18,17 @@ import adbg.error;
 import adbg.objectserver;
 import adbg.utils.bit;
 import core.stdc.stdlib;
+import core.stdc.string : strncmp;
+import core.stdc.ctype : isdigit;
 
 extern (C):
+
+enum ArVersion {
+	unknown	= 0,
+	gnu	= 1,
+	bsd	= 2,
+	coff	= 3,
+}
 
 // NOTE: Possible object formats included
 //       - ELF relocatable objects (POSIX)
@@ -27,8 +37,7 @@ extern (C):
 // NOTE: MSVC linker can only process libraries under 4 GiB in size.
 
 // NOTE: Format detection (taken and updated from llvm/lib/Object/Archive.cpp)
-//       Below is the pattern that is used to figure out the archive format
-//       GNU / System V archive format
+//       GNU and System V (SVR4) archive format
 //         First member : "/"  (May exist, if it exists, points to the symbol table)
 //         Second member: "//" (Ditto)
 //         "/" acts as a main index for all other members in the archive.
@@ -69,18 +78,40 @@ enum AR_MAGIC = CHAR64!"!<arch>\n";
 /// 
 private enum AR_EOL = CHAR16!"`\n";
 
-private immutable char[16] AR_LINKER_MEMBER    = "/               ";
-private immutable char[16] AR_LONGNAMES_MEMBER = "//              ";
-private immutable char[16] AR_HYBRIDMAP_MEMBER = "/<HYBRIDMAP>/   ";
+/// Linker member
+private immutable char[16] AR_MEMBER_LINKER     = "/               ";
+/// Long name table
+private immutable char[16] AR_MEMBER_LONGNAMES  = "//              ";
+
+// Traditional 64-bit GNU archive member
+private immutable char[16] AR_MEMBER_SYM64      = "/SYM64/         ";
+
+// BSD
+private immutable char[16] AR_MEMBER_SYMDEF     = "__.SYMDEF       ";
+// BSD/Darwin
+private immutable char[16] AR_MEMBER_SYMDEF64   = "__.SYMDEF_64    ";
+// BSD
+private immutable char[16] AR_MEMBER_SYMDEF_SORTED = "__.SYMDEF SORTED";
+
+// I forgot where this one comes from
+private immutable char[16] AR_MEMBER_HYBRIDMAP  = "/<HYBRIDMAP>/   ";
+// Note from LLVM:
+// "System libraries from the Windows SDK for Windows 11 contain this symbol.
+// It looks like a CFG guard: we just skip it for now."
+private immutable char[16] AR_MEMBER_XFGHASHMAP = "/<XFGHASHMAP>/  ";
+// Note from LLVM:
+// "Some libraries (e.g., arm64rt.lib) from the Windows WDK
+// (version 10.0.22000.0) contain this undocumented special member."
+private immutable char[16] AR_MEMBER_ECSYMBOLS  = "/<ECSYMBOLS>/   ";
 
 /// 
-struct ar_file_header {
+struct ar_file_header_t {
 	/// Magic containing "!<arch>\n" or similar
 	char[8] Magic;
 }
 
 /// 
-struct ar_member_header {
+struct ar_member_header_t {
 	/// Name of archive member, with a slash (/) appended
 	/// to terminate the name. If the first character is a slash,
 	/// the name has a special interpretation, as described
@@ -114,7 +145,7 @@ struct ar_member_header {
 	/// ASCII octal representation of the member’s file mode.
 	char[8] Mode;
 	/// ASCII decimal representation of the total size of the
-	/// archive member, not including the size of the header.
+	/// archive member, excluding the size of this header.
 	char[10] Size;
 	union {
 		/// The two bytes in the C string: "`\n" (0x60 0x0a).
@@ -123,13 +154,13 @@ struct ar_member_header {
 	}
 }
 
-struct ar_member_data {
-	void *data;
+struct ar_member_data_t {
+	void *pointer;
 	int size;
 }
 
 /// When first name is "/"
-struct mscoff_first_linker_header {
+struct mscoff_first_linker_header_t {
 	/// 
 	uint SymbolCount;
 	/// Offsets in big-endian
@@ -138,7 +169,7 @@ struct mscoff_first_linker_header {
 }
 
 /// When second name is "/"
-struct mscoff_second_linker_header {
+struct mscoff_second_linker_header_t {
 	uint MemberCount;
 	uint[1] Offsets;
 	// uint SymbolCount; // Follows Offset table
@@ -146,19 +177,12 @@ struct mscoff_second_linker_header {
 	// String Table after Indices
 }
 
-private enum ARFormat {
-	unknown,
-	gnu,
-	bsd,
-	microsoft,
-}
-
 private struct internal_ar_t {
+	ArVersion kind;
+	
+	// used for iterating
 	long offset; // current file offset of current header
-	ar_member_header current; // current member
-	ar_member_header symbol;  // symbol member
-	void *symbol_buffer;
-	int symbol_size;
+	ar_member_header_t current; // current member
 }
 
 private enum STATUS_SYMBOL_LOADED = 1 << 16;
@@ -167,7 +191,25 @@ int adbg_object_ar_load(adbg_object_t *o) {
 	o.internal = malloc(internal_ar_t.sizeof);
 	if (o.internal == null) 
 		return adbg_oops(AdbgError.crt);
+	
+	// Since UNIX archives can still be used as regular archives,
+	// we need to find out which kind of archive (gnu/bsd/msvc)
+	// we're dealing, and that it is formatted correctly.
+	/*
+	ar_member_header_t *header0 = adbg_object_ar_first_member(o);
+	if (header0 == null) {
+		free(o.internal);
+		return adbg_error_code();
+	}
+	
+	// "/"
+	if (strncmp(header0.Name.ptr, AR_MEMBER_LINKER.ptr, AR_MEMBER_LINKER.length) == 0) {
 		
+	} else if (strncmp(header0.Name.ptr, AR_MEMBER_SYMDEF.ptr, AR_MEMBER_LINKER.length) == 0) {
+		
+	}
+	*/
+	
 	adbg_object_postload(o, AdbgObject.archive, &adbg_object_ar_unload);
 	return 0;
 }
@@ -181,36 +223,43 @@ void adbg_object_ar_unload(adbg_object_t *o) {
 	free(o.internal);
 }
 
-/// Convert a number from a fixed character buffer to a scalar integer.
+/// Convert a number from a fixed character buffer to an unsigned integer.
 /// Params:
 ///   p = Character buffer pointer. Can be null-terminated.
 ///   s = Size of character buffer. Or the maximum string length input.
-/// Returns: Integer value.
+/// Returns: 32-bit Unsigned integer value.
 private
-int atoint(const(char)* p, size_t s) {
+uint atouint(const(char)* p, size_t s) {
 	if (p == null || s <= 0)
 		return 0;
 	int v; char c = void;
 	for (size_t i; i < s && (c = p[i]) != 0; ++i) {
-		if (c < '0' || c > '9')
-			continue;
+		if (c < '0' || c > '9') // Failsafe/error
+			return 0;
 		v = (10 * v) + (c - '0');
 	}
 	return v;
 }
 extern (D) unittest {
-	assert(atoint("0", 10) == 0);
-	assert(atoint("1", 10) == 1);
-	assert(atoint("2", 10) == 2);
-	assert(atoint("86", 10) == 86);
-	assert(atoint("123", 10) == 123);
-	assert(atoint("4000", 10) == 4000);
-	assert(atoint("68088", 10) == 68088);
-	assert(atoint("4000", 2) == 40); // Test buffer size
-	assert(atoint("2147483647", 10) == int.max);
+	enum L = 10;
+	// valid
+	assert(atouint("0", L) == 0);
+	assert(atouint("1", L) == 1);
+	assert(atouint("2", L) == 2);
+	assert(atouint("86", L) == 86);
+	assert(atouint("123", L) == 123);
+	assert(atouint("4000", L) == 4000);
+	assert(atouint("68088", L) == 68088);
+	assert(atouint("4000", 2) == 40); // Test max size
+	assert(atouint("2147483647", L) == int.max);
+	assert(atouint("4294967295", L) == uint.max);
+	// invalid
+	assert(atouint("0", L) == 0);
+	assert(atouint("a", L) == 0);
+	assert(atouint("-1", L) == 0);
 }
 
-ar_member_header* adbg_object_ar_first_header(adbg_object_t *o) {
+ar_member_header_t* adbg_object_ar_first_member(adbg_object_t *o) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -223,15 +272,13 @@ ar_member_header* adbg_object_ar_first_header(adbg_object_t *o) {
 	internal_ar_t *internal = cast(internal_ar_t*)o.internal;
 	
 	// First entry starts right after signature
-	internal.offset = ar_file_header.sizeof;
+	internal.offset = ar_file_header_t.sizeof;
 	
-	// Read first member
-	if (adbg_object_read_at(o, ar_file_header.sizeof, &internal.current, ar_member_header.sizeof))
+	// Read first member and validate it
+	if (adbg_object_read_at(o, ar_file_header_t.sizeof, &internal.current, ar_member_header_t.sizeof))
 		return null;
-	
-	// 
 	if (internal.current.EndMarker != AR_EOL) {
-		adbg_oops(AdbgError.assertion);
+		adbg_oops(AdbgError.objectMalformed);
 		return null;
 	}
 	
@@ -239,7 +286,7 @@ ar_member_header* adbg_object_ar_first_header(adbg_object_t *o) {
 }
 
 // Get the next instance of the header
-ar_member_header* adbg_object_ar_next_header(adbg_object_t *o) {
+ar_member_header_t* adbg_object_ar_next_member(adbg_object_t *o) {
 	if (o == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -251,18 +298,18 @@ ar_member_header* adbg_object_ar_next_header(adbg_object_t *o) {
 	
 	internal_ar_t *internal = cast(internal_ar_t*)o.internal;
 	
-	int size = adbg_object_ar_membersize(&internal.current);
-	if (size < 0) {
+	uint size = adbg_object_ar_membersize(&internal.current);
+	if (size <= 0) {
 		adbg_oops(AdbgError.assertion);
 		return null;
 	}
 	
 	// Jump to next header location using the current member size
 	// The alignment is needed at least for MS variants
-	long newloc = adbg_alignup64(internal.offset + ar_member_header.sizeof + size, 2);
+	long newloc = adbg_alignup64(internal.offset + ar_member_header_t.sizeof + size, 2);
 	
 	// Read header
-	if (adbg_object_read_at(o, newloc, &internal.current, ar_member_header.sizeof))
+	if (adbg_object_read_at(o, newloc, &internal.current, ar_member_header_t.sizeof))
 		return null;
 	
 	// 
@@ -276,15 +323,58 @@ ar_member_header* adbg_object_ar_next_header(adbg_object_t *o) {
 	return &internal.current;
 }
 
-int adbg_object_ar_membersize(ar_member_header *member) {
+uint adbg_object_ar_membersize(ar_member_header_t *member) {
 	if (member == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 0;
+	}
+	return atouint(member.Size.ptr, member.Size.sizeof);
+}
+
+// TODO: adbg_object_ar_member_name
+//       Names like "/75" should be entry index 76 in "//"
+
+/// Get the resolved name of a member into a user-provided buffer.
+/// 
+/// The buffer will contain a null-terminated string.
+/// Params:
+///   buffer = Pointer to a narrow-character buffer.
+///   bufsize = Size of the buffer, in characters.
+///   o = Object instance.
+///   member = Archive member, given by `adbg_object_ar_first_member` or `adbg_object_ar_next_member`.
+/// Returns: The number of characters written, excluding the null-terminator, or -1 on error.
+ptrdiff_t adbg_object_ar_member_name(char *buffer, size_t bufsize, adbg_object_t *o, ar_member_header_t *member) {
+	if (buffer == null || bufsize == 0 || o == null || member == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return -1;
 	}
-	return atoint(member.Size.ptr, member.Size.sizeof);
+	
+	size_t allowedsz = bufsize - 1; // for null
+	
+	if (member.Name[0] == '/') { // special / long-name
+		// TODO: Check object format
+		// TODO: Check ar kind
+		// coff:
+		// member.Name[1] == ' ' (or '\0'?) -> table
+		// member.Name[1] == '/' -> long-name table
+		// isdigit( member.Name[1] ) -> long-name else special
+		adbg_oops(AdbgError.unimplemented);
+		return -1;
+	}
+	
+	// Otherwise it's in the name as "example.obj/".
+	// Copy until either buffer run out or '/' is met.
+	ptrdiff_t i;
+	for (; i < ar_member_header_t.Name.sizeof && i < allowedsz; ++i) {
+		if (member.Name[i] == '/')
+			break;
+		buffer[i] = member.Name[i];
+	}
+	buffer[i] = 0;
+	return i;
 }
 
-ar_member_data* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header *member) {
+ar_member_data_t* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header_t *member) {
 	if (o == null || member == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -296,24 +386,24 @@ ar_member_data* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header *m
 	
 	internal_ar_t *internal = cast(internal_ar_t*)o.internal;
 	
-	int size = adbg_object_ar_membersize(member);
-	if (size < 0) {
+	uint size = adbg_object_ar_membersize(member);
+	if (size <= 0) {
 		adbg_oops(AdbgError.assertion);
 		return null;
 	}
 	
-	void *buffer = malloc(ar_member_data.sizeof + size);
+	void *buffer = malloc(ar_member_data_t.sizeof + size);
 	if (buffer == null) {
 		adbg_oops(AdbgError.crt);
 		return null;
 	}
 	
-	ar_member_data *data = cast(ar_member_data*)buffer;
-	data.size = size;
-	data.data = buffer + ar_member_data.sizeof;
+	ar_member_data_t *data = cast(ar_member_data_t*)buffer;
+	data.size    = size;
+	data.pointer = buffer + ar_member_data_t.sizeof;
 	
 	long dataloc = internal.offset + size;
-	if (adbg_object_read_at(o, dataloc, data.data, size)) {
+	if (adbg_object_read_at(o, dataloc, data.pointer, size)) {
 		free(buffer);
 		return null;
 	}
@@ -321,76 +411,6 @@ ar_member_data* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header *m
 	return data;
 }
 
-void adbg_object_ar_member_data_close(ar_member_data *data) {
+void adbg_object_ar_member_data_close(ar_member_data_t *data) {
 	if (data) free(data);
 }
-
-//TODO: adbg_object_ar_symbol
-//      This will require going through all object files and get their symbols
-//      So, waiting on being able to load objects in-memory
-
-/*
-const(char)* adbg_object_ar_symbol(adbg_object_t *o, size_t index) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	
-	internal_ar_t *internal = cast(internal_ar_t*)o.internal;
-	
-	// Symbol member not loaded
-	if ((o.status & STATUS_SYMBOL_LOADED) == 0) {
-		version (Trace) trace("Loading first member");
-		
-		if (adbg_object_read_at(o, ar_file_header.sizeof, &internal.symbol, ar_member_header.sizeof))
-			return null;
-		
-		internal.symbol_size = adbg_object_ar_membersize(&internal.symbol);
-		if (internal.symbol_size < 0)
-			return null;
-		if (internal.symbol_size <= uint.sizeof) {
-			adbg_oops(AdbgError.assertion);
-			return null;
-		}
-		
-		internal.symbol_buffer = malloc(internal.symbol_size);
-		if (internal.symbol_buffer == null) {
-			adbg_oops(AdbgError.crt);
-			return null;
-		}
-		
-		if (adbg_object_read_at(o, ar_file_header.sizeof + ar_member_header.sizeof,
-			internal.symbol_buffer, internal.symbol_size))
-			return null;
-		
-		o.status |= STATUS_SYMBOL_LOADED;
-	}
-	
-	uint count = adbg_bswap32(*cast(uint*)internal.symbol_buffer);
-	
-	if (index >= count) {
-		adbg_oops(AdbgError.indexBounds);
-		return null;
-	}
-	
-	uint *offsets = cast(uint*)(internal.symbol_buffer + uint.sizeof);
-	
-	uint *offset = offsets + index;
-	
-	if (adbg_bits_ptrbounds(offset, uint.sizeof, offsets, internal.symbol_size)) {
-		adbg_oops(AdbgError.offsetBounds);
-		return null;
-	}
-	
-	// Offset to member headers
-	uint aoffset = adbg_bswap32(*offset);
-	
-	version (Trace) trace("aoffset=%#x", aoffset);
-	
-	return null;
-}
-*/

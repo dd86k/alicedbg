@@ -120,10 +120,8 @@ enum AdbgObjectOrigin {
 	disk,
 	/// Object was loaded from the debugger into memory.
 	process,
-	/// TODO: Object is a whole buffer provided externally.
+	/// Object is a whole buffer provided externally.
 	userbuffer,
-	/// TODO: Object is memory-mapped.
-	mmap,
 }
 
 package
@@ -720,7 +718,10 @@ void adbg_object_section_close(adbg_object_t *o, adbg_section_t *section) {
 	free(section);
 }
 
-/// Get the size of the object. Only applies for objects loaded from disks.
+/// Get the size of the object.
+///
+/// For local files, it is the filesize.
+/// For user buffers, the buffer size.
 /// Params: o = Object instance.
 /// Returns: Size in bytes, or -1 on error.
 long adbg_object_filesize(adbg_object_t *o) {
@@ -728,16 +729,19 @@ long adbg_object_filesize(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return -1;
 	}
-	if (o.file == null) {
-		adbg_oops(AdbgError.uninitiated);
+	switch (o.origin) {
+	case AdbgObjectOrigin.disk:
+		if (o.file == null) {
+			adbg_oops(AdbgError.uninitiated);
+			return -1;
+		}
+		return osfsize(o.file);
+	case AdbgObjectOrigin.userbuffer:
+		return cast(long)o.user_buffersize; // size_t -> long is ehh..
+	default:
+		adbg_oops(AdbgError.unimplemented);
 		return -1;
 	}
-	if (o.origin != AdbgObjectOrigin.disk) {
-		adbg_oops(AdbgError.unavailable);
-		return -1;
-	}
-	
-	return osfsize(o.file);
 }
 
 /// Returns the first machine type the object supports.
@@ -747,6 +751,8 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	if (o == null)
 		return AdbgMachine.unknown;
 	
+	// TODO: For UNIX archives, get first object and return machine of sub object instance
+	//       Would that really work, though?
 	switch (o.format) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
 	case ne:	return adbg_object_ne_machine(o);
@@ -756,7 +762,6 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	case elf:	return adbg_object_elf_machine(o);
 	case coff:	return adbg_object_coff_machine(o);
 	case dmp:	return adbg_object_dmp_machine(o);
-	// TODO: For UNIX archives, get first object and return machine of sub object instance
 	default:
 	}
 	return AdbgMachine.unknown;
@@ -768,10 +773,8 @@ const(char)* adbg_object_machine_string(adbg_object_t *o) {
 /// Get the object format.
 /// Params: o = Object instance.
 /// Returns: Object format, see AdbgObject enum.
-int adbg_object_format(adbg_object_t *o) {
-	if (o == null)
-		return 0;
-	return o.format;
+AdbgObject adbg_object_format(adbg_object_t *o) {
+	return o ? o.format : AdbgObject.unknown;
 }
 
 // TODO: Rename to adbg_object_format_shortname
