@@ -151,11 +151,12 @@ struct adbg_object_t {
 		}
 		struct {
 			adbg_process_t *process;
-			size_t location;
+			size_t proc_location;
 		}
 		struct {
 			void *user_buffer;
-			size_t user_size;
+			size_t user_buffersize;
+			size_t user_location;
 		}
 	}
 	
@@ -178,6 +179,7 @@ struct adbg_object_t {
 // TODO: "adbg_object_register" function to replace adbg_object_postload
 //       - signature/magic, type, initial internal buffer size, unload callback, flags, etc.
 //       - register defaults (on first load)
+//       - global buffer that holds a list of registered types
 
 // Internal function for submodules to setup internals
 package
@@ -191,7 +193,7 @@ void adbg_object_postload(adbg_object_t *o,
 	o.func_unload = funload;
 }
 
-/// Load an object from disk into memory.
+/// Open and load an object from disk into memory.
 ///
 /// This function allocates memory.
 /// Params:
@@ -201,6 +203,11 @@ void adbg_object_postload(adbg_object_t *o,
 export
 adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 	version (Trace) trace("path=%s", path);
+	
+	if (path == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	
 	adbg_object_t *o = cast(adbg_object_t*)calloc(1, adbg_object_t.sizeof);
 	if (o == null) {
@@ -224,6 +231,48 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 	
 	version (Trace) if (o.func_unload == null)
 		trace("WARNING: object type %d does not have unload function set", o.format);
+	
+	return o;
+}
+
+//adbg_object_t* adbg_object_open_process(int pid, ...) {
+
+/// Open a new instance of an object from a buffer.
+///
+/// This is useful when extract binary load from an archive, like UNIX Archives,
+/// where this function is used internally.
+/// Params:
+///   buffer = User buffer.
+///   buffersize = The size of the buffer, in Bytes.
+///   ... = Options. Terminated with 0.
+/// Returns: Object instance, or null on error.
+adbg_object_t* adbg_object_open_buffer(void *buffer, size_t buffersize, ...) {
+	version (Trace) trace("buffer=%p buffersize=%zu", buffer, buffersize);
+	
+	if (buffer == null || buffersize == 0) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	adbg_object_t *o = cast(adbg_object_t*)calloc(1, adbg_object_t.sizeof);
+	if (o == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	
+	o.user_buffer = buffer;
+	o.user_buffersize = buffersize;
+	
+	o.origin = AdbgObjectOrigin.userbuffer;
+	
+	if (adbg_object_loadv(o)) {
+		adbg_object_close(o);
+		return null;
+	}
+	
+	version (Trace) if (o.func_unload == null)
+		trace("NOTE: object type %s does not have unload function set",
+			adbg_object_format_shortname(o));
 	
 	return o;
 }
@@ -252,15 +301,13 @@ void adbg_object_close(adbg_object_t *o) {
 int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 0) {
 	version (Trace) trace("buffer=%p rdsize=%zu", buffer, rdsize);
 	
-	if (o == null || buffer == null)
+	if (o == null || buffer == null || rdsize == 0)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (rdsize == 0)
-		return 0;
 	
 	version (Trace) trace("origin=%d", o.origin);
 	switch (o.origin) with (AdbgObjectOrigin) {
 	case disk:
-		int r = osfread(o.file, buffer, cast(int)rdsize);
+		int r = osfread(o.file, buffer, cast(int)rdsize); // updates file pos
 		version (Trace) trace("osfread=%d", r);
 		if (r < 0)
 			return adbg_oops(AdbgError.os);
@@ -268,12 +315,16 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 			return adbg_oops(AdbgError.partialRead);
 		return 0;
 	case process:
-		return adbg_memory_read(o.process, o.location, buffer, rdsize);
-	//case userbuffer:
-		//if (location + rsize >= o.buffer_size)
-		//	return adbg_oops(AdbgError.objectOutsideAccess);
-		//if (memcpy(buffer, o.buffer + location, rsize))
-		//	return adbg_oops(AdbgError.crt);
+		int e = adbg_memory_read(o.process, o.proc_location, buffer, rdsize);
+		if (e == 0) o.proc_location += rdsize;
+		return e;
+	case userbuffer:
+		if (o.user_location + rdsize >= o.user_buffersize)
+			return adbg_oops(AdbgError.offsetBounds);
+		if (memcpy(buffer, o.user_buffer + o.user_location, rdsize))
+			return adbg_oops(AdbgError.crt);
+		o.user_location += rdsize;
+		return 0;
 	default:
 	}
 	
@@ -291,12 +342,10 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rdsize, int flags = 0) {
 	version (Trace) trace("location=%lld buffer=%p rdsize=%zu", location, buffer, rdsize);
 	
-	if (o == null || buffer == null) {
+	if (o == null || buffer == null || rdsize == 0) {
 		adbg_oops(AdbgError.invalidArgument);
 		return -1;
 	}
-	if (rdsize == 0)
-		return 0;
 	
 	switch (o.origin) with (AdbgObjectOrigin) {
 	case disk:
@@ -304,7 +353,10 @@ int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rd
 			return adbg_oops(AdbgError.os);
 		break;
 	case process:
-		o.location = cast(size_t)location;
+		o.proc_location = cast(size_t)location;
+		break;
+	case userbuffer:
+		o.user_location = cast(size_t)location;
 		break;
 	default:
 		return adbg_oops(AdbgError.unimplemented);
@@ -345,13 +397,11 @@ void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, i
 	return buffer;
 }
 
-/// Size of signature buffer.
-private enum SIGMAX = MAX!(PDB20_MAGIC.length, PDB70_MAGIC.length);
-
 /// Used in signature detection.
 private
 union SIGNATURE {
-	ubyte[SIGMAX] buffer;
+	// PDB 2.0 magic is 44 Bytes
+	ubyte[44] buffer;
 	ulong u64;
 	uint u32;
 	ushort u16;
@@ -367,29 +417,23 @@ int adbg_object_loadv(adbg_object_t *o) {
 	
 	o.status = 0;
 	
-	// Load buffer for variable-length signature detection
+	// Load buffer for variable-length signature detection.
+	// The only length detection is the function itself checking
+	// the length read from the underlying I/O function.
 	SIGNATURE sig = void;
-	int siglen = osfread(o.file, &sig, SIGNATURE.sizeof); /// signature size
-	version (Trace) trace("siglen=%d sigmax=%u", siglen, cast(uint)SIGMAX);
-	// TODO: Use object I/O functions in case process is being loaded
-	if (siglen < 0)
-		return adbg_oops(AdbgError.os);
-	if (siglen <= uint.sizeof)
-		return adbg_oops(AdbgError.objectTooSmall);
-	if (osfseek(o.file, 0, OSFileSeek.start) < 0) // Reset offset, test seek
-		return adbg_oops(AdbgError.os);
+	memset(&sig, 0, SIGNATURE.sizeof);
+	int e = adbg_object_read_at(o, 0, &sig, SIGNATURE.sizeof);
+	if (e) return e;
 	
 	// Magic detection over 8 Bytes
-	if (siglen > PDB20_MAGIC.length &&
-		memcmp(sig.buffer.ptr, PDB20_MAGIC.ptr, PDB20_MAGIC.length) == 0)
+	if (memcmp(sig.buffer.ptr, PDB20_MAGIC.ptr, PDB20_MAGIC.length) == 0)
 		return adbg_object_pdb20_load(o);
-	if (siglen > PDB70_MAGIC.length &&
-		memcmp(sig.buffer.ptr, PDB70_MAGIC.ptr, PDB70_MAGIC.length) == 0)
+	if (memcmp(sig.buffer.ptr, PDB70_MAGIC.ptr, PDB70_MAGIC.length) == 0)
 		return adbg_object_pdb70_load(o);
 	
 	// 64-bit signature detection
 	version (Trace) trace("u64=%#llx", sig.u64);
-	if (siglen > ulong.sizeof) switch (sig.u64) {
+	switch (sig.u64) {
 	case AR_MAGIC:
 		return adbg_object_ar_load(o);
 	case PAGEDUMP32_MAGIC, PAGEDUMP64_MAGIC:
@@ -399,7 +443,7 @@ int adbg_object_loadv(adbg_object_t *o) {
 	
 	// 32-bit signature detection
 	version (Trace) trace("u32=%#x", sig.u32);
-	if (siglen > uint.sizeof) switch (sig.u32) {
+	switch (sig.u32) {
 	case ELF_MAGIC:	// ELF
 		return adbg_object_elf_load(o);
 	case MACHO_MAGIC:	// Mach-O 32-bit
@@ -416,10 +460,10 @@ int adbg_object_loadv(adbg_object_t *o) {
 	
 	// 16-bit signature detection
 	version (Trace) trace("u16=%#x", sig.u16);
-	if (siglen > ushort.sizeof) switch (sig.u16) {
+	switch (sig.u16) {
 	// Anonymous MSCOFF
 	case 0:
-		if (siglen > uint.sizeof && (sig.u32 >> 16) == 0xffff)
+		if ((sig.u32 >> 16) == 0xffff)
 			return adbg_object_mscoff_load(o);
 		break;
 	// MZ executables
@@ -445,7 +489,7 @@ int adbg_object_loadv(adbg_object_t *o) {
 			return adbg_object_mz_load(o);
 		
 		uint newsig = void;
-		int e = adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof);
+		e = adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof);
 		if (e) return e;
 		
 		// 32-bit signature check

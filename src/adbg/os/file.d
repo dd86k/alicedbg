@@ -24,22 +24,17 @@ version (Windows) {
 	import core.sys.posix.sys.types;
 	import core.sys.posix.sys.stat;
 	import core.sys.posix.fcntl;
-	import core.stdc.errno;
 	import core.stdc.stdio : SEEK_SET, SEEK_CUR, SEEK_END;
 	import core.stdc.stdlib : malloc, free;
 	
-	// BLKGETSIZE64 missing from dmd 2.098.1 and ldc 1.24.0
-	// ldc 1.24 missing core.sys.linux.fs
-	// source musl 1.2.0 and glibc 2.25 has roughly same settings.
-	
-	private enum _IOC_NRBITS = 8;
-	private enum _IOC_TYPEBITS = 8;
-	private enum _IOC_SIZEBITS = 14;
-	private enum _IOC_NRSHIFT = 0;
-	private enum _IOC_TYPESHIFT = _IOC_NRSHIFT+_IOC_NRBITS;
-	private enum _IOC_SIZESHIFT = _IOC_TYPESHIFT+_IOC_TYPEBITS;
-	private enum _IOC_DIRSHIFT = _IOC_SIZESHIFT+_IOC_SIZEBITS;
-	private enum _IOC_READ = 2;
+	private enum _IOC_NRBITS    = 8;
+	private enum _IOC_TYPEBITS  = 8;
+	private enum _IOC_SIZEBITS  = 14;
+	private enum _IOC_NRSHIFT   = 0;
+	private enum _IOC_TYPESHIFT = _IOC_NRSHIFT + _IOC_NRBITS;
+	private enum _IOC_SIZESHIFT = _IOC_TYPESHIFT + _IOC_TYPEBITS;
+	private enum _IOC_DIRSHIFT  = _IOC_SIZESHIFT + _IOC_SIZEBITS;
+	private enum _IOC_READ      = 2;
 	private enum _IOC(int dir,int type,int nr,size_t size) =
 		(dir  << _IOC_DIRSHIFT) |
 		(type << _IOC_TYPESHIFT) |
@@ -51,9 +46,21 @@ version (Windows) {
 	private enum _IOR(int type,int nr,size_t size) =
 		cast(int)_IOC!(_IOC_READ,type,nr,size);
 	
+	// BLKGETSIZE64 missing from dmd 2.098.1 and ldc 1.24.0
+	// ldc 1.24 missing core.sys.linux.fs
+	// musl 1.2.0 and glibc 2.25 sources have the same settings.
 	private enum BLKGETSIZE64 = cast(int)_IOR!(0x12,114,size_t.sizeof);
 	private alias BLOCKSIZE = BLKGETSIZE64;
+
+	// Platforms that lack the lseek64 symbol
+	version (OSX)
+		version = LACKS_LSEEK64;
+	else version (FreeBSD)
+		version = LACKS_LSEEK64;
+	else version (Android)
+		version = LACKS_LSEEK64;
 	
+	// TODO: Likely invalid, or only valid for ioctl, so check!
 	version (Android)
 		alias off_t = int;
 	else
@@ -65,7 +72,7 @@ version (Windows) {
 	
 	version (FreeBSD) {
 		// pragma(mangle, "fstat@FBSD_1.5")
-		// leads to incorrect linked version
+		// leads to incorrect linked version, redefine it here
 		extern (C) int fstat(int, stat_t*);
 	}
 }
@@ -143,20 +150,9 @@ version (Windows) {
 	if (SetFilePointerEx(file.handle, i, &i, origin) == FALSE)
 		return -1;
 	return i.QuadPart;
-} else version (OSX) {
-	// NOTE: Darwin has set off_t as long and doesn't have lseek64
-	position = lseek(file.handle, position, origin);
-	if (position < 0)
-		return -1;
-	return position;
-} else version (FreeBSD) {
-	// NOTE: Darwin has set off_t as long and doesn't have lseek64
-	position = lseek(file.handle, position, origin);
-	if (position < 0)
-		return -1;
-	return position;
-} else version (Android) {
-	position = lseek(file.handle, position, origin);
+} else version (LACKS_LSEEK64) {
+	// TODO: Check for off_t=64b
+	position = lseek(file.handle, position, origin); // Lacks lseek64
 	if (position < 0)
 		return -1;
 	return position;
@@ -173,11 +169,7 @@ version (Windows) {
 	LARGE_INTEGER i;
 	SetFilePointerEx(file.handle, i, &i, FILE_CURRENT);
 	return i.QuadPart;
-} else version (OSX) {
-	return lseek(file.handle, 0, SEEK_CUR);
-} else version (FreeBSD) {
-	return lseek(file.handle, 0, SEEK_CUR);
-} else version (Android) {
+} else version (LACKS_LSEEK64) {
 	return lseek(file.handle, 0, SEEK_CUR);
 } else version (Posix) {
 	return lseek64(file.handle, 0, SEEK_CUR);

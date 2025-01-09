@@ -45,7 +45,7 @@ enum PDB_LARGEST_PAGESIZE = 4096;
 // - ushort[StreamCount] pageNumber;
 
 /// PDB 2.0 signature
-immutable string PDB20_MAGIC = "Microsoft C/C++ program database 2.00\r\n\x1aJG\0\0";
+immutable string PDB20_MAGIC = "Microsoft C/C++ program database 2.00\r\n\x1aJG\0\0"; // 44
 
 struct pdb20_file_header_t {
 	char[44] Magic;
@@ -151,7 +151,7 @@ pdb20_file_header_t* adbg_object_pdb20_header(adbg_object_t *o) {
 // 4 (IPI)  (CodeView) Index Info? (>=0x1600 record types) for module/line?
 
 /// PDB 7.0 "Big MSF" signature
-immutable string PDB70_MAGIC = "Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0";
+immutable string PDB70_MAGIC = "Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0"; // 32
 
 // MSF container
 struct pdb70_file_header_t {
