@@ -55,6 +55,14 @@ template I32(ubyte a, ubyte b, ubyte c, ubyte d) {
 		enum uint I32 = (d << 24) | (c << 16) | (b << 8) | a;
 }
 
+// Force a ushort to be little endian
+template LITTLE16(ushort n) {
+	version (BigEndian)
+		enum ushort LITTLE16 = n >> 8 | n << 8;
+	else
+		enum ushort LITTLE16 = n;
+}
+
 // Form an array using a 16-bit number
 template ARRAY16(ushort n) {
 	version (BigEndian)
@@ -251,7 +259,7 @@ size_t adbg_aligndown(size_t x, int s) {
 /// 	sizeof = Size of the instance in memory.
 /// 	buffer = Base pointer of the memory buffer.
 /// 	bufsize = Size of the bufer memory allocation.
-/// Returns: True is pointer instance breaches outside allocated memory buffer.
+/// Returns: True if pointer instance breaches outside allocated memory buffer.
 align(true)
 bool adbg_bits_boundchk(void *ptr, size_t sizeof, void *buffer, size_t bufsize) {
 	// ptr + sizeof might overflow

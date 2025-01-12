@@ -40,9 +40,9 @@ enum Select {
 	/// Relocations
 	relocs	= BIT!4,
 	
-	/// Exported/dynamic symbols
+	/// Exported, external dynamic symbols
 	exports	= BIT!8,
-	/// Import symbols
+	/// Import, required symbols
 	imports	= BIT!9,
 	/// Resources
 	rsrc	= BIT!10,
@@ -274,6 +274,17 @@ void print_u64(const(char)* name, ulong val, const(char) *meaning = null) {
 	putchar('\n');
 }
 
+// Print signed
+void print_d16(const(char)* name, short val, const(char) *meaning = null) {
+	print_d32(name, val, meaning);
+}
+// Print signed
+void print_d32(const(char)* name, int val, const(char) *meaning = null) {
+	printf("%*s: %d", __field_padding, name, val);
+	if (meaning) printf("\t(%s)", meaning);
+	putchar('\n');
+}
+
 void print_x8(const(char)* name, ubyte val, const(char) *meaning = null) {
 	printf("%*s: 0x%02x", __field_padding, name, val);
 	if (meaning) printf("\t(%s)", meaning);
@@ -462,6 +473,9 @@ void hexdump(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0)
 	printf(_soff.ptr);
 	for (int ib; ib < __columns; ++ib)
 		printf("%2x ", ib);
+	putchar(' ');
+	for (int ib; ib < __columns; ++ib)
+		printf("%x", ib & 0xf);
 	putchar('\n');
 	
 	// Print data
@@ -472,7 +486,7 @@ void hexdump(const(char)* name, void *data, size_t dsize, ulong baseaddress = 0)
 		
 		// Adjust column for row
 		bool eof = offset + __columns >= dsize;
-		int col = eof ? cast(int)(__columns - (dsize - offset)) : __columns;
+		int col = eof ? cast(int)(dsize - offset) : __columns;
 		
 		// Print data bytes
 		for (size_t ib, oi = offset; ib < col; ++ib, ++oi)

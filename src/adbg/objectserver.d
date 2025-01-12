@@ -42,14 +42,14 @@ extern (C):
 //       Function names
 //         At best, prefer adbg_object_OBJECT_xyz where OBJECT is the type
 //         (e.g., pe, elf, etc.) to make things consistent. This is why
-//         auxiliary names are simply "adbg_object_offset", for example.
+//         main function names are simply "adbg_object_offset", for example.
 //
 //       Performance
-//         Keeping crucial information, like the sectiontable, in memory,
-//         can greatly accelerate a lot of the operations, including section
-//         searches, but should only be allocated on-demand. Headers, program
-//         headers, and sections usually should be read when loading a new
-//         object instance.
+//         Load and keep only necessary information in memory, like the sectiontable,
+//         when possible can greatly accelerate a lot of the operations,
+//         including section searches, but should only be allocated on-demand.
+//         Headers, program headers, and sections usually should be read when
+//         loading a new object instance.
 
 // TODO: Clean the section search functions
 // TODO: Consider structure definition, using a template
@@ -60,22 +60,24 @@ extern (C):
 //       Why? Machine module do not include endianness.
 //       And would be beneficial when host has incompatible or both endianness.
 // TODO: adbg_object_open_process(int pid, ...)
-// TODO: adbg_object_open_buffer(void *buffer, size_t size, ...)
 // TODO: adbg_object_origin_string(adbg_object_t *o)
 //       Return string of how object was loaded, mainly for tracing purposes
-// TODO: internal: adbg_object_load_debug(adbg_object_t *o)
+// TODO: Load debugging object
 //       Attach debug object instance to this one. Likely to be used internally for stuff
 //       like getting symbols off memory addresses.
 //       PE32:
-//         - Load PDB from debug entry (PDB absolute or try relative same folder)
+//       - Load PDB from debug entry (absolute path or try relatively with same folder)
 //       ELF:
-//         - DWARF (".debug_info" and others)
-//         - Compact C type Format (CTF, ".ctf"): https://github.com/lovasko/libctf
-//         - BPF Type Format (BTF)
+//       - DWARF (".debug_info" and others)
+//       - Compact C type Format (CTF, ".ctf"): https://github.com/lovasko/libctf
+//       - BPF Type Format (BTF)
 //       Mach-O:
-//         - uuid_command points to dSYM file
-// TODO: Object read flags
-//       ALLOCBUF: Allocate buffer according to size automatically.
+//       - uuid_command points to dSYM file
+// TODO: Small object optimization
+//       Since executables and object can be under a PAGESIZE, it would be worth
+//       exploring a form of optimization to load the entire file data in memory
+//       (only notable for file origins) with a new internal flag.
+// TODO: Promote "readalloc_at" over "malloc+read" to aid small object optimization
 
 /// Executable or object file format.
 enum AdbgObject {
@@ -103,11 +105,11 @@ enum AdbgObject {
 	mdmp,
 	/// OMF object or library. (.obj, .lib)
 	omf,
-	/// COFF Library archive. (.lib)
+	/// UNIX Library archive. (.lib, .a)
 	archive,
-	/// COFF object. (.obj)
+	/// COFF object or executable. (.obj)
 	coff,
-	/// MSCOFF object. (.obj)
+	/// Anonymous COFF object. (.obj)
 	mscoff,
 }
 
@@ -143,7 +145,7 @@ struct adbg_section_t {
 ///
 /// All fields are used internally and should not be used directly.
 struct adbg_object_t {
-	package union {
+	private union {
 		struct {
 			OSFILE *file;
 		}
@@ -175,9 +177,15 @@ struct adbg_object_t {
 }
 
 // TODO: "adbg_object_register" function to replace adbg_object_postload
-//       - signature/magic, type, initial internal buffer size, unload callback, flags, etc.
-//       - register defaults (on first load)
-//       - global buffer that holds a list of registered types
+//       Entry:
+//       - signatures/magics (position + size + data pointer)
+//       - shortname (string)
+//       - fullname (string)
+//       - callbacks (have package function that returns/sets internal pointer)
+//         load (required), unload (required), machine type, object type, etc.
+//         needs an API to set object type and other attributes
+//       Default types to be an immutable structure array.
+//       Custom list to be allocated on new type registration.
 
 // Internal function for submodules to setup internals
 package
@@ -373,7 +381,7 @@ int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rd
 /// 	flags = Additional settings.
 /// Returns: Null pointer on error.
 void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, int flags = 0) {
-	version (Trace) trace("location=%lld rdsize=%zx", location, rdsize);
+	version (Trace) trace("location=%lld rdsize=%zu", location, rdsize);
 	
 	if (o == null || rdsize == 0) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -777,9 +785,6 @@ AdbgObject adbg_object_format(adbg_object_t *o) {
 	return o ? o.format : AdbgObject.unknown;
 }
 
-// TODO: Rename to adbg_object_format_shortname
-//       "Type" is better attributed to object type,
-//       as in "executable", "dynamic library", etc.
 /// Get the short name of the loaded object type.
 /// Params: o = Object instance.
 /// Returns: Object type name.
@@ -824,9 +829,9 @@ const(char)* adbg_object_format_name(adbg_object_t *o) {
 	case mdmp:	return `Windows Minidump`;
 	case dmp:	return `Windows Memory Dump`;
 	case omf:	return `Relocatable Object Module Format`;
-	case archive:	return `Library Archive`;
+	case archive:	return `UNIX Library Archive`;
 	case coff:	return `Common Object File Format`;
-	case mscoff:	return `Microsoft Common Object File Format`;
+	case mscoff:	return `Anonymous COFF`;
 	case unknown:	goto Lunknown;
 	}
 }
