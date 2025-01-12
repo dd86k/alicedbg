@@ -699,7 +699,7 @@ macho_fat_arch_entry_t* adbg_object_macho_fat_arch(adbg_object_t *o, size_t inde
 			return null;
 		
 		if (o.status & AdbgObjectInternalFlags.reversed) {
-			r_fat_entries = cast(bool*)malloc(fat_header.nfat_arch);
+			r_fat_entries = cast(bool*)calloc(1, fat_header.nfat_arch);
 			if (r_fat_entries == null) {
 				adbg_oops(AdbgError.crt);
 				free(fat_entries);
