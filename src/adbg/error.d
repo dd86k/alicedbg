@@ -102,8 +102,8 @@ enum AdbgError {
 	libCapstone	= 3002,	/// Capstone
 }
 
-// TODO: Make adbg_error_t struct private after removing adbg_error_current()
 /// Represents an error in alicedbg.
+private
 struct adbg_error_t {
 	int srccode;	/// Error code from Alicedbg
 	int modcode;	/// Error code for module
@@ -171,21 +171,13 @@ void adbg_error_reset() {
 //       It used so that the caller evaluated those but now the front-end
 //       puts in the value of the callee instead. To prove this, __LINE__
 //       and __FUNCTION__ remains unchanged. To fix that, I'm supposed to
-//       use a template, but function templates pollute the final binary.
-/// Sets the last error code.
-///
-/// Used internally.
-/// Params:
-/// 	e = Error code.
-/// 	handle = External resource (handle, code, etc.).
-/// 	f = Automatically set to `__FUNCTION__`.
-/// 	l = Automatically set to `__LINE__`.
-/// Returns: Error code
-int adbg_oops(AdbgError e, void *handle = null,
-	const(char)* f = __FUNCTION__.ptr, int l = __LINE__) {
-	version(Trace) trace("code=%d handle=%p caller=%s@%d", e, handle, f, l);
-	error.func = f;
-	error.line = l;
+//       use a template, but function templates pollute the final binary
+//       with instances that has no right to be duplicated.
+
+private
+void adbg_error_set(AdbgError e, void *handle, const(char)* func, int line) {
+	error.func = func;
+	error.line = line;
 	// To avoid additional errors, such as formatting,
 	// get the underlying error code now for later.
 	switch (error.srccode = e) {
@@ -208,7 +200,34 @@ int adbg_oops(AdbgError e, void *handle = null,
 	default:
 		error.modcode = 0;
 	}
+}
+
+/// Internal: Sets the last error code.
+/// Params:
+/// 	e = Error code.
+/// 	handle = External resource (handle, code, etc.).
+/// 	func = Automatically set to `__FUNCTION__`.
+/// 	line = Automatically set to `__LINE__`.
+/// Returns: Error code.
+int adbg_oops(AdbgError e, void *handle = null,
+	const(char)* func = __FUNCTION__.ptr, int line = __LINE__) {
+	version(Trace) trace("code=%d handle=%p caller=%s@%d", e, handle, func, line);
+	adbg_error_set(e, handle, func, line);
 	return e;
+}
+
+/// Internal: Same as adbg_oops, but returns a null pointer.
+/// Params:
+/// 	e = Error code.
+/// 	handle = External resource (handle, code, etc.).
+/// 	func = Automatically set to `__FUNCTION__`.
+/// 	line = Automatically set to `__LINE__`.
+/// Returns: Null pointer.
+void* adbg_oops_null(AdbgError e, void *handle = null,
+	const(char)* func = __FUNCTION__.ptr, int line = __LINE__) {
+	version(Trace) trace("code=%d handle=%p caller=%s@%d", e, handle, func, line);
+	adbg_error_set(e, handle, func, line);
+	return null;
 }
 
 private struct adbg_error_msg_t {
