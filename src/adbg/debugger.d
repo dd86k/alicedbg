@@ -910,6 +910,7 @@ version (Windows) {
 	HANDLE phandle = OpenProcess(PROCESS_TERMINATE, FALSE, cast(DWORD)proc.pid);
 	if (phandle == null)
 		return adbg_oops(AdbgError.os);
+	scope(exit) CloseHandle(phandle);
 	// NOTE: ContinueDebugEvent
 	//       Before using TerminateProcess,
 	//       ContinueDebugEvent(pid, tid, DBG_TERMINATE_PROCESS)
@@ -918,7 +919,7 @@ version (Windows) {
 	if (TerminateProcess(phandle, DBG_TERMINATE_PROCESS) == FALSE)
 		return adbg_oops(AdbgError.os);
 } else version (Posix) {
-	// PT_KILL is deprecated on Linux, and likely elsewhere too
+	// PT_KILL is deprecated on Linux, and likely everywhere else too
 	if (kill(proc.pid, SIGKILL) < 0)
 		return adbg_oops(AdbgError.os);
 } else static assert(0, "Implement adbg_debugger_terminate");
@@ -1010,7 +1011,7 @@ version (Windows) {
 /// 	proc = Process instance.
 /// 	tid = Thread or process ID, typically from a stopped event.
 /// Returns: Error code.
-int adbg_debugger_stepi(adbg_process_t *proc, long tid) {
+int adbg_debugger_step_instruction(adbg_process_t *proc, long tid) {
 	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	if (proc.creation == AdbgCreation.unloaded)
@@ -1136,3 +1137,5 @@ version (WinTel) {
 	return adbg_oops(AdbgError.unimplemented);
 }
 }
+// Old alias
+alias adbg_debugger_stepi = adbg_debugger_step_instruction;
