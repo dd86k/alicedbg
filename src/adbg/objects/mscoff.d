@@ -1,7 +1,10 @@
-/// MS-COFF anonymous object format.
+/// MS-COFF Import Library format.
+///
+/// Libraries typically built for the exporting application.
 ///
 /// Sources:
-/// - Microsoft documentation
+/// - Microsoft Portable Executable and Common Object File Format Specification
+//    Revision 11 – January 23, 2017
 /// - https://github.com/dlang/dmd/blob/master/compiler/src/dmd/backend/mscoff.d
 ///
 /// Authors: dd86k <dd@dax.moe>
@@ -9,7 +12,11 @@
 /// License: BSD-3-Clause-Clear
 module adbg.objects.mscoff;
 
-// NOTE: PE32/PE-COFF is an extension of COFF and MZ
+// Layout:
+// - UNIX Archive member header
+// - Import Header
+// - Null-terminated import name string
+// - Null-terminated DLL name string
 
 import adbg.objectserver;
 import adbg.utils.uid;
@@ -18,10 +25,6 @@ import adbg.error;
 import core.stdc.stdlib;
 
 extern (C):
-
-//
-// Non-COFF Object file headers (.obj from VS2002-VS2015, mscoff)
-//
 
 enum {
 	MSCOFF_VERSION_IMPORT = 0,

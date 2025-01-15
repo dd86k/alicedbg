@@ -44,6 +44,7 @@ private enum {
 	MAXIMUM_SECTIONS = 96,
 }
 
+// TODO: Use COFF magics
 enum : ushort { // PE_HEADER.Machine, likely all little-endian
 	PE_MACHINE_UNKNOWN	= 0,	/// Any machine
 	PE_MACHINE_ALPHAOLD	= 0x183,	/// Alpha (old value), unused

@@ -654,12 +654,12 @@ struct internal_coff_t {
 	coff_opt_header_t optheader;
 	
 	/// Current section header buffer
-	coff_section_header_t *c_sectionbuf;
+	coff_section_header_t c_sectionbuf;
 	/// Current section index
 	ushort c_sectionidx;
 	
 	/// Current symbol entry buffer
-	coff_symbol_entry_t *c_symbolbuf;
+	coff_symbol_entry_t c_symbolbuf;
 	/// Current symbol index
 	ushort c_symbolidx;
 	/// Current symbol offset (due to aux. entry processing)
@@ -702,8 +702,6 @@ void adbg_object_coff_unload(adbg_object_t *o) {
 	if (o.internal == null) return;
 	
 	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
-	if (internal.c_sectionbuf) free(internal.c_sectionbuf);
-	if (internal.c_symbolbuf) free(internal.c_symbolbuf);
 	if (internal.strtbl) free(internal.strtbl);
 	
 	free(o.internal);
@@ -814,21 +812,13 @@ coff_section_header_t* adbg_object_coff_section_first(adbg_object_t *o) {
 		return null;
 	}
 	
-	// Allocate buffer for section header
-	if (internal.c_sectionbuf == null)
-		internal.c_sectionbuf = cast(coff_section_header_t*)malloc(coff_section_header_t.sizeof);
-	if (internal.c_sectionbuf == null) {
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
-	
 	// Read first header
 	long offset = coff_header_t.sizeof + internal.header.f_opthdr;
-	if (adbg_object_read_at(o, offset, internal.c_sectionbuf, coff_section_header_t.sizeof, 0))
+	if (adbg_object_read_at(o, offset, &internal.c_sectionbuf, coff_section_header_t.sizeof, 0))
 		return null;
 	
 	internal.c_sectionidx = 0;
-	return internal.c_sectionbuf;
+	return &internal.c_sectionbuf;
 }
 
 coff_section_header_t* adbg_object_coff_section_next(adbg_object_t *o) {
@@ -843,10 +833,6 @@ coff_section_header_t* adbg_object_coff_section_next(adbg_object_t *o) {
 	
 	// Check index
 	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
-	if (internal.c_sectionbuf == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	int newidx = internal.c_sectionidx + 1;
 	if (newidx >= internal.header.f_nscns) {
 		adbg_oops(AdbgError.unavailable);
@@ -862,11 +848,11 @@ coff_section_header_t* adbg_object_coff_section_next(adbg_object_t *o) {
 		coff_header_t.sizeof +
 		internal.header.f_opthdr +
 		(coff_section_header_t.sizeof * newidx);
-	if (adbg_object_read_at(o, offset, internal.c_sectionbuf, coff_section_header_t.sizeof, 0))
+	if (adbg_object_read_at(o, offset, &internal.c_sectionbuf, coff_section_header_t.sizeof, 0))
 		return null;
 	
 	internal.c_sectionidx = cast(ushort)newidx;
-	return internal.c_sectionbuf;
+	return &internal.c_sectionbuf;
 }
 
 // TODO: coff_section_header_t* adbg_object_coff_section_by_index(adbg_object_t *o, short index)
@@ -907,23 +893,16 @@ coff_symbol_entry_t* adbg_object_coff_first_symbol(adbg_object_t *o) {
 		return null;
 	}
 	
-	// Allocate buffer for symbol entry buffer
 	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
-	if (internal.c_symbolbuf == null)
-		internal.c_symbolbuf = cast(coff_symbol_entry_t*)malloc(coff_section_header_t.sizeof);
-	if (internal.c_symbolbuf == null) {
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
 	
 	// Read first entry
 	long offset = internal.header.f_symptr;
-	if (adbg_object_read_at(o, offset, internal.c_symbolbuf, coff_symbol_entry_t.sizeof, 0))
+	if (adbg_object_read_at(o, offset, &internal.c_symbolbuf, coff_symbol_entry_t.sizeof, 0))
 		return null;
 	
 	internal.c_symbolidx = 0;
 	internal.c_symboloff = offset;
-	return internal.c_symbolbuf;
+	return &internal.c_symbolbuf;
 }
 
 //
@@ -939,12 +918,8 @@ coff_symbol_entry_t* adbg_object_coff_next_symbol(adbg_object_t *o) {
 	
 	// Check index
 	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
-	if (internal.c_symbolbuf == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	int newidx = internal.c_symbolidx + 1;
-	if (newidx >= internal.header.f_nscns) {
+	if (newidx >= internal.header.f_nsyms) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
@@ -954,16 +929,19 @@ coff_symbol_entry_t* adbg_object_coff_next_symbol(adbg_object_t *o) {
 	}
 	
 	// Read next entry
+	// For current simplicity reasons, it is simpler to return all symbol entries,
+	// including auxiliary ones, instead of skipping them.
 	long offset =
 		internal.c_symboloff
 		+ coff_symbol_entry_t.sizeof
-		+ ( internal.c_symbolbuf.e_numaux * 18 );
-	if (adbg_object_read_at(o, offset, internal.c_symbolbuf, coff_symbol_entry_t.sizeof, 0))
+		//+ ( internal.c_symbolbuf.e_numaux * coff_symbol_entry_t.sizeof )
+		;
+	if (adbg_object_read_at(o, offset, &internal.c_symbolbuf, coff_symbol_entry_t.sizeof, 0))
 		return null;
 	
 	internal.c_symbolidx = cast(ushort)newidx;
 	internal.c_symboloff = offset;
-	return internal.c_symbolbuf;
+	return &internal.c_symbolbuf;
 }
 
 // Resolves COFF symbol name
@@ -1012,15 +990,17 @@ const(char)* adbg_object_coff_symbol_name(adbg_object_t *o, coff_symbol_entry_t 
 			memset(internal.strtbl, 0, 4);
 		}
 		
+		enum ML = 10; // 8+null+align
 		char *str = internal.strtbl + symbol.entry.offset;
-		with (internal) return
-			adbg_bits_boundchk(str, 10 /* 8+null+align */,
-				internal.strtbl, internal.strtblsize) ?
-				null : str;
+		with (internal) if (adbg_bits_boundchk(str, ML, strtbl, strtblsize)) {
+			adbg_oops(AdbgError.assertion);
+			return null;
+		}
+		return str;
 	}
 	
 	// Copy every character until null or buffer length into
-	// temporary buffer, then null it (in case of full 8 chars used)
+	// temporary buffer, then null it (in case of full buffer used)
 	size_t i;
 	for (; i < coff_symbol_entry_t.entry.name.sizeof; ++i) {
 		if (symbol.entry.name[i] == 0)
@@ -1030,9 +1010,3 @@ const(char)* adbg_object_coff_symbol_name(adbg_object_t *o, coff_symbol_entry_t 
 	internal.tname[i] = 0;
 	return internal.tname.ptr;
 }
-
-/*
-void* adbg_object_coff_first_aux_symbol(adbg_object_t *o, coff_symbol_entry_t *entry) {
-	
-}
-*/

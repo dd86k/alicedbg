@@ -113,7 +113,7 @@ void dump_coff_symbols(adbg_object_t *o) {
 		panic_adbg();
 	
 	uint i;
-	do with (symbol) {
+	A: do with (symbol) {
 		print_section(i++);
 		const(char) *e_name = adbg_object_coff_symbol_name(o, symbol);
 		print_string("e_name", e_name);
@@ -124,5 +124,17 @@ void dump_coff_symbols(adbg_object_t *o) {
 		print_u16("e_type", e_type);
 		print_u8("e_sclass", e_sclass);
 		print_u8("e_numaux", e_numaux);
+		
+		// Auxiliary entries
+		// TODO: continuous data dump
+		for (ubyte a; a < e_numaux; ++a) {
+			// assume pure binary data
+			symbol = adbg_object_coff_next_symbol(o);
+			if (symbol == null)
+				break A;
+			
+			if (SETTING(Setting.extractAny))
+				print_data("auxiliary symbol", symbol, coff_symbol_entry_t.sizeof);
+		}
 	} while ((symbol = adbg_object_coff_next_symbol(o)) != null);
 }

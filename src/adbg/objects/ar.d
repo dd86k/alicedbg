@@ -31,8 +31,10 @@ enum ArVersion {
 }
 
 // NOTE: Possible object formats included
-//       - ELF relocatable objects (POSIX)
+//       - ELF relocatable objects (Typically POSIX platforms)
 //       - COFF objects (Windows)
+//       It's also used in some other applications, like packaging (APT),
+//       so be careful!
 
 // NOTE: MSVC linker can only process libraries under 4 GiB in size.
 
@@ -184,8 +186,6 @@ private struct internal_ar_t {
 	long offset; // current file offset of current header
 	ar_member_header_t current; // current member
 }
-
-private enum STATUS_SYMBOL_LOADED = 1 << 16;
 
 int adbg_object_ar_load(adbg_object_t *o) {
 	o.internal = malloc(internal_ar_t.sizeof);

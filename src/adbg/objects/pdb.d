@@ -1,6 +1,7 @@
-/// Windows Program Database (PDB), Portable PDB (.NET), and Mono Database (MDB).
+/// Manage Program Databases (PDB).
 ///
-/// Supports Multi-Stream Format (MSF) Program Database (PDB) 7.0, known as the "Big MSF".
+/// Supported: Program Database 2.0 and "Big Multi-Stream Format" 7.0 (PDB).
+/// Unsupported: Portable PDB (.NET), Mono Database (MDB), Fastlink (VS2017).
 ///
 /// Sources:
 /// - https://llvm.org/docs/PDB/MsfFile.html
@@ -9,6 +10,7 @@
 /// - https://github.com/microsoft/microsoft-pdb
 /// - https://github.com/ziglang/zig/blob/master/lib/std/pdb.zig
 /// - https://github.com/MolecularMatters/raw_pdb
+/// - https://devblogs.microsoft.com/cppblog/faster-c-build-cycle-in-vs-15-with-debugfastlink/
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -111,8 +113,8 @@ pdb20_file_header_t* adbg_object_pdb20_header(adbg_object_t *o) {
 // +---+  -+        Contains FPM index used, BlockSize, and directory page offset
 // |   |   |
 // +---+   +- B[1..2]: Two FPM blocks, acts as a huge array of bitfields
-// |   |   |           1-bit/block: 0=unallocated/unused, 1=allocated/used
-// +---+  -+
+// |   |   |           Only one FPM block is used, indicated in the Superblock header
+// +---+  -+           1-bit/block: 0=unallocated/unused, 1=allocated/used
 // |   |   |
 // +---+   +- B[3..4095]: Data blocks (1 or more or any block)
 // |   |   |              Stream 0 contains information to load streams

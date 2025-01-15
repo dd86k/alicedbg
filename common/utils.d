@@ -102,9 +102,11 @@ int realstring(char *buffer, size_t bsize, const(char)* str, size_t ssize,
 	char pre = 0, char post = 0) {
 	int len; // total length
 	
+	// No buffer, nothing to process
 	if (bsize == 0)
 		return 0;
 	
+	// Pre-string character
 	if (pre && bsize)
 		buffer[len++] = pre;
 	
@@ -122,6 +124,7 @@ int realstring(char *buffer, size_t bsize, const(char)* str, size_t ssize,
 		}
 	}
 	
+	// Post-string character
 	if (post && len < bsize)
 		buffer[len++] = post;
 	
