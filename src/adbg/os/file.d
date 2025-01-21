@@ -128,13 +128,21 @@ version (Windows) {
 	if (file == null)
 		return null;
 	
-	int oflags; // O_RDONLY == 0
-	if ((flags & OSFileOFlags.readWrite) == OSFileOFlags.readWrite)
-		oflags |= O_RDWR;
-	else if (flags & OSFileOFlags.write)
-		oflags |= O_WRONLY;
+	int oflags = void;
+	final switch (flags & OSFileOFlags.readWrite) {
+	case OSFileOFlags.readWrite:
+		oflags = O_RDWR;
+		break;
+	case OSFileOFlags.write:
+		oflags = O_WRONLY;
+		break;
+	case OSFileOFlags.read:
+		oflags = O_RDONLY;
+		break;
+	}
+	
 	file.handle = .open(path, oflags);
-	if (file.handle == 0) {
+	if (file.handle < 0) {
 		free(file);
 		return null;
 	}

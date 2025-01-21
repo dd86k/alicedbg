@@ -90,7 +90,7 @@ void dump_coff_sections(adbg_object_t *o) {
 			"STYPE_TEXT".ptr, COFF_STYPE_TEXT,
 			"STYPE_DATA".ptr, COFF_STYPE_DATA,
 			"STYPE_BSS".ptr, COFF_STYPE_BSS,
-		);
+			null);
 		
 		if (SETTING(Setting.extractAny)) {
 			void *buf = adbg_object_coff_section_open_data(o, section);
