@@ -20,9 +20,11 @@ int dump_coff(adbg_object_t *o) {
 		dump_coff_headers(o);
 	if (SELECTED(Select.sections))
 		dump_coff_sections(o);
+	// TODO: SELECTED(Select.debug_) ("--debug") -> .debug$T (CodeView)
 	if (SELECTED(Select.exports))
 		dump_coff_symbols(o);
-	// TODO: "--debug" -> .debug$T (CodeView)
+	if (SETTING(Setting.disasmAny))
+		dump_coff_disasm(o);
 	return 0;
 }
 
@@ -113,9 +115,14 @@ void dump_coff_symbols(adbg_object_t *o) {
 		panic_adbg();
 	
 	uint i;
-	A: do with (symbol) {
+	do with (symbol) {
 		print_section(i++);
 		const(char) *e_name = adbg_object_coff_symbol_name(o, symbol);
+		if (e_name == null) {
+			print_warningf("e_name null: %s", adbg_error_message());
+			continue;
+		}
+		
 		print_string("e_name", e_name);
 		print_x32("e_zeroes", entry.zeroes);
 		print_x32("e_offset", entry.offset);
@@ -131,10 +138,34 @@ void dump_coff_symbols(adbg_object_t *o) {
 			// assume pure binary data
 			symbol = adbg_object_coff_next_symbol(o);
 			if (symbol == null)
-				break A;
+				continue;
 			
 			if (SETTING(Setting.extractAny))
 				print_data("auxiliary symbol", symbol, coff_symbol_entry_t.sizeof);
 		}
 	} while ((symbol = adbg_object_coff_next_symbol(o)) != null);
+}
+
+
+void dump_coff_disasm(adbg_object_t *o) {
+	coff_section_header_t *section = adbg_object_coff_section_first(o);
+	if (section == null)
+		panic_adbg();
+	
+	ushort flg = SETTING(Setting.disasmAny) ? 0x00f0 : COFF_STYPE_TEXT;
+	
+	uint i;
+	do with (section) {
+		if ((s_flags & flg) == 0)
+			continue;
+		
+		void *secdata = adbg_object_coff_section_open_data(o, section);
+		if (secdata == null) {
+			print_warningf("section null: %s", adbg_error_message());
+			continue;
+		}
+		
+		dump_disassemble_object(o, s_name.ptr, s_name.sizeof, secdata, s_size, 0);
+		adbg_object_coff_section_close_data(secdata);
+	} while ((section = adbg_object_coff_section_next(o)) != null);
 }

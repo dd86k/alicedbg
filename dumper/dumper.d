@@ -5,16 +5,17 @@
 /// License: BSD-3-Clause-Clear
 module dumper;
 
-import adbg.error, adbg.disassembler, adbg.objectserver;
+import adbg.error;
+import adbg.disassembler;
+import adbg.objectserver;
+import adbg.symbols;
 import adbg.include.c.stdio;
 import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, free;
 import adbg.include.c.stdarg;
 import adbg.machines;
 import adbg.utils.bit : BIT;
-import adbg.utils.math : min;
 import core.stdc.string;
 import core.stdc.ctype : isprint;
-import core.stdc.errno;
 import format;
 import common.errormgmt;
 import common.cli : opt_machine, opt_syntax;
@@ -81,11 +82,11 @@ enum Setting {
 	/// Any sort of extraction is requested
 	extractAny = extract | hexdump,
 	
-	/// Disassemble selections (executable sections)
+	/// Disassemble executable sections
 	disasm	= BIT!24,
-	/// Disassemble selections (all sections)
+	/// Disassemble all sections
 	disasmAll	= BIT!25,
-	/// Output disassembly statistics (sections)
+	/// Disassemble (at least executable sections) and provide statistics
 	disasmStats	= BIT!26,
 	/// Any disassembly is requested
 	disasmAny = disasm | disasmAll | disasmStats,
@@ -121,7 +122,7 @@ int dump_file(const(char)* path) {
 		print_string("format", "Blob");
 		print_string("short_name", "blob");
 		
-		return dump_disassemble(opt_machine, buffer, size, opt_baseaddress);
+		return dump_disassemble(opt_machine, buffer, size, opt_baseaddress, null);
 	}
 	
 	// hotfix when section name specifed, force select all sections
@@ -518,10 +519,22 @@ int dump_disassemble_object(adbg_object_t *o,
 	if (size == 0)
 		return 0;
 	
-	return dump_disassemble(adbg_object_machine(o), data, size, base_address);
+	// HACK: Because this function can be called numerous times for one
+	//       object being dumped, try to init the symbol list once.
+	__gshared adbg_symbol_list_t *symlist;
+	__gshared bool symtried;
+	if (symlist == null && symtried == false) {
+		symlist = adbg_object_load_symbols(o);
+		if (symlist == null)
+			symtried = true;
+	}
+	
+	return dump_disassemble(adbg_object_machine(o), data, size, base_address,
+		adbg_object_load_symbols(o));
 }
 
-int dump_disassemble(AdbgMachine machine, void* data, ulong size, ulong base_address) {
+int dump_disassemble(AdbgMachine machine, void* data, ulong size, ulong base_address,
+	adbg_symbol_list_t *symlist) {
 	// opt_machine acts as an override
 	adbg_disassembler_t *dis = adbg_disassembler_open(opt_machine ? opt_machine : machine);
 	if (dis == null)
@@ -529,9 +542,7 @@ int dump_disassemble(AdbgMachine machine, void* data, ulong size, ulong base_add
 	scope(exit) adbg_disassembler_close(dis);
 	
 	if (opt_syntax)
-		adbg_disassembler_options(dis,
-			AdbgDisassemblerOption.syntax, opt_syntax,
-			0);
+		adbg_disassembler_options(dis, AdbgDisassemblerOption.syntax, opt_syntax, 0);
 	
 	adbg_opcode_t op = void;
 	if (adbg_disassembler_buffer_start(dis, data, cast(size_t)size, base_address))
@@ -573,6 +584,13 @@ Ldisasm:
 	if (adbg_disassembler_buffer_step(dis, &op))
 		panic_adbg();
 	
+	if (symlist) {
+		adbg_symbol_t *sym = adbg_symbol_list_at(symlist, cast(size_t)op.address);
+		if (sym)
+			printf("\n%s:\n", adbg_symbol_name(sym));
+	}
+	
+	// TODO: Should symbol printing be in `print_disasm_line`?
 	print_disasm_line(dis, &op);
 	
 	if (adbg_disassembler_buffer_left(dis))

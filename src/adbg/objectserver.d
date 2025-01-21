@@ -24,6 +24,8 @@
 /// License: BSD-3-Clause-Clear
 module adbg.objectserver;
 
+import adbg.symbols;
+import adbg.types.coff : adbg_type_coff_populate;
 import adbg.process.memory : adbg_memory_read;
 import adbg.process.base : adbg_process_t;
 import adbg.error;
@@ -33,6 +35,7 @@ import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import adbg.os.file;
 import adbg.objects;
+import adbg.utils.list;
 import core.stdc.string;
 
 extern (C):
@@ -141,6 +144,7 @@ struct adbg_section_t {
 	size_t data_size;
 }
 
+// TODO: All fields should be made private
 /// Represents a file object image.
 ///
 /// All fields are used internally and should not be used directly.
@@ -235,13 +239,19 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 		return null;
 	}
 	
+	// Check after loading
 	version (Trace) if (o.func_unload == null)
 		trace("WARNING: object type %d does not have unload function set", o.format);
 	
 	return o;
 }
 
-//adbg_object_t* adbg_object_open_process(int pid, ...) {
+/*
+adbg_object_t* adbg_object_open_process(int pid, ...) {
+	version (Trace) trace("pid=%", buffer, buffersize);
+	
+}
+*/
 
 /// Open a new instance of an object from a buffer.
 ///
@@ -472,6 +482,7 @@ int adbg_object_loadv(adbg_object_t *o) {
 		if ((sig.u32 >> 16) == 0xffff)
 			return adbg_object_mscoff_load(o);
 		break;
+	
 	// MZ executables
 	case MAGIC_MZ, MAGIC_ZM: // ZM being the even older signature in some cases
 		// TODO: Move new header detection to MZ load function
@@ -517,6 +528,7 @@ int adbg_object_loadv(adbg_object_t *o) {
 		
 		// If nothing matches, assume MZ
 		return adbg_object_mz_load(o);
+	
 	// COFF magics
 	case COFF_MAGIC_I386:
 	case COFF_MAGIC_I386_AIX:
@@ -938,5 +950,25 @@ const(char)* adbg_object_osabi_string(adbg_object_t *o) {
 		return adbg_object_elf_abi_string(ehdr.e_ident[ELF_EI_OSABI]);
 	case pdb, mdmp, dmp, omf, archive, coff, mscoff, mz:
 	case unknown:	goto Lunknown;
+	}
+}
+
+// Load list of symbols associated to object
+adbg_symbol_list_t* adbg_object_load_symbols(adbg_object_t *o) {
+	if (o == null)
+		return cast(adbg_symbol_list_t*)adbg_oops_null(AdbgError.invalidArgument);
+	
+	adbg_symbol_list_t *symlist = adbg_symbol_list_create();
+	if (symlist == null) // error already set
+		return null;
+	
+	switch (o.format) {
+	case AdbgObject.coff:
+		if (adbg_type_coff_populate(symlist, o)) // sets error
+			return null;
+		return symlist;
+	default:
+		adbg_symbol_list_close(symlist);
+		return cast(adbg_symbol_list_t*)adbg_oops_null(AdbgError.objectUnsupportedFormat);
 	}
 }

@@ -7,6 +7,8 @@ module adbg.symbols;
 
 import adbg.error;
 import adbg.machines : AdbgMachine;
+import adbg.utils.list;
+import core.stdc.stdlib : calloc, free;
 
 // Sources:
 // - https://itanium-cxx-abi.github.io/cxx-abi/abi.html#mangling
@@ -59,6 +61,96 @@ enum AdbgSymbolMangling {
 	//objcpp,
 	// D mangled name.
 	//d,
+}
+
+enum AdbgSymbolType {
+	unknown, // unused
+	label,
+}
+
+struct adbg_symbol_t {
+	AdbgSymbolType type;
+	ulong start;
+	//ulong end;
+	char[64] name;
+}
+
+const(char)* adbg_symbol_name(adbg_symbol_t *sym) {
+	if (sym == null)
+		return cast(const(char)*)adbg_oops_null(AdbgError.invalidArgument);
+	return sym.name.ptr;
+}
+
+struct adbg_symbol_list_t {
+	list_t *syms;
+}
+
+// Used internally for now
+// type = Symbol type.
+// name = Name string pointer.
+// buff = If unset, set to internal buffer size. If set, maximum symbol name length.
+// addr = Base address of module, untranslated.
+package
+adbg_symbol_t adbg_symbol_init(AdbgSymbolType type, char *name, size_t buff, ulong addr) {
+	assert(type);
+	assert(name);
+	
+	adbg_symbol_t sym = void;
+	sym.type = type;
+	sym.start = addr;
+	
+	if (buff == 0) buff = adbg_symbol_t.name.sizeof;
+	size_t i;
+	for (; i < buff && name[i] != 0; ++i) {
+		sym.name[i] = name[i];
+	}
+	sym.name[i] = 0;
+	
+	return sym;
+}
+
+// Create a new list of symbols with an identifiable name,
+// such as of a module or section.
+adbg_symbol_list_t* adbg_symbol_list_create() {
+	adbg_symbol_list_t *list = cast(adbg_symbol_list_t*)calloc(1, adbg_symbol_list_t.sizeof);
+	if (list == null)
+		return cast(adbg_symbol_list_t*)adbg_oops_null(AdbgError.crt);
+	
+	list.syms = adbg_list_new(adbg_symbol_t.sizeof, 32);
+	if (list.syms == null) // Error already set
+		return null;
+	return list;
+}
+
+// Sub modules need to populate entries using this function
+int adbg_symbol_list_add(adbg_symbol_list_t *list, adbg_symbol_t *symbol) {
+	if (list == null || symbol == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	list.syms = adbg_list_add(list.syms, symbol);
+	return list.syms == null ? adbg_error_code() : 0;
+}
+
+// Get symbol at location, only debugger needs to translate this address
+// Address can be zero, as some symbols can point at the very start of sections
+adbg_symbol_t* adbg_symbol_list_at(adbg_symbol_list_t *list, ulong address) {
+	if (list == null)
+		return cast(adbg_symbol_t*)adbg_oops_null(AdbgError.invalidArgument);
+	
+	adbg_symbol_t *sym = void;
+	for (size_t i; (sym = cast(adbg_symbol_t*)adbg_list_get(list.syms, i)) != null; ++i) {
+		if (sym.start == address)
+			return sym;
+	}
+	
+	return cast(adbg_symbol_t*)adbg_oops_null(AdbgError.unfindable);
+}
+
+// Close symbol list
+void adbg_symbol_list_close(adbg_symbol_list_t *list) {
+	if (list == null) return;
+	adbg_list_close(list.syms);
+	free(list);
 }
 
 // NOTE: On error, copy string as-is.

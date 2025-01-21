@@ -960,7 +960,7 @@ const(char)* adbg_object_coff_symbol_name(adbg_object_t *o, coff_symbol_entry_t 
 	// If first four bytes are unset,
 	// the latter four bytes is an offset to the string table
 	if (symbol.entry.zeroes == 0) {
-		// Load string table
+		// Load string table if not loaded
 		if (internal.strtbl == null) {
 			long off =
 				internal.header.f_symptr +
@@ -990,7 +990,9 @@ const(char)* adbg_object_coff_symbol_name(adbg_object_t *o, coff_symbol_entry_t 
 			memset(internal.strtbl, 0, 4);
 		}
 		
-		enum ML = 10; // 8+null+align
+		// Working maximum length as some symbols at the very end
+		// of the string buffer + null
+		enum ML = 8;
 		char *str = internal.strtbl + symbol.entry.offset;
 		with (internal) if (adbg_bits_boundchk(str, ML, strtbl, strtblsize)) {
 			adbg_oops(AdbgError.assertion);
