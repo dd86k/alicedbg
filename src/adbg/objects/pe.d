@@ -2590,7 +2590,7 @@ const(char)* adbg_object_pe_debug_type_string(uint type) {
 
 const(char)* adbg_object_pe_kind_string(adbg_object_t *o) {
 	if (o == null || o.internal == null)
-		return adbg_oops_null(AdbgError.invalidArgument);
+		return cast(const(char)*)adbg_oops_null(AdbgError.invalidArgument);
 	internal_pe_t *internal = cast(internal_pe_t*)o.internal;
 	return internal.header.Characteristics & PE_CHARACTERISTIC_DLL ?
 		`Dynamically Linked Library` : `Executable`;

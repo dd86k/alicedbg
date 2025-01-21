@@ -196,6 +196,6 @@ mz_reloc_t* adbg_object_mz_reloc(adbg_object_t *o, size_t index) {
 
 const(char)* adbg_object_mz_kind_string(adbg_object_t *o) {
 	if (o == null || o.internal == null)
-		return adbg_oops_null(AdbgError.invalidArgument);
+		return cast(const(char)*)adbg_oops_null(AdbgError.invalidArgument);
 	return (cast(mz_header_t*)o.internal).e_ovno ? `Overlayed Executable` : `Executable`;
 }

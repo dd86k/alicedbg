@@ -420,7 +420,7 @@ AdbgMachine adbg_object_ne_machine(adbg_object_t *o) {
 
 const(char)* adbg_object_ne_kind_string(adbg_object_t *o) {
 	if (o == null || o.internal == null)
-		return adbg_oops_null(AdbgError.invalidArgument);
+		return cast(const(char)*)adbg_oops_null(AdbgError.invalidArgument);
 	ne_header_t* header = cast(ne_header_t*)o.internal;
 	return header.ne_flags & NE_HFLAG_LIBMODULE ? `Library Module` : `Executable`;
 }

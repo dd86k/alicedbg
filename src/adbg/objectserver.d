@@ -892,7 +892,7 @@ alias adbg_object_format_name = adbg_object_format_string;
 /// Returns: String pointer or null on error.
 const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	if (o == null)
-		return adbg_oops_null(AdbgError.invalidArgument);
+		return cast(const(char)*)adbg_oops_null(AdbgError.invalidArgument);
 	
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return adbg_object_mz_kind_string(o);
@@ -907,7 +907,7 @@ const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	case omf:	return adbg_object_omf_is_library(o) ? `Library` : `Object`;
 	case coff:	return `Object`;
 	case unknown:
-		return adbg_oops_null(AdbgError.objectUnsupportedFormat);
+		return cast(const(char)*)adbg_oops_null(AdbgError.objectUnsupportedFormat);
 	}
 }
 
