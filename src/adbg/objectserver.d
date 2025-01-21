@@ -745,7 +745,13 @@ long adbg_object_filesize(adbg_object_t *o) {
 		}
 		return osfsize(o.file);
 	case AdbgObjectOrigin.userbuffer:
-		return cast(long)o.user_buffersize; // size_t -> long is ehh..
+		// Verify overflow, size_t -> can lead to overflow due to sign
+		long l = cast(long)o.user_buffersize;
+		if ( l < 0 ) {
+			adbg_oops(AdbgError.assertion);
+			return -1;
+		}
+		return l;
 	default:
 		adbg_oops(AdbgError.unimplemented);
 		return -1;
@@ -754,7 +760,7 @@ long adbg_object_filesize(adbg_object_t *o) {
 
 /// Returns the first machine type the object supports.
 /// Params: o = Object instance.
-/// Returns: Machine value.
+/// Returns: Machine value. `AdbgMachine.unknown` on error.
 AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	if (o == null)
 		return AdbgMachine.unknown;
@@ -774,6 +780,10 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	}
 	return AdbgMachine.unknown;
 }
+
+/// Get the (first) machine specified in the object as a string.
+/// Params: o = Object instance.
+/// Returns: String pointer or null on error.
 const(char)* adbg_object_machine_string(adbg_object_t *o) {
 	return adbg_machine_name( adbg_object_machine(o) );
 }
@@ -785,18 +795,34 @@ AdbgObject adbg_object_format(adbg_object_t *o) {
 	return o ? o.format : AdbgObject.unknown;
 }
 
-/// Get the short name of the loaded object type.
+/// Get a short identifying string ID for the object format.
+///
+/// Values:
+/// - "mz"
+/// - "ne"
+/// - "lx"
+/// - "pe"
+/// - "macho"
+/// - "elf"
+/// - "pdb"
+/// - "mdmp"
+/// - "dmp"
+/// - "omf"
+/// - "archive"
+/// - "coff"
+/// - "mscoff"
+/// - "unknown" (default or parameter is null)
 /// Params: o = Object instance.
-/// Returns: Object type name.
+/// Returns: String pointer. It does not return null.
 export
-const(char)* adbg_object_format_shortname(adbg_object_t *o) {
+const(char)* adbg_object_id_string(adbg_object_t *o) {
 	if (o == null)
 		goto Lunknown;
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return "mz";
 	case ne:	return "ne";
-	case lx:	return adbg_object_lx_header_shortname(o);
-	case pe:	return "pe32";
+	case lx:	return "lx";
+	case pe:	return "pe";
 	case macho:	return "macho";
 	case elf:	return "elf";
 	case pdb:	return "pdb";
@@ -810,14 +836,35 @@ Lunknown:
 	case unknown:	return "unknown";
 	}
 }
+// Old alias
+alias adbg_object_format_shortname = adbg_object_id_string;
+
+// TODO: adbg_object_id_full: "fuller" id
 
 /// Get the full name of the loaded object type.
+///
+/// Values:
+/// - "Mark Zbikowski"
+/// - "New Executable"
+/// - "Linked Executable"
+/// - "Portable Executable"
+/// - "Mach-O"
+/// - "Executable and Linkable Format"
+/// - "Program Database"
+/// - "Windows Minidump"
+/// - "Windows Memory Dump"
+/// - "Relocatable Object Module Format"
+/// - "UNIX Library Archive"
+/// - "Common Object File Format"
+/// - "Big COFF Object"
+/// - "Unknown" (default or parameter is null)
 /// Params: o = Object instance.
 /// Returns: Object type name.
 export
-const(char)* adbg_object_format_name(adbg_object_t *o) {
+const(char)* adbg_object_format_string(adbg_object_t *o) {
 	if (o == null)
-		Lunknown: return "Unknown";
+	Lunknown: return "Unknown";
+	
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return `Mark Zbikowski`;
 	case ne:	return `New Executable`;
@@ -831,15 +878,22 @@ const(char)* adbg_object_format_name(adbg_object_t *o) {
 	case omf:	return `Relocatable Object Module Format`;
 	case archive:	return `UNIX Library Archive`;
 	case coff:	return `Common Object File Format`;
-	case mscoff:	return `Anonymous COFF`;
+	case mscoff:	return `Big COFF Object`;
 	case unknown:	goto Lunknown;
 	}
 }
+// Old alias
+alias adbg_object_format_name = adbg_object_format_string;
 
-// Printing purposes only
+/// Get the kind of object as a string for printing purposes.
+///
+/// Examples include "Memory Dump", "Object", "Library" (static), etc.
+/// Params: o = Object instance.
+/// Returns: String pointer or null on error.
 const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	if (o == null)
-		Lunknown: return "Unknown";
+		return adbg_oops_null(AdbgError.invalidArgument);
+	
 	final switch (o.format) with (AdbgObject) {
 	case mz:	return adbg_object_mz_kind_string(o);
 	case ne:	return adbg_object_ne_kind_string(o);
@@ -852,10 +906,14 @@ const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	case archive, mscoff:	return `Library`;
 	case omf:	return adbg_object_omf_is_library(o) ? `Library` : `Object`;
 	case coff:	return `Object`;
-	case unknown:	goto Lunknown;
+	case unknown:
+		return adbg_oops_null(AdbgError.objectUnsupportedFormat);
 	}
 }
 
+/// Get the ABI specified in the object.
+/// Params: o = Object instance.
+/// Returns: String pointer or null on error.
 const(char)* adbg_object_osabi_string(adbg_object_t *o) {
 	if (o == null)
 		Lunknown: return null;

@@ -1023,7 +1023,7 @@ const(char) *adbg_object_macho_filetype_string(uint type) {
 	case MACHO_FILETYPE_DYLIB_STUB:	return "Dynamic library stub";
 	case MACHO_FILETYPE_DSYM:	return "Companion file (debug)";
 	case MACHO_FILETYPE_KEXT_BUNDLE:	return "Kext bundle";
-	default:	return null;
+	default:	return adbg_oops_null(AdbgError.objectInvalidType);
 	}
 }
 
@@ -1271,14 +1271,10 @@ const(char)* adbg_object_macho_command_string(uint command) {
 }
 
 const(char)* adbg_object_macho_kind_string(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	if (o == null)
+		return adbg_oops_null(AdbgError.invalidArgument);
+	if (o.internal == null)
+		return adbg_oops_null(AdbgError.uninitiated);
 	
 	internal_macho_t *internal = cast(internal_macho_t*)o.internal;
 	if (o.status & MACHO_IS_FAT) return `Fat Executable`;

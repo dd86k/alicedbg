@@ -440,14 +440,10 @@ AdbgMachine adbg_object_lx_machine(adbg_object_t *o) {
 }
 
 const(char)* adbg_object_lx_kind_string(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	if (o == null)
+		return adbg_oops_null(AdbgError.invalidArgument);
+	if (o.internal == null)
+		return adbg_oops_null(AdbgError.uninitiated);
 	lx_header_t* header = cast(lx_header_t*)o.internal;
 	return adbg_object_lx_modtype_string(header.mflags);
 }
