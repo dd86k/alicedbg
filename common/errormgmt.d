@@ -38,7 +38,9 @@ void print_error_adbg(
 void panic(int code, const(char)* message,
 	const(char)* prefix = null, const(char)* mod = __MODULE__.ptr, int line = __LINE__) {
 	print_error(message, code, prefix, mod, line);
-	exit(code);
+	// NOTE: If a code returned is used as a special signal (like on Windows),
+	//       it could mean something bad, so only return 1 (EXIT_FAILURE) or 2.
+	exit(2);
 }
 void panic_crt(const(char)* prefix = null, const(char)* mod = __MODULE__.ptr, int line = __LINE__) {
 	panic(errno, strerror(errno), prefix, mod, line);
