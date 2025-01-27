@@ -15,6 +15,8 @@ module adbg.process.base;
 // TODO: Process Pause/Resume
 //       Windows: NtSuspendProcess/NtResumeProcess or SuspendThread/ResumeThread
 //       Linux: Send SIGSTOP/SIGCONT signals via kill(2)
+// TODO: Functions to spawn process without debugger.
+// TODO: Functions to attach process without debugger.
 
 import adbg.include.c.stdlib; // malloc, calloc, free, exit;
 import adbg.include.c.stdarg;
@@ -41,15 +43,10 @@ extern (C):
 /// Process status
 enum AdbgProcessState : ubyte {
 	unknown,	/// Process status is not known.
-	unloaded = unknown,	/// Alias for 'unknown'.
 	created,	/// Process was created by debugger and waiting to run.
-	loaded = created,	/// Alias for 'created'.
-	standby = created,	/// Alias for 'created'.
 	running,	/// Process is running.
 	stopped,	/// Process is paused due to an exception or by the debugger.
-	paused = stopped,	/// Alias for 'stopped'.
 }
-alias AdbgProcStatus = AdbgProcessState; // Old alias
 
 /// Process creation source.
 enum AdbgCreation : ubyte {
@@ -125,15 +122,12 @@ const(char)* adbg_process_status_string(adbg_process_t *tracee) pure {
 	static immutable const(char) *default_ = "unknown";
 	if (tracee == null)
 		return default_;
-	const(char) *m = void;
-	switch (tracee.state) with (AdbgProcessState) {
-	case unloaded:	m = "unloaded"; break;
-	case created:	m = "created"; break;
-	case running:	m = "running"; break;
-	case paused:	m = "paused"; break;
-	default:	return default_;
+	final switch (tracee.state) with (AdbgProcessState) {
+	case created:	return "created";
+	case running:	return "running";
+	case stopped:	return "stopped";
+	case unknown:	return default_;
 	}
-	return m;
 }
 
 /// Get the process ID.
@@ -355,5 +349,5 @@ adbg_process_t* adbg_process_list_get(void *proclist, size_t index) {
 /// Params: proclist = List instance.
 void adbg_process_list_close(void *proclist) {
 	if (proclist == null) return;
-	adbg_list_free(cast(list_t*)proclist);
+	adbg_list_close(cast(list_t*)proclist);
 }

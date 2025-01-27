@@ -129,6 +129,7 @@ enum AdbgObjectOrigin {
 	userbuffer,
 }
 
+deprecated
 package
 enum AdbgObjectInternalFlags {
 	/// Object has its fields swapped because of its target endianness.
@@ -150,14 +151,14 @@ struct adbg_section_t {
 /// All fields are used internally and should not be used directly.
 struct adbg_object_t {
 	private union {
-		struct {
+		struct { // opened as file
 			OSFILE *file;
 		}
-		struct {
+		struct { // opened as process
 			adbg_process_t *process;
 			size_t proc_location;
 		}
-		struct {
+		struct { // opened as user buffer
 			void *user_buffer;
 			size_t user_buffersize;
 			size_t user_location;
@@ -168,25 +169,31 @@ struct adbg_object_t {
 	///
 	/// Stuff like disk or in-memory, allowing to select which I/O functions
 	/// to be used when interacting with its source material.
-	AdbgObjectOrigin origin;
+	private AdbgObjectOrigin origin;
 	/// Loaded object format.
-	AdbgObject format;
+	private AdbgObject format;
 	/// Internal status flags. (e.g., swapping required)
-	int status;
+	deprecated int status;
 	/// Internal buffer used by the module responsible of handling
 	/// the specific object format.
-	void *internal;
+	deprecated void *internal;
 	/// Used to attach the unload function
-	void function(adbg_object_t*) func_unload;
+	private void function(adbg_object_t*) func_unload;
 }
 
 // TODO: "adbg_object_register" function to replace adbg_object_postload
 //       Entry:
-//       - signatures/magics (position + size + data pointer)
-//       - shortname (string)
-//       - fullname (string)
+//       - unique id (reuse AdbgObject? in case of replacing builtin functions)
+//       - signatures/magics (position:size_t + data:ubyte[] or dataptr:void* + datasz:size_t)
+//       - shortname (string or callback)
+//       - fullname (string or callback)
 //       - callbacks (have package function that returns/sets internal pointer)
-//         load (required), unload (required), machine type, object type, etc.
+//         - load (required)
+//         - unload (required)
+//         - cleanup (close additional opened buffers except internal, optional?)
+//         - machine type (optional)
+//         - object type (optional)
+//         - etc.
 //         needs an API to set object type and other attributes
 //       Default types to be an immutable structure array.
 //       Custom list to be allocated on new type registration.
@@ -300,9 +307,19 @@ void adbg_object_close(adbg_object_t *o) {
 	if (o == null)
 		return;
 	
+	// Call handler unloading function if set
 	if (o.func_unload) o.func_unload(o);
 	
-	if (o.file) osfclose(o.file);
+	// Close internal buffer if set
+	if (o.internal) free(o.internal);
+	
+	// Close associated handles
+	switch (o.origin) with (AdbgObjectOrigin) {
+	case disk:
+		if (o.file) osfclose(o.file);
+		break;
+	default:
+	}
 	
 	free(o);
 }
@@ -413,6 +430,30 @@ void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, i
 	return buffer;
 }
 
+// Used in implementations.
+//
+// Allocate, or resize, the internal buffer.
+package
+void* adbg_object_impl_alloc_internal(adbg_object_t *o, size_t size) {
+	assert(o);
+	
+	o.internal = o.internal ?
+		realloc(o.internal, size) :
+		calloc(1, size);
+	
+	// Failed
+	if (o.internal == null) adbg_oops(AdbgError.crt);
+	
+	return o.internal;
+}
+
+// Get internal buffer pointer.
+package
+void* adbg_object_impl_internal_buffer(adbg_object_t *o) {
+	assert(o);
+	return o.internal;
+}
+
 /// Used in signature detection.
 private
 union SIGNATURE {
@@ -425,6 +466,13 @@ union SIGNATURE {
 	mz_header_t mzheader;
 }
 
+// TODO: AdbgObject adbg_object_detect(adbg_object_t*)
+//       Return object type to load
+//       Will be used in a future loading function
+
+// TODO: int adbg_object_load(adbg_object_t*)
+//       On error, automatically call unloader
+
 // Object detection and loading
 private
 int adbg_object_loadv(adbg_object_t *o) {
@@ -433,9 +481,10 @@ int adbg_object_loadv(adbg_object_t *o) {
 	
 	o.status = 0;
 	
-	// Load buffer for variable-length signature detection.
-	// The only length detection is the function itself checking
-	// the length read from the underlying I/O function.
+	// Read signature buffer for detection.
+	// Unfortunately, this function fails if read bytes is less than
+	// the size of the SIGNATURE structure.
+	// Hopefully, not many files formats are that small.
 	SIGNATURE sig = void;
 	memset(&sig, 0, SIGNATURE.sizeof);
 	int e = adbg_object_read_at(o, 0, &sig, SIGNATURE.sizeof);
@@ -483,15 +532,14 @@ int adbg_object_loadv(adbg_object_t *o) {
 			return adbg_object_mscoff_load(o);
 		break;
 	
+	// TODO: Move PE/NE/LX detection in MZ loader
+	//       Once implementations can replace callback functions
 	// MZ executables
 	case MAGIC_MZ, MAGIC_ZM: // ZM being the even older signature in some cases
-		// TODO: Move new header detection to MZ load function
-		// TODO: pre-checked if only the signature is swapped
 		version (Trace) trace("e_lfarlc=%#x", sig.mzheader.e_lfarlc);
 		
 		// If e_lfarlc (relocation table) starts lower than e_lfanew,
-		// then assume old MZ.
-		// NOTE: e_lfarlc can point to 0x40.
+		// then assume old MZ, since e_lfarlc can point to 0x40.
 		if (sig.mzheader.e_lfarlc < 0x40)
 			return adbg_object_mz_load(o);
 		
@@ -513,7 +561,7 @@ int adbg_object_loadv(adbg_object_t *o) {
 		version (Trace) trace("newsig=%#x", newsig);
 		switch (newsig) {
 		case MAGIC_PE32:
-			return adbg_object_pe_load(o, &sig.mzheader);
+			return adbg_object_pe_load(o);
 		default:
 		}
 		
@@ -848,8 +896,6 @@ Lunknown:
 	case unknown:	return "unknown";
 	}
 }
-// Old alias
-alias adbg_object_format_shortname = adbg_object_id_string;
 
 // TODO: adbg_object_id_full: "fuller" id
 
@@ -894,8 +940,6 @@ const(char)* adbg_object_format_string(adbg_object_t *o) {
 	case unknown:	goto Lunknown;
 	}
 }
-// Old alias
-alias adbg_object_format_name = adbg_object_format_string;
 
 /// Get the kind of object as a string for printing purposes.
 ///
@@ -947,7 +991,7 @@ const(char)* adbg_object_osabi_string(adbg_object_t *o) {
 		Elf32_Ehdr *ehdr = adbg_object_elf_ehdr32(o);
 		if (ehdr == null)
 			goto Lunknown;
-		return adbg_object_elf_abi_string(ehdr.e_ident[ELF_EI_OSABI]);
+		return adbg_object_elf_osabi_string(ehdr.e_ident[ELF_EI_OSABI]);
 	case pdb, mdmp, dmp, omf, archive, coff, mscoff, mz:
 	case unknown:	goto Lunknown;
 	}

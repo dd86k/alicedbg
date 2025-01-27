@@ -193,7 +193,15 @@ uint adbg_bits_extract32(uint v, uint len, uint pos) {
 	assert(adbg_bits_extract32(flags, 4, 16) == 0b1010);
 }
 
-size_t adbg_alignup(size_t x, int s) {
+// 
+long adbg_alignup64(long x, size_t s) {
+	assert(s > 0);
+	long mask = s - 1;
+	return (x + mask) & (~mask);
+}
+
+size_t adbg_alignup(size_t x, size_t s) {
+	assert(s > 0);
 	size_t mask = s - 1;
 	return (x + mask) & (~mask);
 }
@@ -220,13 +228,8 @@ size_t adbg_alignup(size_t x, int s) {
 	assert(adbg_alignup(9, ulong.sizeof) == 16);
 }
 
-// Ditto but returns long unconditionally
-long adbg_alignup64(long x, int s) {
-	long mask = s - 1;
-	return (x + mask) & (~mask);
-}
-
-size_t adbg_aligndown(size_t x, int s) {
+size_t adbg_aligndown(size_t x, size_t s) {
+	assert(s > 0);
 	size_t mask = s - 1;
 	return x - (x & mask);
 }
@@ -268,21 +271,19 @@ bool adbg_bits_boundchk(void *ptr, size_t sizeof, void *buffer, size_t bufsize) 
 @system unittest {
 	template P(size_t n) { enum P = cast(void*)n; }
 	// Typical usage, check if pointer instance and size within buffer
-	assert(adbg_bits_ptrbounds(P!20, uint.sizeof, P!10, 30) == false);
+	assert(adbg_bits_boundchk(P!20, uint.sizeof, P!10, 30) == false);
 	// Within bounds
-	assert(adbg_bits_ptrbounds(P!0,  4, P!0, 20) == false);
-	assert(adbg_bits_ptrbounds(P!1,  4, P!0, 20) == false);
-	assert(adbg_bits_ptrbounds(P!10, 4, P!0, 20) == false);
-	assert(adbg_bits_ptrbounds(P!11, 4, P!0, 20) == false);
-	assert(adbg_bits_ptrbounds(P!16, 4, P!0, 20) == false);
+	assert(adbg_bits_boundchk(P!0,  4, P!0, 20) == false);
+	assert(adbg_bits_boundchk(P!1,  4, P!0, 20) == false);
+	assert(adbg_bits_boundchk(P!10, 4, P!0, 20) == false);
+	assert(adbg_bits_boundchk(P!11, 4, P!0, 20) == false);
+	assert(adbg_bits_boundchk(P!16, 4, P!0, 20) == false);
 	// Outside bounds
-	assert(adbg_bits_ptrbounds(P!0,  4, P!100, 20));
-	assert(adbg_bits_ptrbounds(P!19, 4, P!0, 20));
-	assert(adbg_bits_ptrbounds(P!20, 4, P!0, 20));
-	assert(adbg_bits_ptrbounds(P!30, 4, P!0, 20));
-	assert(adbg_bits_ptrbounds(P!40, 4, P!0, 20));
-	assert(adbg_bits_ptrbounds(P!(-1), 4, P!0, 20));
-	assert(adbg_bits_ptrbounds(P!0, 100, P!0, 20));
+	assert(adbg_bits_boundchk(P!0,  4, P!100, 20));
+	assert(adbg_bits_boundchk(P!19, 4, P!0, 20));
+	assert(adbg_bits_boundchk(P!20, 4, P!0, 20));
+	assert(adbg_bits_boundchk(P!30, 4, P!0, 20));
+	assert(adbg_bits_boundchk(P!40, 4, P!0, 20));
+	assert(adbg_bits_boundchk(P!(-1), 4, P!0, 20));
+	assert(adbg_bits_boundchk(P!0, 100, P!0, 20));
 }
-
-alias adbg_bits_ptrbounds = adbg_bits_boundchk;

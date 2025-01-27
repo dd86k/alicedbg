@@ -51,12 +51,10 @@ enum AdbgException {
 	Breakpoint,	/// A software breakpoint was hint.
 	Step,	/// Single step was performed.
 	AccessViolation,	/// An access violations or segmentation fault occured.
-	Fault = AccessViolation,	/// Alias to AccessViolation.
 	BoundExceeded,	/// Array bounds exceeded.
 	Misalignment,	/// Data type misaligned.
 	IllegalInstruction,	/// Illegal opcode.
 	ZeroDivision,	/// Integer divide by zero.
-	DivZero = ZeroDivision,	/// Old alias for ZeroDivision.
 	PageError,	/// In-page error. (Windows: Disk demand-page failed)
 	IntOverflow,	/// Integer overflow.
 	StackOverflow,	/// Stack overflow.
@@ -64,7 +62,6 @@ enum AdbgException {
 	// FPU
 	FPUDenormal,	/// Denormal value too small to represent a FP, e.g. operand.
 	FPUZeroDivision,	/// Floating/Decimal divide by zero.
-	FPUDivZero = FPUZeroDivision,	/// Old alias for FPUZeroDivision
 	FPUInexact,	/// Inexact value/result is not exact in decimal.
 	FPUIllegal,	/// Invalid operation.
 	FPUOverflow,	/// Overflow in FPU operation.
@@ -130,7 +127,7 @@ version (Windows) {
 		return StackOverflow;
 	// FPU
 	case EXCEPTION_FLT_DENORMAL_OPERAND:	return FPUDenormal;
-	case EXCEPTION_FLT_DIVIDE_BY_ZERO:	return FPUDivZero;
+	case EXCEPTION_FLT_DIVIDE_BY_ZERO:	return FPUZeroDivision;
 	case EXCEPTION_FLT_INEXACT_RESULT:	return FPUInexact;
 	case EXCEPTION_FLT_INVALID_OPERATION:	return FPUIllegal;
 	case EXCEPTION_FLT_OVERFLOW:	return FPUOverflow;
@@ -147,7 +144,7 @@ version (Windows) {
 		switch (subcode) {
 		case FPE_INTDIV: return ZeroDivision;
 		case FPE_INTOVF: return FPUOverflow;
-		case FPE_FLTDIV: return FPUDivZero;
+		case FPE_FLTDIV: return FPUZeroDivision;
 		case FPE_FLTOVF: return FPUOverflow;
 		case FPE_FLTUND: return FPUUnderflow;
 		case FPE_FLTRES: return FPUInexact;
@@ -184,6 +181,9 @@ version (Windows) {
 	return AdbgException.Unknown;
 }
 
+/// Get the translated exception code.
+/// Params: exception = Exception instance.
+/// Returns: Exception value, or AdbgException.Unknown on error.
 AdbgException adbg_exception_type(adbg_exception_t *exception) {
 	if (exception == null) return AdbgException.Unknown;
 	return exception.type;
@@ -198,16 +198,16 @@ const(char)* adbg_exception_name(adbg_exception_t *exception) {
 	case Breakpoint:	return "BREAKPOINT";
 	case Step:	return "INSTRUCTION STEP";
 	case AccessViolation:	return "ACCESS VIOLATION";
-	case BoundExceeded:	return "INDEX OUT OF BOUNDS";
+	case BoundExceeded:	return "OUT OF BOUND";
 	case Misalignment:	return "DATA MISALIGNMENT";
 	case IllegalInstruction:	return "ILLEGAL INSTRUCTION";
-	case DivZero:	return "ZERO DIVISION";
+	case ZeroDivision:	return "ZERO DIVISION";
 	case PageError:	return "PAGE ERROR";
 	case IntOverflow:	return "INTEGER OVERFLOW";
 	case StackOverflow:	return "STACK OVERFLOW";
 	case PrivilegedOpcode:	return "PRIVILEGED INSTRUCTION";
 	case FPUDenormal:	return "FPU: DEFORMAL";
-	case FPUDivZero:	return "FPU: ZERO DIVISION";
+	case FPUZeroDivision:	return "FPU: ZERO DIVISION";
 	case FPUInexact:	return "FPU: INEXACT";
 	case FPUIllegal:	return "FPU: ILLEGAL";
 	case FPUOverflow:	return "FPU: OVERFLOW";
@@ -217,6 +217,12 @@ const(char)* adbg_exception_name(adbg_exception_t *exception) {
 	}
 }
 
+/// Get the address where the exception happened.
+///
+/// Due to system limitations, like the type of exception,
+/// the memory address can be zero.
+/// Params: exception = Exception instance.
+/// Returns: Memory address, or zero if unavailable.
 ulong adbg_exception_fault_address(adbg_exception_t *exception) {
 	if (exception == null) return 0;
 	return exception.fault_address;
@@ -230,6 +236,9 @@ int adbg_exception_orig_code(adbg_exception_t *exception) {
 	return exception.oscode;
 }
 
+/// Get the task or thread ID associated with the exception.
+/// Params: exception = Exception instance.
+/// Returns: ID, or zero on error.
 long adbg_exception_tid(adbg_exception_t *exception) {
 	if (exception == null) return 0;
 	return exception.id;

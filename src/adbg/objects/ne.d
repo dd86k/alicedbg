@@ -230,8 +230,6 @@ struct ne_header_t {
 	/// Expected Windows version number
 	ushort ne_expver;
 }
-// Old alias for header
-alias ne_header = ne_header_t;
 
 /// NE segment, after header
 struct ne_segment_t {

@@ -92,7 +92,7 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 		
 		fprintf(stderr, "Instruction:");
 		for (size_t bi; bi < op.size; ++bi)
-			fprintf(stderr, " %02x", op.machine[bi]);
+			fprintf(stderr, " %02x", op.data[bi]);
 		fprintf(stderr, " (%s", op.mnemonic);
 		if (op.operands) fprintf(stderr, " %s", op.operands);
 		fputs(")", stderr);

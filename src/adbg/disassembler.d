@@ -71,7 +71,6 @@ struct adbg_opcode_t {
 	ulong address;	/// Base instruction address.
 	int size;	/// Instruction size in Bytes.
 	ubyte[OPCODE_BUFSIZE] data;	/// Machine bytes.
-	alias machine = data;
 	const(char) *mnemonic;	/// Instruction mnemonic.
 	const(char) *operands;	/// Instruction operands.
 }
@@ -421,7 +420,7 @@ int adbg_disassembler_buffer_step(adbg_disassembler_t *dasm, adbg_opcode_t *opco
 		opcode.size = cast(int)min(OPCODE_BUFSIZE, dasm.machinfo.maxopsize);
 		opcode.mnemonic = "illegal";
 		opcode.operands = null;
-		memcpy(opcode.machine.ptr, buffer, opcode.size);
+		memcpy(opcode.data.ptr, buffer, opcode.size);
 		return adbg_oops(AdbgError.disasmIllegalInstruction);
 	}
 	
@@ -429,7 +428,7 @@ int adbg_disassembler_buffer_step(adbg_disassembler_t *dasm, adbg_opcode_t *opco
 	opcode.size = dasm.cs_inst.size;
 	opcode.mnemonic = cs_insn_name(dasm.cs_handle, dasm.cs_inst.id);
 	opcode.operands = dasm.cs_inst.op_str[0] ? dasm.cs_inst.op_str.ptr : null;
-	memcpy(opcode.machine.ptr, buffer, opcode.size);
+	memcpy(opcode.data.ptr, buffer, opcode.size);
 	return 0;
 }
 

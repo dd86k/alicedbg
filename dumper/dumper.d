@@ -141,8 +141,8 @@ int dump_file(const(char)* path) {
 		if (SETTING(Setting.extractAny) == 0) {
 			print_string("filename", path);
 			print_u64("filesize", adbg_object_filesize(o));
-			print_string("type", adbg_object_format_name(o));
-			print_string("shortname", adbg_object_format_shortname(o));
+			print_string("type", adbg_object_format_string(o));
+			print_string("id", adbg_object_id_string(o));
 		}
 		final switch (o.format) with (AdbgObject) {
 		case mz:	return dump_mz(o);
@@ -171,12 +171,14 @@ int dump_file(const(char)* path) {
 		printf("%s: ", path);
 	
 	if (SETTING(Setting.shortName)) {
-		puts(SAFEVAL(adbg_object_format_shortname(o)));
+		puts(SAFEVAL(adbg_object_id_string(o)));
 		return 0;
 	}
 	
 	// Otherwise, make a basic summary
-	printf("%s, %s", adbg_object_format_name(o), adbg_object_kind_string(o));
+	printf("%s, %s",
+		SAFEVAL( adbg_object_format_string(o) ),
+		SAFEVAL( adbg_object_kind_string(o) ));
 	
 	// Print machine type used for object
 	const(char)* machstr = adbg_object_machine_string(o);
@@ -242,7 +244,7 @@ void print_disasm_line(adbg_disassembler_t *dis, adbg_opcode_t *op) {
 	int left = MBFSZ; // Buffer left
 	int tl; // Total length
 	for (size_t bi; bi < op.size; ++bi) {
-		int l = snprintf(machine.ptr + tl, left, " %02x", op.machine[bi]);
+		int l = snprintf(machine.ptr + tl, left, " %02x", op.data[bi]);
 		if (l <= 0) break; // Ran out of buffer space
 		tl += l;
 		left -= l;

@@ -1273,7 +1273,7 @@ Elf32_Phdr* adbg_object_elf_phdr32(adbg_object_t *o, size_t index) {
 	}
 	
 	Elf32_Phdr *phdr = internal.pheader32 + index;
-	if (adbg_bits_ptrbounds(phdr, Elf32_Phdr.sizeof, internal.pheader32, size)) {
+	if (adbg_bits_boundchk(phdr, Elf32_Phdr.sizeof, internal.pheader32, size)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
@@ -1341,7 +1341,7 @@ Elf32_Shdr* adbg_object_elf_shdr32(adbg_object_t *o, size_t index) {
 	}
 	
 	Elf32_Shdr *shdr = internal.sheader32 + index;
-	if (adbg_bits_ptrbounds(shdr, Elf32_Shdr.sizeof, internal.sheader32, size)) {
+	if (adbg_bits_boundchk(shdr, Elf32_Shdr.sizeof, internal.sheader32, size)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
@@ -1397,7 +1397,7 @@ const(char)* adbg_object_elf_shdr32_name(adbg_object_t *o, Elf32_Shdr *s) {
 	//       or make adbg_bits_strbounds variant?
 	//       or null-terminate the memory buffer?
 	void *str = internal.strtable + s.sh_name;
-	if (adbg_bits_ptrbounds(str, 3, internal.strtable, internal.strtable_size32)) {
+	if (adbg_bits_boundchk(str, 3, internal.strtable, internal.strtable_size32)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
@@ -1473,7 +1473,7 @@ Elf64_Phdr* adbg_object_elf_phdr64(adbg_object_t *o, size_t index) {
 	}
 	
 	Elf64_Phdr *phdr = internal.pheader64 + index;
-	if (adbg_bits_ptrbounds(phdr, Elf64_Phdr.sizeof, internal.pheader64, size)) {
+	if (adbg_bits_boundchk(phdr, Elf64_Phdr.sizeof, internal.pheader64, size)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
@@ -1541,7 +1541,7 @@ Elf64_Shdr* adbg_object_elf_shdr64(adbg_object_t *o, size_t index) {
 	}
 	
 	Elf64_Shdr *shdr = internal.sheader64 + index;
-	if (adbg_bits_ptrbounds(shdr, Elf64_Shdr.sizeof, internal.sheader64, size)) {
+	if (adbg_bits_boundchk(shdr, Elf64_Shdr.sizeof, internal.sheader64, size)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
@@ -1596,7 +1596,7 @@ const(char)* adbg_object_elf_shdr64_name(adbg_object_t *o, Elf64_Shdr *s) {
 	// TODO: 3 minimum (".n\0") could be wrong, check strlen?
 	//       or make adbg_bits_strbounds variant?
 	void *str = internal.strtable + s.sh_name;
-	if (adbg_bits_ptrbounds(str, 3, internal.strtable, cast(size_t)internal.strtable_size64)) {
+	if (adbg_bits_boundchk(str, 3, internal.strtable, cast(size_t)internal.strtable_size64)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
@@ -1853,7 +1853,6 @@ const(char) *adbg_object_elf_osabi_string(ubyte object_) {
 	default:	return null;
 	}
 }
-alias adbg_object_elf_abi_string = adbg_object_elf_osabi_string;
 
 const(char) *adbg_object_elf_et_string(ushort type) {
 	switch (type) {

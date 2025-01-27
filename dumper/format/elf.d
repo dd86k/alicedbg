@@ -238,7 +238,7 @@ void dump_elf_coredump64(adbg_object_t *o, Elf64_Phdr *phdr) {
 	void *maxlength = nbuffer + phdr.p_filesz;
 	for (; current < maxlength; ) {
 		Elf64_Nhdr *note = cast(Elf64_Nhdr*)current;
-		if (adbg_bits_ptrbounds(note, Elf64_Nhdr.sizeof, nbuffer, cast(size_t)phdr.p_filesz))
+		if (adbg_bits_boundchk(note, Elf64_Nhdr.sizeof, nbuffer, cast(size_t)phdr.p_filesz))
 			panic(2, "Elf64_Nhdr header does not fit note");
 		
 		// NOTE: Note names
@@ -249,7 +249,7 @@ void dump_elf_coredump64(adbg_object_t *o, Elf64_Phdr *phdr) {
 			return;
 		
 		const(char)* name = cast(const(char)*)note + Elf64_Nhdr.sizeof;
-		if (adbg_bits_ptrbounds(cast(void*)name, note.n_namesz, nbuffer, cast(size_t)phdr.p_filesz))
+		if (adbg_bits_boundchk(cast(void*)name, note.n_namesz, nbuffer, cast(size_t)phdr.p_filesz))
 			panic(2, "Elf64_Nhdr:n_namesz points outside of note bounds");
 		
 		print_section(++index, name, note.n_namesz);
@@ -263,7 +263,7 @@ void dump_elf_coredump64(adbg_object_t *o, Elf64_Phdr *phdr) {
 		
 		switch (note.n_type) {
 		case ELF_NT_PRSTATUS:
-			if (adbg_bits_ptrbounds(data, elf_prstatus64.sizeof, nbuffer, cast(size_t)phdr.p_filesz))
+			if (adbg_bits_boundchk(data, elf_prstatus64.sizeof, nbuffer, cast(size_t)phdr.p_filesz))
 				return;
 			elf_prstatus64 *prstatus = cast(elf_prstatus64*)data;
 			print_u32("pr_info.si_signo", prstatus.pr_info.si_signo);
@@ -315,7 +315,7 @@ void dump_elf_coredump64(adbg_object_t *o, Elf64_Phdr *phdr) {
 			break;
 		case ELF_NT_PRPSINFO:
 			elf_prpsinfo64 *prpsinfo = cast(elf_prpsinfo64*)data;
-			if (adbg_bits_ptrbounds(data, elf_prpsinfo64.sizeof + prpsinfo.pr_sname, nbuffer, cast(size_t)phdr.p_filesz))
+			if (adbg_bits_boundchk(data, elf_prpsinfo64.sizeof + prpsinfo.pr_sname, nbuffer, cast(size_t)phdr.p_filesz))
 				return;
 			char[4] pr_sname = void;
 			int l = realchar(pr_sname.ptr, 4, prpsinfo.pr_sname);
@@ -337,7 +337,7 @@ void dump_elf_coredump64(adbg_object_t *o, Elf64_Phdr *phdr) {
 			// NOTE: SI_MAX_SIZE is defined with 128, must be same size
 			goto default;
 		case ELF_NT_FPREGSET:
-			if (adbg_bits_ptrbounds(data, user_i387_struct64.sizeof, nbuffer, cast(size_t)phdr.p_filesz))
+			if (adbg_bits_boundchk(data, user_i387_struct64.sizeof, nbuffer, cast(size_t)phdr.p_filesz))
 				return;
 			user_i387_struct64 *fregset = cast(user_i387_struct64*)data;
 			print_x16("cwd", fregset.cwd);

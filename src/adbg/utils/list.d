@@ -315,4 +315,3 @@ void adbg_list_close(list_t *list) {
 		return;
 	free(list);
 }
-alias adbg_list_free = adbg_list_close;

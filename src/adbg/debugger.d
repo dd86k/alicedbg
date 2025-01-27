@@ -57,6 +57,7 @@ version (Windows) {
 extern (C):
 
 /// Debugging events
+deprecated
 enum AdbgEvent {
 	/// An exception occurred.
 	exception,
@@ -360,7 +361,7 @@ version (USE_CLONE) { // clone(2)
 } // clone(2)/fork(2)
 	
 	version(Trace) trace("pid=%d", proc.pid);
-	proc.state = AdbgProcessState.standby;
+	proc.state = AdbgProcessState.created;
 	proc.creation = AdbgCreation.spawned;
 	return proc;
 } else {
@@ -525,7 +526,7 @@ version (Windows) {
 		return null;
 	}
 	
-	proc.state = options & OPT_STOP ? AdbgProcessState.paused : AdbgProcessState.running;
+	proc.state = options & OPT_STOP ? AdbgProcessState.stopped : AdbgProcessState.running;
 	proc.orig_pid = proc.pid = cast(pid_t)pid;
 } else version (FreeBSD) {
 	if (ptrace(PT_ATTACH, pid, null, 0) < 0) {
@@ -552,7 +553,7 @@ int adbg_debugger_detach(adbg_process_t *proc) {
 		return adbg_oops(AdbgError.debuggerInvalidAction);
 	
 	proc.creation = AdbgCreation.unloaded;
-	proc.state = AdbgProcessState.unloaded;
+	proc.state = AdbgProcessState.unknown;
 	
 version (Windows) {
 	if (DebugActiveProcessStop(proc.pid) == FALSE)
@@ -567,79 +568,11 @@ version (Windows) {
 	return 0;
 }
 
-private alias cbexeception = void function(adbg_process_t*, void*, adbg_exception_t*);
-//private alias cbproccreate = void function(adbg_process_t*, void*);
-private alias cbprocexited = void function(adbg_process_t*, void*, int);
-private alias cbproccontinued = void function(adbg_process_t*, void*, long);
-
-/// Set an event handler for a particular debugging event for this process.
-///
-/// Except for a few conditions, these are particularly called within the
-/// `adbg_debugger_wait` function.
-///
-/// ### Exception
-///
-/// When a process stops to an exception.
-/// 
-/// If there are no handlers, the process will automatically continue.
-///
-/// Callback: void function(adbg_process_t *process, void *userdata, adbg_exception_t *exception)
-/// 
-/// ### ProcessCreated
-///
-/// Currently not implemented.
-///
-/// ### Process Exit
-///
-/// When a process exited.
-///
-/// Callback: void function(adbg_process_t *process, void *userdata, int exitcode)
-///
-/// ### ProcessContinue
-///
-/// When a process continues to being debugged.
-///
-/// Callback: void function(adbg_process_t *process, void *userdata)
-///
-/// Params:
-/// 	on = Debug event.
-/// 	proc = Process instance. It must be spawned or attached by the debugger.
-/// 	handler = Event handler. Setting it to `null` disables it, skipping it.
-/// Returns: Error code.
-deprecated("Use adbg_debugger_on_* functions")
-int adbg_debugger_on(adbg_process_t *proc, AdbgEvent on, void *handler) {
-	if (proc == null)
-		return adbg_oops(AdbgError.invalidArgument);
-	
-	// NOTE: The weird casting done here is due to usage of `extern` in struct.
-	switch (on) with (AdbgEvent) {
-	case exception:
-		extern (C) cbexeception h = cast(cbexeception)handler;
-		proc.event_exception = h;
-		break;
-	/*case processCreated:
-		extern (C) cbproccreate h = cast(cbproccreate)handler;
-		proc.event_process_created = h;
-		break;*/
-	case processExit:
-		extern (C) cbprocexited h = cast(cbprocexited)handler;
-		proc.event_process_exited = h;
-		break;
-	case processContinue:
-		extern (C) cbproccontinued h = cast(cbproccontinued)handler;
-		proc.event_process_continued = h;
-		break;
-	default:
-		return adbg_oops(AdbgError.invalidOption);
-	}
-	return 0;
-}
-
-// NOTE: adbg_debugger_on_* advantages vs. adbg_debugger_on(enum)
-//       - callback type checking (when source compiling)
-//       - access to attributes (like `deprecated`)
-//       - no need to map/update enums
-//       - Better documentation solely for the event
+// NOTE: adbg_debugger_on_* advantages over adbg_debugger_on(enum)
+//       - Callback type checking (when source compiling)
+//       - Access to attributes (like `deprecated`) per function
+//       - No need to map and update enumeration values
+//       - Better documentation per function
 
 /// Set an event handler for handling exceptions when they occur for
 /// an attached process.
@@ -658,6 +591,7 @@ int adbg_debugger_on_exception(adbg_process_t *proc,
 	proc.event_exception = callback;
 	return 0;
 }
+
 /// Set an event handler to know when the attached process exits.
 ///
 /// The callback will receive the active process (`adbg_process_t*`),
@@ -674,6 +608,7 @@ int adbg_debugger_on_process_exit(adbg_process_t *proc,
 	proc.event_process_exited = callback;
 	return 0;
 }
+
 /// Set an event handler to know when the attached process continues.
 ///
 /// This includes continue and step events.
@@ -694,9 +629,9 @@ int adbg_debugger_on_process_continue(adbg_process_t *proc,
 }
 
 /// Attach user data when an event occurs.
-/// Useful to identify requests for example.
-///
-/// User data is sent to event callback functions.
+/// 
+/// User data is sent to event callback functions, for example, useful to
+/// personally identify debugger requests.
 /// Params:
 /// 	proc = Process instance.
 /// 	udata = User data pointer. Passing null clears it.
@@ -1137,5 +1072,3 @@ version (WinTel) {
 	return adbg_oops(AdbgError.unimplemented);
 }
 }
-// Old alias
-alias adbg_debugger_stepi = adbg_debugger_step_instruction;

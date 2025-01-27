@@ -173,7 +173,7 @@ version (Windows) {
 		t.id = atoi( basename(entry.d_name.ptr) );
 		list = adbg_list_add(list, &t);
 		if (list == null) {
-			adbg_list_free(list);
+			adbg_list_close(list);
 			return null;
 		}
 	}
@@ -230,7 +230,7 @@ version (Windows) {
 
 void adbg_thread_list_close(void *list) {
 	if (list == null) return;
-	adbg_list_free(cast(list_t*)list);
+	adbg_list_close(cast(list_t*)list);
 }
 
 /// Get thread from list by an index.

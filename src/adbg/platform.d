@@ -281,7 +281,8 @@ immutable(adbg_build_info_t)* adbg_build_info() {
 // NOTE: This library avoids the use of TLS whenever possible,
 //       so the need of fixing up TLS entries for Win32 is not needed.
 //       Typically, it is performed by druntime (core.sys.windows.dll).
-// NOTE: TLSTable directory is not created for alicedbg.dll.
+//       If there are no global variables using TLS (non-__gshared),
+//       TLSTable directory is not created for alicedbg.dll.
 version (Windows)
 version (SharedLib) {
 import core.sys.windows.windef : HINSTANCE, BOOL, TRUE, FALSE, DWORD, LPVOID,

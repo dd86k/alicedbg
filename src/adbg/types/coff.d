@@ -26,9 +26,9 @@ int adbg_type_coff_populate(adbg_symbol_list_t *list, adbg_object_t *o) {
 		
 	do with (coffsym) {
 		switch (coffsym.e_sclass) {
-		case C_EXT:
-		case C_STAT:
-			// Quick hack (section number 1 being .text typically..?)
+		case C_EXT, C_STAT: // Public or private class
+			// HACK: Labels/Functions filtering
+			//       Not auxiliary entries and points to section 1 (typically .text)
 			if (e_numaux || e_scnum != 1)
 				continue;
 			char *name = cast(char*)adbg_object_coff_symbol_name(o, coffsym);

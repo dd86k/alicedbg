@@ -44,7 +44,20 @@ struct adbg_scanner_result_t {
 	}
 }
 
-// new scan
+// TODO: Consider separating scanner creation and initial scan as two functions.
+/// Launch a new scan.
+///
+/// Create a new memory scanner and associate it with data (needle) to search
+/// with. Entries are added to 
+///
+/// This immediately launches a new scan. To rescan with the same search
+/// parameter (needle), use `adbg_scanner_rescan`.
+/// Params:
+///   process = Process instance.
+///   data = Search data (needle).
+///   datasize = Search data size in Bytes.
+///   ... = Scanner parameters. Must end with 0.
+/// Returns: Scanner instance, or null on error.
 adbg_scanner_t* adbg_scanner_scan(adbg_process_t *process, void* data, size_t datasize, ...) {
 	if (process == null || data == null) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -64,6 +77,8 @@ adbg_scanner_t* adbg_scanner_scan(adbg_process_t *process, void* data, size_t da
 		OPTION_ALLMODULES = 2,
 	}
 	
+	// TODO: Consider separating options for scanner.
+	//       Useful if we want to rescan with different options.
 	// Get options
 	va_list list = void;
 	va_start(list, datasize);
@@ -110,7 +125,7 @@ Loption:
 	void *mbuffer = malloc(datasize);
 	if (mbuffer == null) {
 		adbg_oops(AdbgError.crt);
-		adbg_list_free(scanner.results);
+		adbg_list_close(scanner.results);
 		free(scanner);
 		return null;
 	}
@@ -153,6 +168,14 @@ Loption:
 
 // rescan/update entries by scanning results and removing entries that
 // do not match the previous value
+/// Perform a rescan using the same, or different, search data (needle).
+///
+/// Entries are automatically removed if they do not match the provided
+/// search data.
+/// Params:
+///   scanner = Scanner instance.
+///   data = Search data (needle).
+/// Returns: Error code.
 int adbg_scanner_rescan(adbg_scanner_t *scanner, void* data) {
 	if (scanner == null || data == null)
 		return adbg_oops(AdbgError.invalidArgument);
@@ -169,7 +192,7 @@ int adbg_scanner_rescan(adbg_scanner_t *scanner, void* data) {
 	// Buffer for reading from process memory
 	void *mbuffer = malloc(scanner.datasize);
 	if (mbuffer == null) {
-		adbg_list_free(scanner.results);
+		adbg_list_close(scanner.results);
 		free(scanner);
 		return adbg_oops(AdbgError.crt);
 	}
@@ -221,7 +244,6 @@ adbg_memory_map_t* adbg_scanner_result_map(adbg_scanner_t *scanner, size_t index
 
 void adbg_scanner_close(adbg_scanner_t *scanner) {
 	if (scanner == null) return;
-	adbg_list_free(scanner.results);
-	//adbg_memory_mapping_close(scanner.pmaps);
+	adbg_list_close(scanner.results);
 	free(scanner);
 }

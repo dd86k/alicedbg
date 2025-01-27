@@ -595,7 +595,8 @@ int shell_disassemble(size_t address, int *opsize,
 	if (addressbuf)
 		snprintf(addressbuf, addresslen, "%#zx", address);
 	
-	// TODO: Maximum opcode size per architecture
+	// TODO: Set buffer size by maximum opcode size per architecture
+	// Read 
 	ubyte[OPCODE_BUFSIZE] buffer = void;
 	int e = adbg_memory_read(process, address, buffer.ptr, OPCODE_BUFSIZE);
 	if (e) return e;
@@ -603,19 +604,24 @@ int shell_disassemble(size_t address, int *opsize,
 	adbg_opcode_t op = void;
 	int err = adbg_disassemble(disassembler, &op, buffer.ptr, OPCODE_BUFSIZE);
 	
+	// Set instruction size if given
 	if (opsize) *opsize = op.size;
 	
+	// Print machine opcodes into string buffer if given
 	if (machinebuf) {
 		for (size_t i, b; i < op.size && b < machinelen; ++i) {
 			if (i) {
 				machinebuf[b++] = ' ';
 				if (b >= machinelen) break;
 			}
-			b += snprintf(machinebuf + b, machinelen - b, "%02x", op.machine[i]);
+			b += snprintf(machinebuf + b, machinelen - b, "%02x", op.data[i]);
 		}
 	}
 	
+	// Set mnemonic string if given
 	if (mnemonic) *mnemonic = op.mnemonic;
+	
+	// Set operands string if given
 	if (operands) *operands = op.operands ? op.operands : "";
 	
 	return err;
@@ -815,7 +821,7 @@ int command_kill(int argc, const(char) **argv) {
 
 // NOTE: Can't simply execute stepi multiple times in a row
 int command_stepi(int argc, const(char) **argv) {
-	if (adbg_debugger_stepi(process, event_tid))
+	if (adbg_debugger_step_instruction(process, event_tid))
 		return ShellError.alicedbg;
 	if (adbg_debugger_wait(process))
 		return ShellError.alicedbg;

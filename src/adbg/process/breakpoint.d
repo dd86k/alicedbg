@@ -28,9 +28,8 @@ version (X86) {
 	private alias ubyte opcode_t;
 	private immutable ubyte[] bpdata = [ 0xcc ]; // int3
 } else version (ARM_Thumb) {
-	// Thumb BKPT
-	//       1       index
-	// 5432 1098 7654 3210
+	//       1           0 Thumb BKPT
+	// 5432 1098 7654 3210 bit
 	// 1011 1110 |       |
 	//           +-imm8--+
 	private template T16BKPT(ubyte n) {
@@ -46,9 +45,8 @@ version (X86) {
 	private immutable ubyte[] bpdata = T16BKPT!(0xdd);
 	//private immutable ubyte[] bpdata = [ 0xbe, 0xdd ]; // BRK #221
 } else version (ARM) {
-	// AArch32 BKPT
-	//  3           2            1       index
-	// 1098 7654 3210 9876 5432 1098 7654 3210
+	//  3           2            1             AArch32 BKPT
+	// 1098 7654 3210 9876 5432 1098 7654 3210 bit
 	// |  | 0001 0010 |            | 0111 |  |
 	// cond(!=1110)   +---imm12----+      imm4 - imm12:imm4
 	private template A32BKPT(ushort n) {
@@ -64,9 +62,8 @@ version (X86) {
 	private immutable ubyte[] bpdata = A32BKPT!(0xdd);
 	//private immutable ubyte[] bpdata = [ 0xe1, 0x20, 0x0d, 0x7d ]; // BRK #221
 } else version (AArch64) {
-	// AArch64 BRK
-	//  3           2            1       index
-	// 1098 7654 3210 9876 5432 1098 7654 3210
+	//  3           2            1             AArch64 BRK
+	// 1098 7654 3210 9876 5432 1098 7654 3210 bit
 	// 1101 0100 001|                  |0 0000
 	//              +-------imm16------+
 	private template A64BRK(ushort n) {
@@ -92,8 +89,9 @@ struct adbg_breakpoint_t { align(1):
 		opcode_t opcode;
 		ubyte[bplength] opdata;
 	}
-	int magic;
-	int id;
+	int magic; // cookie
+	int id;	   // in process breakpoint list
+	int type;  // regular, source, etc.
 }
 
 struct adbg_breakpoint_entry_t {

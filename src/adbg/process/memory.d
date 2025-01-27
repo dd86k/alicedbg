@@ -730,7 +730,7 @@ Lenum:
 		
 		list = adbg_list_add(list, &map);
 		if (list == null) {
-			adbg_list_free(list);
+			adbg_list_close(list);
 			return null;
 		}
 	}
@@ -762,5 +762,5 @@ adbg_memory_map_t* adbg_memory_mapping_at(void *list, size_t index) {
 
 void adbg_memory_mapping_close(void *list) {
 	if (list == null) return;
-	adbg_list_free(cast(list_t*)list);
+	adbg_list_close(cast(list_t*)list);
 }

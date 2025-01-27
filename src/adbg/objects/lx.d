@@ -219,8 +219,6 @@ struct lx_header_t { // NOTE: Names are taken from spec except for its "e32_exe"
 		}
 	}
 }
-// Old alias
-alias lx_header = lx_header_t;
 
 struct lx_record_t {
 	uint size;	/// Object virtual size
