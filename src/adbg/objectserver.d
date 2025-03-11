@@ -76,10 +76,6 @@ extern (C):
 //       - BPF Type Format (BTF)
 //       Mach-O:
 //       - uuid_command points to dSYM file
-// TODO: Small object optimization
-//       Since executables and object can be under a PAGESIZE, it would be worth
-//       exploring a form of optimization to load the entire file data in memory
-//       (only notable for file origins) with a new internal flag.
 // TODO: Promote "readalloc_at" over "malloc+read" to aid small object optimization
 
 /// Executable or object file format.
@@ -182,22 +178,22 @@ struct adbg_object_t {
 }
 
 // TODO: "adbg_object_register" function to replace adbg_object_postload
-//       Entry:
+//       Detection entry (inits):
 //       - unique id (reuse AdbgObject? in case of replacing builtin functions)
 //       - signatures/magics (position:size_t + data:ubyte[] or dataptr:void* + datasz:size_t)
-//       - shortname (string or callback)
-//       - fullname (string or callback)
-//       - callbacks (have package function that returns/sets internal pointer)
-//         - load (required)
-//         - unload (required)
-//         - cleanup (close additional opened buffers except internal, optional?)
-//         - machine type (optional)
-//         - object type (optional)
-//         - etc.
-//         needs an API to set object type and other attributes
 //       Default types to be an immutable structure array.
 //       Custom list to be allocated on new type registration.
+//       Callback registration (in implementation):
+//       - shortname (string or callback)
+//       - fullname (string or callback)
+//       - load (required)
+//       - unload (required)
+//       - machine type (optional)
+//       - object type (optional)
+//       - etc.
+//         needs an API to set object type and other attributes
 
+// TODO: Deprecate after Objectserver Register API is implemented
 // Internal function for submodules to setup internals
 package
 void adbg_object_postload(adbg_object_t *o,
@@ -435,13 +431,12 @@ void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, i
 // Allocate, or resize, the internal buffer.
 package
 void* adbg_object_impl_alloc_internal(adbg_object_t *o, size_t size) {
-	assert(o);
+	if (o == null || size == 0)
+		return adbg_oops_null(AdbgError.invalidArgument);
 	
-	o.internal = o.internal ?
-		realloc(o.internal, size) :
-		calloc(1, size);
+	o.internal = o.internal ? realloc(o.internal, size) : calloc(1, size);
 	
-	// Failed
+	// Allocation failed
 	if (o.internal == null) adbg_oops(AdbgError.crt);
 	
 	return o.internal;
@@ -450,7 +445,10 @@ void* adbg_object_impl_alloc_internal(adbg_object_t *o, size_t size) {
 // Get internal buffer pointer.
 package
 void* adbg_object_impl_internal_buffer(adbg_object_t *o) {
-	assert(o);
+	if (o == null)
+		return adbg_oops_null(AdbgError.invalidArgument);
+	if (o.internal == null) // uninitialized
+		return adbg_oops_null(AdbgError.uninitiated);
 	return o.internal;
 }
 

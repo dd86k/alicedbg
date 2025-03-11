@@ -839,8 +839,7 @@ struct pe_section_entry_t { align(1):
 	uint PointerToRawData;
 	/// The file pointer to the beginning of relocation
 	/// entries for the section. This is set to zero for
-	/// executable images or if there are no
-	/// relocations.
+	/// executable images or if there are no relocations.
 	uint PointerToRelocations;
 	/// The file pointer to the beginning of line-number
 	/// entries for the section. This is set to zero if
@@ -849,16 +848,13 @@ struct pe_section_entry_t { align(1):
 	/// debugging information is deprecated.
 	uint PointerToLinenumbers;
 	/// The number of relocation entries for the
-	/// section. This is set to zero for executable
-	/// images.
+	/// section. This is set to zero for executable images.
 	ushort NumberOfRelocations;
 	/// The number of line-number entries for the
 	/// section. This value should be zero for an image
-	/// because COFF debugging information is
-	/// deprecated.
+	/// because COFF debugging information is deprecated.
 	ushort NumberOfLinenumbers;
-	/// The flags that describe the characteristics of the
-	/// section.
+	/// The flags that describe the characteristics of the section.
 	uint Characteristics;
 }
 
@@ -941,17 +937,11 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	
 	// Read MZ header
 	int e = adbg_object_read_at(o, 0, &pe.mz_header, mz_header_t.sizeof);
-	if (e) {
-		free(o.internal);
-		return e;
-	}
+	if (e) return e;
 	
 	// Read PE header
 	e = adbg_object_read_at(o, pe.mz_header.e_lfanew, &pe.header, pe_header_t.sizeof);
-	if (e) {
-		free(o.internal);
-		return e;
-	}
+	if (e) return e;
 	with (pe.header)
 	if (o.status & AdbgObjectInternalFlags.reversed) {
 		Signature32	= adbg_bswap32(Signature32);
@@ -970,28 +960,17 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	size_t e_lfanew = pe.mz_header.e_lfanew + pe_header_t.sizeof; // point to optional header
 	ushort optmagic = void;
 	e = adbg_object_read_at(o, e_lfanew, &optmagic, ushort.sizeof);
-	if (e) {
-		free(o.internal);
-		o.internal = null;
-		return e;
-	}
+	if (e) return e;
+	
 	switch (optmagic) {
 	case PE_CLASS_32:
 		// TODO: Length check with SizeOfOptionalHeader.
 		e = adbg_object_read_at(o, e_lfanew, &pe.optheader, pe_optional_header_t.sizeof);
-		if (e) {
-			free(o.internal);
-			o.internal = null;
-			return e;
-		}
+		if (e) return e;
 		
 		e_lfanew += pe_optional_header_t.sizeof; // adjust to directory
 		e = adbg_object_read_at(o, e_lfanew, &pe.directory, pe_image_data_directory_t.sizeof);
-		if (e) {
-			free(o.internal);
-			o.internal = null;
-			return e;
-		}
+		if (e) return e;
 		e_lfanew += pe_image_data_directory_t.sizeof; // adjust to sections
 		
 		if (o.status & AdbgObjectInternalFlags.reversed) with (pe.optheader) {
@@ -1027,17 +1006,11 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	case PE_CLASS_64:
 		// TODO: Length check with SizeOfOptionalHeader.
 		e = adbg_object_read_at(o, e_lfanew, &pe.optheader64, pe_optional_header64_t.sizeof);
-		if (e) {
-			free(o.internal);
-			return e;
-		}
+		if (e) return e;
 		
 		e_lfanew += pe_optional_header64_t.sizeof; // adjust to directory
 		e = adbg_object_read_at(o, e_lfanew, &pe.directory, pe_image_data_directory_t.sizeof);
-		if (e) {
-			free(o.internal);
-			return e;
-		}
+		if (e) return e;
 		e_lfanew += pe_image_data_directory_t.sizeof; // adjust to sections
 		
 		if (o.status & AdbgObjectInternalFlags.reversed) with (pe.optheader64) {
@@ -1072,10 +1045,7 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	case PE_CLASS_ROM:
 		// TODO: Length check with SizeOfOptionalHeader.
 		e = adbg_object_read_at(o, e_lfanew, &pe.optheaderrom, pe_optional_headerrom_t.sizeof);
-		if (e) {
-			free(o.internal);
-			return e;
-		}
+		if (e) return e;
 		e_lfanew += pe_optional_headerrom_t.sizeof; // adjust to sections, no directories
 		
 		if (o.status & AdbgObjectInternalFlags.reversed) with (pe.optheaderrom) {
@@ -1146,25 +1116,18 @@ void adbg_object_pe_unload(adbg_object_t *o) {
 	assert(o);
 	
 	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
-	if (pe == null)
-		return;
+	if (pe == null) return;
 	
-	with (pe) {
-	if (sections) free(sections);
-	if (r_sections) free(r_sections);
+	if (pe.sections)         free(pe.sections);
+	if (pe.export_directory) free(pe.export_directory);
+	if (pe.import_buffer)    free(pe.import_buffer);
+	if (pe.debug_buffer)     free(pe.debug_buffer);
+	if (pe.load32_directory) free(pe.load32_directory);
+	if (pe.rich_header_buffer) free(pe.rich_header_buffer);
 	
-	if (export_directory) free(export_directory);
-	if (r_export_entries) free(r_export_entries);
-	
-	if (import_buffer) free(import_buffer);
-	
-	if (debug_buffer) free(debug_buffer);
-	if (r_debug_entries) free(r_debug_entries);
-	
-	if (load32_directory) free(load32_directory);
-	
-	if (rich_header_buffer) free(rich_header_buffer);
-	}
+	if (pe.r_debug_entries) free(pe.r_debug_entries);
+	if (pe.r_export_entries) free(pe.r_export_entries);
+	if (pe.r_sections) free(pe.r_sections);
 }
 
 // NOTE: Mapping directory RVAs to file offsets
@@ -1179,12 +1142,10 @@ pe_section_entry_t* adbg_object_pe_directory_section(adbg_object_t *o, uint rva)
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	ushort seccnt = pe.header.NumberOfSections;
 	for (ushort i; i < seccnt; ++i) {
 		// Function sets error
@@ -1218,10 +1179,10 @@ uint adbg_object_pe_directory_offset(adbg_object_t *o, uint dirrva) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return 0;
-	}
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return 0;
+	
 	// Function checks null
 	return adbg_object_pe_directory_offset_section(
 		adbg_object_pe_directory_section(o, dirrva), dirrva);
@@ -1232,11 +1193,9 @@ pe_header_t* adbg_object_pe_header(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
 	return &pe.header;
 }
 
@@ -1247,11 +1206,10 @@ void* adbg_object_pe_optional_header(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (pe.header.SizeOfOptionalHeader == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
@@ -1264,11 +1222,10 @@ pe_image_data_directory_t* adbg_object_pe_directories(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (pe.header.SizeOfOptionalHeader == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
@@ -1281,12 +1238,10 @@ mz_header_t* adbg_object_pe_mz_header(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	return &pe.mz_header;
 }
 
@@ -1296,25 +1251,22 @@ pe_rich_header_t* adbg_object_pe_rich_header(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
+	// If already allocated and read, return buffer
 	if (pe.rich_buffer_size)
 		return &pe.rich_header;
 	
 	// The rich signature is in-between the DOS stub and the PE header.
 	// We'll need at least that much memory, but usually not after 1.5 KiB.
-	with (pe) {
-	size_t bsize = adbg_aligndown(mz_header.e_lfanew - mz_header_t.sizeof, uint.sizeof);
-	rich_buffer_size = min(bsize, MiB!1); // smallest
-	version(Trace) trace("bsize=%zu ebsize=%zu", bsize, rich_buffer_size);
-	rich_header_buffer = adbg_object_readalloc_at(o, mz_header_t.sizeof, rich_buffer_size, 0);
-	if (rich_header_buffer == null)
+	size_t bsize = adbg_aligndown(pe.mz_header.e_lfanew - mz_header_t.sizeof, uint.sizeof);
+	pe.rich_buffer_size = min(bsize, MiB!1); // smallest
+	version(Trace) trace("bsize=%zu ebsize=%zu", bsize, pe.rich_buffer_size);
+	pe.rich_header_buffer = adbg_object_readalloc_at(o, mz_header_t.sizeof, pe.rich_buffer_size, 0);
+	if (pe.rich_header_buffer == null)
 		return null;
-	}
 	
 	// 1. Starting from the DOS stub, go upwards to locate header end
 	// 2. Downwards, try the XOR key on 4-byte values until we find header start
@@ -1405,16 +1357,15 @@ pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (index >= MAXIMUM_SECTIONS) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
 	ushort count = pe.header.NumberOfSections;
 	if (index >= count) {
 		adbg_oops(AdbgError.indexBounds);
@@ -1497,14 +1448,11 @@ pe_export_descriptor_t* adbg_object_pe_export(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
-	if (pe.header.SizeOfOptionalHeader == 0 ||
-		pe.directory.ExportTable.size == 0) {
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
+	if (pe.header.SizeOfOptionalHeader == 0 || pe.directory.ExportTable.size == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
@@ -1525,6 +1473,15 @@ pe_export_descriptor_t* adbg_object_pe_export(adbg_object_t *o) {
 		}
 		if (adbg_object_read_at(o, offset, pe.export_directory, size)) // sets error
 			return null;
+	
+		// ExportFlags must be zero
+		version(Trace) trace("ExportFlags=%#x", pe.export_directory.ExportFlags);
+		if (pe.export_directory.ExportFlags) {
+			adbg_oops(AdbgError.unavailable);
+			free(pe.export_directory);
+			pe.export_directory = null;
+			return null;
+		}
 		
 		// If need to be swapped
 		if (o.status & AdbgObjectInternalFlags.reversed) with (pe.export_directory) {
@@ -1542,15 +1499,6 @@ pe_export_descriptor_t* adbg_object_pe_export(adbg_object_t *o) {
 		}
 	}
 	
-	// ExportFlags must be zero
-	version(Trace) trace("ExportFlags=%#x", pe.export_directory.ExportFlags);
-	if (pe.export_directory.ExportFlags) {
-		adbg_oops(AdbgError.unavailable);
-		free(pe.export_directory);
-		pe.export_directory = null;
-		return null;
-	}
-	
 	return pe.export_directory;
 }
 
@@ -1559,22 +1507,18 @@ const(char)* adbg_object_pe_export_name(adbg_object_t *o, pe_export_descriptor_t
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return null;
-	}
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
-	if (pe.header.SizeOfOptionalHeader == 0 ||
-		pe.directory.ExportTable.size == 0) {
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
+	if (pe.header.SizeOfOptionalHeader == 0 || pe.directory.ExportTable.size == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
 	// directory_exports (offset) - ExportTable.rva + export.Name
 	// or try: directory_exports + sizeof(export_descriptor_t) ?
-	void* base = cast(void*)export_ -
-		pe.directory.ExportTable.rva +
-		export_.Name;
+	void* base = cast(void*)export_ - pe.directory.ExportTable.rva + export_.Name;
 	if (adbg_bits_boundchk(base, 2, export_, pe.directory.ExportTable.size)) {
 		adbg_oops(AdbgError.offsetBounds); // or assertion?
 		return null;
@@ -1588,19 +1532,16 @@ pe_export_entry_t* adbg_object_pe_export_entry(adbg_object_t *o, pe_export_descr
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return null;
-	}
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
 	
 	if (index >= export_.NumberOfNamePointers) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
-	if (pe.header.SizeOfOptionalHeader == 0 ||
-		pe.directory.ExportTable.size == 0) {
+	if (pe.header.SizeOfOptionalHeader == 0 || pe.directory.ExportTable.size == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
@@ -1637,14 +1578,11 @@ const(char)* adbg_object_pe_export_entry_symbol(adbg_object_t *o,
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
-	if (pe.header.SizeOfOptionalHeader == 0 ||
-		pe.directory.ExportTable.size == 0) {
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
+	if (pe.header.SizeOfOptionalHeader == 0 || pe.directory.ExportTable.size == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
@@ -1684,12 +1622,10 @@ pe_import_descriptor_t* adbg_object_pe_import(adbg_object_t *o, size_t index) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
 		pe.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
@@ -1785,12 +1721,10 @@ const(char)* adbg_object_pe_import_name(adbg_object_t *o, pe_import_descriptor_t
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
 		pe.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
@@ -1815,12 +1749,10 @@ pe_import_entry32_t* adbg_object_pe_import_entry32(adbg_object_t *o, pe_import_d
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
 		pe.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
@@ -1851,47 +1783,15 @@ pe_import_entry32_t* adbg_object_pe_import_entry32(adbg_object_t *o, pe_import_d
 	return entry;
 }
 
-/*ushort* adbg_object_pe_import_entry32_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_ENTRY32 *im32) {
-	if (o == null || import_ == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
-	if (pe.header.SizeOfOptionalHeader == 0 ||
-		pe.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
-		adbg_oops(AdbgError.unavailable);
-		return null;
-	}
-	
-	void* base =
-		pe.import_directory -
-		pe.directory.ImportTable.rva +
-		im32.rva;
-	with (internal)
-	if (adbg_bits_ptr_outside(entry, import_buffer, import_section.SizeOfRawData)) {
-		adbg_oops(AdbgError.offsetBounds);
-		return null;
-	}
-	
-	return cast(ushort*)base;
-}*/
-
 pe_import_entry64_t* adbg_object_pe_import_entry64(adbg_object_t *o, pe_import_descriptor_t *import_, size_t index) {
 	if (o == null || import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
 		pe.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
@@ -1918,29 +1818,6 @@ pe_import_entry64_t* adbg_object_pe_import_entry64(adbg_object_t *o, pe_import_d
 	return entry;
 }
 
-/*ushort* adbg_object_pe_import_entry64_hint(adbg_object_t *o, PE_IMPORT_DESCRIPTOR *import_, PE_IMPORT_ENTRY64 *im64) {
-	if (o == null || import_ == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.i.pe.directory_imports == null) {
-		adbg_oops(AdbgError.unavailable);
-		return null;
-	}
-	
-	ushort* base = cast(ushort*)
-		((cast(char*)o.i.pe.directory_imports - o.i.pe.directory.ImportTable.rva) + im64.rva);
-	
-	version (Trace) trace("base=%p fs=%zx", base, o.file_size);
-	
-	if (adbg_object_outboundp(o, base)) {
-		adbg_oops(AdbgError.offsetBounds);
-		return null;
-	}
-	
-	return base;
-}*/
-
 // Classless functions
 // TODO: Optimize these, maybe cache the last result in internals
 
@@ -1949,12 +1826,10 @@ pe_import_entry_t* adbg_object_pe_import_entry(adbg_object_t *o, pe_import_descr
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
 		pe.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
@@ -1977,12 +1852,10 @@ uint adbg_object_pe_import_entry_rva(adbg_object_t *o, pe_import_descriptor_t *i
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return 0;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return 0;
+	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
 		pe.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
@@ -2005,12 +1878,10 @@ ushort adbg_object_pe_import_entry_hint(adbg_object_t *o, pe_import_descriptor_t
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return 0;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return 0;
+	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
 		pe.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
@@ -2067,12 +1938,10 @@ const(char)* adbg_object_pe_import_entry_symbol(adbg_object_t *o, pe_import_desc
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.unimplemented);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
 		pe.directory.ImportTable.size <= pe_import_descriptor_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
@@ -2135,12 +2004,10 @@ pe_debug_directory_entry_t* adbg_object_pe_debug_directory(adbg_object_t *o, siz
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
 		pe.directory.DebugDirectory.size == 0) {
 		adbg_oops(AdbgError.unavailable);
@@ -2210,6 +2077,7 @@ pe_debug_directory_entry_t* adbg_object_pe_debug_directory(adbg_object_t *o, siz
 		return null;
 	}
 	
+	// Swap if needed
 	if (o.status & AdbgObjectInternalFlags.reversed && pe.r_debug_entries[index] == false) with (debug_) {
 		Characteristics	= adbg_bswap32(Characteristics);
 		TimeDateStamp	= adbg_bswap32(TimeDateStamp);
@@ -2222,7 +2090,7 @@ pe_debug_directory_entry_t* adbg_object_pe_debug_directory(adbg_object_t *o, siz
 		pe.r_debug_entries[index] = true;
 	}
 	
-	return debug_;
+	return &pe.debug_directory[index];
 }
 
 void* adbg_object_pe_debug_directory_data(adbg_object_t *o, pe_debug_directory_entry_t *entry) {
@@ -2230,12 +2098,10 @@ void* adbg_object_pe_debug_directory_data(adbg_object_t *o, pe_debug_directory_e
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
 		pe.directory.DebugDirectory.size == 0) {
 		adbg_oops(AdbgError.unavailable);
@@ -2262,12 +2128,9 @@ void* adbg_object_pe_loadconfig(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
 
 	// If already loaded, return it
 	if (pe.load32_directory)
@@ -2412,12 +2275,10 @@ AdbgMachine adbg_object_pe_machine(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return AdbgMachine.unknown;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return AdbgMachine.unknown;
-	}
-	pe_header_t* header = cast(pe_header_t*)o.internal;
-	return adbg_object_pe_machine_value(header.Machine);
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return AdbgMachine.unknown;
+	return adbg_object_pe_machine_value(pe.header.Machine);
 }
 
 AdbgMachine adbg_object_pe_machine_value(uint machine) {
@@ -2503,11 +2364,10 @@ const(char)* adbg_object_pe_machine_string(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return adbg_object_pe_machine_value_string((cast(pe_header_t*)o.internal).Machine);
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	return adbg_object_pe_machine_value_string(pe.header.Machine);
 }
 
 const(char)* adbg_object_pe_magic_string(adbg_object_t *o) {
@@ -2515,12 +2375,10 @@ const(char)* adbg_object_pe_magic_string(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	pe_optional_header_t* opthdr = &(cast(internal_pe_t*)o.internal).optheader;
-	switch (opthdr.Magic) {
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	switch (pe.optheader.Magic) {
 	case PE_CLASS_32:	return "PE32";
 	case PE_CLASS_64:	return "PE32+";
 	case PE_CLASS_ROM:	return "PE-ROM";
@@ -2535,19 +2393,21 @@ const(char)* adbg_object_pe_subsys_string(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	pe_optional_header_t* opthdr = &(cast(internal_pe_t*)o.internal).optheader;
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
+	// Get subsystem value depending on optional header
 	ushort subsystem = void;
-	switch (opthdr.Magic) {
-	case PE_CLASS_32: subsystem = opthdr.Subsystem; break;
-	case PE_CLASS_64: subsystem = (cast(pe_optional_header64_t*)opthdr).Subsystem; break;
+	switch (pe.optheader.Magic) {
+	case PE_CLASS_32: subsystem = pe.optheader.Subsystem; break;
+	case PE_CLASS_64: subsystem = pe.optheader64.Subsystem; break;
 	default:
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
+	
+	// Get string
 	switch (subsystem) {
 	case PE_SUBSYSTEM_NATIVE:	return "Native";
 	case PE_SUBSYSTEM_WINDOWS_GUI:	return "Windows GUI";
@@ -2596,9 +2456,12 @@ const(char)* adbg_object_pe_debug_type_string(uint type) {
 }
 
 const(char)* adbg_object_pe_kind_string(adbg_object_t *o) {
-	if (o == null || o.internal == null)
+	if (o == null)
 		return cast(const(char)*)adbg_oops_null(AdbgError.invalidArgument);
-	internal_pe_t *pe = cast(internal_pe_t*)o.internal;
+		
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	if (pe == null) return null;
+	
 	return pe.header.Characteristics & PE_CHARACTERISTIC_DLL ?
 		`Dynamically Linked Library` : `Executable`;
 }

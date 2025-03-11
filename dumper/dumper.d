@@ -144,7 +144,7 @@ int dump_file(const(char)* path) {
 			print_string("type", adbg_object_format_string(o));
 			print_string("id", adbg_object_id_string(o));
 		}
-		final switch (o.format) with (AdbgObject) {
+		final switch (adbg_object_format(o)) with (AdbgObject) {
 		case mz:	return dump_mz(o);
 		case ne:	return dump_ne(o);
 		case pe:	return dump_pe(o);

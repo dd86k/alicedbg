@@ -12,7 +12,7 @@ import core.stdc.stdlib : malloc, calloc, free;
 
 extern (C):
 
-//TODO: Support compressed MZ files?
+// TODO: Support compressed MZ files?
 
 /// Minimum file size for an MZ EXE.
 // NOTE: Borland EXE about 6K (includes a CRT?).
@@ -71,7 +71,6 @@ private enum {
 private
 struct internal_mz_t {
 	mz_header_t header;
-	bool *r_relocs; /// Reversed relocations
 	mz_reloc_t *relocs;
 }
 
@@ -79,20 +78,16 @@ int adbg_object_mz_load(adbg_object_t *o) {
 	version (Trace) trace("o=%p", o);
 	
 	// Set format and allocate object internals
-	o.internal = calloc(1, internal_mz_t.sizeof);
-	if (o.internal == null)
-		return adbg_oops(AdbgError.crt);
-	int e = adbg_object_read_at(o, 0, o.internal, mz_header_t.sizeof);
-	if (e) {
-		free(o.internal);
-		return e;
-	}
+	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_alloc_internal(o, internal_mz_t.sizeof);
+	if (mz == null)
+		return adbg_error_code();
 	
-	adbg_object_postload(o, AdbgObject.mz, &adbg_object_mz_unload);
+	// Read header
+	int e = adbg_object_read_at(o, 0, &mz.header, mz_header_t.sizeof);
+	if (e) return e;
 	
 	// Inverse header if required
-	mz_header_t* header = cast(mz_header_t*)o.internal;
-	if (o.status & AdbgObjectInternalFlags.reversed) with (header) {
+	if (o.status & AdbgObjectInternalFlags.reversed) with (mz.header) {
 		e_magic	= adbg_bswap16(e_magic);
 		e_cblp	= adbg_bswap16(e_cblp);
 		e_cp	= adbg_bswap16(e_cp);
@@ -109,19 +104,16 @@ int adbg_object_mz_load(adbg_object_t *o) {
 		e_ovno	= adbg_bswap16(e_ovno);
 	}
 	
+	adbg_object_postload(o, AdbgObject.mz, &adbg_object_mz_unload);
 	return 0;
 }
 
 void adbg_object_mz_unload(adbg_object_t *o) {
-	if (o == null) return;
-	if (o.internal == null) return;
+	assert(o);
 	
-	internal_mz_t *internal = cast(internal_mz_t*)o.internal;
-	
-	if (internal.r_relocs) free(internal.r_relocs);
-	if (internal.relocs) free(internal.relocs);
-	
-	free(internal);
+	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_internal_buffer(o);
+	if (mz == null) return;
+	if (mz.relocs)  free(mz.relocs);
 }
 
 mz_header_t* adbg_object_mz_header(adbg_object_t *o) {
@@ -129,11 +121,9 @@ mz_header_t* adbg_object_mz_header(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return cast(mz_header_t*)o.internal;
+	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_internal_buffer(o);
+	if (mz == null) return null;
+	return &mz.header;
 }
 
 mz_reloc_t* adbg_object_mz_reloc(adbg_object_t *o, size_t index) {
@@ -141,61 +131,59 @@ mz_reloc_t* adbg_object_mz_reloc(adbg_object_t *o, size_t index) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	
-	internal_mz_t *internal = cast(internal_mz_t*)o.internal;
+	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_internal_buffer(o);
+	if (mz == null) return null;
 	
-	// Initiate relocs
-	with (internal) if (relocs == null) {
+	// Initiate relocation buffer
+	if (mz.relocs == null) {
 		// Any relocations in object and after header?
-		if (header.e_crlc == 0 || header.e_lfarlc < MZMHSZ) {
+		if (mz.header.e_crlc == 0 || mz.header.e_lfarlc < MZMHSZ) {
 			adbg_oops(AdbgError.unavailable);
 			return null;
 		}
-		// Allocation portion to hold relocations
-		size_t size = mz_reloc_t.sizeof * header.e_crlc;
-		relocs = cast(mz_reloc_t*)malloc(size);
-		if (relocs == null) {
+		
+		// Allocate portion to hold relocations
+		size_t size = mz.header.e_crlc * mz_reloc_t.sizeof;
+		mz.relocs = cast(mz_reloc_t*)malloc(size);
+		if (mz.relocs == null) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
+		
 		// Error set by function
-		if (adbg_object_read_at(o, header.e_lfarlc, relocs, size)) {
-			free(relocs);
-			relocs = null;
+		if (adbg_object_read_at(o, mz.header.e_lfarlc, mz.relocs, size)) {
+			free(mz.relocs);
+			mz.relocs = null;
 			return null;
 		}
-		// Initiate reverse info if required
+		
+		// Byteswap all relocation entries
 		if (o.status & AdbgObjectInternalFlags.reversed) {
-			r_relocs = cast(bool*)malloc(header.e_crlc);
-			if (r_relocs == null) {
-				free(relocs);
-				relocs = null;
-				adbg_oops(AdbgError.crt);
-				return null;
+			for (ushort i; i < mz.header.e_crlc; ++i) {
+				mz_reloc_t *reloc = &mz.relocs[index];
+				reloc.offset = adbg_bswap16(reloc.offset);
+				reloc.segment = adbg_bswap16(reloc.segment);
 			}
 		}
 	}
 	
-	if (index >= internal.header.e_crlc) {
+	// Check index bounds
+	if (index >= mz.header.e_crlc) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	mz_reloc_t *reloc = &internal.relocs[index];
-	if (o.status & AdbgObjectInternalFlags.reversed && internal.r_relocs[index] == false) {
-		reloc.offset = adbg_bswap16(reloc.offset);
-		reloc.segment = adbg_bswap16(reloc.segment);
-		internal.r_relocs[index] = true;
-	}
-	return reloc;
+	// Get relocation
+	return &mz.relocs[index];
 }
 
 const(char)* adbg_object_mz_kind_string(adbg_object_t *o) {
-	if (o == null || o.internal == null)
+	if (o == null)
 		return cast(const(char)*)adbg_oops_null(AdbgError.invalidArgument);
-	return (cast(mz_header_t*)o.internal).e_ovno ? `Overlayed Executable` : `Executable`;
+	
+	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_internal_buffer(o);
+	if (mz == null) return null;
+	
+	return mz.header.e_ovno ? `Overlayed Executable` : `Executable`;
 }

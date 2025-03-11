@@ -65,7 +65,7 @@ void dump_elf_ehdr(adbg_object_t *o) {
 	print_u8("e_ident[EI_CLASS]", ei_class, adbg_object_elf_class_string(ei_class));
 	print_u8("e_ident[EI_DATA]", ei_data, adbg_object_elf_data_string(ei_data));
 	print_u8("e_ident[EI_VERSION]", ei_version);
-	print_u8("e_ident[EI_OSABI]", ei_osabi, adbg_object_elf_abi_string(ei_osabi));
+	print_u8("e_ident[EI_OSABI]", ei_osabi, adbg_object_elf_osabi_string(ei_osabi));
 	print_u8("e_ident[EI_ABIVERSION]", ei_abiversion);
 	print_u8("e_ident[9]",  e_ident[9]);
 	print_u8("e_ident[10]", e_ident[10]);
