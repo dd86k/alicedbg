@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module format.coff;
+module format_coff;
 
 import adbg.disassembler;
 import adbg.objectserver;

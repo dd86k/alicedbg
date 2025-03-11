@@ -190,7 +190,7 @@ int cli_build_info() {
 //
 
 int cli_version() {
-	__gshared immutable(char) *page_version = // avoid TLS
+	static immutable const(char) *page_version = // avoid TLS
 	"Version     "~FULL_VERSION~"\n"~
 	"            Built "~__TIMESTAMP__~"\n"~
 	"            "~COPYRIGHT~"\n"~

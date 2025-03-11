@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module format.pe;
+module format_pe;
 
 import adbg.disassembler;
 import adbg.objectserver;
@@ -18,7 +18,7 @@ import core.stdc.stdlib;
 import core.stdc.string : strncmp;
 import core.stdc.stdio : snprintf;
 import dumper;
-import format.mz : dump_mz_ext_header;
+import format_mz : dump_mz_ext_header;
 import common.errormgmt;
 
 extern (C):

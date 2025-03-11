@@ -3,14 +3,14 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module format.ne;
+module format_ne;
 
 import adbg.disassembler;
 import adbg.objectserver;
 import adbg.machines : AdbgMachine;
 import adbg.objects.ne;
 import dumper;
-import format.mz : dump_mz_ext_header;
+import format_mz : dump_mz_ext_header;
 
 extern (C):
 

@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module format.omf;
+module format_omf;
 
 import adbg.objectserver;
 import adbg.objects.omf;
