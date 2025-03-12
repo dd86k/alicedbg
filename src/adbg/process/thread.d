@@ -121,7 +121,7 @@ version (Windows) {
 	te32.dwSize = THREADENTRY32.sizeof;
 	if (Thread32First(snap, &te32) == FALSE) {
 		adbg_oops(AdbgError.os);
-		adbg_list_free(list);
+		adbg_list_close(list);
 		return null;
 	}
 	
@@ -135,7 +135,7 @@ version (Windows) {
 		t.id = te32.th32ThreadID;
 		list = adbg_list_add(list, &t);
 		if (list == null) {
-			adbg_list_free(list);
+			adbg_list_close(list);
 			return null;
 		}
 	} while (Thread32Next(snap, &te32));

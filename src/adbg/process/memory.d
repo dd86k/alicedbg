@@ -478,7 +478,7 @@ Lretry:
 		
 		list = adbg_list_add(list, &map);
 		if (list == null) {
-			adbg_list_free(list);
+			adbg_list_close(list);
 			return null;
 		}
 		
@@ -581,7 +581,7 @@ Lenum:
 		map.size = minfo.SizeOfImage;
 		list = adbg_list_add(list, &map);
 		if (list == null) {
-			adbg_list_free(list);
+			adbg_list_close(list);
 			return null;
 		}
 	}

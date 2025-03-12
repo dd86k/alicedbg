@@ -269,7 +269,7 @@ version (Windows) {
 	//         https://gist.github.com/hasherezade/c3f82fb3099fb5d1afd84c9e8831af1e
 	HANDLE hsnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
 	if (hsnap == INVALID_HANDLE_VALUE) {
-		adbg_list_free(list);
+		adbg_list_close(list);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
@@ -277,7 +277,7 @@ version (Windows) {
 	
 	PROCESSENTRY32 entry = void;
 	if (Process32First(hsnap, &entry) == FALSE) {
-		adbg_list_free(list);
+		adbg_list_close(list);
 		adbg_oops(AdbgError.os);
 		return null;
 	}
