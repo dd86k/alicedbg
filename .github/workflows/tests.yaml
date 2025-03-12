@@ -18,7 +18,7 @@ jobs:
       with:
         compiler: ${{ matrix.dc }}
     - name: Test Alicedbg
-      run: dub test -c debugger
+      run: dub test :debugger
   Alicedump:
     strategy:
       matrix:
@@ -32,4 +32,4 @@ jobs:
       with:
         compiler: ${{ matrix.dc }}
     - name: Test Alicedump
-      run: dub test -c dumper
+      run: dub test :dumper

@@ -11,7 +11,7 @@ import adbg.disassembler;
 import adbg.include.capstone : libcapstone_dynload, cs_version;
 import adbg.include.c.stdlib : exit;
 import adbg.include.d.config : GDC_VERSION, GDC_EXCEPTION_MODE, LLVM_VERSION;
-import core.stdc.stdio;
+import adbg.include.c.stdio;
 import core.stdc.stdlib;
 import core.stdc.string;
 public import getopt;

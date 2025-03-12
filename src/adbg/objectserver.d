@@ -281,7 +281,6 @@ adbg_object_t* adbg_object_open_buffer(void *buffer, size_t buffersize, ...) {
 	
 	o.user_buffer = buffer;
 	o.user_buffersize = buffersize;
-	
 	o.origin = AdbgObjectOrigin.userbuffer;
 	
 	if (adbg_object_loadv(o)) {
@@ -291,7 +290,7 @@ adbg_object_t* adbg_object_open_buffer(void *buffer, size_t buffersize, ...) {
 	
 	version (Trace) if (o.func_unload == null)
 		trace("NOTE: object type %s does not have unload function set",
-			adbg_object_format_shortname(o));
+			adbg_object_id_string(o));
 	
 	return o;
 }

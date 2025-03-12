@@ -32,39 +32,20 @@ license "BSD-3-Clause-Clear"
 #       Yes, it works with -fno-druntime, so it can be possible to add
 #       -gdc-betterc build types in the future.
 
-# NOTE: Configurations and Sub-Packages
-#       Sub-packages do not take build type options from root dub file.
-#       But since configurations do, they are defined here, this is important
-#       because on the reliance on betterC.
+subPackage "common"
+subPackage "debugger"
+subPackage "dumper"
+subPackage {
+	name "simple"
+	targetName "simple"
+	targetType "executable"
+	sourceFiles "examples/simple.d"
+	dependency "alicedbg" version="*"
+}
 
 #
 # ANCHOR Configurations
 #
-
-# Application: Debugger (alicedbg)
-configuration "debugger" {
-	targetType "executable"
-	targetName "alicedbg"
-	sourcePaths "debugger" "common"
-	importPaths "debugger" "common"
-	mainSourceFile "debugger/main.d"
-}
-
-# Application: Dumper (alicedump)
-configuration "dumper" {
-	targetType "executable"
-	targetName "alicedump"
-	sourcePaths "dumper" "common"
-	importPaths "dumper" "common"
-	mainSourceFile "dumper/main.d"
-}
-
-# Application: Example (simple)
-configuration "simple" {
-	targetType "executable"
-	targetName "simple"
-	mainSourceFile "examples/simple.d"
-}
 
 # Library
 # NOTE: DUB names it "alicedbg.lib" on Windows and "libalicedbg.a" elsewhere

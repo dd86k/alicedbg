@@ -275,7 +275,7 @@ version (Windows) {
 	proc.orig_handle = pi.hProcess;
 	proc.orig_pid = proc.pid = pi.dwProcessId;
 	
-	proc.state = AdbgProcessState.standby;
+	proc.state = AdbgProcessState.created;
 	proc.creation = AdbgCreation.spawned;
 	return proc;
 } else version (Posix) {
