@@ -50,7 +50,7 @@ extern (D) unittest {
 	assert(list.count == 0);
 	assert(list.itemsize == int.sizeof);
 	assert(adbg_list_get(list, 0) == null);
-	adbg_list_free(list);
+	adbg_list_close(list);
 }
 
 /// Increase or decrease the capacity of the list.
@@ -188,7 +188,7 @@ extern (D) unittest {
 	assert(list.count == 7);
 	assert(list.itemsize == int.sizeof);
 	
-	adbg_list_free(list);
+	adbg_list_close(list);
 }
 
 /// Get an item at this index.
@@ -223,7 +223,7 @@ extern (D) unittest {
 	assert(*a1p == 1);
 	assert(*a2p == 2);
 	
-	adbg_list_free(list);
+	adbg_list_close(list);
 }
 
 /// Set the counter to zero.
@@ -242,7 +242,7 @@ extern (D) unittest {
 	adbg_list_clear(list);
 	assert(list.count == 0);
 	
-	adbg_list_free(list);
+	adbg_list_close(list);
 }
 
 /// Remove an item from the list by its index.
@@ -305,7 +305,7 @@ extern (D) unittest {
 	assert(*cast(int*)adbg_list_get(list, 0) == 10);
 	assert(*cast(int*)adbg_list_get(list, 1) == 15);
 	
-	adbg_list_free(list);
+	adbg_list_close(list);
 }
 
 /// Free the list.
