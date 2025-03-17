@@ -6,7 +6,7 @@
 module examples.simple;
 
 import core.stdc.stdio;
-import core.stdc.stdlib : exit;
+import core.stdc.stdlib : exit, EXIT_FAILURE, EXIT_SUCCESS;
 import adbg;
 
 extern (C): __gshared: private:
@@ -22,9 +22,11 @@ adbg_disassembler_t *disassembler;
 int status = SIMPLE_CONTINUE;
 
 void oops(int code = 0, const(char) *reason = null) {
-	printf("* error=\"%s\"\n", reason ? reason : adbg_error_message());
-	if (code == 0) code = adbg_errno;
-	exit(code);
+	printf("* error=\"%s\" code=\"%d\"\n",
+		reason ? reason : adbg_error_message(),
+		code ? code : adbg_error_code()
+	);
+	exit(EXIT_FAILURE);
 }
 
 void event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *exception) {
@@ -106,9 +108,9 @@ int main(int argc, const(char) **argv) {
 			0);
 	if (process == null)
 		oops;
-	adbg_debugger_on(process, AdbgEvent.exception, &event_exception);
-	adbg_debugger_on(process, AdbgEvent.processContinue, &event_process_continue);
-	adbg_debugger_on(process, AdbgEvent.processExit, &event_process_exit);
+	adbg_debugger_on_exception(process, &event_exception);
+	adbg_debugger_on_process_continue(process, &event_process_continue);
+	adbg_debugger_on_process_exit(process, &event_process_exit);
 	adbg_debugger_udata(process, &status);
 	
 	// New disassembler instance, if able
