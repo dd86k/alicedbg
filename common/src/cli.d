@@ -100,22 +100,27 @@ private:
 int cli_march(const(char) *val) {
 	if (wantsHelp(val)) {
 		puts("Available machine architectures for disassembly:");
-		immutable(AdbgMachine)* mach = adbg_disassembler_machines();
-		for (size_t i; mach[i]; ++i) {
-			immutable(adbg_machine_t)* m = adbg_machine(mach[i]);
-			printf("- %*s", -8, m.alias1);
-			if (m.alias2) printf(" (%s)", m.alias2);
-			else          putchar('\t');
-			printf("\t%s\n", m.name);
+		immutable(AdbgMachine)* disasm_list = adbg_disassembler_machines();
+		for (size_t i; disasm_list[i]; ++i) {
+			immutable(adbg_machine_t) *machine = adbg_machine(disasm_list[i]);
+			printf("- %*s: ", -20, adbg_machine_fullname(machine));
+			
+			const(char)** aliases = adbg_machine_aliases(machine);
+			for (size_t a; aliases[a]; ++a) {
+				if (a) printf(", ");
+				printf(`"%s"`, aliases[a]);
+			}
+			putchar('\n');
 		}
 		exit(0);
 	}
-	immutable(adbg_machine_t)* m = adbg_machine_select(val);
-	if (m) {
-		opt_machine = m.machine;
-		return EXIT_SUCCESS;
-	}
-	return EXIT_FAILURE;
+	
+	immutable(adbg_machine_t)* machine = adbg_machine_select(val);
+	if (machine == null)
+		return EXIT_FAILURE;
+	
+	opt_machine = machine.id;
+	return EXIT_SUCCESS;
 }
 
 //

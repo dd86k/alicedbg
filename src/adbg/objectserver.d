@@ -29,7 +29,7 @@ import adbg.types.coff : adbg_type_coff_populate;
 import adbg.process.memory : adbg_memory_read;
 import adbg.process.base : adbg_process_t;
 import adbg.error;
-import adbg.machines : AdbgMachine, adbg_machine_name;
+import adbg.machines;
 import adbg.utils.math;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
@@ -815,6 +815,7 @@ long adbg_object_filesize(adbg_object_t *o) {
 	}
 }
 
+// TODO: Deprecate adbg_object_machine for being ambiguous due to return value
 /// Returns the first machine type the object supports.
 /// Params: o = Object instance.
 /// Returns: Machine value. `AdbgMachine.unknown` on error.
@@ -838,11 +839,32 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	return AdbgMachine.unknown;
 }
 
-/// Get the (first) machine specified in the object as a string.
+// TODO: adbg_object_machine_list, this function is temporary
+/// Returns the first machine type the object supports.
 /// Params: o = Object instance.
-/// Returns: String pointer or null on error.
-const(char)* adbg_object_machine_string(adbg_object_t *o) {
-	return adbg_machine_name( adbg_object_machine(o) );
+/// Returns: Machine definition instance. null on error.
+immutable(adbg_machine_t)* adbg_object_machine2(adbg_object_t *o) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	AdbgMachine machine = void;
+	switch (o.format) with (AdbgObject) {
+	case mz:	machine = AdbgMachine.i8086; break;
+	case ne:	machine = adbg_object_ne_machine(o); break;
+	case lx:	machine = adbg_object_lx_machine(o); break;
+	case pe:	machine = adbg_object_pe_machine(o); break;
+	case macho:	machine = adbg_object_macho_machine(o); break;
+	case elf:	machine = adbg_object_elf_machine(o); break;
+	case coff:	machine = adbg_object_coff_machine(o); break;
+	case dmp:	machine = adbg_object_dmp_machine(o); break;
+	default:
+		adbg_oops(AdbgError.objectUnsupportedFormat);
+		return null;
+	}
+	
+	return adbg_machine(machine);
 }
 
 /// Get the object format.

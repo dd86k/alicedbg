@@ -192,9 +192,10 @@ int dump_file(const(char)* path) {
 		SAFEVAL( adbg_object_format_string(o) ),
 		SAFEVAL( adbg_object_kind_string(o) ));
 	
+	
 	// Print machine type used for object
-	const(char)* machstr = adbg_object_machine_string(o);
-	if (machstr) printf(", %s", machstr);
+	immutable(adbg_machine_t) *machine = adbg_object_machine2(o);
+	if (machine) printf(", %s", adbg_machine_fullname(machine));
 	
 	// Print OS ABI type used for object
 	const(char)* osabistr = adbg_object_osabi_string(o);

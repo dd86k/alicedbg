@@ -151,6 +151,27 @@ immutable libcsmachine_t[] machmap_capstone = [
 	{ AdbgMachine.systemz,	8,	CS_ARCH_SYSZ,	0 }, // works
 ];
 
+/// Returns a null-terminated list of machines that the disassembler supports.
+/// Returns: Pointer to null-terminated list.
+immutable(AdbgMachine)* adbg_disassembler_machines() {
+	__gshared bool init;
+	__gshared AdbgMachine[machmap_capstone.length + 1] list;
+	// Since machine mapping array isn't linear, make a linear list here
+	if (init == false) {
+		foreach (i, ref immutable(libcsmachine_t) mach; machmap_capstone)
+			list[i] = mach.mach;
+		list[machmap_capstone.length] = AdbgMachine.unknown;
+		init = true;
+	}
+	return cast(immutable(AdbgMachine)*)list.ptr;
+}
+extern (D) unittest {
+	immutable(AdbgMachine)* machs = adbg_disassembler_machines();
+	assert(machs[0] == AdbgMachine.i8086);
+	assert(machs[1] == AdbgMachine.i386);
+	assert(machs[machmap_capstone.length] == 0);
+}
+
 // Platform to CS' ARCH and MODE types
 private
 immutable(libcsmachine_t)* adbg_disassembler_liba2cs(AdbgMachine machine) {
@@ -272,27 +293,6 @@ size_t adbg_disassembler_buffer_left(adbg_disassembler_t *dasm) {
 		return 0;
 	}
 	return dasm.buffer_size;
-}
-
-/// Returns a null-terminated list of machines that the disassembler supports.
-/// Returns: Pointer to null-terminated list.
-immutable(AdbgMachine)* adbg_disassembler_machines() {
-	__gshared bool init;
-	__gshared AdbgMachine[machmap_capstone.length + 1] list;
-	// Since machine mapping array isn't linear, make a linear list here
-	if (init == false) {
-		foreach (i, ref immutable(libcsmachine_t) mach; machmap_capstone)
-			list[i] = mach.mach;
-		list[machmap_capstone.length] = AdbgMachine.unknown;
-		init = true;
-	}
-	return cast(immutable(AdbgMachine)*)list.ptr;
-}
-extern (D) unittest {
-	immutable(AdbgMachine)* machs = adbg_disassembler_machines();
-	assert(machs[0] == AdbgMachine.i8086);
-	assert(machs[1] == AdbgMachine.i386);
-	assert(machs[machmap_capstone.length] == 0);
 }
 
 /// Configure an option to the disassembler.
