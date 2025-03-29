@@ -71,13 +71,14 @@ version (Windows) {
 	private alias OSHANDLE = int;
 	
 	version (FreeBSD) {
+		// Because core.sys.posix.sys.stat.fstat is marked with
 		// pragma(mangle, "fstat@FBSD_1.5")
-		// leads to incorrect linked version, redefine it here
+		// it leads to incorrect linked version, it is redefined here
 		extern (C) int fstat(int, stat_t*);
 	}
 }
 
-import adbg.error;
+version (Trace) import adbg.error : trace;
 
 /// File seek origin.
 enum OSFileSeek {

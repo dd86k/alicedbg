@@ -11,16 +11,18 @@ module adbg.machines;
 import core.stdc.string : strcmp;
 import adbg.error;
 
-// NOTE: Machine enum names are the same as their alias name.
-//       This avoids (mostly) possible collisions.
-
-// TODO: AdbgMachineExtension? (Useful for disassembly options)
-//       Bitflags, long
+// NOTE: Processor models, extensions, etc.
+//       For any characteristics of a processor, new enumerations
+//       SHOULD be created, and NOT as bitfields, due to limited bit space.
 
 /// Word endian.
 enum AdbgEndian { big, little }
 
+// NOTE: Machine enum names are the same as their alias name.
+//       This avoids (mostly) possible collisions.
 /// Object machine type.
+///
+/// This only defines the baseline for a instruction set architecture.
 enum AdbgMachine {
 	/// Unknown.
 	unknown,
@@ -491,7 +493,7 @@ struct adbg_machine_t {
 	// TODO: Default endian?
 }
 
-private // Alias list, adds null terminator
+private // Alias list, appends null terminator
 template A(l...) { enum A = cast(immutable(char)*[])[l]~null; }
 
 // NOTE: Full name consistency.

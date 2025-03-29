@@ -21,11 +21,6 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 
 // TODO: Make module thread-safe
 //       Either via TLS and/or atomic operations
-// TODO: Error utils
-//       adbg_ensure_params(lvalue, "name")
-//       - returns string if null found
-//       - automatically set error code
-//       adbg_oops_ptr(AdbgError, void*) to return null
 // TODO: Localize error messages as option (including system ones, when able)
 
 extern (C):
@@ -36,70 +31,70 @@ enum AdbgError {
 	// 0-99: Generic
 	//
 	success	= 0,
-	invalidArgument	= 1,	/// Argument is null or zero
-	emptyArgument	= 2,	/// Argument contains an empty dataset
-	uninitiated	= 4,	/// Instance was not initiated
-	invalidOption	= 5,	/// Invalid option
-	invalidValue	= 6,	/// Invalid value for option
-	offsetBounds	= 7,	/// File offset is outside of file size
-	indexBounds	= 8,	/// Index is outside of bounds of list
-	unavailable	= 9,	/// Feature or item is unavailable
-	unfindable	= 10,	/// Item not found
-	partialRead	= 11,	/// Not all data could be read
-	partialWrite	= 12,	/// Not all data could be written
+	invalidArgument	= -1,	/// Argument is null or zero
+	emptyArgument	= -2,	/// Argument contains an empty dataset
+	uninitiated	= -4,	/// Instance was not initiated
+	invalidOption	= -5,	/// Invalid option
+	invalidValue	= -6,	/// Invalid value for option
+	offsetBounds	= -7,	/// File offset is outside of file size
+	indexBounds	= -8,	/// Index is outside of bounds of list
+	unavailable	= -9,	/// Feature or item is unavailable
+	unfindable	= -10,	/// Item not found
+	partialRead	= -11,	/// Not all data could be read
+	partialWrite	= -12,	/// Not all data could be written
 	//
 	// 100-199: Debugger
 	//
-	debuggerUnattached	= 100,
-	debuggerUnpaused	= 101,
-	debuggerInvalidAction	= 102,	/// Wrong action from creation method
-	debuggerPresent	= 103,	/// Debugger already present in remote process
-	debuggerNeedFile	= 104,	/// File path not given (e.g., directory)
+	debuggerUnattached	= -100,
+	debuggerUnpaused	= -101,
+	debuggerInvalidAction	= -102,	/// Wrong action from creation method
+	debuggerPresent	= -103,	/// Debugger already present in remote process
+	debuggerNeedFile	= -104,	/// File path not given (e.g., directory)
 	//
 	// 200-299: Disasembler
 	//
-	disasmUnsupportedMachine	= 202,
-	disasmIllegalInstruction	= 220,
-	disasmEndOfData	= 221,
-	disasmOpcodeLimit	= 221,
+	disasmUnsupportedMachine	= -202,
+	disasmIllegalInstruction	= -220,
+	disasmEndOfData	= -221,
+	disasmOpcodeLimit	= -221,
 	//
 	// 300-399: Object server
 	//
-	objectUnknownFormat	= 301,
-	objectUnsupportedFormat	= 302,
-	objectTooSmall	= 303,
-	objectMalformed	= 304,
-	objectItemNotFound	= 305,
-	objectInvalidVersion	= 310,
-	objectInvalidMachine	= 311,
-	objectInvalidClass	= 312,
-	objectInvalidEndian	= 313,
-	objectInvalidType	= 314,
-	objectInvalidABI	= 315,
+	objectUnknownFormat	= -301,
+	objectUnsupportedFormat	= -302,
+	objectTooSmall	= -303,
+	objectMalformed	= -304,
+	objectItemNotFound	= -305,
+	objectInvalidVersion	= -310,
+	objectInvalidMachine	= -311,
+	objectInvalidClass	= -312,
+	objectInvalidEndian	= -313,
+	objectInvalidType	= -314,
+	objectInvalidABI	= -315,
 	//
 	// 400-499: System
 	//
-	systemLoadError	= 402,
-	systemBindError	= 403,
+	systemLoadError	= -402,
+	systemBindError	= -403,
 	//
 	// 800-899: Memory scanner
 	//
-	scannerDataEmpty	= 800,
-	scannerDataLimit	= 801,
+	scannerDataEmpty	= -800,
+	scannerDataLimit	= -801,
 	//
 	// 1000-1999: Misc
 	//
-	assertion	= 1000,	/// Soft assert
-	unimplemented	= 1001,	/// Not implemented
+	assertion	= -1000,	/// Soft assert
+	unimplemented	= -1001,	/// Not implemented
 	//
 	// 2000-2999: External resources
 	//
-	os	= 2001,
-	crt	= 2002,
+	os	= -2001,
+	crt	= -2002,
 	//
 	// 3000-3999: External libraries
 	//
-	libCapstone	= 3002,	/// Capstone
+	libCapstone	= -3002,	/// Capstone
 }
 
 /// Represents an error in alicedbg.
