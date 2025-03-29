@@ -122,7 +122,7 @@ enum AdbgObjectOrigin {
 	/// Object was loaded from the debugger into memory.
 	process,
 	/// Object is a whole buffer provided externally.
-	userbuffer,
+	buffer,
 }
 
 deprecated
@@ -174,7 +174,13 @@ struct adbg_object_t {
 	/// the specific object format.
 	deprecated void *internal;
 	/// Used to attach the unload function
+	deprecated
 	private void function(adbg_object_t*) func_unload;
+	/// Internal buffer used by the module responsible of handling
+	/// the specific object format.
+	private void *modbuffer;
+	// TODO: Event: When closing
+	private void function(adbg_object_t*, void*) on_unload;
 }
 
 // TODO: "adbg_object_register" function to replace adbg_object_postload
@@ -192,19 +198,6 @@ struct adbg_object_t {
 //       - object type (optional)
 //       - etc.
 //         needs an API to set object type and other attributes
-
-// TODO: Deprecate after Objectserver Register API is implemented
-// Internal function for submodules to setup internals
-package
-void adbg_object_postload(adbg_object_t *o,
-	AdbgObject type, void function(adbg_object_t *o) funload) {
-	assert(o);
-	assert(type);
-	assert(funload);
-	
-	o.format = type;
-	o.func_unload = funload;
-}
 
 /// Open and load an object from disk into memory.
 ///
@@ -281,7 +274,7 @@ adbg_object_t* adbg_object_open_buffer(void *buffer, size_t buffersize, ...) {
 	
 	o.user_buffer = buffer;
 	o.user_buffersize = buffersize;
-	o.origin = AdbgObjectOrigin.userbuffer;
+	o.origin = AdbgObjectOrigin.buffer;
 	
 	if (adbg_object_loadv(o)) {
 		adbg_object_close(o);
@@ -302,11 +295,16 @@ void adbg_object_close(adbg_object_t *o) {
 	if (o == null)
 		return;
 	
-	// Call handler unloading function if set
+	// Call old handler unloading function if set
 	if (o.func_unload) o.func_unload(o);
 	
 	// Close internal buffer if set
-	if (o.internal) free(o.internal);
+	if (o.modbuffer) {
+		// If close handler if set, call it so sub-module can close their buffers
+		if (o.on_unload)
+			o.on_unload(o, o.modbuffer);
+		free(o.modbuffer);
+	}
 	
 	// Close associated handles
 	switch (o.origin) with (AdbgObjectOrigin) {
@@ -333,8 +331,8 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	version (Trace) trace("origin=%d", o.origin);
-	switch (o.origin) with (AdbgObjectOrigin) {
-	case disk:
+	switch (o.origin) {
+	case AdbgObjectOrigin.disk:
 		int r = osfread(o.file, buffer, cast(int)rdsize); // updates file pos
 		version (Trace) trace("osfread=%d", r);
 		if (r < 0)
@@ -342,11 +340,11 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 		if (r < rdsize)
 			return adbg_oops(AdbgError.partialRead);
 		return 0;
-	case process:
+	case AdbgObjectOrigin.process:
 		int e = adbg_memory_read(o.process, o.proc_location, buffer, rdsize);
 		if (e == 0) o.proc_location += rdsize;
 		return e;
-	case userbuffer:
+	case AdbgObjectOrigin.buffer:
 		if (o.user_location + rdsize >= o.user_buffersize)
 			return adbg_oops(AdbgError.offsetBounds);
 		if (memcpy(buffer, o.user_buffer + o.user_location, rdsize))
@@ -375,22 +373,22 @@ int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rd
 		return -1;
 	}
 	
-	switch (o.origin) with (AdbgObjectOrigin) {
-	case disk:
+	switch (o.origin) {
+	case AdbgObjectOrigin.disk:
 		if (osfseek(o.file, location, OSFileSeek.start) < 0)
 			return adbg_oops(AdbgError.os);
 		break;
-	case process:
+	case AdbgObjectOrigin.process:
 		o.proc_location = cast(size_t)location;
 		break;
-	case userbuffer:
+	case AdbgObjectOrigin.buffer:
 		o.user_location = cast(size_t)location;
 		break;
 	default:
 		return adbg_oops(AdbgError.unimplemented);
 	}
 	
-	return adbg_object_read(o, buffer, rdsize);
+	return adbg_object_read(o, buffer, rdsize, flags);
 }
 
 /// Allocate a buffer with read size, and read data from object from absolute position.
@@ -405,16 +403,12 @@ int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rd
 void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, int flags = 0) {
 	version (Trace) trace("location=%lld rdsize=%zu", location, rdsize);
 	
-	if (o == null || rdsize == 0) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
+	if (o == null || rdsize == 0)
+		return adbg_oops_null(AdbgError.invalidArgument);
 	
 	void *buffer = malloc(rdsize);
-	if (buffer == null) {
-		adbg_oops(AdbgError.crt);
-		return null;
-	}
+	if (buffer == null)
+		return adbg_oops_null(AdbgError.crt);
 	
 	// Function sets error
 	if (adbg_object_read_at(o, location, buffer, rdsize, flags)) {
@@ -425,30 +419,71 @@ void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, i
 	return buffer;
 }
 
+deprecated
+package
+void adbg_object_impl_setup_type(adbg_object_t *o, AdbgObject type) {
+	assert(o);
+	o.format = type;
+}
+
+// Internal function for submodules to setup internals
+deprecated
+package
+void adbg_object_postload(adbg_object_t *o, AdbgObject type, void function(adbg_object_t *o) funload) {
+	assert(o);
+	assert(type);
+	assert(funload);
+	
+	o.format = type;
+	o.func_unload = funload;
+}
+
 // Used in implementations.
 //
 // Allocate, or resize, the internal buffer.
+deprecated
 package
-void* adbg_object_impl_alloc_internal(adbg_object_t *o, size_t size) {
-	if (o == null || size == 0)
-		return adbg_oops_null(AdbgError.invalidArgument);
-	
-	o.internal = o.internal ? realloc(o.internal, size) : calloc(1, size);
-	
-	// Allocation failed
-	if (o.internal == null) adbg_oops(AdbgError.crt);
-	
-	return o.internal;
+void* adbg_object_impl_setup_buffer(adbg_object_t *o,
+	size_t size, void function(adbg_object_t*, void*) event_close) {
+	assert(o);
+	assert(size);
+	assert(event_close);
+	o.modbuffer = calloc(1, size);
+	if (o.modbuffer == null)
+		return adbg_oops_null(AdbgError.crt);
+	o.on_unload = event_close;
+	return o.modbuffer;
 }
 
-// Get internal buffer pointer.
+// (Internal) Used by object implementations to setup internals.
 package
-void* adbg_object_impl_internal_buffer(adbg_object_t *o) {
+int adbg_object_impl_setup(adbg_object_t *o,
+	AdbgObject type,
+	size_t size,
+	void function(adbg_object_t*, void*) event_close) {
+	assert(o);
+	assert(size);
+	assert(event_close);
+	
+	o.modbuffer = calloc(1, size);
+	if (o.modbuffer == null)
+		return adbg_oops(AdbgError.crt);
+	
+	o.format = type;
+	o.on_unload = event_close;
+	return 0;
+}
+
+// (Internal) Get internal buffer pointer.
+//
+// Can be called as-is within implementations.
+package
+void* adbg_object_impl_get_buffer(adbg_object_t *o) {
 	if (o == null)
 		return adbg_oops_null(AdbgError.invalidArgument);
-	if (o.internal == null) // uninitialized
+	if (o.modbuffer == null)
 		return adbg_oops_null(AdbgError.uninitiated);
-	return o.internal;
+	return o.modbuffer;
 }
 
 /// Used in signature detection.
@@ -462,13 +497,6 @@ union SIGNATURE {
 	ubyte u8;
 	mz_header_t mzheader;
 }
-
-// TODO: AdbgObject adbg_object_detect(adbg_object_t*)
-//       Return object type to load
-//       Will be used in a future loading function
-
-// TODO: int adbg_object_load(adbg_object_t*)
-//       On error, automatically call unloader
 
 // Object detection and loading
 private
@@ -529,49 +557,8 @@ int adbg_object_loadv(adbg_object_t *o) {
 			return adbg_object_mscoff_load(o);
 		break;
 	
-	// TODO: Move PE/NE/LX detection in MZ loader
-	//       Once implementations can replace callback functions
 	// MZ executables
 	case MAGIC_MZ, MAGIC_ZM: // ZM being the even older signature in some cases
-		version (Trace) trace("e_lfarlc=%#x", sig.mzheader.e_lfarlc);
-		
-		// If e_lfarlc (relocation table) starts lower than e_lfanew,
-		// then assume old MZ, since e_lfarlc can point to 0x40.
-		if (sig.mzheader.e_lfarlc < 0x40)
-			return adbg_object_mz_load(o);
-		
-		// If e_lfanew points within (extended) MZ header
-		if (sig.mzheader.e_lfanew <= mz_header_t.sizeof)
-			return adbg_object_mz_load(o);
-		
-		// ReactOS checks if NtHeaderOffset is not higher than 256 MiB.
-		// See: sdk/lib/rtl/image.c:RtlpImageNtHeaderEx
-		//TODO: Consider if object malformed.
-		if (sig.mzheader.e_lfanew >= MiB!256)
-			return adbg_object_mz_load(o);
-		
-		uint newsig = void;
-		e = adbg_object_read_at(o, sig.mzheader.e_lfanew, &newsig, uint.sizeof);
-		if (e) return e;
-		
-		// 32-bit signature check
-		version (Trace) trace("newsig=%#x", newsig);
-		switch (newsig) {
-		case MAGIC_PE32:
-			return adbg_object_pe_load(o);
-		default:
-		}
-		
-		// 16-bit signature check
-		switch (cast(ushort)newsig) {
-		case NE_MAGIC:
-			return adbg_object_ne_load(o, &sig.mzheader);
-		case LX_MAGIC, LE_MAGIC:
-			return adbg_object_lx_load(o, &sig.mzheader);
-		default:
-		}
-		
-		// If nothing matches, assume MZ
 		return adbg_object_mz_load(o);
 	
 	// COFF magics
@@ -801,7 +788,7 @@ long adbg_object_filesize(adbg_object_t *o) {
 			return -1;
 		}
 		return osfsize(o.file);
-	case AdbgObjectOrigin.userbuffer:
+	case AdbgObjectOrigin.buffer:
 		// Verify overflow, size_t -> can lead to overflow due to sign
 		long l = cast(long)o.user_buffersize;
 		if ( l < 0 ) {

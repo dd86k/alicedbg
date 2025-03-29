@@ -363,10 +363,14 @@ enum {
 	LX_OSF_TFLAG_ORDINAL_8BIT      = 0x80,
 }
 
+private enum {
+	INTERNAL_REVERSED = 1
+}
 private
 struct internal_lx_t {
 	lx_header_t header;
 	mz_header_t mzheader;
+	int status;
 }
 
 int adbg_object_lx_load(adbg_object_t *o, mz_header_t *mzhdr) {
@@ -374,89 +378,118 @@ int adbg_object_lx_load(adbg_object_t *o, mz_header_t *mzhdr) {
 	assert(o);
 	assert(mzhdr);
 	
-	o.internal = calloc(1, internal_lx_t.sizeof);
-	if (o.internal == null)
-		return adbg_oops(AdbgError.crt);
-	int e = adbg_object_read_at(o, mzhdr.e_lfanew, o.internal, lx_header_t.sizeof);
-	if (e) {
-		free(o.internal);
-		o.internal = null;
-		return e;
+	int e = adbg_object_impl_setup(o, AdbgObject.lx,
+		internal_lx_t.sizeof,
+		&adbg_object_lx_unload);
+	if (e) return e;
+	
+	internal_lx_t *lx = cast(internal_lx_t*)adbg_object_impl_get_buffer(o);
+	
+	memcpy(&lx.mzheader, mzhdr, mz_header_t.sizeof);
+	
+	e = adbg_object_read_at(o, mzhdr.e_lfanew, &lx.header, lx_header_t.sizeof);
+	if (e) return e;
+	
+	// HACK: Check word endian
+	with (lx.header)
+	if (magic == CHAR16!"EL" || magic == CHAR16!"XL")
+		lx.status |= INTERNAL_REVERSED;
+	
+	with (lx.header)
+	if (lx.status & INTERNAL_REVERSED) {
+		magic	= adbg_bswap16(magic);
+		level	= adbg_bswap32(level);
+		cpu	= adbg_bswap16(cpu);
+		os	= adbg_bswap16(os);
+		ver	= adbg_bswap32(ver);
+		mflags	= adbg_bswap32(mflags);
+		mpages	= adbg_bswap32(mpages);
+		startobj	= adbg_bswap32(startobj);
+		eip	= adbg_bswap32(eip);
+		stackobj	= adbg_bswap32(stackobj);
+		esp	= adbg_bswap32(esp);
+		pagesize	= adbg_bswap32(pagesize);
+		lastpage	= adbg_bswap32(lastpage);
+		fixupsize	= adbg_bswap32(fixupsize);
+		fixupsum	= adbg_bswap32(fixupsum);
+		ldrsize	= adbg_bswap32(ldrsize);
+		ldrsum	= adbg_bswap32(ldrsum);
+		objtab	= adbg_bswap32(objtab);
+		objcnt	= adbg_bswap32(objcnt);
+		objmap	= adbg_bswap32(objmap);
+		itermap	= adbg_bswap32(itermap);
+		rsrctab	= adbg_bswap32(rsrctab);
+		rsrccnt	= adbg_bswap32(rsrccnt);
+		restab	= adbg_bswap32(restab);
+		enttab	= adbg_bswap32(enttab);
+		dirtab	= adbg_bswap32(dirtab);
+		dircnt	= adbg_bswap32(dircnt);
+		fpagetab	= adbg_bswap32(fpagetab);
+		frectab	= adbg_bswap32(frectab);
+		impmod	= adbg_bswap32(impmod);
+		impmodcnt	= adbg_bswap32(impmodcnt);
+		impproc	= adbg_bswap32(impproc);
+		pagesum	= adbg_bswap32(pagesum);
+		datapage	= adbg_bswap32(datapage);
+		preload	= adbg_bswap32(preload);
+		nrestab	= adbg_bswap32(nrestab);
+		cbnrestab	= adbg_bswap32(cbnrestab);
+		nressum	= adbg_bswap32(nressum);
+		autodata	= adbg_bswap32(autodata);
+		debuginfo	= adbg_bswap32(debuginfo);
+		debuglen	= adbg_bswap32(debuglen);
+		instpreload	= adbg_bswap32(instpreload);
+		instdemand	= adbg_bswap32(instdemand);
+		heapsize	= adbg_bswap32(heapsize);
+		stacksize	= adbg_bswap32(stacksize);
+		if (lx.header.magic == LE_MAGIC) {
+			winresoff	= adbg_bswap32(winresoff);
+			winreslen	= adbg_bswap32(winreslen);
+			device_id	= adbg_bswap16(device_id);
+			ddk_version	= adbg_bswap16(ddk_version);
+		}
 	}
 	
-	internal_lx_t *internal = cast(internal_lx_t*)o.internal;
-	
-	memcpy(&internal.mzheader, mzhdr, mz_header_t.sizeof);
-	
-	//TODO: Deal with word order
-	
-	adbg_object_postload(o, AdbgObject.lx, &adbg_object_lx_unload);
 	return 0;
 }
 
-void adbg_object_lx_unload(adbg_object_t *o) {
-	if (o == null)
-		return;
-	if (o.internal) free(o.internal);
+void adbg_object_lx_unload(adbg_object_t *o, void *u) {
+	
 }
 
 lx_header_t* adbg_object_lx_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return cast(lx_header_t*)o.internal;
+	internal_lx_t *lx = cast(internal_lx_t*)adbg_object_impl_get_buffer(o);
+	if (lx == null) return null;
+	return &lx.header;
 }
 
 mz_header_t* adbg_object_lx_mz_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return &(cast(internal_lx_t*)o.internal).mzheader;
+	internal_lx_t *lx = cast(internal_lx_t*)adbg_object_impl_get_buffer(o);
+	if (lx == null) return null;
+	return &lx.mzheader;
 }
 
 AdbgMachine adbg_object_lx_machine(adbg_object_t *o) {
-	if (o == null || o.internal == null)
-		return AdbgMachine.unknown;
-	lx_header_t* header = cast(lx_header_t*)o.internal;
-	switch (header.cpu) {
+	internal_lx_t *lx = cast(internal_lx_t*)adbg_object_impl_get_buffer(o);
+	if (lx == null) return AdbgMachine.unknown;
+	switch (lx.header.cpu) {
 	case LX_CPU_80486:
 	case LX_CPU_80386: return AdbgMachine.i386;
 	case LX_CPU_80286: return AdbgMachine.i8086;
-	default:
+	default: return AdbgMachine.unknown;
 	}
-	return AdbgMachine.unknown;
 }
 
 const(char)* adbg_object_lx_kind_string(adbg_object_t *o) {
-	if (o == null)
-		return cast(const(char*))adbg_oops_null(AdbgError.invalidArgument);
-	if (o.internal == null)
-		return cast(const(char*))adbg_oops_null(AdbgError.uninitiated);
-	lx_header_t* header = cast(lx_header_t*)o.internal;
-	return adbg_object_lx_modtype_string(header.mflags);
+	internal_lx_t *lx = cast(internal_lx_t*)adbg_object_impl_get_buffer(o);
+	if (lx == null) return null;
+	return adbg_object_lx_modtype_string(lx.header.mflags);
 }
 
 const(char)* adbg_object_lx_header_shortname(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	lx_header_t* header = cast(lx_header_t*)o.internal;
-	return header.magic == LX_MAGIC ? "lx" : "le";
+	internal_lx_t *lx = cast(internal_lx_t*)adbg_object_impl_get_buffer(o);
+	if (lx == null) return null;
+	return lx.header.magic == LX_MAGIC ? "lx" : "le";
 }
 
 const(char)* adbg_object_lx_cputype_string(ushort cpu) {
@@ -464,7 +497,7 @@ const(char)* adbg_object_lx_cputype_string(ushort cpu) {
 	case LX_CPU_80286:	return "80286";
 	case LX_CPU_80386:	return "80386";
 	case LX_CPU_80486:	return "80486";
-	default:	return "Unknown";
+	default:	return null;
 	}
 }
 
@@ -475,7 +508,7 @@ const(char)* adbg_object_lx_ostype_string(ushort os) {
 	case LX_OS_DOS4:	return "DOS 4.x";
 	case LX_OS_WINS386:	return "Windows 386";
 	case LX_OS_NEUTRAL:	return "IBM Microkernel";
-	default:	return "Unknown";
+	default:	return null;
 	}
 }
 
@@ -487,6 +520,6 @@ const(char)* adbg_object_lx_modtype_string(uint flags) {
 	case LX_FLAG_MODTYPE_PHYSDEV:	return "Physical Device Driver";
 	case LX_FLAG_MODTYPE_VIRTDEV:	return "Static Virtual Device Driver";
 	case LX_FLAG_MODTYPE_VXDDYN:	return "Dynamic Virtual Device Driver (VxD)";
-	default:	return "Unkown";
+	default:	return null;
 	}
 }

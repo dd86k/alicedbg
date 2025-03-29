@@ -8,6 +8,10 @@ module adbg.objects.mz;
 import adbg.error;
 import adbg.objectserver;
 import adbg.utils.bit;
+import adbg.objects.ne : NE_MAGIC, adbg_object_ne_load;
+import adbg.objects.lx : LX_MAGIC, LE_MAGIC, adbg_object_lx_load;
+import adbg.objects.pe : PE_MAGIC, adbg_object_pe_load;
+import adbg.utils.math : MiB;
 import core.stdc.stdlib : malloc, calloc, free;
 
 extern (C):
@@ -66,28 +70,81 @@ struct mz_reloc_t {
 }
 
 private enum {
-	S_RELOCS_REVERSED = 1,
+	INTERNAL_REVERSED = 1,
 }
 private
 struct internal_mz_t {
 	mz_header_t header;
 	mz_reloc_t *relocs;
+	int status;
 }
 
 int adbg_object_mz_load(adbg_object_t *o) {
 	version (Trace) trace("o=%p", o);
+	uint newsig = void;
 	
-	// Set format and allocate object internals
-	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_alloc_internal(o, internal_mz_t.sizeof);
-	if (mz == null)
-		return adbg_error_code();
+	// Read MZ header to detect if we're dealing with a newer executable format
+	mz_header_t header = void;
+	int e = adbg_object_read_at(o, 0, &header, mz_header_t.sizeof);
+	if (e) return e;
+	version (Trace) trace("e_lfarlc=%#x", header.e_lfarlc);
 	
-	// Read header
-	int e = adbg_object_read_at(o, 0, &mz.header, mz_header_t.sizeof);
+	// If e_lfarlc (relocation table) starts lower than e_lfanew,
+	// then assume old MZ, since e_lfarlc can point to 0x40.
+	if (header.e_lfarlc < 0x40)
+		goto Lmz;
+	
+	// If e_lfanew points within (extended) MZ header,
+	// assume invalid offset
+	if (header.e_lfanew <= mz_header_t.sizeof)
+		goto Lmz;
+	
+	// ReactOS checks if NtHeaderOffset is not higher than 256 MiB.
+	// If it is higher, it considers the executable to be invalid.
+	// See: sdk/lib/rtl/image.c:RtlpImageNtHeaderEx
+	if (header.e_lfanew >= MiB!256)
+		return adbg_oops(AdbgError.objectMalformed);
+	
+	e = adbg_object_read_at(o, header.e_lfanew, &newsig, newsig.sizeof);
 	if (e) return e;
 	
+	// 32-bit signature check
+	version (Trace) trace("newsig=%#x", newsig);
+	switch (newsig) {
+	case PE_MAGIC:
+		return adbg_object_pe_load(o, &header);
+	default:
+	}
+	
+	// 16-bit signature check
+	switch (cast(ushort)newsig) {
+	case NE_MAGIC:
+		return adbg_object_ne_load(o, &header);
+	case LX_MAGIC, LE_MAGIC:
+		return adbg_object_lx_load(o, &header);
+	default:
+		// Because e_lfanew is set and reloc
+		return adbg_oops(AdbgError.objectMalformed);
+	}
+	
+Lmz:	// Nothing else came up, load as MZ
+	e = adbg_object_impl_setup(o, AdbgObject.mz,
+		internal_mz_t.sizeof,
+		&adbg_object_mz_unload);
+	if (e) return e;
+	
+	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_get_buffer(o);
+	
+	// Read header
+	e = adbg_object_read_at(o, 0, &mz.header, mz_header_t.sizeof);
+	if (e) return e;
+	
+	// HACK: Bad hack to check word endian
+	if (mz.header.e_magic == MAGIC_ZM)
+		mz.status = INTERNAL_REVERSED;
+	
 	// Inverse header if required
-	if (o.status & AdbgObjectInternalFlags.reversed) with (mz.header) {
+	if (mz.status & INTERNAL_REVERSED) with (mz.header) {
 		e_magic	= adbg_bswap16(e_magic);
 		e_cblp	= adbg_bswap16(e_cblp);
 		e_cp	= adbg_bswap16(e_cp);
@@ -104,35 +161,22 @@ int adbg_object_mz_load(adbg_object_t *o) {
 		e_ovno	= adbg_bswap16(e_ovno);
 	}
 	
-	adbg_object_postload(o, AdbgObject.mz, &adbg_object_mz_unload);
 	return 0;
 }
 
-void adbg_object_mz_unload(adbg_object_t *o) {
-	assert(o);
-	
-	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_internal_buffer(o);
-	if (mz == null) return;
+void adbg_object_mz_unload(adbg_object_t *o, void *buffer) {
+	internal_mz_t *mz = cast(internal_mz_t*)buffer;
 	if (mz.relocs)  free(mz.relocs);
 }
 
 mz_header_t* adbg_object_mz_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_internal_buffer(o);
+	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_get_buffer(o);
 	if (mz == null) return null;
 	return &mz.header;
 }
 
 mz_reloc_t* adbg_object_mz_reloc(adbg_object_t *o, size_t index) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_internal_buffer(o);
+	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_get_buffer(o);
 	if (mz == null) return null;
 	
 	// Initiate relocation buffer
@@ -159,7 +203,7 @@ mz_reloc_t* adbg_object_mz_reloc(adbg_object_t *o, size_t index) {
 		}
 		
 		// Byteswap all relocation entries
-		if (o.status & AdbgObjectInternalFlags.reversed) {
+		if (mz.status & INTERNAL_REVERSED) {
 			for (ushort i; i < mz.header.e_crlc; ++i) {
 				mz_reloc_t *reloc = &mz.relocs[index];
 				reloc.offset = adbg_bswap16(reloc.offset);
@@ -179,10 +223,7 @@ mz_reloc_t* adbg_object_mz_reloc(adbg_object_t *o, size_t index) {
 }
 
 const(char)* adbg_object_mz_kind_string(adbg_object_t *o) {
-	if (o == null)
-		return cast(const(char)*)adbg_oops_null(AdbgError.invalidArgument);
-	
-	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_internal_buffer(o);
+	internal_mz_t *mz = cast(internal_mz_t*)adbg_object_impl_get_buffer(o);
 	if (mz == null) return null;
 	
 	return mz.header.e_ovno ? `Overlayed Executable` : `Executable`;

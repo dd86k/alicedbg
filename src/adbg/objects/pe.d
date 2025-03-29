@@ -30,7 +30,7 @@ import adbg.objects.mz : mz_header_t;
 extern (C):
 
 /// Magic number for PE32 object files.
-enum MAGIC_PE32 = CHAR32!"PE\0\0";
+enum PE_MAGIC = CHAR32!"PE\0\0";
 /// Rich PE Header start ID
 enum MAGIC_RICH_BEGID = CHAR32!"DanS";
 /// Rich PE Header end ID
@@ -923,27 +923,23 @@ struct internal_pe_t {
 	pe_rich_header_t rich_header;
 }
 
-/// (Internal) Called by the server to preload a PE object.
-/// Params:
-/// 	o = Object instance.
-/// Returns: Error code.
-int adbg_object_pe_load(adbg_object_t *o) {
-	assert(o);
-	
-	// Allocate internal buffer
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_alloc_internal(o, internal_pe_t.sizeof);
-	if (pe == null)
-		return adbg_error_code();
-	
-	// Read MZ header
-	int e = adbg_object_read_at(o, 0, &pe.mz_header, mz_header_t.sizeof);
+int adbg_object_pe_load(adbg_object_t *o, mz_header_t *mzheader) {
+	assert(mzheader);
+	int e = adbg_object_impl_setup(o, AdbgObject.pe,
+		internal_pe_t.sizeof,
+		&adbg_object_pe_unload);
 	if (e) return e;
+	
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
+	
+	memcpy(&pe.mz_header, mzheader, mz_header_t.sizeof);
 	
 	// Read PE header
 	e = adbg_object_read_at(o, pe.mz_header.e_lfanew, &pe.header, pe_header_t.sizeof);
 	if (e) return e;
-	with (pe.header)
-	if (o.status & AdbgObjectInternalFlags.reversed) {
+	
+	/*with (pe.header)
+	if (pe.status & INTERNAL_REVERSED) {
 		Signature32	= adbg_bswap32(Signature32);
 		Machine	= adbg_bswap16(Machine);
 		NumberOfSections	= adbg_bswap16(NumberOfSections);
@@ -952,7 +948,7 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		NumberOfSymbols	= adbg_bswap32(NumberOfSymbols);
 		SizeOfOptionalHeader	= adbg_bswap16(SizeOfOptionalHeader);
 		Characteristics	= adbg_bswap16(Characteristics);
-	}
+	}*/
 	
 	// TODO: This portion will need to be remade to account for SizeOfOptionalHeader.
 	
@@ -973,7 +969,7 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		if (e) return e;
 		e_lfanew += pe_image_data_directory_t.sizeof; // adjust to sections
 		
-		if (o.status & AdbgObjectInternalFlags.reversed) with (pe.optheader) {
+		if (pe.status & INTERNAL_REVERSED) with (pe.optheader) {
 			SizeOfCode	= adbg_bswap32(SizeOfCode);
 			SizeOfInitializedData	= adbg_bswap32(SizeOfInitializedData);
 			SizeOfUninitializedData	= adbg_bswap32(SizeOfUninitializedData);
@@ -1013,7 +1009,7 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		if (e) return e;
 		e_lfanew += pe_image_data_directory_t.sizeof; // adjust to sections
 		
-		if (o.status & AdbgObjectInternalFlags.reversed) with (pe.optheader64) {
+		if (pe.status & INTERNAL_REVERSED) with (pe.optheader64) {
 			SizeOfCode	= adbg_bswap32(SizeOfCode);
 			SizeOfInitializedData	= adbg_bswap32(SizeOfInitializedData);
 			SizeOfUninitializedData	= adbg_bswap32(SizeOfUninitializedData);
@@ -1048,7 +1044,7 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		if (e) return e;
 		e_lfanew += pe_optional_headerrom_t.sizeof; // adjust to sections, no directories
 		
-		if (o.status & AdbgObjectInternalFlags.reversed) with (pe.optheaderrom) {
+		if (pe.status & INTERNAL_REVERSED) with (pe.optheaderrom) {
 			SizeOfCode	= adbg_bswap32(SizeOfCode);
 			SizeOfInitializedData	= adbg_bswap32(SizeOfInitializedData);
 			SizeOfUninitializedData	= adbg_bswap32(SizeOfUninitializedData);
@@ -1072,7 +1068,7 @@ int adbg_object_pe_load(adbg_object_t *o) {
 	
 	// If reversed and it's not a "rom" image (no dirs), swap dictionary entries
 	with (pe.directory)
-	if (o.status & AdbgObjectInternalFlags.reversed && optmagic != PE_CLASS_ROM) {
+	if (pe.status & INTERNAL_REVERSED && optmagic != PE_CLASS_ROM) {
 		ExportTable.rva	= adbg_bswap32(ExportTable.rva);
 		ExportTable.size	= adbg_bswap32(ExportTable.size);
 		ImportTable.rva	= adbg_bswap32(ImportTable.rva);
@@ -1107,16 +1103,13 @@ int adbg_object_pe_load(adbg_object_t *o) {
 		Reserved.size	= adbg_bswap32(Reserved.size);
 	}
 	
-	adbg_object_postload(o, AdbgObject.pe, &adbg_object_pe_unload);
-	
 	return 0;
 }
 
-void adbg_object_pe_unload(adbg_object_t *o) {
+void adbg_object_pe_unload(adbg_object_t *o, void *buffer) {
 	assert(o);
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
-	if (pe == null) return;
+	internal_pe_t *pe = cast(internal_pe_t*)buffer;
 	
 	if (pe.sections)         free(pe.sections);
 	if (pe.export_directory) free(pe.export_directory);
@@ -1138,12 +1131,7 @@ void adbg_object_pe_unload(adbg_object_t *o) {
 private
 pe_section_entry_t* adbg_object_pe_directory_section(adbg_object_t *o, uint rva) {
 	version (Trace) trace("o=%p rva=%#x", o, rva);
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	ushort seccnt = pe.header.NumberOfSections;
@@ -1180,7 +1168,7 @@ uint adbg_object_pe_directory_offset(adbg_object_t *o, uint dirrva) {
 		return 0;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return 0;
 	
 	// Function checks null
@@ -1194,7 +1182,7 @@ pe_header_t* adbg_object_pe_header(adbg_object_t *o) {
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	return &pe.header;
 }
@@ -1202,12 +1190,7 @@ pe_header_t* adbg_object_pe_header(adbg_object_t *o) {
 // void* to force a pointer cast
 // NOTE: then shouldn't there be a function to return the type of optional header?
 void* adbg_object_pe_optional_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0) {
@@ -1218,12 +1201,7 @@ void* adbg_object_pe_optional_header(adbg_object_t *o) {
 }
 
 pe_image_data_directory_t* adbg_object_pe_directories(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0) {
@@ -1234,12 +1212,7 @@ pe_image_data_directory_t* adbg_object_pe_directories(adbg_object_t *o) {
 }
 
 mz_header_t* adbg_object_pe_mz_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	return &pe.mz_header;
@@ -1247,12 +1220,7 @@ mz_header_t* adbg_object_pe_mz_header(adbg_object_t *o) {
 
 // NOTE: Observed offsets are all 4-byte aligned compatible
 pe_rich_header_t* adbg_object_pe_rich_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	// If already allocated and read, return buffer
@@ -1353,12 +1321,7 @@ const(char)* adbg_object_pe_rich_prodid_string(ushort prodid) {
 pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 	version (Trace) trace("o=%p index=%zu", o, index);
 	
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (index >= MAXIMUM_SECTIONS) {
@@ -1387,7 +1350,7 @@ pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 		}
 		
 		// Init swapping stuff if required
-		if (o.status & AdbgObjectInternalFlags.reversed) {
+		if (pe.status & INTERNAL_REVERSED) {
 			pe.r_sections = cast(bool*)malloc(count);
 			if (pe.r_sections == null) {
 				adbg_oops(AdbgError.crt);
@@ -1401,7 +1364,7 @@ pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 	pe_section_entry_t *section = &pe.sections[index];
 	
 	// If needs to be swapped
-	if (o.status & AdbgObjectInternalFlags.reversed && pe.r_sections[index] == false) with (section) {
+	if (pe.status & INTERNAL_REVERSED && pe.r_sections[index] == false) with (section) {
 		VirtualSize	= adbg_bswap32(VirtualSize);
 		VirtualAddress	= adbg_bswap32(VirtualAddress);
 		SizeOfRawData	= adbg_bswap32(SizeOfRawData);
@@ -1444,12 +1407,7 @@ pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 //     AddressTableEntries for count
 //     RVA -> hint + entry
 pe_export_descriptor_t* adbg_object_pe_export(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 || pe.directory.ExportTable.size == 0) {
@@ -1484,7 +1442,7 @@ pe_export_descriptor_t* adbg_object_pe_export(adbg_object_t *o) {
 		}
 		
 		// If need to be swapped
-		if (o.status & AdbgObjectInternalFlags.reversed) with (pe.export_directory) {
+		if (pe.status & INTERNAL_REVERSED) with (pe.export_directory) {
 			ExportFlags	= adbg_bswap32(ExportFlags);
 			Timestamp	= adbg_bswap32(Timestamp);
 			MajorVersion	= adbg_bswap16(MajorVersion);
@@ -1503,12 +1461,12 @@ pe_export_descriptor_t* adbg_object_pe_export(adbg_object_t *o) {
 }
 
 const(char)* adbg_object_pe_export_name(adbg_object_t *o, pe_export_descriptor_t *export_) {
-	if (o == null || export_ == null) {
+	if (export_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 || pe.directory.ExportTable.size == 0) {
@@ -1528,12 +1486,12 @@ const(char)* adbg_object_pe_export_name(adbg_object_t *o, pe_export_descriptor_t
 }
 
 pe_export_entry_t* adbg_object_pe_export_entry(adbg_object_t *o, pe_export_descriptor_t *export_, size_t index) {
-	if (o == null || export_ == null) {
+	if (export_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (index >= export_.NumberOfNamePointers) {
@@ -1563,7 +1521,7 @@ pe_export_entry_t* adbg_object_pe_export_entry(adbg_object_t *o, pe_export_descr
 	}
 	
 	// Bswap entry if necessary
-	if (o.status & AdbgObjectInternalFlags.reversed &&
+	if (pe.status & INTERNAL_REVERSED &&
 		pe.r_export_entries[index] == false) with (entry) {
 		entry.Export = adbg_bswap32(entry.Export);
 		pe.r_export_entries[index] = true;
@@ -1574,12 +1532,12 @@ pe_export_entry_t* adbg_object_pe_export_entry(adbg_object_t *o, pe_export_descr
 
 const(char)* adbg_object_pe_export_entry_symbol(adbg_object_t *o,
 	pe_export_descriptor_t *export_, pe_export_entry_t *entry) {
-	if (o == null || export_ == null || entry == null) {
+	if (export_ == null || entry == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 || pe.directory.ExportTable.size == 0) {
@@ -1618,12 +1576,7 @@ const(char)* adbg_object_pe_export_entry_symbol(adbg_object_t *o,
 //       the entire section is loaded in memory, hoping that nothing 
 // Multiple tables, multiple entries per table
 pe_import_descriptor_t* adbg_object_pe_import(adbg_object_t *o, size_t index) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
@@ -1703,7 +1656,7 @@ pe_import_descriptor_t* adbg_object_pe_import(adbg_object_t *o, size_t index) {
 	}
 	
 	//TODO: swap import directory entries
-	/*if (o.status & AdbgObjectInternalFlags.reversed && pe.r_import_desc[index] == false) with (import_) {
+	/*if (pe.status & INTERNAL_REVERSED && pe.r_import_desc[index] == false) with (import_) {
 		Characteristics	= adbg_bswap32(Characteristics);
 		TimeDateStamp	= adbg_bswap32(TimeDateStamp);
 		ForwarderChain	= adbg_bswap32(ForwarderChain);
@@ -1717,12 +1670,12 @@ pe_import_descriptor_t* adbg_object_pe_import(adbg_object_t *o, size_t index) {
 
 // get module name out of import descriptor
 const(char)* adbg_object_pe_import_name(adbg_object_t *o, pe_import_descriptor_t *import_) {
-	if (o == null || import_ == null) {
+	if (import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
@@ -1745,12 +1698,12 @@ const(char)* adbg_object_pe_import_name(adbg_object_t *o, pe_import_descriptor_t
 // TODO: Byte-swap import look-up table entries
 
 pe_import_entry32_t* adbg_object_pe_import_entry32(adbg_object_t *o, pe_import_descriptor_t *import_, size_t index) {
-	if (o == null || import_ == null) {
+	if (import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
@@ -1769,7 +1722,7 @@ pe_import_entry32_t* adbg_object_pe_import_entry32(adbg_object_t *o, pe_import_d
 	}
 	
 	//TODO: Swap import entry
-	/*if (o.status & AdbgObjectInternalFlags.reversed && pe.r_import_entries[index] == false) {
+	/*if (pe.status & INTERNAL_REVERSED && pe.r_import_entries[index] == false) {
 		entry.ordinal = adbg_bswap32(entry.ordinal);
 		pe.r_import_entries[index] = true;
 	}*/
@@ -1784,12 +1737,12 @@ pe_import_entry32_t* adbg_object_pe_import_entry32(adbg_object_t *o, pe_import_d
 }
 
 pe_import_entry64_t* adbg_object_pe_import_entry64(adbg_object_t *o, pe_import_descriptor_t *import_, size_t index) {
-	if (o == null || import_ == null) {
+	if (import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
@@ -1822,12 +1775,12 @@ pe_import_entry64_t* adbg_object_pe_import_entry64(adbg_object_t *o, pe_import_d
 // TODO: Optimize these, maybe cache the last result in internals
 
 pe_import_entry_t* adbg_object_pe_import_entry(adbg_object_t *o, pe_import_descriptor_t *import_, size_t index) {
-	if (o == null || import_ == null) {
+	if (import_ == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
@@ -1848,12 +1801,12 @@ pe_import_entry_t* adbg_object_pe_import_entry(adbg_object_t *o, pe_import_descr
 }
 
 uint adbg_object_pe_import_entry_rva(adbg_object_t *o, pe_import_descriptor_t *import_, void *entry) {
-	if (o == null || import_ == null || entry == null) {
+	if (import_ == null || entry == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return 0;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
@@ -1874,12 +1827,12 @@ uint adbg_object_pe_import_entry_rva(adbg_object_t *o, pe_import_descriptor_t *i
 }
 
 ushort adbg_object_pe_import_entry_hint(adbg_object_t *o, pe_import_descriptor_t *import_, void *entry) {
-	if (o == null || import_ == null || entry == null) {
+	if (import_ == null || entry == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return 0;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
@@ -1934,12 +1887,12 @@ ushort adbg_object_pe_import_entry_hint(adbg_object_t *o, pe_import_descriptor_t
 }
 
 const(char)* adbg_object_pe_import_entry_symbol(adbg_object_t *o, pe_import_descriptor_t *import_, void *entry) {
-	if (o == null || import_ == null || entry == null) {
+	if (import_ == null || entry == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
@@ -2000,12 +1953,7 @@ const(char)* adbg_object_pe_import_entry_symbol(adbg_object_t *o, pe_import_desc
 //
 
 pe_debug_directory_entry_t* adbg_object_pe_debug_directory(adbg_object_t *o, size_t index) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
@@ -2078,7 +2026,7 @@ pe_debug_directory_entry_t* adbg_object_pe_debug_directory(adbg_object_t *o, siz
 	}
 	
 	// Swap if needed
-	if (o.status & AdbgObjectInternalFlags.reversed && pe.r_debug_entries[index] == false) with (debug_) {
+	if (pe.status & INTERNAL_REVERSED && pe.r_debug_entries[index] == false) with (debug_) {
 		Characteristics	= adbg_bswap32(Characteristics);
 		TimeDateStamp	= adbg_bswap32(TimeDateStamp);
 		MajorVersion	= adbg_bswap16(MajorVersion);
@@ -2094,12 +2042,12 @@ pe_debug_directory_entry_t* adbg_object_pe_debug_directory(adbg_object_t *o, siz
 }
 
 void* adbg_object_pe_debug_directory_data(adbg_object_t *o, pe_debug_directory_entry_t *entry) {
-	if (o == null || entry == null) {
+	if (entry == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	if (pe.header.SizeOfOptionalHeader == 0 ||
@@ -2124,12 +2072,7 @@ void adbg_object_pe_debug_directory_data_close(void* entry) {
 }
 
 void* adbg_object_pe_loadconfig(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 
 	// If already loaded, return it
@@ -2237,33 +2180,33 @@ enum  {// ReplacesCorHdrNumericDefines
 
 // CLR 2.0 header structure.
 struct pe_cor20_header_t { align(1): // IMAGE_COR20_HEADER
-    // Header versioning
-    uint   cb;
-    ushort MajorRuntimeVersion;
-    ushort MinorRuntimeVersion;
+	// Header versioning
+	uint   cb;
+	ushort MajorRuntimeVersion;
+	ushort MinorRuntimeVersion;
 
-    // Symbol table and startup information
-    pe_image_data_directory_t MetaData;
-    uint                      Flags;
+	// Symbol table and startup information
+	pe_image_data_directory_t MetaData;
+	uint                      Flags;
 
-    // If COMIMAGE_FLAGS_NATIVE_ENTRYPOINT is not set, EntryPointToken represents a managed entrypoint.
-    // If COMIMAGE_FLAGS_NATIVE_ENTRYPOINT is set, EntryPointRVA represents an RVA to a native entrypoint.
-    union {
-        uint EntryPointToken;
-        uint EntryPointRVA;
-    }
+	// If COMIMAGE_FLAGS_NATIVE_ENTRYPOINT is not set, EntryPointToken represents a managed entrypoint.
+	// If COMIMAGE_FLAGS_NATIVE_ENTRYPOINT is set, EntryPointRVA represents an RVA to a native entrypoint.
+	union {
+		uint EntryPointToken;
+		uint EntryPointRVA;
+	}
 
-    // Binding information
-    pe_image_data_directory_t    Resources;
-    pe_image_data_directory_t    StrongNameSignature;
+	// Binding information
+	pe_image_data_directory_t    Resources;
+	pe_image_data_directory_t    StrongNameSignature;
 
-    // Regular fixup and binding information
-    pe_image_data_directory_t    CodeManagerTable;
-    pe_image_data_directory_t    VTableFixups;
-    pe_image_data_directory_t    ExportAddressTableJumps;
+	// Regular fixup and binding information
+	pe_image_data_directory_t    CodeManagerTable;
+	pe_image_data_directory_t    VTableFixups;
+	pe_image_data_directory_t    ExportAddressTableJumps;
 
-    // Precompiled image info (internal use only - set to zero)
-    pe_image_data_directory_t    ManagedNativeHeader;
+	// Precompiled image info (internal use only - set to zero)
+	pe_image_data_directory_t    ManagedNativeHeader;
 }
 
 //
@@ -2271,12 +2214,7 @@ struct pe_cor20_header_t { align(1): // IMAGE_COR20_HEADER
 //
 
 AdbgMachine adbg_object_pe_machine(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return AdbgMachine.unknown;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return AdbgMachine.unknown;
 	return adbg_object_pe_machine_value(pe.header.Machine);
 }
@@ -2360,23 +2298,13 @@ const(char)* adbg_object_pe_machine_value_string(ushort Machine) {
 }
 
 const(char)* adbg_object_pe_machine_string(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	return adbg_object_pe_machine_value_string(pe.header.Machine);
 }
 
 const(char)* adbg_object_pe_magic_string(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	switch (pe.optheader.Magic) {
 	case PE_CLASS_32:	return "PE32";
@@ -2389,12 +2317,7 @@ const(char)* adbg_object_pe_magic_string(adbg_object_t *o) {
 }
 
 const(char)* adbg_object_pe_subsys_string(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	// Get subsystem value depending on optional header
@@ -2456,10 +2379,7 @@ const(char)* adbg_object_pe_debug_type_string(uint type) {
 }
 
 const(char)* adbg_object_pe_kind_string(adbg_object_t *o) {
-	if (o == null)
-		return cast(const(char)*)adbg_oops_null(AdbgError.invalidArgument);
-		
-	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_internal_buffer(o);
+	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);
 	if (pe == null) return null;
 	
 	return pe.header.Characteristics & PE_CHARACTERISTIC_DLL ?

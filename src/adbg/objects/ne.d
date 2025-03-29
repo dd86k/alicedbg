@@ -311,37 +311,45 @@ struct ne_resource_string_t {
 	char[1] Text;
 }
 
+// Layout: Length, Text, Ordinal
 struct ne_resident_t {
 	ubyte Length;
-	char[1] Text;
+	ubyte *Text;
 	ushort Ordinal;
+}
+
+private enum {
+	INTERNAL_REVERSED = 1
 }
 
 private
 struct internal_ne_t {
 	ne_header_t header;
 	mz_header_t mzheader;
+	int status;
 }
 
 int adbg_object_ne_load(adbg_object_t *o, mz_header_t *mzheader) {
+	assert(mzheader);
 	version (Trace) trace("o=%p", o);
+	int e = adbg_object_impl_setup(o, AdbgObject.ne,
+		internal_ne_t.sizeof,
+		&adbg_object_ne_unload);
+	if (e) return e;
 	
-	o.internal = calloc(1, internal_ne_t.sizeof);
-	if (o.internal == null)
-		return adbg_oops(AdbgError.crt);
-	int e = adbg_object_read_at(o, mzheader.e_lfanew, o.internal, ne_header_t.sizeof);
-	if (e) {
-		free(o.internal);
-		o.internal = null;
-		return e;
-	}
+	internal_ne_t *ne = cast(internal_ne_t*)adbg_object_impl_get_buffer(o);
 	
-	internal_ne_t *internal = cast(internal_ne_t*)o.internal;
+	memcpy(&ne.mzheader, mzheader, mz_header_t.sizeof);
 	
-	memcpy(&internal.mzheader, mzheader, mz_header_t.sizeof);
+	e = adbg_object_read_at(o, mzheader.e_lfanew, &ne.header, ne_header_t.sizeof);
+	if (e) return e;
 	
-	with (internal.header)
-	if (o.status & AdbgObjectInternalFlags.reversed) {
+	// HACK: Check word endian
+	if (ne.header.ne_magic == CHAR16!"EN")
+		ne.status |= INTERNAL_REVERSED;
+	
+	with (ne.header)
+	if (ne.status & INTERNAL_REVERSED) {
 		ne_enttab	= adbg_bswap16(ne_enttab);
 		ne_cbenttab	= adbg_bswap16(ne_cbenttab);
 		ne_crc	= adbg_bswap32(ne_crc);
@@ -369,58 +377,40 @@ int adbg_object_ne_load(adbg_object_t *o, mz_header_t *mzheader) {
 		ne_expver	= adbg_bswap16(ne_expver);
 	}
 	
-	adbg_object_postload(o, AdbgObject.ne, &adbg_object_ne_unload);
 	return 0;
 }
 
-void adbg_object_ne_unload(adbg_object_t *o) {
-	if (o == null)
-		return;
+void adbg_object_ne_unload(adbg_object_t *o, void *u) {
 	
-	if (o.internal) free(o.internal);
 }
 
 ne_header_t* adbg_object_ne_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return cast(ne_header_t*)o.internal;
+	internal_ne_t *ne = cast(internal_ne_t*)adbg_object_impl_get_buffer(o);
+	if (ne == null) return null;
+	return &ne.header;
 }
 
 mz_header_t* adbg_object_ne_mz_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return &(cast(internal_ne_t*)o.internal).mzheader;
+	internal_ne_t *ne = cast(internal_ne_t*)adbg_object_impl_get_buffer(o);
+	if (ne == null) return null;
+	return &ne.mzheader;
 }
 
 AdbgMachine adbg_object_ne_machine(adbg_object_t *o) {
-	if (o == null || o.internal == null)
-		return AdbgMachine.unknown;
-	ne_header_t* header = cast(ne_header_t*)o.internal;
+	internal_ne_t *ne = cast(internal_ne_t*)adbg_object_impl_get_buffer(o);
+	if (ne == null) return AdbgMachine.unknown;
 	// NOTE: Can have a mix of 8086/i286/i386 instructions, take the highest
-	if (header.ne_flags & NE_HFLAG_INTI386)
+	if (ne.header.ne_flags & NE_HFLAG_INTI386)
 		return AdbgMachine.i386;
-	if (header.ne_flags & (NE_HFLAG_INT8086 | NE_HFLAG_INTI286))
+	if (ne.header.ne_flags & (NE_HFLAG_INT8086 | NE_HFLAG_INTI286))
 		return AdbgMachine.i8086;
 	return AdbgMachine.unknown;
 }
 
 const(char)* adbg_object_ne_kind_string(adbg_object_t *o) {
-	if (o == null || o.internal == null)
-		return cast(const(char)*)adbg_oops_null(AdbgError.invalidArgument);
-	ne_header_t* header = cast(ne_header_t*)o.internal;
-	return header.ne_flags & NE_HFLAG_LIBMODULE ? `Library Module` : `Executable`;
+	internal_ne_t *ne = cast(internal_ne_t*)adbg_object_impl_get_buffer(o);
+	if (ne == null) return null;
+	return ne.header.ne_flags & NE_HFLAG_LIBMODULE ? `Library Module` : `Executable`;
 }
 
 const(char)* adbg_object_ne_type(ubyte type) {
