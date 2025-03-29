@@ -160,27 +160,20 @@ struct adbg_object_t {
 			size_t user_location;
 		}
 	}
+	private:
 	
 	/// Object's loading origin.
 	///
 	/// Stuff like disk or in-memory, allowing to select which I/O functions
 	/// to be used when interacting with its source material.
-	private AdbgObjectOrigin origin;
+	AdbgObjectOrigin origin;
 	/// Loaded object format.
-	private AdbgObject format;
-	/// Internal status flags. (e.g., swapping required)
-	deprecated int status;
+	AdbgObject format;
 	/// Internal buffer used by the module responsible of handling
 	/// the specific object format.
-	deprecated void *internal;
-	/// Used to attach the unload function
-	deprecated
-	private void function(adbg_object_t*) func_unload;
-	/// Internal buffer used by the module responsible of handling
-	/// the specific object format.
-	private void *modbuffer;
+	void *modbuffer;
 	// TODO: Event: When closing
-	private void function(adbg_object_t*, void*) on_unload;
+	void function(adbg_object_t*, void*) on_unload;
 }
 
 // TODO: "adbg_object_register" function to replace adbg_object_postload
@@ -294,9 +287,6 @@ export
 void adbg_object_close(adbg_object_t *o) {
 	if (o == null)
 		return;
-	
-	// Call old handler unloading function if set
-	if (o.func_unload) o.func_unload(o);
 	
 	// Close internal buffer if set
 	if (o.modbuffer) {
@@ -419,55 +409,20 @@ void* adbg_object_readalloc_at(adbg_object_t *o, long location, size_t rdsize, i
 	return buffer;
 }
 
-deprecated
-package
-void adbg_object_impl_setup_type(adbg_object_t *o, AdbgObject type) {
-	assert(o);
-	o.format = type;
-}
-
-// Internal function for submodules to setup internals
-deprecated
-package
-void adbg_object_postload(adbg_object_t *o, AdbgObject type, void function(adbg_object_t *o) funload) {
-	assert(o);
-	assert(type);
-	assert(funload);
-	
-	o.format = type;
-	o.func_unload = funload;
-}
-
-// Used in implementations.
-//
-// Allocate, or resize, the internal buffer.
-deprecated
-package
-void* adbg_object_impl_setup_buffer(adbg_object_t *o,
-	size_t size, void function(adbg_object_t*, void*) event_close) {
-	assert(o);
-	assert(size);
-	assert(event_close);
-	o.modbuffer = calloc(1, size);
-	if (o.modbuffer == null)
-		return adbg_oops_null(AdbgError.crt);
-	o.on_unload = event_close;
-	return o.modbuffer;
-}
-
 // (Internal) Used by object implementations to setup internals.
 package
 int adbg_object_impl_setup(adbg_object_t *o,
 	AdbgObject type,
 	size_t size,
 	void function(adbg_object_t*, void*) event_close) {
-	assert(o);
-	assert(size);
-	assert(event_close);
+	if (o == null)
+		return adbg_oops(AdbgError.assertion);
 	
-	o.modbuffer = calloc(1, size);
-	if (o.modbuffer == null)
-		return adbg_oops(AdbgError.crt);
+	if (size) {
+		o.modbuffer = calloc(1, size);
+		if (o.modbuffer == null)
+			return adbg_oops(AdbgError.crt);
+	}
 	
 	o.format = type;
 	o.on_unload = event_close;
@@ -503,8 +458,6 @@ private
 int adbg_object_loadv(adbg_object_t *o) {
 	if (o == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	
-	o.status = 0;
 	
 	// Read signature buffer for detection.
 	// Unfortunately, this function fails if read bytes is less than

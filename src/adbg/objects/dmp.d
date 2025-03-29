@@ -182,9 +182,9 @@ struct dmp64_physical_memory_run64_t {
 }
 
 struct dmp64_physical_memory_descriptor64_t {
-    uint NumberOfRuns;
-    ulong NumberOfPages;
-    dmp64_physical_memory_run64_t[1] Run;
+	uint NumberOfRuns;
+	ulong NumberOfPages;
+	dmp64_physical_memory_run64_t[1] Run;
 }
 
 /// 64-bit Windows crash dump header.
@@ -266,50 +266,33 @@ private enum {
 }
 
 int adbg_object_dmp_load(adbg_object_t *o) {
-	o.internal = calloc(1, internal_dmp_t.sizeof);
-	if (o.internal == null)
-		return adbg_oops(AdbgError.crt);
-	int e = adbg_object_read_at(o, 0, o.internal, MAX!(dmp32_header_t.sizeof, dmp64_header_t.sizeof));
-	if (e) {
-		free(o.internal);
-		return e;
-	}
+	int e = adbg_object_impl_setup(o, AdbgObject.dmp,
+		internal_dmp_t.sizeof,
+		null);
+	if (e) return e;
 	
-	adbg_object_postload(o, AdbgObject.dmp, &adbg_object_dmp_unload);
+	internal_dmp_t *dmp = cast(internal_dmp_t*)adbg_object_impl_get_buffer(o);
 	
-	internal_dmp_t *internal = cast(internal_dmp_t*)o.internal;
+	e = adbg_object_read_at(o, 0, &dmp.header32, MAX!(dmp32_header_t.sizeof, dmp64_header_t.sizeof));
+	if (e) return e;
 	
-	// NOTE: This avoids a check and a cast for _dmp_is_64bit
-	o.status |= internal.header32.ValidDump32 == PAGEDUMP64_VALID ? DUMP_64BIT : 0;
 	return 0;
 }
+version (none)
 void adbg_object_dmp_unload(adbg_object_t *o) {
-	if (o == null) return;
-	if (o.internal == null) return;
 	
-//	internal_dmp_t *internal = cast(internal_dmp_t*)o.internal;
-	
-	free(o.internal);
 }
 
 int adbg_object_dmp_is_64bit(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return -1;
-	}
-	return o.status & DUMP_64BIT;
+	internal_dmp_t *dmp = cast(internal_dmp_t*)adbg_object_impl_get_buffer(o);
+	if (dmp == null) return adbg_error_code();
+	return dmp.header32.ValidDump32 == PAGEDUMP64_VALID;
 }
 
 void* adbg_object_dmp_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return &(cast(internal_dmp_t*)o.internal).header32;
+	internal_dmp_t *dmp = cast(internal_dmp_t*)adbg_object_impl_get_buffer(o);
+	if (dmp == null) return null;
+	return &dmp.header32;
 }
 
 const(char)* adbg_object_dmp_dumptype_string(uint type) {
@@ -326,23 +309,16 @@ const(char)* adbg_object_dmp_dumptype_string(uint type) {
 }
 
 AdbgMachine adbg_object_dmp_machine(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return AdbgMachine.unknown;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return AdbgMachine.unknown;
-	}
-	internal_dmp_t *internal = cast(internal_dmp_t*)o.internal;
+	internal_dmp_t *dmp = cast(internal_dmp_t*)adbg_object_impl_get_buffer(o);
+	if (dmp == null) return AdbgMachine.unknown;
 	
 	uint machine = void;
-	switch (internal.header32.ValidDump32) {
+	switch (dmp.header32.ValidDump32) {
 	case PAGEDUMP32_VALID:
-		machine = internal.header32.MachineImageType;
+		machine = dmp.header32.MachineImageType;
 		break;
 	case PAGEDUMP64_VALID:
-		machine = internal.header64.MachineImageType;
+		machine = dmp.header64.MachineImageType;
 		break;
 	default:
 		adbg_oops(AdbgError.unavailable);

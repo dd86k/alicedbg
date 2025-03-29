@@ -1,7 +1,7 @@
 /// OMF format.
 ///
-/// This format, made by Intel, dates back to the 8080, and starting with the
-/// 8086, Microsoft extensively used it on MS-DOS.
+/// This format, made by Intel, dates back with the 8080 processor,
+/// and starting with the 8086, Microsoft extensively used it on MS-DOS.
 ///
 /// It was superseeded by COFF objects and libraries, and the MSCOFF format,
 /// when Windows Vista was released.
@@ -141,51 +141,44 @@ struct omf_entry_t { align(1):
 private
 struct internal_omf_t {
 	omf_lib_header_t header;
-	int firstentry; // Offset to first entry. Libraries have this to non-zero.
-	int nextentry;  // Offset to next entry.
-	int lastsize;   // Size of last entry.
+	long firstentry; // Offset to first entry. Libraries have this to non-zero.
+	long nextentry;  // Offset to next entry.
+	long lastsize;   // Size of last entry.
+	// TODO: Current entry buffer
 }
 
 int adbg_object_omf_load(adbg_object_t *o, ubyte first) {
-	o.internal = calloc(1, internal_omf_t.sizeof);
-	if (o.internal == null)
-		return adbg_oops(AdbgError.crt);
+	int e = adbg_object_impl_setup(o, AdbgObject.omf,
+		internal_omf_t.sizeof,
+		&adbg_object_omf_unload);
+	if (e) return e;
 	
-	// NOTE: No swapping is done because I'm lazy
-	
-	internal_omf_t *internal = cast(internal_omf_t*)o.internal;
+	internal_omf_t *omf = cast(internal_omf_t*)adbg_object_impl_get_buffer(o);
 	
 	switch (first) with (OMFRecord) {
 	case LIBRARY: // Check library header
-		int e = adbg_object_read_at(o, 0, &internal.header, omf_lib_header_t.sizeof);
-		if (e) {
-			free(o.internal);
-			return e;
-		}
+		e = adbg_object_read_at(o, 0, &omf.header, omf_lib_header_t.sizeof);
+		if (e) return e;
 		
-		// Legal values at >=4 and <=15, typically 0xd (13), since 13+3=16
-		with (internal.header) if (size < 4 || size > 15)
+		// Check size of header
+		// Should be 4>=X<=15, typically 0xd (13), since 13+3(omf_header)=16 total
+		with (omf.header) if (size < 4 || size > 15)
 			return adbg_oops(AdbgError.objectMalformed);
 		
-		internal.firstentry = internal.header.size + 3;
+		omf.firstentry = omf.header.size + omf_entry_header_t.sizeof;
 		break;
 	case THEADR, LHEADR: // Recommended entries by spec
-		internal.firstentry = 0;
+		omf.firstentry = 0;
 		break;
 	default:
 		return adbg_oops(AdbgError.objectMalformed);
 	}
 	
-	adbg_object_postload(o, AdbgObject.omf, &adbg_object_omf_unload);
-	
 	return 0;
 }
 
-void adbg_object_omf_unload(adbg_object_t *o) {
-	if (o == null) return;
-	if (o.internal == null) return;
+void adbg_object_omf_unload(adbg_object_t *o, void *buffer) {
 	
-	free(o.internal);
 }
 
 int adbg_object_omf_is_library(adbg_object_t *o) {
@@ -193,12 +186,12 @@ int adbg_object_omf_is_library(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return -1;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return -1;
-	}
-	internal_omf_t *internal = cast(internal_omf_t*)o.internal;
-	return internal.firstentry;
+	
+	internal_omf_t *omf = cast(internal_omf_t*)adbg_object_impl_get_buffer(o);
+	if (omf == null) return -1;
+	
+	// If first is higher than start of file, it is a library
+	return omf.firstentry > 0;
 }
 
 omf_lib_header_t* adbg_object_omf_library_header(adbg_object_t *o) {
@@ -206,12 +199,17 @@ omf_lib_header_t* adbg_object_omf_library_header(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
+	
+	internal_omf_t *omf = cast(internal_omf_t*)adbg_object_impl_get_buffer(o);
+	if (omf == null) return null;
+	
+	// If first entry points to start of file, not a library
+	if (omf.firstentry == 0) {
+		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	internal_omf_t *internal = cast(internal_omf_t*)o.internal;
-	return internal.firstentry ? &internal.header : null;
+	
+	return &omf.header;
 }
 
 omf_entry_t* adbg_object_omf_entry_first(adbg_object_t *o) {
@@ -219,17 +217,13 @@ omf_entry_t* adbg_object_omf_entry_first(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	
-	internal_omf_t *internal = cast(internal_omf_t*)o.internal;
+	internal_omf_t *omf = cast(internal_omf_t*)adbg_object_impl_get_buffer(o);
+	if (omf == null) return null;
 	
 	// Reset next offset
-	internal.nextentry = internal.firstentry;
-	
-	return adbg_object_omf_get_entry(o, internal.firstentry);
+	omf.nextentry = omf.firstentry;
+	return adbg_object_omf_get_entry(o, omf.firstentry, omf);
 }
 
 omf_entry_t* adbg_object_omf_entry_next(adbg_object_t *o) {
@@ -237,22 +231,23 @@ omf_entry_t* adbg_object_omf_entry_next(adbg_object_t *o) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
 	
-	internal_omf_t *internal = cast(internal_omf_t*)o.internal;
+	internal_omf_t *omf = cast(internal_omf_t*)adbg_object_impl_get_buffer(o);
+	if (omf == null) return null;
 	
 	// Last entry was valid, increase to next offset
-	if (internal.lastsize)
-		internal.nextentry += internal.lastsize + 3;
+	if (omf.lastsize)
+		omf.nextentry += omf.lastsize + omf_entry_header_t.sizeof;
 	
-	return adbg_object_omf_get_entry(o, internal.nextentry);
+	return adbg_object_omf_get_entry(o, omf.nextentry, omf);
 }
 
 private
-omf_entry_t* adbg_object_omf_get_entry(adbg_object_t *o, int offset) {
+omf_entry_t* adbg_object_omf_get_entry(adbg_object_t *o, long offset, internal_omf_t *omf) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
 	
 	// Ready header for size
 	omf_entry_header_t entryhdr = void;
@@ -276,17 +271,16 @@ omf_entry_t* adbg_object_omf_get_entry(adbg_object_t *o, int offset) {
 	if (adbg_object_read_at(o, offset + omf_entry_header_t.sizeof, entry.data, entry.size))
 		return null;
 	
-	internal_omf_t *internal = cast(internal_omf_t*)o.internal;
-	internal.lastsize = entry.size;
+	omf.lastsize = entry.size;
 	return entry;
 }
 
 void adbg_object_omf_entry_close(omf_entry_t *entry) {
-	if (entry == null)
-		return;
+	if (entry == null) return;
 	free(entry);
 }
 
+// Non-zero on success
 int adbg_object_omf_verify(omf_entry_t *entry) {
 	if (entry == null)
 		return 1;

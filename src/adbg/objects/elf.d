@@ -1026,6 +1026,9 @@ version (BigEndian)
 else
 	private enum PLATFORM_DATA = ELF_DATA_LSB;
 
+private enum {
+	INTERNAL_SWAPPED = 1,
+}
 struct internal_elf_t {
 	union { align(1):
 		Elf32_Ehdr eheader32;
@@ -1053,6 +1056,7 @@ struct internal_elf_t {
 		Elf32_Shdr *sheader32;
 		Elf64_Shdr *sheader64;
 	}
+	int status;
 	bool *r_pheader; // swapped fields for program headers
 	bool *r_sheader; // swapped fields for section headers
 	void *strtable; // string table buffer
@@ -1063,27 +1067,27 @@ struct internal_elf_t {
 }
 
 int adbg_object_elf_load(adbg_object_t *o) {
-	o.internal = calloc(1, internal_elf_t.sizeof);
-	if (o.internal == null)
-		return adbg_oops(AdbgError.crt);
-	
-	// Read much of the header as possible
-	int e = adbg_object_read_at(o, 0, o.internal, MAX!(Elf32_Ehdr.sizeof, Elf64_Ehdr.sizeof));
+	int e = adbg_object_impl_setup(o, AdbgObject.elf,
+		internal_elf_t.sizeof,
+		&adbg_object_elf_unload);
 	if (e) return e;
 	
-	adbg_object_postload(o, AdbgObject.elf, &adbg_object_elf_unload);
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
 	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
+	// Read much of the header as possible
+	e = adbg_object_read_at(o, 0, &elf.eheader32, MAX!(Elf32_Ehdr.sizeof, Elf64_Ehdr.sizeof));
+	if (e) return e;
 	
 	// Set reverse flag (bit 0) if endianness not the same as host
-	o.status |= internal.ident_data != PLATFORM_DATA;
-	version (Trace) trace("status=%#x ident_class=%u", o.status, internal.ident_class);
+	elf.status |= elf.ident_data != PLATFORM_DATA;
+	version (Trace) trace("status=%#x ident_class=%u", elf.status, elf.ident_class);
+	version (Trace) trace("header_version=%u", elf.ident_version);
 	
-	switch (internal.ident_class) {
+	switch (elf.ident_class) {
 	case ELF_CLASS_32:
-		Elf32_Ehdr *header = &(cast(internal_elf_t*)o.internal).eheader32;
+		Elf32_Ehdr *header = &elf.eheader32;
 	
-		if (o.status & AdbgObjectInternalFlags.reversed) with (header) {
+		if (elf.status & INTERNAL_SWAPPED) with (header) {
 			e_type	= adbg_bswap16(e_type);
 			e_machine	= adbg_bswap16(e_machine);
 			e_version	= adbg_bswap32(e_version);
@@ -1099,16 +1103,14 @@ int adbg_object_elf_load(adbg_object_t *o) {
 			e_shstrndx	= adbg_bswap16(e_shstrndx);
 		}
 		
-		if (internal.ident_version != ELF_EV_CURRENT) {
-			free(o.internal);
-			o.internal = null;
+		// Wouldn't it be better to say "unsupported version" intead?
+		if (elf.ident_version != ELF_EV_CURRENT)
 			return adbg_oops(AdbgError.objectInvalidVersion);
-		}
 		break;
 	case ELF_CLASS_64:
-		Elf64_Ehdr *header = &(cast(internal_elf_t*)o.internal).eheader64;
+		Elf64_Ehdr *header = &elf.eheader64;
 		
-		if (o.status & AdbgObjectInternalFlags.reversed) with (header) {
+		if (elf.status & INTERNAL_SWAPPED) with (header) {
 			e_type	= adbg_bswap16(e_type);
 			e_machine	= adbg_bswap16(e_machine);
 			e_version	= adbg_bswap32(e_version);
@@ -1124,12 +1126,9 @@ int adbg_object_elf_load(adbg_object_t *o) {
 			e_shstrndx	= adbg_bswap16(e_shstrndx);
 		}
 		
-		version (Trace) trace("header_version=%u", internal.ident_version);
-		if (internal.ident_version != ELF_EV_CURRENT) {
-			free(o.internal);
-			o.internal = null;
+		// Ditto
+		if (elf.ident_version != ELF_EV_CURRENT)
 			return adbg_oops(AdbgError.objectInvalidVersion);
-		}
 		break;
 	default:
 		return adbg_oops(AdbgError.objectInvalidClass);
@@ -1138,18 +1137,14 @@ int adbg_object_elf_load(adbg_object_t *o) {
 	return 0;
 }
 
-void adbg_object_elf_unload(adbg_object_t *o) {
-	if (o == null || o.internal == null) return;
+void adbg_object_elf_unload(adbg_object_t *o, void *u) {
+	internal_elf_t *elf = cast(internal_elf_t*)u;
 	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
-	
-	if (internal.pheader32) free(internal.pheader32);
-	if (internal.sheader32) free(internal.sheader32);
-	if (internal.r_pheader) free(internal.r_pheader);
-	if (internal.r_sheader) free(internal.r_sheader);
-	if (internal.strtable)  free(internal.strtable);
-	
-	free(internal);
+	if (elf.pheader32) free(elf.pheader32);
+	if (elf.sheader32) free(elf.sheader32);
+	if (elf.r_pheader) free(elf.r_pheader);
+	if (elf.r_sheader) free(elf.r_sheader);
+	if (elf.strtable)  free(elf.strtable);
 }
 
 //
@@ -1157,44 +1152,24 @@ void adbg_object_elf_unload(adbg_object_t *o) {
 //
 
 int adbg_object_elf_class(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return -1;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return -1;
-	}
-	return (cast(internal_elf_t*)o.internal).ident_class;
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return adbg_error_code();
+	return elf.ident_class;
 }
 
 int adbg_object_elf_section_count(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return -1;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return -1;
-	}
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
-	return internal.ident_class == ELF_CLASS_64 ?
-		internal.eheader64.e_shnum : internal.eheader32.e_shnum;
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return adbg_error_code();
+	
+	return elf.ident_class == ELF_CLASS_64 ?
+		elf.eheader64.e_shnum : elf.eheader32.e_shnum;
 }
 
 void* adbg_object_elf_phdr(adbg_object_t *o, size_t index) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return null;
 	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
-	
-	switch (internal.ident_class) {
+	switch (elf.ident_class) {
 	case ELF_CLASS_32:
 		return adbg_object_elf_phdr32(o, index);
 	case ELF_CLASS_64:
@@ -1210,74 +1185,60 @@ void* adbg_object_elf_phdr(adbg_object_t *o, size_t index) {
 //
 
 Elf32_Ehdr* adbg_object_elf_ehdr32(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return &(cast(internal_elf_t*)o.internal).eheader32;
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return null;
+	return &elf.eheader32;
 }
 
 Elf32_Phdr* adbg_object_elf_phdr32(adbg_object_t *o, size_t index) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return null;
 	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
-	
-	if (internal.ident_class != ELF_CLASS_32) {
+	if (elf.ident_class != ELF_CLASS_32) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	with (internal.eheader32)
+	with (elf.eheader32)
 	if (e_phoff == 0 || e_phnum == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	if (index >= internal.eheader32.e_phnum) {
+	if (index >= elf.eheader32.e_phnum) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	size_t size = Elf32_Phdr.sizeof * internal.eheader32.e_phnum;
+	size_t size = Elf32_Phdr.sizeof * elf.eheader32.e_phnum;
 	
-	if (internal.pheader32 == null) {
-		internal.pheader32 = cast(Elf32_Phdr*)malloc(size);
-		if (internal.pheader32 == null) {
+	if (elf.pheader32 == null) {
+		elf.pheader32 = cast(Elf32_Phdr*)malloc(size);
+		if (elf.pheader32 == null) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
-		if (adbg_object_read_at(o, internal.eheader32.e_phoff, internal.pheader32, size)) {
-			free(internal.pheader32);
-			internal.pheader32 = null;
+		if (adbg_object_read_at(o, elf.eheader32.e_phoff, elf.pheader32, size)) {
+			free(elf.pheader32);
+			elf.pheader32 = null;
 			return null;
 		}
 		
-		if (o.status & AdbgObjectInternalFlags.reversed) {
-			internal.r_pheader = cast(bool*)malloc(internal.eheader32.e_phnum);
-			if (internal.r_pheader == null) {
-				free(internal.pheader32);
-				internal.pheader32 = null;
+		if (elf.status & INTERNAL_SWAPPED) {
+			elf.r_pheader = cast(bool*)malloc(elf.eheader32.e_phnum);
+			if (elf.r_pheader == null) {
+				free(elf.pheader32);
+				elf.pheader32 = null;
 				adbg_oops(AdbgError.crt);
 				return null;
 			}
 		}
 	}
 	
-	Elf32_Phdr *phdr = internal.pheader32 + index;
-	if (adbg_bits_boundchk(phdr, Elf32_Phdr.sizeof, internal.pheader32, size)) {
+	Elf32_Phdr *phdr = elf.pheader32 + index;
+	if (adbg_bits_boundchk(phdr, Elf32_Phdr.sizeof, elf.pheader32, size)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
-	if (o.status & AdbgObjectInternalFlags.reversed && internal.r_pheader[index] == false) {
+	if (elf.status & INTERNAL_SWAPPED && elf.r_pheader[index] == false) {
 		phdr.p_type	= adbg_bswap32(phdr.p_type);
 		phdr.p_offset	= adbg_bswap32(phdr.p_offset);
 		phdr.p_vaddr	= adbg_bswap32(phdr.p_vaddr);
@@ -1286,66 +1247,58 @@ Elf32_Phdr* adbg_object_elf_phdr32(adbg_object_t *o, size_t index) {
 		phdr.p_memsz	= adbg_bswap32(phdr.p_memsz);
 		phdr.p_flags	= adbg_bswap32(phdr.p_flags);
 		phdr.p_align	= adbg_bswap32(phdr.p_align);
-		internal.r_pheader[index] = true;
+		elf.r_pheader[index] = true;
 	}
 	return phdr;
 }
 
 Elf32_Shdr* adbg_object_elf_shdr32(adbg_object_t *o, size_t index) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return null;
 	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
-	
-	if (internal.ident_class != ELF_CLASS_32) {
+	if (elf.ident_class != ELF_CLASS_32) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	with (internal.eheader32)
+	with (elf.eheader32)
 	if (e_shoff == 0 || e_shnum == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	if (index >= internal.eheader32.e_shnum) {
+	if (index >= elf.eheader32.e_shnum) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	size_t size = Elf32_Shdr.sizeof * internal.eheader32.e_shnum;
+	size_t size = Elf32_Shdr.sizeof * elf.eheader32.e_shnum;
 	
-	if (internal.sheader32 == null) {
-		internal.sheader32 = cast(Elf32_Shdr*)malloc(size);
-		if (internal.sheader32 == null) {
+	if (elf.sheader32 == null) {
+		elf.sheader32 = cast(Elf32_Shdr*)malloc(size);
+		if (elf.sheader32 == null) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
-		if (adbg_object_read_at(o, internal.eheader32.e_shoff, internal.sheader32, size)) {
-			free(internal.sheader32);
-			internal.sheader32 = null;
+		if (adbg_object_read_at(o, elf.eheader32.e_shoff, elf.sheader32, size)) {
+			free(elf.sheader32);
+			elf.sheader32 = null;
 			return null;
 		}
 		
-		internal.r_sheader = cast(bool*)malloc(internal.eheader32.e_shnum);
-		if (internal.r_sheader == null) {
-			free(internal.sheader32);
-			internal.sheader32 = null;
+		elf.r_sheader = cast(bool*)malloc(elf.eheader32.e_shnum);
+		if (elf.r_sheader == null) {
+			free(elf.sheader32);
+			elf.sheader32 = null;
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
 	}
 	
-	Elf32_Shdr *shdr = internal.sheader32 + index;
-	if (adbg_bits_boundchk(shdr, Elf32_Shdr.sizeof, internal.sheader32, size)) {
+	Elf32_Shdr *shdr = elf.sheader32 + index;
+	if (adbg_bits_boundchk(shdr, Elf32_Shdr.sizeof, elf.sheader32, size)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
-	if (o.status & AdbgObjectInternalFlags.reversed && internal.r_sheader[index] == false) {
+	if (elf.status & INTERNAL_SWAPPED && elf.r_sheader[index] == false) {
 		shdr.sh_name	= adbg_bswap32(shdr.sh_name);
 		shdr.sh_type	= adbg_bswap32(shdr.sh_type);
 		shdr.sh_flags	= adbg_bswap32(shdr.sh_flags);
@@ -1356,48 +1309,40 @@ Elf32_Shdr* adbg_object_elf_shdr32(adbg_object_t *o, size_t index) {
 		shdr.sh_info	= adbg_bswap32(shdr.sh_info);
 		shdr.sh_addralign	= adbg_bswap32(shdr.sh_addralign);
 		shdr.sh_entsize	= adbg_bswap32(shdr.sh_entsize);
-		internal.r_sheader[index] = true;
+		elf.r_sheader[index] = true;
 	}
 	return shdr;
 }
 
 // Get name of section
 const(char)* adbg_object_elf_shdr32_name(adbg_object_t *o, Elf32_Shdr *s) {
-	if (o == null || s == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return null;
 	
 	// If string table is not loaded, load it
-	if (internal.strtable == null) {
+	if (elf.strtable == null) {
 		// Get the section index of the string table
-		Elf32_Shdr *s_strtbl = adbg_object_elf_shdr32(o, internal.eheader32.e_shstrndx);
+		Elf32_Shdr *s_strtbl = adbg_object_elf_shdr32(o, elf.eheader32.e_shstrndx);
 		if (s_strtbl == null)
 			return null; // Function sets error
 		
 		// Load string table into memory
-		internal.strtable = malloc(s_strtbl.sh_size);
-		if (internal.strtable == null) {
+		elf.strtable = malloc(s_strtbl.sh_size);
+		if (elf.strtable == null) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
-		if (adbg_object_read_at(o, s_strtbl.sh_offset, internal.strtable, s_strtbl.sh_size))
+		if (adbg_object_read_at(o, s_strtbl.sh_offset, elf.strtable, s_strtbl.sh_size))
 			return null; // Function sets error
 		
-		internal.strtable_size32 = s_strtbl.sh_size;
+		elf.strtable_size32 = s_strtbl.sh_size;
 	}
 	
 	// TODO: 3 minimum (".n\0") could be wrong, check strlen?
 	//       or make adbg_bits_strbounds variant?
 	//       or null-terminate the memory buffer?
-	void *str = internal.strtable + s.sh_name;
-	if (adbg_bits_boundchk(str, 3, internal.strtable, internal.strtable_size32)) {
+	void *str = elf.strtable + s.sh_name;
+	if (adbg_bits_boundchk(str, 3, elf.strtable, elf.strtable_size32)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
@@ -1410,74 +1355,60 @@ const(char)* adbg_object_elf_shdr32_name(adbg_object_t *o, Elf32_Shdr *s) {
 //
 
 Elf64_Ehdr* adbg_object_elf_ehdr64(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return &(cast(internal_elf_t*)o.internal).eheader64;
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return null;
+	return &elf.eheader64;
 }
 
 Elf64_Phdr* adbg_object_elf_phdr64(adbg_object_t *o, size_t index) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return null;
 	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
-	
-	if (internal.ident_class != ELF_CLASS_64) {
+	if (elf.ident_class != ELF_CLASS_64) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	with (internal.eheader64)
+	with (elf.eheader64)
 	if (e_phoff == 0 || e_phnum == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	if (index >= internal.eheader64.e_phnum) {
+	if (index >= elf.eheader64.e_phnum) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	size_t size = Elf64_Phdr.sizeof * internal.eheader64.e_phnum;
+	size_t size = Elf64_Phdr.sizeof * elf.eheader64.e_phnum;
 	
-	if (internal.pheader64 == null) {
-		internal.pheader64 = cast(Elf64_Phdr*)malloc(size);
-		if (internal.pheader64 == null) {
+	if (elf.pheader64 == null) {
+		elf.pheader64 = cast(Elf64_Phdr*)malloc(size);
+		if (elf.pheader64 == null) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
-		if (adbg_object_read_at(o, internal.eheader64.e_phoff, internal.pheader64, size)) {
-			free(internal.pheader64);
-			internal.pheader64 = null;
+		if (adbg_object_read_at(o, elf.eheader64.e_phoff, elf.pheader64, size)) {
+			free(elf.pheader64);
+			elf.pheader64 = null;
 			return null;
 		}
 		
-		if (o.status & AdbgObjectInternalFlags.reversed) {
-			internal.r_pheader = cast(bool*)malloc(internal.eheader64.e_phnum);
-			if (internal.r_pheader == null) {
-				free(internal.pheader64);
-				internal.pheader64 = null;
+		if (elf.status & INTERNAL_SWAPPED) {
+			elf.r_pheader = cast(bool*)malloc(elf.eheader64.e_phnum);
+			if (elf.r_pheader == null) {
+				free(elf.pheader64);
+				elf.pheader64 = null;
 				adbg_oops(AdbgError.crt);
 				return null;
 			}
 		}
 	}
 	
-	Elf64_Phdr *phdr = internal.pheader64 + index;
-	if (adbg_bits_boundchk(phdr, Elf64_Phdr.sizeof, internal.pheader64, size)) {
+	Elf64_Phdr *phdr = elf.pheader64 + index;
+	if (adbg_bits_boundchk(phdr, Elf64_Phdr.sizeof, elf.pheader64, size)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
-	if (o.status & AdbgObjectInternalFlags.reversed && internal.r_pheader[index] == false) {
+	if (elf.status & INTERNAL_SWAPPED && elf.r_pheader[index] == false) {
 		phdr.p_type	= adbg_bswap32(phdr.p_type);
 		phdr.p_offset	= adbg_bswap64(phdr.p_offset);
 		phdr.p_vaddr	= adbg_bswap64(phdr.p_vaddr);
@@ -1486,66 +1417,58 @@ Elf64_Phdr* adbg_object_elf_phdr64(adbg_object_t *o, size_t index) {
 		phdr.p_memsz	= adbg_bswap64(phdr.p_memsz);
 		phdr.p_flags	= adbg_bswap32(phdr.p_flags);
 		phdr.p_align	= adbg_bswap64(phdr.p_align);
-		internal.r_pheader[index] = true;
+		elf.r_pheader[index] = true;
 	}
 	return phdr;
 }
 
 Elf64_Shdr* adbg_object_elf_shdr64(adbg_object_t *o, size_t index) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return null;
 	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
-	
-	if (internal.ident_class != ELF_CLASS_64) {
+	if (elf.ident_class != ELF_CLASS_64) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	with (internal.eheader64)
+	with (elf.eheader64)
 	if (e_shoff == 0 || e_shnum == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
-	if (index >= internal.eheader64.e_shnum) {
+	if (index >= elf.eheader64.e_shnum) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	size_t size = Elf64_Shdr.sizeof * internal.eheader64.e_shnum;
+	size_t size = Elf64_Shdr.sizeof * elf.eheader64.e_shnum;
 	
-	if (internal.sheader64 == null) {
-		internal.sheader64 = cast(Elf64_Shdr*)malloc(size);
-		if (internal.sheader64 == null) {
+	if (elf.sheader64 == null) {
+		elf.sheader64 = cast(Elf64_Shdr*)malloc(size);
+		if (elf.sheader64 == null) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
-		if (adbg_object_read_at(o, internal.eheader64.e_shoff, internal.sheader64, size)) {
-			free(internal.sheader64);
-			internal.sheader64 = null;
+		if (adbg_object_read_at(o, elf.eheader64.e_shoff, elf.sheader64, size)) {
+			free(elf.sheader64);
+			elf.sheader64 = null;
 			return null;
 		}
 		
-		internal.r_sheader = cast(bool*)malloc(internal.eheader64.e_shnum);
-		if (internal.r_sheader == null) {
-			free(internal.sheader64);
-			internal.sheader64 = null;
+		elf.r_sheader = cast(bool*)malloc(elf.eheader64.e_shnum);
+		if (elf.r_sheader == null) {
+			free(elf.sheader64);
+			elf.sheader64 = null;
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
 	}
 	
-	Elf64_Shdr *shdr = internal.sheader64 + index;
-	if (adbg_bits_boundchk(shdr, Elf64_Shdr.sizeof, internal.sheader64, size)) {
+	Elf64_Shdr *shdr = elf.sheader64 + index;
+	if (adbg_bits_boundchk(shdr, Elf64_Shdr.sizeof, elf.sheader64, size)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
-	if (o.status & AdbgObjectInternalFlags.reversed && internal.r_sheader[index] == false) {
+	if (elf.status & INTERNAL_SWAPPED && elf.r_sheader[index] == false) {
 		shdr.sh_name	= adbg_bswap32(shdr.sh_name);
 		shdr.sh_type	= adbg_bswap32(shdr.sh_type);
 		shdr.sh_flags	= adbg_bswap64(shdr.sh_flags);
@@ -1556,47 +1479,39 @@ Elf64_Shdr* adbg_object_elf_shdr64(adbg_object_t *o, size_t index) {
 		shdr.sh_info	= adbg_bswap32(shdr.sh_info);
 		shdr.sh_addralign	= adbg_bswap64(shdr.sh_addralign);
 		shdr.sh_entsize	= adbg_bswap64(shdr.sh_entsize);
-		internal.r_sheader[index] = true;
+		elf.r_sheader[index] = true;
 	}
 	return shdr;
 }
 
 // Get name of section
 const(char)* adbg_object_elf_shdr64_name(adbg_object_t *o, Elf64_Shdr *s) {
-	if (o == null || s == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return null;
 	
 	// If string table is not loaded, load it
-	if (internal.strtable == null) {
+	if (elf.strtable == null) {
 		// Get the section index of the string table
-		Elf64_Shdr *s_strtbl = adbg_object_elf_shdr64(o, internal.eheader64.e_shstrndx);
+		Elf64_Shdr *s_strtbl = adbg_object_elf_shdr64(o, elf.eheader64.e_shstrndx);
 		if (s_strtbl == null)
 			return null; // Function sets error
 		
 		// Load string table into memory
-		internal.strtable = malloc(cast(size_t)s_strtbl.sh_size);
-		if (internal.strtable == null) {
+		elf.strtable = malloc(cast(size_t)s_strtbl.sh_size);
+		if (elf.strtable == null) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
-		if (adbg_object_read_at(o, s_strtbl.sh_offset, internal.strtable, cast(size_t)s_strtbl.sh_size))
+		if (adbg_object_read_at(o, s_strtbl.sh_offset, elf.strtable, cast(size_t)s_strtbl.sh_size))
 			return null; // Function sets error
 		
-		internal.strtable_size64 = s_strtbl.sh_size;
+		elf.strtable_size64 = s_strtbl.sh_size;
 	}
 	
 	// TODO: 3 minimum (".n\0") could be wrong, check strlen?
 	//       or make adbg_bits_strbounds variant?
-	void *str = internal.strtable + s.sh_name;
-	if (adbg_bits_boundchk(str, 3, internal.strtable, cast(size_t)internal.strtable_size64)) {
+	void *str = elf.strtable + s.sh_name;
+	if (adbg_bits_boundchk(str, 3, elf.strtable, cast(size_t)elf.strtable_size64)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
@@ -1609,19 +1524,11 @@ const(char)* adbg_object_elf_shdr64_name(adbg_object_t *o, Elf64_Shdr *s) {
 //
 
 AdbgMachine adbg_object_elf_machine(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return AdbgMachine.unknown;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return AdbgMachine.unknown;
-	}
-	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return AdbgMachine.unknown;
 	
 	// NOTE: Many reserved values are excluded
-	switch (internal.eheader32.e_machine) {
+	switch (elf.eheader32.e_machine) {
 	case ELF_EM_M32:	return AdbgMachine.we32100;
 	case ELF_EM_SPARC:	return AdbgMachine.sparc;
 	case ELF_EM_386:	return AdbgMachine.i386;
@@ -1798,14 +1705,14 @@ AdbgMachine adbg_object_elf_machine(adbg_object_t *o) {
 	case ELF_EM_MOXIE:	return AdbgMachine.moxie;
 	case ELF_EM_AMDGPU:	return AdbgMachine.amdgpu;
 	case ELF_EM_RISCV:
-		switch (internal.eheader32.e_ident[ELF_EI_CLASS]) {
+		switch (elf.eheader32.e_ident[ELF_EI_CLASS]) {
 		case ELF_CLASS_32: return AdbgMachine.riscv32;
 		case ELF_CLASS_64: return AdbgMachine.riscv64;
 		default:
 		}
 		goto default;
 	case ELF_EM_LOONGARCH:
-		switch (internal.eheader32.e_ident[ELF_EI_CLASS]) {
+		switch (elf.eheader32.e_ident[ELF_EI_CLASS]) {
 		case ELF_CLASS_32: return AdbgMachine.loongarch32;
 		case ELF_CLASS_64: return AdbgMachine.loongarch64;
 		default:
@@ -1870,18 +1777,10 @@ const(char) *adbg_object_elf_et_string(ushort type) {
 }
 
 const(char) *adbg_object_elf_kind_string(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_elf_t *elf = cast(internal_elf_t*)adbg_object_impl_get_buffer(o);
+	if (elf == null) return null;
 	
-	internal_elf_t *internal = cast(internal_elf_t*)o.internal;
-	
-	switch (internal.eheader32.e_type) {
+	switch (elf.eheader32.e_type) {
 	case ELF_ET_NONE:	return "None";
 	case ELF_ET_REL:	return "Relocatable";
 	case ELF_ET_EXEC:	return "Executable";

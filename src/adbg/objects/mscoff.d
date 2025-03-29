@@ -155,49 +155,37 @@ struct internal_mscoff_t {
 	}
 }
 
-private enum MAX1 = MAX!(mscoff_anon_header_t.sizeof, mscoff_anon_header_v2_t.sizeof);
-private enum MAX2 = MAX!(MAX1, mscoff_import_header_t.sizeof);
+private enum HDRSZ = MAX!(
+	MAX!(mscoff_anon_header_t.sizeof, mscoff_anon_header_v2_t.sizeof),
+	mscoff_import_header_t.sizeof);
 
 int adbg_object_mscoff_load(adbg_object_t *o) {
-	o.internal = calloc(1, internal_mscoff_t.sizeof);
-	if (o.internal == null)
-		return adbg_oops(AdbgError.crt);
-	int e = adbg_object_read_at(o, 0, o.internal, MAX2);
+	int e = adbg_object_impl_setup(o, AdbgObject.mscoff,
+		internal_mscoff_t.sizeof,
+		&adbg_object_mscoff_unload);
 	if (e) return e;
 	
-	adbg_object_postload(o, AdbgObject.mscoff, &adbg_object_mscoff_unload);
+	internal_mscoff_t *mscoff = cast(internal_mscoff_t*)adbg_object_impl_get_buffer(o);
+	
+	e = adbg_object_read_at(o, 0, &mscoff.anon_header, HDRSZ);
+	if (e) return e;
 	
 	// TODO: Support swapping
 	
 	return 0;
 }
-void adbg_object_mscoff_unload(adbg_object_t *o) {
-	if (o == null) return;
-	if (o.internal == null) return;
-	free(o.internal);
+void adbg_object_mscoff_unload(adbg_object_t *o, void *u) {
+	
 }
 
 uint adbg_object_mscoff_version(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return -1;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return -1;
-	}
-	internal_mscoff_t *internal = cast(internal_mscoff_t*)o.internal;
-	return internal.anon_header.Version;
+	internal_mscoff_t *mscoff = cast(internal_mscoff_t*)adbg_object_impl_get_buffer(o);
+	if (mscoff == null) return 0;
+	return mscoff.anon_header.Version;
 }
 
 void* adbg_object_mscoff_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return o.internal;
+	internal_mscoff_t *mscoff = cast(internal_mscoff_t*)adbg_object_impl_get_buffer(o);
+	if (mscoff == null) return null;
+	return &mscoff.anon_header;
 }

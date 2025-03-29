@@ -676,63 +676,42 @@ struct internal_coff_t {
 }
 
 int adbg_object_coff_load(adbg_object_t *o) {
-	o.internal = calloc(1, internal_coff_t.sizeof);
-	if (o.internal == null)
-		return adbg_oops(AdbgError.crt);
+	int e = adbg_object_impl_setup(o, AdbgObject.coff,
+		internal_coff_t.sizeof,
+		&adbg_object_coff_unload);
+	if (e) return e;
 	
-	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
+	internal_coff_t *coff = cast(internal_coff_t*)adbg_object_impl_get_buffer(o);
 	
 	// Read header
-	int e = adbg_object_read_at(o, 0, &internal.header, coff_header_t.sizeof);
+	e = adbg_object_read_at(o, 0, &coff.header, coff_header_t.sizeof);
 	if (e) return e;
 	
 	// Read optional header if opthdr size matches, present on executables
-	if (internal.header.f_opthdr == coff_opt_header_t.sizeof) {
-		e = adbg_object_read_at(o, coff_header_t.sizeof, &internal.optheader, coff_opt_header_t.sizeof);
+	if (coff.header.f_opthdr == coff_opt_header_t.sizeof) {
+		e = adbg_object_read_at(o, coff_header_t.sizeof, &coff.optheader, coff_opt_header_t.sizeof);
 		if (e) return e;
 	}
-	
-	adbg_object_postload(o, AdbgObject.coff, &adbg_object_coff_unload);
 	
 	// TODO: Support swapping
 	return 0;
 }
-void adbg_object_coff_unload(adbg_object_t *o) {
-	if (o == null) return;
-	if (o.internal == null) return;
-	
-	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
-	if (internal.strtbl) free(internal.strtbl);
-	
-	free(o.internal);
+void adbg_object_coff_unload(adbg_object_t *o, void *u) {
+	internal_coff_t *coff = cast(internal_coff_t*)u;
+	if (coff.strtbl) free(coff.strtbl);
 }
 
 coff_header_t* adbg_object_coff_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	
-	return &(cast(internal_coff_t*)o.internal).header;
+	internal_coff_t *coff = cast(internal_coff_t*)adbg_object_impl_get_buffer(o);
+	if (coff == null) return null;
+	return &coff.header;
 }
 
 AdbgMachine adbg_object_coff_machine(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return AdbgMachine.unknown;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return AdbgMachine.unknown;
-	}
+	internal_coff_t *coff = cast(internal_coff_t*)adbg_object_impl_get_buffer(o);
+	if (coff == null) return AdbgMachine.unknown;
 	
-	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
-	
-	switch (internal.header.f_magic) {
+	switch (coff.header.f_magic) {
 	case COFF_MAGIC_I386:
 	case COFF_MAGIC_I386_AIX:	return AdbgMachine.i386;
 	case COFF_MAGIC_AMD64:	return AdbgMachine.amd64;
@@ -773,22 +752,15 @@ const(char)* adbg_object_coff_magic_string(ushort mach) {
 }
 
 coff_opt_header_t* adbg_object_coff_optional_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_coff_t *coff = cast(internal_coff_t*)adbg_object_impl_get_buffer(o);
+	if (coff == null) return null;
 	
-	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
-	if (internal.header.f_opthdr != coff_opt_header_t.sizeof) {
+	if (coff.header.f_opthdr != coff_opt_header_t.sizeof) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
-	return &internal.optheader;
+	return &coff.optheader;
 }
 
 //
@@ -796,45 +768,31 @@ coff_opt_header_t* adbg_object_coff_optional_header(adbg_object_t *o) {
 //
 
 coff_section_header_t* adbg_object_coff_section_first(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_coff_t *coff = cast(internal_coff_t*)adbg_object_impl_get_buffer(o);
+	if (coff == null) return null;
 	
 	// Check index
-	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
-	if (internal.header.f_nscns <= 0) {
+	if (coff.header.f_nscns <= 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
 	// Read first header
-	long offset = coff_header_t.sizeof + internal.header.f_opthdr;
-	if (adbg_object_read_at(o, offset, &internal.c_sectionbuf, coff_section_header_t.sizeof, 0))
+	long offset = coff_header_t.sizeof + coff.header.f_opthdr;
+	if (adbg_object_read_at(o, offset, &coff.c_sectionbuf, coff_section_header_t.sizeof, 0))
 		return null;
 	
-	internal.c_sectionidx = 0;
-	return &internal.c_sectionbuf;
+	coff.c_sectionidx = 0;
+	return &coff.c_sectionbuf;
 }
 
 coff_section_header_t* adbg_object_coff_section_next(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_coff_t *coff = cast(internal_coff_t*)adbg_object_impl_get_buffer(o);
+	if (coff == null) return null;
 	
 	// Check index
-	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
-	int newidx = internal.c_sectionidx + 1;
-	if (newidx >= internal.header.f_nscns) {
+	int newidx = coff.c_sectionidx + 1;
+	if (newidx >= coff.header.f_nscns) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
@@ -846,24 +804,20 @@ coff_section_header_t* adbg_object_coff_section_next(adbg_object_t *o) {
 	// Read next header
 	long offset =
 		coff_header_t.sizeof +
-		internal.header.f_opthdr +
+		coff.header.f_opthdr +
 		(coff_section_header_t.sizeof * newidx);
-	if (adbg_object_read_at(o, offset, &internal.c_sectionbuf, coff_section_header_t.sizeof, 0))
+	if (adbg_object_read_at(o, offset, &coff.c_sectionbuf, coff_section_header_t.sizeof, 0))
 		return null;
 	
-	internal.c_sectionidx = cast(ushort)newidx;
-	return &internal.c_sectionbuf;
+	coff.c_sectionidx = cast(ushort)newidx;
+	return &coff.c_sectionbuf;
 }
 
 // TODO: coff_section_header_t* adbg_object_coff_section_by_index(adbg_object_t *o, short index)
 
 void* adbg_object_coff_section_open_data(adbg_object_t *o, coff_section_header_t *section) {
-	if (o == null) {
+	if (section == null) {
 		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
 		return null;
 	}
 	
@@ -872,7 +826,7 @@ void* adbg_object_coff_section_open_data(adbg_object_t *o, coff_section_header_t
 		return null;
 	}
 	
-	return adbg_object_readalloc_at(o, section.s_scnptr, section.s_size, 0);
+	return adbg_object_readalloc_at(o, section.s_scnptr, section.s_size);
 }
 void adbg_object_coff_section_close_data(void *buf) {
 	if (buf) free(buf);
@@ -884,42 +838,27 @@ void adbg_object_coff_section_close_data(void *buf) {
 
 // 
 coff_symbol_entry_t* adbg_object_coff_first_symbol(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	
-	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
+	internal_coff_t *coff = cast(internal_coff_t*)adbg_object_impl_get_buffer(o);
+	if (coff == null) return null;
 	
 	// Read first entry
-	long offset = internal.header.f_symptr;
-	if (adbg_object_read_at(o, offset, &internal.c_symbolbuf, coff_symbol_entry_t.sizeof, 0))
+	long offset = coff.header.f_symptr;
+	if (adbg_object_read_at(o, offset, &coff.c_symbolbuf, coff_symbol_entry_t.sizeof, 0))
 		return null;
 	
-	internal.c_symbolidx = 0;
-	internal.c_symboloff = offset;
-	return &internal.c_symbolbuf;
+	coff.c_symbolidx = 0;
+	coff.c_symboloff = offset;
+	return &coff.c_symbolbuf;
 }
 
 //
 coff_symbol_entry_t* adbg_object_coff_next_symbol(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_coff_t *coff = cast(internal_coff_t*)adbg_object_impl_get_buffer(o);
+	if (coff == null) return null;
 	
 	// Check index
-	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
-	int newidx = internal.c_symbolidx + 1;
-	if (newidx >= internal.header.f_nsyms) {
+	int newidx = coff.c_symbolidx + 1;
+	if (newidx >= coff.header.f_nsyms) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
@@ -932,69 +871,61 @@ coff_symbol_entry_t* adbg_object_coff_next_symbol(adbg_object_t *o) {
 	// For current simplicity reasons, it is simpler to return all symbol entries,
 	// including auxiliary ones, instead of skipping them.
 	long offset =
-		internal.c_symboloff
+		coff.c_symboloff
 		+ coff_symbol_entry_t.sizeof
 		//+ ( internal.c_symbolbuf.e_numaux * coff_symbol_entry_t.sizeof )
 		;
-	if (adbg_object_read_at(o, offset, &internal.c_symbolbuf, coff_symbol_entry_t.sizeof, 0))
+	if (adbg_object_read_at(o, offset, &coff.c_symbolbuf, coff_symbol_entry_t.sizeof, 0))
 		return null;
 	
-	internal.c_symbolidx = cast(ushort)newidx;
-	internal.c_symboloff = offset;
-	return &internal.c_symbolbuf;
+	coff.c_symbolidx = cast(ushort)newidx;
+	coff.c_symboloff = offset;
+	return &coff.c_symbolbuf;
 }
 
 // Resolves COFF symbol name
 const(char)* adbg_object_coff_symbol_name(adbg_object_t *o, coff_symbol_entry_t *symbol) {
-	if (o == null || symbol == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	
-	internal_coff_t *internal = cast(internal_coff_t*)o.internal;
+	internal_coff_t *coff = cast(internal_coff_t*)adbg_object_impl_get_buffer(o);
+	if (coff == null) return null;
 	
 	// If first four bytes are unset,
 	// the latter four bytes is an offset to the string table
 	if (symbol.entry.zeroes == 0) {
 		// Load string table if not loaded
-		if (internal.strtbl == null) {
+		if (coff.strtbl == null) {
 			long off =
-				internal.header.f_symptr +
-				(internal.header.f_nsyms * 18);
+				coff.header.f_symptr +
+				(coff.header.f_nsyms * 18);
 			version(Trace) trace("off=%lld", off);
-			if (adbg_object_read_at(o, off, &internal.strtblsize, int.sizeof, 0))
+			if (adbg_object_read_at(o, off, &coff.strtblsize, int.sizeof, 0))
 				return null;
 			
 			// Adjust size
-			internal.strtblsize -= 4;
-			if (internal.strtblsize <= 0) { // Empty
+			coff.strtblsize -= 4;
+			if (coff.strtblsize <= 0) { // Empty
 				adbg_oops(AdbgError.unavailable);
 				return null;
 			}
 			
-			version(Trace) trace("strtblsize=%u", internal.strtblsize);
-			internal.strtbl = cast(char*)malloc(internal.strtblsize + 4);
-			if (internal.strtbl == null) {
+			version(Trace) trace("strtblsize=%u", coff.strtblsize);
+			coff.strtbl = cast(char*)malloc(coff.strtblsize + 4);
+			if (coff.strtbl == null) {
 				adbg_oops(AdbgError.crt);
 				return null;
 			}
-			if (adbg_object_read_at(o, off + 4, internal.strtbl + 4, internal.strtblsize, 0))
+			if (adbg_object_read_at(o, off + 4, coff.strtbl + 4, coff.strtblsize, 0))
 				return null;
 			
 			// DJGPP unsets bytes 0-3 because strings with an offset of zero
 			// are considered valid, but empty.
-			memset(internal.strtbl, 0, 4);
+			memset(coff.strtbl, 0, 4);
 		}
 		
 		// Working maximum length as some symbols at the very end
 		// of the string buffer + null
 		enum ML = 8;
-		char *str = internal.strtbl + symbol.entry.offset;
-		with (internal) if (adbg_bits_boundchk(str, ML, strtbl, strtblsize)) {
+		char *str = coff.strtbl + symbol.entry.offset;
+		with (coff) if (adbg_bits_boundchk(str, ML, strtbl, strtblsize)) {
 			adbg_oops(AdbgError.assertion);
 			return null;
 		}
@@ -1007,8 +938,8 @@ const(char)* adbg_object_coff_symbol_name(adbg_object_t *o, coff_symbol_entry_t 
 	for (; i < coff_symbol_entry_t.entry.name.sizeof; ++i) {
 		if (symbol.entry.name[i] == 0)
 			break;
-		internal.tname[i] = symbol.entry.name[i];
+		coff.tname[i] = symbol.entry.name[i];
 	}
-	internal.tname[i] = 0;
-	return internal.tname.ptr;
+	coff.tname[i] = 0;
+	return coff.tname.ptr;
 }

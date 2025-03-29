@@ -291,7 +291,7 @@ struct mdmp_module_t {
 }
 struct mdmp_module_list_t {
 	uint Count;
-	mdmp_module_t[1] Modules;
+	mdmp_module_t *Modules;
 }
 
 //
@@ -305,78 +305,58 @@ struct internal_mdmp_t {
 }
 
 int adbg_object_mdmp_load(adbg_object_t *o) {
-	o.internal = calloc(1, internal_mdmp_t.sizeof);
-	if (o.internal == null)
-		return adbg_oops(AdbgError.crt);
-	int e = adbg_object_read_at(o, 0, o.internal, mdmp_header_t.sizeof);
-	if (e) {
-		free(o.internal);
-		return e;
-	}
+	int e = adbg_object_impl_setup(o, AdbgObject.mdmp,
+		internal_mdmp_t.sizeof,
+		&adbg_object_mdmp_unload);
+	if (e) return e;
 	
-	adbg_object_postload(o, AdbgObject.mdmp, &adbg_object_mdmp_unload);
+	internal_mdmp_t *mdmp = cast(internal_mdmp_t*)adbg_object_impl_get_buffer(o);
+	
+	e = adbg_object_read_at(o, 0, &mdmp.header, mdmp_header_t.sizeof);
+	if (e) return e;
 	
 	//TODO: Support swapping
 	
 	return 0;
 }
-void adbg_object_mdmp_unload(adbg_object_t *o) {
-	if (o == null)
-	if (o.internal == null) return;
+void adbg_object_mdmp_unload(adbg_object_t *o, void *u) {
+	internal_mdmp_t *mdmp = cast(internal_mdmp_t*)u;
 	
-	internal_mdmp_t *internal = cast(internal_mdmp_t*)o.internal;
-	
-	if (internal.directories) free(internal.directories);
-	
-	free(o.internal);
+	if (mdmp.directories) free(mdmp.directories);
 }
 
 mdmp_header_t* adbg_object_mdmp_header(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	return &(cast(internal_mdmp_t*)o.internal).header;
+	internal_mdmp_t *mdmp = cast(internal_mdmp_t*)adbg_object_impl_get_buffer(o);
+	if (mdmp == null) return null;
+	return &mdmp.header;
 }
 
 mdmp_directory_entry_t* adbg_object_mdmp_dir_entry(adbg_object_t *o, size_t index) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_mdmp_t *mdmp = cast(internal_mdmp_t*)adbg_object_impl_get_buffer(o);
+	if (mdmp == null) return null;
 	
-	internal_mdmp_t *internal = cast(internal_mdmp_t*)o.internal;
-	
-	if (index >= internal.header.StreamCount) {
+	if (index >= mdmp.header.StreamCount) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	size_t size = internal.header.StreamCount * mdmp_directory_entry_t.sizeof;
+	size_t size = mdmp.header.StreamCount * mdmp_directory_entry_t.sizeof;
 	
 	// Directories not loaded
-	if (internal.directories == null) {
-		internal.directories = cast(mdmp_directory_entry_t*)malloc(size);
-		if (internal.directories == null) {
+	if (mdmp.directories == null) {
+		mdmp.directories = cast(mdmp_directory_entry_t*)malloc(size);
+		if (mdmp.directories == null) {
 			adbg_oops(AdbgError.crt);
 			return null;
 		}
-		if (adbg_object_read_at(o, internal.header.StreamRva, internal.directories, size)) {
-			free(internal.directories);
+		if (adbg_object_read_at(o, mdmp.header.StreamRva, mdmp.directories, size)) {
+			free(mdmp.directories);
 			return null;
 		}
 	}
 	
-	mdmp_directory_entry_t *entry = internal.directories + index;
-	if (adbg_bits_boundchk(entry, mdmp_directory_entry_t.sizeof, internal.directories, size)) {
+	mdmp_directory_entry_t *entry = mdmp.directories + index;
+	if (adbg_bits_boundchk(entry, mdmp_directory_entry_t.sizeof, mdmp.directories, size)) {
 		adbg_oops(AdbgError.offsetBounds);
 		return null;
 	}
@@ -427,12 +407,8 @@ uint adbg_object_mdmp_dir_entry_size(mdmp_directory_entry_t *entry) {
 	return entry.Size;
 }
 void* adbg_object_mdmp_dir_entry_data(adbg_object_t *o, mdmp_directory_entry_t *entry) {
-	if (o == null || entry == null) {
+	if (entry == null) {
 		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
 		return null;
 	}
 	

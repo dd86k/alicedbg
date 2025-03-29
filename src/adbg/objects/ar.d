@@ -18,11 +18,10 @@ import adbg.error;
 import adbg.objectserver;
 import adbg.utils.bit;
 import core.stdc.stdlib;
-import core.stdc.string : strncmp;
-import core.stdc.ctype : isdigit;
 
 extern (C):
 
+// Used internally
 enum ArVersion {
 	unknown	= 0,
 	gnu	= 1,
@@ -104,6 +103,7 @@ private immutable char[16] AR_MEMBER_XFGHASHMAP = "/<XFGHASHMAP>/  ";
 // Note from LLVM:
 // "Some libraries (e.g., arm64rt.lib) from the Windows WDK
 // (version 10.0.22000.0) contain this undocumented special member."
+// Maybe ARM64EC related?
 private immutable char[16] AR_MEMBER_ECSYMBOLS  = "/<ECSYMBOLS>/   ";
 
 /// 
@@ -188,9 +188,10 @@ private struct internal_ar_t {
 }
 
 int adbg_object_ar_load(adbg_object_t *o) {
-	o.internal = malloc(internal_ar_t.sizeof);
-	if (o.internal == null) 
-		return adbg_oops(AdbgError.crt);
+	int e = adbg_object_impl_setup(o, AdbgObject.archive,
+		internal_ar_t.sizeof,
+		null);
+	if (e) return e;
 	
 	// Since UNIX archives can still be used as regular archives,
 	// we need to find out which kind of archive (gnu/bsd/msvc)
@@ -210,17 +211,11 @@ int adbg_object_ar_load(adbg_object_t *o) {
 	}
 	*/
 	
-	adbg_object_postload(o, AdbgObject.archive, &adbg_object_ar_unload);
 	return 0;
 }
-
+version (none)
 void adbg_object_ar_unload(adbg_object_t *o) {
-	if (o == null) return;
-	if (o.internal == null) return;
 	
-	//internal_ar_t *internal = cast(internal_ar_t*)o.internal;
-	
-	free(o.internal);
 }
 
 /// Convert a number from a fixed character buffer to an unsigned integer.
@@ -260,45 +255,29 @@ extern (D) unittest {
 }
 
 ar_member_header_t* adbg_object_ar_first_member(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	
-	internal_ar_t *internal = cast(internal_ar_t*)o.internal;
+	internal_ar_t *ar = cast(internal_ar_t*)adbg_object_impl_get_buffer(o);
+	if (ar == null) return null;
 	
 	// First entry starts right after signature
-	internal.offset = ar_file_header_t.sizeof;
+	ar.offset = ar_file_header_t.sizeof;
 	
 	// Read first member and validate it
-	if (adbg_object_read_at(o, ar_file_header_t.sizeof, &internal.current, ar_member_header_t.sizeof))
+	if (adbg_object_read_at(o, ar_file_header_t.sizeof, &ar.current, ar_member_header_t.sizeof))
 		return null;
-	if (internal.current.EndMarker != AR_EOL) {
+	if (ar.current.EndMarker != AR_EOL) {
 		adbg_oops(AdbgError.objectMalformed);
 		return null;
 	}
 	
-	return &internal.current;
+	return &ar.current;
 }
 
 // Get the next instance of the header
 ar_member_header_t* adbg_object_ar_next_member(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
+	internal_ar_t *ar = cast(internal_ar_t*)adbg_object_impl_get_buffer(o);
+	if (ar == null) return null;
 	
-	internal_ar_t *internal = cast(internal_ar_t*)o.internal;
-	
-	uint size = adbg_object_ar_membersize(&internal.current);
+	uint size = adbg_object_ar_membersize(&ar.current);
 	if (size <= 0) {
 		adbg_oops(AdbgError.assertion);
 		return null;
@@ -306,21 +285,21 @@ ar_member_header_t* adbg_object_ar_next_member(adbg_object_t *o) {
 	
 	// Jump to next header location using the current member size
 	// The alignment is needed at least for MS variants
-	long newloc = adbg_alignup64(internal.offset + ar_member_header_t.sizeof + size, 2);
+	long newloc = adbg_alignup64(ar.offset + ar_member_header_t.sizeof + size, 2);
 	
 	// Read header
-	if (adbg_object_read_at(o, newloc, &internal.current, ar_member_header_t.sizeof))
+	if (adbg_object_read_at(o, newloc, &ar.current, ar_member_header_t.sizeof))
 		return null;
 	
 	// 
-	if (internal.current.EndMarker != AR_EOL) {
+	if (ar.current.EndMarker != AR_EOL) {
 		adbg_oops(AdbgError.assertion);
 		return null;
 	}
 	
 	// All good, set as current, and return member
-	internal.offset = newloc;
-	return &internal.current;
+	ar.offset = newloc;
+	return &ar.current;
 }
 
 uint adbg_object_ar_membersize(ar_member_header_t *member) {
@@ -375,16 +354,8 @@ ptrdiff_t adbg_object_ar_member_name(char *buffer, size_t bufsize, adbg_object_t
 }
 
 ar_member_data_t* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header_t *member) {
-	if (o == null || member == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	if (o.internal == null) {
-		adbg_oops(AdbgError.uninitiated);
-		return null;
-	}
-	
-	internal_ar_t *internal = cast(internal_ar_t*)o.internal;
+	internal_ar_t *ar = cast(internal_ar_t*)adbg_object_impl_get_buffer(o);
+	if (ar == null) return null;
 	
 	uint size = adbg_object_ar_membersize(member);
 	if (size <= 0) {
@@ -402,7 +373,7 @@ ar_member_data_t* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header_
 	data.size    = size;
 	data.pointer = buffer + ar_member_data_t.sizeof;
 	
-	long dataloc = internal.offset + size;
+	long dataloc = ar.offset + size;
 	if (adbg_object_read_at(o, dataloc, data.pointer, size)) {
 		free(buffer);
 		return null;
