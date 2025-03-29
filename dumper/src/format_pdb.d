@@ -77,7 +77,6 @@ void dump_pdb_header(adbg_object_t *o) {
 		
 		print_header("Stream information");
 		uint count = adbg_object_pdb70_total_count(o);
-		print_columns("Stream Number", "Size".ptr, "BlockIDs".ptr);
 		//print_u32("Stream count", count);
 		for (uint i; i < count; ++i, putchar('\n')) {
 			// Print stream number

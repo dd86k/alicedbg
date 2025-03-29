@@ -714,10 +714,6 @@ size_t adbg_object_pdb70_fpmcount(adbg_object_t *o) {
 
 // Total count of streams
 uint adbg_object_pdb70_total_count(adbg_object_t *o) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return 0;
-	}
 	internal_pdb_t *pdb = cast(internal_pdb_t*)adbg_object_impl_get_buffer(o);
 	if (pdb == null)
 		return 0;

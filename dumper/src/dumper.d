@@ -246,7 +246,7 @@ void print_section(uint i, const(char) *name = null, int len = 0) {
 }
 void print_disasm_line(adbg_disassembler_t *dis, adbg_opcode_t *op) {
 	// Print address
-	printf("%12llx ", op.address);
+	printf("%8llx ", op.address);
 	
 	int spacing = adbg_disassembler_max_opcode_size(dis) * 2;
 	assert(spacing > 0);

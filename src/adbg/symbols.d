@@ -19,7 +19,7 @@ import core.stdc.stdlib : calloc, free;
 //       | C        | Varies.           |
 //       | C++      | Varies.           |
 //       | D        | Uses `_D` prefix. |
-//       | Zig      | Uses C names.     |
+//       | Zig      | Uses C mangling.  |
 //       | Rust     | Uses `_R` prefix. |
 
 extern (C):
@@ -36,7 +36,7 @@ enum AdbgSymbolMangling {
 	/// Exact mangled symbol name, as given.
 	exact,
 	/// C mangled name. (Most 32-bit targets)
-	/// Example: int g(int) -> _g (Windows, 32 and 64 bit targets)
+	/// Example: int g(int) -> _g (Windows 32/64-bit targets)
 	cdecl,
 	/// Windows Standard Call mangled name. (32-bit targets)
 	/// Example: (C) int g(int) -> _g@4

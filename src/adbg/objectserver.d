@@ -228,10 +228,6 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 		return null;
 	}
 	
-	// Check after loading
-	version (Trace) if (o.func_unload == null)
-		trace("WARNING: object type %d does not have unload function set", o.format);
-	
 	return o;
 }
 
@@ -273,10 +269,6 @@ adbg_object_t* adbg_object_open_buffer(void *buffer, size_t buffersize, ...) {
 		adbg_object_close(o);
 		return null;
 	}
-	
-	version (Trace) if (o.func_unload == null)
-		trace("NOTE: object type %s does not have unload function set",
-			adbg_object_id_string(o));
 	
 	return o;
 }
