@@ -13,10 +13,10 @@ __dummy.html
 # Executable objects
 /alicedbg
 alicedbg-test-*
+alicedbg-*-test-*
 /alicedump
-alicedump-test-*
+alicedump-*-test-*
 /simple
-simple-test-*
 *.dll
 *.dylib
 *.so
@@ -42,10 +42,3 @@ simple-test-*
 # Personal stuff
 /notes/
 /o/
-
-# Temporary commit message (git commit -t)
-MSG
-
-# AFL stuff
-/testcases/
-/findings/
