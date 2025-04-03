@@ -51,10 +51,10 @@ immutable string PDB20_MAGIC = "Microsoft C/C++ program database 2.00\r\n\x1aJG\
 
 struct pdb20_file_header_t {
 	char[44] Magic;
-	uint BlockSize;	// Usually 0x400, multiply with BlockCount to get filesize
-	ushort StartPage;	// 
-	ushort BlockCount;	// Number of file pages
-	uint RootSize;	// Root stream size
+	uint BlockSize;	// Usually 1024, multiply with BlockCount to get filesize
+	ushort StartPage;	// First usable block index
+	ushort BlockCount;	// Number of total blocks for file
+	uint RootSize;	// Root stream size in bytes
 	uint Reserved;
 	ushort RootNumber;	// Root stream page number list
 }
@@ -90,7 +90,7 @@ pdb20_file_header_t* adbg_object_pdb20_header(adbg_object_t *o) {
 // # PDB 7.0 Structure
 //
 // 1. The very first block containing the file header, the Superblock, is read.
-// 2. The FPM (for block index usage) is read. This is to see which blocks are used.
+// 2. The FPM (Free Page Map) is read. This is to see which blocks are used.
 //    FPM offset: FPMIndex * BlockSize
 //    The FPM is always one BlockSize of size.
 // 3. The offset to the block directory is calculated.
@@ -158,8 +158,8 @@ immutable string PDB70_MAGIC = "Microsoft C/C++ MSF 7.00\r\n\x1aDS\0\0\0"; // 32
 // MSF container
 struct pdb70_file_header_t {
 	char[32] Magic;	/// Magic string
-	uint BlockSize;	/// Usually 0x1000
-	uint FreeIndex;	/// FPM index
+	uint BlockSize;	/// Usually 4096
+	uint FreeIndex;	/// FPM block index
 	uint BlockCount;	/// Total block count. Multiply with BlockSize and you get filesize
 	uint DirectorySize;	/// Size of block directory, in bytes
 	uint Unknown;	/// Reserved
@@ -485,7 +485,6 @@ struct internal_pdb_t {
 	
 	ubyte *fpm;	/// Points to used FPM block
 	size_t fpmcnt;
-	size_t fpmoffset;
 	
 	// Buffer for Stream 0
 	void *stream0;	/// Buffer to hold Stream 0
@@ -515,8 +514,11 @@ int adbg_object_pdb_load(adbg_object_t *o, PdbVersion pdbversion) {
 	
 	switch (pdbversion) {
 	case PdbVersion.pdb20:
-		e = adbg_object_read_at(o, 0, &pdb.pdb20_header, pdb20_file_header_t.sizeof);
+		pdb20_file_header_t *pdb20_header = &pdb.pdb20_header;
+		
+		e = adbg_object_read_at(o, 0, pdb20_header, pdb20_file_header_t.sizeof);
 		if (e) return e;
+		
 		pdb.pdbversion = PdbVersion.pdb20;
 		break;
 	case PdbVersion.pdb70:
@@ -532,20 +534,34 @@ int adbg_object_pdb_load(adbg_object_t *o, PdbVersion pdbversion) {
 			BlockSize > 4096 ||     // Not observed to be higher than 4,096 bytes
 			BlockSize % 512 != 0 || // Multiple of "sector"
 			Unknown ||              // This must be empty (zero)
-			FreeIndex < 1 || FreeIndex > 2) { // 1 or 2 only
+			FreeIndex < 1 || FreeIndex > 2) // 1 or 2 only
 			return adbg_oops(AdbgError.objectMalformed);
-		}
 		
-		// NOTE: This loads the first (current) FPM. Other FPMs may be loaded later.
-		// Load FPM, being the block after the superblock
-		pdb.fpmoffset = pdb70_header.FreeIndex * pdb70_header.BlockSize;
-		version (Trace) trace("fpm offset=%zu", pdb.fpmoffset);
-		pdb.fpm = cast(ubyte*)malloc(pdb70_header.BlockSize);
-		pdb.fpmcnt = pdb70_header.BlockCount / 8; // Assuming
-		if (pdb.fpm == null)
+		// Preload the currently used FPM.
+		// FPMs can span across clusters of blocks if there are more blocks
+		// in total than the blocksize (e.g., 5000 blocks at 4096 size means
+		// there will be at least two sets of FPM blocks).
+		// Reading blocks in full is safer, but wastes a little memory.
+		size_t fpm_sets = ceildiv32(pdb70_header.BlockCount, pdb70_header.BlockSize);
+		size_t fpm_size = fpm_sets * pdb70_header.BlockSize;
+		ubyte *fpm = pdb.fpm = cast(ubyte*)malloc(fpm_size);
+		if (fpm == null)
 			return adbg_oops(AdbgError.crt);
-		e = adbg_object_read_at(o, pdb.fpmoffset, pdb.fpm, pdb70_header.BlockSize);
-		if (e) return e;
+		long fpm_off  = pdb70_header.FreeIndex * pdb70_header.BlockSize;
+		long fpm_clu  = pdb70_header.BlockSize * pdb70_header.BlockSize;
+		pdb.fpmcnt    = ceildiv32(pdb70_header.BlockCount, 8); // 8 bits per byte
+		version (Trace)
+			trace("fpm_sets=%zu fpm_size=%zu fpm_off=%lld fpm_clu=%lld",
+				fpm_sets, fpm_size, fpm_off, fpm_clu);
+		for (size_t i; i < fpm_sets; ++i) {
+			if (adbg_object_read_at(o, fpm_off, fpm, pdb70_header.BlockSize, 0))
+				return adbg_error_code();
+			
+			// Increment FPM memory buffer offset by blocksize, as we are reading blocks
+			fpm     += pdb.pdb70_header.BlockSize;
+			// Increment FPM offset in file
+			fpm_off += fpm_clu;
+		}
 		
 		// Load block directory, we'll need this to load Stream 0
 		
@@ -725,11 +741,6 @@ uint adbg_object_pdb70_total_count(adbg_object_t *o) {
 }
 // Return the Stream size in bytes
 uint adbg_object_pdb70_stream_size(adbg_object_t *o, size_t i) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return 0;
-	}
-	
 	internal_pdb_t *pdb = cast(internal_pdb_t*)adbg_object_impl_get_buffer(o);
 	if (pdb == null)
 		return 0;
@@ -746,11 +757,6 @@ uint adbg_object_pdb70_stream_size(adbg_object_t *o, size_t i) {
 }
 // Return the Stream number of blocks used
 uint adbg_object_pdb70_stream_block_count(adbg_object_t *o, size_t i) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return 0;
-	}
-	
 	internal_pdb_t *pdb = cast(internal_pdb_t*)adbg_object_impl_get_buffer(o);
 	if (pdb == null)
 		return 0;
@@ -768,11 +774,6 @@ uint adbg_object_pdb70_stream_block_count(adbg_object_t *o, size_t i) {
 }
 // Return array of blocks for Stream
 uint* adbg_object_pdb70_stream_blocks(adbg_object_t *o, size_t i) {
-	if (o == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
-	
 	internal_pdb_t *pdb = cast(internal_pdb_t*)adbg_object_impl_get_buffer(o);
 	if (pdb == null)
 		return null;
