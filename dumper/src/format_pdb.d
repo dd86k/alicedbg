@@ -44,25 +44,27 @@ void dump_pdb_header(adbg_object_t *o) {
 		pdb20_file_header_t *header = adbg_object_pdb20_header(o);
 		
 		with (header) {
-		print_stringl("Magic", header.Magic.ptr, 37);
-		print_u32("BlockSize", BlockSize);
-		print_u16("StartPage", StartPage);
+		print_rstring("Magic",  Magic.ptr, Magic.sizeof);
+		print_u32("BlockSize",  BlockSize);
+		print_u16("StartPage",  StartPage);
 		print_u16("BlockCount", BlockCount);
-		print_u32("RootSize", RootSize);
-		print_x32("Reserved", Reserved);
+		print_u32("RootSize",   RootSize);
+		print_x32("Reserved",   Reserved);
 		print_u16("RootNumber", RootNumber);
 		}
 		break;
 	case pdb70:
 		pdb70_file_header_t *header = adbg_object_pdb70_header(o);
 		
-		print_stringl("Magic", header.Magic.ptr, 24);
-		print_u32("BlockSize", header.BlockSize);
-		print_u32("FreeIndex", header.FreeIndex);
-		print_u32("BlockCount", header.BlockCount);
-		print_u32("DirectorySize", header.DirectorySize);
-		print_x32("Unknown", header.Unknown);
-		print_x32("DirectoryOffset", header.DirectoryOffset);
+		with (header) {
+		print_rstring("Magic",       Magic.ptr, Magic.sizeof);
+		print_u32("BlockSize",       BlockSize);
+		print_u32("FreeIndex",       FreeIndex);
+		print_u32("BlockCount",      BlockCount);
+		print_u32("DirectorySize",   DirectorySize);
+		print_x32("Unknown",         Unknown);
+		print_x32("DirectoryOffset", DirectoryOffset);
+		}
 		
 		//TODO: Consider moving this information to another selector/option
 		print_header("FPM information");

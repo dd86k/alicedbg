@@ -15,7 +15,7 @@ import adbg.include.c.stdio;
 import adbg.include.c.stdlib : EXIT_SUCCESS, EXIT_FAILURE, malloc, free;
 import adbg.include.c.stdarg;
 import core.stdc.string;
-import core.stdc.ctype : isprint;
+import core.stdc.ctype;
 import common.errormgmt;
 import common.cli : opt_machine, opt_syntax;
 import common.utils;
@@ -346,6 +346,19 @@ void print_f64(const(char)* name, double val, int pad = 2) {
 	printf("%*s: %.*f\n", __field_padding, name, pad, val);
 }
 
+// Print "real" string with \xFF formatting, relies on size
+void print_rstring(const(char)* name, const(char)* val, size_t size) {
+	printf("%*s: ", __field_padding, name);
+	for (size_t i; i < size; ++i) {
+		int c = val[i];
+		if (isprint(c)) {
+			putchar(c);
+			continue;
+		}
+		printf(`\x%02X`, c);
+	}
+	putchar('\n');
+}
 void print_string(const(char)* name, const(char)* val) {
 	printf("%*s: %s\n", __field_padding, name, val);
 }
