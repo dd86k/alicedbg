@@ -17,9 +17,11 @@ module adbg.types.cv;
 //           Likely means User-Defined Type.
 
 // NOTE: CodeView Debug Sections
-//       Version 0x0000_0001: Microsoft CodeView 4.0 Debugger specifications
-//       Version 0x0000_0002: VS97, VC6.0 (?)
-//       Version 0x0000_0004: VS2003 - VS2022 (vc7.0 - vc17.x ?)
+//
+//       Version (bitfields?)
+//       0x0000_0001: Microsoft CodeView 4.0 Debugger specifications
+//       0x0000_0002: PDB 2.0, MSVC 2.0 and later
+//       0x0000_0004: PDB 7.0, MSVC 7.0 and later (big offsets?)
 //
 //       Symbols (.debug$S in COFF objects)
 //       Leaf: u16le:length, u16le:index/type, ...
@@ -47,6 +49,7 @@ struct cv_record_t {
 	ushort kind;
 }
 
+// Used in PDBs
 alias LEAF_ENUM_e = ushort;
 enum : LEAF_ENUM_e {
 	// leaf indices starting records but referenced from symbol records

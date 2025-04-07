@@ -39,7 +39,9 @@ private:
 void dump_pdb_header(adbg_object_t *o) {
 	print_header("Header");
 	
-	final switch (adbg_object_pdb_version(o)) with(PdbVersion) {
+	uint max = void;
+	PdbVersion pdbversion = adbg_object_pdb_version(o);
+	final switch (pdbversion) with(PdbVersion) {
 	case pdb20:
 		pdb20_file_header_t *header = adbg_object_pdb20_header(o);
 		
@@ -50,8 +52,9 @@ void dump_pdb_header(adbg_object_t *o) {
 		print_u16("BlockCount", BlockCount);
 		print_u32("RootSize",   RootSize);
 		print_x32("Reserved",   Reserved);
-		print_u16("RootNumber", RootNumber);
 		}
+		
+		max = 0xffff; // or 0x7fff with 4K pages
 		break;
 	case pdb70:
 		pdb70_file_header_t *header = adbg_object_pdb70_header(o);
@@ -66,7 +69,6 @@ void dump_pdb_header(adbg_object_t *o) {
 		print_x32("DirectoryOffset", DirectoryOffset);
 		}
 		
-		//TODO: Consider moving this information to another selector/option
 		print_header("FPM information");
 		ubyte *fpm      = adbg_object_pdb70_fpm(o);
 		size_t fpmcount = adbg_object_pdb70_fpmcount(o);
@@ -77,35 +79,44 @@ void dump_pdb_header(adbg_object_t *o) {
 			print_x8(buf.ptr, fpm[fpmi]);
 		}
 		
-		print_header("Stream information");
-		uint count = adbg_object_pdb70_total_count(o);
-		//print_u32("Stream count", count);
-		for (uint i; i < count; ++i, putchar('\n')) {
-			// Print stream number
-			char[48] buf = void;
-			snprintf(buf.ptr, 48, "Stream %u", i);
-			print_name(buf.ptr);
-			
-			uint size = adbg_object_pdb70_stream_size(o, i);
-			
-			// Skip if empty
-			if (size == 0 || size == PDB_BLOCK_SIZE_UNUSED)
-				continue;
-			
-			uint *blocks  = adbg_object_pdb70_stream_blocks(o, i);
-			if (blocks == null)
-				continue;
-			
-			// Print stream size + associated blocks
-			uint blkcount = adbg_object_pdb70_stream_block_count(o, i);
-			printf("%u\t(", size);
-			for (uint bi; bi < blkcount; ++bi) {
-				if (bi) putchar(',');
-				printf("%u", blocks[bi]);
-			}
-			printf(")");
-		}
+		max = PDB_BLOCK_SIZE_UNUSED;
 		break;
+	}
+	
+	print_header("Stream information");
+	uint count = adbg_object_pdb_stream_count(o);
+	for (uint i = 1; i < count; ++i, putchar('\n')) {
+		// Print stream number
+		char[48] buf = void;
+		snprintf(buf.ptr, 48, "Stream %u", i);
+		print_name(buf.ptr);
+		
+		pdb_stream_t *stream = adbg_object_pdb_stream_info(o, i);
+		if (stream == null) {
+			print_warningf("Stream %u failed to load", i);
+			continue;
+		}
+		
+		// If size zero of unused, it's unmapped
+		if (stream.size == 0 || stream.size >= max)
+			continue;
+		
+		printf("%u\t(", stream.size);
+		final switch (pdbversion) {
+		case PdbVersion.pdb20:
+			for (uint bi; bi < stream.blkcnt; ++bi) {
+				if (bi) putchar(',');
+				printf("%u", stream.blocks16[bi]);
+			}
+			break;
+		case PdbVersion.pdb70:
+			for (uint bi; bi < stream.blkcnt; ++bi) {
+				if (bi) putchar(',');
+				printf("%u", stream.blocks32[bi]);
+			}
+			break;
+		}
+		printf(")");
 	}
 }
 
@@ -124,40 +135,75 @@ const(char)* pdb_stream_name(size_t i) {
 }
 
 void dump_pdb_stream(adbg_object_t *o, int num) {
-	switch (num) { // specific
-	case 1:    dump_pdb70_stream_pdb(o); return;
-	case 2, 4: dump_pdb70_stream_tpi_ipi(o, num); return;
-	case 3:    dump_pdb70_stream_dbi(o); return;
-	default:
+	pdb_stream_t *stream = adbg_object_pdb_open_stream(o, num);
+	if (stream == null)
+		panic_adbg("Failed to open PDB stream");
+	scope(exit) adbg_object_pdb_close_stream(stream);
+	
+	if (SETTING(Setting.extractAny)) {
+		dump_pdb70_stream_raw(stream, num);
+		return;
 	}
 	
-	// Otherwise, generic
-	pdb70_stream_t *stream = adbg_object_pdb70_stream_open(o, num);
-	if (stream == null)
-		panic_adbg("Failed to open Stream 1");
-	scope(exit) adbg_object_pdb70_stream_close(stream);
-	
+	switch (adbg_object_pdb_version(o)) {
+	case PdbVersion.pdb20:
+		switch (num) {
+		case 7:
+			dump_pdb20_stream_pubsym(o, stream);
+			return;
+		default:
+		}
+		break;
+	case PdbVersion.pdb70: // NOTE: PDB 2.0 might have the same
+		switch (num) {
+		case 1:    dump_pdb70_stream_pdb(o, stream); return;
+		case 2, 4: dump_pdb70_stream_tpi_ipi(o, stream, num); return;
+		case 3:    dump_pdb70_stream_dbi(o, stream); return;
+		default:
+		}
+		break;
+	default:
+		return;
+	}
+		
 	char[64] b = void;
 	snprintf(b.ptr, 64, "Stream %d", num);
 	print_data(b.ptr, stream.data, stream.size);
 }
 
-void dump_pdb70_stream_raw(pdb70_stream_t *stream, int num) {
+void dump_pdb70_stream_raw(pdb_stream_t *stream, int num) {
 	print_data(pdb_stream_name(num), stream.data, stream.size);
 }
 
-void dump_pdb70_stream_pdb(adbg_object_t *o) {
-	pdb70_stream_t *stream = adbg_object_pdb70_stream_open(o, PdbStream.pdb);
-	if (stream == null)
-		panic_adbg("Failed to open Stream 1");
-	scope(exit) adbg_object_pdb70_stream_close(stream);
+void dump_pdb20_stream_pubsym(adbg_object_t *o, pdb_stream_t *stream) {
+	print_section(7, "Public symbols");
 	
-	if (SETTING(Setting.extractAny)) {
-		dump_pdb70_stream_raw(stream, PdbStream.pdb);
+	if (stream.size <= 0 || stream.size >= 0xffff) {
+		print_warningf("Stream too small or unused");
 		return;
 	}
 	
-	print_section(PdbStream.pdb, pdb_stream_name(PdbStream.pdb));
+	// CodeView information
+	cv_record_t *rec = cast(cv_record_t*)(stream.data + 4);
+	for (int tpioffset; tpioffset < stream.size; tpioffset += rec.length) {
+		print_u16("Length", rec.length);
+		print_x16("Kind", rec.kind, SAFEVAL( adbg_type_cv_leaf_enum_string(rec.kind) ));
+		
+		if (rec.kind == 0 || rec.length == 0)
+			break;
+		
+		// Get next leaf record
+		rec = cast(cv_record_t*)(cast(void*)rec + rec.length + ushort.sizeof);
+	}
+}
+
+void dump_pdb70_stream_pdb(adbg_object_t *o, pdb_stream_t *stream) {
+	print_section(Pdb70Stream.pdb, pdb_stream_name(Pdb70Stream.pdb));
+	
+	if (stream.size < pdb70_pdb_header_t.sizeof) {
+		print_warningf("Stream smaller than PDB header");
+		return;
+	}
 	
 	pdb70_pdb_header_t *pdb = cast(pdb70_pdb_header_t*)stream.data;
 	
@@ -183,18 +229,13 @@ void dump_pdb70_stream_pdb(adbg_object_t *o) {
 	print_stringl("UniqueID", uidstr.ptr, uidlen);
 }
 
-void dump_pdb70_stream_tpi_ipi(adbg_object_t *o, int num) {
-	pdb70_stream_t *stream = adbg_object_pdb70_stream_open(o, num);
-	if (stream == null)
-		panic_adbg(num == 2 ? "Failed to open Stream 2" : "Failed to open Stream 4");
-	scope(exit) adbg_object_pdb70_stream_close(stream);
+void dump_pdb70_stream_tpi_ipi(adbg_object_t *o, pdb_stream_t *stream, int num) {
+	print_section(num, pdb_stream_name(num));
 	
-	if (SETTING(Setting.extractAny)) {
-		dump_pdb70_stream_raw(stream, num);
+	if (stream.size < pdb70_dbi_header_t.sizeof) {
+		print_warningf("Stream smaller than TPI/IPI header");
 		return;
 	}
-	
-	print_section(num, pdb_stream_name(num));
 	
 	pdb70_tpi_header_t *tpi = cast(pdb70_tpi_header_t*)stream.data;
 	
@@ -225,31 +266,25 @@ void dump_pdb70_stream_tpi_ipi(adbg_object_t *o, int num) {
 	print_u32("HashAdjBufferLength", tpi.HashAdjBufferLength);
 	
 	cv_record_t *rec = cast(cv_record_t*)(stream.data + pdb70_tpi_header_t.sizeof);
-	int tpioffset;
-	while (tpioffset < stream.size) {
+	for (int tpioffset; tpioffset < stream.size; tpioffset += rec.length) {
 		print_u16("Length", rec.length);
 		print_x16("Kind", rec.kind, SAFEVAL( adbg_type_cv_leaf_enum_string(rec.kind) ));
 		
 		if (rec.kind == 0 || rec.length == 0)
 			break;
 		
+		// Get next leaf record
 		rec = cast(cv_record_t*)(cast(void*)rec + rec.length + ushort.sizeof);
-		tpioffset += rec.length;
 	}
 }
 
-void dump_pdb70_stream_dbi(adbg_object_t *o) {
-	pdb70_stream_t *stream = adbg_object_pdb70_stream_open(o, PdbStream.dbi);
-	if (stream == null)
-		panic_adbg("Failed to open Stream 3");
-	scope(exit) adbg_object_pdb70_stream_close(stream);
+void dump_pdb70_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
+	print_section(Pdb70Stream.dbi, pdb_stream_name(Pdb70Stream.dbi));
 	
-	if (SETTING(Setting.extractAny)) {
-		dump_pdb70_stream_raw(stream, PdbStream.pdb);
+	if (stream.size < pdb70_dbi_header_t.sizeof) {
+		print_warningf("Stream smaller than DBI header");
 		return;
 	}
-	
-	print_section(PdbStream.dbi, pdb_stream_name(PdbStream.dbi));
 	
 	pdb70_dbi_header_t *dbi = cast(pdb70_dbi_header_t*)stream.data;
 	

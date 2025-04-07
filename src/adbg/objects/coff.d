@@ -36,8 +36,6 @@ extern (C):
 
 // NOTE: DJGPP uses unsigned numbers for locations, which makes more sense, and we should too!
 
-// NOTE: These are pre-swapped but may be wrong on big-endian targets
-//       objectserver might have to keep a pre-swapped version for itself
 enum : ushort {
 	/// i386 COFF magic
 	COFF_MAGIC_I386	= I16!(0x4c, 0x01),	// 0x14c
