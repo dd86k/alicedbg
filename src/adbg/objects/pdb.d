@@ -219,6 +219,10 @@ pdb_stream_t* adbg_object_pdb_open_stream(adbg_object_t *o, uint number) {
 		return null;
 	if (stream.data) // Buffer already opened?
 		return stream;
+	if (stream.size == 0) { // Stream unavailable
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
 	
 	// Remember, it's safer and faster to just read and copy blocks
 	// instead of attempting to read and trim the exact amount of bytes
