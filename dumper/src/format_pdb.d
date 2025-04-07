@@ -1,15 +1,11 @@
-/// PDB 7.00 dumper
-///
-/// Sources:
-/// - https://github.com/Microsoft/microsoft-pdb/
-/// - http://www.godevtool.com/Other/pdb.htm
-/// - http://www.debuginfo.com/articles/debuginfomatch.html
+/// PDB 2.0 and 7.0 dumper
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
 module format_pdb;
 
+import adbg.error;
 import adbg.objectserver;
 import adbg.objects.pdb;
 import adbg.objects.pe : adbg_object_pe_machine_value_string;
@@ -83,9 +79,9 @@ void dump_pdb_header(adbg_object_t *o) {
 		break;
 	}
 	
-	print_header("Stream information");
+	print_header("Block allocation");
 	uint count = adbg_object_pdb_stream_count(o);
-	for (uint i = 1; i < count; ++i, putchar('\n')) {
+	for (uint i; i < count; ++i, putchar('\n')) {
 		// Print stream number
 		char[48] buf = void;
 		snprintf(buf.ptr, 48, "Stream %u", i);
@@ -93,7 +89,7 @@ void dump_pdb_header(adbg_object_t *o) {
 		
 		pdb_stream_t *stream = adbg_object_pdb_stream_info(o, i);
 		if (stream == null) {
-			print_warningf("Stream %u failed to load", i);
+			print_warningf("Stream %u failed to load: %s", i, adbg_error_message());
 			continue;
 		}
 		
@@ -124,13 +120,13 @@ void dump_pdb_header(adbg_object_t *o) {
 const(char)* pdb_stream_name(size_t i) {
 	static immutable string[] StreamNames = [
 		"Old MSF Directory",
-		"PDB Stream",
-		"TPI Stream",
-		"DBI Stream",
-		"IPI Stream",
+		"PDB information",
+		"TPI stream",
+		"DBI stream",
+		"IPI stream",
 	];
 	if (i >= StreamNames.length)
-		return "(todo)";
+		return "Unknown";
 	return StreamNames[i].ptr;
 }
 
@@ -141,38 +137,61 @@ void dump_pdb_stream(adbg_object_t *o, int num) {
 	scope(exit) adbg_object_pdb_close_stream(stream);
 	
 	if (SETTING(Setting.extractAny)) {
-		dump_pdb70_stream_raw(stream, num);
+	Lextract:
+		char[64] b = void;
+		snprintf(b.ptr, 64, "Stream %d", num);
+		print_data(b.ptr, stream.data, stream.size);
 		return;
 	}
 	
-	switch (adbg_object_pdb_version(o)) {
+	// If Stream number has any special meaning
+	final switch (adbg_object_pdb_version(o)) {
 	case PdbVersion.pdb20:
 		switch (num) {
-		case 7:
+		case 1: // pdb info
+			dump_pdb20_stream_pdb(o, stream);
+			return;
+		case 7: // pdb public symbols
 			dump_pdb20_stream_pubsym(o, stream);
 			return;
 		default:
 		}
 		break;
-	case PdbVersion.pdb70: // NOTE: PDB 2.0 might have the same
+	case PdbVersion.pdb70:
 		switch (num) {
-		case 1:    dump_pdb70_stream_pdb(o, stream); return;
-		case 2, 4: dump_pdb70_stream_tpi_ipi(o, stream, num); return;
-		case 3:    dump_pdb70_stream_dbi(o, stream); return;
+		case 1: // pdb info
+			dump_pdb70_stream_pdb(o, stream);
+			return;
+		case 2, 4:
+			dump_pdb70_stream_tpi_ipi(o, stream, num);
+			return;
+		case 3:
+			dump_pdb70_stream_dbi(o, stream);
+			return;
 		default:
 		}
 		break;
-	default:
-		return;
 	}
-		
-	char[64] b = void;
-	snprintf(b.ptr, 64, "Stream %d", num);
-	print_data(b.ptr, stream.data, stream.size);
+	
+	// No special meaning, go hexdump it
+	// Assume no other bit set since another check is done earlier
+	opt_settings |= Setting.hexdump;
+	goto Lextract;
 }
 
-void dump_pdb70_stream_raw(pdb_stream_t *stream, int num) {
-	print_data(pdb_stream_name(num), stream.data, stream.size);
+void dump_pdb20_stream_pdb(adbg_object_t *o, pdb_stream_t *stream) {
+	print_section(1, "PDB information");
+	
+	if (stream.size < pdb20_pdb_stream_t.sizeof) {
+		print_warningf("Stream smaller than PDB header");
+		return;
+	}
+	
+	pdb20_pdb_stream_t *pdb = cast(pdb20_pdb_stream_t*)stream.data;
+	
+	print_u32("Version", pdb.Version, adbg_object_pdb_pdbversion_string(pdb.Version));
+	print_x32("Signature", pdb.Signature);
+	print_u32("Age", pdb.Age);
 }
 
 void dump_pdb20_stream_pubsym(adbg_object_t *o, pdb_stream_t *stream) {
@@ -207,23 +226,9 @@ void dump_pdb70_stream_pdb(adbg_object_t *o, pdb_stream_t *stream) {
 	
 	pdb70_pdb_header_t *pdb = cast(pdb70_pdb_header_t*)stream.data;
 	
-	const(char) *vcver = void;
-	switch (pdb.Version) with (PdbRaw_PdbVersion) {
-	case vc2:	vcver = "VC2"; break;
-	case vc4:	vcver = "VC4"; break;
-	case vc41:	vcver = "VC41"; break;
-	case vc50:	vcver = "VC50"; break;
-	case vc98:	vcver = "VC98"; break;
-	case vc70_old:	vcver = "VC70_OLD"; break;
-	case vc70:	vcver = "VC70"; break;
-	case vc80:	vcver = "VC80"; break;
-	case vc110:	vcver = "VC110"; break;
-	case vc140:	vcver = "VC140"; break;
-	default:	vcver = "Unknown";
-	}
 	char[UID_TEXTLEN] uidstr = void;
 	int uidlen = uid_string(pdb.UniqueId, uidstr.ptr, UID_TEXTLEN, UID_GUID);
-	print_u32("Version", pdb.Version, vcver);
+	print_u32("Version", pdb.Version, adbg_object_pdb_pdbversion_string(pdb.Version));
 	print_x32("Signature", pdb.Signature);
 	print_u32("Age", pdb.Age);
 	print_stringl("UniqueID", uidstr.ptr, uidlen);

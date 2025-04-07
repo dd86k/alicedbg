@@ -11,13 +11,14 @@
 ///
 /// Sources:
 /// - https://llvm.org/docs/PDB/MsfFile.html
-/// - llvm/include/llvm/DebugInfo/PDB/
-/// - llvm-pdbutil(1): llvm-pdbutil dump --summary PDBFILE
+/// - llvm/include/llvm/DebugInfo/PDB/ and llvm-pdbutil(1) (llvm-pdbutil dump --summary FILE)
 /// - https://github.com/microsoft/microsoft-pdb
 /// - https://github.com/ziglang/zig/blob/master/lib/std/pdb.zig
 /// - https://github.com/MolecularMatters/raw_pdb
 /// - https://devblogs.microsoft.com/cppblog/faster-c-build-cycle-in-vs-15-with-debugfastlink/
-/// - https://www.informit.com/articles/article.aspx?p=22685
+/// - https://web.archive.org/web/20250318100020/https://www.informit.com/articles/article.aspx?p=22685
+/// - http://www.godevtool.com/Other/pdb.htm
+/// - http://www.debuginfo.com/articles/debuginfomatch.html
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -85,6 +86,14 @@ private
 struct pdb20_root_entry_t {
 	uint size; // in bytes
 	uint reserved; // 
+}
+
+struct pdb20_pdb_stream_t {
+	PdbRaw_PdbVersion Version;
+	uint Signature;
+	uint[3] Unknown1;
+	uint Age;
+	uint[3] Unknown2;
 }
 
 int adbg_object_pdb20_load(adbg_object_t *o) {
@@ -192,18 +201,12 @@ pdb_stream_t* adbg_object_pdb_stream_info(adbg_object_t *o, uint number) {
 	internal_pdb_t *pdb = cast(internal_pdb_t*)adbg_object_impl_get_buffer(o);
 	if (pdb == null) return null;
 	
-	// TODO: It should be possible to have Stream 0 content
-	// NOTE: stream[0] is Stream 1
-	if (number == 0) {
-		adbg_oops(AdbgError.invalidArgument);
-		return null;
-	}
 	if (number >= pdb.stream_count) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	return pdb.streams + number - 1;
+	return pdb.streams + number;
 }
 
 // Multiple streams can be opened at the same time.
@@ -211,23 +214,14 @@ pdb_stream_t* adbg_object_pdb_open_stream(adbg_object_t *o, uint number) {
 	internal_pdb_t *pdb = cast(internal_pdb_t*)adbg_object_impl_get_buffer(o);
 	if (pdb == null) return null;
 	
-	// TODO: It should be possible to have Stream 0 content
-	// NOTE: stream[0] is Stream 1
-	if (number == 0) {
-		adbg_oops(AdbgError.invalidArgument);
+	pdb_stream_t *stream = adbg_object_pdb_stream_info(o, number);
+	if (stream == null)
 		return null;
-	}
-	if (number >= pdb.stream_count) {
-		adbg_oops(AdbgError.indexBounds);
-		return null;
-	}
-	
-	pdb_stream_t *stream = pdb.streams + number;
-	if (stream.data) // Already opened?
+	if (stream.data) // Buffer already opened?
 		return stream;
 	
 	// Remember, it's safer and faster to just read and copy blocks
-	// instead of attempting to read and trim just the bytes
+	// instead of attempting to read and trim the exact amount of bytes
 	final switch (pdb.pdbversion) {
 	case PdbVersion.pdb20:
 		uint blksize = pdb.pdb20_header.BlockSize;
@@ -277,7 +271,7 @@ pdb_stream_t* adbg_object_pdb_open_stream(adbg_object_t *o, uint number) {
 			final switch (adbg_object_pdb70_free_block(o, block)) {
 			case -1: // error
 				adbg_oops(AdbgError.crt);
-				free(data);
+				free(stream.data);
 				return null;
 			case 0: // used
 				long off = block * blksize;
@@ -434,6 +428,21 @@ enum PdbRaw_PdbVersion : uint { // PdbRaw_ImplVer
 	vc80	= 20030901,
 	vc110	= 20091201,
 	vc140	= 20140508,
+}
+const(char)* adbg_object_pdb_pdbversion_string(uint ver) {
+	switch (ver) with (PdbRaw_PdbVersion) {
+	case vc2:	return "VC2";
+	case vc4:	return "VC4";
+	case vc41:	return "VC41";
+	case vc50:	return "VC50";
+	case vc98:	return "VC60";
+	case vc70_old:	return "VC70_OLD";
+	case vc70:	return "VC70";
+	case vc80:	return "VC80";
+	case vc110:	return "VC110";
+	case vc140:	return "VC140";
+	default:	return null;
+	}
 }
 
 /// Stream 1 PDB feature codes (after named stream map)
