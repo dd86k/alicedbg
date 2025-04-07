@@ -136,6 +136,7 @@ void dump_pdb_stream(adbg_object_t *o, int num) {
 		panic_adbg("Failed to open PDB stream");
 	scope(exit) adbg_object_pdb_close_stream(stream);
 	
+	// If by preference we want to extract the stream data
 	if (SETTING(Setting.extractAny)) {
 	Lextract:
 		char[64] b = void;
@@ -144,33 +145,26 @@ void dump_pdb_stream(adbg_object_t *o, int num) {
 		return;
 	}
 	
+	PdbVersion pdbver = adbg_object_pdb_version(o);
 	// If Stream number has any special meaning
-	final switch (adbg_object_pdb_version(o)) {
-	case PdbVersion.pdb20:
-		switch (num) {
-		case 1: // pdb info
-			dump_pdb20_stream_pdb(o, stream);
-			return;
-		case 7: // pdb public symbols
-			dump_pdb20_stream_pubsym(o, stream);
-			return;
-		default:
-		}
-		break;
-	case PdbVersion.pdb70:
-		switch (num) {
-		case 1: // pdb info
+	switch (num) {
+	case 1: // pdb info
+		if (pdbver == PdbVersion.pdb70)
 			dump_pdb70_stream_pdb(o, stream);
-			return;
-		case 2, 4:
-			dump_pdb70_stream_tpi_ipi(o, stream, num);
-			return;
-		case 3:
-			dump_pdb70_stream_dbi(o, stream);
-			return;
-		default:
-		}
-		break;
+		else
+			dump_pdb20_stream_pdb(o, stream);
+		return;
+	case 2, 4:
+		dump_pdb_stream_tpi_ipi(o, stream, num);
+		return;
+	case 3:
+		dump_pdb_stream_dbi(o, stream);
+		return;
+	case 7: // pdb public symbols (at least for pdb 2.0?)
+		if (pdbver == PdbVersion.pdb20)
+			dump_pdb20_stream_pubsym(o, stream);
+		return;
+	default:
 	}
 	
 	// No special meaning, go hexdump it
@@ -219,12 +213,12 @@ void dump_pdb20_stream_pubsym(adbg_object_t *o, pdb_stream_t *stream) {
 void dump_pdb70_stream_pdb(adbg_object_t *o, pdb_stream_t *stream) {
 	print_section(Pdb70Stream.pdb, pdb_stream_name(Pdb70Stream.pdb));
 	
-	if (stream.size < pdb70_pdb_header_t.sizeof) {
+	if (stream.size < pdb_pdb_header_t.sizeof) {
 		print_warningf("Stream smaller than PDB header");
 		return;
 	}
 	
-	pdb70_pdb_header_t *pdb = cast(pdb70_pdb_header_t*)stream.data;
+	pdb_pdb_header_t *pdb = cast(pdb_pdb_header_t*)stream.data;
 	
 	char[UID_TEXTLEN] uidstr = void;
 	int uidlen = uid_string(pdb.UniqueId, uidstr.ptr, UID_TEXTLEN, UID_GUID);
@@ -234,15 +228,15 @@ void dump_pdb70_stream_pdb(adbg_object_t *o, pdb_stream_t *stream) {
 	print_stringl("UniqueID", uidstr.ptr, uidlen);
 }
 
-void dump_pdb70_stream_tpi_ipi(adbg_object_t *o, pdb_stream_t *stream, int num) {
+void dump_pdb_stream_tpi_ipi(adbg_object_t *o, pdb_stream_t *stream, int num) {
 	print_section(num, pdb_stream_name(num));
 	
-	if (stream.size < pdb70_dbi_header_t.sizeof) {
+	if (stream.size < pdb_dbi_header_t.sizeof) {
 		print_warningf("Stream smaller than TPI/IPI header");
 		return;
 	}
 	
-	pdb70_tpi_header_t *tpi = cast(pdb70_tpi_header_t*)stream.data;
+	pdb_tpi_header_t *tpi = cast(pdb_tpi_header_t*)stream.data;
 	
 	const(char) *vcver = void;
 	switch (tpi.Version) with (PdbRaw_TpiVer) {
@@ -270,7 +264,7 @@ void dump_pdb70_stream_tpi_ipi(adbg_object_t *o, pdb_stream_t *stream, int num) 
 	print_u32("HashAdjBufferOffset", tpi.HashAdjBufferOffset);
 	print_u32("HashAdjBufferLength", tpi.HashAdjBufferLength);
 	
-	cv_record_t *rec = cast(cv_record_t*)(stream.data + pdb70_tpi_header_t.sizeof);
+	cv_record_t *rec = cast(cv_record_t*)(stream.data + pdb_tpi_header_t.sizeof);
 	for (int tpioffset; tpioffset < stream.size; tpioffset += rec.length) {
 		print_u16("Length", rec.length);
 		print_x16("Kind", rec.kind, SAFEVAL( adbg_type_cv_leaf_enum_string(rec.kind) ));
@@ -283,15 +277,15 @@ void dump_pdb70_stream_tpi_ipi(adbg_object_t *o, pdb_stream_t *stream, int num) 
 	}
 }
 
-void dump_pdb70_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
+void dump_pdb_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
 	print_section(Pdb70Stream.dbi, pdb_stream_name(Pdb70Stream.dbi));
 	
-	if (stream.size < pdb70_dbi_header_t.sizeof) {
+	if (stream.size < pdb_dbi_header_t.sizeof) {
 		print_warningf("Stream smaller than DBI header");
 		return;
 	}
 	
-	pdb70_dbi_header_t *dbi = cast(pdb70_dbi_header_t*)stream.data;
+	pdb_dbi_header_t *dbi = cast(pdb_dbi_header_t*)stream.data;
 	
 	const(char) *vcver = void;
 	switch (dbi.VersionHeader) with (PdbRaw_DbiVer) {
@@ -336,14 +330,14 @@ void dump_pdb70_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
 	print_u32("Padding", dbi.Padding);
 	
 	// Module Info Substream containing object entries
-	if (dbi.ModInfoSize > pdb70_dbi_modinfo_t.sizeof) {
+	if (dbi.ModInfoSize > pdb_dbi_modinfo_t.sizeof) {
 		print_header("Module info substream");
 		
 		uint count;
 		size_t size;
 		for (size_t offset; offset < dbi.ModInfoSize; offset += size) {
-			pdb70_dbi_modinfo_t *mod = cast(pdb70_dbi_modinfo_t*)
-				(stream.data + pdb70_dbi_header_t.sizeof + offset);
+			pdb_dbi_modinfo_t *mod = cast(pdb_dbi_modinfo_t*)
+				(stream.data + pdb_dbi_header_t.sizeof + offset);
 			
 			print_section(count++);
 			print_x32("Unused1", mod.Unused1);
@@ -375,10 +369,8 @@ void dump_pdb70_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
 			// NOTE: Usually only non-zero for "* Linker *" module
 			print_u32("PdbFilePathNameIndex", mod.PdbFilePathNameIndex);
 			
-			// TODO: min(4096, left) for nstrlen
-			
 			// Print ModuleName, usually associated *.obj/*.exp files
-			char *modname = cast(char*)mod + pdb70_dbi_modinfo_t.sizeof;
+			char *modname = cast(char*)mod + pdb_dbi_modinfo_t.sizeof;
 			int modlen = cast(int)adbg_nstrlen(modname, 4096);
 			print_stringl("ModuleName", modname, modlen);
 			
@@ -393,7 +385,7 @@ void dump_pdb70_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
 			// Ditto
 			if (objlen) ++objlen;
 			
-			size = adbg_alignup(pdb70_dbi_modinfo_t.sizeof + modlen + objlen, 4);
+			size = adbg_alignup(pdb_dbi_modinfo_t.sizeof + modlen + objlen, 4);
 		}
 	}
 	
@@ -402,18 +394,18 @@ void dump_pdb70_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
 	// TODO: Section Map Substream
 	
 	// File Info Substream
-	if (dbi.SourceInfoSize > pdb70_dbi_fileinfo_t.sizeof) {
+	if (dbi.SourceInfoSize > pdb_dbi_fileinfo_t.sizeof) {
 		print_header("File Info substream");
 		
-		pdb70_dbi_fileinfo_t *fi = cast(pdb70_dbi_fileinfo_t*)(
-			stream.data +
+		pdb_dbi_fileinfo_t *fi = cast(pdb_dbi_fileinfo_t*)
+			(stream.data +
 			dbi.ModInfoSize +
 			dbi.SectionContributionSize +
 			dbi.SectionMapSize);
 		
 		// TODO: Fix hack with string-check-like function
 		enum fimin = 20; // Some arbitrary amount for FileInfo minimum
-		if (adbg_bits_boundchk(fi, pdb70_dbi_fileinfo_t.sizeof + fimin, stream.data, stream.size)) {
+		if (adbg_bits_boundchk(fi, pdb_dbi_fileinfo_t.sizeof + fimin, stream.data, stream.size)) {
 			print_warningf("FileInfo substream fileinfo outside stream data");
 			return;
 		}
@@ -421,7 +413,7 @@ void dump_pdb70_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
 		print_u16("NumModules", fi.NumModules);
 		print_u16("NumSourceFiles", fi.NumSourceFiles);
 		
-		ushort *ModIndices = cast(ushort*)(cast(void*)fi + pdb70_dbi_fileinfo_t.sizeof);
+		ushort *ModIndices = cast(ushort*)(cast(void*)fi + pdb_dbi_fileinfo_t.sizeof);
 		ushort *NumSourceFiles = ModIndices + fi.NumModules;
 		uint *FileNameOffsets = cast(uint*)(NumSourceFiles + fi.NumModules);
 		char *NamesBuffer = cast(char*)(FileNameOffsets + fi.NumSourceFiles);

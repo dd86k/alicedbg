@@ -385,12 +385,6 @@ struct pdb70_file_header_t {
 	uint DirectoryOffset;
 }
 
-/// Represents a stream.
-struct pdb70_stream_t {
-	size_t size;
-	void *data;
-}
-
 /// Fixed streams
 enum Pdb70Stream : uint {
 	/// PDB fixed stream 1
@@ -458,7 +452,7 @@ enum PdbRaw_PdbFeatures : uint {
 }
 
 /// Stream 1 structure
-struct pdb70_pdb_header_t {
+struct pdb_pdb_header_t {
 	/// Contains VC version
 	uint Version;
 	/// Timestamp (Using time(3))
@@ -483,7 +477,7 @@ enum PdbRaw_TpiVer : uint {
 }
 
 /// CodeView record header for Stream 2 (TPI) and Stream 4 (IPI)
-struct pdb70_tpi_header_t {
+struct pdb_tpi_header_t {
 	/// Maps to PdbRaw_TpiVer, usually v80.
 	uint Version;
 	/// Usually size of this header.
@@ -550,7 +544,7 @@ enum PdbRaw_DbiFlags : ushort {
 }
 
 /// Stream 3 DBI header
-struct pdb70_dbi_header_t {
+struct pdb_dbi_header_t {
 	/// Seems to be always -1.
 	int VersonSignature;
 	/// Maps to PdbRaw_DbiVersion.
@@ -613,7 +607,7 @@ struct pdb70_dbi_header_t {
 /// Follows the DBI header, substream information.
 ///
 /// One per module.
-struct pdb70_dbi_modinfo_t { align(1):
+struct pdb_dbi_modinfo_t { align(1):
 	/// 
 	uint Unused1;
 	struct pdb70_dbi_mod_contrib_entry { align(1):
@@ -657,7 +651,7 @@ enum {
 /// File information substream header.
 ///
 /// One per file.
-struct pdb70_dbi_fileinfo_t {
+struct pdb_dbi_fileinfo_t {
 	ushort NumModules;
 	ushort NumSourceFiles;
 	//ushort[NumModules] ModIndices;
