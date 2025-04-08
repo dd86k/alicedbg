@@ -162,13 +162,6 @@ void adbg_error_reset() {
 	error.srccode = 0;
 }
 
-// NOTE: D compilers changed how __MODULE__ and __FILE__ are evaluated.
-//       It used so that the caller evaluated those but now the front-end
-//       puts in the value of the callee instead. To prove this, __LINE__
-//       and __FUNCTION__ remains unchanged. To fix that, I'm supposed to
-//       use a template, but function templates pollute the final binary
-//       with instances that has no right to be duplicated.
-
 private
 void adbg_error_set(AdbgError e, void *handle, const(char)* func, int line) {
 	error.func = func;
@@ -312,29 +305,36 @@ const(char)* adbg_error_message() {
 }
 
 version (Trace) {
-	import core.stdc.stdio, core.stdc.stdarg;
-	private import adbg.include.d.config : D_FEATURE_PRAGMA_PRINTF;
-	
-	private extern (C) int putchar(int);
-	
-	static if (D_FEATURE_PRAGMA_PRINTF) {
-		/// Trace application
-		pragma(printf)
-		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
-			va_list va;
-			va_start(va, fmt);
-			printf("TRACE:%s@%u: ", func.ptr, line);
-			vprintf(fmt, va);
-			putchar('\n');
-		}
-	} else {
-		/// Trace application
-		void trace(string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
-			va_list va;
-			va_start(va, fmt);
-			printf("TRACE:%s@%u: ", func.ptr, line);
-			vprintf(fmt, va);
-			putchar('\n');
-		}
+
+import core.stdc.stdio, core.stdc.stdarg;
+private import adbg.include.d.config : D_FEATURE_PRAGMA_PRINTF;
+
+private
+void adbg_trace_write(const(char) *mod, const(char) *func, int line, const(char) *fmt, va_list *args) {
+	fprintf(stderr, "TRACE[%s@%u] %s: ", mod, line, func);
+	vfprintf(stderr, fmt, *args);
+	fputc('\n', stderr);
+}
+
+static if (D_FEATURE_PRAGMA_PRINTF) {
+	/// Trace application.
+	///
+	/// Enabled when Trace build option is active.
+	pragma(printf)
+	void trace(string mod = __MODULE__, string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
+		va_list va = void;
+		va_start(va, fmt);
+		adbg_trace_write(mod.ptr, func.ptr, line, fmt, &va);
+		//va_end(va); // <- linking errors and doesn't do anything
+	}
+} else {
+	/// Ditto
+	void trace(string mod = __MODULE__, string func = __FUNCTION__, int line = __LINE__)(const(char) *fmt, ...) {
+		va_list va = void;
+		va_start(va, fmt);
+		adbg_trace_write(mod.ptr, func.ptr, line, fmt, &va);
+		//va_end(va); // <- linking errors and doesn't do anything
 	}
 }
+
+} // version (Trace)
