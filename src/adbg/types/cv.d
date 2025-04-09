@@ -792,20 +792,20 @@ enum : CV_type_e {
 // Pointers can be one of the following types
 alias CV_ptrtype_e = ubyte;
 enum : CV_ptrtype_e {
-    CV_PTR_NEAR         = 0x00, // 16 bit pointer
-    CV_PTR_FAR          = 0x01, // 16:16 far pointer
-    CV_PTR_HUGE         = 0x02, // 16:16 huge pointer
-    CV_PTR_BASE_SEG     = 0x03, // based on segment
-    CV_PTR_BASE_VAL     = 0x04, // based on value of base
-    CV_PTR_BASE_SEGVAL  = 0x05, // based on segment value of base
-    CV_PTR_BASE_ADDR    = 0x06, // based on address of base
-    CV_PTR_BASE_SEGADDR = 0x07, // based on segment address of base
-    CV_PTR_BASE_TYPE    = 0x08, // based on type
-    CV_PTR_BASE_SELF    = 0x09, // based on self
-    CV_PTR_NEAR32       = 0x0a, // 32 bit pointer
-    CV_PTR_FAR32        = 0x0b, // 16:32 pointer
-    CV_PTR_64           = 0x0c, // 64 bit pointer
-    CV_PTR_UNUSEDPTR    = 0x0d  // first unused pointer type
+	CV_PTR_NEAR         = 0x00, // 16 bit pointer
+	CV_PTR_FAR          = 0x01, // 16:16 far pointer
+	CV_PTR_HUGE         = 0x02, // 16:16 huge pointer
+	CV_PTR_BASE_SEG     = 0x03, // based on segment
+	CV_PTR_BASE_VAL     = 0x04, // based on value of base
+	CV_PTR_BASE_SEGVAL  = 0x05, // based on segment value of base
+	CV_PTR_BASE_ADDR    = 0x06, // based on address of base
+	CV_PTR_BASE_SEGADDR = 0x07, // based on segment address of base
+	CV_PTR_BASE_TYPE    = 0x08, // based on type
+	CV_PTR_BASE_SELF    = 0x09, // based on self
+	CV_PTR_NEAR32       = 0x0a, // 32 bit pointer
+	CV_PTR_FAR32        = 0x0b, // 16:32 pointer
+	CV_PTR_64           = 0x0c, // 64 bit pointer
+	CV_PTR_UNUSEDPTR    = 0x0d  // first unused pointer type
 }
 
 //      Mode enum for pointers
@@ -942,7 +942,7 @@ enum : TYPE_ENUM_e {
 	T_BOOL32FF      = 0x0062,   // 32-bit BOOL where true is 0xffffffff
 
 
-	//      Character types
+	//      Character "char" types
 
 	T_CHAR          = 0x0010,   // 8 bit signed
 	T_PCHAR         = 0x0110,   // 16 bit pointer to 8 bit signed
@@ -961,7 +961,7 @@ enum : TYPE_ENUM_e {
 	T_64PUCHAR      = 0x0620,   // 64 bit pointer to 8 bit unsigned
 
 
-	//      really a character types
+	//      Character types
 
 	T_RCHAR         = 0x0070,   // really a char
 	T_PRCHAR        = 0x0170,   // 16 bit pointer to a real char
@@ -972,7 +972,7 @@ enum : TYPE_ENUM_e {
 	T_64PRCHAR      = 0x0670,   // 64 bit pointer to a real char
 
 
-	//      really a wide character types
+	//      Wide character types
 
 	T_WCHAR         = 0x0071,   // wide char
 	T_PWCHAR        = 0x0171,   // 16 bit pointer to a wide char
@@ -982,7 +982,7 @@ enum : TYPE_ENUM_e {
 	T_32PFWCHAR     = 0x0571,   // 16:32 pointer to a wide char
 	T_64PWCHAR      = 0x0671,   // 64 bit pointer to a wide char
 
-	//      really a 16-bit unicode char
+	//      16-bit Unicode character types
 
 	T_CHAR16         = 0x007a,   // 16-bit unicode char
 	T_PCHAR16        = 0x017a,   // 16 bit pointer to a 16-bit unicode char
@@ -992,7 +992,7 @@ enum : TYPE_ENUM_e {
 	T_32PFCHAR16     = 0x057a,   // 16:32 pointer to a 16-bit unicode char
 	T_64PCHAR16      = 0x067a,   // 64 bit pointer to a 16-bit unicode char
 
-	//      really a 32-bit unicode char
+	//     32-bit Unicode character types
 
 	T_CHAR32         = 0x007b,   // 32-bit unicode char
 	T_PCHAR32        = 0x017b,   // 16 bit pointer to a 32-bit unicode char
@@ -1002,7 +1002,7 @@ enum : TYPE_ENUM_e {
 	T_32PFCHAR32     = 0x057b,   // 16:32 pointer to a 32-bit unicode char
 	T_64PCHAR32      = 0x067b,   // 64 bit pointer to a 32-bit unicode char
 
-	//      8 bit int types
+	//      8-bit byte types
 
 	T_INT1          = 0x0068,   // 8 bit signed int
 	T_PINT1         = 0x0168,   // 16 bit pointer to 8 bit signed int
@@ -1021,7 +1021,7 @@ enum : TYPE_ENUM_e {
 	T_64PUINT1      = 0x0669,   // 64 bit pointer to 8 bit unsigned int
 
 
-	//      16 bit short types
+	//      16-bit short types
 
 	T_SHORT         = 0x0011,   // 16 bit signed
 	T_PSHORT        = 0x0111,   // 16 bit pointer to 16 bit signed
@@ -1040,7 +1040,7 @@ enum : TYPE_ENUM_e {
 	T_64PUSHORT     = 0x0621,   // 64 bit pointer to 16 bit unsigned
 
 
-	//      16 bit int types
+	//      16-bit int types
 
 	T_INT2          = 0x0072,   // 16 bit signed int
 	T_PINT2         = 0x0172,   // 16 bit pointer to 16 bit signed int
@@ -1059,7 +1059,7 @@ enum : TYPE_ENUM_e {
 	T_64PUINT2      = 0x0673,   // 64 bit pointer to 16 bit unsigned int
 
 
-	//      32 bit long types
+	//      32-bit long types
 
 	T_LONG          = 0x0012,   // 32 bit signed
 	T_ULONG         = 0x0022,   // 32 bit unsigned
@@ -1078,7 +1078,7 @@ enum : TYPE_ENUM_e {
 	T_64PULONG      = 0x0622,   // 64 bit pointer to 32 bit unsigned
 
 
-	//      32 bit int types
+	//      32-bit int types
 
 	T_INT4          = 0x0074,   // 32 bit signed int
 	T_PINT4         = 0x0174,   // 16 bit pointer to 32 bit signed int
@@ -1097,7 +1097,7 @@ enum : TYPE_ENUM_e {
 	T_64PUINT4      = 0x0675,   // 64 bit pointer to 32 bit unsigned int
 
 
-	//      64 bit quad types
+	//      64-bit quad types
 
 	T_QUAD          = 0x0013,   // 64 bit signed
 	T_PQUAD         = 0x0113,   // 16 bit pointer to 64 bit signed
@@ -1116,7 +1116,7 @@ enum : TYPE_ENUM_e {
 	T_64PUQUAD      = 0x0623,   // 64 bit pointer to 64 bit unsigned
 
 
-	//      64 bit int types
+	//      64-bit int types
 
 	T_INT8          = 0x0076,   // 64 bit signed int
 	T_PINT8         = 0x0176,   // 16 bit pointer to 64 bit signed int
@@ -1135,7 +1135,7 @@ enum : TYPE_ENUM_e {
 	T_64PUINT8      = 0x0677,   // 64 bit pointer to 64 bit unsigned int
 
 
-	//      128 bit octet types
+	//      128-bit octet types
 
 	T_OCT           = 0x0014,   // 128 bit signed
 	T_POCT          = 0x0114,   // 16 bit pointer to 128 bit signed
@@ -1154,7 +1154,7 @@ enum : TYPE_ENUM_e {
 	T_64PUOCT       = 0x0624,   // 64 bit pointer to 128 bit unsigned
 
 
-	//      128 bit int types
+	//      128-bit int types
 
 	T_INT16         = 0x0078,   // 128 bit signed int
 	T_PINT16        = 0x0178,   // 16 bit pointer to 128 bit signed int
@@ -1173,7 +1173,7 @@ enum : TYPE_ENUM_e {
 	T_64PUINT16     = 0x0679,   // 64 bit pointer to 128 bit unsigned int
 
 
-	//      16 bit real types
+	//      16-bit real types
 
 	T_REAL16        = 0x0046,   // 16 bit real
 	T_PREAL16       = 0x0146,   // 16 bit pointer to 16 bit real
@@ -1184,7 +1184,7 @@ enum : TYPE_ENUM_e {
 	T_64PREAL16     = 0x0646,   // 64 bit pointer to 16 bit real
 
 
-	//      32 bit real types
+	//      32-bit real types
 
 	T_REAL32        = 0x0040,   // 32 bit real
 	T_PREAL32       = 0x0140,   // 16 bit pointer to 32 bit real
@@ -1195,7 +1195,7 @@ enum : TYPE_ENUM_e {
 	T_64PREAL32     = 0x0640,   // 64 bit pointer to 32 bit real
 
 
-	//      32 bit partial-precision real types
+	//      32-bit partial-precision real types
 
 	T_REAL32PP      = 0x0045,   // 32 bit PP real
 	T_PREAL32PP     = 0x0145,   // 16 bit pointer to 32 bit PP real
@@ -1206,7 +1206,7 @@ enum : TYPE_ENUM_e {
 	T_64PREAL32PP   = 0x0645,   // 64 bit pointer to 32 bit PP real
 
 
-	//      48 bit real types
+	//      48-bit real types
 
 	T_REAL48        = 0x0044,   // 48 bit real
 	T_PREAL48       = 0x0144,   // 16 bit pointer to 48 bit real
@@ -1217,7 +1217,7 @@ enum : TYPE_ENUM_e {
 	T_64PREAL48     = 0x0644,   // 64 bit pointer to 48 bit real
 
 
-	//      64 bit real types
+	//      64-bit real types
 
 	T_REAL64        = 0x0041,   // 64 bit real
 	T_PREAL64       = 0x0141,   // 16 bit pointer to 64 bit real
@@ -1228,7 +1228,7 @@ enum : TYPE_ENUM_e {
 	T_64PREAL64     = 0x0641,   // 64 bit pointer to 64 bit real
 
 
-	//      80 bit real types
+	//      80-bit real types
 
 	T_REAL80        = 0x0042,   // 80 bit real
 	T_PREAL80       = 0x0142,   // 16 bit pointer to 80 bit real
@@ -1239,7 +1239,7 @@ enum : TYPE_ENUM_e {
 	T_64PREAL80     = 0x0642,   // 64 bit pointer to 80 bit real
 
 
-	//      128 bit real types
+	//      128-bit real types
 
 	T_REAL128       = 0x0043,   // 128 bit real
 	T_PREAL128      = 0x0143,   // 16 bit pointer to 128 bit real
@@ -1250,7 +1250,7 @@ enum : TYPE_ENUM_e {
 	T_64PREAL128    = 0x0643,   // 64 bit pointer to 128 bit real
 
 
-	//      32 bit complex types
+	//      32-bit complex types
 
 	T_CPLX32        = 0x0050,   // 32 bit complex
 	T_PCPLX32       = 0x0150,   // 16 bit pointer to 32 bit complex
@@ -1261,7 +1261,7 @@ enum : TYPE_ENUM_e {
 	T_64PCPLX32     = 0x0650,   // 64 bit pointer to 32 bit complex
 
 
-	//      64 bit complex types
+	//      64-bit complex types
 
 	T_CPLX64        = 0x0051,   // 64 bit complex
 	T_PCPLX64       = 0x0151,   // 16 bit pointer to 64 bit complex
@@ -1272,7 +1272,7 @@ enum : TYPE_ENUM_e {
 	T_64PCPLX64     = 0x0651,   // 64 bit pointer to 64 bit complex
 
 
-	//      80 bit complex types
+	//      80-bit complex types
 
 	T_CPLX80        = 0x0052,   // 80 bit complex
 	T_PCPLX80       = 0x0152,   // 16 bit pointer to 80 bit complex
@@ -1283,7 +1283,7 @@ enum : TYPE_ENUM_e {
 	T_64PCPLX80     = 0x0652,   // 64 bit pointer to 80 bit complex
 
 
-	//      128 bit complex types
+	//      128-bit complex types
 
 	T_CPLX128       = 0x0053,   // 128 bit complex
 	T_PCPLX128      = 0x0153,   // 16 bit pointer to 128 bit complex
@@ -1329,7 +1329,7 @@ enum : TYPE_ENUM_e {
 	T_64PBOOL64     = 0x0633,   // 64 bit pointer to 64 bit boolean
 
 
-	//      ???
+	//      Other pointer types
 
 	T_NCVPTR        = 0x01f0,   // CV Internal type for created near pointers
 	T_FCVPTR        = 0x02f0,   // CV Internal type for created far pointers

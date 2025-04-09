@@ -68,11 +68,12 @@ enum AdbgSymbolType {
 	label,
 }
 
+private enum MAXSYMLEN = 64;
 struct adbg_symbol_t {
 	AdbgSymbolType type;
 	ulong start;
 	//ulong end;
-	char[64] name;
+	char[MAXSYMLEN] name;
 }
 
 const(char)* adbg_symbol_name(adbg_symbol_t *sym) {
@@ -85,28 +86,52 @@ struct adbg_symbol_list_t {
 	list_t *syms;
 }
 
-// Used internally for now
-// type = Symbol type.
-// name = Name string pointer.
-// buff = If unset, set to internal buffer size. If set, maximum symbol name length.
-// addr = Base address of module, untranslated.
-package
-adbg_symbol_t adbg_symbol_init(AdbgSymbolType type, char *name, size_t buff, ulong addr) {
-	assert(type);
+private
+void adbg_symbol_init(adbg_symbol_t *symbol) {
+	import core.stdc.string : memset;
+	assert(symbol);
+	memset(symbol, 0, adbg_symbol_t.sizeof);
+}
+extern (D) unittest {
+	adbg_symbol_t symbol = void;
+	adbg_symbol_init(&symbol);
+	assert(symbol.type == AdbgSymbolType.unknown);
+	assert(symbol.start == 0);
+	assert(symbol.name[0] == 0);
+}
+
+private
+void adbg_symbol_set_name(adbg_symbol_t *symbol, const(char) *name, size_t namelen) {
+	assert(symbol);
 	assert(name);
-	
-	adbg_symbol_t sym = void;
-	sym.type = type;
-	sym.start = addr;
-	
-	if (buff == 0) buff = adbg_symbol_t.name.sizeof;
-	size_t i;
-	for (; i < buff && name[i] != 0; ++i) {
-		sym.name[i] = name[i];
+	/*
+	if (name == null) {
+		symbol.name[0] = 0;
+		return;
 	}
-	sym.name[i] = 0;
-	
-	return sym;
+	*/
+	// Get the maximum number of characters to copy
+	// If name length (namelen) is specified, then check the minimum
+	// count of characters that is eligible to copy.
+	// e.g., namelen=128 and MAXSYMLEN=64, only make it maximum of 64.
+	// Otherwise, if namelen is unset, assume MAXSYMLEN (.name buffer size).
+	import adbg.utils.math : min;
+	size_t max = namelen ? min(namelen, MAXSYMLEN) : MAXSYMLEN;
+	// Inlined copy that checks for null-termination and buffersize
+	size_t i;
+	for (; name[i] != 0 && i < max; ++i)
+		symbol.name[i] = name[i];
+	symbol.name[i] = 0;
+}
+extern (D) unittest {
+	adbg_symbol_t symbol = void;
+	adbg_symbol_init(&symbol);
+	adbg_symbol_set_name(&symbol, "test", 0);
+	assert(symbol.name[0] == 't');
+	assert(symbol.name[1] == 'e');
+	assert(symbol.name[2] == 's');
+	assert(symbol.name[3] == 't');
+	assert(symbol.name[4] == 0);
 }
 
 // Create a new list of symbols with an identifiable name,
@@ -122,12 +147,24 @@ adbg_symbol_list_t* adbg_symbol_list_create() {
 	return list;
 }
 
-// Sub modules need to populate entries using this function
-int adbg_symbol_list_add(adbg_symbol_list_t *list, adbg_symbol_t *symbol) {
-	if (list == null || symbol == null)
+/// Add a label tyoe symbol to the list.
+/// Params:
+///   list = adbg_symbol_list_t instance.
+///   name = Pointer to symbol name. This string is copied until a null-terminator is met.
+///   namelen = Length of name if available. Zero being buffer maximum.
+///   address = Offset address within section or object.
+/// Returns: Error code.
+int adbg_symbol_list_append_label(adbg_symbol_list_t *list, char *name, size_t namelen, ulong address) {
+	if (list == null || name == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
-	list.syms = adbg_list_add(list.syms, symbol);
+	adbg_symbol_t symbol = void;
+	adbg_symbol_init(&symbol);
+	adbg_symbol_set_name(&symbol, name, namelen);
+	symbol.type = AdbgSymbolType.label;
+	symbol.start = address;
+	
+	list.syms = adbg_list_add(list.syms, &symbol);
 	return list.syms == null ? adbg_error_code() : 0;
 }
 

@@ -12,12 +12,13 @@
 /// License: BSD-3-Clause-Clear
 module adbg.objects.coff;
 
-import adbg.objectserver;
-import adbg.utils.bit;
-import adbg.machines;
 import adbg.error;
+import adbg.machines;
+import adbg.objectserver;
+import adbg.symbols;
+import adbg.utils.bit;
 import core.stdc.stdlib;
-import core.stdc.string : memset, memcpy;
+import core.stdc.string : memset;
 
 extern (C):
 
@@ -75,20 +76,20 @@ enum : ushort {
 	
 	/// If set, relocation information has been removed.
 	/// This is usually clear for objects and set for executables.
-	COFF_F_RELFLG	= I16!(0x00, 0x01),
+	COFF_F_RELFLG	= LITTLE16!(0x0001),
 	/// If set, all unresolved symbols have been resolved and the
 	/// file may be considered executable.
-	COFF_F_EXEC	= I16!(0x00, 0x02),
+	COFF_F_EXEC	= LITTLE16!(0x0002),
 	/// If set, all line number information has been removed from the
 	/// file (or was never added in the first place).
-	COFF_F_LNNO	= I16!(0x00, 0x04),
+	COFF_F_LNNO	= LITTLE16!(0x0004),
 	/// If set, all the local symbols have been removed from the
 	/// file (or were never added in the first place).
-	COFF_F_LSYMS	= I16!(0x00, 0x08),
+	COFF_F_LSYMS	= LITTLE16!(0x0008),
 	/// Indicates that the file is little endian (in most cases)
-	COFF_F_LSB	= I16!(0x01, 0x00),
+	COFF_F_LSB	= LITTLE16!(0x0100),
 	/// Indicates that the file is big endian (in most cases)
-	COFF_F_MSB	= I16!(0x02, 0x00),
+	COFF_F_MSB	= LITTLE16!(0x0200),
 	
 	// Section flags
 	
@@ -431,6 +432,7 @@ struct coff_header_t {
 	ushort f_flags;
 	
 	// NOTE: TI extends this with ushort TargetID.
+	//       Create new header (e.g., coff_ti_header_t) in case
 }
 
 // Optional header
@@ -474,24 +476,6 @@ struct coff_linenum_entry_t {
 	}
 	ushort l_lnno;	/// Line number
 }
-
-// NOTE: The n_value, n_scnum and n_sclass fields need to be considered as interlinked.
-//       Source: (wiki.osdev.org/COFF)
-//
-// A number of the more common combinations of these fields is given in the
-// following table. (Much of the information in the following table is from
-// observation and not from referenced sources.
-// It is incomplete and may not be accurate.) 
-//
-// n_sclass   | n_scnum          | n_value | Meaning        | Typical use
-// -----------+------------------+---------+----------------+--------------
-// C_EXT (2)  | 0                | 0       | --             | Unresolved external Symbol
-//            | 0                | >0      | Variable size  | Uninitialised global variable (not in BSS)
-//            | .text            | Any     | Section offset | Function entry point
-//            | .data            | Any     | Section offset | Initialised global variable
-// C_STAT (3) | .text/.data/.bss | 0       | --             | Section Symbol indicating start of Section
-//            | .data            | Any     | Section offset | Initialised static variable
-//            | .bss             | Any     | Section offset | Unitialised static variable
 
 enum : short { // e_scnum values
 	/// Debugging symbol.
@@ -691,7 +675,7 @@ int adbg_object_coff_load(adbg_object_t *o) {
 		if (e) return e;
 	}
 	
-	// TODO: Support swapping
+	// TODO: Support swapping (from magic)
 	return 0;
 }
 void adbg_object_coff_unload(adbg_object_t *o, void *u) {
@@ -940,4 +924,54 @@ const(char)* adbg_object_coff_symbol_name(adbg_object_t *o, coff_symbol_entry_t 
 	}
 	coff.tname[i] = 0;
 	return coff.tname.ptr;
+}
+
+// NOTE: The n_value, n_scnum and n_sclass fields need to be considered as interlinked.
+//       Source: (wiki.osdev.org/COFF)
+//
+// Following table is mostly from observations.
+//
+// n_sclass   | n_scnum          | n_value | Meaning        | Typical use
+// -----------+------------------+---------+----------------+--------------
+// C_EXT (2)  | 0                | 0       | --             | Unresolved external Symbol
+//            | 0                | >0      | Variable size  | Uninitialised global variable (not in BSS)
+//            | .text            | Any     | Section offset | Function entry point
+//            | .data            | Any     | Section offset | Initialised global variable
+// C_STAT (3) | .text/.data/.bss | 0       | --             | Section Symbol indicating start of Section
+//            | .data            | Any     | Section offset | Initialised static variable
+//            | .bss             | Any     | Section offset | Unitialised static variable
+
+// Use symbol list from adbg.symbol
+int adbg_coff_populate_symbols(adbg_symbol_list_t *list, adbg_object_t *o) {
+	if (list == null || o == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	if (adbg_object_format(o) != AdbgObject.coff)
+		return adbg_oops(AdbgError.assertion);
+	
+	coff_symbol_entry_t *coffsym = adbg_object_coff_first_symbol(o);
+	if (coffsym == null)
+		return adbg_error_code();
+	
+	with (coffsym) do {
+		switch (coffsym.e_sclass) {
+		case C_EXT, C_STAT: // Public or private class
+			// HACK: Labels/Functions filtering
+			//       Not auxiliary entries and points to section 1 (typically .text)
+			if (e_numaux || e_scnum != 1)
+				continue;
+			char *name = cast(char*)adbg_object_coff_symbol_name(o, coffsym);
+			if (name == null)
+				continue;
+			if (adbg_symbol_list_append_label(list,
+				name,
+				0,
+				e_value))
+				return adbg_error_code();
+			break;
+		default:
+		}
+	} while ((coffsym = adbg_object_coff_next_symbol(o)) != null);
+	
+	return 0;
 }

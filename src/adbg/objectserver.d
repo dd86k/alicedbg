@@ -25,7 +25,7 @@
 module adbg.objectserver;
 
 import adbg.symbols;
-import adbg.types.coff : adbg_type_coff_populate;
+import adbg.objects.coff : adbg_coff_populate_symbols;
 import adbg.process.memory : adbg_memory_read;
 import adbg.process.base : adbg_process_t;
 import adbg.error;
@@ -959,7 +959,7 @@ adbg_symbol_list_t* adbg_object_load_symbols(adbg_object_t *o) {
 	
 	switch (o.format) {
 	case AdbgObject.coff:
-		if (adbg_type_coff_populate(symlist, o)) // sets error
+		if (adbg_coff_populate_symbols(symlist, o)) // sets error
 			return null;
 		return symlist;
 	default:

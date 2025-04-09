@@ -26,6 +26,11 @@ extern (D) unittest {
 	static assert(MIN!(1, 1) == 1);
 }
 
+/// Select the highest number between two choices.
+/// Params:
+///   a = Choice 1.
+///   b = Choice 2.
+/// Returns: The highest value.
 size_t max(size_t a, size_t b) {
 	return a >= b ? a : b;
 }
@@ -35,6 +40,12 @@ extern (D) unittest {
 	assert(max(3, 3) == 3);
 	assert(max(4, 3) == 4);
 }
+
+/// Select the lowest number between two choices.
+/// Params:
+///   a = Choice 1.
+///   b = Choice 2.
+/// Returns: The lowest value.
 size_t min(size_t a, size_t b) {
 	return a <= b ? a : b;
 }
