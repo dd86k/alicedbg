@@ -38,6 +38,7 @@ import format_pe;
 //       usage: print_mask("something", "something", FLAGS, MASK, FLAG1, FLAG2, etc.)
 // TODO: print_wstringl (wide-string)
 // TODO: (disassembly) attach shortest and longuest instructions found to buffers
+// TODO: When extracting raw data, don't print titles/warnings
 
 extern (C):
 __gshared:
@@ -120,7 +121,7 @@ int SETTING(Setting setting)   { return opt_settings & setting; }
 /// Returns: Error code if non-zero
 int dump_file(const(char)* path) {
 	if (SETTING(Setting.blob)) {
-		// NOTE: Program exits and memory is free'ds by OS
+		// NOTE: Program exits and memory is freed by OS
 		size_t size = void;
 		ubyte *buffer = readall(path, &size);
 		if (buffer == null)
@@ -136,10 +137,6 @@ int dump_file(const(char)* path) {
 		
 		return dump_disassemble(opt_machine, buffer, size, opt_baseaddress, null);
 	}
-	
-	// hotfix when section name specifed, force select all sections
-	if (opt_section_name)
-		opt_settings |= Setting.disasmAll;
 	
 	adbg_object_t *o = adbg_object_open_file(path, 0);
 	if (o == null)
