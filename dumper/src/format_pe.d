@@ -15,7 +15,7 @@ import adbg.utils.uid, adbg.utils.bit;
 import adbg.utils.strings;
 import adbg.error;
 import core.stdc.stdlib;
-import core.stdc.string : strncmp;
+import core.stdc.string;
 import core.stdc.stdio : snprintf;
 import dumper;
 import format_mz : dump_mz_ext_header;
@@ -262,10 +262,29 @@ void dump_pe_sections(adbg_object_t *o) {
 		if (opt_section_name && strncmp(Name.ptr, opt_section_name, Name.sizeof))
 			continue;
 		
+		// HACK: Not expecting section header to be extracted
+		//       Open section data instead
 		if (SETTING(Setting.extractAny)) {
+			if (SizeOfRawData == 0) {
+				if (opt_section_name) // was targetting a specific section
+					return;
+			}
+			
+			void *buffer = malloc(SizeOfRawData); /// section buffer
+			if (buffer == null) {
+				import core.stdc.errno : errno;
+				print_warningf("Could not allocate buffer: %s", strerror(errno));
+				return;
+			}
+			scope(exit) free(buffer);
+			if (adbg_object_read_at(o, PointerToRawData, buffer, SizeOfRawData))
+				panic_adbg();
 			char[8] name = void;
-			cast(void)strncmp(name.ptr, Name.ptr, Name.sizeof);
-			print_data(name.ptr, section, SizeOfRawData, PointerToRawData);
+			cast(void)strncpy(name.ptr, Name.ptr, Name.sizeof);
+			print_data(name.ptr, buffer, SizeOfRawData, PointerToRawData);
+			
+			if (opt_section_name) // was targetting a specific section
+				return;
 			continue;
 		}
 		

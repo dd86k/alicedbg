@@ -1335,7 +1335,7 @@ pe_section_entry_t* adbg_object_pe_section(adbg_object_t *o, size_t index) {
 		return null;
 	}
 	
-	// Otherwise, load section headers
+	// If section information unloaded, load section headers
 	if (pe.sections == null) {
 		size_t totsize = count * pe_section_entry_t.sizeof;
 		pe.sections = cast(pe_section_entry_t*)malloc(totsize);
