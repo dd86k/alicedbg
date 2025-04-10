@@ -107,9 +107,9 @@ enum AdbgSpawnOpt {
 	/// Debug all sub processes that the target process spawns.
 	/// Type: int
 	/// Default: 0
-	debugAll    = 10,
+	debugAll	= 10,
 	/// Alias to debugAll
-	debugChildren = debugAll,
+	debugChildren	= debugAll,
 }
 
 /// Load executable image into the debugger.
@@ -277,6 +277,7 @@ version (Windows) {
 	
 	proc.state = AdbgProcessState.created;
 	proc.creation = AdbgCreation.spawned;
+	proc.option_timeout = INFINITE;
 	return proc;
 } else version (Posix) {
 	// Verify if file exists and we has access to it
@@ -510,6 +511,7 @@ version (Windows) {
 		return null;
 	}
 	
+	proc.option_timeout = INFINITE;
 	// TODO: Continue process on OPT_STOP
 } else version (linux) {
 	version (Trace) if (options & OPT_STOP) trace("Sending break...");
@@ -643,15 +645,36 @@ int adbg_debugger_udata(adbg_process_t *proc, void *udata) {
 	return 0;
 }
 
+/// Sets a timeout when waiting for a debug event to occur.
+/// 
+/// This function is only effective for adbg_debugger_wait on Windows.
+/// Params:
+/// 	proc = Process instance.
+/// 	ms = Timeout in milliseconds.
+/// Returns: Error code.
+int adbg_debugger_option_wait_timeout(adbg_process_t *proc, uint ms) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+version (Windows) {
+	proc.option_timeout = ms == 0 ? INFINITE : ms;
+	return 0;
+} else {
+	return adbg_oops(AdbgError.unimplemented);	
+}
+}
+
 /// Wait until a new debug event occurs. This call is blocking.
 ///
 /// The lifetime of the event callback parameters are not guaranteed.
-/// To keep a reference, use the proper duplicate function.
+/// To keep a reference, use the proper duplicate function (when that is implemented).
+///
+/// Note that on Windows, debugger and wait calls must be performed on the
+/// same thread. This debugger module does not yet provide a debugger loop.
 ///
 /// Windows: Uses WaitForDebugEvent.
 /// POSIX: Uses waitpid(2) and ptrace(2).
 ///
-/// Params: proc = Process instancied by the debugger.
+/// Params: proc = Process instance created by debugger.
 /// Returns: Error code.
 int adbg_debugger_wait(adbg_process_t *proc) {
 	version(Trace) trace("proc=%p", proc);
@@ -664,7 +687,7 @@ int adbg_debugger_wait(adbg_process_t *proc) {
 version (Windows) {
 	DEBUG_EVENT de = void;
 Lwait:
-	if (WaitForDebugEvent(&de, INFINITE) == FALSE) {
+	if (WaitForDebugEvent(&de, proc.option_timeout) == FALSE) {
 		proc.state = AdbgProcessState.unknown;
 		return adbg_oops(AdbgError.os);
 	}
@@ -680,6 +703,7 @@ Lwait:
 		
 		proc.state = AdbgProcessState.stopped;
 		
+		// If exception event handler is unset, continue
 		if (proc.event_exception == null)
 			goto Lcontinue;
 		
@@ -693,6 +717,7 @@ Lwait:
 		
 		proc.state = AdbgProcessState.unknown;
 		
+		// If process exit event handler is unset, continue
 		if (proc.event_process_exited == null)
 			goto Lcontinue;
 		
@@ -709,7 +734,7 @@ Lwait:
 	default:
 		version(Trace) trace("Unknown event=%u pid=%d tid=%d",
 			de.dwDebugEventCode, de.dwProcessId, de.dwThreadId);
-	Lcontinue: // To bypass trace call
+	Lcontinue: // Label exists to bypass trace call
 		ContinueDebugEvent(de.dwProcessId, de.dwThreadId, DBG_CONTINUE);
 		goto Lwait;
 	}
@@ -731,6 +756,7 @@ Lwait:
 		
 		proc.state = AdbgProcessState.unknown;
 		
+		// If process exit event handler is set, call it
 		if (proc.event_process_exited)
 			proc.event_process_exited(proc, proc.udata, WTERMSIG(wstatus));
 	/*} else if (WIFCONTINUED(wstatus)) { // continuing
@@ -745,6 +771,7 @@ Lwait:
 		
 		proc.state = AdbgProcessState.stopped;
 		
+		// If exception event handler is unset, continue
 		if (proc.event_exception == null) {
 			int e = adbg_debugger_continue(proc, proc.pid);
 			if (e) return e;

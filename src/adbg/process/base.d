@@ -59,10 +59,11 @@ enum AdbgCreation : ubyte {
 /// Represents an instance of a process.
 struct adbg_process_t {
 version (Windows) {
-	DWORD orig_pid;	/// Original Process ID
+	DWORD orig_pid;	/// Original Process ID created by debugger
 	HANDLE orig_handle;	/// Original Process Handle
 	char *orig_args;	/// Saved arguments when process was launched
 	DWORD pid;	/// Process ID
+	uint option_timeout;
 }
 version (Posix) {
 	pid_t orig_pid;	/// Original spawned PID
