@@ -177,7 +177,7 @@ void adbg_error_set(AdbgError e, void *handle, const(char)* func, int line) {
 		version(Trace) trace("oscode="~ERR_OSFMT, error.modcode);
 		break;
 	case AdbgError.crt:
-		error.modcode = errno;
+		error.modcode = handle ? *cast(int*)handle : errno;
 		version(Trace) trace("crt=%d", error.modcode);
 		break;
 	case AdbgError.libCapstone:
