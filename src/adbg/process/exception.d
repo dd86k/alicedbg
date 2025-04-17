@@ -9,6 +9,9 @@
 /// License: BSD-3-Clause-Clear
 module adbg.process.exception;
 
+import adbg.error;
+import adbg.process.thread : adbg_process_thread_t;
+
 version (Windows) {
 	import core.sys.windows.winbase;
 	private enum {
@@ -78,12 +81,8 @@ struct adbg_exception_t {
 	uint oscode;
 	/// Faulting address, if available; Otherwise zero.
 	ulong fault_address;
-	// NOTE: Associated PID and/or TID.
-	//       Windows: Thread ID.
-	//       Linux: Thread ID or thread group.
-	//       FreeBSD: PID or TID.
-	/// Associated thread ID or process ID.
-	long id;
+	/// Associated thread.
+	adbg_process_thread_t thread;
 }
 
 /// Internal usage.
@@ -236,10 +235,16 @@ int adbg_exception_orig_code(adbg_exception_t *exception) {
 	return exception.oscode;
 }
 
-/// Get the task or thread ID associated with the exception.
+/// Get the associated thread for this exception.
+///
+/// The lifetime of the thread instance is only valid for the duration
+/// of the event handler.
 /// Params: exception = Exception instance.
-/// Returns: ID, or zero on error.
-long adbg_exception_tid(adbg_exception_t *exception) {
-	if (exception == null) return 0;
-	return exception.id;
+/// Returns: Thread instance, or null on error or if unavailable.
+adbg_process_thread_t* adbg_exception_thread(adbg_exception_t *exception) {
+	if (exception == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	return &exception.thread;
 }

@@ -56,6 +56,11 @@ enum AdbgCreation : ubyte {
 	spawned,
 }
 
+package enum {
+	// /proc/PID/mem couldn't be opened, so do not depend on it
+	__PROC_MEM_UNAVAIL = 1 << 16,
+}
+
 /// Represents an instance of a process.
 struct adbg_process_t {
 version (Windows) {
@@ -75,6 +80,9 @@ version (linux) {
 	int mhandle;	/// Internal memory file handle to /proc/PID/mem
 	bool memfailed;	/// Set if we fail to open /proc/PID/mem
 }
+	/// Internal status
+	int status;
+	
 	/// Last known process status.
 	AdbgProcessState state;
 	/// Process' creation source.
@@ -85,7 +93,9 @@ version (linux) {
 	// HACK: Debugger event handlers
 	void function(adbg_process_t*, void *udata, adbg_exception_t *ex) event_exception;
 //	void function(adbg_process_t*, void *udata) event_process_created;
+	// TODO: Consider moving `int code` to `int *code`
 	void function(adbg_process_t*, void *udata, int code) event_process_exited;
+	// TODO: Consider moving `long tid` to `adbg_process_thread_t *thread`
 	void function(adbg_process_t*, void *udata, long tid) event_process_continued;
 	
 	// HACK: Event user data (when attached in wait)
@@ -100,11 +110,11 @@ void adbg_process_free(adbg_process_t *proc) {
 		if (proc.orig_args) free(proc.orig_args);
 		CloseHandle(proc.orig_handle);
 	}
-	version (linux) {
-		if (proc.mhandle) close(proc.mhandle);
-	}
 	version (Posix) {
 		if (proc.orig_argv) free(proc.orig_argv);
+	}
+	version (linux) {
+		if (proc.mhandle) close(proc.mhandle);
 	}
 	free(proc);
 }

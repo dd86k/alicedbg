@@ -6,9 +6,6 @@
 module adbg.debugger;
 
 // TODO: adbg_debugger_spawn: Get/set default child stack size
-// TODO: High-level disassembly functions (e.g., from exception, process, etc.)
-// TODO: Check process creation
-//       Calls to fork/vfork/clone/etc.
 
 /*
 version (linux) {
@@ -122,7 +119,7 @@ enum AdbgSpawnOpt {
 /// Posix: stat(2), fork(2) or clone(2), ptrace(2) with PT_TRACEME, and execve(2).
 /// Params:
 /// 	path = Command, path to executable.
-/// 	... = Options, with zero ending them.
+/// 	... = Zero-terminated list of options.
 /// Returns: Process instance; Or null on error.
 adbg_process_t* adbg_debugger_spawn(const(char) *path, ...) {
 	if (path == null) {
@@ -310,7 +307,8 @@ version (Windows) {
 		memcpy(proc.orig_argv + 1, oargv, argc * size_t.sizeof);
 	proc.orig_argv[argc + 1] = null;
 	
-version (USE_CLONE) { // clone(2)
+version (USE_CLONE) { // Use clone(2) for subprocess
+	// TODO: Assign stack to process for cleanup
 	void *stack = mmap(null, ADBG_CHILD_STACK_SIZE,
 		PROT_READ | PROT_WRITE,
 		MAP_PRIVATE | MAP_ANONYMOUS | MAP_STACK,
@@ -335,7 +333,7 @@ version (USE_CLONE) { // clone(2)
 		adbg_oops(AdbgError.os);
 		return null;
 	}
-} else { // fork(2)
+} else { // Use fork(2) for subprocess
 	pid_t pid = fork();
 	if (pid < 0) { // error
 		version(Trace) trace("fork=%s", strerror(errno));
@@ -709,6 +707,13 @@ Lwait:
 		
 		adbg_exception_t exception = void;
 		adbg_translate_exception(&exception, proc, &de);
+		
+		// HACK: fill up thread details for exception
+		exception.thread.process = &proc;
+		exception.thread.id = de.dwThreadId;
+		exception.thread.status = 0;
+		
+		// Call event handler
 		proc.event_exception(proc, proc.udata, &exception);
 		break;
 	case EXIT_PROCESS_DEBUG_EVENT:
@@ -745,7 +750,7 @@ Lwait:
 Lwait:
 	// TODO: Check process flag to debug all subprocesses instead of -1
 	// NOTE: WCONTINUED does not work on Linux, even when sending SIGCONT
-	//       And even ptrace(2) manpage states it is not recommended
+	//       ptrace(2) manpage states that setting WCONTINUED is not recommended
 	if ((proc.pid = waitpid(-1, &wstatus, WBASE)) < 0) {
 		proc.state = AdbgProcessState.unknown;
 		return adbg_oops(AdbgError.crt);
@@ -784,8 +789,14 @@ Lwait:
 		//       of the PID, and while Linux ptrace calls refer to the TID,
 		//       this holds up for the moment being, but will fall short when
 		//       multiple processes and threads come into play.
-		exception.id = proc.pid;
-		adbg_translate_exception(&exception, proc, cast(void*)WSTOPSIG(wstatus));
+		int stopsig = WSTOPSIG(wstatus);
+		adbg_translate_exception(&exception, proc, &stopsig);
+		
+		// HACK: fill up thread details for exception
+		exception.thread.process = proc;
+		exception.thread.id = proc.pid;
+		exception.thread.status = 0;
+		
 		proc.event_exception(proc, proc.udata, &exception);
 	} else {
 		version (Trace) trace("Unknown status=%d", wstatus);
@@ -806,17 +817,22 @@ version (Windows) {
 	// While the first ExceptionInformation used to be more interesting for
 	// EXCEPTION_IN_PAGE_ERROR and EXCEPTION_ACCESS_VIOLATION,
 	// it might be interesting to unconditionally send it for future interests.
-	with (event.Exception.ExceptionRecord)
-	exception.type = adbg_exception_from_os(ExceptionCode, cast(uint)ExceptionInformation[0]);
-	exception.fault_address = cast(ulong)event.Exception.ExceptionRecord.ExceptionAddress;
-	exception.oscode = event.Exception.ExceptionRecord.ExceptionCode;
-	exception.id = cast(int)event.dwThreadId;
+	EXCEPTION_RECORD *rec = &event.Exception.ExceptionRecord;
+	exception.type = adbg_exception_from_os(rec.ExceptionCode, cast(uint)rec.ExceptionInformation[0]);
+	exception.fault_address = cast(ulong)rec.ExceptionAddress;
+	exception.oscode = rec.ExceptionCode;
+	
+	// HACK: fill up thread details for exception
+	exception.thread.id = event.dwThreadId;
+	exception.thread.process = proc;
+	exception.thread.status = 0;
 } else version (linux) {
 	assert(proc);
 	assert(osevent);
-	int signo = cast(int)osevent;
+	int signo = *cast(int*)osevent;
 	int si_code = void;
 	
+	// Get subcode and fault address if available
 	siginfo_t siginfo = void;
 	if (ptrace(PTRACE_GETSIGINFO, proc.pid, null, &siginfo) < 0) {
 		si_code = 0;
@@ -835,13 +851,18 @@ version (Windows) {
 	
 	exception.type = adbg_exception_from_os(signo, si_code);
 	exception.oscode = signo;
-	exception.id = proc.pid;
+	
+	// HACK: fill up thread details for exception
+	exception.thread.id = proc.pid;
+	exception.thread.process = proc;
+	exception.thread.status = 0;
 } else version (FreeBSD) {
 	assert(proc);
 	assert(osevent);
-	int signo = cast(int)osevent;
+	int signo = *cast(int*)osevent;
 	int si_code = void;
 	
+	// Get subcode fault address if available
 	ptrace_lwpinfo lwp = void;
 	if (ptrace(PT_LWPINFO, proc.pid, &lwp, 0) < 0) {
 		si_code = 0;
@@ -853,7 +874,11 @@ version (Windows) {
 	
 	exception.type = adbg_exception_from_os(signo, si_code);
 	exception.oscode = signo;
-	exception.id = proc.pid;
+	
+	// HACK: fill up thread details for exception
+	exception.thread.id = de.dwThreadId;
+	exception.thread.process = proc;
+	exception.thread.status = 0;
 } else {
 	static assert(false, "Implement exception translation code");
 }

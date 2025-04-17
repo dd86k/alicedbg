@@ -5,10 +5,9 @@
 /// License: BSD-3-Clause-Clear
 module main;
 
-import adbg.include.c.stdlib : exit;
 import adbg.self;
 import adbg.error;
-import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE;
+import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE, exit;
 import core.stdc.stdio;
 import shell, term;
 import common.errormgmt;

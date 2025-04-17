@@ -222,7 +222,7 @@ __gshared:
 // NOTE: Process management
 //       Right now the shell is only capable of dealing with one process
 adbg_process_t *process;	/// Process instance
-long event_tid;	/// Exception TID
+long event_tid;	/// Last exception TID, or selected TID
 
 adbg_disassembler_t *disassembler;	/// Disassembler instance
 
@@ -627,9 +627,43 @@ int shell_disassemble(size_t address, int *opsize,
 	return err;
 }
 
+void shell_print_stack(adbg_process_thread_t *thread) {
+	if (thread == null)
+		return;
+	
+	// Print callstack if available
+	void *frames = adbg_frame_list(thread);
+	if (frames) {
+		puts("* Callstack (WIP):");
+		adbg_stackframe_t *frame = void;
+		for (size_t i; (frame = adbg_frame_list_at(frames, i)) != null; ++i) {
+			printf("%3zu. %llx\n", i, frame.address);
+		}
+		adbg_frame_list_close(frames);
+	}
+}
+
+void shell_print_address_disasm(ulong address) {
+	if (address == 0)
+		return;
+	printf("* Address : 0x%llx\n", address);
+	char[32] machbuf = void;
+	const(char)* mnemonic = void, operands = void;
+	// Disassembling instruction at fault address passed
+	if (shell_disassemble(cast(size_t)address,
+		null,     // no opsize
+		null, 0,  // no address buffer
+		machbuf.ptr, 32,
+		&mnemonic, &operands) == 0) {
+		printf("* Machine : %s\n", machbuf.ptr);
+		printf("* Mnemonic: %s %s\n", mnemonic, operands);
+	}
+}
+
 void shell_event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *exception) {
 	int pid = adbg_process_id(proc);
-	event_tid = adbg_exception_tid(exception);
+	adbg_process_thread_t *thread = adbg_exception_thread(exception);
+	event_tid = adbg_process_thread_id(thread);
 	
 	printf("* Process %d (thread %lld) stopped\n"~
 		"* Reason  : %s ("~ERR_OSFMT~")\n",
@@ -637,34 +671,10 @@ void shell_event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *
 		adbg_exception_name(exception), adbg_exception_orig_code(exception));
 	
 	// Fault address available, print it
-	if (exception.fault_address) {
-		printf("	Address : 0x%llx\n", exception.fault_address);
-		char[32] machbuf = void;
-		const(char)* mnemonic = void, operands = void;
-		// Disassembling instruction at fault address passed
-		if (shell_disassemble(cast(size_t)exception.fault_address,
-			null,
-			null, 0,
-			machbuf.ptr, 32,
-			&mnemonic, &operands) == 0) {
-			printf("* Machine : %s\n", machbuf.ptr);
-			printf("* Mnemonic: %s %s\n", mnemonic, operands);
-		}
-	}
+	ulong faddr = adbg_exception_fault_address(exception);
+	shell_print_address_disasm(faddr);
 	
-	// Print callstack, if available
-	adbg_thread_t *thread = adbg_thread_new(event_tid);
-	if (thread) {
-		void *frames = adbg_frame_list(process, thread);
-		if (frames) {
-			puts("\n* Callstack (WIP):");
-			adbg_stackframe_t *frame = void;
-			for (size_t i; (frame = adbg_frame_list_at(frames, i)) != null; ++i) {
-				printf("%3zu. %llx\n", i, frame.address);
-			}
-			adbg_frame_list_close(frames);
-		}
-	}
+	shell_print_stack(thread);
 }
 void shell_event_process_exit(adbg_process_t *proc, void *udata, int code) {
 	printf("* Process %d exited with code %d\n", adbg_process_id(proc), code);
@@ -1126,7 +1136,7 @@ int command_thread(int argc, const(char) **argv) {
 	// TODO: Being able to select thread
 	//       then prompt can be (adbg [thread 12345])
 	
-	adbg_thread_t *thread = void;
+	adbg_process_thread_t *thread = void;
 	void *thrlist = adbg_thread_list_new(process);
 	if (thrlist == null)
 		return ShellError.alicedbg;
@@ -1138,7 +1148,7 @@ int command_thread(int argc, const(char) **argv) {
 		printf("Threads:");
 		for (size_t i; (thread = adbg_thread_list_get(thrlist, i)) != null; ++i) {
 			if (i) putchar(',');
-			printf(" %lld", adbg_thread_id(thread));
+			printf(" %lld", adbg_process_thread_id(thread));
 		}
 		putchar('\n');
 		return 0;
@@ -1155,9 +1165,12 @@ int command_thread(int argc, const(char) **argv) {
 	
 	action = argv[2];
 	if (*action == 'r' || strcmp(action, "registers") == 0) {
+		adbg_thread_context_t *ctx = adbg_process_thread_context(thread);
+		if (ctx == null)
+			return ShellError.alicedbg;
 		int id;
 		adbg_register_t *register = void;
-		while ((register = adbg_register_by_id(thread, id++)) != null) {
+		while ((register = adbg_register_by_id(ctx, id++)) != null) {
 			char[32] dec = void, hex = void;
 			adbg_register_format(dec.ptr, 32, register, AdbgRegisterFormat.dec);
 			adbg_register_format(hex.ptr, 32, register, AdbgRegisterFormat.hexPadded);
@@ -1173,7 +1186,7 @@ int command_thread(int argc, const(char) **argv) {
 		
 		action = argv[3];
 		if (strcmp(action, "show") == 0) { // show thread id stack
-			void *frames = adbg_frame_list(process, thread);
+			void *frames = adbg_frame_list(thread);
 			if (frames == null)
 				return ShellError.alicedbg;
 			

@@ -40,53 +40,70 @@ extern (C):
 //       e.g., a "Minidump thread" would get frames in its own way
 //       "OS" would be Win32/pthreads, then implementation can go by machine type
 
-// TODO: status flags?
-//       - context initialized
-struct adbg_thread_t {
+private enum {
+	ADBG_THREAD_HAS_CONTEXT = 1,
+}
+
+/// Represents a process' thread.
+struct adbg_process_thread_t {
 	long id;
+	adbg_process_t *process;
+	int status;
 	adbg_thread_context_t context;
 }
 
-/// Make a new single thread instance by its id.
-/// Params: id = Thread ID.
-/// Returns: New thread instance
-adbg_thread_t* adbg_thread_new(long id) {
-	adbg_thread_t *thread = cast(adbg_thread_t*)malloc(adbg_thread_t.sizeof);
+// HACK: Temporary function until debugger returns thread instance pointer in event handler.
+//
+// Used to create an instance of a thread (by conception only) to get
+// access to thread services (e.g., context and frames).
+//
+// No thread verification is done.
+adbg_process_thread_t* adbg_process_thread_create_from_id(adbg_process_t *process, long id) {
+	if (process == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	adbg_process_thread_t *thread =
+		cast(adbg_process_thread_t*)calloc(1, adbg_process_thread_t.sizeof);
 	if (thread == null) {
 		adbg_oops(AdbgError.crt);
 		return null;
 	}
+	
 	thread.id = id;
+	thread.process = process;
 	return thread;
 }
 
-void adbg_thread_close(adbg_thread_t *thread) {
-	if (thread == null) return;
+void adbg_process_thread_close(adbg_process_thread_t *thread) {
+	if (thread == null)
+		return;
 	free(thread);
 }
 
 /// Get the thread ID out of this thread instance.
 /// Params: thread = Thread instance.
 /// Returns: Thread ID. On error, zero.
-long adbg_thread_id(adbg_thread_t *thread) {
+long adbg_process_thread_id(adbg_process_thread_t *thread) {
 	version (Trace) trace("thread=%p", thread);
-version (Windows) {
 	if (thread == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return 0;
 	}
+version (Windows) {
 	return thread.id;
 } else version (Posix) {
-	if (thread == null) {
-		adbg_oops(AdbgError.invalidArgument);
-		return 0;
-	}
 	return thread.id;
 } else {
 	adbg_oops(AdbgError.unimplemented);
 	return 0;
 }
 }
+
+//
+// Thread list management
+//
 
 /// Update the list of threads for the target process.
 /// Params: process = Process instance.
@@ -113,7 +130,7 @@ version (Windows) {
 	}
 	scope(exit) CloseHandle(snap);
 	
-	list_t *list = adbg_list_new(adbg_thread_t.sizeof, LISTINIT);
+	list_t *list = adbg_list_new(adbg_process_thread_t.sizeof, LISTINIT);
 	if (list == null)
 		return null;
 	
@@ -125,7 +142,8 @@ version (Windows) {
 		return null;
 	}
 	
-	adbg_thread_t t = void;
+	adbg_process_thread_t t = void;
+	t.process = process;
 	adbg_thread_context_config(&t.context, adbg_process_machine(process));
 	do {
 		if (te32.th32OwnerProcessID != process.pid)
@@ -158,12 +176,13 @@ version (Windows) {
 	scope(exit) closedir(procfd);
 	
 	// New list
-	list_t *list = adbg_list_new(adbg_thread_t.sizeof, LISTINIT);
+	list_t *list = adbg_list_new(adbg_process_thread_t.sizeof, LISTINIT);
 	if (list == null)
 		return null;
 	
 	// Go through kernel thread IDs
-	adbg_thread_t t = void;
+	adbg_process_thread_t t = void;
+	t.process = process;
 	adbg_thread_context_config(&t.context, adbg_process_machine(process));
 	for (dirent *entry = void; (entry = readdir(procfd)) != null;) {
 		// readdir() includes "." and "..", skip them
@@ -211,10 +230,11 @@ version (Windows) {
 	}
 	
 	// Copy list into our own
-	list_t *list = adbg_list_new(adbg_thread_t.sizeof, count);
+	list_t *list = adbg_list_new(adbg_process_thread_t.sizeof, count);
 	if (list == null)
 		return null;
-	adbg_thread_t t = void;
+	adbg_process_thread_t t = void;
+	t.process = process;
 	adbg_thread_context_config(&t.context, adbg_process_machine(process));
 	for (int i; i < count; ++i) {
 		t.id = lwlist[i];
@@ -238,7 +258,7 @@ void adbg_thread_list_close(void *list) {
 /// 	list = Thread list instance.
 /// 	index = Zero-based index.
 /// Returns: Thread instance. On error, null.
-adbg_thread_t* adbg_thread_list_get(void *list, size_t index) {
+adbg_process_thread_t* adbg_thread_list_get(void *list, size_t index) {
 	version (Trace) trace("list=%p index=%zu", list, index);
 	if (list == null) {
 		adbg_oops(AdbgError.invalidArgument);
@@ -246,7 +266,7 @@ adbg_thread_t* adbg_thread_list_get(void *list, size_t index) {
 	}
 	
 	// NOTE: adbg_list_get checks both list pointer and index and sets error
-	return cast(adbg_thread_t*)adbg_list_get(cast(list_t*)list, index);
+	return cast(adbg_process_thread_t*)adbg_list_get(cast(list_t*)list, index);
 }
 
 /// Get a thread from list by its ID.
@@ -254,16 +274,16 @@ adbg_thread_t* adbg_thread_list_get(void *list, size_t index) {
 /// 	list = Thread list instance.
 /// 	id = Thread ID
 /// Returns: Thread instance. On error, null.
-adbg_thread_t* adbg_thread_list_by_id(void *list, long id) {
+adbg_process_thread_t* adbg_thread_list_by_id(void *list, long id) {
 	version (Trace) trace("list=%p id=%lld", list, id);
 	if (list == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	adbg_thread_t *t = void;
+	adbg_process_thread_t *t = void;
 	size_t i;
-	while ((t = cast(adbg_thread_t*)adbg_list_get(cast(list_t*)list, i++)) != null)
+	while ((t = cast(adbg_process_thread_t*)adbg_list_get(cast(list_t*)list, i++)) != null)
 		if (t.id == id)
 			return t;
 	adbg_oops(AdbgError.unfindable);
@@ -275,7 +295,6 @@ adbg_thread_t* adbg_thread_list_by_id(void *list, long id) {
 //
 
 // TODO: Support FPU registers (f32, f64, f80 types)
-// TODO: Thread struct type, to hold its context, and other info
 
 enum AdbgRegister {
 	// x86
@@ -418,113 +437,104 @@ struct adbg_register_t {
 	}
 }
 
-/// Represents a thread context structure with the register values once a
-/// process is paused.
-struct adbg_thread_context_t {
-	/// Count of set registers for this instance.
-	size_t count;
-	/// Register population, this may depends by platform.
-	adbg_register_t[REG_COUNT] items;
-}
-
 // Register sets
 private immutable adbg_register_info_t[] regset_x86 = [
-	{ "eip",	AdbgRegisterType.u32 },
-	{ "eflags",	AdbgRegisterType.u32 },
-	{ "eax",	AdbgRegisterType.u32 },
-	{ "ebx",	AdbgRegisterType.u32 },
-	{ "ecx",	AdbgRegisterType.u32 },
-	{ "edx",	AdbgRegisterType.u32 },
-	{ "esp",	AdbgRegisterType.u32 },
-	{ "ebp",	AdbgRegisterType.u32 },
-	{ "esi",	AdbgRegisterType.u32 },
-	{ "edi",	AdbgRegisterType.u32 },
-	{ "cs",	AdbgRegisterType.u16 },
-	{ "ds",	AdbgRegisterType.u16 },
-	{ "es",	AdbgRegisterType.u16 },
-	{ "fs",	AdbgRegisterType.u16 },
-	{ "gs",	AdbgRegisterType.u16 },
-	{ "ss",	AdbgRegisterType.u16 },
+	{ "eip",    AdbgRegisterType.u32 },
+	{ "eflags", AdbgRegisterType.u32 },
+	{ "eax",    AdbgRegisterType.u32 },
+	{ "ebx",    AdbgRegisterType.u32 },
+	{ "ecx",    AdbgRegisterType.u32 },
+	{ "edx",    AdbgRegisterType.u32 },
+	{ "esp",    AdbgRegisterType.u32 },
+	{ "ebp",    AdbgRegisterType.u32 },
+	{ "esi",    AdbgRegisterType.u32 },
+	{ "edi",    AdbgRegisterType.u32 },
+	{ "cs",     AdbgRegisterType.u16 },
+	{ "ds",     AdbgRegisterType.u16 },
+	{ "es",     AdbgRegisterType.u16 },
+	{ "fs",     AdbgRegisterType.u16 },
+	{ "gs",     AdbgRegisterType.u16 },
+	{ "ss",     AdbgRegisterType.u16 },
 ];
 private immutable adbg_register_info_t[] regset_x86_64 = [
-	{ "rip",	AdbgRegisterType.u64 },
-	{ "rflags",	AdbgRegisterType.u64 },
-	{ "rax",	AdbgRegisterType.u64 },
-	{ "rbx",	AdbgRegisterType.u64 },
-	{ "rcx",	AdbgRegisterType.u64 },
-	{ "rdx",	AdbgRegisterType.u64 },
-	{ "rsp",	AdbgRegisterType.u64 },
-	{ "rbp",	AdbgRegisterType.u64 },
-	{ "rsi",	AdbgRegisterType.u64 },
-	{ "rdi",	AdbgRegisterType.u64 },
-	{ "r8",	AdbgRegisterType.u64 },
-	{ "r9",	AdbgRegisterType.u64 },
-	{ "r10",	AdbgRegisterType.u64 },
-	{ "r11",	AdbgRegisterType.u64 },
-	{ "r12",	AdbgRegisterType.u64 },
-	{ "r13",	AdbgRegisterType.u64 },
-	{ "r14",	AdbgRegisterType.u64 },
-	{ "r15",	AdbgRegisterType.u64 },
-	{ "cs",	AdbgRegisterType.u16 },
-	{ "ds",	AdbgRegisterType.u16 },
-	{ "es",	AdbgRegisterType.u16 },
-	{ "fs",	AdbgRegisterType.u16 },
-	{ "gs",	AdbgRegisterType.u16 },
-	{ "ss",	AdbgRegisterType.u16 },
+	{ "rip",    AdbgRegisterType.u64 },
+	{ "rflags", AdbgRegisterType.u64 },
+	{ "rax",    AdbgRegisterType.u64 },
+	{ "rbx",    AdbgRegisterType.u64 },
+	{ "rcx",    AdbgRegisterType.u64 },
+	{ "rdx",    AdbgRegisterType.u64 },
+	{ "rsp",    AdbgRegisterType.u64 },
+	{ "rbp",    AdbgRegisterType.u64 },
+	{ "rsi",    AdbgRegisterType.u64 },
+	{ "rdi",    AdbgRegisterType.u64 },
+	{ "r8",     AdbgRegisterType.u64 },
+	{ "r9",     AdbgRegisterType.u64 },
+	{ "r10",    AdbgRegisterType.u64 },
+	{ "r11",    AdbgRegisterType.u64 },
+	{ "r12",    AdbgRegisterType.u64 },
+	{ "r13",    AdbgRegisterType.u64 },
+	{ "r14",    AdbgRegisterType.u64 },
+	{ "r15",    AdbgRegisterType.u64 },
+	{ "cs",     AdbgRegisterType.u16 },
+	{ "ds",     AdbgRegisterType.u16 },
+	{ "es",     AdbgRegisterType.u16 },
+	{ "fs",     AdbgRegisterType.u16 },
+	{ "gs",     AdbgRegisterType.u16 },
+	{ "ss",     AdbgRegisterType.u16 },
 ];
 private immutable adbg_register_info_t[] regset_arm = [
-	{ "r0",	AdbgRegisterType.u32 },
-	{ "r1",	AdbgRegisterType.u32 },
-	{ "r2",	AdbgRegisterType.u32 },
-	{ "r3",	AdbgRegisterType.u32 },
-	{ "r4",	AdbgRegisterType.u32 },
-	{ "r5",	AdbgRegisterType.u32 },
-	{ "r6",	AdbgRegisterType.u32 },
-	{ "r7",	AdbgRegisterType.u32 },
-	{ "r8",	AdbgRegisterType.u32 },
-	{ "r9",	AdbgRegisterType.u32 },
-	{ "r10",	AdbgRegisterType.u32 },
-	{ "fp",	AdbgRegisterType.u32 },
-	{ "ip",	AdbgRegisterType.u32 },
-	{ "sp",	AdbgRegisterType.u32 },
-	{ "lr",	AdbgRegisterType.u32 },
-	{ "pc",	AdbgRegisterType.u32 },
-	{ "cpsr",	AdbgRegisterType.u32 },
+	{ "r0",    AdbgRegisterType.u32 },
+	{ "r1",    AdbgRegisterType.u32 },
+	{ "r2",    AdbgRegisterType.u32 },
+	{ "r3",    AdbgRegisterType.u32 },
+	{ "r4",    AdbgRegisterType.u32 },
+	{ "r5",    AdbgRegisterType.u32 },
+	{ "r6",    AdbgRegisterType.u32 },
+	{ "r7",    AdbgRegisterType.u32 },
+	{ "r8",    AdbgRegisterType.u32 },
+	{ "r9",    AdbgRegisterType.u32 },
+	{ "r10",   AdbgRegisterType.u32 },
+	{ "fp",    AdbgRegisterType.u32 },
+	{ "ip",    AdbgRegisterType.u32 },
+	{ "sp",    AdbgRegisterType.u32 },
+	{ "lr",    AdbgRegisterType.u32 },
+	{ "pc",    AdbgRegisterType.u32 },
+	{ "cpsr",  AdbgRegisterType.u32 },
 ];
 private immutable adbg_register_info_t[] regset_aarch64 = [
-	{ "x0",	AdbgRegisterType.u64 },
-	{ "x1",	AdbgRegisterType.u64 },
-	{ "x2",	AdbgRegisterType.u64 },
-	{ "x3",	AdbgRegisterType.u64 },
-	{ "x4",	AdbgRegisterType.u64 },
-	{ "x5",	AdbgRegisterType.u64 },
-	{ "x6",	AdbgRegisterType.u64 },
-	{ "x7",	AdbgRegisterType.u64 },
-	{ "x8",	AdbgRegisterType.u64 },
-	{ "x9",	AdbgRegisterType.u64 },
-	{ "x10",	AdbgRegisterType.u64 },
-	{ "x11",	AdbgRegisterType.u64 },
-	{ "x12",	AdbgRegisterType.u64 },
-	{ "x13",	AdbgRegisterType.u64 },
-	{ "x14",	AdbgRegisterType.u64 },
-	{ "x15",	AdbgRegisterType.u64 },
-	{ "x16",	AdbgRegisterType.u64 },
-	{ "x17",	AdbgRegisterType.u64 },
-	{ "x18",	AdbgRegisterType.u64 },
-	{ "x19",	AdbgRegisterType.u64 },
-	{ "x20",	AdbgRegisterType.u64 },
-	{ "x21",	AdbgRegisterType.u64 },
-	{ "x22",	AdbgRegisterType.u64 },
-	{ "x23",	AdbgRegisterType.u64 },
-	{ "x24",	AdbgRegisterType.u64 },
-	{ "x25",	AdbgRegisterType.u64 },
-	{ "x26",	AdbgRegisterType.u64 },
-	{ "x27",	AdbgRegisterType.u64 },
-	{ "x28",	AdbgRegisterType.u64 },
-	{ "fp",	AdbgRegisterType.u64 },
-	{ "lr",	AdbgRegisterType.u64 },
-	{ "sp",	AdbgRegisterType.u64 },
-	{ "pc",	AdbgRegisterType.u64 },
+	{ "x0",    AdbgRegisterType.u64 },
+	{ "x1",    AdbgRegisterType.u64 },
+	{ "x2",    AdbgRegisterType.u64 },
+	{ "x3",    AdbgRegisterType.u64 },
+	{ "x4",    AdbgRegisterType.u64 },
+	{ "x5",    AdbgRegisterType.u64 },
+	{ "x6",    AdbgRegisterType.u64 },
+	{ "x7",    AdbgRegisterType.u64 },
+	{ "x8",    AdbgRegisterType.u64 },
+	{ "x9",    AdbgRegisterType.u64 },
+	{ "x10",   AdbgRegisterType.u64 },
+	{ "x11",   AdbgRegisterType.u64 },
+	{ "x12",   AdbgRegisterType.u64 },
+	{ "x13",   AdbgRegisterType.u64 },
+	{ "x14",   AdbgRegisterType.u64 },
+	{ "x15",   AdbgRegisterType.u64 },
+	{ "x16",   AdbgRegisterType.u64 },
+	{ "x17",   AdbgRegisterType.u64 },
+	{ "x18",   AdbgRegisterType.u64 },
+	{ "x19",   AdbgRegisterType.u64 },
+	{ "x20",   AdbgRegisterType.u64 },
+	{ "x21",   AdbgRegisterType.u64 },
+	{ "x22",   AdbgRegisterType.u64 },
+	{ "x23",   AdbgRegisterType.u64 },
+	{ "x24",   AdbgRegisterType.u64 },
+	{ "x25",   AdbgRegisterType.u64 },
+	{ "x26",   AdbgRegisterType.u64 },
+	{ "x27",   AdbgRegisterType.u64 },
+	{ "x28",   AdbgRegisterType.u64 },
+	{ "fp",    AdbgRegisterType.u64 },
+	{ "lr",    AdbgRegisterType.u64 },
+	{ "sp",    AdbgRegisterType.u64 },
+	{ "pc",    AdbgRegisterType.u64 },
 ];
 
 version (X86)
@@ -540,32 +550,74 @@ else
 
 version(PrintTargetInfo) pragma(msg, "REG_COUNT\t", REG_COUNT);
 
+/// Represents a thread context structure with the register values once a
+/// process is paused.
+struct adbg_thread_context_t {
+	/// Count of set registers for this instance.
+	size_t count;
+	/// 
+	AdbgMachine machine;
+	/// Register population, this may depends by platform.
+	adbg_register_t[REG_COUNT] items;
+}
+
+/// Get the context of the thread
+/// Params:
+///   thread = Thread instance.
+/// Returns: Thread context instance.
+adbg_thread_context_t* adbg_process_thread_context(adbg_process_thread_t *thread) {
+	version (Trace) trace("thread=%p", thread);
+	if (thread == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	// Setup context if not configured for thread
+	if ((thread.status & ADBG_THREAD_HAS_CONTEXT) == 0) {
+	
+		// Get the process machine type, if a process is associated with
+		// this thread
+		AdbgMachine machine = thread.process ?
+			adbg_process_machine(thread.process) : AdbgMachine.unknown;
+		
+		if (adbg_thread_context_config(&thread.context, machine))
+			return null;
+	}
+	thread.status |= ADBG_THREAD_HAS_CONTEXT;
+	
+	// Update context
+	if (adbg_process_thread_update_context(thread))
+		return null;
+	
+	return &thread.context;
+}
+
 /// Select a register from the thread context by its ID.
 ///
 /// To obtain a list of registers, start iterating from 0, until
 /// null is reached.
 /// Params:
-/// 	thread = Thread instance.
-/// 	id = Register ID, or index.
+/// 	context = Thread context instance.
+/// 	id = Register ID.
 /// Returns: Register pointer; Or null on error.
-adbg_register_t* adbg_register_by_id(adbg_thread_t *thread, int id) {
-	version (Trace) trace("thread=%p index=%u", thread, id);
-	if (thread == null) {
+adbg_register_t* adbg_register_by_id(adbg_thread_context_t *context, int id) {
+	version (Trace) trace("thread=%p index=%u", context, id);
+	if (context == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (thread.context.count == 0) {
+	if (context.count == 0) {
 		adbg_oops(AdbgError.unavailable);
 		return null;
 	}
 	
 	size_t index = cast(size_t)id;
-	if (index >= thread.context.count) {
+	if (index >= context.count) {
 		adbg_oops(AdbgError.indexBounds);
 		return null;
 	}
 	
-	return &thread.context.items[index];
+	return &context.items[index];
 }
 
 // get register name
@@ -628,11 +680,14 @@ int adbg_thread_context_config(adbg_thread_context_t *ctx, AdbgMachine mach) {
 }
 
 // Update the context for thread
-int adbg_thread_context_update(adbg_process_t *proc, adbg_thread_t *thread) {
-	version (Trace) trace("proc=%p thread=%p", proc, thread);
+package
+int adbg_process_thread_update_context(adbg_process_thread_t *thread) {
+	version (Trace) trace("thread=%p", thread);
 	
-	if (proc == null || thread == null)
+	if (thread == null)
 		return adbg_oops(AdbgError.invalidArgument);
+	if (thread.process == null)
+		return adbg_oops(AdbgError.assertion);
 	
 version (Win64) {
 	HANDLE thandle = OpenThread(THREAD_GET_CONTEXT, FALSE, cast(DWORD)thread.id);
@@ -640,7 +695,8 @@ version (Win64) {
 		return adbg_oops(AdbgError.os);
 	scope(exit) CloseHandle(thandle);
 	
-	AdbgMachine mach = adbg_process_machine(proc);
+	AdbgMachine mach = adbg_process_machine(thread.process);
+	// x86 and AMD64
 	version (X86_64) switch (mach) {
 	case AdbgMachine.amd64:
 		CONTEXT_X64 winctx = void; // CONTEXT
@@ -697,6 +753,7 @@ version (Win64) {
 	default:
 		return adbg_oops(AdbgError.assertion);
 	}
+	// Arm and AArch64
 	version (AArch64) switch (mach) {
 	case AdbgMachine.aarch64:
 		ARM64_NT_CONTEXT winctx = void; // CONTEXT
@@ -835,6 +892,7 @@ version (Win64) {
 		thread.context.items[AdbgRegister.x86_ss].u16     = cast(ushort)u.xss;
 		return 0;
 	} else version (X86_64) {
+		// TODO: Consider x86 personality
 		user_regs_struct u = void;
 		if (ptrace(PTRACE_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
@@ -886,6 +944,7 @@ version (Win64) {
 		thread.context.items[AdbgRegister.arm_cpsr].u32 = u.cpsr;
 		return 0;
 	} else version (AArch64) {
+		// TODO: Consider AArch32 personality
 		user_regs_struct u = void;
 		if (ptrace(PTRACE_GETREGS, cast(pid_t)thread.id, null, &u) < 0)
 			return adbg_oops(AdbgError.os);
@@ -949,6 +1008,7 @@ version (Win64) {
 		thread.context.items[AdbgRegister.x86_ss].u16     = cast(ushort)u.r_ss;
 		return 0;
 	} else version (X86_64) {
+		// TODO: Consider x86 personality
 		reg u = void;
 		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, &u, 0) < 0)
 			return adbg_oops(AdbgError.os);
@@ -1000,6 +1060,7 @@ version (Win64) {
 		thread.context.items[AdbgRegister.arm_cpsr].u32 = u.r_cpsr;
 		return 0;
 	} else version (AArch64) {
+		// TODO: Consider AArch32 personality
 		reg u = void;
 		if (ptrace(PT_GETREGS, cast(pid_t)thread.id, &u, 0) < 0)
 			return adbg_oops(AdbgError.os);

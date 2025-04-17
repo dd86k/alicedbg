@@ -13,23 +13,6 @@ import adbg.process.base; // for machine info
 import adbg.process.thread; // for accessing thread information
 import adbg.utils.list;
 
-// Stack frame layouts
-//
-// # x86-32
-//
-// ## Frame Pointers
-// 
-// ### Windows
-//
-// With EBP, [EBP] points to the previous EBP value, [EBP+4] points to the return
-// address, and [EBP+8] points to the first stack argument. [EBP-n] have function
-// parameters.
-//
-// ## FPO
-//
-// TODO
-//
-
 extern (C):
 
 struct adbg_stackframe_t {
@@ -53,28 +36,39 @@ static immutable __machine_pc_reg[] stackregs = [
 	{ AdbgMachine.aarch64,	AdbgRegister.aarch64_pc },
 ];
 
-void* adbg_frame_list(adbg_process_t *process, adbg_thread_t *thread) {
-	if (process == null || thread == null) {
+void* adbg_frame_list(adbg_process_thread_t *thread) {
+	if (thread == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
 	
-	if (adbg_thread_context_update(process, thread))
+	// No process attached
+	if (thread.process == null) {
+		adbg_oops(AdbgError.assertion);
+		return null;
+	}
+	
+	// Get (updated) context because PC/IP being the first frame is
+	// important
+	adbg_thread_context_t *ctx = adbg_process_thread_context(thread);
+	if (ctx == null)
 		return null;
 	
-	// Map a set of registers to use at primary stackframe levels
-	AdbgMachine mach = adbg_process_machine(process);
-	AdbgRegister register;
+	// Get register denoting PC depending on machine
+	AdbgMachine mach = adbg_process_machine(thread.process);
+	AdbgRegister register = void;
 	foreach (ref regs; stackregs) {
+		// Found it
 		if (mach == regs.machine) {
 			register = regs.reg;
 			goto Lfound;
 		}
 	}
+	
 	adbg_oops(AdbgError.unavailable);
 	return null;
+
 Lfound:
-	
 	// New frame list
 	list_t *list = adbg_list_new(adbg_stackframe_t.sizeof, 8);
 	if (list == null)
@@ -82,25 +76,54 @@ Lfound:
 	
 	// Start with the first frame, which is always PC
 	// If we can't have that, then we cannot even obtain frames at all
-	adbg_register_t *reg = adbg_register_by_id(thread, register);
+	adbg_register_t *reg = adbg_register_by_id(&thread.context, register);
 	if (reg == null) {
 		adbg_oops(AdbgError.unavailable);
 		adbg_list_close(list);
 		return null;
 	}
-	ulong *address = cast(ulong*)adbg_register_value(reg);
-	if (address == null || *address == 0) {
+	
+	void *address = adbg_register_value(reg);
+	if (address == null) {
 		adbg_list_close(list);
 		return null;
 	}
+	
 	adbg_stackframe_t frame = void;
 	frame.level = 0;
-	frame.address = *address;
+	
+	// Get its value
+	switch (mach) {
+	// 32-bit PC
+	case AdbgMachine.i386, AdbgMachine.arm:
+		frame.address = *cast(uint*)address;
+		break;
+	// 64-bit PC
+	case AdbgMachine.amd64, AdbgMachine.aarch64:
+		frame.address = *cast(ulong*)address;
+		break;
+	default:
+		adbg_oops(AdbgError.assertion);
+		adbg_list_close(list);
+		return null;
+	}
+	
 	list = adbg_list_add(list, &frame);
 	if (list == null) {
 		adbg_list_close(list);
 		return null;
 	}
+	
+	// TODO: Next frame
+	//
+	//       Frame pointers (EBP: x86, RBP: amd64, FP: arm) usually
+	//       designate the next stack frame.
+	//       Typically, for example under Linux (amd64), RBP is assigned
+	//       for segmentation faults, but not breakpoints (in the parent
+	//       process, at least, like a debugger).
+	//
+	//       Otherwise, the next frame will have to be obtained from
+	//       debugging information (FPO, etc.)
 	
 	return list;
 }

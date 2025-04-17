@@ -29,10 +29,12 @@ void oops(int code = 0, const(char) *reason = null) {
 	exit(EXIT_FAILURE);
 }
 
-void event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *exception) {
-	long tid = adbg_exception_tid(exception);
+void event_exception(adbg_process_t *process, void *udata, adbg_exception_t *exception) {
+	adbg_process_thread_t *thread = adbg_exception_thread(exception);
+	long tid = thread ? adbg_process_thread_id(thread) : 0;
+	
 	printf(`* pid=%d tid=%lld event=\"exception\" name="%s" oscode=`~ERR_OSFMT,
-		adbg_process_id(proc), tid,
+		adbg_process_id(process), tid,
 		adbg_exception_name(exception), adbg_exception_orig_code(exception));
 	
 	// Print fault address if available
@@ -45,7 +47,7 @@ void event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *except
 		enum BSZ = 32;
 		ubyte[BSZ] buffer = void;
 		adbg_opcode_t opcode = void;
-		if (adbg_memory_read(proc, cast(size_t)faultaddr, buffer.ptr, BSZ) || 
+		if (adbg_memory_read(process, cast(size_t)faultaddr, buffer.ptr, BSZ) || 
 			adbg_disassemble(disassembler, &opcode, buffer.ptr, BSZ, faultaddr))
 			goto Lnodisasm;
 		
@@ -55,42 +57,37 @@ void event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *except
 		goto Ldone;
 	Ldisasm:
 		printf(` disasm="%s`, opcode.mnemonic);
-		if (opcode.operands) printf(` %s"`, opcode.operands);
+		if (opcode.operands) printf(` %s`, opcode.operands);
 		putchar('"');
 	Ldone:
 	}
 	
-	// If available, print register data for thread
-	void *thrlist = adbg_thread_list_new(proc);
-	if (thrlist) {
-		adbg_thread_t *thread = adbg_thread_list_by_id(thrlist, tid);
-		if (thread && adbg_thread_context_update(proc, thread) == 0) {
-			int rid;
-			adbg_register_t *reg = void;
-			while ((reg = adbg_register_by_id(thread, rid++)) != null) {
-				char[20] hex = void;
-				adbg_register_format(hex.ptr, 20, reg, AdbgRegisterFormat.hex);
-				printf(` %s=0x%s`, adbg_register_name(reg), hex.ptr);
-			}
+	// Print thread's context
+	adbg_thread_context_t *ctx = adbg_process_thread_context(thread);
+	if (ctx) {
+		adbg_register_t *reg = void;
+		for (int id; (reg = adbg_register_by_id(ctx, id)) != null; id++) {
+			char[20] hex = void;
+			adbg_register_format(hex.ptr, 20, reg, AdbgRegisterFormat.hex);
+			printf(` %s=0x%s`, adbg_register_name(reg), hex.ptr);
 		}
-		adbg_thread_list_close(thrlist);
 	}
 	
 	putchar('\n');
 	
 	switch (adbg_exception_type(exception)) with (AdbgException) {
 	case Breakpoint, Step:
-		adbg_debugger_continue(proc, tid);
+		adbg_debugger_continue(process, tid);
 		break;
 	default: // Quit at first fault
 		*(cast(int*)udata) = SIMPLE_STOP;
 	}
 }
-void event_process_continue(adbg_process_t *proc, void *udata, long tid) {
-	printf("* pid=%d event=\"continued\"\n", adbg_process_id(proc));
+void event_process_continue(adbg_process_t *process, void *udata, long tid) {
+	printf("* pid=%d tid=%lld event=\"continued\"\n", adbg_process_id(process), tid);
 }
-void event_process_exit(adbg_process_t *proc, void *udata, int code) {
-	printf("* pid=%d event=\"exited\" code=%d\n", adbg_process_id(proc), code);
+void event_process_exit(adbg_process_t *process, void *udata, int code) {
+	printf("* pid=%d event=\"exited\" code=%d\n", adbg_process_id(process), code);
 	*(cast(int*)udata) = SIMPLE_STOP;
 }
 
@@ -108,6 +105,8 @@ int main(int argc, const(char) **argv) {
 			0);
 	if (process == null)
 		oops;
+	
+	// Setup
 	adbg_debugger_on_exception(process, &event_exception);
 	adbg_debugger_on_process_continue(process, &event_process_continue);
 	adbg_debugger_on_process_exit(process, &event_process_exit);
