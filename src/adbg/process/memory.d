@@ -5,7 +5,7 @@
 /// License: BSD-3-Clause-Clear
 module adbg.process.memory;
 
-import adbg.process.base : AdbgProcessState, adbg_process_t;
+import adbg.process.base : AdbgProcessState, adbg_process_t, __PROC_STATUS_NO_PROC_MEM;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import core.stdc.string : memcpy;
@@ -101,26 +101,24 @@ version (Windows) {
 		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (linux) {
-	if (proc.memfailed == false) { // Try /proc/PID/mem if able
-		if (proc.mhandle) {
-		Lread:
-			if (read(proc.mhandle, data, size) >= 0)
-				return 0;
-			
-			// Mark as failed and don't try again
-			proc.memfailed = true;
-		} else { // open mem handle
-			char[32] pathbuf = void;
-			snprintf(pathbuf.ptr, 32, "/proc/%d/mem", proc.pid);
-			proc.mhandle = open(pathbuf.ptr, O_RDWR);
-			// Success? Try reading
-			if (proc.mhandle)
-				goto Lread;
-			// On failure, mark fail and proceed to try ptrace fallback
-			proc.memfailed = true;
+	// If /proc/PID/mem is unavaialble, skip it
+	if ((proc.status & __PROC_STATUS_NO_PROC_MEM) == 0) {
+		// Open an handle to /proc/PID/mem
+		if (proc.mhandle == 0) {
+			int fd = adbg_memory_open_linux(proc);
+			if (fd < 0) {
+				// On failure, mark fail and proceed to try ptrace fallback
+				proc.status |= __PROC_STATUS_NO_PROC_MEM;
+				goto Lptrace;
+			}
+			proc.mhandle = fd;
 		}
+		
+		if (read(proc.mhandle, data, size) >= 0)
+			return 0;
 	}
 	
+Lptrace:
 	switch (type) {
 	case AdbgMemory.data: type = PTRACE_PEEKDATA; break;
 	case AdbgMemory.instruction: type = PTRACE_PEEKTEXT; break;
@@ -198,27 +196,24 @@ version (Windows) {
 		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (linux) {
-	// Try reading from mem if able
-	if (proc.memfailed == false) {
-		if (proc.mhandle) {
-		Lread:
-			if (write(proc.mhandle, data, size) >= 0)
-				return 0;
-			
-			// Mark as failed and don't try again
-			proc.memfailed = true;
-		} else { // open mem handle
-			char[32] pathbuf = void;
-			snprintf(pathbuf.ptr, 32, "/proc/%d/mem", proc.pid);
-			proc.mhandle = open(pathbuf.ptr, O_RDWR);
-			// Success? Try reading
-			if (proc.mhandle)
-				goto Lread;
-			// On failure, mark fail and proceed to try ptrace fallback
-			proc.memfailed = true;
+	// If /proc/PID/mem is unavaialble, skip it
+	if ((proc.status & __PROC_STATUS_NO_PROC_MEM) == 0) {
+		// Open an handle to /proc/PID/mem
+		if (proc.mhandle == 0) {
+			int fd = adbg_memory_open_linux(proc);
+			if (fd < 0) {
+				// On failure, mark fail and proceed to try ptrace fallback
+				proc.status |= __PROC_STATUS_NO_PROC_MEM;
+				goto Lptrace;
+			}
+			proc.mhandle = fd;
 		}
+		
+		if (write(proc.mhandle, data, size) >= 0)
+			return 0;
 	}
 	
+Lptrace:
 	switch (type) {
 	case AdbgMemory.data: type = PTRACE_PEEKDATA; break;
 	case AdbgMemory.instruction: type = PTRACE_PEEKTEXT; break;
@@ -253,6 +248,16 @@ version (Windows) {
 	return adbg_oops(AdbgError.unimplemented);
 }
 
+version (linux)
+private
+int adbg_memory_open_linux(adbg_process_t *proc) {
+	assert(proc);
+	// Open an handle to /proc/PID/mem
+	char[32] pathbuf = void;
+	snprintf(pathbuf.ptr, 32, "/proc/%d/mem", proc.pid);
+	return open(pathbuf.ptr, O_RDWR);
+}
+
 /// Memory permission access bits.
 enum AdbgMemPerm : ushort {
 	read	= 1,	/// Read permission
@@ -274,7 +279,9 @@ enum AdbgPageUse : ubyte {
 	/// Private memory.
 	resident,
 	/// Slice or memory-mapped file.
-	fileview,
+	mapped,
+	/// Older alias to mapped.
+	fileview = mapped,
 	/// Module, like a shared object or dynamic linked library.
 	module_,
 }

@@ -57,8 +57,8 @@ enum AdbgCreation : ubyte {
 }
 
 package enum {
-	// /proc/PID/mem couldn't be opened, so do not depend on it
-	__PROC_MEM_UNAVAIL = 1 << 16,
+	/// Linux: /proc/PID/mem couldn't be opened, so do not depend on it
+	__PROC_STATUS_NO_PROC_MEM = 1 << 16,
 }
 
 /// Represents an instance of a process.
@@ -78,7 +78,6 @@ version (Posix) {
 }
 version (linux) {
 	int mhandle;	/// Internal memory file handle to /proc/PID/mem
-	bool memfailed;	/// Set if we fail to open /proc/PID/mem
 }
 	/// Internal status
 	int status;
