@@ -23,11 +23,12 @@ import core.stdc.string;
 import adbg.utils.strings;
 
 version (Windows) {
+	// NOTE: winbase also imports ExceptionRecord, conflicting with our winnt module
+	import core.sys.windows.winbase;
 	import adbg.include.windows.wow64apiset;
 	import adbg.include.windows.winnt;
-	import core.sys.windows.winbase;
 	import adbg.machines;
-
+	
 	version (X86)	version = WinTel;
 	version (X86_64)	version = WinTel;
 	
@@ -817,7 +818,9 @@ version (Windows) {
 	// While the first ExceptionInformation used to be more interesting for
 	// EXCEPTION_IN_PAGE_ERROR and EXCEPTION_ACCESS_VIOLATION,
 	// it might be interesting to unconditionally send it for future interests.
-	EXCEPTION_RECORD *rec = &event.Exception.ExceptionRecord;
+	// HACK: The cast hack is to force select adbg.include.windows.winnt.EXCEPTION_RECORD.
+	//       Otherwise, compiler tries to use core.sys.windows.winbase.EXCEPTION_RECORD.
+	EXCEPTION_RECORD *rec = cast(.EXCEPTION_RECORD*)&event.Exception.ExceptionRecord;
 	exception.type = adbg_exception_from_os(rec.ExceptionCode, cast(uint)rec.ExceptionInformation[0]);
 	exception.fault_address = cast(ulong)rec.ExceptionAddress;
 	exception.oscode = rec.ExceptionCode;
