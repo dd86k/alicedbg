@@ -24,7 +24,7 @@ version (Windows) {
 	import core.sys.windows.winnt;
 	import adbg.include.windows.psapi_dyn;
 } else version (Posix) {
-	import core.sys.posix.fcntl : open, O_RDWR;
+	import core.sys.posix.fcntl : open, O_RDWR, O_RDONLY, O_WRONLY;
 	import adbg.include.c.stdio : snprintf, sscanf;
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd : sysconf, read, write, ssize_t, _SC_PAGESIZE;
@@ -59,6 +59,29 @@ version (Windows) {
 //      Linux: /proc/meminfo:Hugepagesize
 /*size_t adbg_memory_hugepagesize() {
 }*/
+
+version (linux)
+// Opens a write/read handle to proc mem.
+// The single handle makes things easier until we need granular access.
+// Return non-zero on error
+private
+int __adbg_memory_open_linux(adbg_process_t *proc) {
+	assert(proc);
+	// Open an handle to /proc/PID/mem
+	char[32] pathbuf = void;
+	snprintf(pathbuf.ptr, 32, "/proc/%d/mem", proc.pid);
+	int fd = open(pathbuf.ptr, O_RDWR);
+	if (fd < 0) {
+		// On failure, mark "do not retry opening proc/mem"
+		// So future I/O attempts skips this initialization function
+		proc.status |= __PROC_STATUS_NO_PROC_MEM;
+		// NOTE: This returns -1 as generic instead of adbg error
+		//       because there are no particular soft warnings about this
+		return -1;
+	}
+	proc.mhandle = fd;
+	return 0;
+}
 
 /// Memory type
 enum AdbgMemory {
@@ -101,28 +124,25 @@ version (Windows) {
 		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (linux) {
-	// If /proc/PID/mem is unavaialble, skip it
+	// If "do not use proc memory" bit is set,
+	// then /proc/PID/mem is unavaialble, skip it
 	if ((proc.status & __PROC_STATUS_NO_PROC_MEM) == 0) {
-		// Open an handle to /proc/PID/mem
-		if (proc.mhandle == 0) {
-			int fd = adbg_memory_open_linux(proc);
-			if (fd < 0) {
-				// On failure, mark fail and proceed to try ptrace fallback
-				proc.status |= __PROC_STATUS_NO_PROC_MEM;
-				goto Lptrace;
-			}
-			proc.mhandle = fd;
-		}
+		// Since the handle is unopened, open an handle to /proc/PID/mem
+		if (proc.mhandle == 0 && __adbg_memory_open_linux(proc))
+			goto Lptrace;
 		
+		// If it succeeds, return immediately.
+		// Otherwise, try via ptrace(3)
 		if (read(proc.mhandle, data, size) >= 0)
 			return 0;
 	}
 	
 Lptrace:
 	switch (type) {
-	case AdbgMemory.data: type = PTRACE_PEEKDATA; break;
+	case AdbgMemory.data:        type = PTRACE_PEEKDATA; break;
 	case AdbgMemory.instruction: type = PTRACE_PEEKTEXT; break;
-	default: return adbg_oops(AdbgError.invalidOption);
+	default:
+		return adbg_oops(AdbgError.invalidOption);
 	}
 	
 	// If reading mem fails, try ptrace method
@@ -138,7 +158,7 @@ Lptrace:
 	
 	r = size % c_long.sizeof;
 	if (r) {
-		errno = 0; // Clear errno on PT_PEEK*
+		errno = 0; // Clear errno for PT_PEEK*
 		c_long l = ptrace(type, proc.pid, addr, null);
 		if (errno)
 			return adbg_oops(AdbgError.os);
@@ -148,14 +168,16 @@ Lptrace:
 	return 0;
 } else version (FreeBSD) {
 	switch (type) {
-	case AdbgMemory.data: type = PIOD_READ_D; break;
+	case AdbgMemory.data:        type = PIOD_READ_D; break;
 	case AdbgMemory.instruction: type = PIOD_READ_I; break;
-	default: return adbg_oops(AdbgError.invalidOption);
+	default:
+		return adbg_oops(AdbgError.invalidOption);
 	}
 	
 	ptrace_io_desc io = ptrace_io_desc(type, cast(void*)addr, data, size);
 	if (ptrace(PT_IO, proc.pid, &io, 0) < 0) // sets errno
 		return adbg_oops(AdbgError.crt);
+	// TODO: Check ptrace_io_desc.piod_len
 	return 0;
 } else // Unsupported
 	return adbg_oops(AdbgError.unimplemented);
@@ -196,28 +218,25 @@ version (Windows) {
 		return adbg_oops(AdbgError.os);
 	return 0;
 } else version (linux) {
-	// If /proc/PID/mem is unavaialble, skip it
+	// If "do not use proc memory" bit is set,
+	// then /proc/PID/mem is unavaialble, skip it
 	if ((proc.status & __PROC_STATUS_NO_PROC_MEM) == 0) {
-		// Open an handle to /proc/PID/mem
-		if (proc.mhandle == 0) {
-			int fd = adbg_memory_open_linux(proc);
-			if (fd < 0) {
-				// On failure, mark fail and proceed to try ptrace fallback
-				proc.status |= __PROC_STATUS_NO_PROC_MEM;
-				goto Lptrace;
-			}
-			proc.mhandle = fd;
-		}
+		// Since the handle is unopened, open an handle to /proc/PID/mem
+		if (proc.mhandle == 0 && __adbg_memory_open_linux(proc))
+			goto Lptrace;
 		
+		// If it succeeds, return immediately.
+		// Otherwise, try via ptrace(3)
 		if (write(proc.mhandle, data, size) >= 0)
 			return 0;
 	}
 	
 Lptrace:
 	switch (type) {
-	case AdbgMemory.data: type = PTRACE_PEEKDATA; break;
+	case AdbgMemory.data:        type = PTRACE_PEEKDATA; break;
 	case AdbgMemory.instruction: type = PTRACE_PEEKTEXT; break;
-	default: return adbg_oops(AdbgError.invalidOption);
+	default:
+		return adbg_oops(AdbgError.invalidOption);
 	}
 	
 	// If reading mem fails, try ptrace method
@@ -235,27 +254,19 @@ Lptrace:
 	return 0;
 } else version (FreeBSD) {
 	switch (type) {
-	case AdbgMemory.data: type = PIOD_READ_D; break;
-	case AdbgMemory.instruction: type = PIOD_READ_I; break;
-	default: return adbg_oops(AdbgError.invalidOption);
+	case AdbgMemory.data:        type = PIOD_WRITE_D; break;
+	case AdbgMemory.instruction: type = PIOD_WRITE_I; break;
+	default:
+		return adbg_oops(AdbgError.invalidOption);
 	}
 	
-	ptrace_io_desc io = ptrace_io_desc(PIOD_WRITE_D, cast(void*)addr, data, size);
+	ptrace_io_desc io = ptrace_io_desc(type, cast(void*)addr, data, size);
 	if (ptrace(PT_IO, proc.pid, &io, 0) < 0)
 		return adbg_oops(AdbgError.os);
+	// TODO: Check ptrace_io_desc.piod_len
 	return 0;
 } else // Unsupported
 	return adbg_oops(AdbgError.unimplemented);
-}
-
-version (linux)
-private
-int adbg_memory_open_linux(adbg_process_t *proc) {
-	assert(proc);
-	// Open an handle to /proc/PID/mem
-	char[32] pathbuf = void;
-	snprintf(pathbuf.ptr, 32, "/proc/%d/mem", proc.pid);
-	return open(pathbuf.ptr, O_RDWR);
 }
 
 /// Memory permission access bits.
