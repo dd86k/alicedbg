@@ -1141,7 +1141,8 @@ pe_section_entry_t* adbg_object_pe_directory_section(adbg_object_t *o, uint rva)
 		if (section == null) return null;
 		
 		// If RVA is outside section's VA and range
-		with (section) if (rva <= VirtualAddress || rva > VirtualAddress + SizeOfRawData)
+		with (section)
+		if (rva <= VirtualAddress || rva > VirtualAddress + SizeOfRawData)
 			continue;
 		
 		return section;
@@ -1573,7 +1574,7 @@ const(char)* adbg_object_pe_export_entry_symbol(adbg_object_t *o,
 
 // NOTE: Import directory handling
 //       Because the import directory is not self-contained (its size only reflects headers),
-//       the entire section is loaded in memory, hoping that nothing 
+//       the entire section is loaded in memory
 // Multiple tables, multiple entries per table
 pe_import_descriptor_t* adbg_object_pe_import(adbg_object_t *o, size_t index) {
 	internal_pe_t *pe = cast(internal_pe_t*)adbg_object_impl_get_buffer(o);

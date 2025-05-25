@@ -116,12 +116,53 @@ const(char)* opt_pdb_stream;
 int SELECTED(Select selection) { return opt_selected & selection; }
 int SETTING(Setting setting)   { return opt_settings & setting; }
 
+void print_preamble(const(char) *filename, long filesize, const(char) *type, const(char) *id) {
+	// If in any "extract" mode, do not print
+	if (SETTING(Setting.extractAny))
+		return;
+	print_string("filename", filename);
+	print_u64("filesize", filesize);
+	print_string("type", type);
+	print_string("id", id);
+}
+
+void print_summary(const(char) *path, adbg_object_t *o) {
+	// If no-prefix option enabled, don't print file path
+	if (SETTING(Setting.noPrefix) == 0) // no prefix
+		printf("%s: ", path);
+	
+	// If short name option enabled, only print object type id
+	if (SETTING(Setting.shortName)) {
+		puts(SAFEVAL(adbg_object_id_string(o)));
+		return;
+	}
+	
+	// Start basic summary with type (format) and kind of object
+	printf("%s, %s",
+		SAFEVAL( adbg_object_format_string(o) ),
+		SAFEVAL( adbg_object_kind_string(o) ));
+	
+	// If available, print machine type used
+	immutable(adbg_machine_t) *machine = adbg_object_machine2(o);
+	if (machine)
+		printf(", %s", adbg_machine_fullname(machine));
+	
+	// If available, print OS ABI (or subsystem) type used
+	const(char)* osabistr = adbg_object_osabi_string(o);
+	if (osabistr)
+		printf(", %s", osabistr);
+	
+	putchar('\n');
+}
+
 /// Dump given file to stdout.
 /// Params: path = Path to object file.
 /// Returns: Error code if non-zero
 int dump_file(const(char)* path) {
+	// A "blob" here is just a flat binary file of no format
 	if (SETTING(Setting.blob)) {
 		// NOTE: Program exits and memory is freed by OS
+		// Read everything (temporary hack) for dumping
 		size_t size = void;
 		ubyte *buffer = readall(path, &size);
 		if (buffer == null)
@@ -129,15 +170,13 @@ int dump_file(const(char)* path) {
 		
 		if (size == 0)
 			panic(0, "File is empty");
-	
-		print_string("filename", path);
-		print_u64("filesize", size);
-		print_string("format", "Blob");
-		print_string("short_name", "blob");
+		
+		print_preamble(path, size, "Blob", "blob");
 		
 		return dump_disassemble(opt_machine, buffer, size, opt_baseaddress, null);
 	}
 	
+	// Open file
 	adbg_object_t *o = adbg_object_open_file(path, 0);
 	if (o == null)
 		panic_adbg("Failed to open object");
@@ -146,13 +185,10 @@ int dump_file(const(char)* path) {
 	// If anything was selected to dump specifically, we'll proceed
 	// to dump object-specific information.
 	if (opt_selected || SETTING(Setting.disasmAny)) {
-		// If not in any "extract" mode, print file info
-		if (SETTING(Setting.extractAny) == 0) {
-			print_string("filename", path);
-			print_u64("filesize", adbg_object_filesize(o));
-			print_string("type", adbg_object_format_string(o));
-			print_string("id", adbg_object_id_string(o));
-		}
+		print_preamble(path,
+			adbg_object_filesize(o),
+			adbg_object_format_string(o),
+			adbg_object_id_string(o));
 		final switch (adbg_object_format(o)) with (AdbgObject) {
 		case mz:	return dump_mz(o);
 		case ne:	return dump_ne(o);
@@ -171,34 +207,8 @@ int dump_file(const(char)* path) {
 		}
 	}
 	
-	// TODO: MODE: Section dump
-//	if (SETTING(Setting.extractAny | Setting.disasmAny))
-	
-	// MODE: Summary
-	
-	if (SETTING(Setting.noPrefix) == 0)
-		printf("%s: ", path);
-	
-	if (SETTING(Setting.shortName)) {
-		puts(SAFEVAL(adbg_object_id_string(o)));
-		return 0;
-	}
-	
-	// Otherwise, make a basic summary
-	printf("%s, %s",
-		SAFEVAL( adbg_object_format_string(o) ),
-		SAFEVAL( adbg_object_kind_string(o) ));
-	
-	
-	// Print machine type used for object
-	immutable(adbg_machine_t) *machine = adbg_object_machine2(o);
-	if (machine) printf(", %s", adbg_machine_fullname(machine));
-	
-	// Print OS ABI type used for object
-	const(char)* osabistr = adbg_object_osabi_string(o);
-	if (osabistr) printf(", %s", osabistr);
-	
-	putchar('\n');
+	// Default operating mode (summary)
+	print_summary(path, o);
 	return 0;
 }
 

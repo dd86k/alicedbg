@@ -709,7 +709,7 @@ Lwait:
 		adbg_translate_exception(&exception, proc, &de);
 		
 		// HACK: fill up thread details for exception
-		exception.thread.process = &proc;
+		exception.thread.process = proc;
 		exception.thread.id = de.dwThreadId;
 		exception.thread.status = 0;
 		
