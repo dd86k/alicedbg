@@ -178,9 +178,9 @@ configuration "readln" {
 	sourceFiles "tests/readln.d" "debugger/src/term.d"
 }
 # Too OS-specific to be a regular unittest
-#configuration "threading" {
-#	sourceFiles "tests/threading.d"
-#}
+configuration "threading" {
+	sourceFiles "tests/threading.d"
+}
 
 #
 # ANCHOR Documentation build types (docs/ddox)
