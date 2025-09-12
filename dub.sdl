@@ -161,34 +161,32 @@ buildType "release-debug-static" {
 }
 
 #
-# ANCHOR Integration tests
-#
-# NOTE: These MUST be ran as "dub test -b TEST"
-# NOTE: Dedicated tests must only exist if one of these conditions are met
-#       - Requires user input (e.g., readline)
-#       - Are prone to crashing application (e.g., longjmp on Windows)
+# ANCHOR Additional tests (dub test -c CONFIGURATION)
 #
 
-buildType "setjmp" {
-	buildOptions "unittests"
+# Unstable on Windows 64-bit
+configuration "setjmp" {
 	sourceFiles "tests/setjmp.d"
 	sourcePaths "src"
 }
-buildType "readkey" {
-	buildOptions "unittests"
-	sourceFiles "tests/readkey.d" "app/term.d"
+# Needs user input
+configuration "readkey" {
+	sourceFiles "tests/readkey.d" "debugger/src/term.d"
 }
-buildType "readln" {
-	buildOptions "unittests"
-	sourceFiles "tests/readln.d" "app/term.d"
+# Needs user input
+configuration "readln" {
+	sourceFiles "tests/readln.d" "debugger/src/term.d"
 }
+# Too OS-specific to be a regular unittest
+#configuration "threading" {
+#	sourceFiles "tests/threading.d"
+#}
 
 #
-# ANCHOR Documentation build types
+# ANCHOR Documentation build types (docs/ddox)
 #
-# NOTE: Documentation (docs/ddox) builds
-#       Works best with the "library" configuration (-c|--configuration)
-#       to avoid DUB peek in other import directories.
+# Works best with the "library" configuration (-c|--configuration)
+# to avoid DUB peek in other import directories, like debugger FE.
 #
 
 buildType "docs" {
