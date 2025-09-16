@@ -59,6 +59,8 @@ version (Win32Threads) {
 	private alias HANDLE thread_handle_t;
 } else version (LibcmtThreads) {
 	import core.stdc.stdint : uintptr_t;
+	import core.sys.windows.windef : HANDLE, DWORD;
+	import core.sys.windows.winbase : WaitForSingleObject, INFINITE, CloseHandle;
 	
 	// Returns -1 on error
 	extern (C)
@@ -68,7 +70,9 @@ version (Win32Threads) {
 	
 	// Returns 0 on error
 	extern (C)
-	uintptr_t _beginthreadex(void *sec, uint stk, uint function(void*) fn, void *args, uint flags, uint *thraddr);
+	//uintptr_t _beginthreadex(void *sec, uint stk, uint function(void*) fn, void *args, uint flags, uint *thraddr);
+	// NOTE: stupid extern crap being included in the type
+	uintptr_t _beginthreadex(void *sec, uint stk, void *fn, void *args, uint flags, uint *thraddr);
 	extern (C)
 	void _endthreadex(uint code);
 	
@@ -214,7 +218,7 @@ version (Win32Threads) {
 	thread.handle = _beginthreadex( // Same parameters/returns as CreateThread
 		null,                // security
 		cast(uint)size,      // stack_size
-		&osthrhandle,        // start_address
+		cast(void*)&osthrhandle,        // start_address
 		thread,              // arglist
 		THREAD_FLAGS,        // initflags
 		&thread.tid);        // thrdaddr
@@ -222,6 +226,16 @@ version (Win32Threads) {
 		free(thread);
 		return null;
 	}
+	/*
+	thread.handle = _beginthread(
+		&osthrhandle,
+		cast(uint)size,
+		thread);
+	if (thread.handle == -1) {
+		free(thread);
+		return null;
+	}
+	*/
 	
 	return thread;
 } else version (MFCThreads) {
@@ -264,8 +278,8 @@ uint osthrhandle(void *data) {
 // _beginthread: __cdecl void function(void*)
 // _beginthreadex: __stdcall unsigned function(void*)
 version (LibcmtThreads)
-extern (Windows) // __stdcall
 private
+extern (Windows) // __stdcall
 uint osthrhandle(void *data) {
 	assert(data, "data is null");
 	__osthread_t *thread = cast(__osthread_t*)data;
@@ -286,8 +300,8 @@ uint osthrhandle(void *data) {
 
 // Thread handler for MFC threads
 version (MFCThreads)
-extern (Windows)
 private
+extern (Windows)
 void osthrhandle(void *data) {
 	assert(data, "data is null");
 	__osthread_t *thread = cast(__osthread_t*)data;
