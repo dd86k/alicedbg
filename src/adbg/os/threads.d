@@ -114,16 +114,23 @@ enum {
 	__OSTHREAD_CANCELED = 4,
 	
 	// No error.
-	//__OSTERR_OK = 0,
-	// 
-	//__OSTERR_NOALLOC = -2,
+	__OSTERR_OK = 0,
+	// OS error.
+	__OSTERR_OS = -1,
+	// Allocation failed.
+	__OSTERR_NOALLOC = -2,
 }
 
 struct __osthread_t {
+	// OS thread handle
 	thread_handle_t handle;
+	// User function
 	int function(__osthread_t*, void*) ufunc;
+	// User data
 	void *udata;
+	// Thread status
 	int status;
+	// Exit code
 	int code;
 	// NOTE: Mutexes
 	//       Not a performance option v. atomics, but offers more
@@ -359,21 +366,21 @@ int osthrdetach(__osthread_t *thread) {
 /// If a thread was detached, it is no longer joinable.
 /// Params: thread = Thread.
 /// Returns: Exit code, or -1 on error.
-int osthrjoin(__osthread_t *thread) {
+int osthrjoin(__osthread_t *thread, int *exitcode = null) {
 	assert(thread, "thread is NULL");
 	
 	// Because we manually save exit code, no need to use OS functions
 	// to get the remote thread's exit code.
 version (PosixThreads) {
-	void *ret = void;
-	if (pthread_join(thread.handle, &ret))
+	if (pthread_join(thread.handle, null))
 		return -1;
 	
-	int code = thread.code;
+	if (exitcode)
+		*exitcode = thread.code;
 	
 	osthrdestroy(thread);
 	
-	return code;
+	return 0;
 } else { // Libcmt/Win32, MFC will be implemented later
 	// If MS examples casts the thread handle, so can I.
 	HANDLE handle = cast(HANDLE)thread.handle;
@@ -381,14 +388,15 @@ version (PosixThreads) {
 	DWORD r = WaitForSingleObject(handle, INFINITE);
 	CloseHandle(handle); // close anyway
 	
-	int code = thread.code;
+	if (exitcode)
+		*exitcode = thread.code;
+	
 	osthrdestroy(thread);
 	
-	// r: WAIT_ABANDONED, WAIT_OBJECT_0+n, WAIT_TIMEOUT, WAIT_FAILED
-	// Right now, if anything happened, consider as error.
-	return r ? -1 : code;
+	// Error: WAIT_ABANDONED, WAIT_TIMEOUT, WAIT_FAILED
+	// WAIT_OBJECT_0 (0) is OK.
+	return r ? -1 : 0;
 }
-	return 0;
 }
 
 /// Request cancelation of a thread.
