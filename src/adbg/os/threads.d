@@ -56,7 +56,7 @@ version (Win32Threads) {
 	import core.sys.windows.winbase;
 	import core.sys.windows.windef;
 	
-	private alias HANDLE thread_handle_t;
+	private alias os_thread = HANDLE;
 } else version (LibcmtThreads) {
 	import core.stdc.stdint : uintptr_t;
 	import core.sys.windows.windef : HANDLE, DWORD;
@@ -77,7 +77,7 @@ version (Win32Threads) {
 	void _endthreadex(uint code);
 	
 	// In MS examples, this is casted to HANDLE for WaitForSingleObject.
-	private alias uintptr_t thread_handle_t;
+	private alias os_thread = uintptr_t;
 } else version (MFCThreads) {
 	struct CWinThread;
 	/* C++
@@ -102,7 +102,7 @@ version (Win32Threads) {
 	import core.sys.posix.pthread;
 	
 	// pthread_t is typically c_ulong
-	private alias pthread_t thread_handle_t;
+	private alias os_thread = pthread_t;
 }
 
 extern (C):
@@ -123,7 +123,7 @@ enum {
 
 struct __osthread_t {
 	// OS thread handle
-	thread_handle_t handle;
+	os_thread handle;
 	// User function
 	int function(__osthread_t*, void*) ufunc;
 	// User data
@@ -140,7 +140,9 @@ struct __osthread_t {
 	version (LibcmtThreads) uint tid;
 }
 
-const(char)* osthrmodel() {
+/// Returns the short name of the thread model in use for target.
+/// Returns: Short name.
+const(char)* os_thread_model() {
 	version (Win32Threads)
 		return "win32";
 	version (LibcmtThreads)
@@ -153,7 +155,7 @@ const(char)* osthrmodel() {
 
 /// Sleep caller thread by this amount of time.
 /// Params: ms = Milliseconds.
-void ossleep(uint ms) {
+void os_thread_sleep(uint ms) {
 version (Windows) {
 	import core.sys.windows.winbase : Sleep;
 	Sleep(ms);
@@ -180,25 +182,18 @@ Lsleep:
 }
 
 /// Create and execute a new remote thread.
-///
-/// New threads need to use `osthrcancel
 /// Params:
 /// 	func = Function (must be externed as C).
 /// 	data = Pointer to data to be passed to function.
 /// 	size = Stack size in Bytes. 0 meaning to use the default size.
 /// Returns: Thread instance, or null on error.
-__osthread_t* osthrnew(int function(__osthread_t*, void*) func, void *data = null, size_t size = 0) {
+__osthread_t* os_thread_new(int function(__osthread_t*, void*) func, void *data = null, size_t size = 0) {
 	assert(func, "func is null");
 	
 	__osthread_t* thread = cast(__osthread_t*)calloc(1, __osthread_t.sizeof);
-	if (thread == null) {
+	if (thread == null)
 		return null;
-	}
-	/*__osthread_t* thread = cast(__osthread_t*)mmap(null, 4096,
-		PROT_READ | PROT_WRITE | PROT_EXEC, MAP_PRIVATE | MAP_ANON, 0, 0);
-	if (thread == MAP_FAILED)
-		return null;*/
-	if (osmutexinit(&thread.mutex) < 0) {
+	if (os_mutex_init(&thread.mutex) < 0) {
 		free(thread);
 		return null;
 	}
@@ -267,16 +262,16 @@ uint osthrhandle(void *data) {
 	assert(data, "data is null");
 	__osthread_t *thread = cast(__osthread_t*)data;
 	
-	osmutexacquire(&thread.mutex);
+	os_mutex_acquire(&thread.mutex);
 	thread.status |= __OSTHREAD_RUNNING;
-	osmutexrelease(&thread.mutex);
+	os_mutex_release(&thread.mutex);
 	
 	int rc = thread.func(thread, thread.udata);
 	
-	osmutexacquire(&thread.mutex);
+	os_mutex_acquire(&thread.mutex);
 	thread.status &= ~__OSTHREAD_RUNNING;
 	thread.code = rc;
-	osmutexrelease(&thread.mutex);
+	os_mutex_release(&thread.mutex);
 	
 	return rc; // implicit ExitThread(code)
 }
@@ -291,16 +286,16 @@ uint osthrhandle(void *data) {
 	assert(data, "data is null");
 	__osthread_t *thread = cast(__osthread_t*)data;
 	
-	osmutexacquire(&thread.mutex);
+	os_mutex_acquire(&thread.mutex);
 	thread.status |= __OSTHREAD_RUNNING;
-	osmutexrelease(&thread.mutex);
+	os_mutex_release(&thread.mutex);
 	
 	int rc = thread.ufunc(thread, thread.udata);
 	
-	osmutexacquire(&thread.mutex);
+	os_mutex_acquire(&thread.mutex);
 	thread.status &= ~__OSTHREAD_RUNNING;
 	thread.code = rc;
-	osmutexrelease(&thread.mutex);
+	os_mutex_release(&thread.mutex);
 	
 	return rc; // implicit _endthreadex(code);
 }
@@ -313,16 +308,16 @@ void osthrhandle(void *data) {
 	assert(data, "data is null");
 	__osthread_t *thread = cast(__osthread_t*)data;
 	
-	osmutexacquire(&thread.mutex);
+	os_mutex_acquire(&thread.mutex);
 	thread.status |= __OSTHREAD_RUNNING;
-	osmutexrelease(&thread.mutex);
+	os_mutex_release(&thread.mutex);
 	
 	int rc = thread.ufunc(thread, thread.udata);
 	
-	osmutexacquire(&thread.mutex);
+	os_mutex_acquire(&thread.mutex);
 	thread.status &= ~__OSTHREAD_RUNNING;
 	thread.code = rc;
-	osmutexrelease(&thread.mutex);
+	os_mutex_release(&thread.mutex);
 	
 	AfxEndThread(rc, TRUE);
 }
@@ -333,16 +328,16 @@ void* osthrhandle(void *data) {
 	assert(data, "data is null");
 	__osthread_t *thread = cast(__osthread_t*)data;
 	
-	osmutexacquire(&thread.mutex);
+	os_mutex_acquire(&thread.mutex);
 	thread.status |= __OSTHREAD_RUNNING;
-	osmutexrelease(&thread.mutex);
+	os_mutex_release(&thread.mutex);
 	
 	int rc = thread.ufunc(thread, thread.udata);
 	
-	osmutexacquire(&thread.mutex);
+	os_mutex_acquire(&thread.mutex);
 	thread.status &= ~__OSTHREAD_RUNNING;
 	thread.code = rc;
-	osmutexrelease(&thread.mutex);
+	os_mutex_release(&thread.mutex);
 	
 	pthread_exit(&thread.code);
 	return null;
@@ -352,7 +347,7 @@ void* osthrhandle(void *data) {
 /// Params: thread = Thread.
 /// Returns: Zero on success, otherwise error number.
 version (PosixThreads)
-int osthrdetach(__osthread_t *thread) {
+int os_thread_detach(__osthread_t *thread) {
 	assert(thread, "thread is NULL");
 	
 	if (pthread_detach(thread.handle))
@@ -366,7 +361,7 @@ int osthrdetach(__osthread_t *thread) {
 /// If a thread was detached, it is no longer joinable.
 /// Params: thread = Thread.
 /// Returns: Exit code, or -1 on error.
-int osthrjoin(__osthread_t *thread, int *exitcode = null) {
+int os_thread_join(__osthread_t *thread, int *exitcode = null) {
 	assert(thread, "thread is NULL");
 	
 	// Because we manually save exit code, no need to use OS functions
@@ -401,13 +396,13 @@ version (PosixThreads) {
 
 /// Request cancelation of a thread.
 /// Params: thread = Thread.
-void osthrcancel(__osthread_t *thread) {
+void os_thread_cancel(__osthread_t *thread) {
 	assert(thread, "thread is null");
 	
 	// TODO: Consider atomic
-	osmutexacquire(&thread.mutex);
+	os_mutex_acquire(&thread.mutex);
 	thread.status |= __OSTHREAD_CANCELED;
-	osmutexrelease(&thread.mutex);
+	os_mutex_release(&thread.mutex);
 }
 
 /// Get internal status flags.
@@ -419,9 +414,9 @@ int osthrstatus(__osthread_t *thread) {
 	assert(thread, "thread is null");
 	
 	// TODO: Consider atomic
-	osmutexacquire(&thread.mutex);
+	os_mutex_acquire(&thread.mutex);
 	int status = thread.status;
-	osmutexrelease(&thread.mutex);
+	os_mutex_release(&thread.mutex);
 	
 	return status;
 }
@@ -432,6 +427,6 @@ private
 void osthrdestroy(__osthread_t *thread) {
 	assert(thread, "thread is null");
 	
-	osmutexdestroy(&thread.mutex);
+	os_mutex_destroy(&thread.mutex);
 	free(thread);
 }

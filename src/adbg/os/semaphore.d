@@ -26,9 +26,10 @@ POSIX: sem_close(3), sem_destroy(3), sem_getvalue(3), sem_init(3),
 version (Windows) {
 	import core.sys.windows.winbase;
 	import core.sys.windows.basetsd;
-	import core.sys.windows.windef : TRUE, FALSE, BOOL, WAIT_TIMEOUT;
+	import core.sys.windows.windef : TRUE, FALSE, BOOL, WAIT_TIMEOUT, DWORD;
 	
 	private alias os_semaphore = HANDLE;
+	private enum MAX_SEM_COUNT = int.max; // example doesn't elaborate
 } else version (Posix) {
 	import core.sys.posix.semaphore;
 	import core.stdc.errno : errno, ETIMEDOUT;
@@ -56,16 +57,16 @@ int os_sem_create(os_semaphore_t *sem) {
 	assert(sem, "null ptr");
 version (Windows) {
 	sem.handle = CreateSemaphoreA(
-		null, // default security
-		MAX_SEM_COUNT, // initial count
+		null,          // default security
+		0,             // initial count
 		MAX_SEM_COUNT, // maximum count
-		null); // unnamed
+		null);         // unnamed
 	if (sem.handle == null)
 		return GetLastError();
 } else version (Posix) {
 	// pshared=0 -> shared between threads of a process
-	// pshared>0 -> shared between processes (using shm
-	if (sem_init(&sem.handle, 0, SEM_VALUE_MAX) < 0)
+	// pshared>0 -> shared between processes (using shm)
+	if (sem_init(&sem.handle, 0, 0) < 0)
 		return errno;
 } else static assert(false, "osseminit");
 	return 0;
@@ -115,8 +116,8 @@ version (Windows) {
 } else version (Posix) {
 	if (sem_wait(&sem.handle) < 0)
 		return errno;
-} else static assert(false, "ossemwait");
 	return 0;
+} else static assert(false, "ossemwait");
 }
 
 // NOTE: ms could be turned into a "duration" structure at some point
@@ -145,7 +146,7 @@ version (Windows) {
 	import core.stdc.config : c_long;
 	
 	time_t secs = ms / 1000;
-	c_long nsec = (ms - (secs * 1000)) * 1_000_000;
+	c_long nsec = (ms % 1000) * 1_000_000;
 	
 	timespec ts = void;
 	if (clock_gettime(CLOCK_REALTIME, &ts) < 0)
