@@ -8,10 +8,10 @@ int threadfunc0(__osthread_t *thread, void *data) {
 	return 0;
 }
 unittest {
-	__osthread_t *t = osthrnew(&threadfunc0);
+	__osthread_t *t = os_thread_new(&threadfunc0);
 	assert(t, "t == NULL");
 	int code;
-	assert(osthrjoin(t, &code) == 0, "osthrjoin(t) != 0");
+	assert(os_thread_join(t, &code) == 0, "os_thread_join(t) != 0");
 	assert(code == 0, "code != 0");
 }
 
@@ -23,10 +23,10 @@ int threadfunc1(__osthread_t *thread, void *data) {
 	return 1;
 }
 unittest {
-	__osthread_t *t = osthrnew(&threadfunc1);
+	__osthread_t *t = os_thread_new(&threadfunc1);
 	assert(t, "t == NULL");
 	int code;
-	assert(osthrjoin(t, &code) == 0, "osthrjoin(t) != 0");
+	assert(os_thread_join(t, &code) == 0, "os_thread_join(t) != 0");
 	assert(code == 1, "code != 1");
 }
 
@@ -42,10 +42,10 @@ int threadfunc2(__osthread_t *thread, void *data) {
 }
 unittest {
 	__gshared int a = FUNC2DATA0;
-	__osthread_t *t = osthrnew(&threadfunc2, &a);
+	__osthread_t *t = os_thread_new(&threadfunc2, &a);
 	assert(t, "t == NULL");
 	int code;
-	assert(osthrjoin(t, &code) == 0, "osthrjoin(t) != 0");
+	assert(os_thread_join(t, &code) == 0, "os_thread_join(t) != 0");
 	assert(code == 0, "code != 0");
 	assert(a == FUNC2DATA1, "a != FUNC2DATA1");
 }
@@ -62,10 +62,10 @@ int threadfunc3(__osthread_t *thread, void *data) {
 }
 unittest {
 	__gshared int a = FUNC3DATA0;
-	__osthread_t *t = osthrnew(&threadfunc3, &a);
+	__osthread_t *t = os_thread_new(&threadfunc3, &a);
 	assert(t, "t == NULL");
 	int code;
-	assert(osthrjoin(t, &code) == 0, "osthrjoin(t) != 0");
+	assert(os_thread_join(t, &code) == 0, "os_thread_join(t) != 0");
 	assert(code == 1, "code != 1");
 	assert(a == FUNC3DATA1, "a != FUNC3DATA1");
 }
@@ -76,17 +76,16 @@ int threadfunc4(__osthread_t *thread, void *data) {
 	assert(thread);
 	assert(data == null);
 	// busy loop
-	while (true) {
-		if (osthrstatus(thread) & __OSTHREAD_CANCELED)
-			return 1;
-	}
-	return 0;
+	L:
+	if (osthrstatus(thread) & __OSTHREAD_CANCELED)
+		return 1;
+	goto L;
 }
 unittest {
-	__osthread_t *t = osthrnew(&threadfunc4);
+	__osthread_t *t = os_thread_new(&threadfunc4);
 	assert(t, "t == NULL");
-	osthrcancel(t);
+	os_thread_cancel(t);
 	int code;
-	assert(osthrjoin(t, &code) == 0, "osthrjoin(t) != 0");
+	assert(os_thread_join(t, &code) == 0, "os_thread_join(t) != 0");
 	assert(code == 1, "code != 1");
 }
