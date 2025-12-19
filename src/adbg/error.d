@@ -106,7 +106,7 @@ struct adbg_error_t {
 	int line;	/// Line source
 }
 /// Last error in alicedbg.
-private __gshared adbg_error_t error;
+private adbg_error_t error;
 
 /// Get last Alicedbg error code.
 /// Returns: Error code (AdbgError).
@@ -135,9 +135,9 @@ const(char)* adbg_error_function() {
 private
 const(char)* adbg_error_system_message(int code) {
 	version (Windows) {
-		//TODO: Handle NTSTATUS codes
+		// TODO: Handle NTSTATUS codes
 		enum ERR_BUF_SZ = 256;
-		__gshared char [ERR_BUF_SZ]buffer = void;
+		static char [ERR_BUF_SZ]buffer = void;
 		size_t len = FormatMessageA(
 			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_MAX_WIDTH_MASK,
 			null,
