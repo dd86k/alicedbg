@@ -77,6 +77,10 @@ enum AdbgError {
 	systemLoadError	= -402,
 	systemBindError	= -403,
 	//
+	// 500-599: Easy API
+	//
+	timeout = -500,
+	//
 	// 800-899: Memory scanner
 	//
 	scannerDataEmpty	= -800,

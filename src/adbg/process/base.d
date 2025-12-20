@@ -17,6 +17,7 @@ module adbg.process.base;
 //       Linux: Send SIGSTOP/SIGCONT signals via kill(2)
 // TODO: Functions to spawn process without debugger.
 // TODO: Functions to attach process without debugger.
+// TODO: Rename module to adbg.process.process.
 
 import adbg.include.c.stdlib; // malloc, calloc, free, exit;
 import adbg.include.c.stdarg;
@@ -46,6 +47,7 @@ enum AdbgProcessState : ubyte {
 	created,	/// Process was created by debugger and waiting to run.
 	running,	/// Process is running.
 	stopped,	/// Process is paused due to an exception or by the debugger.
+	exited,	/// Process exited.
 }
 
 /// Process creation source.
@@ -57,10 +59,22 @@ enum AdbgCreation : ubyte {
 }
 
 package enum {
+	/// Debugger is attached.
+	ADBG_PROCESS_ATTACHED = 1,
+	/// Process has stopped.
+	ADBG_PROCESS_STOPPED  = 1 << 1,
+	/// Process has exited.
+	ADBG_PROCESS_EXITED   = 1 << 2,
+}
+
+package enum {
 	/// Linux: /proc/PID/mem couldn't be opened, so do not depend on it
 	__PROC_STATUS_NO_PROC_MEM = 1 << 16,
 }
 
+// TODO: Any params used to spawn/attach to a process SHOULD be held in a new structure
+//       Either "adbg_debugger_t" (if generic oriented) or "adbg_tracee_t"
+//       adbg_process_t should only have PID.
 /// Represents an instance of a process.
 struct adbg_process_t {
 version (Windows) {
@@ -77,25 +91,20 @@ version (Posix) {
 			// On Linux, the starting thread ID is the same as the process ID
 }
 version (linux) {
-	int mhandle;	/// Internal memory file handle to /proc/PID/mem
+	int procmemfd;	/// Internal memory file handle to /proc/PID/mem
+	deprecated alias mhandle = procmemfd; // Older alias
 }
 	/// Internal status
 	int status;
 	
+	// TODO: Remove state & creation to rely on statuses
+	//       - debugger attached
+	//       - process is stopped
+	//       - process exited
 	/// Last known process status.
-	AdbgProcessState state;
+	deprecated AdbgProcessState state;
 	/// Process' creation source.
-	AdbgCreation creation;
-	// List of breakpoints.
-	//list_t *breakpoint_list;
-	
-	// HACK: Debugger event handlers
-	void function(adbg_process_t*, void *udata, adbg_exception_t *ex) event_exception;
-//	void function(adbg_process_t*, void *udata) event_process_created;
-	// TODO: Consider moving `int code` to `int *code`
-	void function(adbg_process_t*, void *udata, int code) event_process_exited;
-	// TODO: Consider moving `long tid` to `adbg_process_thread_t *thread`
-	void function(adbg_process_t*, void *udata, long tid) event_process_continued;
+	deprecated AdbgCreation creation;
 	
 	// HACK: Event user data (when attached in wait)
 	void *udata;
@@ -113,7 +122,7 @@ void adbg_process_free(adbg_process_t *proc) {
 		if (proc.orig_argv) free(proc.orig_argv);
 	}
 	version (linux) {
-		if (proc.mhandle) close(proc.mhandle);
+		if (proc.procmemfd) close(proc.procmemfd);
 	}
 	free(proc);
 }
@@ -136,6 +145,7 @@ const(char)* adbg_process_status_string(adbg_process_t *tracee) pure {
 	case created:	return "created";
 	case running:	return "running";
 	case stopped:	return "stopped";
+	case exited:	return "exited";
 	case unknown:	return default_;
 	}
 }
@@ -251,10 +261,10 @@ version (LinuxPersonality) {
 	int fd = open(path.ptr, O_RDONLY);
 	if (fd < 0)
 		return adbg_machine_current();
-	// TODO: Extend to 16 chars just in case
-	if (read(fd, path.ptr, 8)) // re-use buffer that's no longer needed
+	enum RDLEN = 16;
+	if (read(fd, path.ptr, RDLEN)) // re-use buffer that's no longer needed
 		return adbg_machine_current();
-	path[8] = 0;
+	path[RDLEN] = 0;
 	char *end = void;
 	uint personality = cast(uint)strtol(path.ptr, &end, 16);
 	enum LINUX32 = PER_LINUX_32BIT | PER_LINUX32 | PER_LINUX32_3GB;
@@ -262,6 +272,10 @@ version (LinuxPersonality) {
 }
 	return adbg_machine_current();
 }
+
+//
+// Process list
+//
 
 /// Create a list of processes running on the system.
 /// Returns: Internal list; Or null on error.

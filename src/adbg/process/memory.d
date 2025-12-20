@@ -79,7 +79,7 @@ int __adbg_memory_open_linux(adbg_process_t *proc) {
 		//       because there are no particular soft warnings about this
 		return -1;
 	}
-	proc.mhandle = fd;
+	proc.procmemfd = fd;
 	return 0;
 }
 
@@ -128,12 +128,12 @@ version (Windows) {
 	// then /proc/PID/mem is unavaialble, skip it
 	if ((proc.status & __PROC_STATUS_NO_PROC_MEM) == 0) {
 		// Since the handle is unopened, open an handle to /proc/PID/mem
-		if (proc.mhandle == 0 && __adbg_memory_open_linux(proc))
+		if (proc.procmemfd == 0 && __adbg_memory_open_linux(proc))
 			goto Lptrace;
 		
 		// If it succeeds, return immediately.
 		// Otherwise, try via ptrace(3)
-		if (read(proc.mhandle, data, size) >= 0)
+		if (read(proc.procmemfd, data, size) >= 0)
 			return 0;
 	}
 	
@@ -222,12 +222,12 @@ version (Windows) {
 	// then /proc/PID/mem is unavaialble, skip it
 	if ((proc.status & __PROC_STATUS_NO_PROC_MEM) == 0) {
 		// Since the handle is unopened, open an handle to /proc/PID/mem
-		if (proc.mhandle == 0 && __adbg_memory_open_linux(proc))
+		if (proc.procmemfd == 0 && __adbg_memory_open_linux(proc))
 			goto Lptrace;
 		
 		// If it succeeds, return immediately.
 		// Otherwise, try via ptrace(3)
-		if (write(proc.mhandle, data, size) >= 0)
+		if (write(proc.procmemfd, data, size) >= 0)
 			return 0;
 	}
 	
