@@ -15,6 +15,7 @@ import core.stdc.string : memset, memcpy;
 struct message_t {
 	int type;
 	void *data;
+	/// Size of data excluding this structure
 	size_t size;
 }
 
@@ -40,8 +41,14 @@ int adbg_mailbox_create(mailbox_t *box, size_t capacity) {
 	box.capacity = capacity;
 	box.count    = 0;
 	
-	os_mutex_init(&box.mutex);
-	os_sem_create(&box.sem);
+	if (os_mutex_init(&box.mutex)) {
+		free(box.messages);
+		return adbg_oops(AdbgError.os);
+	}
+	if (os_sem_create(&box.sem)) {
+		free(box.messages);
+		return adbg_oops(AdbgError.os);
+	}
 	
 	return 0;
 }
@@ -56,6 +63,9 @@ void adbg_mailbox_destroy(mailbox_t *box) {
 	
 	memset(box, 0, mailbox_t.sizeof);
 }
+
+// TODO: On crowding (full) behavior function option
+//       In std.concurrency, options are to wait, throw (error), or skip
 
 int adbg_mailbox_send(mailbox_t *box, message_t msg) {
 	// TODO: adbg_oops is not thread safe
@@ -100,7 +110,7 @@ message_t* adbg_mailbox_receivefor(mailbox_t *box, uint ms) {
 		return null;
 	
 	int status = void;
-	if (os_sem_waitfor(&box.sem, ms, &status) || status)
+	if (os_sem_waitfor(&box.sem, ms, &status) || status) // error or timeout
 		return null;
 	
 	os_mutex_acquire(&box.mutex);
