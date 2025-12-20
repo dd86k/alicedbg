@@ -17,7 +17,7 @@ import core.stdc.string;
 import common.errormgmt;
 import common.cli : opt_syntax;
 import common.utils;
-import term;
+import common.terminal;
 
 extern (C):
 
@@ -119,28 +119,32 @@ void loginfo(const(char) *fmt, ...) {
 	logwrite(null, 0, fmt, args);
 }
 private
-void logwrite(const(char) *pre, int color, const(char) *fmt, va_list args) {
+void logwrite(string pre, int color, const(char) *fmt, va_list args) {
 	if (pre) {
 		if ((shellflags & SHELL_NOCOLORS) == 0)
-			concoltext(cast(TextColor)color, stderr);
-		fputs(pre, stderr);
+			console_fgcolor(cast(TextColor)color, CONSOLE_STDERR);
+		console_write(CONSOLE_STDERR, pre.ptr, pre.length);
 		if ((shellflags & SHELL_NOCOLORS) == 0)
-			concolrst(stderr);
-		fputs(": ", stderr);
+			console_reset(CONSOLE_STDERR);
+		console_write2(CONSOLE_STDERR, ": ");
 	}
 	
-	vfprintf(stderr, fmt, args);
-	putchar('\n');
+	/*enum len = 512;
+	char[len] buf = void;
+	int r = vsnprintf(buf.ptr, len, fmt, args);
+	buf[r++] = '\n';
+	console_write(CONSOLE_STDERR, buf.ptr, r);*/
+	console_vwritef(CONSOLE_STDERR, fmt, args);
 }
 
 int shell_start(int argc, const(char)** argv) {
 Lcommand:
-	fputs("(adbg) ", stdout);
-	fflush(stdout);
+	/// stdout/stderr leads to windows linker errors for dmd <=2.099
+	console_write2(CONSOLE_STDOUT, "(adbg) ");
 	
 	// .ptr is temporary because a slice with a length of 0
 	// also make its pointer null.
-	char* line = conrdln().ptr;
+	char* line = console_readline().ptr;
 	
 	// Invalid line or CTRL+D
 	if (line == null || line[0] == 4)
@@ -567,11 +571,6 @@ immutable(command2_t)* shell_findcommand(const(char) *ucommand) {
 
 // After 
 int shell_setup() {
-	if (adbg_debugger_on_exception(process, &shell_event_exception) ||
-		adbg_debugger_on_process_exit(process, &shell_event_process_exit) ||
-		adbg_debugger_on_process_continue(process, &shell_event_process_continue))
-		return ShellError.alicedbg;
-	
 	// Open disassembler for process machine type
 	disassembler = adbg_disassembler_open(adbg_process_machine(process));
 	if (disassembler == null) {
@@ -585,6 +584,37 @@ int shell_setup() {
 	}
 	
 	return 0;
+}
+
+void shell_print_event(adbg_event_t *event, adbg_process_t *process) {
+	switch (event.type) {
+	case AdbgEvent.exception:
+		adbg_exception_t *exception = &event.exception;
+		
+		int pid = adbg_process_id(process);
+		adbg_process_thread_t *thread = adbg_exception_thread(exception);
+		event_tid = adbg_process_thread_id(thread);
+		
+		printf("[adbg] Process %d (thread %lld) stopped\n"~
+			"[adbg] Reason  : %s ("~ERR_OSFMT~")\n",
+			pid, event_tid,
+			adbg_exception_name(exception), adbg_exception_orig_code(exception));
+		
+		// Fault address available, print it
+		ulong faddr = adbg_exception_fault_address(exception);
+		shell_print_address_disasm(faddr);
+		
+		shell_print_stack(thread);
+		break;
+	case AdbgEvent.processExit:
+		printf("[adbg] Process %d exited with code %d\n", adbg_process_id(process), event.exitcode);
+		break;
+	case AdbgEvent.processContinue:
+		printf("[adbg] Process %d continued\n", adbg_process_id(process));
+		break;
+	default:
+		
+	}
 }
 
 // TODO: Move as common.disassembler module
@@ -813,14 +843,6 @@ int command_restart(int argc, const(char) **argv) {
 	}
 }
 
-int command_go(int argc, const(char) **argv) {
-	if (event_tid && adbg_debugger_continue(process, event_tid))
-		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process))
-		return ShellError.alicedbg;
-	return 0;
-}
-
 int command_kill(int argc, const(char) **argv) {
 	if (adbg_debugger_terminate(process))
 		return ShellError.alicedbg;
@@ -829,12 +851,26 @@ int command_kill(int argc, const(char) **argv) {
 	return 0;
 }
 
+int command_go(int argc, const(char) **argv) {
+	if (event_tid && adbg_debugger_continue(process, event_tid))
+		return ShellError.alicedbg;
+	adbg_event_t event = void;
+	adbg_process_t *proc = adbg_debugger_wait(process, &event);
+	if (proc == null)
+		return ShellError.alicedbg;
+	shell_print_event(&event, proc);
+	return 0;
+}
+
 // NOTE: Can't simply execute stepi multiple times in a row
 int command_stepi(int argc, const(char) **argv) {
 	if (adbg_debugger_step_instruction(process, event_tid))
 		return ShellError.alicedbg;
-	if (adbg_debugger_wait(process))
+	adbg_event_t event = void;
+	adbg_process_t *proc = adbg_debugger_wait(process, &event);
+	if (proc == null)
 		return ShellError.alicedbg;
+	shell_print_event(&event, proc);
 	return 0;
 }
 
@@ -1242,7 +1278,6 @@ int command_quit(int argc, const(char) **argv) {
 	if (process) {
 		printf("Process %d is still running. Quit and terminate? [Y/n] ",
 			adbg_process_id(process));
-		fflush(stdout);
 	Lgetchar:
 		int c = getchar();
 		switch (c) {

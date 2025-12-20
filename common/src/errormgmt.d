@@ -16,22 +16,20 @@ import core.stdc.string : strerror;
 import core.stdc.errno : errno;
 import core.stdc.stdio;
 import core.stdc.stdlib : exit;
+import common.terminal;
 
 extern (C):
 
 void print_error(const(char) *message, int code,
 	const(char)* prefix = null, const(char)* mod = cast(char*)__MODULE__, int line = __LINE__) {
-	debug fprintf(stderr, "[%s@%d] ", mod, line);
-	fputs("error: ", stderr);
-	if (prefix) {
-		fputs(prefix, stderr);
-		fputs(": ", stderr);
-	}
-	fprintf(stderr, "(%d) %s\n", code, message);
+	debug console_writef(CONSOLE_STDERR, "[%s@%d] ", mod, line);
+	console_write2(CONSOLE_STDERR, "error: ");
+	if (prefix)
+		console_writef(CONSOLE_STDERR, "%s: ", prefix);
+	console_writef(CONSOLE_STDERR, "(%d) %s\n", code, message);
 }
 void print_error_adbg(
 	const(char)* mod = __FILE__.ptr, int line = __LINE__) {
-	debug fprintf(stderr, "[%s@%d] ", mod, line);
 	print_error(adbg_error_message(), adbg_error_code(), null, adbg_error_function(), adbg_error_line());
 }
 
@@ -57,7 +55,7 @@ int errorcode() {
 }
 
 void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
-	fputs(
+	console_write2(CONSOLE_STDERR,
 `
    _ _ _   _ _ _       _ _       _ _ _   _     _   _
  _|_|_|_| |_|_|_|_   _|_|_|_   _|_|_|_| |_|   |_| |_|
@@ -65,20 +63,19 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 |_|       |_|_|_|_  |_|_|_|_|   |_|_|_  |_|_|_|_| |_|
 |_|_ _ _  |_|   |_| |_|   |_|  _ _ _|_| |_|   |_|  _
   |_|_|_| |_|   |_| |_|   |_| |_|_|_|   |_|   |_| |_|
-`,
-	stderr);
+`);
 	
 	// NOTE: Any future call could make the app crash harder,
 	//       so, print one line at at time
-	fprintf(stderr, "PID        : %d\n", adbg_process_id(proc));
-	fprintf(stderr, "Code       : "~ERR_OSFMT~"\n", ex.oscode);
-	fprintf(stderr, "Exception  : %s\n", adbg_exception_name(ex));
+	console_writef(CONSOLE_STDERR, "PID        : %d\n", adbg_process_id(proc));
+	console_writef(CONSOLE_STDERR, "Code       : "~ERR_OSFMT~"\n", ex.oscode);
+	console_writef(CONSOLE_STDERR, "Exception  : %s\n", adbg_exception_name(ex));
 	
 	// TODO: Get thread context
 	
 	// Fault address & disasm if available
 	if (ex.fault_address) {
-		fprintf(stderr, "Address    : %#llx\n", ex.fault_address);
+		console_writef(CONSOLE_STDERR, "Address    : %#llx\n", ex.fault_address);
 		
 		ubyte[OPCODE_BUFSIZE] buffer = void;
 		adbg_opcode_t op = void;
@@ -90,17 +87,17 @@ void crashed(adbg_process_t *proc, adbg_exception_t *ex) {
 		if (adbg_disassemble(dis, &op, buffer.ptr, OPCODE_BUFSIZE))
 			goto Lunavail;
 		
-		fprintf(stderr, "Instruction:");
+		console_write2(CONSOLE_STDERR, "Instruction:");
 		for (size_t bi; bi < op.size; ++bi)
-			fprintf(stderr, " %02x", op.data[bi]);
-		fprintf(stderr, " (%s", op.mnemonic);
-		if (op.operands) fprintf(stderr, " %s", op.operands);
-		fputs(")", stderr);
+			console_writef(CONSOLE_STDERR, " %02x", op.data[bi]);
+		console_writef(CONSOLE_STDERR, " (%s", op.mnemonic);
+		if (op.operands) console_writef(CONSOLE_STDERR, " %s", op.operands);
+		console_write2(CONSOLE_STDERR, ")");
 		
 		goto Lcont;
 		
 	Lunavail:
-		fprintf(stderr, " Disassembly unavailable (%s)\n", adbg_error_message());
+		console_writef(CONSOLE_STDERR, " Disassembly unavailable (%s)\n", adbg_error_message());
 	Lcont:
 	}
 	

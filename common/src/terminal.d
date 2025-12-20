@@ -3,7 +3,7 @@
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
-module term;
+module common.terminal;
 
 import core.stdc.stdlib;
 import adbg.include.c.stdio;
@@ -29,9 +29,9 @@ version (Windows) {
 	private import core.sys.posix.ucontext;
 	
 	version (CRuntime_Musl) {
-		alias uint tcflag_t;
-		alias uint speed_t;
-		alias char cc_t;
+		alias tcflag_t = uint;
+		alias speed_t = uint;
+		alias cc_t = char;
 		private enum TCSANOW	= 0;
 		private enum NCCS	= 32;
 		private enum ICANON	= 2;
@@ -67,7 +67,11 @@ version (Windows) {
 	private __gshared termios old_tio = void, new_tio = void;
 }
 
-// Flags: CONFxyz
+enum { // older compilers fuck up standard C stream definitions
+	CONSOLE_STDIN  = 0,
+	CONSOLE_STDOUT = 1,
+	CONSOLE_STDERR = 2,
+}
 
 private __gshared {
 	/// User defined function for resize events
@@ -81,13 +85,13 @@ private __gshared {
 
 /// Initiates terminal basics
 /// Returns: Error keyCode, non-zero on error
-int coninit(/*int flags = 0*/) {
+int console_init() {
 version (Posix) {
 	tcgetattr(STDIN_FILENO, &old_tio);
 	new_tio = old_tio;
 	new_tio.c_lflag &= TERM_ATTR;
 
-	//TODO: See flags we can put
+	// TODO: See flags we can put
 	// tty_ioctl TIOCSETD
 } else {
 	handleOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -127,7 +131,8 @@ enum TextColor {
 // https://ss64.com/nt/color.html
 
 version (Windows)
-ushort concolor(TextColor color) {
+private
+ushort console_fgcolor_win(TextColor color) {
 	final switch (color) {
 	case TextColor.red:    return FOREGROUND_RED;
 	case TextColor.yellow: return FOREGROUND_GREEN | FOREGROUND_RED;
@@ -135,73 +140,75 @@ ushort concolor(TextColor color) {
 }
 
 version (Windows)
-HANDLE conhandle(FILE *stream) {
-	if (stream == stdout)
-		return handleOut;
-	else if (stream == stderr)
-		return handleErr;
-	assert(false, "no stream map");
+private
+HANDLE console_handle(int stream) {
+	final switch (stream) {
+	case CONSOLE_STDIN:  return handleIn;
+	case CONSOLE_STDOUT: return handleOut;
+	case CONSOLE_STDERR: return handleErr;
+	}
 }
 
 version (Posix)
-const(char)* concolor(TextColor color) {
+private
+string console_fgcolor_xterm(TextColor color) {
 	final switch (color) {
 	case TextColor.red   : return "\033[31m";
 	case TextColor.yellow: return "\033[33m";
 	}
 }
 
-// Set foreground text color for stdout
-void concoltext(TextColor color, FILE *stream = stdout) {
+void console_fgcolor(TextColor color, int stream) {
 version (Windows) {
-	ushort c = concolor(color);
-	HANDLE h = conhandle(stream);
-	SetConsoleTextAttribute(h, (defaultColor & 0xfff0) | c);
-}
-version (Posix) {
-	const(char) *c = concolor(color);
-	fputs(c, stream);
+	SetConsoleTextAttribute(
+		console_handle(stream),
+		(defaultColor & 0xfff0) | console_fgcolor_win(color));
+} else version (Posix) {
+	string color = console_fgcolor_xterm(color);
+	write(console_handle(stream), color.ptr, color.length);
 }
 }
 
 // Invert console color with default color
-void concolinv(FILE *stream = stdout) {
+void console_invert(int stream) {
 version (Windows) {
-	HANDLE h = conhandle(stream);
-	SetConsoleTextAttribute(h, COMMON_LVB_REVERSE_VIDEO | defaultColor);
+	SetConsoleTextAttribute(console_handle(stream), COMMON_LVB_REVERSE_VIDEO | defaultColor);
+} else version (Posix) {
+	static immutable string c = "\033[7m";
+	write(console_handle(stream), c.ptr, c.length);
 }
-version (Posix)
-	fputs("\033[7m", stream);
 }
 
 // Reset console color to default color
-void concolrst(FILE *stream = stdout) {
+void console_reset(int stream) {
 version (Windows) {
-	HANDLE h = conhandle(stream);
-	SetConsoleTextAttribute(h, defaultColor);
+	SetConsoleTextAttribute(console_handle(stream), defaultColor);
+} else version (Posix) {
+	static immutable string c = "\033[0m";
+	write(console_handle(stream), c.ptr, c.length);
 }
-version (Posix)
-	fputs("\033[0m", stream);
 }
 
 /// Clear screen
-void conclear() {
+void console_clear(int stream = CONSOLE_STDOUT) {
 version (Windows) {
+	HANDLE h = console_handle(stream);
 	CONSOLE_SCREEN_BUFFER_INFO csbi = void;
 	COORD c; // 0, 0
-	GetConsoleScreenBufferInfo(handleOut, &csbi);
-	//const int buflen = csbi.dwSize.X * csbi.dwSize.Y; buf buflen
+	GetConsoleScreenBufferInfo(h, &csbi);
 	const int buflen = // window buflen
 		(csbi.srWindow.Right - csbi.srWindow.Left + 1)* // width
 		(csbi.srWindow.Bottom - csbi.srWindow.Top + 1); // height
 	DWORD num = void; // kind of ala .NET
-	FillConsoleOutputCharacterA(handleOut, ' ', buflen, c, &num);
-	FillConsoleOutputAttribute(handleOut, csbi.wAttributes, buflen, c, &num);
-	conmvcur(0, 0);
+	FillConsoleOutputCharacterA(h, ' ', buflen, c, &num);
+	FillConsoleOutputAttribute(h, csbi.wAttributes, buflen, c, &num);
+	console_seek(0, 0);
 } else version (Posix) {
+	int fd = console_handle(stream);
 	// "ESC [ 2 J" acts like clear(1)
 	// "ESC c" is a full reset ala cls (Windows)
-	printf("\033c");
+	static immutable string c = "\033c";
+	write(fd, c.ptr, c.length);
 }
 else static assert(false, "Not implemented");
 }
@@ -210,18 +217,18 @@ else static assert(false, "Not implemented");
 /// Params:
 ///   w = Width (columns) pointer.
 ///   h = Height (rows) pointer.
-void consize(int *w, int *h) {
+void console_size(int *w, int *h) {
 	/// NOTE: A COORD uses SHORT (short) and Linux uses unsigned shorts.
 version (Windows) {
 	CONSOLE_SCREEN_BUFFER_INFO c = void;
 	GetConsoleScreenBufferInfo(handleOut, &c);
-	*w = c.srWindow.Right - c.srWindow.Left + 1;
-	*h = c.srWindow.Bottom - c.srWindow.Top + 1;
+	if (w) *w = c.srWindow.Right - c.srWindow.Left + 1;
+	if (h) *h = c.srWindow.Bottom - c.srWindow.Top + 1;
 } else version (Posix) {
 	winsize win = void;
 	ioctl(STDOUT_FILENO, TIOCGWINSZ, &win);
-	*w = win.ws_col;
-	*h = win.ws_row;
+	if (w) *w = win.ws_col;
+	if (h) *h = win.ws_row;
 }
 }
 
@@ -231,7 +238,7 @@ version (Windows) {
 /// Params:
 ///   x = X position (horizontal, columns)
 ///   y = Y position (vertical, rows)
-void conmvcur(int x, int y) {
+void console_seek(int x, int y) {
 version (Windows) { // 0-based
 	COORD c = { cast(SHORT)x, cast(SHORT)y };
 	SetConsoleCursorPosition(handleOut, c);
@@ -246,7 +253,9 @@ version (Windows) { // 0-based
 /// Params:
 ///   x = X position (horizontal, columns)
 ///   y = Y position (vertical, rows)
-void congetxy(int *x, int *y) {
+void console_tell(int *x, int *y) {
+	assert(x);
+	assert(y);
 version (Windows) { // 0-based
 	CONSOLE_SCREEN_BUFFER_INFO csbi = void;
 	GetConsoleScreenBufferInfo(handleOut, &csbi);
@@ -262,6 +271,42 @@ version (Windows) { // 0-based
 }
 }
 
+import adbg.include.c.stdarg;
+
+size_t console_writef(int stream, const(char) *fmt, ...) {
+	va_list args = void;
+	va_start(args, fmt);
+	return console_vwritef(stream, fmt, args);
+}
+
+
+size_t console_vwritef(int stream, const(char) *fmt, va_list args) {
+	enum len = 512;
+	char[len] buf = void;
+	int r = vsnprintf(buf.ptr, len, fmt, args);
+	buf[r++] = '\n';
+	return console_write(stream, buf.ptr, r);
+}
+
+size_t console_write2(int stream, const(char)[] data) {
+	return console_write(stream, data.ptr, data.length);
+}
+
+size_t console_write(int stream, const(char) *data, size_t size) {
+version (Windows) {
+	uint r = void;
+	if (WriteFile(console_handle(stream), data, cast(uint)size, &r, null) == FALSE)
+		return 0;
+	return r;
+} else version (Posix) {
+	ssize_t r = write(console_handle(stream), data, size);
+	if (r < 0)
+		return 0;
+	// TODO: flush (due to fbcon)
+	return r;
+}
+}
+
 //
 // ANCHOR Terminal input
 //
@@ -272,7 +317,7 @@ version (Windows) { // 0-based
 /// Windows: User handler function called if EventType is WINDOW_BUFFER_SIZE_EVENT.
 /// Posix: Handled externally via the SIGWINCH signal.
 /// Params: ii = InputInfo structure
-void conrdkey(InputInfo *ii) {
+void console_readkey(InputInfo *ii) {
 	ii.type = InputType.None;
 version (Windows) {
 	INPUT_RECORD ir = void;
@@ -382,7 +427,7 @@ L_DEFAULT:
 
 /// Read a line from stdin.
 /// Returns: Character slice; Or null on error.
-char[] conrdln() {
+char[] console_readline() {
 	import core.stdc.ctype : isprint;
 	
 	enum BUFFERSIZE = 512; // GNU readline has this set to 512

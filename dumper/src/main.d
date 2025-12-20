@@ -15,6 +15,7 @@ import adbg.error;
 import core.stdc.stdlib : EXIT_FAILURE;
 import core.stdc.stdio;
 import dumper;
+import common.terminal;
 import common.errormgmt;
 import common.cli;
 import common.utils;
@@ -223,6 +224,8 @@ int main(int argc, const(char)** argv) {
 		puts("error: No file specified");
 		return EXIT_FAILURE;
 	}
+	
+	console_init();
 	
 	return dump_file(*getoptleftovers()); // First argument as file
 }
