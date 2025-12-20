@@ -139,6 +139,15 @@ ushort console_fgcolor_win(TextColor color) {
 	}
 }
 
+version (Posix)
+private
+string console_fgcolor_xterm(TextColor color) {
+	final switch (color) {
+	case TextColor.red   : return "\033[31m";
+	case TextColor.yellow: return "\033[33m";
+	}
+}
+
 version (Windows)
 private
 HANDLE console_handle(int stream) {
@@ -151,10 +160,11 @@ HANDLE console_handle(int stream) {
 
 version (Posix)
 private
-string console_fgcolor_xterm(TextColor color) {
-	final switch (color) {
-	case TextColor.red   : return "\033[31m";
-	case TextColor.yellow: return "\033[33m";
+int console_handle(int stream) {
+	final switch (stream) {
+	case CONSOLE_STDIN:  return STDIN_FILENO;
+	case CONSOLE_STDOUT: return STDOUT_FILENO;
+	case CONSOLE_STDERR: return STDERR_FILENO;
 	}
 }
 
@@ -164,8 +174,8 @@ version (Windows) {
 		console_handle(stream),
 		(defaultColor & 0xfff0) | console_fgcolor_win(color));
 } else version (Posix) {
-	string color = console_fgcolor_xterm(color);
-	write(console_handle(stream), color.ptr, color.length);
+	string s = console_fgcolor_xterm(color);
+	write(console_handle(stream), s.ptr, s.length);
 }
 }
 

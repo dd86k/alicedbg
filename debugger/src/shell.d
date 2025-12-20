@@ -129,11 +129,6 @@ void logwrite(string pre, int color, const(char) *fmt, va_list args) {
 		console_write2(CONSOLE_STDERR, ": ");
 	}
 	
-	/*enum len = 512;
-	char[len] buf = void;
-	int r = vsnprintf(buf.ptr, len, fmt, args);
-	buf[r++] = '\n';
-	console_write(CONSOLE_STDERR, buf.ptr, r);*/
 	console_vwritef(CONSOLE_STDERR, fmt, args);
 }
 
