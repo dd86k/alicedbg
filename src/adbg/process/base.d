@@ -41,33 +41,14 @@ version (Windows) {
 
 extern (C):
 
-/// Process status
-enum AdbgProcessState : ubyte {
-	unknown,	/// Process status is not known.
-	created,	/// Process was created by debugger and waiting to run.
-	running,	/// Process is running.
-	stopped,	/// Process is paused due to an exception or by the debugger.
-	exited,	/// Process exited.
-}
-
-/// Process creation source.
-enum AdbgCreation : ubyte {
-	unattached,
-	unloaded = unattached, // Older alias
-	attached,
-	spawned,
-}
-
-package enum {
+enum {
 	/// Debugger is attached.
 	ADBG_PROCESS_ATTACHED = 1,
 	/// Process has stopped.
 	ADBG_PROCESS_STOPPED  = 1 << 1,
 	/// Process has exited.
 	ADBG_PROCESS_EXITED   = 1 << 2,
-}
-
-package enum {
+	
 	/// Linux: /proc/PID/mem couldn't be opened, so do not depend on it
 	__PROC_STATUS_NO_PROC_MEM = 1 << 16,
 }
@@ -92,22 +73,31 @@ version (Posix) {
 }
 version (linux) {
 	int procmemfd;	/// Internal memory file handle to /proc/PID/mem
-	deprecated alias mhandle = procmemfd; // Older alias
 }
 	/// Internal status
 	int status;
 	
-	// TODO: Remove state & creation to rely on statuses
-	//       - debugger attached
-	//       - process is stopped
-	//       - process exited
-	/// Last known process status.
-	deprecated AdbgProcessState state;
-	/// Process' creation source.
-	deprecated AdbgCreation creation;
-	
 	// HACK: Event user data (when attached in wait)
 	void *udata;
+}
+
+int adbg_process_is_attached(adbg_process_t *proc) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	return proc.status & ADBG_PROCESS_ATTACHED;
+}
+int adbg_process_is_stopped(adbg_process_t *proc) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	return proc.status & ADBG_PROCESS_STOPPED;
+}
+int adbg_process_is_alive(adbg_process_t *proc) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	return (proc.status & ADBG_PROCESS_EXITED) == 0;
 }
 
 void adbg_process_free(adbg_process_t *proc) {
@@ -125,29 +115,6 @@ void adbg_process_free(adbg_process_t *proc) {
 		if (proc.procmemfd) close(proc.procmemfd);
 	}
 	free(proc);
-}
-
-/// Get the debuggee's current status.
-/// Params: tracee = Debugged process.
-/// Returns: Debuggee status.
-AdbgProcessState adbg_process_status(adbg_process_t *tracee) pure {
-	if (tracee == null) return AdbgProcessState.unknown;
-	return tracee.state;
-}
-/// Get the debuggee current status as a string.
-/// Params: tracee = Debugged process.
-/// Returns: Debuggee status string.
-const(char)* adbg_process_status_string(adbg_process_t *tracee) pure {
-	static immutable const(char) *default_ = "unknown";
-	if (tracee == null)
-		return default_;
-	final switch (tracee.state) with (AdbgProcessState) {
-	case created:	return "created";
-	case running:	return "running";
-	case stopped:	return "stopped";
-	case exited:	return "exited";
-	case unknown:	return default_;
-	}
 }
 
 /// Get the process ID.

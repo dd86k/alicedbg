@@ -5,7 +5,7 @@
 /// License: BSD-3-Clause-Clear
 module adbg.process.memory;
 
-import adbg.process.base : AdbgProcessState, adbg_process_t, __PROC_STATUS_NO_PROC_MEM;
+import adbg.process.base : adbg_process_t, __PROC_STATUS_NO_PROC_MEM;
 import adbg.include.c.stdlib;
 import adbg.include.c.stdarg;
 import core.stdc.string : memcpy;

@@ -48,11 +48,10 @@ extern (C):
 
 adbg_process_t* adbg_self_process() {
 	__gshared adbg_process_t proc;
-	proc.creation = AdbgCreation.unloaded;
-	proc.state = AdbgProcessState.running;
+	proc.status = 0;
 version (Windows) {
 	proc.pid = GetCurrentProcessId();
-	// GetCurrentThreadId();
+	// TODO: GetCurrentThreadId();
 } else version (linux) {
 	proc.pid = getpid();
 	// TODO: gettid(2)

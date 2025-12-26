@@ -35,7 +35,7 @@ enum ShellError {
 	none	= 0,
 	invalidParameter	= -1,
 	invalidCommand	= -2, // or action or sub-command
-	unavailable	= -3,
+	unavailable	= -3, // Feature unavailable
 	loadFailed	= -4,
 	pauseRequired	= -5,
 	alreadyLoaded	= -6,
@@ -53,6 +53,8 @@ enum ShellError {
 	
 	crt	= -1000,
 	alicedbg	= -1001,
+	
+	assertion	= -9999,
 }
 
 const(char) *shell_error_string(int code) {
@@ -754,6 +756,17 @@ void shell_event_help(immutable(command2_t) *command) {
 	putchar('\n');
 }
 
+const(char)* shell_process_status(){
+	if (process == null || adbg_process_is_attached(process) == 0)
+		return "unattached";
+	else if (adbg_process_is_alive(process) == 0)
+		return "exited";
+	else if (adbg_process_is_stopped(process))
+		return "stopped";
+	else
+		return "unknown";
+}
+
 debug // This is only to test the crash handler
 int command_crash(int, const(char) **) {
 	void function() fnull;
@@ -762,7 +775,7 @@ int command_crash(int, const(char) **) {
 }
 
 int command_status(int argc, const(char) **argv) {
-	puts(adbg_process_status_string(process));
+	puts(shell_process_status());
 	return 0;
 }
 
@@ -820,22 +833,23 @@ int command_detach(int argc, const(char) **argv) {
 }
 
 int command_restart(int argc, const(char) **argv) {
-	switch (process.creation) with (AdbgCreation) {
-	case spawned:
+	// Hack to restart debugging session
+	
+	if (process && last_spawn_exec) {
 		// Terminate first, ignore on error (e.g., already gone)
 		adbg_debugger_terminate(process);
 		
-		// Spawn, shell still messages status
 		return shell_spawn(last_spawn_exec, last_spawn_argv);
-	case attached:
+	} else if (last_spawn_exec) {
+		return shell_spawn(last_spawn_exec, last_spawn_argv);
+	} else if (process) {
 		// Detach first, ignore on error (e.g., already detached)
 		adbg_debugger_detach(process);
 		
 		// Attach, shell still messages status
 		return shell_attach(opt_pid);
-	default:
-		return ShellError.unattached;
-	}
+	} else
+		return ShellError.assertion; // no idea
 }
 
 int command_kill(int argc, const(char) **argv) {

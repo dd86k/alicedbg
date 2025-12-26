@@ -391,8 +391,7 @@ version (USE_CLONE) { // Use clone(2) for subprocess
 } // clone(2)/fork(2)
 	
 	version(Trace) trace("pid=%d", process.pid);
-	process.state = AdbgProcessState.created;
-	process.creation = AdbgCreation.spawned;
+	process.status = ADBG_PROCESS_ATTACHED;
 	return process;
 } else {
 	adbg_oops(AdbgError.unimplemented);
@@ -493,7 +492,7 @@ Loption:
 		return null;
 	}
 	
-	process.creation = AdbgCreation.attached;
+	process.status = ADBG_PROCESS_ATTACHED;
 	
 version (Windows) {
 	//TODO: Integrate ObRegisterCallbacks?
@@ -533,7 +532,7 @@ version (Windows) {
 		return null;
 	}
 	
-	// DebugActiveProcess, by default, kills the process on exit.
+	// DebugActiveProcess, the default kills the process on exit.
 	if (DebugSetProcessKillOnExit(options & OPT_EXITKILL) == FALSE) {
 		adbg_oops(AdbgError.os);
 		adbg_process_free(process);
@@ -557,20 +556,20 @@ version (Windows) {
 		return null;
 	}
 	
-	process.state = options & OPT_STOP ? AdbgProcessState.stopped : AdbgProcessState.running;
+	if (options & OPT_STOP)
+		process.status |= ADBG_PROCESS_STOPPED;
+	
 	process.orig_pid = process.pid = cast(pid_t)pid;
-} else version (FreeBSD) {
+} else version (Posix) { // BSDs, macOS
 	if (ptrace(PT_ATTACH, pid, null, 0) < 0) {
 		adbg_oops(AdbgError.os);
 		adbg_process_free(process);
 		return null;
 	}
 	
-	process.state = AdbgProcessState.paused;
 	process.orig_pid = process.pid = cast(pid_t)pid;
 }
 	
-	process.creation = AdbgCreation.attached;
 	return process;
 }
 
@@ -580,11 +579,10 @@ version (Windows) {
 int adbg_debugger_detach(adbg_process_t *process) {
 	if (process == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (process.creation != AdbgCreation.attached)
+	if ((process.status & ADBG_PROCESS_ATTACHED) == 0)
 		return adbg_oops(AdbgError.debuggerInvalidAction);
 	
-	process.creation = AdbgCreation.unloaded;
-	process.state = AdbgProcessState.unknown;
+	process.status = 0;
 	
 version (Windows) {
 	if (DebugActiveProcessStop(process.pid) == FALSE)
@@ -658,7 +656,7 @@ adbg_process_t* adbg_debugger_wait(scope adbg_process_t *process, scope adbg_eve
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
 	}
-	if (process.creation == AdbgCreation.unloaded) {
+	if ((process.status & ADBG_PROCESS_ATTACHED) == 0) {
 		adbg_oops(AdbgError.debuggerUnattached);
 		return null;
 	}
@@ -680,11 +678,12 @@ Lwait:
 		version(Trace) trace("Exception pid=%d tid=%d code=%#x",
 			de.dwProcessId, de.dwThreadId,
 			de.Exception.ExceptionRecord.ExceptionCode);
+	
+		process.status |= ADBG_PROCESS_STOPPED;
 		
 		event.type = AdbgEvent.exception;
 		
-		event.process.state = AdbgProcessState.stopped;
-		event.process.pid = de.dwProcessId;
+		event.process.status = process.status;
 		
 		adbg_exception_t exception = void;
 		adbg_translate_exception(&exception, process, &de);
@@ -699,10 +698,12 @@ Lwait:
 		version(Trace) trace("ProcExit pid=%d tid=%d code=%u",
 			de.dwProcessId, de.dwThreadId, de.ExitProcess.dwExitCode);
 		
-		event.process.state = AdbgProcessState.unknown;
-		
 		event.type = AdbgEvent.processExit;
 		event.exitcode = cast(int)de.ExitProcess.dwExitCode;
+		
+		process.status |= ADBG_PROCESS_EXITED;
+		
+		event.process.status = process.status;
 			
 		return &event.process; // can't wait on a dead process
 	/*case CREATE_THREAD_DEBUG_EVENT:
@@ -729,18 +730,25 @@ Lwait:
 	//       ptrace(2) manpage states that setting WCONTINUED is not recommended
 	pid_t pid = waitpid(-1, &wstatus, WBASE);
 	if (pid < 0) {
-		event.process.state = AdbgProcessState.unknown;
 		adbg_oops(AdbgError.crt);
 		return null;
 	}
 	
+	// HACK: To allow thread services, we assume that the TID is equal to PID.
+	//       This is partially true, the initial TID on Linux is the same as
+	//       of the PID, and while Linux ptrace calls refer to the TID,
+	//       this holds up for the moment being, but will fall short when
+	//       multiple processes and threads come into play.
+	event.process.pid = pid;
+	
 	if (WIFEXITED(wstatus) || WIFSIGNALED(wstatus)) { // exited or killed
 		version (Trace) trace("Exit/Signal status=%#x pid=%d", wstatus, process.pid);
 		
-		// Can't really filter out process exits, can't wait on a dead process
-		process.state = AdbgProcessState.unknown;
 		event.type = AdbgEvent.processExit;
 		event.exitcode = WTERMSIG(wstatus);
+		
+		process.status |= ADBG_PROCESS_EXITED;
+		event.process.status = process.status;
 	/*} else if (WIFCONTINUED(wstatus)) { // SIGCONT (from a previous pause.2, not ptrace.2)
 		version (Trace) trace("Continued status=%#x pid=%d", wstatus, process.pid);
 		
@@ -752,37 +760,13 @@ Lwait:
 		version (Trace) trace("Stopped status=%#x pid=%d", wstatus, process.pid);
 		
 		event.type = AdbgEvent.exception;
-		// HACK: To allow thread services, we assume that the TID is equal to PID.
-		//       This is partially true, the initial TID on Linux is the same as
-		//       of the PID, and while Linux ptrace calls refer to the TID,
-		//       this holds up for the moment being, but will fall short when
-		//       multiple processes and threads come into play.
-		event.process.pid = pid;
-		event.process.state = AdbgProcessState.stopped;
+		
+		process.status |= ADBG_PROCESS_STOPPED;
+		event.process.status = process.status;
 		
 		int signo = WSTOPSIG(wstatus);
 		
-		// Get subcode and fault address if available
-		siginfo_t siginfo = void;
-		int si_code = void;
-		if (ptrace(PTRACE_GETSIGINFO, process.pid, null, &siginfo) < 0) {
-			si_code = 0;
-			event.exception.fault_address = 0;
-		} else {
-			si_code = siginfo.si_code;
-			switch (signo) { // Get fault address
-			case SIGILL, SIGSEGV, SIGFPE, SIGBUS:
-				// NOTE: .si_addr() emits linker errors on Musl platforms.
-				event.exception.fault_address =
-					cast(ulong)siginfo._sifields._sigfault.si_addr;
-				break;
-			default:
-				event.exception.fault_address = 0;
-			}
-		}
-		
-		event.exception.type = adbg_exception_from_os(signo, si_code);
-		event.exception.oscode = signo;
+		adbg_translate_exception(&event.exception, &event.process, cast(void*)signo);
 		
 		// HACK: fill up thread details for exception
 		event.exception.thread.process = &event.process;
@@ -887,7 +871,7 @@ version (Windows) {
 int adbg_debugger_terminate(adbg_process_t *process) {
 	if (process == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (process.creation == AdbgCreation.unloaded || process.pid == 0)
+	if ((process.status & ADBG_PROCESS_ATTACHED) == 0)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
 version (Windows) {
@@ -908,8 +892,7 @@ version (Windows) {
 		return adbg_oops(AdbgError.os);
 } else static assert(0, "Implement adbg_debugger_terminate");
 
-	process.state = AdbgProcessState.unknown;
-	process.creation = AdbgCreation.unloaded;
+	process.status = ADBG_PROCESS_EXITED; // Neither attached or stopped anyway!
 	return 0;
 }
 
@@ -921,68 +904,52 @@ version (Windows) {
 int adbg_debugger_continue(adbg_process_t *process, long tid) {
 	if (process == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (process.creation == AdbgCreation.unloaded)
+	
+	// Needs to be attached
+	if ((process.status & ADBG_PROCESS_ATTACHED) == 0)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
 version (Windows) {
-	version(Trace) trace("pid=%d tid=%lld state=%d", process.pid, tid, process.state);
-	switch (process.state) with (AdbgProcessState) {
+	version(Trace) trace("pid=%d tid=%lld status=%d", process.pid, tid, process.status);
 	// HACK: Created processes are not in a "stopped" state
 	//       But will continue at the next wait call
-	case created: break;
-	case stopped:
-		if (ContinueDebugEvent(process.pid, cast(DWORD)tid, DBG_CONTINUE) == FALSE) {
-			process.state = AdbgProcessState.unknown;
-			return adbg_oops(AdbgError.os);
-		}
-		break;
-	default: return adbg_oops(AdbgError.debuggerUnpaused);
+	if (ContinueDebugEvent(process.pid, cast(DWORD)tid, DBG_CONTINUE) == FALSE) {
+		process.state = AdbgProcessState.unknown;
+		return adbg_oops(AdbgError.os);
 	}
-	
-	//if (process.event_process_continued)
-	//	process.event_process_continued(process, process.udata, tid);
 } else version (linux) {
-	version(Trace) trace("pid=%d state=%d", process.pid, process.state);
-	switch (process.state) with (AdbgProcessState) {
-	case created, stopped: // attached or stopped
-		if (ptrace(PTRACE_CONT, process.pid, null, null) < 0) {
-			version (Trace) trace("ptrace=%s", strerror(errno));
-			process.state = AdbgProcessState.unknown;
-			return adbg_oops(AdbgError.os);
-		}
-		break;
-	default: return adbg_oops(AdbgError.debuggerUnpaused);
+	version(Trace) trace("pid=%d status=0x%x", process.pid, process.status);
+	if ((process.status & ADBG_PROCESS_STOPPED) == 0)
+		return adbg_oops(AdbgError.debuggerUnpaused);
+	
+	if (ptrace(PTRACE_CONT, process.pid, null, null) < 0) {
+		version (Trace) trace("ptrace=%s", strerror(errno));
+		return adbg_oops(AdbgError.os);
 	}
 } else version (Posix) {
-	version(Trace) trace("pid=%d state=%d", process.pid, process.state);
-	switch (process.state) with (AdbgProcessState) {
-	case created:
-		// TODO: Test HACK on NetBSD, OpenBSD
-		// HACK: FreeBSD: PT_TRACEME and stop state.
-		//       Because the PT_TRACEME does not seem to mark the tracee
-		//       as stopped, calling PT_CONTINUE after execve will return
-		//       errno=13 (Device Busy). raise(SIGSTOP) does nothing.
-		//       This workaround forces waiting through a stop state.
+	version(Trace) trace("pid=%d status=0x%x", process.pid, process.status);
+	// TODO: Test HACK on NetBSD, OpenBSD
+	// HACK: FreeBSD: PT_TRACEME and stop state.
+	//       Because the PT_TRACEME does not seem to mark the tracee
+	//       as stopped, calling PT_CONTINUE after execve will return
+	//       errno=13 (Device Busy). raise(SIGSTOP) does nothing.
+	//       This workaround forces waiting through a stop state.
+	if ((process.status & ADBG_PROCESS_STOPPED) == 0) {
 		int w = void;
 		waitpid(cast(pid_t)tid, &w, 0);
-		goto case;
-	case stopped:
-		// NOTE: FreeBSD/NetBSD/OpenBSD PT_CONTINUE
-		//       addr can be an address to resume at, or 1
-		//       data can be a signal number, or 0
-		if (ptrace(PT_CONTINUE, cast(pid_t)tid, cast(caddr_t)1, 0) < 0) {
-			version (Trace) trace("ptrace=%s", strerror(errno));
-			process.state = AdbgProcessState.unknown;
-			return adbg_oops(AdbgError.os);
-		}
-		if (process.event_process_continued)
-			process.event_process_continued(process, process.udata, tid);
-		break;
-	default: return adbg_oops(AdbgError.debuggerUnpaused);
+	}
+	
+	// NOTE: FreeBSD/NetBSD/OpenBSD PT_CONTINUE
+	//       addr can be an address to resume at, or 1
+	//       data can be a signal number, or 0
+	if (ptrace(PT_CONTINUE, cast(pid_t)tid, cast(caddr_t)1, 0) < 0) {
+		version (Trace) trace("ptrace=%s", strerror(errno));
+		process.state = AdbgProcessState.unknown;
+		return adbg_oops(AdbgError.os);
 	}
 } else static assert(0, "Implement adbg_debugger_continue");
 	
-	process.state = AdbgProcessState.running;
+	process.status &= ~ADBG_PROCESS_STOPPED;
 	return 0;
 }
 
@@ -996,7 +963,7 @@ version (Windows) {
 int adbg_debugger_step_instruction(adbg_process_t *process, long tid) {
 	if (process == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	if (process.creation == AdbgCreation.unloaded)
+	if ((process.status & ADBG_PROCESS_ATTACHED) == 0)
 		return adbg_oops(AdbgError.debuggerUnattached);
 	
 version (WinTel) {
@@ -1090,29 +1057,21 @@ version (WinTel) {
 	return adbg_debugger_continue(process, tid);
 } else version (linux) {
 	if (ptrace(PTRACE_SINGLESTEP, tid, null, null) < 0) {
-		process.state = AdbgProcessState.unknown;
 		return adbg_oops(AdbgError.os);
 	}
-	//if (process.event_process_continued)
-	//	process.event_process_continued(process, process.udata, tid);
 	
 	return 0;
 } else version (Posix) {
-	switch (process.state) with (AdbgProcessState) {
-	case created:
-		// HACK: See HACK in continue function.
+	// HACK: See HACK in continue function.
+	if ((process.status & ADBG_PROCESS_STOPPED) == 0) {
 		int w = void;
 		waitpid(cast(pid_t)tid, &w, 0);
-		break;
-	default:
 	}
 	
 	if (ptrace(PT_STEP, cast(pid_t)tid, null, 0) < 0) {
 		process.state = AdbgProcessState.unknown;
 		return adbg_oops(AdbgError.os);
 	}
-	if (process.event_process_continued)
-		process.event_process_continued(process, process.udata, tid);
 	
 	return 0;
 } else {
