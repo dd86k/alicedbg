@@ -3,17 +3,20 @@ module tests.easy;
 import adbg.easy;
 
 
-void enforce(bool cond, string msg,
+void enforce(bool cond, string func,
 	size_t line = __LINE__, string file = __FILE__) {
 	if (cond) return;
 	
 	import std.string : fromStringz;
 	import std.conv : text;
 	
-	const(char) *err = adbg_error_message();
+	const(char) *aerr = adbg_error_message();
+	int acode = adbg_error_code();
+	int aline = adbg_error_line();
+	const(char)* afunc = adbg_error_function();
 	
 	throw new Exception(
-		text(msg,": ", fromStringz(err)),
+		text(func,": (", acode, "@", fromStringz(afunc), ":", aline, ") ", fromStringz(aerr)),
 		file, line);
 }
 
@@ -35,7 +38,7 @@ unittest {
 		return;
 	}
 	
-	// 1. Create EZ instance
+	// 1. Create easy instance
 	adbg_easy_t *ez = adbg_easy_create();
 	enforce(ez != null, "adbg_easy_create");
 	

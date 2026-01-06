@@ -278,26 +278,30 @@ Lwait:
 	if (msg) {
 		cast(void)os_mutex_acquire(&ez.lock);
 		int err = adbg_easy_handle_request(ez, msg);
-		cast(void)os_mutex_release(&ez.lock);
+		
+		void *reply_data;
 		
 		if (err) {
 			adbg_error_t *e = adbg_error();
 			
 			// Stuff request in buffer
 			if (ez.reply_count >= CAPACITY) {
-				// Can't really do anything here yet
-				// Need a mailbox function to check number of items or status (ie, full)
-				os_mutex_release(&ez.lock);
 				assert(false); // HACK: BAD but i need to know
 			}
 			
 			adbg_easy_reply_t *reply = ez.reply_buffer + ez.reply_count++;
-			import core.stdc.string : memcpy;
-			memcpy(&reply.error, e, adbg_error_t.sizeof);
+			//import core.stdc.string : memcpy;
+			//memcpy(&reply.error, e, adbg_error_t.sizeof);
+			reply.error.code = e.code;
+			reply.error.line = e.line;
+			reply.error.func = e.func;
 			
-			adbg_mailbox_send(&ez.reply_box, message_t(0, reply));
-		} else
-			adbg_mailbox_send(&ez.reply_box, message_t());
+			reply_data = reply;
+		}
+		
+		cast(void)os_mutex_release(&ez.lock);
+		
+		adbg_mailbox_send(&ez.reply_box, message_t(0, reply_data));
 	}
 	
 	// Windows: Poll for debugging events, and send them to event thread
@@ -309,7 +313,7 @@ Lwait:
 		if (process == null) // TODO: Should we error?
 			goto Lwait;
 		
-		adbg_mailbox_send(&ez.events_mbox, message_t(0, &event, adbg_event_t.sizeof));
+		adbg_mailbox_send(&ez.event_box, message_t(0, &event, adbg_event_t.sizeof));
 	}
 	goto Lwait;
 }
@@ -355,7 +359,7 @@ int adbg_easy_thread_events_windows(__osthread_t *thread, void *data) {
 	adbg_easy_t *ez = cast(adbg_easy_t*)data;
 	
 Lwait:
-	message_t *msg = adbg_mailbox_receive(&ez.events_mbox);
+	message_t *msg = adbg_mailbox_receive(&ez.event_box);
 	if (msg == null)
 		goto Lwait;
 	
@@ -365,7 +369,7 @@ Lwait:
 	
 	// If the process exits, quit loop. Nothing else to wait on
 	if (event.type == AdbgEvent.processExit)
-		return;
+		return 0;
 	goto Lwait;
 }
 

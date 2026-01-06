@@ -167,8 +167,9 @@ const(char)* adbg_error_system_message(int code) {
 
 /// Reset the last set error code.
 void adbg_error_reset() {
-	// NOTE: Code is enough. Other fields are purely internal.
 	error.code = 0;
+	error.func = null;
+	error.line = 0;
 }
 
 // Easy module needs to be able to set error for caller thread

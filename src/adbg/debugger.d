@@ -303,8 +303,7 @@ version (Windows) {
 	process.orig_handle = pi.hProcess;
 	process.orig_pid = process.pid = pi.dwProcessId;
 	
-	process.state = AdbgProcessState.created;
-	process.creation = AdbgCreation.spawned;
+	process.status = ADBG_PROCESS_ATTACHED;
 	process.option_timeout = INFINITE;
 	return process;
 } else version (Posix) {
@@ -665,11 +664,13 @@ version (Windows) {
 	DEBUG_EVENT de = void;
 Lwait:
 	if (WaitForDebugEvent(&de, process.option_timeout) == FALSE) {
-		process.state = AdbgProcessState.unknown;
 		return null;
 	}
 	
+	process.status |= ADBG_PROCESS_STOPPED;
+	
 	event.process.pid = de.dwProcessId;
+	event.process.status = process.status;
 	event.process.option_timeout = process.option_timeout;
 	
 	// Filter events
@@ -914,7 +915,6 @@ version (Windows) {
 	// HACK: Created processes are not in a "stopped" state
 	//       But will continue at the next wait call
 	if (ContinueDebugEvent(process.pid, cast(DWORD)tid, DBG_CONTINUE) == FALSE) {
-		process.state = AdbgProcessState.unknown;
 		return adbg_oops(AdbgError.os);
 	}
 } else version (linux) {
