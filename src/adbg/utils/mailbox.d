@@ -10,7 +10,26 @@ import adbg.os.mutex;
 import adbg.os.semaphore;
 import adbg.os.threads;
 import core.stdc.stdlib : calloc, malloc, free;
-import core.stdc.string : memset, memcpy;
+import core.stdc.string : memset, memcpy, memmove;
+
+// NOTE: std.concurrency.MessageBox & Multithreading
+//
+//       Currently, this implementation assumes one producer and one consumer, but
+//       wasn't designed to handle multiple producers and consumers.
+//
+//       Mailboxes in Phobos uses the MessageBox class (phobos/std/concurrency.d),
+//       which uses a Lock (mutex) and two Conditions.
+//
+//       Conditions (druntime/src/core/sync/condition.d) are typically implemented
+//       using one PThread condition and one lock (mutex).
+//
+//       On Windows, Conditions are implemented using Algorithm 8c:
+//       http://groups.google.com/group/comp.programming.threads/browse_frm/thread/1692bdec8040ba40/e7a5f9d40e86503a
+//
+//       However, since Vista, Conditional Variables exist:
+//       https://learn.microsoft.com/en-us/windows/win32/Sync/condition-variables
+//       https://learn.microsoft.com/en-us/windows/win32/Sync/using-condition-variables
+//       
 
 struct message_t {
 	int type;
@@ -68,7 +87,6 @@ void adbg_mailbox_destroy(mailbox_t *box) {
 //       In std.concurrency, options are to wait, throw (error), or skip
 
 int adbg_mailbox_send(mailbox_t *box, message_t msg) {
-	// TODO: adbg_oops is not thread safe
 	if (box == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
@@ -77,11 +95,39 @@ int adbg_mailbox_send(mailbox_t *box, message_t msg) {
 		cast(void)os_mutex_release(&box.mutex);
 		// TODO: Wait until capacity available again
 		//       Or make it a stategy
-		// TODO: adbg_oops is not thread safe
 		return adbg_oops(AdbgError.assertion);
 	}
 	memcpy(box.messages + box.count, &msg, message_t.sizeof);
 	box.count++;
+	cast(void)os_mutex_release(&box.mutex);
+	
+	os_sem_notify(&box.sem);
+	return 0;
+}
+
+int adbg_mailbox_send_priority(mailbox_t *box, message_t msg) {
+	if (box == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	cast(void)os_mutex_acquire(&box.mutex);
+	
+	if (box.count >= box.capacity) {
+		cast(void)os_mutex_release(&box.mutex);
+		// TODO: Wait until capacity available again
+		//       Or make it a stategy
+		return adbg_oops(AdbgError.assertion);
+	}
+	
+	// Move items by one message
+	memmove(
+		box.messages + 1, // to
+		box.messages,     // from
+		message_t.sizeof * box.count); // size
+	
+	// Copy to [0]
+	memcpy(box.messages, &msg, message_t.sizeof);
+	box.count++;
+	
 	cast(void)os_mutex_release(&box.mutex);
 	
 	os_sem_notify(&box.sem);

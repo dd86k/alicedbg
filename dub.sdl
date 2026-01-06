@@ -181,6 +181,10 @@ configuration "readln" {
 configuration "threading" {
 	sourceFiles "tests/threading.d"
 }
+# Integration test
+configuration "easy-api" {
+	sourceFiles "tests/easy.d"
+}
 
 #
 # ANCHOR Documentation build types (docs/ddox)

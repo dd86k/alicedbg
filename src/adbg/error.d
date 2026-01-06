@@ -102,20 +102,21 @@ enum AdbgError {
 }
 
 /// Represents an error in alicedbg.
-private
+package // easy module needs a copy of error
 struct adbg_error_t {
-	int srccode;	/// Error code from Alicedbg
+	int code;	/// Error code from Alicedbg
 	int modcode;	/// Error code for module
 	const(char)* func;	/// Source function
 	int line;	/// Line source
 }
 /// Last error in alicedbg.
-private adbg_error_t error;
+private
+adbg_error_t error; // Keep in TLS!
 
 /// Get last Alicedbg error code.
 /// Returns: Error code (AdbgError).
 int adbg_error_code() {
-	return error.srccode;
+	return error.code;
 }
 /// Get the last error from the associated module.
 /// Returns: Error code (submodule).
@@ -131,6 +132,10 @@ int adbg_error_line() {
 /// Returns: Function name.
 const(char)* adbg_error_function() {
 	return error.func;
+}
+
+adbg_error_t* adbg_error() {
+	return &error;
 }
 
 /// Get error message from the OS (or CRT) by providing the error code
@@ -163,7 +168,19 @@ const(char)* adbg_error_system_message(int code) {
 /// Reset the last set error code.
 void adbg_error_reset() {
 	// NOTE: Code is enough. Other fields are purely internal.
-	error.srccode = 0;
+	error.code = 0;
+}
+
+// Easy module needs to be able to set error for caller thread
+package
+void adbg_error_set2(adbg_error_t *e) {
+	// NOTE: Copying
+	//       Global is now in TLS, calling memcpy or doing struct copy
+	//       will make this crash
+	error.code = e.code;
+	error.func = e.func;
+	error.line = e.line;
+	error.modcode = e.modcode;
 }
 
 private
@@ -172,7 +189,7 @@ void adbg_error_set(AdbgError e, void *handle, const(char)* func, int line) {
 	error.line = line;
 	// To avoid additional errors, such as formatting,
 	// get the underlying error code now for later.
-	switch (error.srccode = e) {
+	switch (error.code = e) {
 	case AdbgError.os:
 		version (Windows)
 			error.modcode = GetLastError();
@@ -293,7 +310,7 @@ private immutable adbg_error_msg_t[] errors_msg = [
 /// Returns: Error message.
 export
 const(char)* adbg_error_message() {
-	switch (error.srccode) with (AdbgError) {
+	switch (error.code) with (AdbgError) {
 	case crt:
 		return strerror(error.modcode);
 	case os:
@@ -302,7 +319,7 @@ const(char)* adbg_error_message() {
 		return cs_strerror(error.modcode);
 	default:
 		foreach (ref e; errors_msg)
-			if (error.srccode == e.code)
+			if (error.code == e.code)
 				return e.msg.ptr;
 	}
 	return defaultMsg;
