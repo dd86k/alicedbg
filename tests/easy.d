@@ -1,7 +1,7 @@
 module tests.easy;
 
 import adbg.easy;
-
+import std.stdio : writeln;
 
 void enforce(bool cond, string func,
 	size_t line = __LINE__, string file = __FILE__) {
@@ -31,7 +31,6 @@ unittest {
 	//    Unbothered to detect dmd/gdc/ldc and perform a compile
 	//    Do that yourself
 	if (exists(EXEC) == false) {
-		import std.stdio : writeln;
 		writeln("easy: target does not exist");
 		writeln("easy: compile '", SRC, "' as '", EXEC, "'");
 		writeln("easy: then re-run this test");

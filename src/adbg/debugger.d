@@ -648,7 +648,7 @@ version (Windows) {
 ///
 /// Params: process = Process instance created by debugger.
 /// Returns: Affected process instance by debugging event. Or null on error.
-adbg_process_t* adbg_debugger_wait(scope adbg_process_t *process, scope adbg_event_t *event) {
+adbg_process_t* adbg_debugger_wait(adbg_process_t *process, adbg_event_t *event) {
 	version(Trace) trace("process=%p", process);
 	
 	if (process == null || event == null) {

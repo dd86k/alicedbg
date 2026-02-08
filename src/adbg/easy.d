@@ -152,13 +152,20 @@ int adbg_easy_spawn(adbg_easy_t *ez, const(char) *path) {
 	// Get reply
 	message_t *msg = adbg_mailbox_receivefor(&ez.reply_box, 5000); // TODO: timeout option
 	if (msg == null)
-		return adbg_oops(AdbgError.assertion); // TODO: timeout error
+		return adbg_oops(AdbgError.assertion); // TODO: "operation timed out" error
+	
+	os_mutex_acquire(&ez.lock); // should replies have their own locks?
+	
+	ez.reply_count--;
 	
 	adbg_easy_reply_t *reply = cast(adbg_easy_reply_t*)msg.data;
-	if (reply) {
-		adbg_error_set2(&reply.error);
+	assert(reply, "reply==NULL");
+	if (reply.type == Reply.error) {
+		adbg_error_paste(&reply.error);
 		return reply.error.code;
 	}
+	
+	os_mutex_release(&ez.lock);
 	
 	return 0;
 }
@@ -277,24 +284,19 @@ Lwait:
 		message_t *msg = adbg_mailbox_receive(&ez.request_box);
 	if (msg) {
 		cast(void)os_mutex_acquire(&ez.lock);
-		int err = adbg_easy_handle_request(ez, msg);
 		
 		void *reply_data;
 		
+		int err = adbg_easy_handle_request(ez, msg);
 		if (err) {
-			adbg_error_t *e = adbg_error();
-			
 			// Stuff request in buffer
 			if (ez.reply_count >= CAPACITY) {
 				assert(false); // HACK: BAD but i need to know
 			}
 			
 			adbg_easy_reply_t *reply = ez.reply_buffer + ez.reply_count++;
-			//import core.stdc.string : memcpy;
-			//memcpy(&reply.error, e, adbg_error_t.sizeof);
-			reply.error.code = e.code;
-			reply.error.line = e.line;
-			reply.error.func = e.func;
+			reply.type = Reply.error;
+			adbg_error_copy(&reply.error);
 			
 			reply_data = reply;
 		}

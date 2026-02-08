@@ -134,6 +134,7 @@ const(char)* adbg_error_function() {
 	return error.func;
 }
 
+deprecated
 adbg_error_t* adbg_error() {
 	return &error;
 }
@@ -146,7 +147,7 @@ const(char)* adbg_error_system_message(int code) {
 	version (Windows) {
 		// TODO: Handle NTSTATUS codes
 		enum ERR_BUF_SZ = 256;
-		static char [ERR_BUF_SZ]buffer = void;
+		static char [ERR_BUF_SZ]buffer = void; // LTS
 		size_t len = FormatMessageA(
 			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_MAX_WIDTH_MASK,
 			null,
@@ -167,21 +168,39 @@ const(char)* adbg_error_system_message(int code) {
 
 /// Reset the last set error code.
 void adbg_error_reset() {
-	error.code = 0;
+	import core.stdc.string : memset;
+	adbg_error_t *e = &error;
+	memset(&error, 0, adbg_error_t.sizeof);
+	/*error.code = 0;
 	error.func = null;
-	error.line = 0;
+	error.line = 0;*/
 }
 
 // Easy module needs to be able to set error for caller thread
 package
-void adbg_error_set2(adbg_error_t *e) {
+void adbg_error_paste(adbg_error_t *buffer) {
+	assert(buffer);
 	// NOTE: Copying
 	//       Global is now in TLS, calling memcpy or doing struct copy
 	//       will make this crash
-	error.code = e.code;
-	error.func = e.func;
-	error.line = e.line;
-	error.modcode = e.modcode;
+	import core.stdc.string : memcpy;
+	memcpy(&error, buffer, adbg_error_t.sizeof);
+	/*error.code    = buffer.code;
+	error.func    = buffer.func;
+	error.line    = buffer.line;
+	error.modcode = buffer.modcode;*/
+}
+deprecated alias adbg_error_set2 = adbg_error_paste;
+
+package
+void adbg_error_copy(adbg_error_t *buffer) {
+	assert(buffer);
+	import core.stdc.string : memcpy;
+	memcpy(&error, buffer, adbg_error_t.sizeof);
+	/*buffer.code    = error.code;
+	buffer.func    = error.func;
+	buffer.line    = error.line;
+	buffer.modcode = error.modcode;*/
 }
 
 private
