@@ -145,27 +145,27 @@ message_t* adbg_mailbox_receive(mailbox_t *box) {
 		cast(void)os_mutex_release(&box.mutex);
 		return null;
 	}
-	message_t *msg = &box.messages[box.count--];
+	message_t *msg = &box.messages[--box.count];
 	os_mutex_release(&box.mutex);
-	
+
 	return msg;
 }
 
 message_t* adbg_mailbox_receivefor(mailbox_t *box, uint ms) {
 	if (box == null)
 		return null;
-	
+
 	int status = void;
 	if (os_sem_waitfor(&box.sem, ms, &status) || status) // error or timeout
 		return null;
-	
+
 	os_mutex_acquire(&box.mutex);
 	if (box.count == 0) {
 		cast(void)os_mutex_release(&box.mutex);
 		return null;
 	}
-	message_t *msg = &box.messages[box.count--];
+	message_t *msg = &box.messages[--box.count];
 	os_mutex_release(&box.mutex);
-	
+
 	return msg;
 }

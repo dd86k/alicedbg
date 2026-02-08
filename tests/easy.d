@@ -34,7 +34,7 @@ unittest {
 		writeln("easy: target does not exist");
 		writeln("easy: compile '", SRC, "' as '", EXEC, "'");
 		writeln("easy: then re-run this test");
-		return;
+		assert(false, "Compile target and run this test again");
 	}
 	
 	// 1. Create easy instance

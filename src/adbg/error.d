@@ -196,11 +196,7 @@ package
 void adbg_error_copy(adbg_error_t *buffer) {
 	assert(buffer);
 	import core.stdc.string : memcpy;
-	memcpy(&error, buffer, adbg_error_t.sizeof);
-	/*buffer.code    = error.code;
-	buffer.func    = error.func;
-	buffer.line    = error.line;
-	buffer.modcode = error.modcode;*/
+	memcpy(buffer, &error, adbg_error_t.sizeof);
 }
 
 private
