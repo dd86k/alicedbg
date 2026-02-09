@@ -8,7 +8,6 @@ module adbg.easy;
 import adbg.debugger;
 public import adbg.error;
 import adbg.os.mutex;
-import adbg.os.semaphore;
 import adbg.os.threads;
 import adbg.process.base;
 import adbg.utils.mailbox;
