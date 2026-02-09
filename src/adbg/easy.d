@@ -126,7 +126,13 @@ int adbg_easy_spawn(adbg_easy_t *ez, const(char) *path) {
 }
 
 int adbg_easy_attach(adbg_easy_t *ez, int pid) {
-	return -1;
+	if (ez == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	adbg_easy_request_t req;
+	req.type = Request.attach;
+	req.attach.pid = pid;
+	return adbg_easy_request(ez, &req);
 }
 
 // NOTE: adbg_debugger_on_* advantages over adbg_debugger_on(enum)
@@ -197,11 +203,16 @@ struct adbg_easy_request_spawn_t {
 	const(char) *path;
 }
 
+struct adbg_easy_request_attach_t {
+	int pid;
+}
+
 // Buffer entry
 struct adbg_easy_request_t {
 	Request type;
 	union {
 	adbg_easy_request_spawn_t spawn;
+	adbg_easy_request_attach_t attach;
 	} // union
 }
 
@@ -228,6 +239,11 @@ struct adbg_easy_reply_t {
 
 /// Send a request to the debugger thread and wait for a reply.
 /// Optionally returns the reply pointer for callers that need response data.
+/// Params:
+/// 	ez = Easy instance.
+/// 	req = Request instance.
+/// 	reply_out = (Optional) If caller needs to check reply of debugging function.
+/// Return: Error code for request.
 int adbg_easy_request(adbg_easy_t *ez, adbg_easy_request_t *req,
 		adbg_easy_reply_t **reply_out = null) {
 	// Send request (mailbox handles blocking if full)
@@ -313,9 +329,32 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 
 		ez.process = proc;
 
+		// Hacks to make looping work
 		version (Windows)
 			adbg_debugger_option_wait_timeout(ez.process, 100);
 
+		version (Windows)
+		ez.event_thread =
+			os_thread_new(&adbg_easy_thread_events_windows, ez);
+		version (Posix)
+		ez.event_thread =
+			os_thread_new(&adbg_easy_thread_events_posix, ez);
+		break;
+	case Request.attach:
+		if (ez.process && adbg_process_is_attached(ez.process))
+			return adbg_oops(AdbgError.debuggerPresent);
+		
+		adbg_process_t *proc = adbg_debugger_attach(req.attach.pid, 0);
+		if (proc == null) {
+			return adbg_error_code();
+		}
+
+		ez.process = proc;
+
+		version (Windows)
+			adbg_debugger_option_wait_timeout(ez.process, 100);
+		
+		// Hacks to make looping work
 		version (Windows)
 		ez.event_thread =
 			os_thread_new(&adbg_easy_thread_events_windows, ez);
