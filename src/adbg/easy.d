@@ -42,12 +42,9 @@ struct adbg_easy_t {
 	//       creation time).
 	
 	mailbox_t            request_box;
-	adbg_easy_request_t *request_buffer;
-	size_t               request_count;
-	
+
 	mailbox_t          reply_box;
-	adbg_easy_reply_t *reply_buffer;
-	size_t             reply_count;
+	adbg_easy_reply_t  reply;
 	
 	mailbox_t      event_box;
 	adbg_event_t  *event_buffer;
@@ -66,16 +63,6 @@ adbg_easy_t* adbg_easy_create() {
 	}
 	
 	// Create buffers
-	ez.request_buffer = cast(adbg_easy_request_t*)calloc(CAPACITY, adbg_easy_request_t.sizeof);
-	if (ez.request_buffer == null) {
-		adbg_oops(AdbgError.crt);
-		goto Lerror;
-	}
-	ez.reply_buffer = cast(adbg_easy_reply_t*)calloc(CAPACITY, adbg_easy_reply_t.sizeof);
-	if (ez.reply_buffer == null) {
-		adbg_oops(AdbgError.crt);
-		goto Lerror;
-	}
 	ez.event_buffer = cast(adbg_event_t*)calloc(CAPACITY, adbg_event_t.sizeof);
 	if (ez.event_buffer == null) {
 		adbg_oops(AdbgError.crt);
@@ -89,16 +76,21 @@ adbg_easy_t* adbg_easy_create() {
 		goto Lerror;
 	}
 	
-	// 
+	//
 	if (os_mutex_init(&ez.lock)) {
 		adbg_oops(AdbgError.os);
 		goto Lerror;
 	}
-	
+
+	// Start debugger thread (blocks waiting for requests)
+	ez.debugger_thread = os_thread_new(&adbg_easy_thread_debugger, ez);
+	if (ez.debugger_thread == null) {
+		adbg_oops(AdbgError.os);
+		goto Lerror;
+	}
+
 	return ez;
 Lerror:
-	if (ez.reply_buffer)   free(ez.reply_buffer);
-	if (ez.request_buffer) free(ez.request_buffer);
 	if (ez.event_buffer)   free(ez.event_buffer);
 	free(ez);
 	return null;
@@ -118,8 +110,6 @@ void adbg_easy_destroy(adbg_easy_t *ez) {
 
 	os_mutex_destroy(&ez.lock);
 
-	if (ez.request_buffer) free(ez.request_buffer);
-	if (ez.reply_buffer)   free(ez.reply_buffer);
 	if (ez.event_buffer)   free(ez.event_buffer);
 
 	free(ez);
@@ -128,61 +118,11 @@ void adbg_easy_destroy(adbg_easy_t *ez) {
 int adbg_easy_spawn(adbg_easy_t *ez, const(char) *path) {
 	if (ez == null)
 		return adbg_oops(AdbgError.invalidArgument);
-	
-	os_mutex_acquire(&ez.lock);
-	
-	//
-	if (ez.process && adbg_process_is_attached(ez.process)) {
-		os_mutex_release(&ez.lock);
-		return adbg_oops(AdbgError.debuggerPresent);
-	}
-	
-	// Stuff request in buffer
-	if (ez.request_count >= CAPACITY) {
-		// Can't really do anything here yet
-		// Need a mailbox function to check number of items or status (ie, full)
-		os_mutex_release(&ez.lock);
-		return adbg_oops(AdbgError.assertion);
-	}
-	
-	adbg_easy_request_t *req = ez.request_buffer + ez.request_count++;
+
+	adbg_easy_request_t req;
 	req.type = Request.spawn;
 	req.spawn.path = path;
-	os_mutex_release(&ez.lock);
-	
-	// If the debugger thread hasn't started, start it
-	if (ez.debugger_thread == null) {
-		ez.debugger_thread = os_thread_new(&adbg_easy_thread_debugger, ez);
-		if (ez.debugger_thread == null) {
-			--ez.request_count;
-			return adbg_oops(AdbgError.os);
-		}
-	}
-	
-	// Send it
-	int rc = adbg_mailbox_send(&ez.request_box, message_t(0, req, 0));
-	if (rc) return rc;
-	
-	// Get reply
-	message_t *msg = adbg_mailbox_receivefor(&ez.reply_box, 5000); // TODO: timeout option
-	if (msg == null)
-		return adbg_oops(AdbgError.assertion); // TODO: "operation timed out" error
-	
-	os_mutex_acquire(&ez.lock); // should replies have their own locks?
-	
-	ez.reply_count--;
-	
-	adbg_easy_reply_t *reply = cast(adbg_easy_reply_t*)msg.data;
-	assert(reply, "reply==NULL");
-	if (reply.type == Reply.error) {
-		adbg_error_paste(&reply.error);
-		os_mutex_release(&ez.lock);
-		return reply.error.code;
-	}
-
-	os_mutex_release(&ez.lock);
-
-	return 0;
+	return adbg_easy_request(ez, &req);
 }
 
 int adbg_easy_attach(adbg_easy_t *ez, int pid) {
@@ -283,6 +223,37 @@ struct adbg_easy_reply_t {
 }
 
 //
+// Easy API: Request helper
+//
+
+/// Send a request to the debugger thread and wait for a reply.
+/// Optionally returns the reply pointer for callers that need response data.
+int adbg_easy_request(adbg_easy_t *ez, adbg_easy_request_t *req,
+		adbg_easy_reply_t **reply_out = null) {
+	// Send request (mailbox handles blocking if full)
+	int rc = adbg_mailbox_send(&ez.request_box, message_t(0, req, 0));
+	if (rc) return rc;
+
+	// Wait for reply // TODO: timeout option
+	message_t *msg = adbg_mailbox_receivefor(&ez.reply_box, 5000);
+	if (msg == null)
+		return adbg_oops(AdbgError.assertion); // TODO: "operation timed out" error
+
+	adbg_easy_reply_t *reply = cast(adbg_easy_reply_t*)msg.data;
+	assert(reply, "reply==NULL");
+
+	if (reply_out)
+		*reply_out = reply;
+
+	if (reply.type == Reply.error) {
+		adbg_error_paste(&reply.error);
+		return reply.error.code;
+	}
+
+	return 0;
+}
+
+//
 // Easy API: Debug loop
 //
 
@@ -298,26 +269,15 @@ Lwait:
 	else
 		message_t *msg = adbg_mailbox_receive(&ez.request_box);
 	if (msg) {
-		cast(void)os_mutex_acquire(&ez.lock);
-
-		// Stuff reply in buffer
-		if (ez.reply_count >= CAPACITY) {
-			assert(false); // HACK: BAD but i need to know
-		}
-
-		adbg_easy_reply_t *reply = ez.reply_buffer + ez.reply_count++;
-
 		int err = adbg_easy_handle_request(ez, msg);
 		if (err) {
-			reply.type = Reply.error;
-			adbg_error_copy(&reply.error);
+			ez.reply.type = Reply.error;
+			adbg_error_copy(&ez.reply.error);
 		} else {
-			reply.type = Reply.success;
+			ez.reply.type = Reply.success;
 		}
 
-		cast(void)os_mutex_release(&ez.lock);
-
-		adbg_mailbox_send(&ez.reply_box, message_t(0, reply));
+		adbg_mailbox_send(&ez.reply_box, message_t(0, &ez.reply));
 	}
 	
 	// Windows: Poll for debugging events, and send them to event thread
@@ -341,6 +301,9 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 	
 	switch (req.type) {
 	case Request.spawn:
+		if (ez.process && adbg_process_is_attached(ez.process))
+			return adbg_oops(AdbgError.debuggerPresent);
+
 		adbg_process_t *proc = adbg_debugger_spawn(
 			req.spawn.path,
 			0);
