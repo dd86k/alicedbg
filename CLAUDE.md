@@ -10,7 +10,7 @@ Alice Debugger (alicedbg) is a cross-platform debugging and object inspection fr
 
 The project uses DUB (D's package manager/build system). Supported compilers: DMD, LDC, GDC.
 
-```bash
+```sh
 # Build the library
 dub build
 
@@ -19,10 +19,11 @@ dub build :debugger    # builds alicedbg CLI
 dub build :dumper      # builds alicedump CLI
 
 # Run tests
-dub test :debugger     # test debugger subpackage
-dub test :dumper       # test dumper subpackage
+dub test               # Run tests for library
+dub test :debugger     # Test debugger subpackage
+dub test :dumper       # Test dumper subpackage
 
-# Run specific test configurations
+# Run specific test configurations (run only if needed/related)
 dub test -c threading       # OS threading tests
 dub test -c easy-api        # Easy API integration tests (this needs the easy test target to be built)
 dub test -c setjmp          # setjmp/longjmp tests (unstable on Win64)
@@ -33,7 +34,7 @@ dub build -b release        # release mode
 dub build -b trace          # extremely verbose tracing
 dub build -b release-static # statically linked release
 
-# Generate docs
+# Generate documentation
 dub build -b docs
 ```
 
@@ -47,7 +48,7 @@ dub build -b docs
 
 Essentially, the Easy API is contained in `easy.d`.
 
-The rest is considered to be Multi API, just like libcurl.
+The rest is considered to be Multi API, akin to libcurl.
 
 ### Library (`src/adbg/`)
 
@@ -121,8 +122,8 @@ Many D features are retained:
 
 - Constants: `UPPER_SNAKE_CASE`
 - Functions: `snake_case` (C-style)
-- Types/structs: `PascalCase`
-- Private members: underscore prefix
+- Enums: `PascalCase`
+- Structs: Typically prefixed with `adbg_` and suffixed with `_t`
 - Platform-specific code uses `version` guards (`version (Windows)`, `version (Posix)`, etc.)
 - Code sections marked with `// ANCHOR Section Name` comments
 - Module headers use triple-slash doc comments with Authors, Copyright, License
@@ -133,3 +134,9 @@ Many D features are retained:
 Capstone disassembly engine 4.0.2 is an optional runtime dependency. Install via system package manager (e.g., `libcapstone4` on Debian/Ubuntu 22.04+) or download DLL on Windows.
 
 Assume for it to be installed for development purposes.
+
+## Important Notes
+
+### Windows
+
+The Debugger API on Windows require all calls to be done by the thread that initially spawned or attached to the process.

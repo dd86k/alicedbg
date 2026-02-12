@@ -43,4 +43,12 @@ unittest {
 	
 	// 2. Spawn executable
 	enforce(adbg_easy_spawn(ez, EXEC) == 0, "adbg_easy_spawn");
+	
+	// 3. Is it really alive?
+	enforce(adbg_easy_process_is_alive(ez) > 0, "adbg_easy_process_is_alive");
+	
+	// Destroy! We'll know if it hangs
+	adbg_easy_destroy(ez);
 }
+
+// TODO: Variant to attach

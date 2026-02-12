@@ -53,8 +53,7 @@ enum {
 	__PROC_STATUS_NO_PROC_MEM = 1 << 16,
 }
 
-// TODO: Any params used to spawn/attach to a process SHOULD be held in a new structure
-//       Either "adbg_debugger_t" (if generic oriented) or "adbg_tracee_t"
+// TODO: (Idea) Consider a "adbg_tracee_t" structure to diversify internals
 //       adbg_process_t should only have PID.
 /// Represents an instance of a process.
 struct adbg_process_t {
@@ -63,7 +62,7 @@ version (Windows) {
 	HANDLE orig_handle;	/// Original Process Handle
 	char *orig_args;	/// Saved arguments when process was launched
 	DWORD pid;	/// Process ID
-	uint option_timeout;
+	uint option_timeout;	/// For adbg_debugger_wait specifically
 }
 version (Posix) {
 	pid_t orig_pid;	/// Original spawned PID

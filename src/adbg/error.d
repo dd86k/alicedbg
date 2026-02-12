@@ -346,6 +346,8 @@ version (Trace) {
 import core.stdc.stdio, core.stdc.stdarg;
 private import adbg.include.d.config : D_FEATURE_PRAGMA_PRINTF;
 
+// NOTE: Reminder that trace() takes printf-like formatting
+
 private
 void adbg_trace_write(const(char) *mod, const(char) *func, int line, const(char) *fmt, va_list *args) {
 	fprintf(stderr, "TRACE[%s@%u] %s: ", mod, line, func);

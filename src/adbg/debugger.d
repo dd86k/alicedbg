@@ -633,11 +633,10 @@ version (Windows) {
 // NOTE: Wait function: Keep it simple!
 //
 //       The process and event parameters are absolute minimum.
-//       A timeout option is only useful on Windows.
-//       A "filter" int increases complexity pointlessly (user code can filter events itself).
-//
-//       The process return indicates which process was affected, and again,
-//       user code can filter itself.
+//       A timeout option is only useful on Windows (no timeout option for
+//       ptrace.2/wait.2 anyway).
+//       A "filter" parameter only increases complexity pointlessly (user code
+//       can filter these events itself).
 
 /// Wait until a new debug event occurs. This call is blocking.
 ///
@@ -664,6 +663,7 @@ version (Windows) {
 	DEBUG_EVENT de = void;
 Lwait:
 	if (WaitForDebugEvent(&de, process.option_timeout) == FALSE) {
+		adbg_oops(AdbgError.os);
 		return null;
 	}
 	
@@ -686,12 +686,11 @@ Lwait:
 		
 		event.process.status = process.status;
 		
-		adbg_exception_t exception = void;
-		adbg_translate_exception(&exception, process, &de);
+		adbg_translate_exception(&event.exception, process, &de);
 		// HACK: fill up thread details for exception
-		exception.thread.id      = de.dwThreadId;
-		exception.thread.process = process;
-		exception.thread.status  = 0;
+		event.exception.thread.id      = de.dwThreadId;
+		event.exception.thread.process = process;
+		event.exception.thread.status  = 0;
 		return &event.process;
 		
 		//goto Lcontinue; // auto-continue
