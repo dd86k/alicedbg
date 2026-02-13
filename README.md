@@ -1,63 +1,120 @@
-# Alice Debugger Project
+# alicedbg
 
-Aiming to be a simple cross-platform framework for debugging and object inspection.
+Cross-platform debugging and binary inspection framework written in D (BetterC).
 
-Fully written in D's [BetterC mode](https://dlang.org/spec/betterc.html),
-and available as a DUB package.
+## Overview
 
-It is currently available for Windows, Linux, and FreeBSD, under x86, x86-64, Armv7, and AArch64.
+alicedbg provides process debugging, binary format parsing, and disassembly
+under a unified API. It targets Windows, Linux, and FreeBSD on x86, x86-64,
+Armv7, and AArch64.
 
-Written from scratch for educational purposes.
+## Features
 
-## Warnings
+- **Debugging** -- spawn or attach to processes, set breakpoints, read/write
+  memory, inspect threads and stack frames, handle exceptions via callbacks
+- **Object inspection** -- parse 13 binary formats: ELF, PE, Mach-O, PDB,
+  COFF, MS-COFF, AR, MZ, NE, LX, OMF, Minidump, DMP
+- **Disassembly** -- multi-architecture disassembly via Capstone 4.0.2
+  (optional runtime dependency)
+- **Memory scanning** -- pattern scanning over process memory
+- **Two API levels** -- Easy API (high-level, multithreaded) and Multi API
+  (direct, granular control)
 
-⚠️ This is a toy project with barely any features! ⚠️
+## CLI Tools
 
-There are currently no stable APIs. Every releases pre-1.0 will see frequent
-changes to the API.
+### alicedbg
 
-None of the functions are currently thread-safe.
+Interactive debugger with a REPL shell.
 
-Compiling a static binary on one C runtime may not work on another due to
-specific behaviors when using ptrace(2).
+```
+$ alicedbg ./myapp
+Process './easy-target' created
+(adbg) go
+*	Process 48239 stopped
+	Reason  : ACCESS VIOLATION (11)
+(adbg) 
+```
 
-# Usage
+### alicedump
 
-Usage for `alicedbg` (debugger) and `alicedump` (dumper) can be looked in the
-repository Wiki, or invoking the `--help` argument.
+Binary format dumper. Parses headers, sections, imports, exports, relocations,
+and debug info.
 
-The disassembly feature is provided by Capstone 4.0.2 when it is available on
-the system. For Windows, the dynamic library can be
-[downloaded on GitHub](https://github.com/capstone-engine/capstone/releases/tag/4.0.2).
+```sh
+$ ./alicedump --headers /usr/bin/ls
+filename                    : /usr/bin/ls
+filesize                    : 142312
+type                        : Executable and Linkable Format
+id                          : elf
 
-For other platforms, package names are typically:
-- Debian, Ubuntu 22.04 and later, SUSE: `libcapstone4`
-- Ubuntu 20.04: `libcapstone3` (4.0.1)
-- RHEL: `capstone-devel`
-- Alpine: `capstone-dev`
+# Header
+e_ident[0]                  : 0x7f	(\x7f)
+e_ident[1]                  : 0x45	(E)
+e_ident[2]                  : 0x4c	(L)
+e_ident[3]                  : 0x46	(F)
+e_ident[EI_CLASS]           : 2	(ELF64)
+e_ident[EI_DATA]            : 1	(LSB)
+e_ident[EI_VERSION]         : 1
+e_ident[EI_OSABI]           : 0	(No ABI)
+e_ident[EI_ABIVERSION]      : 0
+e_ident[9]                  : 0
+e_ident[10]                 : 0
+e_ident[11]                 : 0
+e_ident[12]                 : 0
+e_ident[13]                 : 0
+e_ident[14]                 : 0
+e_ident[15]                 : 0
+e_type                      : 3	(DYN)
+e_machine                   : 62	(AMD x86-64)
+e_version                   : 1
+...
+```
 
-Capstone is licensed under the BSD 3-Clause license.
+## Library Usage
 
-# Hacking
+For an example using the Multi API, see `examples/simple.d`.
 
-There are two main branches:
-- `marisa`: Main development branch. Very unstable.
-- `stable`: Last released branch.
+## Building
 
-This project primarily uses [DUB](https://dub.pm/cli-reference/dub/)
-for compilation and unittesting.
+Requires [DUB](https://dub.pm/) and a D compiler (DMD, LDC, or GDC).
 
-Wiki contains more information on structure, features, and compilation
-instructions.
+```sh
+dub build            # library
+dub build :debugger  # alicedbg CLI
+dub build :dumper    # alicedump CLI
+dub test             # run tests
+```
 
-# Contributing
+Build types:
 
-Because I'm not very good at managing people and I tend to be a little too
-pedantic, I am currently not looking for contributors, sorry.
+```sh
+dub build -b release         # optimized
+dub build -b release-static  # statically linked
+dub build -b trace           # verbose tracing
+```
 
-However, feel free to provide feedback regarding contributor management,
-features, enhancements, and fixes. It's appreciated.
+## Capstone (Optional)
 
-# License
+Disassembly requires [Capstone](http://www.capstone-engine.org/) 4.0.2 at
+runtime. Without it, all other functionality remains available.
 
-This project is licensed under the BSD 3-Clause Clear license.
+| Platform               | Package            |
+|------------------------|--------------------|
+| Debian, Ubuntu 22.04+  | `libcapstone4`     |
+| RHEL                   | `capstone-devel`   |
+| Alpine                 | `capstone-dev`     |
+| Windows                | [capstone-4.0.2-win64.zip](https://github.com/capstone-engine/capstone/releases/tag/4.0.2) |
+
+## Status
+
+Pre-1.0. APIs are unstable and change between releases.
+
+Development happens on the `marisa` branch.
+The `stable` branch tracks the latest release.
+
+Not currently accepting contributions, but feedback on features and bugs is
+welcome.
+
+## License
+
+BSD-3-Clause-Clear
