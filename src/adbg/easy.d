@@ -213,6 +213,53 @@ int adbg_easy_continue(adbg_easy_t *ez) {
 	return adbg_easy_request(ez, &req);
 }
 
+/// Pause the process (debug break).
+///
+/// Generates a `processPaused` event. Call `adbg_easy_continue` to resume.
+/// Params: ez = Easy instance.
+/// Returns: Zero on success; Non-zero on error.
+int adbg_easy_pause(adbg_easy_t *ez) {
+	version (Trace) trace("ez=%p", ez);
+
+	if (ez == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	adbg_easy_request_t req = adbg_easy_request_t(Request.pause);
+	return adbg_easy_request(ez, &req);
+}
+
+/// Suspend the process at OS level.
+///
+/// Call `adbg_easy_resume` to resume from a suspend.
+///
+/// Windows: Does not generate a debug event.
+/// Params: ez = Easy instance.
+/// Returns: Zero on success; Non-zero on error.
+int adbg_easy_suspend(adbg_easy_t *ez) {
+	version (Trace) trace("ez=%p", ez);
+
+	if (ez == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	adbg_easy_request_t req = adbg_easy_request_t(Request.suspend);
+	return adbg_easy_request(ez, &req);
+}
+
+/// Resume the process from an OS-level suspend.
+///
+/// To be only used with `adbg_easy_suspend`.
+/// Params: ez = Easy instance.
+/// Returns: Zero on success; Non-zero on error.
+int adbg_easy_resume(adbg_easy_t *ez) {
+	version (Trace) trace("ez=%p", ez);
+
+	if (ez == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	adbg_easy_request_t req = adbg_easy_request_t(Request.resume);
+	return adbg_easy_request(ez, &req);
+}
+
 /// Ask if the process is still alive.
 /// Params: ez = Easy instance.
 /// Returns: Zero on success; Non-zero on error.
@@ -272,12 +319,17 @@ enum { // Easy instance status flags
 enum Request {
 	quit       = 1,
 
+	// Debugger session creation
 	spawn      = 100,
 	attach     = 101,
 
+	// Process control
 	continue_  = 200,
 	pause      = 201,
+	suspend    = 202,
+	resume     = 203,
 
+	// Process memory
 	readmemory = 500,
 	writememory= 501,
 }
@@ -502,6 +554,22 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 		break;
 	case Request.continue_:
 		return adbg_debugger_continue(ez.process, ez.tid);
+	case Request.pause:
+		return adbg_debugger_pause(ez.process);
+	case Request.suspend:
+		int rc = adbg_debugger_suspend(ez.process);
+		if (rc) return rc;
+		// Windows: NtSuspendProcess doesn't generate debug events,
+		// synthesize a processPaused event for the event thread
+		version (Windows) {
+			adbg_event_t synth_event = void;
+			synth_event.type = AdbgEvent.processPaused;
+			synth_event.process = *ez.process;
+			adbg_mailbox_send(&ez.event_box, message_t(0, &synth_event, adbg_event_t.sizeof));
+		}
+		return 0;
+	case Request.resume:
+		return adbg_debugger_resume(ez.process);
 	default:
 		version (Trace) trace("request:unknown req.type=%d", req.type);
 		return adbg_oops(AdbgError.assertion);
@@ -577,8 +645,9 @@ Lwait:
 	if (event.type == AdbgEvent.processExit)
 		return 0;
 
-	// No event handler, auto-continue
-	if (ez.uevent == null && adbg_process_is_stopped(process))
+	// No event handler, auto-continue (but not for pause/suspend events)
+	if (ez.uevent == null && event.type != AdbgEvent.processPaused
+			&& adbg_process_is_stopped(process))
 		adbg_easy_continue(ez); // Good one...
 
 	goto Lwait;

@@ -48,6 +48,10 @@ enum {
 	ADBG_PROCESS_STOPPED  = 1 << 1,
 	/// Process has exited.
 	ADBG_PROCESS_EXITED   = 1 << 2,
+	/// Debug-break requested (for event correlation).
+	ADBG_PROCESS_PAUSED   = 1 << 3,
+	/// OS-level suspended. Requires special handling.
+	ADBG_PROCESS_SUSPENDED = 1 << 4,
 	
 	/// Linux: /proc/PID/mem couldn't be opened, so do not depend on it
 	__PROC_STATUS_NO_PROC_MEM = 1 << 16,
@@ -107,6 +111,15 @@ int adbg_process_is_alive(adbg_process_t *proc) {
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	return (proc.status & ADBG_PROCESS_EXITED) == 0;
+}
+/// Check if process is paused or suspended.
+/// Params: proc = Process.
+/// Returns: Positive value if paused/suspended, zero if not, or negative value on error.
+int adbg_process_is_paused(adbg_process_t *proc) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	return proc.status & (ADBG_PROCESS_PAUSED | ADBG_PROCESS_SUSPENDED);
 }
 
 void adbg_process_free(adbg_process_t *proc) {

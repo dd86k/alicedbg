@@ -27,6 +27,7 @@ version (Windows) {
 	import core.sys.windows.winbase;
 	import adbg.include.windows.wow64apiset;
 	import adbg.include.windows.winnt;
+	import adbg.include.windows.ntdll;
 	import adbg.machines;
 	
 	version (X86)	version = WinTel;
@@ -39,6 +40,7 @@ version (Windows) {
 	import adbg.include.posix.ptrace;
 	import adbg.include.posix.unistd;
 	import adbg.include.posix.sys.wait;
+	import adbg.include.posix.signal;
 	import core.stdc.errno;
 	import core.sys.posix.fcntl;
 	
@@ -67,6 +69,8 @@ enum AdbgEvent {
 	processExit,
 	/// A process continued.
 	processContinue,
+	/// A process was paused or suspended.
+	processPaused,
 }
 
 /// Represents a debugger event.
@@ -691,8 +695,16 @@ Lwait:
 		event.exception.thread.id      = de.dwThreadId;
 		event.exception.thread.process = process;
 		event.exception.thread.status  = 0;
+
+		// Detect DebugBreakProcess: EXCEPTION_BREAKPOINT with PAUSED flag set
+		if (de.Exception.ExceptionRecord.ExceptionCode == STATUS_BREAKPOINT
+				&& (process.status & ADBG_PROCESS_PAUSED)) {
+			event.type = AdbgEvent.processPaused;
+			process.status &= ~ADBG_PROCESS_PAUSED; // no longer paused if something happens
+		}
+
 		return &event.process;
-		
+
 		//goto Lcontinue; // auto-continue
 	case EXIT_PROCESS_DEBUG_EVENT:
 		version(Trace) trace("ProcExit pid=%d tid=%d code=%u",
@@ -758,22 +770,29 @@ Lwait:
 			process.event_process_continued(process, udata);*/
 	} else if (WIFSTOPPED(wstatus)) { // stopped by signal
 		version (Trace) trace("Stopped status=%#x pid=%d", wstatus, process.pid);
-		
-		event.type = AdbgEvent.exception;
-		
+
 		process.status |= ADBG_PROCESS_STOPPED;
 		event.process.status = process.status;
-		
+
 		int signo = WSTOPSIG(wstatus);
-		
+
+		// Detect pause/suspend: SIGSTOP with PAUSED flag set
+		if (signo == SIGSTOP && (process.status & (ADBG_PROCESS_PAUSED | ADBG_PROCESS_SUSPENDED))) {
+			event.type = AdbgEvent.processPaused;
+			process.status &= ~ADBG_PROCESS_PAUSED; // no longer paused
+			return &event.process;
+		}
+
+		event.type = AdbgEvent.exception;
+
 		adbg_translate_exception(&event.exception, &event.process, cast(void*)signo);
-		
+
 		// HACK: fill up thread details for exception
 		event.exception.thread.process = &event.process;
 		event.exception.thread.id      = event.process.pid;
 		event.exception.thread.status  = 0;
 		return &event.process;
-		
+
 		//int e = adbg_debugger_continue(process, process.pid);
 		//if (e) return null;
 		//goto Lwait;
@@ -949,6 +968,114 @@ version (Windows) {
 } else static assert(0, "Implement adbg_debugger_continue");
 	
 	process.status &= ~ADBG_PROCESS_STOPPED;
+	return 0;
+}
+
+/// Debug break: interrupt the process and generate a debug event.
+///
+/// The event loop will report a `processPaused` event.
+/// Call `adbg_debugger_continue` to resume after a debug break.
+/// Windows: Uses DebugBreakProcess which injects a breakpoint exception.
+/// POSIX: Sends SIGSTOP which is intercepted by ptrace.
+/// Params: process = Process instance.
+/// Returns: Error code.
+int adbg_debugger_pause(adbg_process_t *process) {
+	if (process == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	if ((process.status & ADBG_PROCESS_ATTACHED) == 0)
+		return adbg_oops(AdbgError.debuggerUnattached);
+	if (process.status & (ADBG_PROCESS_PAUSED | ADBG_PROCESS_SUSPENDED))
+		return adbg_oops(AdbgError.debuggerInvalidAction);
+
+	process.status |= ADBG_PROCESS_PAUSED; // set before so wait catches it
+
+version (Windows) {
+	HANDLE phandle = OpenProcess(PROCESS_CREATE_THREAD, FALSE, cast(DWORD)process.pid);
+	if (phandle == null) {
+		process.status &= ~ADBG_PROCESS_PAUSED;
+		return adbg_oops(AdbgError.os);
+	}
+	scope(exit) CloseHandle(phandle);
+	if (DebugBreakProcess(phandle) == FALSE) {
+		process.status &= ~ADBG_PROCESS_PAUSED;
+		return adbg_oops(AdbgError.os);
+	}
+} else version (Posix) {
+	if (kill(process.pid, SIGSTOP) < 0) {
+		process.status &= ~ADBG_PROCESS_PAUSED;
+		return adbg_oops(AdbgError.os);
+	}
+}
+	return 0;
+}
+
+/// Suspend the process at OS level.
+///
+/// On Windows, uses NtSuspendProcess. This does NOT generate a debug event.
+/// On POSIX, sends SIGSTOP (same as pause; ptrace intercepts everything).
+/// Call `adbg_debugger_resume` to resume from a suspend.
+/// Params: process = Process instance.
+/// Returns: Error code.
+int adbg_debugger_suspend(adbg_process_t *process) {
+	if (process == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	if ((process.status & ADBG_PROCESS_ATTACHED) == 0)
+		return adbg_oops(AdbgError.debuggerUnattached);
+	if (process.status & (ADBG_PROCESS_PAUSED | ADBG_PROCESS_SUSPENDED))
+		return adbg_oops(AdbgError.debuggerInvalidAction);
+
+version (Windows) {
+	if (__dynlib_ntdll_load())
+		return adbg_oops(AdbgError.unimplemented);
+	HANDLE phandle = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, cast(DWORD)process.pid);
+	if (phandle == null)
+		return adbg_oops(AdbgError.os);
+	scope(exit) CloseHandle(phandle);
+	if (NtSuspendProcess(phandle) != 0)
+		return adbg_oops(AdbgError.os);
+} else version (Posix) {
+	// On POSIX, ptrace intercepts SIGSTOP the same as pause
+	process.status |= ADBG_PROCESS_PAUSED; // for wait() correlation
+	if (kill(process.pid, SIGSTOP) < 0) {
+		process.status &= ~ADBG_PROCESS_PAUSED;
+		return adbg_oops(AdbgError.os);
+	}
+}
+	process.status |= ADBG_PROCESS_SUSPENDED;
+	return 0;
+}
+
+/// Resume the process from an OS-level suspend.
+///
+/// On Windows, uses NtResumeProcess.
+/// On POSIX, uses PTRACE_CONT (Linux) or PT_CONTINUE (FreeBSD).
+/// Params: process = Process instance.
+/// Returns: Error code.
+int adbg_debugger_resume(adbg_process_t *process) {
+	if (process == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	if ((process.status & ADBG_PROCESS_ATTACHED) == 0)
+		return adbg_oops(AdbgError.debuggerUnattached);
+	if ((process.status & ADBG_PROCESS_SUSPENDED) == 0)
+		return adbg_oops(AdbgError.debuggerInvalidAction);
+
+version (Windows) {
+	if (__dynlib_ntdll_load())
+		return adbg_oops(AdbgError.unimplemented);
+	HANDLE phandle = OpenProcess(PROCESS_SUSPEND_RESUME, FALSE, cast(DWORD)process.pid);
+	if (phandle == null)
+		return adbg_oops(AdbgError.os);
+	scope(exit) CloseHandle(phandle);
+	if (NtResumeProcess(phandle) != 0)
+		return adbg_oops(AdbgError.os);
+} else version (linux) {
+	if (ptrace(PTRACE_CONT, process.pid, null, null) < 0)
+		return adbg_oops(AdbgError.os);
+} else version (Posix) {
+	if (ptrace(PT_CONTINUE, process.pid, cast(caddr_t)1, 0) < 0)
+		return adbg_oops(AdbgError.os);
+}
+	process.status &= ~(ADBG_PROCESS_SUSPENDED | ADBG_PROCESS_STOPPED | ADBG_PROCESS_PAUSED);
 	return 0;
 }
 

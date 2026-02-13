@@ -16,5 +16,8 @@ BOOL QueryFullProcessImageNameA(
   HANDLE hProcess,	// [in]
   DWORD  dwFlags,	// [in]
   LPSTR  lpExeName,	// [out]
-  PDWORD lpdwSize	// [in, out
+  PDWORD lpdwSize	// [in, out]
 );
+
+extern (Windows)
+BOOL DebugBreakProcess(HANDLE Process);
