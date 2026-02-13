@@ -40,21 +40,18 @@ dub build -b docs
 
 ## Git Branches
 
-- `marisa`: Main development branch (unstable). Use as PR target.
+- `marisa`: Main development branch. Use as PR target.
 - `stable`: Last released branch.
-- `easyapi`: Current feature branch for multithreaded Easy API.
 
 ## Architecture
 
-Essentially, the Easy API is contained in `easy.d`.
-
-The rest is considered to be Multi API, akin to libcurl.
+Essentially, there are two sets of APIs: Easy API (`src/adbg/easy.d`) and Multi API (the rest).
 
 ### Library (`src/adbg/`)
 
 The public API surface is defined in `src/adbg/package.d` and re-exports these core modules:
 
-- **`debugger.d`** — Core debugging features: process spawning/attaching, event-driven via ptrace (POSIX) or Windows Debug API
+- **`debugger.d`** — Core debugging features: process spawning/attaching, pause/suspend/resume, event-driven via ptrace (POSIX) or Windows Debug API
 - **`process/`** — Process management: threads, memory read/write, breakpoints, stack frames, exception info
 - **`objectserver.d`** + **`objects/`** — Binary format parsing for 14+ formats (ELF, PE, Mach-O, PDB, COFF, AR, MZ, NE, LX, etc.)
 - **`disassembler.d`** — Capstone 4.0.2 wrapper for multi-architecture disassembly (optional runtime dependency)
@@ -63,6 +60,8 @@ The public API surface is defined in `src/adbg/package.d` and re-exports these c
 - **`easy.d`** — High-level multithreaded debugging loop API using message-based mailboxes (WIP, `easyapi` branch)
 
 ### Internal utilities (`src/adbg/utils/`)
+
+These are used within alicedbg internally, though sometimes the front-ends re-use these.
 
 - **`bit.d`** — Bit operations.
 - **`date.d`** — Date utilities.
@@ -136,6 +135,13 @@ Capstone disassembly engine 4.0.2 is an optional runtime dependency. Install via
 Assume for it to be installed for development purposes.
 
 ## Important Notes
+
+### Debugger Process Control
+
+Two distinct operations exist for stopping a running process:
+
+- **Debug break** (`pause`): Interrupts the process and generates a `processPaused` debug event. The user calls `continue` to resume. Uses `DebugBreakProcess` on Windows, `kill(SIGSTOP)` on POSIX.
+- **OS-level suspend** (`suspend`/`resume`): Freezes threads at OS level. On Windows uses `NtSuspendProcess`/`NtResumeProcess` (no debug event generated). On POSIX, functionally equivalent to pause since ptrace intercepts all signals.
 
 ### Windows
 
