@@ -11,6 +11,7 @@ module adbg.easy;
 public import adbg.error; // makes it easier to deal with messages
 import adbg.debugger;
 import adbg.os.mutex;
+import adbg.os.semaphore;
 import adbg.os.threads;
 import adbg.process.base;
 import adbg.utils.mailbox;
@@ -48,6 +49,8 @@ struct adbg_easy_t {
 	// there is no point doing filtering ourselves.
 	void function(adbg_easy_t *ez, adbg_process_t *process, adbg_event_t *event, void *udata) uevent;
 	
+	os_semaphore_t done_sem;
+
 	// Last event Thread ID.
 	// A hack for auto-continue because code structure is not great...
 	long tid;
@@ -78,6 +81,11 @@ adbg_easy_t* adbg_easy_create() {
 
 	//
 	if (os_mutex_init(&ez.lock)) {
+		adbg_oops(AdbgError.os);
+		goto Lerror;
+	}
+
+	if (os_sem_create(&ez.done_sem)) {
 		adbg_oops(AdbgError.os);
 		goto Lerror;
 	}
@@ -120,6 +128,7 @@ void adbg_easy_destroy(adbg_easy_t *ez) {
 	adbg_mailbox_destroy(&ez.reply_box);
 	adbg_mailbox_destroy(&ez.event_box);
 	os_mutex_destroy(&ez.lock);
+	os_sem_close(&ez.done_sem);
 
 	free(ez);
 }
@@ -261,6 +270,24 @@ int adbg_easy_process_is_alive(adbg_easy_t *ez) {
 	if (ez == null || ez.process == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	return adbg_process_is_alive(ez.process);
+}
+
+/// Block until the debugged process exits or the event thread terminates.
+///
+/// Only useful in a scenario that the Easy API is used and needs blocking,
+/// like a CLI application, because the Easy API is already multithreaded.
+/// Params: ez = Easy instance.
+/// Returns: Zero on success; Non-zero on error.
+int adbg_easy_wait(adbg_easy_t *ez) {
+	version (Trace) trace("ez=%p", ez);
+
+	if (ez == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	if (os_sem_wait(&ez.done_sem))
+		return adbg_oops(AdbgError.os);
+
+	return 0;
 }
 
 private:
@@ -577,8 +604,10 @@ Lwait:
 	message_t *msg = adbg_mailbox_receive(&ez.event_box);
 	// HACK: EVENT_MSG_QUIT is sent by debugger thread when quitting
 	//       without notifying user callback
-	if (msg == null || msg.type == EVENT_MSG_QUIT)
+	if (msg == null || msg.type == EVENT_MSG_QUIT) {
+		os_sem_notify(&ez.done_sem);
 		return 0;
+	}
 
 	adbg_event_t *event = cast(adbg_event_t*)msg.data;
 
@@ -589,8 +618,10 @@ Lwait:
 	}
 
 	// If the process exits, quit loop. Nothing else to wait on
-	if (event.type == AdbgEvent.processExit)
+	if (event.type == AdbgEvent.processExit) {
+		os_sem_notify(&ez.done_sem);
 		return 0;
+	}
 
 	goto Lwait;
 }
@@ -613,8 +644,10 @@ int adbg_easy_thread_events_posix(__osthread_t *thread, void *data) {
 	adbg_event_t event = void;
 Lwait:
 	adbg_process_t *process = adbg_debugger_wait(ez.process, &event);
-	if (process == null)
+	if (process == null) {
+		os_sem_notify(&ez.done_sem);
 		return adbg_error_code();
+	}
 
 	if (event.type == AdbgEvent.exception)
 		ez.tid = event.exception.thread.id; // for auto-continue
@@ -624,8 +657,10 @@ Lwait:
 		ez.uevent(ez, process, &event, ez.udata);
 
 	// If the process exits, quit loop. Nothing else to wait on
-	if (event.type == AdbgEvent.processExit)
+	if (event.type == AdbgEvent.processExit) {
+		os_sem_notify(&ez.done_sem);
 		return 0;
+	}
 
 	// No event handler, auto-continue (but not for pause/suspend events)
 	if (ez.uevent == null && event.type != AdbgEvent.processPaused

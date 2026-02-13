@@ -15,9 +15,7 @@ import core.stdc.stdlib : exit, EXIT_FAILURE;
 import adbg;
 import adbg.easy;
 
-extern (C): __gshared: private:
-
-int done;
+extern (C): private:
 
 void oops(int code = 0, const(char) *reason = null) {
 	printf("* error=\"%s\" code=\"%d\"\n",
@@ -44,8 +42,7 @@ void event_handler(adbg_easy_t *ez, adbg_process_t *process, adbg_event_t *event
 			adbg_easy_continue(ez);
 			break;
 		default:
-			// First real fault: stop
-			done = 1;
+			break;
 		}
 		break;
 	case AdbgEvent.processCreated:
@@ -56,7 +53,6 @@ void event_handler(adbg_easy_t *ez, adbg_process_t *process, adbg_event_t *event
 		break;
 	case AdbgEvent.processExit:
 		printf("* event=\"exited\" pid=%d code=%d\n", adbg_process_id(process), event.exitcode);
-		done = 1;
 		break;
 	default:
 	}
@@ -71,15 +67,16 @@ int main(int argc, const(char) **argv) {
 	if (ez == null)
 		oops;
 
-	// 2. Set event handler (pass ez as user data so we can call continue)
+	// 2. Set event handler
 	adbg_easy_set_event_handler(ez, &event_handler);
 
 	// 3. Spawn executable
 	if (adbg_easy_spawn(ez, argv[1]))
 		oops;
 
-	// 4. Wait until done (event handler sets the flag)
-	while (!done) {}
+	// 4. Block until process exits
+	//    In a GUI application, you wouldn't need this!
+	adbg_easy_wait(ez);
 
 	// 5. Clean up
 	puts("* quitting");
