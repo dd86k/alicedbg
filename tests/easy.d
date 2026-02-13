@@ -20,13 +20,14 @@ void enforce(bool cond, string func,
 		file, line);
 }
 
+enum SRC = "tests/easy-target.d";
+version (Windows) enum EXEC="easy-target.exe";
+else              enum EXEC="./easy-target";
+import std.file : exists;
+import std.process : spawnProcess, Pid;
+
+/// Example of spawning
 unittest {
-	enum SRC = "tests/easy-target.d";
-	version (Windows) enum EXEC="easy-target.exe";
-	else              enum EXEC="./easy-target";
-	
-	import std.file : exists;
-	
 	// 0. Check if target exists
 	//    Unbothered to detect dmd/gdc/ldc and perform a compile
 	//    Do that yourself
@@ -51,4 +52,29 @@ unittest {
 	adbg_easy_destroy(ez);
 }
 
-// TODO: Variant to attach
+/// Example of attaching
+unittest {
+	// 0. Check if target exists
+	//    Unbothered to detect dmd/gdc/ldc and perform a compile
+	//    Do that yourself
+	if (exists(EXEC) == false) {
+		writeln("easy: target does not exist");
+		writeln("easy: compile '", SRC, "' as '", EXEC, "'");
+		writeln("easy: then re-run this test");
+		assert(false, "Compile target and run this test again");
+	}
+	
+	// 1. Create easy instance
+	adbg_easy_t *ez = adbg_easy_create();
+	enforce(ez != null, "adbg_easy_create");
+	
+	// 2. Spawn executable and attach to it
+	Pid proc = spawnProcess([ EXEC, "1" ]);
+	enforce(adbg_easy_attach(ez, proc.processID) == 0, "adbg_easy_attach");
+	
+	// 3. Is it really alive?
+	enforce(adbg_easy_process_is_alive(ez) > 0, "adbg_easy_process_is_alive");
+	
+	// Destroy! We'll know if it hangs
+	adbg_easy_destroy(ez);
+}
