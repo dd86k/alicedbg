@@ -80,18 +80,28 @@ version (linux) {
 	void *udata;
 }
 
+/// Check if process was attached, as opposed to spawned.
+/// Params: proc = Process.
+/// Returns: Positive value if it was attached, zero if not, or negative value on error.
 int adbg_process_is_attached(adbg_process_t *proc) {
 	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	return proc.status & ADBG_PROCESS_ATTACHED;
 }
+/// Check if process is in a stopped state, useful to know if it is safe to
+/// call continue.
+/// Params: proc = Process.
+/// Returns: Positive value if stopped, zero if not, or negative value on error.
 int adbg_process_is_stopped(adbg_process_t *proc) {
 	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);
 	
 	return proc.status & ADBG_PROCESS_STOPPED;
 }
+/// Check if process is still alive (ie, not exited).
+/// Params: proc = Process.
+/// Returns: Positive value if stopped, zero if not, or negative value on error.
 int adbg_process_is_alive(adbg_process_t *proc) {
 	if (proc == null)
 		return adbg_oops(AdbgError.invalidArgument);
