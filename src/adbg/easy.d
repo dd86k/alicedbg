@@ -46,7 +46,7 @@ struct adbg_easy_t {
 
 	// There is only one callback, because, just like the note in src/adbg/debugger.d,
 	// there is no point doing filtering ourselves.
-	void function(adbg_process_t *process, adbg_event_t *event, void *udata) uevent;
+	void function(adbg_easy_t *ez, adbg_process_t *process, adbg_event_t *event, void *udata) uevent;
 	
 	// Last event Thread ID.
 	// A hack for auto-continue because code structure is not great...
@@ -132,7 +132,7 @@ void adbg_easy_destroy(adbg_easy_t *ez) {
 /// 	ez = Easy instance.
 /// 	ufunc = User function. Can be set to null to clear it.
 void adbg_easy_set_event_handler(adbg_easy_t *ez,
-	void function(adbg_process_t *process, adbg_event_t *event, void *udata) ufunc) {
+	void function(adbg_easy_t *ez, adbg_process_t *process, adbg_event_t *event, void *udata) ufunc) {
 	version (Trace) trace("ez=%p ufunc=%p", ez, ufunc);
 
 	if (ez == null)
@@ -585,7 +585,7 @@ Lwait:
 	// Send event to user callback
 	if (ez.uevent) {
 		adbg_process_t *process = &event.process;
-		ez.uevent(process, event, ez.udata);
+		ez.uevent(ez, process, event, ez.udata);
 	}
 
 	// If the process exits, quit loop. Nothing else to wait on
@@ -621,7 +621,7 @@ Lwait:
 
 	// Send event to user callback
 	if (ez.uevent)
-		ez.uevent(process, &event, ez.udata);
+		ez.uevent(ez, process, &event, ez.udata);
 
 	// If the process exits, quit loop. Nothing else to wait on
 	if (event.type == AdbgEvent.processExit)

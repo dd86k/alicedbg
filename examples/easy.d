@@ -27,7 +27,7 @@ void oops(int code = 0, const(char) *reason = null) {
 	exit(EXIT_FAILURE);
 }
 
-void event_handler(adbg_process_t *process, adbg_event_t *event, void *udata) {
+void event_handler(adbg_easy_t *ez, adbg_process_t *process, adbg_event_t *event, void *udata) {
 	switch (event.type) {
 	case AdbgEvent.exception:
 		adbg_exception_t *exc = &event.exception;
@@ -41,7 +41,7 @@ void event_handler(adbg_process_t *process, adbg_event_t *event, void *udata) {
 		switch (adbg_exception_type(exc)) with (AdbgException) {
 		case Breakpoint, Step:
 			// Initial breakpoint or single-step: continue
-			adbg_easy_continue(cast(adbg_easy_t*)udata);
+			adbg_easy_continue(ez);
 			break;
 		default:
 			// First real fault: stop
@@ -73,7 +73,6 @@ int main(int argc, const(char) **argv) {
 
 	// 2. Set event handler (pass ez as user data so we can call continue)
 	adbg_easy_set_event_handler(ez, &event_handler);
-	adbg_easy_set_user_data(ez, ez);
 
 	// 3. Spawn executable
 	if (adbg_easy_spawn(ez, argv[1]))
