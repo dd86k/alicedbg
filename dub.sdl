@@ -45,6 +45,16 @@ subPackage {
 	dflags "-betterC" platform="ldc"
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
 }
+subPackage {
+	name "easy-example"
+	targetName "easy-example"
+	targetType "executable"
+	sourceFiles "examples/easy.d"
+	dependency "alicedbg" version="*"
+	dflags "-betterC" platform="dmd"
+	dflags "-betterC" platform="ldc"
+	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+}
 
 #
 # ANCHOR Configurations

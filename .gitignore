@@ -16,6 +16,10 @@ alicedbg-test-*
 alicedbg-*-test-*
 /alicedump
 alicedump-*-test-*
+
+# From tests
+/easy-example
+/easy-example.exe
 /easy-target
 /easy-target.exe
 /simple
