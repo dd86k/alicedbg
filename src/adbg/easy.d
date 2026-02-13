@@ -18,14 +18,6 @@ import core.stdc.stdlib : calloc, free;
 
 extern (C):
 
-// TODO: Multithread test
-//
-//       Right now, this assumes one thread caller, but real-world environments,
-//       this could be multiple callers, which will need better sync mechanics.
-//
-//       One example being if a second thread calls a request fonctions and
-//       gets the incorrect response (Request 3 finishing before Reuqest 2).
-
 /// Message capacity for mailboxes
 private enum CAPACITY = 10;
 
@@ -271,18 +263,9 @@ int adbg_easy_process_is_alive(adbg_easy_t *ez) {
 	return adbg_process_is_alive(ez.process);
 }
 
-// NOTE: Debugger events
-//       Because this is multithreaded, obviously, callbacks are much better suited
-//       for Easy API than Multi API.
-//       adbg_debugger_on_EVENT(callback) advantages over adbg_debugger_on(enum, callback):
-//       - Callback type checking (when source compiling)
-//       - Access to attributes (like `deprecated`) per function
-//       - No need to map and update enumeration values
-//       - Better documentation per function
-
 private:
 
-/* Easy API architecture (DRAFT)
+/* Easy API architecture
 
   Windows model
   Debug API & WaitForDebugEvent functions MUST be on the same thread
@@ -290,7 +273,7 @@ private:
   User Thread
     [Request Mailbox]
       Debugger Thread + Event polling
-        On Attach/Spawn: Spawn event thread
+        On Attach/Spawn: Spawn event thread and sents events to event thread
         On Event: [Event Mailbox] -> Event Thread -> User Callback
 
   POSIX model
@@ -301,21 +284,18 @@ private:
     [Request Mailbox]
       Debugger Thread
         On Attach/Spawn: Spawn event thread
-	On Event: Event Thread -> User Callback
+	On Event: Event Thread -> Wait for event -> User Callback
 
   Requests: See Request enum
   Response: 0 for success or AdbgError
   Event: AdbgEvent
 */
 
-enum { // Easy instance status flags
-	EASY_ATTACHED = 1 << 0,
-}
-
 //
 // Requests
 //
 
+/// Internal request
 enum Request {
 	quit       = 1,
 
@@ -334,10 +314,12 @@ enum Request {
 	writememory= 501,
 }
 
+/// Represents spawn request arguments
 struct adbg_easy_request_spawn_t {
 	const(char) *path;
 }
 
+/// Represents attach request arguments
 struct adbg_easy_request_attach_t {
 	int pid;
 }
@@ -409,7 +391,7 @@ int adbg_easy_request(adbg_easy_t *ez, adbg_easy_request_t *req,
 // Debugger thread
 //
 
-enum EVENT_MSG_QUIT = 1;
+enum EVENT_MSG_QUIT = 1; // Currently used in a hack on Windows
 
 // Internal function to know if debugger should auto-continue.
 // Called by debugger thread on Windows and event thread on POSIX.
