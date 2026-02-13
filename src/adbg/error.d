@@ -77,6 +77,10 @@ enum AdbgError {
 	systemLoadError	= -402,
 	systemBindError	= -403,
 	//
+	// 500-599: Easy API
+	//
+	timeout = -500,
+	//
 	// 800-899: Memory scanner
 	//
 	scannerDataEmpty	= -800,
@@ -98,20 +102,21 @@ enum AdbgError {
 }
 
 /// Represents an error in alicedbg.
-private
+package // easy module needs a copy of error
 struct adbg_error_t {
-	int srccode;	/// Error code from Alicedbg
+	int code;	/// Error code from Alicedbg
 	int modcode;	/// Error code for module
 	const(char)* func;	/// Source function
 	int line;	/// Line source
 }
 /// Last error in alicedbg.
-private __gshared adbg_error_t error;
+private
+adbg_error_t error; // Keep in TLS!
 
 /// Get last Alicedbg error code.
 /// Returns: Error code (AdbgError).
 int adbg_error_code() {
-	return error.srccode;
+	return error.code;
 }
 /// Get the last error from the associated module.
 /// Returns: Error code (submodule).
@@ -129,15 +134,20 @@ const(char)* adbg_error_function() {
 	return error.func;
 }
 
+deprecated
+adbg_error_t* adbg_error() {
+	return &error;
+}
+
 /// Get error message from the OS (or CRT) by providing the error code
 /// Params: code = Error code number from OS
 /// Returns: String
 private
 const(char)* adbg_error_system_message(int code) {
 	version (Windows) {
-		//TODO: Handle NTSTATUS codes
+		// TODO: Handle NTSTATUS codes
 		enum ERR_BUF_SZ = 256;
-		__gshared char [ERR_BUF_SZ]buffer = void;
+		static char [ERR_BUF_SZ]buffer = void; // LTS
 		size_t len = FormatMessageA(
 			FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_MAX_WIDTH_MASK,
 			null,
@@ -158,8 +168,35 @@ const(char)* adbg_error_system_message(int code) {
 
 /// Reset the last set error code.
 void adbg_error_reset() {
-	// NOTE: Code is enough. Other fields are purely internal.
-	error.srccode = 0;
+	import core.stdc.string : memset;
+	adbg_error_t *e = &error;
+	memset(&error, 0, adbg_error_t.sizeof);
+	/*error.code = 0;
+	error.func = null;
+	error.line = 0;*/
+}
+
+// Easy module needs to be able to set error for caller thread
+package
+void adbg_error_paste(adbg_error_t *buffer) {
+	assert(buffer);
+	// NOTE: Copying
+	//       Global is now in TLS, calling memcpy or doing struct copy
+	//       will make this crash
+	import core.stdc.string : memcpy;
+	memcpy(&error, buffer, adbg_error_t.sizeof);
+	/*error.code    = buffer.code;
+	error.func    = buffer.func;
+	error.line    = buffer.line;
+	error.modcode = buffer.modcode;*/
+}
+deprecated alias adbg_error_set2 = adbg_error_paste;
+
+package
+void adbg_error_copy(adbg_error_t *buffer) {
+	assert(buffer);
+	import core.stdc.string : memcpy;
+	memcpy(buffer, &error, adbg_error_t.sizeof);
 }
 
 private
@@ -168,7 +205,7 @@ void adbg_error_set(AdbgError e, void *handle, const(char)* func, int line) {
 	error.line = line;
 	// To avoid additional errors, such as formatting,
 	// get the underlying error code now for later.
-	switch (error.srccode = e) {
+	switch (error.code = e) {
 	case AdbgError.os:
 		version (Windows)
 			error.modcode = GetLastError();
@@ -289,7 +326,7 @@ private immutable adbg_error_msg_t[] errors_msg = [
 /// Returns: Error message.
 export
 const(char)* adbg_error_message() {
-	switch (error.srccode) with (AdbgError) {
+	switch (error.code) with (AdbgError) {
 	case crt:
 		return strerror(error.modcode);
 	case os:
@@ -298,7 +335,7 @@ const(char)* adbg_error_message() {
 		return cs_strerror(error.modcode);
 	default:
 		foreach (ref e; errors_msg)
-			if (error.srccode == e.code)
+			if (error.code == e.code)
 				return e.msg.ptr;
 	}
 	return defaultMsg;
@@ -308,6 +345,8 @@ version (Trace) {
 
 import core.stdc.stdio, core.stdc.stdarg;
 private import adbg.include.d.config : D_FEATURE_PRAGMA_PRINTF;
+
+// NOTE: Reminder that trace() takes printf-like formatting
 
 private
 void adbg_trace_write(const(char) *mod, const(char) *func, int line, const(char) *fmt, va_list *args) {

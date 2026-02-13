@@ -16,6 +16,8 @@ alicedbg-test-*
 alicedbg-*-test-*
 /alicedump
 alicedump-*-test-*
+/easy-target
+/easy-target.exe
 /simple
 *.dll
 *.dylib

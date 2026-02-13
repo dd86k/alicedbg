@@ -9,7 +9,8 @@ import adbg.self;
 import adbg.error;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE, exit;
 import core.stdc.stdio;
-import shell, term;
+import shell;
+import common.terminal;
 import common.errormgmt;
 import common.cli;
 import common.utils;
@@ -81,7 +82,8 @@ int cli_help() {
 	getoptprinter(options[NUMBER_OF_SECRETS..$]);
 	puts("\nFor a list of values, for example a list of platforms, type '-a help'");
 	exit(0);
-	return 0;
+	// noreturn exit
+	static if (__VERSION__ > 2099) return 0;
 }
 
 // --meow: Secret
@@ -99,7 +101,8 @@ int cli_meow() {
 `
 	);
 	exit(0);
-	return 0;
+	// noreturn exit
+	static if (__VERSION__ > 2099) return 0;
 }
 
 extern (C)
@@ -108,7 +111,7 @@ int main(int argc, const(char)** argv) {
 	// Could do a warning, but it might be a little confusing
 	adbg_self_set_crashhandler(&crashed);
 	
-	coninit();
+	console_init(); // for logerror
 	
 	argc = getoptions(argc, argv, options);
 	if (argc < 0) {

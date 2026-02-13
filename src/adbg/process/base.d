@@ -17,6 +17,7 @@ module adbg.process.base;
 //       Linux: Send SIGSTOP/SIGCONT signals via kill(2)
 // TODO: Functions to spawn process without debugger.
 // TODO: Functions to attach process without debugger.
+// TODO: Rename module to adbg.process.process.
 
 import adbg.include.c.stdlib; // malloc, calloc, free, exit;
 import adbg.include.c.stdarg;
@@ -40,27 +41,24 @@ version (Windows) {
 
 extern (C):
 
-/// Process status
-enum AdbgProcessState : ubyte {
-	unknown,	/// Process status is not known.
-	created,	/// Process was created by debugger and waiting to run.
-	running,	/// Process is running.
-	stopped,	/// Process is paused due to an exception or by the debugger.
-}
-
-/// Process creation source.
-enum AdbgCreation : ubyte {
-	unattached,
-	unloaded = unattached, // Older alias
-	attached,
-	spawned,
-}
-
-package enum {
+enum {
+	/// Debugger is attached.
+	ADBG_PROCESS_ATTACHED = 1,
+	/// Process has stopped.
+	ADBG_PROCESS_STOPPED  = 1 << 1,
+	/// Process has exited.
+	ADBG_PROCESS_EXITED   = 1 << 2,
+	/// Debug-break requested (for event correlation).
+	ADBG_PROCESS_PAUSED   = 1 << 3,
+	/// OS-level suspended. Requires special handling.
+	ADBG_PROCESS_SUSPENDED = 1 << 4,
+	
 	/// Linux: /proc/PID/mem couldn't be opened, so do not depend on it
 	__PROC_STATUS_NO_PROC_MEM = 1 << 16,
 }
 
+// TODO: (Idea) Consider a "adbg_tracee_t" structure to diversify internals
+//       adbg_process_t should only have PID.
 /// Represents an instance of a process.
 struct adbg_process_t {
 version (Windows) {
@@ -68,7 +66,7 @@ version (Windows) {
 	HANDLE orig_handle;	/// Original Process Handle
 	char *orig_args;	/// Saved arguments when process was launched
 	DWORD pid;	/// Process ID
-	uint option_timeout;
+	uint option_timeout;	/// For adbg_debugger_wait specifically
 }
 version (Posix) {
 	pid_t orig_pid;	/// Original spawned PID
@@ -77,28 +75,51 @@ version (Posix) {
 			// On Linux, the starting thread ID is the same as the process ID
 }
 version (linux) {
-	int mhandle;	/// Internal memory file handle to /proc/PID/mem
+	int procmemfd;	/// Internal memory file handle to /proc/PID/mem
 }
 	/// Internal status
 	int status;
 	
-	/// Last known process status.
-	AdbgProcessState state;
-	/// Process' creation source.
-	AdbgCreation creation;
-	// List of breakpoints.
-	//list_t *breakpoint_list;
-	
-	// HACK: Debugger event handlers
-	void function(adbg_process_t*, void *udata, adbg_exception_t *ex) event_exception;
-//	void function(adbg_process_t*, void *udata) event_process_created;
-	// TODO: Consider moving `int code` to `int *code`
-	void function(adbg_process_t*, void *udata, int code) event_process_exited;
-	// TODO: Consider moving `long tid` to `adbg_process_thread_t *thread`
-	void function(adbg_process_t*, void *udata, long tid) event_process_continued;
-	
 	// HACK: Event user data (when attached in wait)
 	void *udata;
+}
+
+/// Check if process was attached, as opposed to spawned.
+/// Params: proc = Process.
+/// Returns: Positive value if it was attached, zero if not, or negative value on error.
+int adbg_process_is_attached(adbg_process_t *proc) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	return proc.status & ADBG_PROCESS_ATTACHED;
+}
+/// Check if process is in a stopped state, useful to know if it is safe to
+/// call continue.
+/// Params: proc = Process.
+/// Returns: Positive value if stopped, zero if not, or negative value on error.
+int adbg_process_is_stopped(adbg_process_t *proc) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	return proc.status & ADBG_PROCESS_STOPPED;
+}
+/// Check if process is still alive (ie, not exited).
+/// Params: proc = Process.
+/// Returns: Positive value if stopped, zero if not, or negative value on error.
+int adbg_process_is_alive(adbg_process_t *proc) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	
+	return (proc.status & ADBG_PROCESS_EXITED) == 0;
+}
+/// Check if process is paused or suspended.
+/// Params: proc = Process.
+/// Returns: Positive value if paused/suspended, zero if not, or negative value on error.
+int adbg_process_is_paused(adbg_process_t *proc) {
+	if (proc == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	return proc.status & (ADBG_PROCESS_PAUSED | ADBG_PROCESS_SUSPENDED);
 }
 
 void adbg_process_free(adbg_process_t *proc) {
@@ -113,31 +134,9 @@ void adbg_process_free(adbg_process_t *proc) {
 		if (proc.orig_argv) free(proc.orig_argv);
 	}
 	version (linux) {
-		if (proc.mhandle) close(proc.mhandle);
+		if (proc.procmemfd) close(proc.procmemfd);
 	}
 	free(proc);
-}
-
-/// Get the debuggee's current status.
-/// Params: tracee = Debugged process.
-/// Returns: Debuggee status.
-AdbgProcessState adbg_process_status(adbg_process_t *tracee) pure {
-	if (tracee == null) return AdbgProcessState.unknown;
-	return tracee.state;
-}
-/// Get the debuggee current status as a string.
-/// Params: tracee = Debugged process.
-/// Returns: Debuggee status string.
-const(char)* adbg_process_status_string(adbg_process_t *tracee) pure {
-	static immutable const(char) *default_ = "unknown";
-	if (tracee == null)
-		return default_;
-	final switch (tracee.state) with (AdbgProcessState) {
-	case created:	return "created";
-	case running:	return "running";
-	case stopped:	return "stopped";
-	case unknown:	return default_;
-	}
 }
 
 /// Get the process ID.
@@ -251,10 +250,10 @@ version (LinuxPersonality) {
 	int fd = open(path.ptr, O_RDONLY);
 	if (fd < 0)
 		return adbg_machine_current();
-	// TODO: Extend to 16 chars just in case
-	if (read(fd, path.ptr, 8)) // re-use buffer that's no longer needed
+	enum RDLEN = 16;
+	if (read(fd, path.ptr, RDLEN)) // re-use buffer that's no longer needed
 		return adbg_machine_current();
-	path[8] = 0;
+	path[RDLEN] = 0;
 	char *end = void;
 	uint personality = cast(uint)strtol(path.ptr, &end, 16);
 	enum LINUX32 = PER_LINUX_32BIT | PER_LINUX32 | PER_LINUX32_3GB;
@@ -262,6 +261,10 @@ version (LinuxPersonality) {
 }
 	return adbg_machine_current();
 }
+
+//
+// Process list
+//
 
 /// Create a list of processes running on the system.
 /// Returns: Internal list; Or null on error.

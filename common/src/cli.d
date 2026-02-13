@@ -164,6 +164,9 @@ int cli_build_info() {
 	"Config     "~D_FEATURES;
 	puts(page);
 	
+	import adbg.os.threads : os_thread_model;
+	printf("Thread      %s\n", os_thread_model());
+	
 	static if (GDC_VERSION) {
 		printf("GCC         %d\n", GDC_VERSION);
 		printf("GDC-EH      %s\n", GDC_EXCEPTION_MODE);

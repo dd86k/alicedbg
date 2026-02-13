@@ -53,6 +53,9 @@ struct SYSTEM_BASIC_WORKING_SET_INFORMATION
 alias pNtQueryVirtualMemory =
         NTSTATUS function(HANDLE, PVOID, MEMORY_INFORMATION_CLASS, PVOID, SIZE_T, PSIZE_T);
 
+alias pNtSuspendProcess = NTSTATUS function(HANDLE);
+alias pNtResumeProcess = NTSTATUS function(HANDLE);
+
 // Source: ProcessHacker
 alias SYSTEM_INFORMATION_CLASS = int;
 enum
@@ -291,6 +294,8 @@ __gshared
 {
     pNtQueryVirtualMemory NtQueryVirtualMemory;
     pNtQuerySystemInformation NtQuerySystemInformation;
+    pNtSuspendProcess NtSuspendProcess;
+    pNtResumeProcess NtResumeProcess;
 }
 
 private __gshared bool __lib_ntdll_loaded;
@@ -307,6 +312,8 @@ bool __dynlib_ntdll_load()
     
     adbg_system_library_bind(lib, cast(void**)&NtQueryVirtualMemory, "NtQueryVirtualMemory");
     adbg_system_library_bind(lib, cast(void**)&NtQuerySystemInformation, "NtQuerySystemInformation");
+    adbg_system_library_bind(lib, cast(void**)&NtSuspendProcess, "NtSuspendProcess");
+    adbg_system_library_bind(lib, cast(void**)&NtResumeProcess, "NtResumeProcess");
     
     size_t missingcnt = adbg_system_library_missingcnt(lib);
     if (missingcnt)
