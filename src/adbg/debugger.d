@@ -785,7 +785,7 @@ Lwait:
 
 		event.type = AdbgEvent.exception;
 
-		adbg_translate_exception(&event.exception, &event.process, cast(void*)signo);
+		adbg_translate_exception(&event.exception, &event.process, cast(void*)&signo);
 
 		// HACK: fill up thread details for exception
 		event.exception.thread.process = &event.process;

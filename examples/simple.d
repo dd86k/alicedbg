@@ -1,5 +1,7 @@
 /// Minimal example that loops until the first fault is fault.
 ///
+/// Uses the Multi API. Use `dub build :simple` (from parent dir) to build.
+///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
 /// License: BSD-3-Clause-Clear
@@ -19,7 +21,6 @@ enum {
 int putchar(int);
 
 adbg_disassembler_t *disassembler;
-int status = SIMPLE_CONTINUE;
 
 void oops(int code = 0, const(char) *reason = null) {
 	printf("* error=\"%s\" code=\"%d\"\n",
@@ -29,7 +30,7 @@ void oops(int code = 0, const(char) *reason = null) {
 	exit(EXIT_FAILURE);
 }
 
-void event_exception(adbg_process_t *process, void *udata, adbg_exception_t *exception) {
+void event_exception(adbg_process_t *process, adbg_exception_t *exception, int *status) {
 	adbg_process_thread_t *thread = adbg_exception_thread(exception);
 	long tid = thread ? adbg_process_thread_id(thread) : 0;
 	
@@ -80,15 +81,8 @@ void event_exception(adbg_process_t *process, void *udata, adbg_exception_t *exc
 		adbg_debugger_continue(process, tid);
 		break;
 	default: // Quit at first fault
-		*(cast(int*)udata) = SIMPLE_STOP;
+		*status = SIMPLE_STOP;
 	}
-}
-void event_process_continue(adbg_process_t *process, void *udata, long tid) {
-	printf("* pid=%d tid=%lld event=\"continued\"\n", adbg_process_id(process), tid);
-}
-void event_process_exit(adbg_process_t *process, void *udata, int code) {
-	printf("* pid=%d event=\"exited\" code=%d\n", adbg_process_id(process), code);
-	*(cast(int*)udata) = SIMPLE_STOP;
 }
 
 int main(int argc, const(char) **argv) {
@@ -99,18 +93,9 @@ int main(int argc, const(char) **argv) {
 	const(char) **pargv = argc > 2 ? argv + 2 : null;
 	
 	// Launch process
-	adbg_process_t *process =
-		adbg_debugger_spawn(argv[1],
-			AdbgSpawnOpt.argv, pargv,
-			0);
+	adbg_process_t *process = adbg_debugger_spawn(argv[1], AdbgSpawnOpt.argv, pargv, 0);
 	if (process == null)
 		oops;
-	
-	// Setup
-	adbg_debugger_on_exception(process, &event_exception);
-	adbg_debugger_on_process_continue(process, &event_process_continue);
-	adbg_debugger_on_process_exit(process, &event_process_exit);
-	adbg_debugger_udata(process, &status);
 	
 	// New disassembler instance, if able
 	disassembler = adbg_disassembler_open(adbg_process_machine(process));
@@ -118,9 +103,28 @@ int main(int argc, const(char) **argv) {
 		printf("* warning=\"Disassembler unavailable: %s\"\n", adbg_error_message());
 	
 	// Start and listen to events
-	while (status) {
-		if (adbg_debugger_wait(process))
+	adbg_event_t event = void;
+	int status = SIMPLE_CONTINUE;
+	A: while (status) {
+		adbg_process_t *proc = adbg_debugger_wait(process, &event);
+		if (proc == null)
 			oops;
+		
+		switch (event.type) {
+		case AdbgEvent.exception:
+			event_exception(proc, &event.exception, &status);
+			break;
+		case AdbgEvent.processCreated:
+			printf("* event=\"created\" pid=%d\n", adbg_process_id(proc));
+			break;
+		case AdbgEvent.processContinue:
+			printf("* event=\"continued\" pid=%d\n", adbg_process_id(proc));
+			break;
+		case AdbgEvent.processExit:
+			printf("* event=\"exited\" pid=%d code=%d\n", adbg_process_id(proc), event.exitcode);
+			break A;
+		default:
+		}
 	}
 	puts("* quitting");
 	return 0;
