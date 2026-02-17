@@ -1,7 +1,6 @@
 /// Easy API implementation.
 ///
-/// While an Easy instance can only support a single process, multiple Easy
-/// instances can be created.
+/// The Easy API implments a multithreaded debug loop.
 ///
 /// Authors: dd86k <dd@dax.moe>
 /// Copyright: © dd86k <dd@dax.moe>
@@ -202,15 +201,19 @@ int adbg_easy_attach(adbg_easy_t *ez, int pid) {
 }
 
 /// Continue the process from a previous signaled stopped state (event).
-/// Params: ez = Easy instance.
+/// Params:
+/// 	ez = Easy instance.
+/// 	tid = Thread or Task ID to continue. Zero for all.
 /// Returns: Zero on success; Non-zero on error.
-int adbg_easy_continue(adbg_easy_t *ez) {
+int adbg_easy_continue(adbg_easy_t *ez, int tid = 0) {
 	version (Trace) trace("ez=%p", ez);
 
 	if (ez == null)
 		return adbg_oops(AdbgError.invalidArgument);
 
-	adbg_easy_request_t req = adbg_easy_request_t(Request.continue_);
+	adbg_easy_request_t req = void;
+	req.type = Request.continue_;
+	req.continue_.tid = tid;
 	return adbg_easy_request(ez, &req);
 }
 
@@ -351,12 +354,18 @@ struct adbg_easy_request_attach_t {
 	int pid;
 }
 
+/// Continue parameters
+struct adbg_easy_request_continue_t {
+	long tid;
+}
+
 // Buffer entry
 struct adbg_easy_request_t {
 	Request type;
 	union {
 	adbg_easy_request_spawn_t spawn;
 	adbg_easy_request_attach_t attach;
+	adbg_easy_request_continue_t continue_;
 	} // union
 }
 
@@ -562,7 +571,9 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 		}
 		break;
 	case Request.continue_:
-		return adbg_debugger_continue(ez.process, ez.tid);
+		// TODO: If zero, it should resume all threads
+		long tid = req.continue_.tid ? req.continue_.tid : ez.tid;
+		return adbg_debugger_continue(ez.process, tid);
 	case Request.pause:
 		return adbg_debugger_pause(ez.process);
 	case Request.suspend:
