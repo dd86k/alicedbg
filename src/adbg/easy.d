@@ -54,6 +54,10 @@ struct adbg_easy_t {
 	// Last event Thread ID.
 	// A hack for auto-continue because code structure is not great...
 	long tid;
+
+	// Timeout settings
+	uint request_timeout_ms;  /// How long user thread waits for debugger thread reply
+	uint poll_interval_ms;    /// Debugger thread poll granularity (Windows only)
 }
 
 //
@@ -71,6 +75,10 @@ adbg_easy_t* adbg_easy_create() {
 		adbg_oops(AdbgError.crt);
 		return null;
 	}
+
+	// Set default timeouts
+	ez.request_timeout_ms = 5000;
+	ez.poll_interval_ms = 100;
 
 	// Create mailboxes
 	if (adbg_mailbox_create(&ez.request_box, CAPACITY) ||
@@ -161,6 +169,38 @@ void adbg_easy_set_user_data(adbg_easy_t *ez, void *udata) {
 		return;
 
 	ez.udata = udata;
+}
+
+/// Set the timeout for how long the user thread waits for the debugger
+/// thread to reply to a request.
+/// Params:
+/// 	ez = Easy instance.
+/// 	ms = Timeout in milliseconds. Default is 5000.
+void adbg_easy_set_request_timeout(adbg_easy_t *ez, uint ms) {
+	version (Trace) trace("ez=%p ms=%u", ez, ms);
+
+	if (ez == null)
+		return;
+
+	ez.request_timeout_ms = ms;
+}
+
+/// Set the poll interval for the debugger thread loop.
+///
+/// On Windows, the debugger thread interleaves request handling with
+/// debug event polling. This controls the granularity of that loop.
+/// Lower values are more responsive but use more CPU.
+/// Has no effect on POSIX.
+/// Params:
+/// 	ez = Easy instance.
+/// 	ms = Poll interval in milliseconds. Default is 100.
+void adbg_easy_set_poll_interval(adbg_easy_t *ez, uint ms) {
+	version (Trace) trace("ez=%p ms=%u", ez, ms);
+
+	if (ez == null)
+		return;
+
+	ez.poll_interval_ms = ms;
 }
 
 //
@@ -477,8 +517,7 @@ int adbg_easy_request(adbg_easy_t *ez, adbg_easy_request_t *req,
 	if (rc) return rc;
 
 	// Wait for reply
-	uint timeout_ms = 5000; // TODO: timeout setting
-	message_t *msg = adbg_mailbox_receivefor(&ez.reply_box, timeout_ms);
+	message_t *msg = adbg_mailbox_receivefor(&ez.reply_box, ez.request_timeout_ms);
 	if (msg == null)
 		return adbg_oops(AdbgError.timeout);
 
@@ -516,11 +555,10 @@ int adbg_easy_thread_debugger(__osthread_t *thread, void *data) {
 	assert(data);
 	adbg_easy_t *ez = cast(adbg_easy_t*)data;
 
-	version (Windows) uint timeout_ms = 100;
 Lwait:
 	// Wait for a request
 	version (Windows)
-		message_t *msg = adbg_mailbox_receivefor(&ez.request_box, timeout_ms);
+		message_t *msg = adbg_mailbox_receivefor(&ez.request_box, ez.poll_interval_ms);
 	else
 		message_t *msg = adbg_mailbox_receive(&ez.request_box);
 	if (msg) { // null: timeout
@@ -571,7 +609,6 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 
 	version (Trace) trace("ez=%p msg=%p req=%p", ez, msg, req);
 
-	version (Windows) uint timeout_ms = 100; // default timeout
 	final switch (req.type) {
 	case Request.spawn:
 		version (Trace) trace("request:spawn path=%p", req.spawn.path);
@@ -587,7 +624,7 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 
 		// Hacks to make multi-threaded events work
 		version (Windows)
-			adbg_debugger_option_wait_timeout(ez.process, timeout_ms);
+			adbg_debugger_option_wait_timeout(ez.process, ez.poll_interval_ms);
 
 		// Make event thread
 		version (Windows)
@@ -611,7 +648,7 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 
 		// Hack to make multi-threaded events work
 		version (Windows)
-			adbg_debugger_option_wait_timeout(ez.process, timeout_ms);
+			adbg_debugger_option_wait_timeout(ez.process, ez.poll_interval_ms);
 
 		// Make event thread
 		version (Windows)
