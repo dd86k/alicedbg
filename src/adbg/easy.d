@@ -264,6 +264,26 @@ int adbg_easy_resume(adbg_easy_t *ez) {
 	return adbg_easy_request(ez, &req);
 }
 
+int adbg_easy_terminate(adbg_easy_t *ez) {
+	version (Trace) trace("ez=%p", ez);
+	
+	if (ez == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	adbg_easy_request_t req = adbg_easy_request_t(Request.terminate);
+	return adbg_easy_request(ez, &req);
+}
+
+int adbg_easy_detach(adbg_easy_t *ez) {
+	version (Trace) trace("ez=%p", ez);
+	
+	if (ez == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	adbg_easy_request_t req = adbg_easy_request_t(Request.detach);
+	return adbg_easy_request(ez, &req);
+}
+
 /// Ask if the process is still alive.
 /// Params: ez = Easy instance.
 /// Returns: Zero on success; Non-zero on error.
@@ -332,6 +352,8 @@ enum Request {
 	// Debugger session creation
 	spawn      = 100,
 	attach     = 101,
+	detach     = 102,
+	terminate  = 103,
 
 	// Process control
 	continue_  = 200,
@@ -499,7 +521,7 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 	version (Trace) trace("ez=%p msg=%p req=%p", ez, msg, req);
 
 	version (Windows) uint timeout_ms = 100; // default timeout
-	switch (req.type) {
+	final switch (req.type) {
 	case Request.spawn:
 		version (Trace) trace("request:spawn path=%p", req.spawn.path);
 
@@ -548,6 +570,10 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 		if (ez.event_thread == null)
 			return adbg_oops(AdbgError.os);
 		break;
+	case Request.detach:
+		return adbg_debugger_detach(ez.process);
+	case Request.terminate:
+		return adbg_debugger_terminate(ez.process);
 	case Request.quit:
 		version (Trace) trace("request:quit");
 
@@ -590,9 +616,9 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 		return 0;
 	case Request.resume:
 		return adbg_debugger_resume(ez.process);
-	default:
-		version (Trace) trace("request:unknown req.type=%d", req.type);
-		return adbg_oops(AdbgError.assertion);
+	case Request.readmemory:
+	case Request.writememory:
+		return adbg_oops(AdbgError.unimplemented);
 	}
 	return 0;
 }
