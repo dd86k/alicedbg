@@ -59,8 +59,6 @@ extern (C):
 /// Debugging events
 /// Used in both filtering and identification for wait function.
 enum AdbgEvent {
-	none,
-	
 	/// An exception occurred.
 	exception,
 	// A process was created.
