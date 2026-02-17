@@ -13,6 +13,7 @@ import adbg.os.mutex;
 import adbg.os.semaphore;
 import adbg.os.threads;
 import adbg.process.base;
+import adbg.process.memory;
 import adbg.utils.mailbox;
 import core.stdc.stdlib : calloc, free;
 
@@ -295,6 +296,48 @@ int adbg_easy_process_is_alive(adbg_easy_t *ez) {
 	return adbg_process_is_alive(ez.process);
 }
 
+/// Read from process memory.
+/// Params:
+/// 	ez = Easy instance.
+/// 	addr = Memory address in the target process.
+/// 	data = Pointer to buffer to receive data.
+/// 	size = Number of bytes to read.
+/// Returns: Zero on success; Non-zero on error.
+int adbg_easy_read_memory(adbg_easy_t *ez, size_t addr, void *data, size_t size) {
+	version (Trace) trace("ez=%p addr=%zx data=%p size=%zu", ez, addr, data, size);
+
+	if (ez == null || data == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	adbg_easy_request_t req = void;
+	req.type = Request.readmemory;
+	req.memory.addr = addr;
+	req.memory.data = data;
+	req.memory.size = size;
+	return adbg_easy_request(ez, &req);
+}
+
+/// Write to process memory.
+/// Params:
+/// 	ez = Easy instance.
+/// 	addr = Memory address in the target process.
+/// 	data = Pointer to buffer containing data to write.
+/// 	size = Number of bytes to write.
+/// Returns: Zero on success; Non-zero on error.
+int adbg_easy_write_memory(adbg_easy_t *ez, size_t addr, void *data, size_t size) {
+	version (Trace) trace("ez=%p addr=%zx data=%p size=%zu", ez, addr, data, size);
+
+	if (ez == null || data == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	adbg_easy_request_t req = void;
+	req.type = Request.writememory;
+	req.memory.addr = addr;
+	req.memory.data = data;
+	req.memory.size = size;
+	return adbg_easy_request(ez, &req);
+}
+
 /// Block until the debugged process exits or the event thread terminates.
 ///
 /// Only useful in a scenario that the Easy API is used and needs blocking,
@@ -381,6 +424,13 @@ struct adbg_easy_request_continue_t {
 	long tid;
 }
 
+/// Memory read/write parameters
+struct adbg_easy_request_memory_t {
+	size_t addr;
+	void *data;
+	size_t size;
+}
+
 // Buffer entry
 struct adbg_easy_request_t {
 	Request type;
@@ -388,6 +438,7 @@ struct adbg_easy_request_t {
 	adbg_easy_request_spawn_t spawn;
 	adbg_easy_request_attach_t attach;
 	adbg_easy_request_continue_t continue_;
+	adbg_easy_request_memory_t memory;
 	} // union
 }
 
@@ -617,8 +668,9 @@ int adbg_easy_handle_request(adbg_easy_t *ez, message_t *msg) {
 	case Request.resume:
 		return adbg_debugger_resume(ez.process);
 	case Request.readmemory:
+		return adbg_memory_read(ez.process, req.memory.addr, req.memory.data, req.memory.size);
 	case Request.writememory:
-		return adbg_oops(AdbgError.unimplemented);
+		return adbg_memory_write(ez.process, req.memory.addr, req.memory.data, req.memory.size);
 	}
 	return 0;
 }
