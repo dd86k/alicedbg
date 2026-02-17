@@ -111,4 +111,28 @@ version (linux) {
 	#define	W_EXITCODE(ret, sig)	((ret) << 8 | (sig))
 	#define	W_STOPCODE(sig)		((sig) << 8 | _WSTOPPED)
 	*/
+} else version (OSX) {
+	// Source: xnu/bsd/sys/wait.h
+
+	enum WNOHANG	= 1;
+	enum WUNTRACED	= 2;
+	enum WEXITED	= 4;
+	enum WSTOPPED	= 8;
+	enum WCONTINUED	= 0x10;
+	enum WNOWAIT	= 0x20;
+
+	enum _WSTOPPED	= 0x7f; // 0177, _WSTATUS if process is stopped
+
+	int _WSTATUS(int x)	{ return x & 0x7f; }
+
+	int WEXITSTATUS(int x)	{ return (x >> 8) & 0xff; }
+	int WTERMSIG(int x)	{ return _WSTATUS(x); }
+	int WSTOPSIG(int x)	{ return x >> 8; }
+
+	bool WIFEXITED(int x)	{ return _WSTATUS(x) == 0; }
+	bool WIFSIGNALED(int x)	{ return _WSTATUS(x) != _WSTOPPED && _WSTATUS(x) != 0; }
+	bool WIFSTOPPED(int x)	{ return _WSTATUS(x) == _WSTOPPED && WSTOPSIG(x) != 0x13; }
+	bool WIFCONTINUED(int x)	{ return _WSTATUS(x) == _WSTOPPED && WSTOPSIG(x) == 0x13; }
+
+	int WCOREDUMP(int x)	{ return x & 0x80; } // WCOREFLAG = 0200
 } else static assert(0, "Define wait.h macros");
