@@ -8,8 +8,26 @@ jobs:
   Alicedbg:
     strategy:
       matrix:
-        os: [ ubuntu-22.04, windows-2022 ]
-        dc: [ dmd-latest, ldc-latest ]
+        # https://docs.github.com/en/actions/how-tos/write-workflows/choose-where-workflows-run/choose-the-runner-for-a-job#standard-github-hosted-runners-for-public-repositories
+        include: # easier to maintain, more explicit
+          # DMD: Currently x86-only
+          # GDC: Works best on Linux, BSDs
+          # Windows
+          - { os: windows-2022, dc: dmd }
+          - { os: windows-2022, dc: dmd }
+          - { os: windows-2025, dc: dmd }
+          - { os: windows-2025, dc: ldc }
+          #- { os: windows-11-arm, dc: ldc }
+          # macOS
+          - { os: macos-15, dc: ldc }
+          - { os: macos-15-intel, dc: ldc }
+          # Linux
+          - { os: ubuntu-22.04, dc: dmd }
+          - { os: ubuntu-22.04, dc: gdc }
+          - { os: ubuntu-22.04, dc: ldc }
+          - { os: ubuntu-24.04, dc: dmd }
+          - { os: ubuntu-24.04, dc: gdc }
+          - { os: ubuntu-24.04, dc: ldc }
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v4
