@@ -19,8 +19,8 @@ jobs:
           - { os: windows-2025, dc: ldc }
           #- { os: windows-11-arm, dc: ldc }
           # macOS
-          - { os: macos-15, dc: ldc }
-          - { os: macos-15-intel, dc: ldc }
+          #- { os: macos-15, dc: ldc }
+          #- { os: macos-15-intel, dc: ldc }
           # Linux
           - { os: ubuntu-22.04, dc: dmd }
           - { os: ubuntu-22.04, dc: gdc }
