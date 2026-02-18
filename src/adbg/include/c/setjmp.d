@@ -173,6 +173,23 @@ version (Windows) {
 	}
 	
 	alias jmp_buf = c_long[_JBLEN];
+} else version (OSX) {
+	// apple/darwin-libplatform/blob/main/include/setjmp.h
+	//   _JBLEN=48
+	// apple-oss-distributions/xnu/blob/main/osfmk/arm/setjmp.h
+	//   _JBLEN=24
+	// Okay... Would rather have more anyway
+	version (X86) {
+		private enum _JBLEN = 18;
+	} else version (X86_64) {
+		private enum _JBLEN = (9 * 2) + 3 + 16;
+	} else version (ARM) {
+		private enum _JBLEN = 10 + 16 + 2;
+	} else version (AArch64) {
+		private enum _JBLEN = (14 + 8 + 2) * 2;
+	} else static assert(0, "Missing setjmp definitions (Darwin)");
+
+	alias jmp_buf = int[_JBLEN]; // typedef int jmp_buf[_JBLEN];
 } else version (FreeBSD) {
 	import core.sys.posix.setjmp : jmp_buf;
 } else static assert(0, "Missing setjmp definitions");
