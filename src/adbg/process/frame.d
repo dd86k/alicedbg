@@ -10,33 +10,44 @@ module adbg.process.frame;
 import adbg.error;
 import adbg.machines;
 import adbg.process.base; // for machine info
+import adbg.process.memory;
 import adbg.process.thread; // for accessing thread information
 import adbg.utils.list;
 
 extern (C):
 
+private enum FRAME_MAX_DEPTH = 128;
+
+struct adbg_frames_t {
+	list_t *list;
+	alias list this;
+}
+
 struct adbg_stackframe_t {
 	int level;
 	// TODO: Frame type/function (e.g., points to memory, register, etc.)
+	//       Shouldn't that be on-demand and not done eagerly?
+	//       What was the point for this thing again?
 	ulong address;
 }
 
 private
-struct __machine_pc_reg {
+struct __machine_stack_regs {
 	AdbgMachine machine;
-	AdbgRegister reg;
+	AdbgRegister pc_reg;
+	AdbgRegister fp_reg;
+	ubyte ptr_size;
 }
-// Level 0: Current location, typically Program Counter
-// Level 1: Frame Pointer if available
+
 private
-static immutable __machine_pc_reg[] stackregs = [
-	{ AdbgMachine.i386,	AdbgRegister.x86_eip },
-	{ AdbgMachine.amd64,	AdbgRegister.amd64_rip },
-	{ AdbgMachine.arm,	AdbgRegister.arm_pc },
-	{ AdbgMachine.aarch64,	AdbgRegister.aarch64_pc },
+static immutable __machine_stack_regs[] stackregs = [
+	{ AdbgMachine.i386,    AdbgRegister.x86_eip,     AdbgRegister.x86_ebp,    4 },
+	{ AdbgMachine.amd64,   AdbgRegister.amd64_rip,   AdbgRegister.amd64_rbp,  8 },
+	{ AdbgMachine.arm,     AdbgRegister.arm_pc,      AdbgRegister.arm_fp,     4 },
+	{ AdbgMachine.aarch64, AdbgRegister.aarch64_pc,  AdbgRegister.aarch64_fp, 8 },
 ];
 
-void* adbg_frame_list(adbg_process_thread_t *thread) {
+adbg_frames_t* adbg_frame_list(adbg_process_thread_t *thread) {
 	if (thread == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return null;
@@ -54,88 +65,121 @@ void* adbg_frame_list(adbg_process_thread_t *thread) {
 	if (ctx == null)
 		return null;
 	
-	// Get register denoting PC depending on machine
+	// Get register denoting PC and FP depending on machine
 	AdbgMachine mach = adbg_process_machine(thread.process);
-	AdbgRegister register = void;
+	AdbgRegister pc_register = void;
+	AdbgRegister fp_register = void;
+	ubyte ptr_size = void;
 	foreach (ref regs; stackregs) {
-		// Found it
 		if (mach == regs.machine) {
-			register = regs.reg;
+			pc_register = regs.pc_reg;
+			fp_register = regs.fp_reg;
+			ptr_size = regs.ptr_size;
 			goto Lfound;
 		}
 	}
-	
+
 	adbg_oops(AdbgError.unavailable);
 	return null;
 
 Lfound:
 	// New frame list
-	list_t *list = adbg_list_new(adbg_stackframe_t.sizeof, 8);
-	if (list == null)
+	adbg_frames_t *frames = cast(adbg_frames_t*)adbg_list_new(adbg_stackframe_t.sizeof, 8);
+	if (frames.list == null)
 		return null;
-	
+
 	// Start with the first frame, which is always PC
 	// If we can't have that, then we cannot even obtain frames at all
-	adbg_register_t *reg = adbg_register_by_id(&thread.context, register);
-	if (reg == null) {
+	adbg_register_t *pc_reg = adbg_register_by_id(&thread.context, pc_register);
+	if (pc_reg == null) {
 		adbg_oops(AdbgError.unavailable);
-		adbg_list_close(list);
+		adbg_list_close(frames.list);
 		return null;
 	}
-	
-	void *address = adbg_register_value(reg);
-	if (address == null) {
-		adbg_list_close(list);
+
+	// Build frame 0 (PC)
+	void *pc_val = adbg_register_value(pc_reg);
+	if (pc_val == null) {
+		adbg_list_close(frames.list);
 		return null;
 	}
-	
 	adbg_stackframe_t frame = void;
 	frame.level = 0;
-	
-	// Get its value
-	switch (mach) {
-	// 32-bit PC
-	case AdbgMachine.i386, AdbgMachine.arm:
-		frame.address = *cast(uint*)address;
-		break;
-	// 64-bit PC
-	case AdbgMachine.amd64, AdbgMachine.aarch64:
-		frame.address = *cast(ulong*)address;
-		break;
-	default:
-		adbg_oops(AdbgError.assertion);
-		adbg_list_close(list);
+	frame.address = (ptr_size == 4) ? *cast(uint*)pc_val : *cast(ulong*)pc_val;
+	frames.list = adbg_list_add(frames.list, &frame);
+	if (frames.list == null) {
+		adbg_list_close(frames.list);
 		return null;
 	}
-	
-	list = adbg_list_add(list, &frame);
-	if (list == null) {
-		adbg_list_close(list);
-		return null;
+
+	// Walk frame pointer chain
+	adbg_register_t *fp_reg = adbg_register_by_id(&thread.context, fp_register);
+	if (fp_reg == null)
+		return frames; // No FP available, return with just level 0
+
+	void *fp_val = adbg_register_value(fp_reg);
+	if (fp_val == null)
+		return frames;
+
+	ulong fp = (ptr_size == 4) ? *cast(uint*)fp_val : *cast(ulong*)fp_val;
+	int level = 1;
+	while (fp != 0 && level < FRAME_MAX_DEPTH) {
+		// Alignment check
+		if (fp % ptr_size != 0)
+			break;
+
+		// Read [fp] = saved_fp, [fp + ptr_size] = return_address
+		ulong saved_fp = void;
+		ulong ret_addr = void;
+
+		switch (ptr_size) {
+		case 4:
+			uint[2] pair = void;
+			if (adbg_memory_read(thread.process, cast(size_t)fp, &pair, pair.sizeof) != 0)
+				break;
+			saved_fp = pair[0];
+			ret_addr = pair[1];
+			break;
+		case 8:
+			ulong[2] pair = void;
+			if (adbg_memory_read(thread.process, cast(size_t)fp, &pair, pair.sizeof) != 0)
+				break;
+			saved_fp = pair[0];
+			ret_addr = pair[1];
+			break;
+		default:
+			ret_addr = 0;
+		}
+
+		if (ret_addr == 0)
+			break;
+
+		frame.level = level;
+		frame.address = ret_addr;
+		frames.list = adbg_list_add(frames.list, &frame);
+		if (frames.list == null)
+			return null;
+
+		// Forward progress check
+		// Most stacks grow down and FP chain grows up
+		if (saved_fp <= fp)
+			break;
+
+		fp = saved_fp;
+		level++;
 	}
-	
-	// TODO: Next frame
-	//
-	//       Frame pointers (EBP: x86, RBP: amd64, FP: arm) usually
-	//       designate the next stack frame.
-	//       Typically, for example under Linux (amd64), RBP is assigned
-	//       for segmentation faults, but not breakpoints (in the parent
-	//       process, at least, like a debugger).
-	//
-	//       Otherwise, the next frame will have to be obtained from
-	//       debugging information (FPO, etc.)
-	
-	return list;
+
+	return frames;
 }
 
-size_t adbg_frame_list_count(void *list) {
+size_t adbg_frame_list_count(adbg_frames_t *list) {
 	return adbg_list_count(cast(list_t*)list);
 }
 
-adbg_stackframe_t* adbg_frame_list_at(void *list, size_t index) {
+adbg_stackframe_t* adbg_frame_list_at(adbg_frames_t *list, size_t index) {
 	return cast(adbg_stackframe_t*)adbg_list_get(cast(list_t*)list, index);
 }
 
-void adbg_frame_list_close(void *list) {
+void adbg_frame_list_close(adbg_frames_t *list) {
 	adbg_list_close(cast(list_t*)list);
 }

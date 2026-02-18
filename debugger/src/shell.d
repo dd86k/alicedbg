@@ -659,7 +659,7 @@ void shell_print_stack(adbg_process_thread_t *thread) {
 		return;
 	
 	// Print callstack if available
-	void *frames = adbg_frame_list(thread);
+	adbg_frames_t *frames = adbg_frame_list(thread);
 	if (frames) {
 		puts("* Callstack (WIP):");
 		adbg_stackframe_t *frame = void;
@@ -1231,7 +1231,7 @@ int command_thread(int argc, const(char) **argv) {
 		
 		action = argv[3];
 		if (strcmp(action, "show") == 0) { // show thread id stack
-			void *frames = adbg_frame_list(thread);
+			adbg_frames_t *frames = adbg_frame_list(thread);
 			if (frames == null)
 				return ShellError.alicedbg;
 			
