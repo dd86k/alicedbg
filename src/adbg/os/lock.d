@@ -63,10 +63,10 @@ int os_lock_acquire(os_lock_t *lock) {
 	assert(lock, "null lock");
 version (Windows) {
 	EnterCriticalSection(&lock.handle);
+	return 0;
 } else version (Posix) {
 	return pthread_mutex_lock(&lock.handle);
 } else static assert(false, "os_lock_acquire");
-	return 0;
 }
 
 /// Release exclusive access from lock.
@@ -76,8 +76,8 @@ int os_lock_release(os_lock_t *lock) {
 	assert(lock, "null lock");
 version (Windows) {
 	LeaveCriticalSection(&lock.handle);
+	return 0;
 } else version (Posix) {
 	return pthread_mutex_unlock(&lock.handle);
 } else static assert(false, "os_lock_release");
-	return 0;
 }

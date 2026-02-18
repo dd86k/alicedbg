@@ -84,10 +84,10 @@ int os_condvar_wait(os_condvar_t *cv, os_lock_t *lock) {
 version (Windows) {
 	if (SleepConditionVariableCS(&cv.handle, cast(LPCRITICAL_SECTION)&lock.handle, INFINITE) == FALSE)
 		return GetLastError();
+	return 0;
 } else version (Posix) {
 	return pthread_cond_wait(&cv.handle, &lock.handle);
 } else static assert(false, "os_condvar_wait");
-	return 0;
 }
 
 /// Wait on a condition variable for a limited amount of time.
@@ -157,10 +157,10 @@ int os_condvar_signal(os_condvar_t *cv) {
 	assert(cv, "null condvar");
 version (Windows) {
 	WakeConditionVariable(&cv.handle);
+	return 0;
 } else version (Posix) {
 	return pthread_cond_signal(&cv.handle);
 } else static assert(false, "os_condvar_signal");
-	return 0;
 }
 
 /// Wake all threads waiting on the condition variable.
@@ -170,8 +170,8 @@ int os_condvar_broadcast(os_condvar_t *cv) {
 	assert(cv, "null condvar");
 version (Windows) {
 	WakeAllConditionVariable(&cv.handle);
+	return 0;
 } else version (Posix) {
 	return pthread_cond_broadcast(&cv.handle);
 } else static assert(false, "os_condvar_broadcast");
-	return 0;
 }
