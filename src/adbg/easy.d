@@ -14,6 +14,7 @@ import adbg.os.semaphore;
 import adbg.os.threads;
 import adbg.process.base;
 import adbg.process.memory;
+import adbg.process.thread;
 import adbg.utils.mailbox;
 import core.stdc.stdlib : calloc, free;
 
@@ -394,6 +395,48 @@ int adbg_easy_wait(adbg_easy_t *ez) {
 		return adbg_oops(AdbgError.os);
 
 	return 0;
+}
+
+/// Create a snapshot of threads for the debugged process.
+/// Params: ez = Easy instance.
+/// Returns: Opaque thread list pointer; null on error.
+void* adbg_easy_thread_list(adbg_easy_t* ez) {
+	if (ez == null || ez.process == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	return adbg_thread_list_new(ez.process);
+}
+
+/// Get a thread from the list by index.
+/// Params:
+/// 	list = Thread list from `adbg_easy_thread_list`.
+/// 	index = Zero-based index.
+/// Returns: Thread instance; null when index is out of range or on error.
+adbg_process_thread_t* adbg_easy_thread_list_get(void* list, size_t index) {
+	return adbg_thread_list_get(list, index);
+}
+
+/// Find a thread in the list by its ID.
+/// Params:
+/// 	list = Thread list from `adbg_easy_thread_list`.
+/// 	id = Thread ID to find.
+/// Returns: Thread instance; null if not found or on error.
+adbg_process_thread_t* adbg_easy_thread_list_by_id(void* list, long id) {
+	return adbg_thread_list_by_id(list, id);
+}
+
+/// Close a thread list and free its resources.
+/// Params: list = Thread list from `adbg_easy_thread_list`.
+void adbg_easy_thread_list_close(void* list) {
+	adbg_thread_list_close(list);
+}
+
+/// Get the thread ID from a thread instance.
+/// Params: thread = Thread instance.
+/// Returns: Thread ID; 0 on error.
+long adbg_easy_thread_id(adbg_process_thread_t* thread) {
+	return adbg_process_thread_id(thread);
 }
 
 private:
