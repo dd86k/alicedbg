@@ -29,6 +29,8 @@ int dump_pdb(adbg_object_t *o) {
 		dump_pdb_modules(o);
 	if (SELECTED_OBJ(SelectObj.pdbSecContribs))
 		dump_pdb_seccontribs(o);
+	if (SELECTED_OBJ(SelectObj.pdbSyms))
+		dump_pdb_syms(o);
 	// can be 0
 	if (opt_pdb_stream)
 		dump_pdb_stream(o, atoi(opt_pdb_stream));
@@ -580,6 +582,62 @@ void dump_pdb_seccontribs(adbg_object_t *o) {
 				e.ModuleIndex, rwxc.ptr, sname_len, sname_ptr, tag);
 		}
 		++i;
+	}
+}
+
+void dump_pdb_syms(adbg_object_t *o) {
+	print_header("PDB symbols (per-module)");
+
+	pdb_dbi_modinfo_iter_t *mit = adbg_object_pdb_dbi_modinfo_open(o);
+	if (mit == null) {
+		print_warningf("Failed to open ModInfo iterator: %s", adbg_error_message());
+		return;
+	}
+	scope(exit) adbg_object_pdb_dbi_modinfo_close(mit);
+
+	uint mod_index;
+	const(char) *modname;
+	const(char) *objname;
+	pdb_dbi_modinfo_t *mod = void;
+	while ((mod = adbg_object_pdb_dbi_modinfo_next(mit, &modname, &objname)) != null) {
+		uint this_mod = mod_index++;
+
+		// Skip modules with no symbol blob entirely — keeps output focused
+		// on modules that actually contribute usable function data.
+		if (mod.ModuleSysStream == 0xffff || mod.SymByteSize == 0)
+			continue;
+
+		pdb_module_stream_t layout = void;
+		if (adbg_object_pdb_module_open(o, mod, &layout)) {
+			print_warningf("Module %u (%s): %s", this_mod, modname, adbg_error_message());
+			continue;
+		}
+
+		printf("\n## Module %u: %s\n", this_mod, modname);
+		printf("Stream=%u Signature=%u SymBytes=%u C11=%u C13=%u\n",
+			mod.ModuleSysStream, layout.signature,
+			layout.symbols_size, layout.c11_size, layout.c13_size);
+
+		cv_sym_iter_t sit = void;
+		adbg_type_cv_sym_open(&sit, layout.symbols, layout.symbols_size);
+
+		cv_record_t *rec = void;
+		while ((rec = adbg_type_cv_sym_next(&sit)) != null) {
+			if (adbg_type_cv_sym_is_proc32(rec.kind)) {
+				cv_procsym32_t *p = cast(cv_procsym32_t*)rec;
+				// Name is NUL-terminated immediately after the fixed
+				// part. Use precision so a missing terminator can't
+				// run off the buffer; record `length + 2` bounds it.
+				int maxname = cast(int)rec.length + 2 - cast(int)cv_procsym32_t.sizeof;
+				if (maxname < 0) maxname = 0;
+				const(char) *name = cast(const(char)*)(p + 1);
+				const(char) *kindstr = adbg_type_cv_sym_enum_string(rec.kind);
+				printf("  %-12s %02u:%08x size=%*u type=%08x %.*s\n",
+					kindstr ? kindstr : "S_?",
+					p.Segment, p.CodeOffset, -5, p.CodeSize, p.TypeIndex,
+					maxname, name);
+			}
+		}
 	}
 }
 

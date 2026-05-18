@@ -92,6 +92,8 @@ enum SelectObj {
 	pdbModules = BIT!0,
 	/// PDB section contributions
 	pdbSecContribs = BIT!1,
+	/// PDB per-module CV symbols
+	pdbSyms = BIT!2,
 }
 int opt_selected_obj; // object-specific selections
 int SELECTED_OBJ(SelectObj selection)   { return opt_selected_obj & selection; }

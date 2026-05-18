@@ -34,6 +34,8 @@ module adbg.types.cv;
 //
 //       2-byte padding for 16:16 compilers, 4-byte padding for 16:32 compilers
 
+extern (C):
+
 enum CV_MMASK        = 0x700;	/// mode mask
 enum CV_TMASK        = 0x0f0;	/// type mask
 
@@ -1337,4 +1339,111 @@ enum : TYPE_ENUM_e {
 	T_32NCVPTR      = 0x04f0,   // CV Internal type for created near 32-bit pointers
 	T_32FCVPTR      = 0x05f0,   // CV Internal type for created far 32-bit pointers
 	T_64NCVPTR      = 0x06f0,   // CV Internal type for created near 64-bit pointers
+}
+
+//
+// CV symbol record iterator
+//
+// A CV symbol blob is a packed sequence of records. Each record begins
+// with cv_record_t { ushort length; ushort kind; }. `length` covers
+// everything after itself (i.e., `kind` plus the trailing data), so the
+// total byte advance per record is `length + sizeof(ushort)`.
+//
+// A length of 0 or 1 is invalid (length must at least cover `kind`).
+// PDB symbol blobs sometimes contain S_END / S_BLOCK structure that we
+// don't interpret here. The iterator just hands back the raw header
+// pointer and the caller dispatches on `kind`.
+
+/// CV symbol-record iterator state.
+struct cv_sym_iter_t {
+	ubyte *base;	/// Buffer start.
+	uint length;	/// Buffer length in bytes.
+	uint offset;	/// Current cursor.
+}
+
+/// Initialize an iterator over a CV symbol blob.
+///
+/// The buffer is borrowed; lifetime is the caller's responsibility.
+void adbg_type_cv_sym_open(cv_sym_iter_t *it, void *data, uint size) {
+	if (it == null)
+		return;
+	it.base   = cast(ubyte*)data;
+	it.length = size;
+	it.offset = 0;
+}
+
+/// Advance to the next CV symbol record.
+///
+/// Returns: Pointer to the record header (length + kind), or null at end
+///          of buffer or on a malformed record (length < 2 or overflows
+///          the buffer). The pointer is interior to the source buffer.
+cv_record_t* adbg_type_cv_sym_next(cv_sym_iter_t *it) {
+	if (it == null)
+		return null;
+	if (it.length - it.offset < cv_record_t.sizeof)
+		return null;
+
+	cv_record_t *r = cast(cv_record_t*)(it.base + it.offset);
+	// `length` must cover at least the `kind` field.
+	if (r.length < ushort.sizeof)
+		return null;
+
+	uint advance = ushort.sizeof + r.length;
+	if (advance > it.length - it.offset)
+		return null;
+
+	it.offset += advance;
+	return r;
+}
+
+//
+// CV PROCSYM32 (S_GPROC32 / S_LPROC32 and *_ID variants)
+//
+// Reference: Microsoft cvinfo.h `PROCSYM32`. The fixed part follows the
+// cv_record_t header; `Name` is a NUL-terminated string immediately after
+// the fixed fields.
+struct cv_procsym32_t { align(1):
+	cv_record_t Header;
+	uint Parent;	/// Parent symbol byte offset (0 for outermost).
+	uint End;	/// Offset to matching S_END.
+	uint Next;	/// Next procedure in the chain.
+	uint CodeSize;	/// Procedure length in bytes.
+	uint DbgStart;	/// Offset into the procedure of the first executable byte.
+	uint DbgEnd;	/// Offset into the procedure of the last executable byte.
+	uint TypeIndex;	/// Type index (or ID for _ID variants).
+	uint CodeOffset;	/// Offset within the section.
+	ushort Segment;	/// Section index (1-based, as in PE).
+	ubyte Flags;	/// CV_PROCFLAGS bits.
+	// char Name[];     // NUL-terminated, follows the fixed part.
+}
+static assert(cv_procsym32_t.sizeof == cv_record_t.sizeof + 35);
+
+/// Returns: True for S_GPROC32 / S_LPROC32 and their `_ID` variants.
+bool adbg_type_cv_sym_is_proc32(ushort kind) {
+	switch (kind) {
+	case S_GPROC32, S_LPROC32, S_GPROC32_ID, S_LPROC32_ID:
+		return true;
+	default:
+		return false;
+	}
+}
+
+/// Translate a few common SYM kinds to a short string for display.
+/// Returns: null for kinds we don't recognize yet.
+const(char)* adbg_type_cv_sym_enum_string(ushort kind) {
+	switch (kind) {
+	case S_GPROC32:    return "S_GPROC32";
+	case S_LPROC32:    return "S_LPROC32";
+	case S_GPROC32_ID: return "S_GPROC32_ID";
+	case S_LPROC32_ID: return "S_LPROC32_ID";
+	case S_END:        return "S_END";
+	case S_PROC_ID_END: return "S_PROC_ID_END";
+	case S_FRAMEPROC:  return "S_FRAMEPROC";
+	case S_OBJNAME:    return "S_OBJNAME";
+	case S_COMPILE3:   return "S_COMPILE3";
+	case S_BUILDINFO:  return "S_BUILDINFO";
+	case S_INLINESITE: return "S_INLINESITE";
+	case S_INLINESITE_END: return "S_INLINESITE_END";
+	default:           return null;
+	}
 }

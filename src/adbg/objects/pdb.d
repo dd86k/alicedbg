@@ -1286,6 +1286,95 @@ ushort* adbg_object_pdb_dbi_dbgheader(adbg_object_t *o, size_t *out_count) {
 }
 
 //
+// Per-module stream layout
+//
+// Each ModInfo entry references a stream (ModuleSysStream) whose contents
+// are laid out as:
+//   uint32 Signature;                // CV_SIGNATURE_* (usually C13 = 4)
+//   ubyte  Symbols[SymByteSize - 4]; // CV symbol records
+//   ubyte  C11LineInfo[C11ByteSize];
+//   ubyte  C13LineInfo[C13ByteSize];
+//   uint32 GlobalRefsSize;           // followed by GlobalRefsSize bytes
+//   ubyte  GlobalRefs[GlobalRefsSize];
+//
+// The Signature counts toward SymByteSize, so the actual symbol record
+// area is (SymByteSize - 4) bytes. SymByteSize == 0 means no symbol blob
+// (and no leading signature); in that case `signature` is left at 0 and
+// the `symbols` slice is empty.
+
+/// Per-module stream split into its CV regions.
+struct pdb_module_stream_t {
+	/// Underlying stream handle (still owned by the PDB internals. do not
+	/// close directly; unloading the object releases it).
+	pdb_stream_t *stream;
+	/// CV signature read from the first 4 bytes. Typically `CV_SIGNATURE_C13`.
+	/// Zero if `SymByteSize == 0`.
+	uint signature;
+	/// CV symbol record area (excludes the 4-byte signature).
+	ubyte *symbols;
+	uint symbols_size;
+	/// C11 line info area.
+	ubyte *c11;
+	uint c11_size;
+	/// C13 line info area.
+	ubyte *c13;
+	uint c13_size;
+}
+
+/// Open a module's data stream and split it into its CV regions.
+///
+/// Params:
+/// 	o = Object instance.
+/// 	mod = ModInfo entry obtained from the ModInfo iterator.
+/// 	out_layout = Caller-provided struct that will be populated on success.
+/// Returns: 0 on success, non-zero error code otherwise.
+///          Returns `AdbgError.unavailable` if the module has no stream
+///          (`ModuleSysStream == 0xffff`) or no symbol blob at all.
+int adbg_object_pdb_module_open(adbg_object_t *o, pdb_dbi_modinfo_t *mod,
+	pdb_module_stream_t *out_layout) {
+	if (mod == null || out_layout == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	memset(out_layout, 0, pdb_module_stream_t.sizeof);
+
+	if (mod.ModuleSysStream == 0xffff)
+		return adbg_oops(AdbgError.unavailable);
+
+	pdb_stream_t *s = adbg_object_pdb_open_stream(o, mod.ModuleSysStream);
+	if (s == null)
+		return adbg_error_code();
+
+	// Validate that all three regions fit within the stream. Trailing
+	// GlobalRefs blob lives beyond and is ignored here.
+	ulong need = cast(ulong)mod.SymByteSize
+		+ cast(ulong)mod.C11ByteSize
+		+ cast(ulong)mod.C13ByteSize;
+	if (need > s.size)
+		return adbg_oops(AdbgError.objectMalformed);
+
+	ubyte *p = cast(ubyte*)s.data;
+	out_layout.stream = s;
+
+	if (mod.SymByteSize >= 4) {
+		out_layout.signature    = *cast(uint*)p;
+		out_layout.symbols      = p + 4;
+		out_layout.symbols_size = mod.SymByteSize - 4;
+	} else if (mod.SymByteSize != 0) {
+		return adbg_oops(AdbgError.objectMalformed);
+	}
+	p += mod.SymByteSize;
+
+	out_layout.c11      = p;
+	out_layout.c11_size = mod.C11ByteSize;
+	p += mod.C11ByteSize;
+
+	out_layout.c13      = p;
+	out_layout.c13_size = mod.C13ByteSize;
+
+	return 0;
+}
+
+//
 // Portable PDB and CILDB
 //
 // Introduced with .NET Core and used in .NET 5 and later
