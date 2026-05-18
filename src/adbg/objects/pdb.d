@@ -840,7 +840,17 @@ void adbg_object_pdb70_unload(adbg_object_t *o, void *buffer) {
 	
 	if (pdb.fpm) free(pdb.fpm);
 	if (pdb.stream0) free(pdb.stream0);
-	if (pdb.streams) free(pdb.streams);
+	if (pdb.streams) {
+		// Release any per-stream buffers that were lazily loaded by
+		// adbg_object_pdb_open_stream.
+		for (uint i; i < pdb.stream_count; ++i) {
+			if (pdb.streams[i].data) {
+				free(pdb.streams[i].data);
+				pdb.streams[i].data = null;
+			}
+		}
+		free(pdb.streams);
+	}
 }
 
 /// Get the PDB version loaded.
