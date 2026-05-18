@@ -66,17 +66,30 @@ enum Select {
 	// Source
 //	source	= 
 	
+	// TODO: Move PE32 specific bits to SelectObj
 	/// PE32 directories
 	dirs	= BIT!24,
 	/// PE32 load configuration
 	loadconfig	= BIT!25,
 	
+	// TODO: Remove hack
+	//       Depend on opt_selected_obj instead of "any" bit
 	/// This is a hack to let dumper avoid making a summary
 	any = BIT!31,
 	
 	/// Select everything to dump
 	all = 0xffff_ffff,
 }
+int opt_selected;
+int SELECTED(Select selection) { return opt_selected & selection; }
+
+enum SelectObj {
+	/// PDB modules
+	pdbModules = BIT!0,
+}
+int opt_selected_obj; // object-specific selections
+int SELECTED_OBJ(SelectObj selection)   { return opt_selected_obj & selection; }
+
 enum Setting {
 	/// Input file or data is blob
 	blob	= BIT!0,
@@ -84,7 +97,7 @@ enum Setting {
 	shortName	= BIT!1,
 	
 	/// 
-	noPrefix = BIT!8,
+	noPrefix	= BIT!8,
 	
 	// bits 17-16: Extraction type
 	
@@ -93,7 +106,7 @@ enum Setting {
 	/// Dump binary information as hex dump
 	hexdump	= BIT!17,
 	/// Any sort of extraction is requested
-	extractAny = extract | hexdump,
+	extractAny	= extract | hexdump,
 	
 	/// Disassemble executable sections
 	disasm	= BIT!24,
@@ -102,19 +115,17 @@ enum Setting {
 	/// Disassemble (at least executable sections) and provide statistics
 	disasmStats	= BIT!26,
 	/// Any disassembly is requested
-	disasmAny = disasm | disasmAll | disasmStats,
+	disasmAny	= disasm | disasmAll | disasmStats,
 }
-
-int opt_selected;
 int opt_settings;
+int SETTING(Setting setting)   { return opt_settings & setting; }
+
 const(char)* opt_section_name;
 long opt_baseaddress;
 const(char)* opt_extractfile;
 
 const(char)* opt_pdb_stream;
 
-int SELECTED(Select selection) { return opt_selected & selection; }
-int SETTING(Setting setting)   { return opt_settings & setting; }
 
 void print_preamble(const(char) *filename, long filesize, const(char) *type, const(char) *id) {
 	// If in any "extract" mode, do not print

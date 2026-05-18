@@ -25,6 +25,9 @@ extern (C):
 int dump_pdb(adbg_object_t *o) {
 	if (SELECTED(Select.headers))
 		dump_pdb_header(o);
+	if (SELECTED_OBJ(SelectObj.pdbModules))
+		dump_pdb_modules(o);
+	// can be 0
 	if (opt_pdb_stream)
 		dump_pdb_stream(o, atoi(opt_pdb_stream));
 	return 0;
@@ -458,4 +461,34 @@ void dump_pdb_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
 	// TODO: EC Substream
 	
 	// TODO: Optional Debug Header Stream
+}
+
+void dump_pdb_modules(adbg_object_t *o) {
+	print_header("PDB modules");
+
+	pdb_dbi_modinfo_iter_t *it = adbg_object_pdb_dbi_modinfo_open(o);
+	if (it == null) {
+		print_warningf("Failed to open ModInfo iterator: %s", adbg_error_message());
+		return;
+	}
+	scope(exit) adbg_object_pdb_dbi_modinfo_close(it);
+
+	uint index;
+	const(char) *modname;
+	const(char) *objname;
+	pdb_dbi_modinfo_t *mod = void;
+	while ((mod = adbg_object_pdb_dbi_modinfo_next(it, &modname, &objname)) !is null) {
+		print_section(index++);
+		print_string("ModuleName", modname);
+		print_string("ObjFileName", objname);
+		print_u16("ModuleSysStream", mod.ModuleSysStream);
+		print_u32("SymByteSize", mod.SymByteSize);
+		print_u32("C11ByteSize", mod.C11ByteSize);
+		print_u32("C13ByteSize", mod.C13ByteSize);
+		print_u16("SourceFileCount", mod.SourceFileCount);
+		print_flags16("Flags", mod.Flags,
+			"DIRTY".ptr, PDB_DBI_MOD_DIRTY,
+			"EC".ptr, PDB_DBI_MOD_EC,
+			null);
+	}
 }

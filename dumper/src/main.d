@@ -47,7 +47,9 @@ immutable option_t[] options = [
 	option_t(0,   "relocs",       "Dump relocations", &cliopt_relocs),
 	option_t(0,   "debug",        "Dump debug information", &cliopt_debug),
 	option_t(0,   "everything",   "Dump everything except disassembly", &cliopt_everything),
+	// object-specific selections
 	option_t(0,   "pdb-stream",   "Dump given PDB stream", &cliopt_pdb_stream),
+	option_t(0,   "pdb-modules",  "Dump PDB modules", &cliopt_pdb_modules),
 	// settings
 	option_t(0,   "as-blob",           "Setting: Input is headless binary blob", &cliopt_as_blob),
 	option_t(0,   "disassemble",       "Setting: Disassemble executable sections", &cliopt_disasm),
@@ -118,6 +120,11 @@ int cliopt_everything() {
 int cliopt_pdb_stream(const(char) *num) {
 	opt_selected |= Select.any;
 	opt_pdb_stream = num;
+	return 0;
+}
+int cliopt_pdb_modules() {
+	opt_selected |= Select.any;
+	opt_selected_obj |= SelectObj.pdbModules;
 	return 0;
 }
 
