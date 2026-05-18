@@ -1447,3 +1447,176 @@ const(char)* adbg_type_cv_sym_enum_string(ushort kind) {
 	default:           return null;
 	}
 }
+
+//
+// CV C13 line subsections
+//
+// The C13 region of a module stream is a sequence of subsections, each
+// introduced by `cv_c13_subsection_header_t`. Subsection payloads are
+// padded to a 4-byte boundary. For Objective 1, the two kinds that matter
+// are DEBUG_S_LINES (line tables) and DEBUG_S_FILECHKSMS (file checksum
+// records, which carry the file-name string-table offsets).
+
+/// C13 subsection kinds. Values match `PdbSubsectionKind` in `adbg.objects.pdb`.
+enum : uint {
+	DEBUG_S_IGNORE             = 0x80000000, // mask for "ignore this entry"
+	DEBUG_S_SYMBOLS            = 0xf1,
+	DEBUG_S_LINES              = 0xf2,
+	DEBUG_S_STRINGTABLE        = 0xf3,
+	DEBUG_S_FILECHKSMS         = 0xf4,
+	DEBUG_S_FRAMEDATA          = 0xf5,
+	DEBUG_S_INLINEELINES       = 0xf6,
+	DEBUG_S_CROSSSCOPEIMPORTS  = 0xf7,
+	DEBUG_S_CROSSSCOPEEXPORTS  = 0xf8,
+	DEBUG_S_IL_LINES           = 0xf9,
+	DEBUG_S_FUNC_MDTOKEN_MAP   = 0xfa,
+	DEBUG_S_TYPE_MDTOKEN_MAP   = 0xfb,
+	DEBUG_S_MERGED_ASSEMBLYINPUT = 0xfc,
+	DEBUG_S_COFF_SYMBOL_RVA    = 0xfd,
+}
+
+/// Translate a C13 subsection kind to a short string.
+/// Returns: String name for kind of C13 debug entry.
+const(char)* adbg_type_cv_c13_kind_string(uint kind) {
+	switch (kind) {
+	case DEBUG_S_SYMBOLS:             return "SYMBOLS";
+	case DEBUG_S_LINES:               return "LINES";
+	case DEBUG_S_STRINGTABLE:         return "STRINGTABLE";
+	case DEBUG_S_FILECHKSMS:          return "FILECHKSMS";
+	case DEBUG_S_FRAMEDATA:           return "FRAMEDATA";
+	case DEBUG_S_INLINEELINES:        return "INLINEELINES";
+	case DEBUG_S_CROSSSCOPEIMPORTS:   return "CROSSSCOPEIMPORTS";
+	case DEBUG_S_CROSSSCOPEEXPORTS:   return "CROSSSCOPEEXPORTS";
+	case DEBUG_S_IL_LINES:            return "IL_LINES";
+	case DEBUG_S_FUNC_MDTOKEN_MAP:    return "FUNC_MDTOKEN_MAP";
+	case DEBUG_S_TYPE_MDTOKEN_MAP:    return "TYPE_MDTOKEN_MAP";
+	case DEBUG_S_MERGED_ASSEMBLYINPUT: return "MERGED_ASSEMBLYINPUT";
+	case DEBUG_S_COFF_SYMBOL_RVA:     return "COFF_SYMBOL_RVA";
+	default: return null;
+	}
+}
+
+/// C13 subsection header: 8 bytes, followed by `Length` bytes of payload.
+/// Subsections are 4-byte aligned.
+struct cv_c13_subsection_header_t {
+	uint Kind;	/// DEBUG_S_* value. High bit (DEBUG_S_IGNORE) means skip.
+	uint Length;	/// Payload size, excluding this header.
+}
+static assert(cv_c13_subsection_header_t.sizeof == 8);
+
+/// DEBUG_S_LINES subsection header (12 bytes), followed by one or more
+/// per-file blocks (`cv_c13_lines_file_block_t`).
+struct cv_c13_lines_header_t { align(1):
+	uint OffsetInSection;	/// Start offset of the covered code in its section.
+	ushort Segment;	/// 1-based section index.
+	ushort Flags;	/// `CV_LINES_HAS_COLUMNS` if column info is present.
+	uint CodeSize;	/// Bytes of code covered by this subsection.
+}
+static assert(cv_c13_lines_header_t.sizeof == 12);
+
+/// Flag for `cv_c13_lines_header_t.Flags`: column-info entries follow lines.
+enum CV_LINES_HAS_COLUMNS = 0x0001;
+
+/// Per-file block header within a DEBUG_S_LINES subsection.
+/// Followed by `NumLines` line entries, then (if column flag is set) the
+/// same count of column entries. Total block size is `BlockSize` bytes
+/// including this header.
+struct cv_c13_lines_file_block_t { align(1):
+	/// Offset into the DEBUG_S_FILECHKSMS subsection identifying the file.
+	uint FileChecksumOffset;
+	uint NumLines;
+	uint BlockSize;	/// Includes the header and all line/column entries.
+}
+static assert(cv_c13_lines_file_block_t.sizeof == 12);
+
+/// One line entry in a DEBUG_S_LINES block. The line number and "end delta"
+/// are packed into `LineAndFlags`.
+struct cv_c13_line_entry_t { align(1):
+	/// Offset within the subsection's code range
+	/// (`cv_c13_lines_header_t.OffsetInSection`).
+	uint Offset;
+	/// bits 0-23  = start line number
+	/// bits 24-30 = end-line delta (usually 0)
+	/// bit  31    = is-statement flag
+	uint LineAndFlags;
+}
+static assert(cv_c13_line_entry_t.sizeof == 8);
+
+/// Extract the start line number from `cv_c13_line_entry_t.LineAndFlags`.
+pragma(inline, true)
+uint cv_c13_line_start(uint lineflags) { return lineflags & 0xff_ffff; }
+/// Extract the end-line delta.
+pragma(inline, true)
+uint cv_c13_line_end_delta(uint lineflags) { return (lineflags >> 24) & 0x7f; }
+/// True if the entry is marked as a statement boundary.
+pragma(inline, true)
+bool cv_c13_line_is_statement(uint lineflags) { return (lineflags & 0x8000_0000u) != 0; }
+
+/// Optional column entry (one per line entry, when CV_LINES_HAS_COLUMNS).
+struct cv_c13_column_entry_t { align(1):
+	ushort StartColumn;
+	ushort EndColumn;
+}
+static assert(cv_c13_column_entry_t.sizeof == 4);
+
+/// DEBUG_S_FILECHKSMS entry header (6 bytes). Followed by `ChecksumSize`
+/// bytes of checksum, then padding to 4 bytes.
+struct cv_c13_filechksm_t { align(1):
+	uint FileNameOffset;	/// Offset into the `/names` string stream.
+	ubyte ChecksumSize;
+	ubyte ChecksumKind;	/// 0=None, 1=MD5, 2=SHA1, 3=SHA256.
+}
+static assert(cv_c13_filechksm_t.sizeof == 6);
+
+//
+// CV C13 subsection iterator
+//
+
+/// Iterator over the C13 region of a module stream.
+struct cv_c13_iter_t {
+	ubyte *base;	/// Buffer start.
+	uint length;	/// Buffer length.
+	uint offset;	/// Current cursor (always 4-byte aligned).
+}
+
+/// Initialize an iterator over a C13 blob.
+void adbg_type_cv_c13_open(cv_c13_iter_t *it, void *data, uint size) {
+	if (it == null)
+		return;
+	it.base   = cast(ubyte*)data;
+	it.length = size;
+	it.offset = 0;
+}
+
+/// Advance to the next C13 subsection.
+///
+/// On success returns a pointer to the subsection header. The payload is
+/// at `header + 1` (i.e., immediately after the 8-byte header) and is
+/// `header.Length` bytes long. The cursor is advanced past the payload
+/// and re-aligned to 4 bytes.
+///
+/// Params:
+/// 	it = Iterator state.
+/// Returns: Pointer to header, or null at end of buffer or on a
+///          malformed entry (Length overflows the buffer).
+cv_c13_subsection_header_t* adbg_type_cv_c13_next(cv_c13_iter_t *it) {
+	if (it == null)
+		return null;
+	if (it.length - it.offset < cv_c13_subsection_header_t.sizeof)
+		return null;
+
+	cv_c13_subsection_header_t *h =
+		cast(cv_c13_subsection_header_t*)(it.base + it.offset);
+	uint avail = it.length - it.offset - cast(uint)cv_c13_subsection_header_t.sizeof;
+	if (h.Length > avail)
+		return null;
+
+	uint advance = cast(uint)cv_c13_subsection_header_t.sizeof + h.Length;
+	// 4-byte align the cursor for the next entry.
+	import adbg.utils.bit : adbg_alignup;
+	advance = cast(uint)adbg_alignup(advance, 4);
+	if (advance > it.length - it.offset)
+		advance = it.length - it.offset;
+	it.offset += advance;
+	return h;
+}

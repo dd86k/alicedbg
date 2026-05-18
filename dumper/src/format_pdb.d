@@ -31,6 +31,8 @@ int dump_pdb(adbg_object_t *o) {
 		dump_pdb_seccontribs(o);
 	if (SELECTED_OBJ(SelectObj.pdbSyms))
 		dump_pdb_syms(o);
+	if (SELECTED_OBJ(SelectObj.pdbLines))
+		dump_pdb_lines(o);
 	// can be 0
 	if (opt_pdb_stream)
 		dump_pdb_stream(o, atoi(opt_pdb_stream));
@@ -606,6 +608,141 @@ void dump_pdb_syms(adbg_object_t *o) {
 					kindstr ? kindstr : "S_?",
 					p.Segment, p.CodeOffset, -5, p.CodeSize, p.TypeIndex,
 					maxname, name);
+			}
+		}
+	}
+}
+
+// Walk a DEBUG_S_LINES subsection payload and print each per-file block.
+void dump_c13_lines_subsection(ubyte *payload, uint paylen) {
+	if (paylen < cv_c13_lines_header_t.sizeof) {
+		print_warningf("LINES subsection truncated");
+		return;
+	}
+	cv_c13_lines_header_t *hdr = cast(cv_c13_lines_header_t*)payload;
+	bool has_columns = (hdr.Flags & CV_LINES_HAS_COLUMNS) != 0;
+	printf("  range=%02u:%08x..%08x  flags=%04x%s\n",
+		hdr.Segment, hdr.OffsetInSection,
+		hdr.OffsetInSection + hdr.CodeSize,
+		hdr.Flags, has_columns ? " HAS_COLUMNS".ptr : "".ptr);
+
+	uint p = cast(uint)cv_c13_lines_header_t.sizeof;
+	while (p + cv_c13_lines_file_block_t.sizeof <= paylen) {
+		cv_c13_lines_file_block_t *fb = cast(cv_c13_lines_file_block_t*)(payload + p);
+		if (fb.BlockSize < cv_c13_lines_file_block_t.sizeof ||
+			p + fb.BlockSize > paylen) {
+			print_warningf("Malformed file block");
+			return;
+		}
+		printf("    fileChksm=%u  lines=%u\n",
+			fb.FileChecksumOffset, fb.NumLines);
+
+		uint lp = p + cast(uint)cv_c13_lines_file_block_t.sizeof;
+		uint entries_size = fb.NumLines * cast(uint)cv_c13_line_entry_t.sizeof;
+		if (lp + entries_size > p + fb.BlockSize) {
+			print_warningf("Line entries overflow block");
+			return;
+		}
+		cv_c13_line_entry_t *line_entries = cast(cv_c13_line_entry_t*)(payload + lp);
+		cv_c13_column_entry_t *col_entries = null;
+		if (has_columns) {
+			uint cp = lp + entries_size;
+			uint col_size = fb.NumLines * cast(uint)cv_c13_column_entry_t.sizeof;
+			if (cp + col_size <= p + fb.BlockSize)
+				col_entries = cast(cv_c13_column_entry_t*)(payload + cp);
+		}
+
+		for (uint i; i < fb.NumLines; ++i) {
+			cv_c13_line_entry_t *le = line_entries + i;
+			uint sec_off = hdr.OffsetInSection + le.Offset;
+			uint line = cv_c13_line_start(le.LineAndFlags);
+			char stmt = cv_c13_line_is_statement(le.LineAndFlags) ? 'S' : '-';
+			if (col_entries) {
+				printf("      %02u:%08x  L%u  col=%u..%u  %c\n",
+					hdr.Segment, sec_off, line,
+					col_entries[i].StartColumn,
+					col_entries[i].EndColumn, stmt);
+			} else {
+				printf("      %02u:%08x  L%u  %c\n",
+					hdr.Segment, sec_off, line, stmt);
+			}
+		}
+
+		p += fb.BlockSize;
+	}
+}
+
+// Walk a DEBUG_S_FILECHKSMS subsection and print each entry's offset (in
+// the subsection) along with the file-name offset into /names. The string
+// table lookup is deferred until the named-stream map is wired up.
+void dump_c13_filechksms_subsection(ubyte *payload, uint paylen) {
+	uint p;
+	while (p + cv_c13_filechksm_t.sizeof <= paylen) {
+		cv_c13_filechksm_t *e = cast(cv_c13_filechksm_t*)(payload + p);
+		uint reclen = cast(uint)cv_c13_filechksm_t.sizeof + e.ChecksumSize;
+		import adbg.utils.bit : adbg_alignup;
+		uint aligned = cast(uint)adbg_alignup(reclen, 4);
+		if (p + reclen > paylen) {
+			print_warningf("Truncated checksum entry");
+			return;
+		}
+		printf("  [@%*u] file=/names+%u  kind=%u  csumlen=%u\n",
+			-6, p, e.FileNameOffset, e.ChecksumKind, e.ChecksumSize);
+		p += aligned;
+	}
+}
+
+void dump_pdb_lines(adbg_object_t *o) {
+	print_header("PDB line info (per-module)");
+
+	pdb_dbi_modinfo_iter_t *mit = adbg_object_pdb_dbi_modinfo_open(o);
+	if (mit == null) {
+		print_warningf("Failed to open ModInfo iterator: %s", adbg_error_message());
+		return;
+	}
+	scope(exit) adbg_object_pdb_dbi_modinfo_close(mit);
+
+	uint mod_index;
+	const(char) *modname;
+	pdb_dbi_modinfo_t *mod = void;
+	while ((mod = adbg_object_pdb_dbi_modinfo_next(mit, &modname, null)) != null) {
+		uint this_mod = mod_index++;
+		if (mod.ModuleSysStream == 0xffff || mod.C13ByteSize == 0)
+			continue;
+
+		pdb_module_stream_t layout = void;
+		if (adbg_object_pdb_module_open(o, mod, &layout)) {
+			print_warningf("Module %u: %s", this_mod, adbg_error_message());
+			continue;
+		}
+		if (layout.c13_size == 0)
+			continue;
+
+		printf("\n## Module %u: %s (C13=%u bytes)\n", this_mod, modname, layout.c13_size);
+
+		cv_c13_iter_t it = void;
+		adbg_type_cv_c13_open(&it, layout.c13, layout.c13_size);
+
+		cv_c13_subsection_header_t *sub = void;
+		while ((sub = adbg_type_cv_c13_next(&it)) != null) {
+			uint kind = sub.Kind & ~DEBUG_S_IGNORE;
+			const(char) *kstr = adbg_type_cv_c13_kind_string(kind);
+			printf("\n[kind=%08x %s, len=%u]\n", sub.Kind, kstr ? kstr : "?", sub.Length);
+
+			if (sub.Kind & DEBUG_S_IGNORE)
+				continue;
+
+			ubyte *payload = cast(ubyte*)(sub + 1);
+			switch (kind) {
+			case DEBUG_S_LINES:
+				dump_c13_lines_subsection(payload, sub.Length);
+				break;
+			case DEBUG_S_FILECHKSMS:
+				dump_c13_filechksms_subsection(payload, sub.Length);
+				break;
+			default:
+				// Unhandled kinds — header alone gives a useful summary.
+				break;
 			}
 		}
 	}

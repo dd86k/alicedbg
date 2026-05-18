@@ -52,6 +52,7 @@ immutable option_t[] options = [
 	option_t(0,   "pdb-modules",  "Dump PDB modules", &cliopt_pdb_modules),
 	option_t(0,   "pdb-seccontribs", "Dump PDB section contributions", &cliopt_pdb_seccontribs),
 	option_t(0,   "pdb-syms",     "Dump PDB per-module CV symbols", &cliopt_pdb_syms),
+	option_t(0,   "pdb-lines",    "Dump PDB per-module C13 line info", &cliopt_pdb_lines),
 	// settings
 	option_t(0,   "as-blob",           "Setting: Input is headless binary blob", &cliopt_as_blob),
 	option_t(0,   "disassemble",       "Setting: Disassemble executable sections", &cliopt_disasm),
@@ -137,6 +138,11 @@ int cliopt_pdb_seccontribs() {
 int cliopt_pdb_syms() {
 	opt_selected |= Select.any;
 	opt_selected_obj |= SelectObj.pdbSyms;
+	return 0;
+}
+int cliopt_pdb_lines() {
+	opt_selected |= Select.any;
+	opt_selected_obj |= SelectObj.pdbLines;
 	return 0;
 }
 
