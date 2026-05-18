@@ -492,36 +492,6 @@ const(char)* pdb_seccontrib_ver_string(uint v) {
 	}
 }
 
-// Resolve a 1-based section index (as found in SC / SYM records) to the
-// associated PE section header from the section-headers stream pointed to
-// by the Optional Debug Header. Returns null if unavailable.
-pe_section_entry_t* pdb_resolve_section(adbg_object_t *o, ushort section,
-	pe_section_entry_t *cache_base, size_t cache_count) {
-	if (cache_base == null || section == 0 || section > cache_count)
-		return null;
-	return cache_base + (section - 1);
-}
-
-// Open the section-headers stream referenced by the Optional Debug Header
-// (slot 5) and return its base pointer + entry count. Returns null pointer
-// and count=0 if the stream isn't present.
-pe_section_entry_t* pdb_open_section_headers(adbg_object_t *o,
-	size_t *out_count) {
-	*out_count = 0;
-	size_t dbg_count;
-	ushort *dbg = adbg_object_pdb_dbi_dbgheader(o, &dbg_count);
-	if (dbg == null || dbg_count <= PdbDbgHeaderIndex.sectionHeaders)
-		return null;
-	ushort sh_stream = dbg[PdbDbgHeaderIndex.sectionHeaders];
-	if (sh_stream == PDB_DBG_HEADER_ABSENT)
-		return null;
-
-	pdb_stream_t *s = adbg_object_pdb_open_stream(o, sh_stream);
-	if (s == null)
-		return null;
-	*out_count = s.size / pe_section_entry_t.sizeof;
-	return cast(pe_section_entry_t*)s.data;
-}
 
 void dump_pdb_seccontribs(adbg_object_t *o) {
 	print_header("PDB section contributions");
@@ -536,7 +506,7 @@ void dump_pdb_seccontribs(adbg_object_t *o) {
 	// Resolve section-name table once. May be absent (older PDBs); we'll just
 	// leave that column blank in that case.
 	size_t sh_count;
-	pe_section_entry_t *sh = pdb_open_section_headers(o, &sh_count);
+	pe_section_entry_t *sh = adbg_object_pdb_section_headers(o, &sh_count);
 
 	// Header line: version + record count.
 	uint total = it.length / it.entrysize;
@@ -565,7 +535,7 @@ void dump_pdb_seccontribs(adbg_object_t *o) {
 		// NUL-terminated, so use %.*s with the field length.
 		const(char) *sname_ptr = "".ptr;
 		int sname_len;
-		pe_section_entry_t *psh = pdb_resolve_section(o, e.Section, sh, sh_count);
+		pe_section_entry_t *psh = adbg_object_pdb_section_lookup(sh, sh_count, e.Section);
 		if (psh) {
 			sname_ptr = psh.Name.ptr;
 			sname_len = cast(int)pe_section_entry_t.Name.sizeof;

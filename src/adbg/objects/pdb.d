@@ -27,11 +27,13 @@ module adbg.objects.pdb;
 
 import adbg.error;
 import adbg.objectserver;
+import adbg.objects.pe : pe_section_entry_t;
+import adbg.types.cv;
 import adbg.utils.bit;
 import adbg.utils.uid;
 import adbg.utils.math;
 import core.stdc.stdlib;
-import core.stdc.string : memset;
+import core.stdc.string : memset, strlen, strncmp;
 
 extern (C):
 
@@ -1286,6 +1288,77 @@ ushort* adbg_object_pdb_dbi_dbgheader(adbg_object_t *o, size_t *out_count) {
 }
 
 //
+// Section headers (via Optional Debug Header slot 5)
+//
+// The section-headers stream is an array of pe_section_entry_t
+// (IMAGE_SECTION_HEADER) for the original image. Indices in CV/SC records
+// are 1-based against this array.
+
+/// Open the section-headers stream and return a pointer + entry count.
+///
+/// Caches the underlying stream as a side effect.
+///
+/// Params:
+/// 	o = Object instance.
+/// 	out_count = Receives the number of section header entries.
+/// Returns: Pointer to first entry, or null if the stream is absent
+///          (older / stripped PDBs).
+pe_section_entry_t* adbg_object_pdb_section_headers(adbg_object_t *o,
+	size_t *out_count) {
+	if (out_count) *out_count = 0;
+
+	size_t dbg_count;
+	ushort *dbg = adbg_object_pdb_dbi_dbgheader(o, &dbg_count);
+	if (dbg == null || dbg_count <= PdbDbgHeaderIndex.sectionHeaders)
+		return null;
+	ushort sh_stream = dbg[PdbDbgHeaderIndex.sectionHeaders];
+	if (sh_stream == PDB_DBG_HEADER_ABSENT) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+
+	pdb_stream_t *s = adbg_object_pdb_open_stream(o, sh_stream);
+	if (s == null)
+		return null;
+	if (out_count) *out_count = s.size / pe_section_entry_t.sizeof;
+	return cast(pe_section_entry_t*)s.data;
+}
+
+/// Look up a 1-based section index against a caller-cached section-headers
+/// table.
+///
+/// Intended for hot loops where the caller has already fetched the table
+/// via `adbg_object_pdb_section_headers`. One-shot callers should prefer
+/// `adbg_object_pdb_section_by_index`.
+///
+/// Params:
+/// 	table = Section-headers table base.
+/// 	count = Number of entries in `table`.
+/// 	section = 1-based section index. `0` is the "no section" sentinel.
+/// Returns: Pointer into `table`, or null if `section` is 0 or out of range.
+pragma(inline, true)
+pe_section_entry_t* adbg_object_pdb_section_lookup(
+	pe_section_entry_t *table, size_t count, ushort section) {
+	if (table == null || section == 0 || section > count)
+		return null;
+	return table + (section - 1);
+}
+
+/// Resolve a 1-based section index (as found in SC / SYM records) to its
+/// section header entry.
+///
+/// Params:
+/// 	o = Object instance.
+/// 	section = 1-based section index.
+/// Returns: Section header pointer, or null if `section` is 0 or out of
+///          range, or if the section-headers stream is absent.
+pe_section_entry_t* adbg_object_pdb_section_by_index(adbg_object_t *o, ushort section) {
+	size_t count;
+	pe_section_entry_t *base = adbg_object_pdb_section_headers(o, &count);
+	return adbg_object_pdb_section_lookup(base, count, section);
+}
+
+//
 // Per-module stream layout
 //
 // Each ModInfo entry references a stream (ModuleSysStream) whose contents
@@ -1372,6 +1445,94 @@ int adbg_object_pdb_module_open(adbg_object_t *o, pdb_dbi_modinfo_t *mod,
 	out_layout.c13_size = mod.C13ByteSize;
 
 	return 0;
+}
+
+//
+// Address resolution
+//
+
+/// Translate a CV PROCSYM32 record's `Segment:CodeOffset` to an image-relative
+/// virtual address (RVA).
+///
+/// Params:
+/// 	o = Object instance.
+/// 	p = Procedure symbol record.
+/// 	out_rva = Receives the RVA on success.
+/// Returns: 0 on success, non-zero error code otherwise (typically when the
+///          section-headers stream is unavailable, or the segment index is
+///          out of range).
+int adbg_object_pdb_sym_rva(adbg_object_t *o, cv_procsym32_t *p, uint *out_rva) {
+	if (p == null || out_rva == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	pe_section_entry_t *sec = adbg_object_pdb_section_by_index(o, p.Segment);
+	if (sec == null)
+		return adbg_oops(AdbgError.objectMalformed);
+	*out_rva = sec.VirtualAddress + p.CodeOffset;
+	return 0;
+}
+
+/// Find a procedure symbol by name and resolve its image-relative RVA.
+///
+/// Walks every module's symbol blob and matches `cv_procsym32_t.Name`
+/// against `name`. First match wins. This is a linear scan; for repeated
+/// lookups, callers should cache the result or eventually consume the
+/// publics stream instead.
+///
+/// Params:
+/// 	o = Object instance.
+/// 	name = NUL-terminated procedure name to match.
+/// 	out_rva = Receives the resolved RVA on success.
+/// 	out_size = Optional. Receives the procedure code size on success.
+/// Returns: 0 on success, `AdbgError.unavailable` if no match.
+int adbg_object_pdb_find_proc_by_name(adbg_object_t *o, const(char) *name,
+	uint *out_rva, uint *out_size) {
+	if (name == null || out_rva == null)
+		return adbg_oops(AdbgError.invalidArgument);
+
+	size_t namelen = strlen(name);
+
+	pdb_dbi_modinfo_iter_t *mit = adbg_object_pdb_dbi_modinfo_open(o);
+	if (mit == null)
+		return adbg_error_code();
+	scope(exit) adbg_object_pdb_dbi_modinfo_close(mit);
+
+	pdb_dbi_modinfo_t *mod = void;
+	while ((mod = adbg_object_pdb_dbi_modinfo_next(mit, null, null)) !is null) {
+		if (mod.ModuleSysStream == 0xffff || mod.SymByteSize == 0)
+			continue;
+
+		pdb_module_stream_t layout = void;
+		if (adbg_object_pdb_module_open(o, mod, &layout))
+			continue;
+
+		cv_sym_iter_t sit = void;
+		adbg_type_cv_sym_open(&sit, layout.symbols, layout.symbols_size);
+
+		cv_record_t *rec = void;
+		while ((rec = adbg_type_cv_sym_next(&sit)) != null) {
+			if (!adbg_type_cv_sym_is_proc32(rec.kind))
+				continue;
+			cv_procsym32_t *p = cast(cv_procsym32_t*)rec;
+			const(char) *pname = cast(const(char)*)(p + 1);
+			// Bytes available for the Name string within the record.
+			uint maxname = cast(uint)rec.length + 2 - cast(uint)cv_procsym32_t.sizeof;
+			// strncmp with `namelen + 1` includes the trailing NUL in the
+			// comparison, so a 0 result means exact match (not just a
+			// prefix), and the bound prevents over-read if Name is
+			// unterminated.
+			if (namelen >= maxname)
+				continue;
+			if (strncmp(pname, name, namelen + 1) != 0)
+				continue;
+
+			if (adbg_object_pdb_sym_rva(o, p, out_rva))
+				return adbg_error_code();
+			if (out_size) *out_size = p.CodeSize;
+			return 0;
+		}
+	}
+
+	return adbg_oops(AdbgError.unavailable);
 }
 
 //
