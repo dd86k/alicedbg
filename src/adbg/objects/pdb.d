@@ -938,6 +938,127 @@ int adbg_object_pdb70_is_block_free(adbg_object_t *o, uint id) {
 }
 
 //
+// ModInfo iterator
+//
+
+// The Module Info Substream sits immediately after the DBI header in
+// Stream 3, and its length is given by pdb_dbi_header_t.ModInfoSize.
+// Each entry is variable-length: the 64-byte pdb_dbi_modinfo_t fixed
+// record, followed by two NUL-terminated strings (module name, object
+// file name), padded to the next 4-byte boundary.
+
+/// Iterator state for the DBI ModInfo substream.
+///
+/// Pointers into `base` are interior pointers into the cached DBI stream
+/// buffer; they remain valid until the DBI stream is closed or the
+/// object is unloaded.
+struct pdb_dbi_modinfo_iter_t {
+	ubyte *base;	/// Start of ModInfo substream.
+	uint length;	/// Substream length in bytes.
+	uint offset;	/// Current offset into substream.
+}
+
+/// Open an iterator over the DBI Module Info Substream.
+///
+/// Opens Stream 3 (DBI) as a side effect and leaves it cached.
+///
+/// Params: o = Object instance.
+/// Returns: Iterator handle, or null on error.
+pdb_dbi_modinfo_iter_t* adbg_object_pdb_dbi_modinfo_open(adbg_object_t *o) {
+	internal_pdb_t *pdb = cast(internal_pdb_t*)adbg_object_impl_get_buffer(o);
+	if (pdb == null)
+		return null;
+	if (pdb.pdbversion != PdbVersion.pdb70) {
+		adbg_oops(AdbgError.objectInvalidVersion);
+		return null;
+	}
+
+	pdb_stream_t *dbi = adbg_object_pdb_open_stream(o, Pdb70Stream.dbi);
+	if (dbi == null)
+		return null;
+	if (dbi.size < pdb_dbi_header_t.sizeof) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+
+	pdb_dbi_header_t *hdr = cast(pdb_dbi_header_t*)dbi.data;
+	if (hdr.ModInfoSize < 0) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	uint sub_off = cast(uint)pdb_dbi_header_t.sizeof;
+	uint sub_len = cast(uint)hdr.ModInfoSize;
+	if (sub_off + sub_len > dbi.size) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+
+	pdb_dbi_modinfo_iter_t *iter = cast(pdb_dbi_modinfo_iter_t*)calloc(1, pdb_dbi_modinfo_iter_t.sizeof);
+	if (iter == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	iter.base   = cast(ubyte*)dbi.data + sub_off;
+	iter.length = sub_len;
+	iter.offset = 0;
+	return iter;
+}
+
+/// Advance to the next module entry.
+///
+/// On success, `*out_modname` and `*out_objname` (when non-null) are set
+/// to NUL-terminated strings interior to the DBI stream buffer.
+///
+/// Params:
+/// 	it = Iterator handle.
+/// 	out_modname = Optional. Receives module name pointer.
+/// 	out_objname = Optional. Receives object file name pointer.
+/// Returns: Pointer to the fixed record, or null at end of iteration
+///          or on malformed entry.
+pdb_dbi_modinfo_t* adbg_object_pdb_dbi_modinfo_next(pdb_dbi_modinfo_iter_t *it,
+	const(char) **out_modname, const(char) **out_objname) {
+	if (it == null)
+		return null;
+	if (it.offset >= it.length)
+		return null;
+	if (it.length - it.offset < pdb_dbi_modinfo_t.sizeof)
+		return null;
+
+	pdb_dbi_modinfo_t *m = cast(pdb_dbi_modinfo_t*)(it.base + it.offset);
+	uint p = it.offset + cast(uint)pdb_dbi_modinfo_t.sizeof;
+
+	// Two NUL-terminated strings: module name, then object file name.
+	const(char) *modname = cast(const(char)*)(it.base + p);
+	while (p < it.length && it.base[p] != 0)
+		++p;
+	if (p >= it.length) // unterminated
+		return null;
+	++p; // skip NUL
+
+	const(char) *objname = cast(const(char)*)(it.base + p);
+	while (p < it.length && it.base[p] != 0)
+		++p;
+	if (p >= it.length)
+		return null;
+	++p; // skip NUL
+
+	// Pad to 4-byte boundary.
+	p = (p + 3) & ~3u;
+	if (p > it.length)
+		p = it.length;
+
+	if (out_modname) *out_modname = modname;
+	if (out_objname) *out_objname = objname;
+	it.offset = p;
+	return m;
+}
+
+/// Close a ModInfo iterator. Does not close the underlying DBI stream.
+void adbg_object_pdb_dbi_modinfo_close(pdb_dbi_modinfo_iter_t *it) {
+	if (it) free(it);
+}
+
+//
 // Portable PDB and CILDB
 //
 // Introduced with .NET Core and used in .NET 5 and later
