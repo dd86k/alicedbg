@@ -673,9 +673,9 @@ void dump_c13_lines_subsection(ubyte *payload, uint paylen) {
 }
 
 // Walk a DEBUG_S_FILECHKSMS subsection and print each entry's offset (in
-// the subsection) along with the file-name offset into /names. The string
-// table lookup is deferred until the named-stream map is wired up.
-void dump_c13_filechksms_subsection(ubyte *payload, uint paylen) {
+// the subsection), the resolved file path from /names, and the checksum
+// kind/size.
+void dump_c13_filechksms_subsection(adbg_object_t *o, ubyte *payload, uint paylen) {
 	uint p;
 	while (p + cv_c13_filechksm_t.sizeof <= paylen) {
 		cv_c13_filechksm_t *e = cast(cv_c13_filechksm_t*)(payload + p);
@@ -686,8 +686,11 @@ void dump_c13_filechksms_subsection(ubyte *payload, uint paylen) {
 			print_warningf("Truncated checksum entry");
 			return;
 		}
-		printf("  [@%*u] file=/names+%u  kind=%u  csumlen=%u\n",
-			-6, p, e.FileNameOffset, e.ChecksumKind, e.ChecksumSize);
+		const(char) *path = adbg_object_pdb_names_string(o, e.FileNameOffset);
+		printf("  [@%*u] file=%s  kind=%u  csumlen=%u\n",
+			-6, p,
+			path ? path : "<unresolved>".ptr,
+			e.ChecksumKind, e.ChecksumSize);
 		p += aligned;
 	}
 }
@@ -738,7 +741,7 @@ void dump_pdb_lines(adbg_object_t *o) {
 				dump_c13_lines_subsection(payload, sub.Length);
 				break;
 			case DEBUG_S_FILECHKSMS:
-				dump_c13_filechksms_subsection(payload, sub.Length);
+				dump_c13_filechksms_subsection(o, payload, sub.Length);
 				break;
 			default:
 				// Unhandled kinds — header alone gives a useful summary.

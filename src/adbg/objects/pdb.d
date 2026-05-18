@@ -443,7 +443,7 @@ enum PdbRaw_PdbFeatures : uint {
 }
 
 /// Stream 1 structure
-struct pdb_pdb_header_t {
+struct pdb_pdb_header_t { align(1):
 	/// Contains VC version
 	uint Version;
 	/// Timestamp (Using time(3))
@@ -453,6 +453,7 @@ struct pdb_pdb_header_t {
 	/// Unique GUID, used to match PDB and EXE
 	UID UniqueId;
 }
+static assert(pdb_pdb_header_t.sizeof == 28);
 
 //
 // Stream 2 (TPI) structures
@@ -1533,6 +1534,166 @@ int adbg_object_pdb_find_proc_by_name(adbg_object_t *o, const(char) *name,
 	}
 
 	return adbg_oops(AdbgError.unavailable);
+}
+
+//
+// Stream 1 named-stream map and `/names` (PDB string table)
+//
+// Stream 1 layout, after `pdb_pdb_header_t`:
+//   uint   StringBufferSize
+//   char   StringBuffer[StringBufferSize]
+//   uint   Size              // populated entries in the hash table
+//   uint   Capacity          // bucket count
+//   uint   PresentWordCount; uint Present[PresentWordCount]
+//   uint   DeletedWordCount; uint Deleted[DeletedWordCount]
+//   struct { uint Key; uint Value; }[Size]
+//   uint   FeatureCodes[...]
+// `Key` is an offset into StringBuffer (a NUL-terminated stream name like
+// "/names"); `Value` is the stream index that name maps to.
+
+/// Sentinel returned by `adbg_object_pdb_named_stream_index` when the
+/// requested name is not present in the map.
+enum ushort PDB_NAMED_STREAM_ABSENT = 0xffff;
+
+/// Magic at the start of the `/names` (PDB string table) stream.
+enum uint PDB_NAMES_MAGIC = 0xEFFEEFFE;
+
+/// `/names` (PDB string table) header. Followed by `ByteSize` bytes of
+/// NUL-terminated strings, then a hash-table epilogue we don't need for
+/// offset-based lookups.
+struct pdb_names_header_t { align(1):
+	uint Magic;	/// `PDB_NAMES_MAGIC` (0xEFFEEFFE).
+	uint HashVersion;	/// 1 or 2 — selects the hash function used by the epilogue.
+	uint ByteSize;	/// Size in bytes of the string buffer that follows.
+}
+static assert(pdb_names_header_t.sizeof == 12);
+
+/// Look up a named stream (e.g., "/names", "/LinkInfo") by name.
+///
+/// Parses the named-stream map in Stream 1 on each call; Stream 1 itself is
+/// cached after the first open, so repeated calls are inexpensive but not
+/// free. Callers that need many lookups should cache the result.
+///
+/// Params:
+/// 	o = PDB object instance.
+/// 	name = NUL-terminated stream name including the leading slash.
+/// Returns: Stream index, or `PDB_NAMED_STREAM_ABSENT` if not found or on error.
+ushort adbg_object_pdb_named_stream_index(adbg_object_t *o, const(char) *name) {
+	if (o == null || name == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return PDB_NAMED_STREAM_ABSENT;
+	}
+
+	pdb_stream_t *s = adbg_object_pdb_open_stream(o, Pdb70Stream.pdb);
+	if (s == null)
+		return PDB_NAMED_STREAM_ABSENT;
+	if (s.size < pdb_pdb_header_t.sizeof + 4) {
+		adbg_oops(AdbgError.objectMalformed);
+		return PDB_NAMED_STREAM_ABSENT;
+	}
+
+	ubyte *base = cast(ubyte*)s.data;
+	uint   end  = cast(uint)s.size;
+	uint   off  = cast(uint)pdb_pdb_header_t.sizeof;
+
+	// StringBuffer
+	uint sbsize = *cast(uint*)(base + off); off += 4;
+	if (sbsize > end - off) {
+		adbg_oops(AdbgError.objectMalformed);
+		return PDB_NAMED_STREAM_ABSENT;
+	}
+	const(char) *sbuf = cast(const(char)*)(base + off);
+	off += sbsize;
+
+	// HashTable header
+	if (end - off < 8) {
+		adbg_oops(AdbgError.objectMalformed);
+		return PDB_NAMED_STREAM_ABSENT;
+	}
+	uint hsize = *cast(uint*)(base + off); off += 4;
+	off += 4; // Capacity (unused for linear scan)
+
+	// Skip Present bitvector
+	if (end - off < 4) {
+		adbg_oops(AdbgError.objectMalformed);
+		return PDB_NAMED_STREAM_ABSENT;
+	}
+	uint pwc = *cast(uint*)(base + off); off += 4;
+	if (pwc > (end - off) / 4) {
+		adbg_oops(AdbgError.objectMalformed);
+		return PDB_NAMED_STREAM_ABSENT;
+	}
+	off += pwc * 4;
+
+	// Skip Deleted bitvector
+	if (end - off < 4) {
+		adbg_oops(AdbgError.objectMalformed);
+		return PDB_NAMED_STREAM_ABSENT;
+	}
+	uint dwc = *cast(uint*)(base + off); off += 4;
+	if (dwc > (end - off) / 4) {
+		adbg_oops(AdbgError.objectMalformed);
+		return PDB_NAMED_STREAM_ABSENT;
+	}
+	off += dwc * 4;
+
+	// Entries: { uint Key; uint Value; }[hsize]
+	if (hsize > (end - off) / 8) {
+		adbg_oops(AdbgError.objectMalformed);
+		return PDB_NAMED_STREAM_ABSENT;
+	}
+
+	size_t namelen = strlen(name);
+	for (uint i; i < hsize; ++i) {
+		uint key = *cast(uint*)(base + off + i * 8);
+		uint val = *cast(uint*)(base + off + i * 8 + 4);
+		if (key >= sbsize)
+			continue;
+		// strncmp with namelen+1 compares the trailing NUL too, avoiding
+		// prefix false matches (e.g., "/names" vs "/names2").
+		if (strncmp(sbuf + key, name, namelen + 1) == 0)
+			return cast(ushort)val;
+	}
+
+	return PDB_NAMED_STREAM_ABSENT;
+}
+
+/// Resolve a `/names` (PDB string table) offset into the underlying
+/// NUL-terminated string.
+///
+/// Opens the `/names` stream on first call (cached thereafter), validates
+/// its magic, then returns an interior pointer at the requested offset.
+/// The returned pointer is valid until the object is unloaded.
+///
+/// Params:
+/// 	o = PDB object instance.
+/// 	offset = Byte offset into the `/names` string buffer (typically
+/// 	         taken from a C13 `cv_c13_filechksm_t.FileNameOffset`).
+/// Returns: Pointer into the string buffer, or null on error
+///          (no `/names` stream, bad magic, or offset out of range).
+const(char)* adbg_object_pdb_names_string(adbg_object_t *o, uint offset) {
+	ushort idx = adbg_object_pdb_named_stream_index(o, "/names");
+	if (idx == PDB_NAMED_STREAM_ABSENT)
+		return null;
+
+	pdb_stream_t *s = adbg_object_pdb_open_stream(o, idx);
+	if (s == null)
+		return null;
+	if (s.size < pdb_names_header_t.sizeof) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	pdb_names_header_t *hdr = cast(pdb_names_header_t*)s.data;
+	if (hdr.Magic != PDB_NAMES_MAGIC) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	if (pdb_names_header_t.sizeof + cast(size_t)hdr.ByteSize > s.size ||
+		offset >= hdr.ByteSize) {
+		adbg_oops(AdbgError.indexBounds);
+		return null;
+	}
+	return cast(const(char)*)(hdr + 1) + offset;
 }
 
 //
