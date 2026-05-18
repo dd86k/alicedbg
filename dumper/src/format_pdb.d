@@ -8,13 +8,13 @@ module format_pdb;
 import adbg.error;
 import adbg.objectserver;
 import adbg.objects.pdb;
-import adbg.objects.pe : adbg_object_pe_machine_value_string;
+import adbg.objects.pe : adbg_object_pe_machine_value_string, pe_section_entry_t;
 import adbg.utils.uid;
 import adbg.utils.date;
 import adbg.utils.strings;
 import adbg.utils.math;
 import adbg.utils.bit;
-import adbg.include.c.stdio : printf, snprintf, putchar;
+import adbg.include.c.stdio : printf, snprintf, putchar, puts;
 import adbg.types.cv;
 import core.stdc.stdlib : atoi;
 import dumper;
@@ -27,6 +27,8 @@ int dump_pdb(adbg_object_t *o) {
 		dump_pdb_header(o);
 	if (SELECTED_OBJ(SelectObj.pdbModules))
 		dump_pdb_modules(o);
+	if (SELECTED_OBJ(SelectObj.pdbSecContribs))
+		dump_pdb_seccontribs(o);
 	// can be 0
 	if (opt_pdb_stream)
 		dump_pdb_stream(o, atoi(opt_pdb_stream));
@@ -461,6 +463,124 @@ void dump_pdb_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
 	// TODO: EC Substream
 	
 	// TODO: Optional Debug Header Stream
+}
+
+// IMAGE_SECTION_HEADER.Characteristics bits relevant for a compact rwxc summary.
+enum : uint {
+	IMAGE_SCN_CNT_CODE       = 0x00000020,
+	IMAGE_SCN_MEM_EXECUTE    = 0x20000000,
+	IMAGE_SCN_MEM_READ       = 0x40000000,
+	IMAGE_SCN_MEM_WRITE      = 0x80000000,
+}
+
+// Format Characteristics as a 4-char rwxc string into buf[5].
+void format_sc_chars(uint c, char *buf) {
+	buf[0] = (c & IMAGE_SCN_MEM_READ)    ? 'r' : '-';
+	buf[1] = (c & IMAGE_SCN_MEM_WRITE)   ? 'w' : '-';
+	buf[2] = (c & IMAGE_SCN_MEM_EXECUTE) ? 'x' : '-';
+	buf[3] = (c & IMAGE_SCN_CNT_CODE)    ? 'c' : '-';
+	buf[4] = 0;
+}
+
+const(char)* pdb_seccontrib_ver_string(uint v) {
+	switch (v) with (PdbRaw_DbiSecContribVer) {
+	case ver60: return "ver60";
+	case v2:    return "v2";
+	default:    return "Unknown";
+	}
+}
+
+// Resolve a 1-based section index (as found in SC / SYM records) to the
+// associated PE section header from the section-headers stream pointed to
+// by the Optional Debug Header. Returns null if unavailable.
+pe_section_entry_t* pdb_resolve_section(adbg_object_t *o, ushort section,
+	pe_section_entry_t *cache_base, size_t cache_count) {
+	if (cache_base == null || section == 0 || section > cache_count)
+		return null;
+	return cache_base + (section - 1);
+}
+
+// Open the section-headers stream referenced by the Optional Debug Header
+// (slot 5) and return its base pointer + entry count. Returns null pointer
+// and count=0 if the stream isn't present.
+pe_section_entry_t* pdb_open_section_headers(adbg_object_t *o,
+	size_t *out_count) {
+	*out_count = 0;
+	size_t dbg_count;
+	ushort *dbg = adbg_object_pdb_dbi_dbgheader(o, &dbg_count);
+	if (dbg == null || dbg_count <= PdbDbgHeaderIndex.sectionHeaders)
+		return null;
+	ushort sh_stream = dbg[PdbDbgHeaderIndex.sectionHeaders];
+	if (sh_stream == PDB_DBG_HEADER_ABSENT)
+		return null;
+
+	pdb_stream_t *s = adbg_object_pdb_open_stream(o, sh_stream);
+	if (s == null)
+		return null;
+	*out_count = s.size / pe_section_entry_t.sizeof;
+	return cast(pe_section_entry_t*)s.data;
+}
+
+void dump_pdb_seccontribs(adbg_object_t *o) {
+	print_header("PDB section contributions");
+
+	pdb_dbi_seccontrib_iter_t *it = adbg_object_pdb_dbi_seccontrib_open(o);
+	if (it == null) {
+		print_warningf("Failed to open SecContrib iterator: %s", adbg_error_message());
+		return;
+	}
+	scope(exit) adbg_object_pdb_dbi_seccontrib_close(it);
+
+	// Resolve section-name table once. May be absent (older PDBs); we'll just
+	// leave that column blank in that case.
+	size_t sh_count;
+	pe_section_entry_t *sh = pdb_open_section_headers(o, &sh_count);
+
+	// Header line: version + record count.
+	uint total = it.length / it.entrysize;
+	printf("Version: %08x (%s), %u entries\n",
+		it.vermark, pdb_seccontrib_ver_string(it.vermark), total);
+
+	// Column header. ISectCoff appears only for v2.
+	if (it.entrysize == pdb_dbi_seccontrib2_entry_t.sizeof)
+		puts("    #    Sec:Off       Size       Mod   Chars  Name      ICoff");
+	else
+		puts("    #    Sec:Off       Size       Mod   Chars  Name");
+
+	uint i;
+	pdb_dbi_seccontrib_entry_t *e = void;
+	while ((e = adbg_object_pdb_dbi_seccontrib_next(it)) != null) {
+		// Sentinel entries (Section==0, or ModuleIndex==0xffff) occasionally
+		// appear as terminators; tag rather than skip silently.
+		const(char) *tag = "";
+		if (e.Section == 0 || e.ModuleIndex == 0xffff)
+			tag = " *sentinel*";
+
+		char[5] rwxc = void;
+		format_sc_chars(e.Characteristics, rwxc.ptr);
+
+		// Section name. pe_section_entry_t.Name is char[8], possibly not
+		// NUL-terminated, so use %.*s with the field length.
+		const(char) *sname_ptr = "".ptr;
+		int sname_len;
+		pe_section_entry_t *psh = pdb_resolve_section(o, e.Section, sh, sh_count);
+		if (psh) {
+			sname_ptr = psh.Name.ptr;
+			sname_len = cast(int)pe_section_entry_t.Name.sizeof;
+		}
+
+		if (it.entrysize == pdb_dbi_seccontrib2_entry_t.sizeof) {
+			auto e2 = cast(pdb_dbi_seccontrib2_entry_t*)e;
+			printf("  %4u   %02u:%08x  %10d  %4u   %s  %-8.*s  %u%s\n",
+				i, e.Section, e.Offset, e.Size,
+				e.ModuleIndex, rwxc.ptr, sname_len, sname_ptr, e2.ISectCoff, tag);
+		} else {
+			printf("  %4u   %02u:%08x  %10d  %4u   %s  %-8.*s%s\n",
+				i, e.Section, e.Offset, e.Size,
+				e.ModuleIndex, rwxc.ptr, sname_len, sname_ptr, tag);
+		}
+		++i;
+	}
 }
 
 void dump_pdb_modules(adbg_object_t *o) {

@@ -640,6 +640,42 @@ enum {
 	PDB_DBI_MOD_EC = 2,
 }
 
+/// Section Contribution entry, v60 form (28 bytes).
+///
+/// Same layout as the nested `SectionContr` inside `pdb_dbi_modinfo_t`. Exposed
+/// standalone here so callers of the Section Contribution Substream iterator
+/// don't have to reach into the ModInfo type.
+struct pdb_dbi_seccontrib_entry_t { align(1):
+	/// 1-based section index in the original image. Use the section
+	/// headers stream (referenced by the Optional Debug Header) to
+	/// translate to RVA.
+	ushort Section;
+	ushort Padding1;
+	/// Offset within the section.
+	int Offset;
+	/// Contribution size in bytes.
+	int Size;
+	/// IMAGE_SECTION_HEADER.Characteristics for the originating section.
+	uint Characteristics;
+	/// Module index into the DBI ModInfo array.
+	ushort ModuleIndex;
+	ushort Padding2;
+	uint DataCrc;
+	uint RelocCrc;
+}
+static assert(pdb_dbi_seccontrib_entry_t.sizeof == 28);
+
+/// Section Contribution entry, v2 form (32 bytes).
+///
+/// Identical to v60 plus a trailing `ISectCoff` field. Callers that observe
+/// `pdb_dbi_seccontrib_iter_t.entrysize == 32` may cast the entry pointer
+/// returned by the iterator to this type to read `ISectCoff`.
+struct pdb_dbi_seccontrib2_entry_t { align(1):
+	pdb_dbi_seccontrib_entry_t Base;
+	uint ISectCoff;
+}
+static assert(pdb_dbi_seccontrib2_entry_t.sizeof == 32);
+
 /// File information substream header.
 ///
 /// One per file.
@@ -1056,6 +1092,197 @@ pdb_dbi_modinfo_t* adbg_object_pdb_dbi_modinfo_next(pdb_dbi_modinfo_iter_t *it,
 /// Close a ModInfo iterator. Does not close the underlying DBI stream.
 void adbg_object_pdb_dbi_modinfo_close(pdb_dbi_modinfo_iter_t *it) {
 	if (it) free(it);
+}
+
+//
+// Section Contribution iterator
+//
+// The Section Contribution Substream sits immediately after the ModInfo
+// substream. Layout:
+//   uint Version;            // PdbRaw_DbiSecContribVer
+//   EntryType Entries[];     // 28-byte (ver60) or 32-byte (v2) records
+// Entry count is (SectionContributionSize - 4) / entrysize.
+
+/// Iterator state for the DBI Section Contribution substream.
+struct pdb_dbi_seccontrib_iter_t {
+	ubyte *base;	/// Start of first entry (past the version dword).
+	uint length;	/// Bytes available for entries.
+	uint offset;	/// Current offset into the entry array.
+	uint entrysize;	/// 28 for ver60, 32 for v2.
+	uint vermark;	/// Raw version dword (PdbRaw_DbiSecContribVer).
+}
+
+/// Open an iterator over the DBI Section Contribution substream.
+///
+/// Opens Stream 3 (DBI) as a side effect and leaves it cached.
+///
+/// Params: o = Object instance.
+/// Returns: Iterator handle, or null on error.
+pdb_dbi_seccontrib_iter_t* adbg_object_pdb_dbi_seccontrib_open(adbg_object_t *o) {
+	internal_pdb_t *pdb = cast(internal_pdb_t*)adbg_object_impl_get_buffer(o);
+	if (pdb == null)
+		return null;
+	if (pdb.pdbversion != PdbVersion.pdb70) {
+		adbg_oops(AdbgError.objectInvalidVersion);
+		return null;
+	}
+
+	pdb_stream_t *dbi = adbg_object_pdb_open_stream(o, Pdb70Stream.dbi);
+	if (dbi == null)
+		return null;
+	if (dbi.size < pdb_dbi_header_t.sizeof) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+
+	pdb_dbi_header_t *hdr = cast(pdb_dbi_header_t*)dbi.data;
+	if (hdr.ModInfoSize < 0 || hdr.SectionContributionSize < 4) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	uint sub_off = cast(uint)pdb_dbi_header_t.sizeof + cast(uint)hdr.ModInfoSize;
+	uint sub_len = cast(uint)hdr.SectionContributionSize;
+	if (sub_off + sub_len > dbi.size) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+
+	uint vermark = *cast(uint*)(cast(ubyte*)dbi.data + sub_off);
+	uint entrysize = void;
+	switch (vermark) with (PdbRaw_DbiSecContribVer) {
+	case ver60: entrysize = pdb_dbi_seccontrib_entry_t.sizeof; break;
+	case v2:    entrysize = pdb_dbi_seccontrib2_entry_t.sizeof; break;
+	default:
+		adbg_oops(AdbgError.objectInvalidVersion);
+		return null;
+	}
+
+	pdb_dbi_seccontrib_iter_t *iter = cast(pdb_dbi_seccontrib_iter_t*)
+		calloc(1, pdb_dbi_seccontrib_iter_t.sizeof);
+	if (iter == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	iter.base      = cast(ubyte*)dbi.data + sub_off + uint.sizeof;
+	iter.length    = sub_len - cast(uint)uint.sizeof;
+	iter.offset    = 0;
+	iter.entrysize = entrysize;
+	iter.vermark   = vermark;
+	return iter;
+}
+
+/// Advance to the next section contribution entry.
+///
+/// When `it.entrysize == 32` (v2 form), the returned pointer may be safely
+/// cast to `pdb_dbi_seccontrib2_entry_t*` to read the trailing `ISectCoff`.
+///
+/// Params: it = Iterator handle.
+/// Returns: Pointer to the entry, or null at end of iteration.
+pdb_dbi_seccontrib_entry_t* adbg_object_pdb_dbi_seccontrib_next(pdb_dbi_seccontrib_iter_t *it) {
+	if (it == null)
+		return null;
+	if (it.length - it.offset < it.entrysize)
+		return null;
+
+	pdb_dbi_seccontrib_entry_t *e =
+		cast(pdb_dbi_seccontrib_entry_t*)(it.base + it.offset);
+	it.offset += it.entrysize;
+	return e;
+}
+
+/// Close a Section Contribution iterator. Does not close the DBI stream.
+void adbg_object_pdb_dbi_seccontrib_close(pdb_dbi_seccontrib_iter_t *it) {
+	if (it) free(it);
+}
+
+//
+// Optional Debug Header substream
+//
+// The last DBI substream. Its content is a packed array of ushort stream
+// indices; a 0xffff entry means "absent". The array index identifies the
+// purpose of the referenced stream (see PdbDbgHeaderIndex).
+
+/// Well-known slots in the Optional Debug Header array.
+enum PdbDbgHeaderIndex : uint {
+	fpo                = 0,
+	exception          = 1,
+	fixup              = 2,
+	omapToSrc          = 3,
+	omapFromSrc        = 4,
+	/// Array of pe_section_entry_t (IMAGE_SECTION_HEADER) for the image.
+	/// Used to translate a Section index (from SC entries / SYMs) to RVA.
+	sectionHeaders     = 5,
+	tokenRidMap        = 6,
+	xdata              = 7,
+	pdata              = 8,
+	newFpo             = 9,
+	origSectionHeaders = 10,
+}
+
+enum ushort PDB_DBG_HEADER_ABSENT = 0xffff;
+
+/// Get the Optional Debug Header substream (array of stream indices).
+///
+/// Opens Stream 3 (DBI) as a side effect and leaves it cached. The returned
+/// pointer is interior to the DBI stream buffer and remains valid until that
+/// stream is closed or the object is unloaded.
+///
+/// Params:
+/// 	o = Object instance.
+/// 	out_count = Receives the number of ushort entries.
+/// Returns: Pointer to the first entry, or null on error.
+ushort* adbg_object_pdb_dbi_dbgheader(adbg_object_t *o, size_t *out_count) {
+	if (out_count) *out_count = 0;
+	internal_pdb_t *pdb = cast(internal_pdb_t*)adbg_object_impl_get_buffer(o);
+	if (pdb == null)
+		return null;
+	if (pdb.pdbversion != PdbVersion.pdb70) {
+		adbg_oops(AdbgError.objectInvalidVersion);
+		return null;
+	}
+
+	pdb_stream_t *dbi = adbg_object_pdb_open_stream(o, Pdb70Stream.dbi);
+	if (dbi == null)
+		return null;
+	if (dbi.size < pdb_dbi_header_t.sizeof) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+
+	pdb_dbi_header_t *hdr = cast(pdb_dbi_header_t*)dbi.data;
+	if (hdr.ModInfoSize < 0 ||
+		hdr.SectionContributionSize < 0 ||
+		hdr.SectionMapSize < 0 ||
+		hdr.SourceInfoSize < 0 ||
+		hdr.TypeServerMapSize < 0 ||
+		hdr.ECSubstreamSize < 0 ||
+		hdr.OptionalDbgHeaderSize < 0) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+
+	// Optional Debug Header sits after all other substreams.
+	// Order: ModInfo, SectionContribution, SectionMap, SourceInfo,
+	//        TypeServerMap, EC, OptionalDbgHeader.
+	size_t off = pdb_dbi_header_t.sizeof
+		+ cast(uint)hdr.ModInfoSize
+		+ cast(uint)hdr.SectionContributionSize
+		+ cast(uint)hdr.SectionMapSize
+		+ cast(uint)hdr.SourceInfoSize
+		+ cast(uint)hdr.TypeServerMapSize
+		+ cast(uint)hdr.ECSubstreamSize;
+	size_t len = cast(uint)hdr.OptionalDbgHeaderSize;
+	if (off + len > dbi.size) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	if (len < ushort.sizeof) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+
+	if (out_count) *out_count = len / ushort.sizeof;
+	return cast(ushort*)(cast(ubyte*)dbi.data + off);
 }
 
 //

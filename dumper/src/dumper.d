@@ -43,6 +43,8 @@ import format_pe;
 extern (C):
 __gshared:
 
+// Data selection, unspecific to a certain object
+// One or more object contain this kind of information
 enum Select {
 	/// Headers, program headers
 	headers	= BIT!0,
@@ -83,13 +85,18 @@ enum Select {
 int opt_selected;
 int SELECTED(Select selection) { return opt_selected & selection; }
 
+// Object-specific selections
+// These can collide with other object types safely
 enum SelectObj {
 	/// PDB modules
 	pdbModules = BIT!0,
+	/// PDB section contributions
+	pdbSecContribs = BIT!1,
 }
 int opt_selected_obj; // object-specific selections
 int SELECTED_OBJ(SelectObj selection)   { return opt_selected_obj & selection; }
 
+// Generic settings
 enum Setting {
 	/// Input file or data is blob
 	blob	= BIT!0,

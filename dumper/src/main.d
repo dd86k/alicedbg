@@ -50,6 +50,7 @@ immutable option_t[] options = [
 	// object-specific selections
 	option_t(0,   "pdb-stream",   "Dump given PDB stream", &cliopt_pdb_stream),
 	option_t(0,   "pdb-modules",  "Dump PDB modules", &cliopt_pdb_modules),
+	option_t(0,   "pdb-seccontribs", "Dump PDB section contributions", &cliopt_pdb_seccontribs),
 	// settings
 	option_t(0,   "as-blob",           "Setting: Input is headless binary blob", &cliopt_as_blob),
 	option_t(0,   "disassemble",       "Setting: Disassemble executable sections", &cliopt_disasm),
@@ -125,6 +126,11 @@ int cliopt_pdb_stream(const(char) *num) {
 int cliopt_pdb_modules() {
 	opt_selected |= Select.any;
 	opt_selected_obj |= SelectObj.pdbModules;
+	return 0;
+}
+int cliopt_pdb_seccontribs() {
+	opt_selected |= Select.any;
+	opt_selected_obj |= SelectObj.pdbSecContribs;
 	return 0;
 }
 
