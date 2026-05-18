@@ -272,24 +272,13 @@ pdb_stream_t* adbg_object_pdb_open_stream(adbg_object_t *o, uint number) {
 				continue;
 			}
 			
-			final switch (adbg_object_pdb70_free_block(o, block)) {
-			case -1: // error
-				adbg_oops(AdbgError.crt);
+			// Any block pointed by the directory is allocated by definition
+			long off = block * blksize;
+			if (adbg_object_read_at(o, off, data, blksize)) {
 				free(stream.data);
 				return null;
-			case 0: // used
-				long off = block * blksize;
-				if (adbg_object_read_at(o, off, data, blksize)) {
-					free(stream.data);
-					return null;
-				}
-				data += blksize;
-				break;
-			case 1: // free
-				memset(data, 0, blksize);
-				data += blksize;
-				break;
 			}
+			data += blksize;
 		}
 		break;
 	}
@@ -603,6 +592,7 @@ struct pdb_dbi_header_t {
 	/// ?
 	uint Padding;
 }
+static assert(pdb_dbi_header_t.sizeof == 64);
 
 /// Follows the DBI header, substream information.
 ///
@@ -612,12 +602,12 @@ struct pdb_dbi_modinfo_t { align(1):
 	uint Unused1;
 	struct pdb70_dbi_mod_contrib_entry { align(1):
 		ushort Section;
-		char[2] Padding1;
+		ushort Padding1;
 		int Offset;
 		int Size;
 		uint Characteristics;
 		ushort ModuleIndex;
-		char[2] Padding2;
+		ushort Padding2;
 		uint DataCrc;
 		uint RelocCrc;
 	}
@@ -635,13 +625,15 @@ struct pdb_dbi_modinfo_t { align(1):
 	uint C11ByteSize;
 	uint C13ByteSize;
 	ushort SourceFileCount;
-	char[2] Padding;
+	ushort Padding;
 	uint Unused2;
 	uint SourceFileNameIndex;
 	uint PdbFilePathNameIndex;
+	// Both strings are 4-byte aligned-up
 	// char[] ModuleName
 	// char[] ObjFileName
 }
+static assert(pdb_dbi_modinfo_t.sizeof == 64);
 
 enum {
 	PDB_DBI_MOD_DIRTY = 1,
@@ -734,6 +726,8 @@ struct internal_pdb_t {
 	// Free Page Map (PDB 7.0 only)
 	ubyte *fpm;	/// Points to completed FPM in use
 	size_t fpmcnt;	/// Size in bytes
+	
+	
 }
 
 int adbg_object_pdb70_load(adbg_object_t *o) {
@@ -916,7 +910,7 @@ uint adbg_object_pdb_stream_count(adbg_object_t *o) {
 /// 	id = Block ID.
 /// Returns: 1=Free, 0=Used, -1=Error
 private
-int adbg_object_pdb70_free_block(adbg_object_t *o, uint id) {
+int adbg_object_pdb70_is_block_free(adbg_object_t *o, uint id) {
 	internal_pdb_t *pdb = cast(internal_pdb_t*)adbg_object_impl_get_buffer(o);
 	if (pdb.pdbversion != PdbVersion.pdb70) {
 		adbg_oops(AdbgError.objectInvalidVersion);
@@ -929,7 +923,7 @@ int adbg_object_pdb70_free_block(adbg_object_t *o, uint id) {
 	}
 	
 	uint bi = id >> 3; // block byte index (id / 8)
-	uint br = 7 - (id % 8); // block reminder shift
+	uint br = id % 8; // LSB block reminder
 	return (pdb.fpm[bi] & (1 << br)) != 0; // if set, free block
 }
 

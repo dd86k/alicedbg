@@ -342,14 +342,12 @@ void dump_pdb_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
 			print_section(count++);
 			print_x32("Unused1", mod.Unused1);
 			print_x32("SectionContr.Section", mod.SectionContr.Section);
-			print_char("SectionContr.Padding1[0]", mod.SectionContr.Padding1[0]);
-			print_char("SectionContr.Padding1[1]", mod.SectionContr.Padding1[1]);
+			print_x16("SectionContr.Padding1", mod.SectionContr.Padding1);
 			print_u32("SectionContr.Offset", mod.SectionContr.Offset);
 			print_u32("SectionContr.Size", mod.SectionContr.Size);
 			print_x32("SectionContr.Characteristics", mod.SectionContr.Characteristics);
 			print_u16("SectionContr.ModuleIndex", mod.SectionContr.ModuleIndex);
-			print_char("SectionContr.Padding2[0]", mod.SectionContr.Padding2[0]);
-			print_char("SectionContr.Padding2[1]", mod.SectionContr.Padding2[1]);
+			print_x16("SectionContr.Padding2", mod.SectionContr.Padding2);
 			print_x32("SectionContr.DataCrc", mod.SectionContr.DataCrc);
 			print_x32("SectionContr.RelocCrc", mod.SectionContr.RelocCrc);
 			print_flags16("Flags", mod.Flags,
@@ -361,8 +359,7 @@ void dump_pdb_stream_dbi(adbg_object_t *o, pdb_stream_t *stream) {
 			print_u32("C11ByteSize", mod.C11ByteSize);
 			print_u32("C13ByteSize", mod.C13ByteSize);
 			print_u16("SourceFileCount", mod.SourceFileCount);
-			print_char("Padding[0]", mod.Padding[0]);
-			print_char("Padding[1]", mod.Padding[1]);
+			print_x16("Padding", mod.Padding);
 			print_x32("Unused2", mod.Unused2);
 			// NOTE: SourceFileNameIndex is usually zero these days.
 			print_u32("SourceFileNameIndex", mod.SourceFileNameIndex);
