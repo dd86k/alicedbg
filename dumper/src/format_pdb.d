@@ -33,6 +33,8 @@ int dump_pdb(adbg_object_t *o) {
 		dump_pdb_syms(o);
 	if (SELECTED_OBJ(SelectObj.pdbLines))
 		dump_pdb_lines(o);
+	if (SELECTED_OBJ(SelectObj.pdbAddr2LineRva))
+		dump_pdb_addr2line_rva(o, cast(uint)opt_pdb_addr2line_rva);
 	// can be 0
 	if (opt_pdb_stream)
 		dump_pdb_stream(o, atoi(opt_pdb_stream));
@@ -574,7 +576,7 @@ void dump_pdb_syms(adbg_object_t *o) {
 	while ((mod = adbg_object_pdb_dbi_modinfo_next(mit, &modname, &objname)) != null) {
 		uint this_mod = mod_index++;
 
-		// Skip modules with no symbol blob entirely — keeps output focused
+		// Skip modules with no symbol blob entirely, keeps output focused
 		// on modules that actually contribute usable function data.
 		if (mod.ModuleSysStream == 0xffff || mod.SymByteSize == 0)
 			continue;
@@ -744,7 +746,7 @@ void dump_pdb_lines(adbg_object_t *o) {
 				dump_c13_filechksms_subsection(o, payload, sub.Length);
 				break;
 			default:
-				// Unhandled kinds — header alone gives a useful summary.
+				// Unhandled kinds, header alone gives a useful summary.
 				break;
 			}
 		}
@@ -765,7 +767,7 @@ void dump_pdb_modules(adbg_object_t *o) {
 	const(char) *modname;
 	const(char) *objname;
 	pdb_dbi_modinfo_t *mod = void;
-	while ((mod = adbg_object_pdb_dbi_modinfo_next(it, &modname, &objname)) !is null) {
+	while ((mod = adbg_object_pdb_dbi_modinfo_next(it, &modname, &objname)) != null) {
 		print_section(index++);
 		print_string("ModuleName", modname);
 		print_string("ObjFileName", objname);
@@ -778,5 +780,38 @@ void dump_pdb_modules(adbg_object_t *o) {
 			"DIRTY".ptr, PDB_DBI_MOD_DIRTY,
 			"EC".ptr, PDB_DBI_MOD_EC,
 			null);
+	}
+}
+
+void dump_pdb_addr2line_rva(adbg_object_t *o, uint rva) {
+	print_header("PDB RVA resolution");
+
+	pdb_resolved_rva_t info = void;
+	if (adbg_object_pdb_resolve_rva(o, rva, &info)) {
+		print_warningf("Resolution failed: %s", adbg_error_message());
+		return;
+	}
+
+	printf("rva           : 0x%08x\n", rva);
+	if (info.segment)
+		printf("section       : %u:%08x\n", info.segment, info.sec_offset);
+	if (info.module_index)
+		printf("module_index  : %u\n", info.module_index);
+	if (info.func) {
+		printf("function      : %s\n", info.func);
+		printf("function_rva  : 0x%08x  (+0x%x of 0x%x)\n",
+			info.func_rva, rva - info.func_rva, info.func_size);
+	} else {
+		printf("function      : <unresolved>\n");
+	}
+
+	if (info.file && info.column) {
+		printf("source        : %s:%u:%u\n", info.file, info.line, info.column);
+	} else if (info.file && info.line) {
+		printf("source        : %s:%u\n", info.file, info.line);
+	} else if (info.line) {
+		printf("source        : <unknown file>:%u\n", info.line);
+	} else {
+		printf("source        : <unresolved>\n");
 	}
 }

@@ -1563,7 +1563,7 @@ enum uint PDB_NAMES_MAGIC = 0xEFFEEFFE;
 /// offset-based lookups.
 struct pdb_names_header_t { align(1):
 	uint Magic;	/// `PDB_NAMES_MAGIC` (0xEFFEEFFE).
-	uint HashVersion;	/// 1 or 2 — selects the hash function used by the epilogue.
+	uint HashVersion;	/// 1 or 2 selects the hash function used by the epilogue.
 	uint ByteSize;	/// Size in bytes of the string buffer that follows.
 }
 static assert(pdb_names_header_t.sizeof == 12);
@@ -1694,6 +1694,221 @@ const(char)* adbg_object_pdb_names_string(adbg_object_t *o, uint offset) {
 		return null;
 	}
 	return cast(const(char)*)(hdr + 1) + offset;
+}
+
+//
+// Top-level RVA resolver(function, file, line)
+//
+
+/// Result of `adbg_object_pdb_resolve_rva`.
+///
+/// All pointer/integer fields are zero-initialized; any field that could not
+/// be resolved is left at zero/null. Callers should check fields individually.
+/// `func` and `file` point into PDB stream buffers and are valid until the
+/// object is unloaded.
+struct pdb_resolved_rva_t {
+	const(char) *func;	/// Containing function name, or null if not found.
+	const(char) *file;	/// Source file path from `/names`, or null.
+	uint   line;	/// Source line number, 0 if unknown.
+	ushort column;	/// Start column when present, 0 otherwise.
+	uint   func_rva;	/// RVA of the containing function's first byte.
+	uint   func_size;	/// `CodeSize` of the containing function.
+	ushort segment;	/// 1-based section index that owns `rva`.
+	uint   sec_offset;	/// Byte offset within that section.
+	ushort module_index;	/// DBI module index owning the contribution.
+}
+
+/// Resolve an RVA to function/file/line using DBI section contributions,
+/// per-module CV symbols, and C13 line info.
+///
+/// The function does a best-effort fill: any single piece (function name,
+/// file, line) that cannot be resolved is left at its zero value, but the
+/// remaining pieces are still populated when possible.
+///
+/// Params:
+/// 	o = PDB object instance.
+/// 	rva = Relative virtual address (offset from image base).
+/// 	out_info = Receives resolved fields. Must be non-null.
+/// Returns: 0 on success (info populated, even if some fields are zero).
+///          Non-zero on plumbing failure (e.g., missing section headers, no
+///          DBI). On failure `out_info` is still zeroed.
+int adbg_object_pdb_resolve_rva(adbg_object_t *o, uint rva, pdb_resolved_rva_t *out_info) {
+	if (o == null || out_info == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	memset(out_info, 0, pdb_resolved_rva_t.sizeof);
+
+	// Step 1: RVA to {segment, sec_offset} via the section headers table.
+	size_t sec_count;
+	pe_section_entry_t *sec_table = adbg_object_pdb_section_headers(o, &sec_count);
+	if (sec_table == null)
+		return adbg_error_code();
+	pe_section_entry_t *owning_sec;
+	ushort segment;
+	for (size_t i; i < sec_count; ++i) {
+		pe_section_entry_t *sh = sec_table + i;
+		if (rva >= sh.VirtualAddress && rva <  sh.VirtualAddress + sh.VirtualSize) {
+			owning_sec = sh;
+			segment = cast(ushort)(i + 1);
+			break;
+		}
+	}
+	if (owning_sec == null)
+		return adbg_oops(AdbgError.unavailable);
+	uint sec_offset = rva - owning_sec.VirtualAddress;
+	out_info.segment    = segment;
+	out_info.sec_offset = sec_offset;
+
+	// Step 2: Find the owning module via Section Contributions.
+	ushort mod_index = 0xffff;
+	pdb_dbi_seccontrib_iter_t *scit = adbg_object_pdb_dbi_seccontrib_open(o);
+	if (scit == null)
+		return adbg_error_code();
+	pdb_dbi_seccontrib_entry_t *sc = void;
+	while ((sc = adbg_object_pdb_dbi_seccontrib_next(scit)) != null) {
+		if (sc.Section != segment)
+			continue;
+		uint sc_off = cast(uint)sc.Offset;
+		uint sc_end = sc_off + cast(uint)sc.Size;
+		if (sec_offset >= sc_off && sec_offset < sc_end) {
+			mod_index = sc.ModuleIndex;
+			break;
+		}
+	}
+	adbg_object_pdb_dbi_seccontrib_close(scit);
+	if (mod_index == 0xffff)
+		return 0; // section known, but no module owns this RVA
+	out_info.module_index = mod_index;
+
+	// Step 3: Find the ModInfo for that module index.
+	pdb_dbi_modinfo_iter_t *mit = adbg_object_pdb_dbi_modinfo_open(o);
+	if (mit == null)
+		return adbg_error_code();
+	pdb_dbi_modinfo_t *mod = void;
+	pdb_dbi_modinfo_t mod_copy = void;
+	bool found_mod;
+	uint cur;
+	while ((mod = adbg_object_pdb_dbi_modinfo_next(mit, null, null)) != null) {
+		if (cur == mod_index) {
+			mod_copy = *mod;
+			found_mod = true;
+			break;
+		}
+		++cur;
+	}
+	adbg_object_pdb_dbi_modinfo_close(mit);
+	if (!found_mod)
+		return 0;
+
+	pdb_module_stream_t layout = void;
+	if (adbg_object_pdb_module_open(o, &mod_copy, &layout))
+		return 0; // best-effort: section/module known but stream unavailable
+
+	// Step 4: Walk CV symbols for the containing PROCSYM32.
+	if (layout.symbols && layout.symbols_size) {
+		cv_sym_iter_t sit = void;
+		adbg_type_cv_sym_open(&sit, layout.symbols, layout.symbols_size);
+		cv_record_t *rec = void;
+		while ((rec = adbg_type_cv_sym_next(&sit)) != null) {
+			if (adbg_type_cv_sym_is_proc32(rec.kind) == false)
+				continue;
+			cv_procsym32_t *p = cast(cv_procsym32_t*)rec;
+			if (p.Segment != segment)
+				continue;
+			if (sec_offset < p.CodeOffset || sec_offset >= p.CodeOffset + p.CodeSize)
+				continue;
+			out_info.func      = cast(const(char)*)p + cv_procsym32_t.sizeof;
+			out_info.func_rva  = owning_sec.VirtualAddress + p.CodeOffset;
+			out_info.func_size = p.CodeSize;
+			break;
+		}
+	}
+
+	// Step 5: Walk C13. Find both the matching LINES block and the
+	// FILECHKSMS payload in the same module so we can resolve the file path.
+	if (layout.c13 == null || layout.c13_size == 0)
+		return 0;
+
+	ubyte *chksms_payload;
+	uint   chksms_len;
+	uint   best_file_chksm_off;
+	bool   line_resolved;
+
+	cv_c13_iter_t c13it = void;
+	adbg_type_cv_c13_open(&c13it, layout.c13, layout.c13_size);
+	cv_c13_subsection_header_t *sub = void;
+	while ((sub = adbg_type_cv_c13_next(&c13it)) != null) {
+		if (sub.Kind & DEBUG_S_IGNORE)
+			continue;
+		uint kind = sub.Kind & ~DEBUG_S_IGNORE;
+		ubyte *payload = cast(ubyte*)(sub + 1);
+		uint   paylen  = sub.Length;
+		if (kind == DEBUG_S_FILECHKSMS) {
+			chksms_payload = payload;
+			chksms_len     = paylen;
+			continue;
+		}
+		if (kind != DEBUG_S_LINES || line_resolved)
+			continue;
+		if (paylen < cv_c13_lines_header_t.sizeof)
+			continue;
+		cv_c13_lines_header_t *lh = cast(cv_c13_lines_header_t*)payload;
+		if (lh.Segment != segment)
+			continue;
+		if (sec_offset < lh.OffsetInSection || sec_offset >= lh.OffsetInSection + lh.CodeSize)
+			continue;
+
+		bool has_cols = (lh.Flags & CV_LINES_HAS_COLUMNS) != 0;
+		uint p = cast(uint)cv_c13_lines_header_t.sizeof;
+		while (p + cv_c13_lines_file_block_t.sizeof <= paylen) {
+			cv_c13_lines_file_block_t *fb = cast(cv_c13_lines_file_block_t*)(payload + p);
+			if (fb.BlockSize < cv_c13_lines_file_block_t.sizeof ||
+				p + fb.BlockSize > paylen)
+				break;
+			uint lp = p + cast(uint)cv_c13_lines_file_block_t.sizeof;
+			uint entries_size = fb.NumLines *
+				cast(uint)cv_c13_line_entry_t.sizeof;
+			if (lp + entries_size > p + fb.BlockSize) {
+				p += fb.BlockSize;
+				continue;
+			}
+			cv_c13_line_entry_t *entries = cast(cv_c13_line_entry_t*)(payload + lp);
+			cv_c13_column_entry_t *cols;
+			if (has_cols) {
+				uint cp = lp + entries_size;
+				uint col_size = fb.NumLines * cast(uint)cv_c13_column_entry_t.sizeof;
+				if (cp + col_size <= p + fb.BlockSize)
+					cols = cast(cv_c13_column_entry_t*)(payload + cp);
+			}
+			// Pick the entry with the largest Offset <= sec_offset (lines
+			// extend until the next entry / end of block).
+			uint best = uint.max;
+			for (uint i; i < fb.NumLines; ++i) {
+				uint abs_off = lh.OffsetInSection + entries[i].Offset;
+				if (abs_off > sec_offset)
+					break;
+				best = i;
+			}
+			if (best != uint.max) {
+				out_info.line = cv_c13_line_start(entries[best].LineAndFlags);
+				if (cols) out_info.column = cols[best].StartColumn;
+				best_file_chksm_off = fb.FileChecksumOffset;
+				line_resolved = true;
+				break;
+			}
+			p += fb.BlockSize;
+		}
+	}
+
+	// Step 6: Resolve the file path via FILECHKSMS + /names.
+	if (line_resolved && chksms_payload &&
+		best_file_chksm_off + cv_c13_filechksm_t.sizeof <= chksms_len) {
+		cv_c13_filechksm_t *fc =
+			cast(cv_c13_filechksm_t*)(chksms_payload + best_file_chksm_off);
+		const(char) *path = adbg_object_pdb_names_string(o, fc.FileNameOffset);
+		if (path) out_info.file = path;
+	}
+
+	return 0;
 }
 
 //

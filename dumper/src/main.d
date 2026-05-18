@@ -53,6 +53,7 @@ immutable option_t[] options = [
 	option_t(0,   "pdb-seccontribs", "Dump PDB section contributions", &cliopt_pdb_seccontribs),
 	option_t(0,   "pdb-syms",     "Dump PDB per-module CV symbols", &cliopt_pdb_syms),
 	option_t(0,   "pdb-lines",    "Dump PDB per-module C13 line info", &cliopt_pdb_lines),
+	option_t(0,   "addr2line-rva", "Resolve a PDB RVA to function/file:line", &cliopt_pdb_addr2line_rva),
 	// settings
 	option_t(0,   "as-blob",           "Setting: Input is headless binary blob", &cliopt_as_blob),
 	option_t(0,   "disassemble",       "Setting: Disassemble executable sections", &cliopt_disasm),
@@ -122,6 +123,8 @@ int cliopt_everything() {
 
 int cliopt_pdb_stream(const(char) *num) {
 	opt_selected |= Select.any;
+	// TODO: Use parse32 here instead of atoi in format_pdb.d
+	//       return 1 on parse32 error
 	opt_pdb_stream = num;
 	return 0;
 }
@@ -144,6 +147,11 @@ int cliopt_pdb_lines() {
 	opt_selected |= Select.any;
 	opt_selected_obj |= SelectObj.pdbLines;
 	return 0;
+}
+int cliopt_pdb_addr2line_rva(const(char) *val) {
+	opt_selected |= Select.any;
+	opt_selected_obj |= SelectObj.pdbAddr2LineRva;
+	return parse64(cast(long*)&opt_pdb_addr2line_rva, val);
 }
 
 //
