@@ -8,7 +8,9 @@ module format_pdb;
 import adbg.error;
 import adbg.objectserver;
 import adbg.objects.pdb;
-import adbg.objects.pe : adbg_object_pe_machine_value_string, pe_section_entry_t;
+import adbg.objects.pe : adbg_object_pe_machine_value_string, pe_section_entry_t,
+	adbg_object_pe_optional_header, pe_optional_header_t, pe_optional_header64_t,
+	PE_CLASS_32, PE_CLASS_64;
 import adbg.utils.uid;
 import adbg.utils.date;
 import adbg.utils.strings;
@@ -35,6 +37,8 @@ int dump_pdb(adbg_object_t *o) {
 		dump_pdb_lines(o);
 	if (SELECTED_OBJ(SelectObj.pdbAddr2LineRva))
 		dump_pdb_addr2line_rva(o, cast(uint)opt_pdb_addr2line_rva);
+	if (SELECTED_OBJ(SelectObj.pdbAddr2LineVa))
+		dump_pdb_addr2line_va(o, opt_pdb_addr2line_va);
 	// can be 0
 	if (opt_pdb_stream)
 		dump_pdb_stream(o, atoi(opt_pdb_stream));
@@ -792,6 +796,92 @@ void dump_pdb_addr2line_rva(adbg_object_t *o, uint rva) {
 		return;
 	}
 
+	printf("rva           : 0x%08x\n", rva);
+	if (info.segment)
+		printf("section       : %u:%08x\n", info.segment, info.sec_offset);
+	if (info.module_index)
+		printf("module_index  : %u\n", info.module_index);
+	if (info.func) {
+		printf("function      : %s\n", info.func);
+		printf("function_rva  : 0x%08x  (+0x%x of 0x%x)\n",
+			info.func_rva, rva - info.func_rva, info.func_size);
+	} else {
+		printf("function      : <unresolved>\n");
+	}
+
+	if (info.file && info.column) {
+		printf("source        : %s:%u:%u\n", info.file, info.line, info.column);
+	} else if (info.file && info.line) {
+		printf("source        : %s:%u\n", info.file, info.line);
+	} else if (info.line) {
+		printf("source        : <unknown file>:%u\n", info.line);
+	} else {
+		printf("source        : <unresolved>\n");
+	}
+}
+
+// Read ImageBase from a PE/PE32+ optional header. Returns 0 on failure.
+// Temporary util
+ulong get_pe_image_base(adbg_object_t *pe) {
+	void *opt = adbg_object_pe_optional_header(pe);
+	if (opt == null)
+		return 0;
+	ushort magic = *cast(ushort*)opt;
+	switch (magic) {
+	case PE_CLASS_32:
+		return (cast(pe_optional_header_t*)opt).ImageBase;
+	case PE_CLASS_64:
+		return (cast(pe_optional_header64_t*)opt).ImageBase;
+	default:
+		return 0;
+	}
+}
+
+void dump_pdb_addr2line_va(adbg_object_t *o, ulong va) {
+	print_header("PDB VA resolution");
+
+	if (opt_image == null) {
+		print_warningf("--addr2line requires --image=PATH");
+		return;
+	}
+
+	adbg_object_t *pe = adbg_object_open_file(opt_image, 0);
+	if (pe == null) {
+		print_warningf("Failed to open image: %s", adbg_error_message());
+		return;
+	}
+	scope(exit) adbg_object_close(pe);
+
+	if (adbg_object_format(pe) != AdbgObject.pe) {
+		print_warningf("--image is not a PE/PE32+ object");
+		return;
+	}
+
+	ulong image_base = get_pe_image_base(pe);
+	if (image_base == 0) {
+		print_warningf("Could not read ImageBase from --image");
+		return;
+	}
+	if (va < image_base) {
+		print_warningf("VA 0x%llx is below ImageBase 0x%llx", va, image_base);
+		return;
+	}
+
+	ulong rva64 = va - image_base;
+	if (rva64 > uint.max) {
+		print_warningf("Computed RVA 0x%llx exceeds 32 bits", rva64);
+		return;
+	}
+	uint rva = cast(uint)rva64;
+
+	pdb_resolved_rva_t info = void;
+	if (adbg_object_pdb_resolve_rva(o, rva, &info)) {
+		print_warningf("Resolution failed: %s", adbg_error_message());
+		return;
+	}
+
+	printf("va            : 0x%016llx\n", va);
+	printf("image_base    : 0x%016llx\n", image_base);
 	printf("rva           : 0x%08x\n", rva);
 	if (info.segment)
 		printf("section       : %u:%08x\n", info.segment, info.sec_offset);

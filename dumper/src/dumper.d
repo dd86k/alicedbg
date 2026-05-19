@@ -98,6 +98,8 @@ enum SelectObj {
 	pdbLines = BIT!3,
 	/// PDB RVA resolution via --addr2line-rva
 	pdbAddr2LineRva = BIT!4,
+	/// PDB VA resolution via --addr2line (requires --image)
+	pdbAddr2LineVa = BIT!5,
 }
 int opt_selected_obj; // object-specific selections
 int SELECTED_OBJ(SelectObj selection)   { return opt_selected_obj & selection; }
@@ -139,6 +141,8 @@ const(char)* opt_extractfile;
 
 const(char)* opt_pdb_stream;
 ulong opt_pdb_addr2line_rva;
+ulong opt_pdb_addr2line_va;
+const(char)* opt_image;
 
 
 void print_preamble(const(char) *filename, long filesize, const(char) *type, const(char) *id) {

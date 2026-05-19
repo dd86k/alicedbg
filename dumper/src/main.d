@@ -54,6 +54,7 @@ immutable option_t[] options = [
 	option_t(0,   "pdb-syms",     "Dump PDB per-module CV symbols", &cliopt_pdb_syms),
 	option_t(0,   "pdb-lines",    "Dump PDB per-module C13 line info", &cliopt_pdb_lines),
 	option_t(0,   "addr2line-rva", "Resolve a PDB RVA to function/file:line", &cliopt_pdb_addr2line_rva),
+	option_t(0,   "addr2line",    "Resolve a PDB VA to function/file:line (requires --image)", &cliopt_pdb_addr2line_va),
 	// settings
 	option_t(0,   "as-blob",           "Setting: Input is headless binary blob", &cliopt_as_blob),
 	option_t(0,   "disassemble",       "Setting: Disassemble executable sections", &cliopt_disasm),
@@ -65,6 +66,7 @@ immutable option_t[] options = [
 	option_t(0,   "hexdump",           "Setting: Output selected portion to stdout as hexdump", &cliopt_hexdump),
 	option_t(0,   "no-prefix",         "Setting: Remove file path prefix of output", &cliopt_no_prefix),
 	option_t(0,   "shortname",         "Setting: Instead of a summary, only print short machine name", &cliopt_shortname),
+	option_t(0,   "image",             "Setting: Paired PE image used to derive ImageBase for VA→RVA", &cliopt_image),
 	// pages
 	option_t('h', "help", "Show this help screen and exit", &cliopt_help),
 	option_version,
@@ -152,6 +154,15 @@ int cliopt_pdb_addr2line_rva(const(char) *val) {
 	opt_selected |= Select.any;
 	opt_selected_obj |= SelectObj.pdbAddr2LineRva;
 	return parse64(cast(long*)&opt_pdb_addr2line_rva, val);
+}
+int cliopt_pdb_addr2line_va(const(char) *val) {
+	opt_selected |= Select.any;
+	opt_selected_obj |= SelectObj.pdbAddr2LineVa;
+	return parse64(cast(long*)&opt_pdb_addr2line_va, val);
+}
+int cliopt_image(const(char) *val) {
+	opt_image = val;
+	return 0;
 }
 
 //
