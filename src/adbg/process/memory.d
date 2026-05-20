@@ -459,11 +459,12 @@ Lretry:
 			continue;
 		
 		// Get mapped file
-		if (GetMappedFileNameA(phandle, mem.BaseAddress, map.name.ptr, MEM_MAP_NAME_LEN)) {
-			map.name[GetModuleFileNameExA(phandle, null, map.name.ptr, MEM_MAP_NAME_LEN)] = 0;
-		} else {
+		// NOTE: Do not call GetModuleFileNameExA with hModule=NULL here!
+		//       On some Windows versions that returns the
+		//       *calling* process's exe path (alicedbg's own) instead of the
+		//       target's, clobbering the per-region GetMappedFileNameA result.
+		if (GetMappedFileNameA(phandle, mem.BaseAddress, map.name.ptr, MEM_MAP_NAME_LEN) == 0)
 			map.name[0] = 0;
-		}
 		
 		// Adjust protection bits
 		map.access = mem.Type & MEM_PRIVATE ? AdbgMemPerm.private_ : 0;
@@ -482,8 +483,12 @@ Lretry:
 		else if (mem.Protect & PAGE_READONLY)
 			map.access |= AdbgMemPerm.read;
 		
+		// NOTE: working-set image pages are reported as fileview, not module.
+		//       The authoritative module list is produced by Part 2 (EnumProcessModules)
+		//       with real base/size from MODULEINFO; Part 1 pages have working-set
+		//       granularity and would collide with real module entries.
 		if (mem.Type & MEM_IMAGE)
-			map.type = AdbgPageUse.module_;
+			map.type = AdbgPageUse.fileview;
 		else if (mem.Type & MEM_MAPPED)
 			map.type = AdbgPageUse.fileview;
 		else if (mem.Type & MEM_PRIVATE)
