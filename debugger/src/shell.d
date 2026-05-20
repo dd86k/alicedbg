@@ -226,7 +226,20 @@ adbg_process_t *process;	/// Process instance
 long event_tid;	/// Last exception TID, or selected TID
 
 adbg_disassembler_t *disassembler;	/// Disassembler instance
-adbg_object_t *image_object;	/// Primary image object for symbol resolution
+
+// Per-process module cache for symbol resolution.
+// Populated lazily from `adbg_memory_mapping(allModules)`; module images
+// are opened on first miss against an in-range address.
+struct mod_entry_t {
+	void *base;	/// Module load base in target process.
+	size_t size;	/// Image size in bytes.
+	char *path;	/// strdup'd module path (file name on Windows).
+	adbg_object_t *obj;	/// Lazily opened object, null until attempted.
+	ubyte open_state;	/// 0=untried, 1=open, 2=failed.
+}
+import adbg.utils.list : list_t, adbg_list_new, adbg_list_add, adbg_list_get,
+	adbg_list_count, adbg_list_close;
+list_t *modules;
 
 const(char)* last_spawn_exec;
 const(char)** last_spawn_argv;
@@ -581,52 +594,134 @@ int shell_setup() {
 			return ShellError.alicedbg;
 	}
 
-	// Open primary image as object for on-the-fly symbol resolution.
-	// Lazy: pairing (to debug symbols) is attempted on first resolve.
-	if (image_object) {
-		adbg_object_close(image_object);
-		image_object = null;
-	}
-	enum IMGPATH_SZ = 4096;
-	char[IMGPATH_SZ] imgpath = void;
-	const(char) *imgpath_used = null;
-	if (adbg_process_path(process, imgpath.ptr, IMGPATH_SZ) > 0) {
-		imgpath_used = imgpath.ptr;
-	} else if (last_spawn_exec) {
-		// Fallback: use the spawned executable path (no equivalent for attach).
-		imgpath_used = last_spawn_exec;
-	}
-	if (imgpath_used) {
-		image_object = adbg_object_open_file(imgpath_used);
-		if (image_object == null)
-			logwarn("Symbols unavailable: cannot open image '%s' (%s)\n",
-				imgpath_used, adbg_error_message());
-	} else {
-		logwarn("Symbols unavailable: cannot resolve process image path (%s)\n",
-			adbg_error_message());
-	}
+	// Reset module cache for the new process; entries open lazily.
+	modules_close();
+	modules_refresh();
 
 	return 0;
 }
 
-// Resolve a VA to function/file:line and print it on its own line.
-// Silent on failure; symbol resolution is best-effort.
-void shell_print_symbol(ulong va, const(char) *prefix) {
-	if (image_object == null || va == 0)
-		return;
-	adbg_resolved_t res = void;
-	if (adbg_object_resolve_va(image_object, va, 0, &res))
-		return;
-	if (res.func == null && res.file == null)
-		return;
-	printf("%s%s", prefix ? prefix : "* Symbol  : ",
-		res.func ? res.func : "<no function>");
-	if (res.file) {
-		printf(" at %s", res.file);
-		if (res.line)
-			printf(":%u", res.line);
+// Close all cached modules. Safe to call when cache is empty.
+void modules_close() {
+	if (modules == null) return;
+	size_t n = adbg_list_count(modules);
+	for (size_t i; i < n; ++i) {
+		mod_entry_t *e = cast(mod_entry_t*)adbg_list_get(modules, i);
+		if (e.obj) adbg_object_close(e.obj);
+		if (e.path) free(e.path);
 	}
-	putchar('\n');
+	adbg_list_close(modules);
+	modules = null;
+}
+
+bool modules_has_base(void *base) {
+	if (modules == null) return false;
+	size_t n = adbg_list_count(modules);
+	for (size_t i; i < n; ++i) {
+		mod_entry_t *e = cast(mod_entry_t*)adbg_list_get(modules, i);
+		if (e.base == base) return true;
+	}
+	return false;
+}
+
+// Pull a fresh module list from the target and append new entries to the
+// cache. Existing entries (and their lazily-opened objects) are preserved.
+void modules_refresh() {
+	if (process == null) return;
+	void *list = adbg_memory_mapping(process, AdbgMappingOption.allModules, 1, 0);
+	if (list == null) return;
+	scope(exit) adbg_memory_mapping_close(list);
+	if (modules == null) {
+		modules = adbg_list_new(mod_entry_t.sizeof, 16);
+		if (modules == null) return;
+	}
+	adbg_memory_map_t *map = void;
+	for (size_t i; (map = adbg_memory_mapping_at(list, i)) != null; ++i) {
+		if (map.type != AdbgPageUse.module_) continue;
+		if (modules_has_base(map.base)) continue;
+		mod_entry_t e = void;
+		e.base = map.base;
+		e.size = map.size;
+		size_t nlen = strlen(map.name.ptr);
+		e.path = cast(char*)malloc(nlen + 1);
+		if (e.path) memcpy(e.path, map.name.ptr, nlen + 1);
+		e.obj = null;
+		e.open_state = 0;
+		list_t *t = adbg_list_add(modules, &e);
+		if (t == null) { if (e.path) free(e.path); return; }
+		modules = t;
+	}
+}
+
+mod_entry_t* modules_find_va(ulong va) {
+	if (modules == null) return null;
+	size_t n = adbg_list_count(modules);
+	for (size_t i; i < n; ++i) {
+		mod_entry_t *e = cast(mod_entry_t*)adbg_list_get(modules, i);
+		ulong b = cast(ulong)e.base;
+		if (va >= b && va < b + e.size) return e;
+	}
+	return null;
+}
+
+// Find the module owning `va`, refreshing the cache on miss (DLL may have
+// loaded since last enumeration). Returns null if the address is not in
+// any known module mapping.
+mod_entry_t* modules_lookup(ulong va) {
+	mod_entry_t *e = modules_find_va(va);
+	if (e) return e;
+	modules_refresh();
+	return modules_find_va(va);
+}
+
+// Resolve `va` and print symbol info on its own line.
+//   * Symbol  : func at file:line             (full debug info)
+//   * Symbol  : module.dll!func               (function only, no lines)
+//   * Symbol  : module.dll+0xOFFSET           (in-module, no debug info)
+// Silent if the address is not inside any known module.
+void shell_print_symbol(ulong va, const(char) *prefix) {
+	if (va == 0) return;
+	mod_entry_t *m = modules_lookup(va);
+	if (m == null) return;
+
+	if (m.open_state == 0) {
+		m.obj = adbg_object_open_file(m.path);
+		m.open_state = m.obj ? 1 : 2;
+	}
+
+	const(char) *plabel = prefix ? prefix : "* Symbol  : ";
+	const(char) *mname = module_basename(m.path);
+
+	if (m.obj) {
+		ulong rva64 = va - cast(ulong)m.base;
+		if (rva64 <= uint.max) {
+			adbg_resolved_t res = void;
+			if (adbg_object_resolve_rva(m.obj, cast(uint)rva64, 0, &res) == 0
+				&& (res.func || res.file)) {
+				printf("%s%s!%s", plabel, mname,
+					res.func ? res.func : "<no function>");
+				if (res.file) {
+					printf(" at %s", res.file);
+					if (res.line) printf(":%u", res.line);
+				}
+				putchar('\n');
+				return;
+			}
+		}
+	}
+
+	// Fallback: best-effort module+offset.
+	printf("%s%s+0x%llx\n", plabel, mname, va - cast(ulong)m.base);
+}
+
+// Return the last path component of `path` (file name only).
+const(char)* module_basename(const(char) *path) {
+	if (path == null) return "<unknown>";
+	const(char) *base = path;
+	for (const(char) *p = path; *p; ++p) {
+		if (*p == '/' || *p == '\\') base = p + 1;
+	}
+	return base;
 }
 
 void shell_print_event(adbg_event_t *event, adbg_process_t *process) {
@@ -708,24 +803,43 @@ void shell_print_stack(adbg_process_thread_t *thread) {
 	// Print callstack if available
 	adbg_frames_t *frames = adbg_frame_list(thread);
 	if (frames) {
-		puts("* Callstack (WIP):");
+		puts("* Callstack):");
 		adbg_stackframe_t *frame = void;
 		for (size_t i; (frame = adbg_frame_list_at(frames, i)) != null; ++i) {
 			printf("%3zu. %llx", i, frame.address);
+			shell_frame_print_symbol(frame.address);
+		}
+		adbg_frame_list_close(frames);
+	}
+}
+
+// Print symbol info inline after a stack-frame address. Suppresses the
+// leading line break of shell_print_symbol so output stays on one line.
+void shell_frame_print_symbol(ulong va) {
+	mod_entry_t *m = modules_lookup(va);
+	if (m == null) { putchar('\n'); return; }
+	if (m.open_state == 0) {
+		m.obj = adbg_object_open_file(m.path);
+		m.open_state = m.obj ? 1 : 2;
+	}
+	const(char) *mname = module_basename(m.path);
+	if (m.obj) {
+		ulong rva64 = va - cast(ulong)m.base;
+		if (rva64 <= uint.max) {
 			adbg_resolved_t res = void;
-			if (image_object &&
-				adbg_object_resolve_va(image_object, frame.address, 0, &res) == 0 &&
-				(res.func || res.file)) {
-				printf("  %s", res.func ? res.func : "<no function>");
+			if (adbg_object_resolve_rva(m.obj, cast(uint)rva64, 0, &res) == 0
+				&& (res.func || res.file)) {
+				printf("  %s!%s", mname, res.func ? res.func : "<no function>");
 				if (res.file) {
 					printf(" at %s", res.file);
 					if (res.line) printf(":%u", res.line);
 				}
+				putchar('\n');
+				return;
 			}
-			putchar('\n');
 		}
-		adbg_frame_list_close(frames);
 	}
+	printf("  %s+0x%llx\n", mname, va - cast(ulong)m.base);
 }
 
 void shell_print_address_disasm(ulong address) {
@@ -888,10 +1002,7 @@ int command_detach(int argc, const(char) **argv) {
 		return ShellError.alicedbg;
 
 	adbg_disassembler_close(disassembler);
-	if (image_object) {
-		adbg_object_close(image_object);
-		image_object = null;
-	}
+	modules_close();
 	return 0;
 }
 
@@ -920,10 +1031,7 @@ int command_kill(int argc, const(char) **argv) {
 		return ShellError.alicedbg;
 	loginfo("Process killed");
 	adbg_disassembler_close(disassembler);
-	if (image_object) {
-		adbg_object_close(image_object);
-		image_object = null;
-	}
+	modules_close();
 	return 0;
 }
 
