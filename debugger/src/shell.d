@@ -226,6 +226,7 @@ adbg_process_t *process;	/// Process instance
 long event_tid;	/// Last exception TID, or selected TID
 
 adbg_disassembler_t *disassembler;	/// Disassembler instance
+adbg_object_t *image_object;	/// Primary image object for symbol resolution
 
 const(char)* last_spawn_exec;
 const(char)** last_spawn_argv;
@@ -579,8 +580,53 @@ int shell_setup() {
 			0))
 			return ShellError.alicedbg;
 	}
-	
+
+	// Open primary image as object for on-the-fly symbol resolution.
+	// Lazy: pairing (to debug symbols) is attempted on first resolve.
+	if (image_object) {
+		adbg_object_close(image_object);
+		image_object = null;
+	}
+	enum IMGPATH_SZ = 4096;
+	char[IMGPATH_SZ] imgpath = void;
+	const(char) *imgpath_used = null;
+	if (adbg_process_path(process, imgpath.ptr, IMGPATH_SZ) > 0) {
+		imgpath_used = imgpath.ptr;
+	} else if (last_spawn_exec) {
+		// Fallback: use the spawned executable path (no equivalent for attach).
+		imgpath_used = last_spawn_exec;
+	}
+	if (imgpath_used) {
+		image_object = adbg_object_open_file(imgpath_used);
+		if (image_object == null)
+			logwarn("Symbols unavailable: cannot open image '%s' (%s)\n",
+				imgpath_used, adbg_error_message());
+	} else {
+		logwarn("Symbols unavailable: cannot resolve process image path (%s)\n",
+			adbg_error_message());
+	}
+
 	return 0;
+}
+
+// Resolve a VA to function/file:line and print it on its own line.
+// Silent on failure; symbol resolution is best-effort.
+void shell_print_symbol(ulong va, const(char) *prefix) {
+	if (image_object == null || va == 0)
+		return;
+	adbg_resolved_t res = void;
+	if (adbg_object_resolve_va(image_object, va, 0, &res))
+		return;
+	if (res.func == null && res.file == null)
+		return;
+	printf("%s%s", prefix ? prefix : "* Symbol  : ",
+		res.func ? res.func : "<no function>");
+	if (res.file) {
+		printf(" at %s", res.file);
+		if (res.line)
+			printf(":%u", res.line);
+	}
+	putchar('\n');
 }
 
 void shell_print_event(adbg_event_t *event, adbg_process_t *process) {
@@ -592,22 +638,23 @@ void shell_print_event(adbg_event_t *event, adbg_process_t *process) {
 		adbg_process_thread_t *thread = adbg_exception_thread(exception);
 		event_tid = adbg_process_thread_id(thread);
 		
-		printf("[adbg] Process %d (thread %lld) stopped\n"~
-			"[adbg] Reason  : %s ("~ERR_OSFMT~")\n",
+		printf("* Process %d (thread %lld) stopped\n"~
+			"* Reason  : %s ("~ERR_OSFMT~")\n",
 			pid, event_tid,
 			adbg_exception_name(exception), adbg_exception_orig_code(exception));
 		
 		// Fault address available, print it
 		ulong faddr = adbg_exception_fault_address(exception);
 		shell_print_address_disasm(faddr);
-		
+		shell_print_symbol(faddr, null);
+
 		shell_print_stack(thread);
 		break;
 	case AdbgEvent.processExit:
-		printf("[adbg] Process %d exited with code %d\n", adbg_process_id(process), event.exitcode);
+		printf("* Process %d exited with code %d\n", adbg_process_id(process), event.exitcode);
 		break;
 	case AdbgEvent.processContinue:
-		printf("[adbg] Process %d continued\n", adbg_process_id(process));
+		printf("* Process %d continued\n", adbg_process_id(process));
 		break;
 	default:
 		
@@ -664,7 +711,18 @@ void shell_print_stack(adbg_process_thread_t *thread) {
 		puts("* Callstack (WIP):");
 		adbg_stackframe_t *frame = void;
 		for (size_t i; (frame = adbg_frame_list_at(frames, i)) != null; ++i) {
-			printf("%3zu. %llx\n", i, frame.address);
+			printf("%3zu. %llx", i, frame.address);
+			adbg_resolved_t res = void;
+			if (image_object &&
+				adbg_object_resolve_va(image_object, frame.address, 0, &res) == 0 &&
+				(res.func || res.file)) {
+				printf("  %s", res.func ? res.func : "<no function>");
+				if (res.file) {
+					printf(" at %s", res.file);
+					if (res.line) printf(":%u", res.line);
+				}
+			}
+			putchar('\n');
 		}
 		adbg_frame_list_close(frames);
 	}
@@ -700,7 +758,8 @@ void shell_event_exception(adbg_process_t *proc, void *udata, adbg_exception_t *
 	// Fault address available, print it
 	ulong faddr = adbg_exception_fault_address(exception);
 	shell_print_address_disasm(faddr);
-	
+	shell_print_symbol(faddr, null);
+
 	shell_print_stack(thread);
 }
 void shell_event_process_exit(adbg_process_t *proc, void *udata, int code) {
@@ -827,8 +886,12 @@ int command_attach(int argc, const(char) **argv) {
 int command_detach(int argc, const(char) **argv) {
 	if (adbg_debugger_detach(process))
 		return ShellError.alicedbg;
-	
+
 	adbg_disassembler_close(disassembler);
+	if (image_object) {
+		adbg_object_close(image_object);
+		image_object = null;
+	}
 	return 0;
 }
 
@@ -857,6 +920,10 @@ int command_kill(int argc, const(char) **argv) {
 		return ShellError.alicedbg;
 	loginfo("Process killed");
 	adbg_disassembler_close(disassembler);
+	if (image_object) {
+		adbg_object_close(image_object);
+		image_object = null;
+	}
 	return 0;
 }
 
