@@ -18,10 +18,7 @@ extern (C):
 
 private enum FRAME_MAX_DEPTH = 128;
 
-struct adbg_frames_t {
-	list_t *list;
-	alias list this;
-}
+alias adbg_frames_t = list_t;
 
 struct adbg_stackframe_t {
 	int level;
@@ -85,7 +82,7 @@ adbg_frames_t* adbg_frame_list(adbg_process_thread_t *thread) {
 Lfound:
 	// New frame list
 	adbg_frames_t *frames = cast(adbg_frames_t*)adbg_list_new(adbg_stackframe_t.sizeof, 8);
-	if (frames.list == null)
+	if (frames == null)
 		return null;
 
 	// Start with the first frame, which is always PC
@@ -93,22 +90,22 @@ Lfound:
 	adbg_register_t *pc_reg = adbg_register_by_id(&thread.context, pc_register);
 	if (pc_reg == null) {
 		adbg_oops(AdbgError.unavailable);
-		adbg_list_close(frames.list);
+		adbg_list_close(frames);
 		return null;
 	}
 
 	// Build frame 0 (PC)
 	void *pc_val = adbg_register_value(pc_reg);
 	if (pc_val == null) {
-		adbg_list_close(frames.list);
+		adbg_list_close(frames);
 		return null;
 	}
 	adbg_stackframe_t frame = void;
 	frame.level = 0;
 	frame.address = (ptr_size == 4) ? *cast(uint*)pc_val : *cast(ulong*)pc_val;
-	frames.list = adbg_list_add(frames.list, &frame);
-	if (frames.list == null) {
-		adbg_list_close(frames.list);
+	frames = adbg_list_add(frames, &frame);
+	if (frames == null) {
+		adbg_list_close(frames);
 		return null;
 	}
 
@@ -156,8 +153,8 @@ Lfound:
 
 		frame.level = level;
 		frame.address = ret_addr;
-		frames.list = adbg_list_add(frames.list, &frame);
-		if (frames.list == null)
+		frames = adbg_list_add(frames, &frame);
+		if (frames == null)
 			return null;
 
 		// Forward progress check
