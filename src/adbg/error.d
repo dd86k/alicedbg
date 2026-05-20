@@ -25,6 +25,9 @@ import adbg.include.capstone : csh, cs_errno, cs_strerror;
 
 extern (C):
 
+// NOTE: It's best to make additional error codes
+//       Having "feature unavailable" does not provide why an action failed
+
 /// Error codes.
 enum AdbgError {
 	//
@@ -38,6 +41,7 @@ enum AdbgError {
 	invalidValue	= -6,	/// Invalid value for option
 	offsetBounds	= -7,	/// File offset is outside of file size
 	indexBounds	= -8,	/// Index is outside of bounds of list
+	// WARNING: unavailable does not provide *why* is it so. Use sparingly.
 	unavailable	= -9,	/// Feature or item is unavailable
 	unfindable	= -10,	/// Item not found
 	partialRead	= -11,	/// Not all data could be read
@@ -71,6 +75,11 @@ enum AdbgError {
 	objectInvalidEndian	= -313,
 	objectInvalidType	= -314,
 	objectInvalidABI	= -315,
+	objectPairUnavailable	= -320,	/// No paired debug/image object found
+	objectPairMismatch	= -321,	/// Paired debug object identity disagrees with primary
+	objectPairWrongFormat	= -322,	/// Primary object format does not support pairing
+	objectAddressOutOfRange	= -323,	/// Address is outside the image's valid range
+	objectSymbolUnresolved	= -324,	/// Address could not be resolved to a symbol/line
 	//
 	// 400-499: System
 	//
@@ -304,6 +313,11 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	{ AdbgError.objectInvalidEndian,	"Object has invalid endian value." },
 	{ AdbgError.objectInvalidType,	"Object type invalid." },
 	{ AdbgError.objectInvalidABI,	"Object has Invalid ABI value." },
+	{ AdbgError.objectPairUnavailable,	"No paired object found (no debug record, no sibling)." },
+	{ AdbgError.objectPairMismatch,	"Debugging symbols found with metadata mismatch." },
+	{ AdbgError.objectPairWrongFormat,	"Primary object format does not support pairing." },
+	{ AdbgError.objectAddressOutOfRange,	"Address is outside the image's valid range." },
+	{ AdbgError.objectSymbolUnresolved,	"Address could not be resolved to a symbol/line." },
 	//
 	// Symbols
 	//

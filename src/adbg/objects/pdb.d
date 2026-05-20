@@ -1577,6 +1577,27 @@ static assert(pdb_names_header_t.sizeof == 12);
 /// Params:
 /// 	o = PDB object instance.
 /// 	name = NUL-terminated stream name including the leading slash.
+/// Read the PDB's GUID and Age from the PDB Info stream (stream 1).
+/// Returns 0 on success.
+int adbg_object_pdb_pdb_id(adbg_object_t *o, UID *guid_out, uint *age_out) {
+	if (o == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 1;
+	}
+	pdb_stream_t *s = adbg_object_pdb_open_stream(o, Pdb70Stream.pdb);
+	if (s == null)
+		return 1;
+	scope(exit) adbg_object_pdb_close_stream(s);
+	if (s.size < pdb_pdb_header_t.sizeof) {
+		adbg_oops(AdbgError.objectMalformed);
+		return 1;
+	}
+	pdb_pdb_header_t *hdr = cast(pdb_pdb_header_t*)s.data;
+	if (guid_out) *guid_out = hdr.UniqueId;
+	if (age_out) *age_out = hdr.Age;
+	return 0;
+}
+
 /// Returns: Stream index, or `PDB_NAMED_STREAM_ABSENT` if not found or on error.
 ushort adbg_object_pdb_named_stream_index(adbg_object_t *o, const(char) *name) {
 	if (o == null || name == null) {
@@ -1889,8 +1910,22 @@ int adbg_object_pdb_resolve_rva(adbg_object_t *o, uint rva, pdb_resolved_rva_t *
 				best = i;
 			}
 			if (best != uint.max) {
-				out_info.line = cv_c13_line_start(entries[best].LineAndFlags);
-				if (cols) out_info.column = cols[best].StartColumn;
+				// CV emits sentinel line numbers on compiler-introduced
+				// instructions: 0xF00F00 ("not-a-statement / step-out")
+				// and 0xFEEFEE ("no source"). When the chosen entry is a
+				// sentinel, walk back to the most recent real source
+				// statement so callers see a meaningful line.
+				uint pick = best;
+				for (;;) {
+					uint ln = cv_c13_line_start(entries[pick].LineAndFlags);
+					if (ln != 0xF00F00 && ln != 0xFEEFEE) {
+						out_info.line = ln;
+						if (cols) out_info.column = cols[pick].StartColumn;
+						break;
+					}
+					if (pick == 0) break;
+					--pick;
+				}
 				best_file_chksm_off = fb.FileChecksumOffset;
 				line_resolved = true;
 				break;

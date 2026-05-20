@@ -143,6 +143,9 @@ const(char)* opt_pdb_stream;
 ulong opt_pdb_addr2line_rva;
 ulong opt_pdb_addr2line_va;
 const(char)* opt_image;
+const(char)* opt_symbols;
+/// When set, skip GUID/age verification of paired PE/PDB.
+int opt_no_verify_pair;
 
 
 void print_preamble(const(char) *filename, long filesize, const(char) *type, const(char) *id) {

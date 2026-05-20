@@ -14,15 +14,15 @@
 /// License: BSD-3-Clause-Clear
 module adbg.objects.pe;
 
-import core.stdc.stdlib;
 import core.stdc.string : memcpy;
 import adbg.error;
-import adbg.objectserver;
+import adbg.include.c.stdlib;
 import adbg.machines : AdbgMachine;
-import adbg.utils.uid : UID;
+import adbg.objects.mz : mz_header_t;
+import adbg.objectserver;
 import adbg.utils.bit;
 import adbg.utils.math : min, MiB;
-import adbg.objects.mz : mz_header_t;
+import adbg.utils.uid : UID;
 
 // NOTE: Avoid the Windows base types as they are not defined outside "version (Windows)"
 // NOTE: PE32 loader limits executable images to 4 GiB
@@ -2070,6 +2070,70 @@ void* adbg_object_pe_debug_directory_data(adbg_object_t *o, pe_debug_directory_e
 }
 void adbg_object_pe_debug_directory_data_close(void* entry) {
 	if (entry) free(entry);
+}
+
+/// PDB 7.0 CodeView record extracted from a PE's debug directory.
+/// Path is heap-allocated and must be freed by the caller (free()).
+struct pe_codeview_pdb70_t {
+	UID  Guid;
+	uint Age;
+	char *Path;
+}
+
+/// Locate the first PDB 7.0 CodeView entry in the PE's debug directory and
+/// return its GUID, age, and embedded PDB path.
+///
+/// Returns: 0 on success. Caller frees `out_info.Path` via `free()`.
+int adbg_object_pe_codeview_pdb70(adbg_object_t *o, pe_codeview_pdb70_t *out_info) {
+	if (o == null || out_info == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return 1;
+	}
+
+	pe_debug_directory_entry_t *entry = void;
+	for (size_t i; (entry = adbg_object_pe_debug_directory(o, i)) != null; ++i) {
+		if (entry.Type != PE_IMAGE_DEBUG_TYPE_CODEVIEW)
+			continue;
+		if (entry.SizeOfData < pe_debug_data_codeview_pdb70_t.sizeof)
+			continue;
+
+		void *data = adbg_object_pe_debug_directory_data(o, entry);
+		if (data == null)
+			return 1;
+		scope(exit) adbg_object_pe_debug_directory_data_close(data);
+
+		uint sig = *cast(uint*)data;
+		if (sig != PE_IMAGE_DEBUG_MAGIC_CODEVIEW_CV700)
+			continue;
+
+		pe_debug_data_codeview_pdb70_t *cv = cast(pe_debug_data_codeview_pdb70_t*)data;
+		out_info.Guid = cv.Guid;
+		out_info.Age = cv.Age;
+
+		// The path occupies the remainder of the entry; copy to heap so it
+		// outlives the temporary `data` buffer.
+		size_t pathmax = entry.SizeOfData - pe_debug_data_codeview_pdb70_t.sizeof + 1;
+		if (pathmax == 0) {
+			out_info.Path = null;
+			return 0;
+		}
+		// Bound by actual NUL within the slice.
+		const(char) *pathstart = cv.Path.ptr;
+		size_t pathlen;
+		while (pathlen < pathmax && pathstart[pathlen]) ++pathlen;
+		char *copy = cast(char*)malloc(pathlen + 1);
+		if (copy == null) {
+			adbg_oops(AdbgError.crt);
+			return 1;
+		}
+		memcpy(copy, pathstart, pathlen);
+		copy[pathlen] = 0;
+		out_info.Path = copy;
+		return 0;
+	}
+
+	adbg_oops(AdbgError.unavailable);
+	return 1;
 }
 
 void* adbg_object_pe_loadconfig(adbg_object_t *o) {

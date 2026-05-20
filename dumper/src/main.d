@@ -67,6 +67,8 @@ immutable option_t[] options = [
 	option_t(0,   "no-prefix",         "Setting: Remove file path prefix of output", &cliopt_no_prefix),
 	option_t(0,   "shortname",         "Setting: Instead of a summary, only print short machine name", &cliopt_shortname),
 	option_t(0,   "image",             "Setting: Paired PE image used to derive ImageBase for VA→RVA", &cliopt_image),
+	option_t(0,   "symbols",           "Setting: Paired PDB (overrides auto-paired symbols when input is PE)", &cliopt_symbols),
+	option_t(0,   "no-verify-pair",    "Setting: Skip GUID/age verification of paired PE/PDB", &cliopt_no_verify_pair),
 	// pages
 	option_t('h', "help", "Show this help screen and exit", &cliopt_help),
 	option_version,
@@ -162,6 +164,14 @@ int cliopt_pdb_addr2line_va(const(char) *val) {
 }
 int cliopt_image(const(char) *val) {
 	opt_image = val;
+	return 0;
+}
+int cliopt_symbols(const(char) *val) {
+	opt_symbols = val;
+	return 0;
+}
+int cliopt_no_verify_pair() {
+	opt_no_verify_pair = 1;
 	return 0;
 }
 

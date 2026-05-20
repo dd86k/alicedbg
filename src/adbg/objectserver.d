@@ -54,6 +54,13 @@ extern (C):
 //         Headers, program headers, and sections usually should be read when
 //         loading a new object instance.
 
+// NOTE: Object loading strategy
+//
+//       Most things SHOULD be lazily loaded.
+//
+//       adbg_object_open_*: should do the minimum of scanning object type, making
+//                           filtering faster.
+
 // TODO: Clean the section search functions
 // TODO: Consider structure definition, using a template
 //       Uses:
@@ -68,13 +75,13 @@ extern (C):
 // TODO: Load debugging object
 //       Attach debug object instance to this one. Likely to be used internally for stuff
 //       like getting symbols off memory addresses.
-//       PE32:
+//       PE32: (done)
 //       - Load PDB from debug entry (absolute path or try relatively with same folder)
-//       ELF:
+//       ELF: (todo)
 //       - DWARF (".debug_info" and others)
 //       - Compact C type Format (CTF, ".ctf"): https://github.com/lovasko/libctf
 //       - BPF Type Format (BTF)
-//       Mach-O:
+//       Mach-O: (todo)
 //       - uuid_command points to dSYM file
 // TODO: Promote "readalloc_at" over "malloc+read" to aid small object optimization
 
@@ -174,6 +181,21 @@ struct adbg_object_t {
 	void *modbuffer;
 	// TODO: Event: When closing
 	void function(adbg_object_t*, void*) on_unload;
+	/// Source path the object was opened from (disk origin only).
+	/// Owned heap copy; null for other origins.
+	const(char) *path;
+
+	/// Lazily-resolved paired object (PE↔PDB). Owned by this object and
+	/// closed automatically by `adbg_object_close`. May be installed
+	/// directly via `adbg_object_set_pair`.
+	adbg_object_t *paired;
+	/// 0 = pairing not yet attempted, 1 = pairing succeeded (cached in
+	/// `paired`), 2 = pairing previously failed and should not be retried
+	/// silently. Last failure code recorded in `pair_error`.
+	ubyte pair_state;
+	/// Error code recorded on a failed pair attempt; reissued on subsequent
+	/// calls when `pair_state == 2`.
+	int pair_error;
 }
 
 // TODO: "adbg_object_register" function to replace adbg_object_postload
@@ -220,7 +242,15 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 		adbg_oops(AdbgError.os);
 		return null;
 	}
-	
+
+	// Keep a heap copy of the path so callers (e.g. pairing) can find siblings.
+	size_t pathlen = strlen(path);
+	char *pathcopy = cast(char*)malloc(pathlen + 1);
+	if (pathcopy) {
+		memcpy(pathcopy, path, pathlen + 1);
+		o.path = pathcopy;
+	}
+
 	o.origin = AdbgObjectOrigin.disk;
 	
 	if (adbg_object_loadv(o)) {
@@ -295,8 +325,345 @@ void adbg_object_close(adbg_object_t *o) {
 		break;
 	default:
 	}
-	
+
+	if (o.path) free(cast(void*)o.path);
+
+	// Cascade close to cached paired object (if any). User-installed pairs
+	// are also owned by the primary; callers wanting separate lifetimes
+	// should call set_pair(primary, null, 0) before closing.
+	if (o.paired) adbg_object_close(o.paired);
+
 	free(o);
+}
+
+/// Returns: The path the object was opened from, or null if unknown.
+export
+const(char)* adbg_object_path(adbg_object_t *o) {
+	return o ? o.path : null;
+}
+
+/// Returns the cached paired object, or null if none is attached.
+///
+/// This does not trigger pairing; use `adbg_object_resolve_*` or
+/// `adbg_object_set_pair` to populate the pair.
+/// Returns: Paired object (typically debug symbol file or associated executable).
+export
+adbg_object_t* adbg_object_paired(adbg_object_t *o) {
+	return o ? o.paired : null;
+}
+
+/// Try to find and open the object paired with the given primary.
+///
+/// The pairing strategy is selected by the primary's format. Currently:
+///
+/// - PE primary: locate the matching PDB. First tries the embedded
+///   `IMAGE_DEBUG_TYPE_CODEVIEW` path (PDB 7.0 / RSDS), Windows only because
+///   the path is typically a Windows absolute path; then falls back to a
+///   sibling file with the same basename and a `.pdb` extension.
+/// - PDB primary: locate the matching image. Tries a sibling `.exe`, then
+///   `.dll`.
+///
+/// Future pair kinds (Mach-O + dSYM bundle, ELF + split DWARF via build-id
+/// or `.gnu_debuglink`) should be added as additional cases.
+///
+/// Returns: opened object on success, null on failure. The caller is
+/// responsible for closing the returned object (or attaching it to a primary
+/// via `adbg_object_set_pair`, which transfers ownership).
+export
+adbg_object_t* adbg_object_pair(adbg_object_t *primary) {
+	if (primary == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	
+	// Already paired
+	if (primary.paired)
+		return primary.paired;
+	
+	const(char) *primary_path = primary.path;
+	if (primary_path == null) {
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+
+	import adbg.os.path : adbg_os_replace_ext;
+
+	switch (primary.format) with (AdbgObject) {
+	case pe:
+		// Try embedded CV path on Windows only.
+version (Windows) {
+		import adbg.objects.pe : pe_codeview_pdb70_t, adbg_object_pe_codeview_pdb70;
+		pe_codeview_pdb70_t cv = void;
+		if (adbg_object_pe_codeview_pdb70(primary, &cv) == 0) {
+			scope(exit) if (cv.Path) free(cv.Path);
+			if (cv.Path) {
+				adbg_object_t *o = adbg_object_open_file(cv.Path);
+				if (o) {
+					if (o.format == AdbgObject.pdb) return o;
+					adbg_object_close(o);
+				}
+			}
+		}
+} // version Windows
+		// Sibling .pdb
+		char *sibling = adbg_os_replace_ext(primary_path, ".pdb");
+		if (sibling == null)
+			goto default;
+		scope(exit) free(sibling);
+		adbg_object_t *o2 = adbg_object_open_file(sibling);
+		if (o2) {
+			if (o2.format == AdbgObject.pdb) return o2;
+			adbg_object_close(o2);
+		}
+		goto default;
+	case pdb:
+		static immutable const(char)*[2] exts = [ ".exe".ptr, ".dll".ptr ];
+		foreach (ext; exts) {
+			char *cand = adbg_os_replace_ext(primary_path, ext);
+			if (cand == null) continue;
+			scope(exit) free(cand);
+			adbg_object_t *o3 = adbg_object_open_file(cand);
+			if (o3) {
+				if (o3.format == AdbgObject.pe) return o3;
+				adbg_object_close(o3);
+			}
+		}
+		goto default;
+	default:
+		adbg_oops(AdbgError.unavailable);
+		return null;
+	}
+}
+
+/// Flags for `adbg_object_resolve_va`, `adbg_object_resolve_rva`, and
+/// `adbg_object_set_pair`. Combine with bitwise OR.
+enum AdbgResolveFlags : int {
+	none      = 0,
+	/// Skip GUID/age verification when pairing PE with PDB.
+	noVerify  = 1 << 0,
+}
+
+/// Resolved address information returned by `adbg_object_resolve_va` and
+/// `adbg_object_resolve_rva`. Any unresolved field is left at zero/null.
+///
+/// `func` and `file` point into the paired PDB's stream buffers and remain
+/// valid until either object is closed.
+struct adbg_resolved_t {
+	const(char) *func;	/// Containing function name, or null if not found.
+	const(char) *file;	/// Source file path from `/names`, or null.
+	uint   line;	/// Source line number, 0 if unknown.
+	uint   column;	/// Start column when present, 0 otherwise.
+	uint   rva;	/// Resolved RVA (== input rva for `_rva`, computed for `_va`).
+	uint   func_rva;	/// RVA of the containing function's first byte.
+	uint   func_size;	/// `CodeSize` of the containing function.
+	ushort segment;	/// 1-based section index that owns `rva`.
+	uint   sec_offset;	/// Byte offset within that section.
+	ushort module_index;	/// DBI module index owning the contribution.
+}
+
+// Internal: pull the PE ImageBase. Returns 0 on failure.
+// TODO: This is a PE specific hack, remove or move elsewhere
+private ulong pe_image_base(adbg_object_t *pe) {
+	import adbg.objects.pe :
+		adbg_object_pe_optional_header,
+		pe_optional_header_t, pe_optional_header64_t,
+		PE_CLASS_32, PE_CLASS_64;
+	void *opt = adbg_object_pe_optional_header(pe);
+	if (opt == null) return 0;
+	ushort magic = *cast(ushort*)opt;
+	switch (magic) {
+	case PE_CLASS_32: return (cast(pe_optional_header_t*)opt).ImageBase;
+	case PE_CLASS_64: return (cast(pe_optional_header64_t*)opt).ImageBase;
+	default: return 0;
+	}
+}
+
+// Internal: compare PDB UID+age with PE CV record. Returns 0 if they match
+// OR if either side has no record to compare against (e.g., legacy PDB with
+// no info stream); returns objectPairMismatch on a real disagreement.
+private int verify_pe_pdb(adbg_object_t *pe, adbg_object_t *pdb) {
+	import adbg.objects.pdb : adbg_object_pdb_pdb_id;
+	import adbg.objects.pe : adbg_object_pe_codeview_pdb70, pe_codeview_pdb70_t;
+	import adbg.utils.uid : UID;
+	UID pdb_guid = void;
+	uint pdb_age;
+	if (adbg_object_pdb_pdb_id(pdb, &pdb_guid, &pdb_age))
+		return 0;
+	pe_codeview_pdb70_t cv = void;
+	if (adbg_object_pe_codeview_pdb70(pe, &cv))
+		return 0;
+	scope(exit) if (cv.Path) free(cv.Path);
+	if (memcmp(pdb_guid.data.ptr, cv.Guid.data.ptr, 16) != 0 || pdb_age != cv.Age)
+		return adbg_oops(AdbgError.objectPairMismatch);
+	return 0;
+}
+
+// Internal: ensure `o.paired` is populated; verify on each call unless caller
+// opts out. Pair object is cached so discovery only runs once; verification is
+// cheap and re-runs to keep the error surface honest.
+private adbg_object_t* ensure_pair(adbg_object_t *o, int flags) {
+	if (o.paired == null) {
+		if (o.pair_state == 2) {
+			adbg_oops(cast(AdbgError)o.pair_error);
+			return null;
+		}
+		adbg_object_t *p = adbg_object_pair(o);
+		if (p == null) {
+			int code = adbg_error_code();
+			// Normalize generic unavailable to the pair-specific code.
+			if (code == AdbgError.unavailable) {
+				code = AdbgError.objectPairUnavailable;
+				adbg_oops(AdbgError.objectPairUnavailable);
+			}
+			o.pair_state = 2;
+			o.pair_error = code;
+			return null;
+		}
+		o.paired = p;
+		o.pair_state = 1;
+	}
+	if ((flags & AdbgResolveFlags.noVerify) == 0) {
+		adbg_object_t *pe  = o.format == AdbgObject.pe  ? o : o.paired;
+		adbg_object_t *pdb = o.format == AdbgObject.pdb ? o : o.paired;
+		if (pe.format == AdbgObject.pe && pdb.format == AdbgObject.pdb) {
+			if (verify_pe_pdb(pe, pdb))
+				return null; // adbg_oops already set
+		}
+	}
+	return o.paired;
+}
+
+/// Install or clear a paired object on the primary.
+///
+/// Ownership of `paired` transfers to `primary`; it will be closed by
+/// `adbg_object_close(primary)`. Pass `paired == null` to clear an existing
+/// pair (the previously paired object is closed).
+///
+/// When verification is enabled (default), the function returns
+/// `objectPairMismatch` if PE/PDB GUID/age disagree. The pair is still
+/// installed so the caller can choose to proceed.
+///
+/// Params:
+///   primary = Primary object.
+///   paired = Object to attach as the pair, or null to clear.
+///   flags = Combination of `AdbgResolveFlags`.
+/// Returns: 0 on success, or an `AdbgError` code on mismatch/wrong format.
+export
+int adbg_object_set_pair(adbg_object_t *primary, adbg_object_t *paired, int flags) {
+	if (primary == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	// Replace existing pair, if any.
+	if (primary.paired) {
+		adbg_object_close(primary.paired);
+		primary.paired = null;
+	}
+	primary.pair_state = 0;
+	primary.pair_error = 0;
+	if (paired == null)
+		return 0;
+	primary.paired = paired;
+	primary.pair_state = 1;
+	if ((flags & AdbgResolveFlags.noVerify) == 0) {
+		adbg_object_t *pe  = primary.format == AdbgObject.pe ? primary : paired;
+		adbg_object_t *pdb = primary.format == AdbgObject.pdb ? primary : paired;
+		if (pe.format == AdbgObject.pe && pdb.format == AdbgObject.pdb)
+			return verify_pe_pdb(pe, pdb);
+	}
+	return 0;
+}
+
+/// Resolve an RVA to function/file/line using the primary's symbols (PDB) or
+/// a lazily-paired PDB if the primary is a PE.
+///
+/// Params:
+///   o = PE or PDB object.
+///   rva = Image-relative virtual address.
+///   flags = `AdbgResolveFlags` combination (e.g., `noVerify`).
+///   out_info = Receives resolved info. Must be non-null.
+/// Returns: 0 on success, or an `AdbgError` code on failure.
+export
+int adbg_object_resolve_rva(adbg_object_t *o, uint rva, int flags, adbg_resolved_t *out_info) {
+	import adbg.objects.pdb : adbg_object_pdb_resolve_rva, pdb_resolved_rva_t;
+	if (o == null || out_info == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	memset(out_info, 0, adbg_resolved_t.sizeof);
+
+	adbg_object_t *sym;
+	switch (o.format) {
+	case AdbgObject.pdb:
+		sym = o;
+		break;
+	case AdbgObject.pe:
+		sym = ensure_pair(o, flags);
+		if (sym == null) return adbg_error_code(); // already set
+		break;
+	default:
+		return adbg_oops(AdbgError.objectPairWrongFormat);
+	}
+
+	pdb_resolved_rva_t r = void;
+	if (adbg_object_pdb_resolve_rva(sym, rva, &r))
+		return adbg_error_code();
+
+	out_info.func         = r.func;
+	out_info.file         = r.file;
+	out_info.line         = r.line;
+	out_info.column       = r.column;
+	out_info.rva          = rva;
+	out_info.func_rva     = r.func_rva;
+	out_info.func_size    = r.func_size;
+	out_info.segment      = r.segment;
+	out_info.sec_offset   = r.sec_offset;
+	out_info.module_index = r.module_index;
+
+	if (r.func == null && r.file == null && r.line == 0)
+		return adbg_oops(AdbgError.objectSymbolUnresolved);
+	return 0;
+}
+
+/// Resolve a virtual address to function/file/line. The PE side (the primary
+/// itself or a lazily-paired PE) supplies `ImageBase`; the PDB side supplies
+/// symbols.
+///
+/// Params:
+///   o = PE or PDB object.
+///   va = Virtual address (image-base relative + ImageBase).
+///   flags = `AdbgResolveFlags` combination.
+///   out_info = Receives resolved info. Must be non-null.
+/// Returns: 0 on success, or an `AdbgError` code on failure.
+export
+int adbg_object_resolve_va(adbg_object_t *o, ulong va, int flags, adbg_resolved_t *out_info) {
+	if (o == null || out_info == null)
+		return adbg_oops(AdbgError.invalidArgument);
+	memset(out_info, 0, adbg_resolved_t.sizeof);
+
+	adbg_object_t *img;
+	adbg_object_t *sym;
+	switch (o.format) {
+	case AdbgObject.pe:
+		img = o;
+		sym = ensure_pair(o, flags);
+		if (sym == null) return adbg_error_code();
+		break;
+	case AdbgObject.pdb:
+		sym = o;
+		img = ensure_pair(o, flags);
+		if (img == null) return adbg_error_code();
+		break;
+	default:
+		return adbg_oops(AdbgError.objectPairWrongFormat);
+	}
+
+	ulong image_base = pe_image_base(img);
+	if (image_base == 0)
+		return adbg_oops(AdbgError.objectMalformed);
+	if (va < image_base)
+		return adbg_oops(AdbgError.objectAddressOutOfRange);
+	ulong rva64 = va - image_base;
+	if (rva64 > uint.max)
+		return adbg_oops(AdbgError.objectAddressOutOfRange);
+
+	return adbg_object_resolve_rva(sym, cast(uint)rva64, flags | AdbgResolveFlags.noVerify, out_info);
 }
 
 /// Read data from object at the current position.
@@ -748,6 +1115,7 @@ long adbg_object_filesize(adbg_object_t *o) {
 }
 
 // TODO: Deprecate adbg_object_machine for being ambiguous due to return value
+//       adbg_object_machine_list iterator might be nicer for fat binaries
 /// Returns the first machine type the object supports.
 /// Params: o = Object instance.
 /// Returns: Machine value. `AdbgMachine.unknown` on error.
@@ -755,8 +1123,6 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	if (o == null)
 		return AdbgMachine.unknown;
 	
-	// TODO: For UNIX archives, get first object and return machine of sub object instance
-	//       Would that really work, though?
 	switch (o.format) with (AdbgObject) {
 	case mz:	return AdbgMachine.i8086;
 	case ne:	return adbg_object_ne_machine(o);
@@ -771,7 +1137,7 @@ AdbgMachine adbg_object_machine(adbg_object_t *o) {
 	return AdbgMachine.unknown;
 }
 
-// TODO: adbg_object_machine_list, this function is temporary
+// TODO: adbg_object_machine_list iterator might be nicer for fat binaries
 /// Returns the first machine type the object supports.
 /// Params: o = Object instance.
 /// Returns: Machine definition instance. null on error.
@@ -847,8 +1213,6 @@ Lunknown:
 	case unknown:	return "unknown";
 	}
 }
-
-// TODO: adbg_object_id_full: "fuller" id
 
 /// Get the full name of the loaded object type.
 ///

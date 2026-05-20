@@ -19,6 +19,7 @@ import core.stdc.string;
 import core.stdc.stdio : snprintf;
 import dumper;
 import format_mz : dump_mz_ext_header;
+import format_pdb : dump_pe_addr2line_va, dump_pe_addr2line_rva;
 import common.errormgmt;
 
 extern (C):
@@ -40,6 +41,10 @@ int dump_pe(adbg_object_t *o) {
 		dump_pe_debug(o);
 	if (SELECTED(Select.loadconfig))
 		dump_pe_loadconfig(o);
+	if (SELECTED_OBJ(SelectObj.pdbAddr2LineRva))
+		dump_pe_addr2line_rva(o, cast(uint)opt_pdb_addr2line_rva);
+	if (SELECTED_OBJ(SelectObj.pdbAddr2LineVa))
+		dump_pe_addr2line_va(o, opt_pdb_addr2line_va);
 	if (SETTING(Setting.disasmAny))
 		dump_pe_disasm(o);
 	return 0;

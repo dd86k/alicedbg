@@ -8,9 +8,7 @@ module format_pdb;
 import adbg.error;
 import adbg.objectserver;
 import adbg.objects.pdb;
-import adbg.objects.pe : adbg_object_pe_machine_value_string, pe_section_entry_t,
-	adbg_object_pe_optional_header, pe_optional_header_t, pe_optional_header64_t,
-	PE_CLASS_32, PE_CLASS_64;
+import adbg.objects.pe : adbg_object_pe_machine_value_string, pe_section_entry_t;
 import adbg.utils.uid;
 import adbg.utils.date;
 import adbg.utils.strings;
@@ -18,7 +16,6 @@ import adbg.utils.math;
 import adbg.utils.bit;
 import adbg.include.c.stdio : printf, snprintf, putchar, puts;
 import adbg.types.cv;
-import core.stdc.stdlib : atoi;
 import dumper;
 import common.errormgmt;
 
@@ -39,13 +36,63 @@ int dump_pdb(adbg_object_t *o) {
 		dump_pdb_addr2line_rva(o, cast(uint)opt_pdb_addr2line_rva);
 	if (SELECTED_OBJ(SelectObj.pdbAddr2LineVa))
 		dump_pdb_addr2line_va(o, opt_pdb_addr2line_va);
-	// can be 0
+	import core.stdc.stdlib : atoi; // TODO: Move to main, use parse32
 	if (opt_pdb_stream)
 		dump_pdb_stream(o, atoi(opt_pdb_stream));
 	return 0;
 }
 
+// PE-primary entry points. The PE supplies the ImageBase; the paired PDB
+// (from --symbols or auto-paired sibling) supplies the symbols.
+void dump_pe_addr2line_va(adbg_object_t *pe, ulong va) {
+	print_header("PDB VA resolution");
+	if (install_override_pair(pe, /*want_pdb=*/true)) return;
+	resolve_and_print_va(pe, va);
+}
+
+void dump_pe_addr2line_rva(adbg_object_t *pe, uint rva) {
+	print_header("PDB RVA resolution");
+	if (install_override_pair(pe, /*want_pdb=*/true)) return;
+	resolve_and_print_rva(pe, rva);
+}
+
 private:
+
+// Apply --image/--symbols overrides on the primary. Returns non-zero if the
+// caller should abort (open failure or wrong format already warned).
+int install_override_pair(adbg_object_t *primary, bool want_pdb) {
+	// PE primary wants PDB on the other side; PDB primary wants PE.
+	const(char) *override_path = want_pdb ? opt_symbols : opt_image;
+	if (override_path == null)
+		return 0;
+	adbg_object_t *paired = adbg_object_open_file(override_path, 0);
+	if (paired == null) {
+		print_warningf("Failed to open %s: %s",
+			want_pdb ? "--symbols".ptr : "--image".ptr, adbg_error_message());
+		return 1;
+	}
+	AdbgObject wanted = want_pdb ? AdbgObject.pdb : AdbgObject.pe;
+	if (adbg_object_format(paired) != wanted) {
+		print_warningf("%s is not the expected format",
+			want_pdb ? "--symbols".ptr : "--image".ptr);
+		adbg_object_close(paired);
+		return 1;
+	}
+	int flags = (opt_no_verify_pair || g_pair_warned_mismatch) ? AdbgResolveFlags.noVerify : 0;
+	int e = adbg_object_set_pair(primary, paired, flags);
+	if (e == AdbgError.objectPairMismatch) {
+		print_warningf("Paired debug object identity mismatch (paired anyway)");
+		// Suppress the duplicate warning at resolve time; the user has
+		// explicitly chosen this pair and been informed.
+		g_pair_warned_mismatch = true;
+	}
+	return 0;
+}
+
+// Tracks whether the mismatch warning was already emitted at pair-install
+// time, so resolve_* doesn't repeat it.
+__gshared bool g_pair_warned_mismatch;
+
 
 void dump_pdb_header(adbg_object_t *o) {
 	print_header("Header");
@@ -787,16 +834,8 @@ void dump_pdb_modules(adbg_object_t *o) {
 	}
 }
 
-void dump_pdb_addr2line_rva(adbg_object_t *o, uint rva) {
-	print_header("PDB RVA resolution");
-
-	pdb_resolved_rva_t info = void;
-	if (adbg_object_pdb_resolve_rva(o, rva, &info)) {
-		print_warningf("Resolution failed: %s", adbg_error_message());
-		return;
-	}
-
-	printf("rva           : 0x%08x\n", rva);
+void print_resolved(ref adbg_resolved_t info) {
+	printf("rva           : 0x%08x\n", info.rva);
 	if (info.segment)
 		printf("section       : %u:%08x\n", info.segment, info.sec_offset);
 	if (info.module_index)
@@ -804,7 +843,7 @@ void dump_pdb_addr2line_rva(adbg_object_t *o, uint rva) {
 	if (info.func) {
 		printf("function      : %s\n", info.func);
 		printf("function_rva  : 0x%08x  (+0x%x of 0x%x)\n",
-			info.func_rva, rva - info.func_rva, info.func_size);
+			info.func_rva, info.rva - info.func_rva, info.func_size);
 	} else {
 		printf("function      : <unresolved>\n");
 	}
@@ -820,88 +859,78 @@ void dump_pdb_addr2line_rva(adbg_object_t *o, uint rva) {
 	}
 }
 
-// Read ImageBase from a PE/PE32+ optional header. Returns 0 on failure.
-// Temporary util
-ulong get_pe_image_base(adbg_object_t *pe) {
-	void *opt = adbg_object_pe_optional_header(pe);
-	if (opt == null)
-		return 0;
-	ushort magic = *cast(ushort*)opt;
-	switch (magic) {
-	case PE_CLASS_32:
-		return (cast(pe_optional_header_t*)opt).ImageBase;
-	case PE_CLASS_64:
-		return (cast(pe_optional_header64_t*)opt).ImageBase;
+// Translate a resolve_* error into a user-facing warning. Returns 1 if the
+// caller should abort, 0 if recoverable (mismatch under verify: continue).
+int handle_resolve_error(int code) {
+	switch (code) {
+	case AdbgError.objectPairUnavailable:
+		print_warningf("Could not auto-pair: %s", adbg_error_message());
+		return 1;
+	case AdbgError.objectPairMismatch:
+		// Should not reach here from the resolve path (verify happens at
+		// pair time and was either accepted or skipped). Print and abort.
+		print_warningf("Paired debug object identity mismatch");
+		return 1;
+	case AdbgError.objectPairWrongFormat:
+		print_warningf("Object format does not support address resolution");
+		return 1;
+	case AdbgError.objectAddressOutOfRange:
+		print_warningf("Address is outside the image's valid range");
+		return 1;
+	case AdbgError.objectSymbolUnresolved:
+		print_warningf("Address resolved to no symbol or line info");
+		return 0; // out_info still populated with section/segment if any
 	default:
-		return 0;
+		print_warningf("Resolution failed: %s", adbg_error_message());
+		return 1;
 	}
+}
+
+void resolve_and_print_rva(adbg_object_t *o, uint rva) {
+	int flags = (opt_no_verify_pair || g_pair_warned_mismatch) ? AdbgResolveFlags.noVerify : 0;
+	adbg_resolved_t info = void;
+	int e = adbg_object_resolve_rva(o, rva, flags, &info);
+	if (e == AdbgError.objectPairMismatch) {
+		print_warningf("Paired debug object identity mismatch (paired anyway)");
+		e = adbg_object_resolve_rva(o, rva, flags | AdbgResolveFlags.noVerify, &info);
+	}
+	print_paired(o);
+	if (e && handle_resolve_error(e)) return;
+	print_resolved(info);
+}
+
+void resolve_and_print_va(adbg_object_t *o, ulong va) {
+	int flags = (opt_no_verify_pair || g_pair_warned_mismatch) ? AdbgResolveFlags.noVerify : 0;
+	adbg_resolved_t info = void;
+	int e = adbg_object_resolve_va(o, va, flags, &info);
+	if (e == AdbgError.objectPairMismatch) {
+		print_warningf("Paired debug object identity mismatch (paired anyway)");
+		e = adbg_object_resolve_va(o, va, flags | AdbgResolveFlags.noVerify, &info);
+	}
+	print_paired(o);
+	if (e && handle_resolve_error(e)) return;
+	printf("va            : 0x%016llx\n", va);
+	print_resolved(info);
+}
+
+// Print the paired object's path (whichever side was auto-paired or installed)
+// so users can see what was actually used. Format-agnostic so future pair
+// kinds (Mach-O dSYM, ELF split DWARF, etc.) display the same way.
+void print_paired(adbg_object_t *primary) {
+	adbg_object_t *p = adbg_object_paired(primary);
+	if (p == null) return;
+	const(char) *path = adbg_object_path(p);
+	if (path == null) return;
+	printf("paired        : %s (%s)\n", path, adbg_object_id_string(p));
+}
+
+void dump_pdb_addr2line_rva(adbg_object_t *o, uint rva) {
+	print_header("PDB RVA resolution");
+	resolve_and_print_rva(o, rva);
 }
 
 void dump_pdb_addr2line_va(adbg_object_t *o, ulong va) {
 	print_header("PDB VA resolution");
-
-	if (opt_image == null) {
-		print_warningf("--addr2line requires --image=PATH");
-		return;
-	}
-
-	adbg_object_t *pe = adbg_object_open_file(opt_image, 0);
-	if (pe == null) {
-		print_warningf("Failed to open image: %s", adbg_error_message());
-		return;
-	}
-	scope(exit) adbg_object_close(pe);
-
-	if (adbg_object_format(pe) != AdbgObject.pe) {
-		print_warningf("--image is not a PE/PE32+ object");
-		return;
-	}
-
-	ulong image_base = get_pe_image_base(pe);
-	if (image_base == 0) {
-		print_warningf("Could not read ImageBase from --image");
-		return;
-	}
-	if (va < image_base) {
-		print_warningf("VA 0x%llx is below ImageBase 0x%llx", va, image_base);
-		return;
-	}
-
-	ulong rva64 = va - image_base;
-	if (rva64 > uint.max) {
-		print_warningf("Computed RVA 0x%llx exceeds 32 bits", rva64);
-		return;
-	}
-	uint rva = cast(uint)rva64;
-
-	pdb_resolved_rva_t info = void;
-	if (adbg_object_pdb_resolve_rva(o, rva, &info)) {
-		print_warningf("Resolution failed: %s", adbg_error_message());
-		return;
-	}
-
-	printf("va            : 0x%016llx\n", va);
-	printf("image_base    : 0x%016llx\n", image_base);
-	printf("rva           : 0x%08x\n", rva);
-	if (info.segment)
-		printf("section       : %u:%08x\n", info.segment, info.sec_offset);
-	if (info.module_index)
-		printf("module_index  : %u\n", info.module_index);
-	if (info.func) {
-		printf("function      : %s\n", info.func);
-		printf("function_rva  : 0x%08x  (+0x%x of 0x%x)\n",
-			info.func_rva, rva - info.func_rva, info.func_size);
-	} else {
-		printf("function      : <unresolved>\n");
-	}
-
-	if (info.file && info.column) {
-		printf("source        : %s:%u:%u\n", info.file, info.line, info.column);
-	} else if (info.file && info.line) {
-		printf("source        : %s:%u\n", info.file, info.line);
-	} else if (info.line) {
-		printf("source        : <unknown file>:%u\n", info.line);
-	} else {
-		printf("source        : <unresolved>\n");
-	}
+	if (install_override_pair(o, /*want_pdb=*/false)) return;
+	resolve_and_print_va(o, va);
 }

@@ -47,3 +47,29 @@ version (Windows) {
 	return adbg_oops(AdbgError.unimplemented);
 }
 }
+
+/// Build a new path that replaces the extension on `base`
+/// with `newext` (must include leading dot, e.g. ".pdb").
+/// Returns: heap-allocated string or null on failure.
+char *adbg_os_replace_ext(const(char) *base, const(char) *newext) {
+	if (base == null || newext == null)
+		return null;
+	
+	import core.stdc.stdlib : malloc;
+	import core.stdc.string : memcpy, strlen;
+	size_t baselen = strlen(base);
+	// Find last '.' after the last '/' or '\\'
+	ptrdiff_t dot = -1;
+	for (ptrdiff_t i = cast(ptrdiff_t)baselen - 1; i >= 0; --i) {
+		char c = base[i];
+		if (c == '/' || c == '\\') break;
+		if (c == '.') { dot = i; break; }
+	}
+	size_t stem = dot >= 0 ? cast(size_t)dot : baselen;
+	size_t extlen = strlen(newext);
+	char *out_ = cast(char*)malloc(stem + extlen + 1);
+	if (out_ == null) return null;
+	memcpy(out_, base, stem);
+	memcpy(out_ + stem, newext, extlen + 1);
+	return out_;
+}
