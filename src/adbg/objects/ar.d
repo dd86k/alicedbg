@@ -192,6 +192,12 @@ private struct internal_ar_t {
 	long strtab_offset;
 	uint strtab_size;
 	bool strtab_searched;
+	
+	// "/" or "/SYM64/" member data location, cached on first symbol lookup
+	long symtab_offset;
+	uint symtab_size;
+	bool symtab_searched;
+	bool symtab_wide;
 }
 
 int adbg_object_ar_load(adbg_object_t *o) {
@@ -320,6 +326,13 @@ uint adbg_object_ar_membersize(ar_member_header_t *member) {
 	return atouint(member.Size.ptr, member.Size.sizeof);
 }
 
+// Cached tables are trusted afterwards, so reject sizes that run past EOF
+private
+bool ar_member_fits(adbg_object_t *o, long dataloc, uint size) {
+	long filesize = adbg_object_filesize(o);
+	return filesize >= 0 && dataloc + size <= filesize;
+}
+
 // Locate the "//" member. It always precedes regular members, so stop at the
 // first one to avoid walking archives that have no string table.
 private
@@ -338,7 +351,7 @@ int adbg_object_ar_find_strtab(adbg_object_t *o, internal_ar_t *ar) {
 		
 		uint size = adbg_object_ar_membersize(&header);
 		if (header.Name == AR_MEMBER_LONGNAMES) {
-			if (size == 0)
+			if (size == 0 || ar_member_fits(o, loc + ar_member_header_t.sizeof, size) == false)
 				return adbg_oops(AdbgError.objectMalformed);
 			ar.strtab_offset = loc + ar_member_header_t.sizeof;
 			ar.strtab_size   = size;
@@ -460,4 +473,203 @@ ar_member_data_t* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header_
 
 void adbg_object_ar_member_data_close(ar_member_data_t *data) {
 	if (data) free(data);
+}
+
+// Read-ahead buffer so walking the index costs a handful of reads
+private struct ar_window_t {
+	long pos;
+	size_t len;
+	ubyte[512] data;
+}
+
+/// Iterator over the archive symbol index.
+struct ar_symbol_iter_t {
+	adbg_object_t *object;
+	ulong count;
+	ulong index;
+	long offsets;	// file offset of the member offset array
+	long strings;	// file offset of the next name
+	long end;	// end of the symbol index member data
+	bool wide;
+	ar_member_symbol_t current;
+	ar_window_t offwin;
+	ar_window_t strwin;
+}
+
+/// 
+struct ar_member_symbol_t {
+	/// File offset of the member header defining this symbol, see `adbg_object_ar_member_at`.
+	long member_offset;
+	/// Name length, can exceed the buffer size given to `adbg_object_ar_symbol_next`.
+	size_t name_length;
+}
+
+private
+ubyte* ar_window_get(adbg_object_t *o, ar_window_t *w, long loc, size_t size, long end) {
+	if (loc >= w.pos && loc + size <= w.pos + w.len)
+		return w.data.ptr + (loc - w.pos);
+	if (loc + size > end) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	size_t rdsize = cast(size_t)(end - loc);
+	if (rdsize > w.data.sizeof) rdsize = w.data.sizeof;
+	if (adbg_object_read_at(o, loc, w.data.ptr, rdsize))
+		return null;
+	w.pos = loc;
+	w.len = rdsize;
+	return w.data.ptr;
+}
+
+// The GNU "/" (or "/SYM64/") and the first COFF linker member share a layout:
+// a big-endian count, as many big-endian member offsets, then null-terminated
+// names. The second COFF linker member is ignored since the first suffices.
+private
+int adbg_object_ar_find_symtab(adbg_object_t *o, internal_ar_t *ar) {
+	if (ar.symtab_searched)
+		return ar.symtab_size ? 0 : adbg_oops(AdbgError.objectItemNotFound);
+	ar.symtab_searched = true;
+	
+	ar_member_header_t header = void;
+	long loc = ar_file_header_t.sizeof;
+	if (adbg_object_read_at(o, loc, &header, ar_member_header_t.sizeof))
+		return adbg_error_code();
+	if (header.EndMarker != AR_EOL)
+		return adbg_oops(AdbgError.objectMalformed);
+	
+	bool wide = header.Name == AR_MEMBER_SYM64;
+	if (header.Name != AR_MEMBER_LINKER && wide == false)
+		return adbg_oops(AdbgError.objectItemNotFound); // incl. BSD __.SYMDEF
+	
+	uint size = adbg_object_ar_membersize(&header);
+	if (size < (wide ? ulong.sizeof : uint.sizeof) ||
+		ar_member_fits(o, loc + ar_member_header_t.sizeof, size) == false)
+		return adbg_oops(AdbgError.objectMalformed);
+	
+	ar.symtab_offset = loc + ar_member_header_t.sizeof;
+	ar.symtab_size   = size;
+	ar.symtab_wide   = wide;
+	return 0;
+}
+
+/// Open an iterator over the archive symbol index.
+///
+/// Entries are read on demand.
+/// Params: o = Object instance.
+/// Returns: Iterator, or null on error.
+ar_symbol_iter_t* adbg_object_ar_symbol_open(adbg_object_t *o) {
+	internal_ar_t *ar = cast(internal_ar_t*)adbg_object_impl_get_buffer(o);
+	if (ar == null) return null;
+	if (adbg_object_ar_find_symtab(o, ar))
+		return null;
+	
+	ulong count = void;
+	size_t width = ar.symtab_wide ? ulong.sizeof : uint.sizeof;
+	if (ar.symtab_wide) {
+		if (adbg_object_read_at(o, ar.symtab_offset, &count, ulong.sizeof))
+			return null;
+		version (LittleEndian) count = adbg_bswap64(count);
+	} else {
+		uint count32 = void;
+		if (adbg_object_read_at(o, ar.symtab_offset, &count32, uint.sizeof))
+			return null;
+		version (LittleEndian) count32 = adbg_bswap32(count32);
+		count = count32;
+	}
+	if (count > (ar.symtab_size - width) / width) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	
+	ar_symbol_iter_t *it = cast(ar_symbol_iter_t*)calloc(1, ar_symbol_iter_t.sizeof);
+	if (it == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+	it.object  = o;
+	it.count   = count;
+	it.wide    = ar.symtab_wide;
+	it.offsets = ar.symtab_offset + width;
+	it.strings = it.offsets + (count * width);
+	it.end     = ar.symtab_offset + ar.symtab_size;
+	return it;
+}
+
+/// Get the next symbol from the index.
+///
+/// The name is null-terminated and truncated to fit the buffer.
+/// Params:
+///   it = Iterator.
+///   buffer = Name buffer.
+///   bufsize = Size of the name buffer, in characters.
+/// Returns: Symbol entry, or null at the end of the index or on error.
+ar_member_symbol_t* adbg_object_ar_symbol_next(ar_symbol_iter_t *it, char *buffer, size_t bufsize) {
+	if (it == null || buffer == null || bufsize == 0) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+	if (it.index >= it.count)
+		return null;
+	
+	adbg_object_t *o = it.object;
+	size_t width = it.wide ? ulong.sizeof : uint.sizeof;
+	ubyte *p = ar_window_get(o, &it.offwin, it.offsets + (it.index * width), width, it.strings);
+	if (p == null)
+		return null;
+	version (LittleEndian)
+		it.current.member_offset = it.wide ?
+			cast(long)adbg_bswap64(*cast(ulong*)p) : adbg_bswap32(*cast(uint*)p);
+	else
+		it.current.member_offset = it.wide ? cast(long)*cast(ulong*)p : *cast(uint*)p;
+	
+	size_t allowedsz = bufsize - 1; // for null
+	size_t len;
+	for (;;) {
+		char *c = cast(char*)ar_window_get(o, &it.strwin, it.strings + len, 1, it.end);
+		if (c == null)
+			return null;
+		if (*c == 0)
+			break;
+		if (len < allowedsz)
+			buffer[len] = *c;
+		++len;
+	}
+	buffer[len < allowedsz ? len : allowedsz] = 0;
+	
+	it.strings += len + 1;
+	it.current.name_length = len;
+	++it.index;
+	return &it.current;
+}
+
+void adbg_object_ar_symbol_close(ar_symbol_iter_t *it) {
+	if (it) free(it);
+}
+
+/// Read the member header at a file offset, typically from a symbol entry.
+///
+/// This becomes the current member, so member iteration continues from it.
+/// Params:
+///   o = Object instance.
+///   offset = File offset of the member header.
+/// Returns: Member header, or null on error.
+ar_member_header_t* adbg_object_ar_member_at(adbg_object_t *o, long offset) {
+	internal_ar_t *ar = cast(internal_ar_t*)adbg_object_impl_get_buffer(o);
+	if (ar == null) return null;
+	
+	if (offset < ar_file_header_t.sizeof) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	ar_member_header_t header = void;
+	if (adbg_object_read_at(o, offset, &header, ar_member_header_t.sizeof))
+		return null;
+	if (header.EndMarker != AR_EOL) {
+		adbg_oops(AdbgError.objectMalformed);
+		return null;
+	}
+	
+	ar.current = header;
+	ar.offset  = offset;
+	return &ar.current;
 }

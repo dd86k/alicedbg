@@ -21,6 +21,8 @@ extern (C):
 int dump_archive(adbg_object_t *o) {
 	if (SELECTED(Select.headers))
 		dump_archive_firstheader(o);
+	if (SELECTED(Select.sections))
+		dump_archive_members(o);
 	if (SELECTED(Select.debug_))
 		dump_archive_allheaders(o);
 	if (SELECTED(Select.exports))
@@ -78,8 +80,8 @@ void dump_archive_allheaders(adbg_object_t *o) {
 	} while ((member = adbg_object_ar_next_member(o)) != null);
 }
 
-void dump_archive_symbols(adbg_object_t *o) {
-	print_header("Symbols");
+void dump_archive_members(adbg_object_t *o) {
+	print_header("Members");
 	
 	ar_member_header_t *member = adbg_object_ar_first_member(o);
 	if (member == null)
@@ -123,4 +125,36 @@ void dump_archive_symbols(adbg_object_t *o) {
 		
 		print_section(i++, namebuf.ptr);
 	} while ((member = adbg_object_ar_next_member(o)) != null);
+}
+
+void dump_archive_symbols(adbg_object_t *o) {
+	print_header("Symbols");
+	
+	ar_symbol_iter_t *it = adbg_object_ar_symbol_open(o);
+	if (it == null)
+		panic_adbg();
+	scope(exit) adbg_object_ar_symbol_close(it);
+	
+	// Symbols are grouped per member, so only resolve the name when it changes
+	char[120] membername = void;
+	long lastmember = -1;
+	
+	char[256] symname = void;
+	ar_member_symbol_t *sym = void;
+	for (uint i; (sym = adbg_object_ar_symbol_next(it, symname.ptr, symname.sizeof)) != null; ++i) {
+		if (sym.member_offset != lastmember) {
+			ar_member_header_t *member = adbg_object_ar_member_at(o, sym.member_offset);
+			if (member == null ||
+				adbg_object_ar_member_name(membername.ptr, membername.sizeof, o, member) < 0) {
+				print_warningf("Symbol #%u member issue: %s", i, adbg_error_message());
+				membername[0] = 0;
+			}
+			lastmember = sym.member_offset;
+		}
+		
+		print_section(i, symname.ptr);
+		print_x64("Member", sym.member_offset, membername.ptr);
+	}
+	if (it.index < it.count)
+		print_warningf("Symbol index stopped at #%llu: %s", it.index, adbg_error_message());
 }

@@ -367,7 +367,7 @@ void print_x32l(const(char)* name, uint val, const(char) *meaning = null, int le
 }
 void print_x64(const(char)* name, ulong val, const(char) *meaning = null) {
 	printf("%*s: 0x%016llx", __field_padding, name, val);
-	if (meaning) printf(`\t(%s)`, meaning);
+	if (meaning) printf("\t(%s)", meaning);
 	putchar('\n');
 }
 
