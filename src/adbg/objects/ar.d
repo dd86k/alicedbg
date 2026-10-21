@@ -18,6 +18,7 @@ import adbg.error;
 import adbg.objectserver;
 import adbg.utils.bit;
 import core.stdc.stdlib;
+import core.stdc.string : memcmp;
 
 extern (C):
 
@@ -41,6 +42,7 @@ enum ArVersion {
 //       GNU and System V (SVR4) archive format
 //         First member : "/"  (May exist, if it exists, points to the symbol table)
 //         Second member: "//" (Ditto)
+//         Third member : "//" (optional, string table, terminated by "/\n")
 //         "/" acts as a main index for all other members in the archive.
 //         These members mostly contain object data (COFF or ELF)
 //         u32:    Number of offsets
@@ -54,7 +56,7 @@ enum ArVersion {
 //       COFF archive format
 //         First member : "/"
 //         Second member: "/"  (Provides a directory of symbols)
-//         Third member : "//" (May exist, if it exists, contains the string table)
+//         Third member : "//" (optional, string table, terminated by "\0")
 //         Note: Microsoft PE/COFF Spec 8.3 says that the third member is present
 //         even if the string table is empty. However, lib.exe does not in fact
 //         seem to create the third member if there's no member whose filename
@@ -185,6 +187,11 @@ private struct internal_ar_t {
 	// used for iterating
 	long offset; // current file offset of current header
 	ar_member_header_t current; // current member
+	
+	// "//" member data location, cached on first long-name lookup
+	long strtab_offset;
+	uint strtab_size;
+	bool strtab_searched;
 }
 
 int adbg_object_ar_load(adbg_object_t *o) {
@@ -229,6 +236,8 @@ uint atouint(const(char)* p, size_t s) {
 		return 0;
 	int v; char c = void;
 	for (size_t i; i < s && (c = p[i]) != 0; ++i) {
+		if (c == ' ') // Header fields are space-padded
+			break;
 		if (c < '0' || c > '9') // Failsafe/error
 			return 0;
 		v = (10 * v) + (c - '0');
@@ -246,6 +255,7 @@ extern (D) unittest {
 	assert(atouint("4000", L) == 4000);
 	assert(atouint("68088", L) == 68088);
 	assert(atouint("4000", 2) == 40); // Test max size
+	assert(atouint("1684      ", L) == 1684);
 	assert(atouint("2147483647", L) == int.max);
 	assert(atouint("4294967295", L) == uint.max);
 	// invalid
@@ -310,44 +320,100 @@ uint adbg_object_ar_membersize(ar_member_header_t *member) {
 	return atouint(member.Size.ptr, member.Size.sizeof);
 }
 
-// TODO: adbg_object_ar_member_name
-//       Names like "/75" should be entry index 76 in "//"
+// Locate the "//" member. It always precedes regular members, so stop at the
+// first one to avoid walking archives that have no string table.
+private
+int adbg_object_ar_find_strtab(adbg_object_t *o, internal_ar_t *ar) {
+	if (ar.strtab_searched)
+		return ar.strtab_size ? 0 : adbg_oops(AdbgError.objectMalformed);
+	ar.strtab_searched = true;
+	
+	ar_member_header_t header = void;
+	long loc = ar_file_header_t.sizeof;
+	for (;;) {
+		if (adbg_object_read_at(o, loc, &header, ar_member_header_t.sizeof))
+			return adbg_error_code();
+		if (header.EndMarker != AR_EOL || header.Name[0] != '/')
+			return adbg_oops(AdbgError.objectMalformed);
+		
+		uint size = adbg_object_ar_membersize(&header);
+		if (header.Name == AR_MEMBER_LONGNAMES) {
+			if (size == 0)
+				return adbg_oops(AdbgError.objectMalformed);
+			ar.strtab_offset = loc + ar_member_header_t.sizeof;
+			ar.strtab_size   = size;
+			return 0;
+		}
+		
+		loc = adbg_alignup64(loc + ar_member_header_t.sizeof + size, 2);
+	}
+}
 
 /// Get the resolved name of a member into a user-provided buffer.
 /// 
-/// The buffer will contain a null-terminated string.
+/// The buffer will contain a null-terminated string. Special members
+/// ("/", "//", "/SYM64/", etc.) are returned as-is.
 /// Params:
 ///   buffer = Pointer to a narrow-character buffer.
 ///   bufsize = Size of the buffer, in characters.
 ///   o = Object instance.
-///   member = Archive member, given by `adbg_object_ar_first_member` or `adbg_object_ar_next_member`.
+///   member = Current archive member, given by `adbg_object_ar_first_member` or `adbg_object_ar_next_member`.
 /// Returns: The number of characters written, excluding the null-terminator, or -1 on error.
 ptrdiff_t adbg_object_ar_member_name(char *buffer, size_t bufsize, adbg_object_t *o, ar_member_header_t *member) {
 	if (buffer == null || bufsize == 0 || o == null || member == null) {
 		adbg_oops(AdbgError.invalidArgument);
 		return -1;
 	}
+	internal_ar_t *ar = cast(internal_ar_t*)adbg_object_impl_get_buffer(o);
+	if (ar == null) return -1;
 	
 	size_t allowedsz = bufsize - 1; // for null
+	ptrdiff_t i;
 	
-	if (member.Name[0] == '/') { // special / long-name
-		// TODO: Check object format
-		// TODO: Check ar kind
-		// coff:
-		// member.Name[1] == ' ' (or '\0'?) -> table
-		// member.Name[1] == '/' -> long-name table
-		// isdigit( member.Name[1] ) -> long-name else special
-		adbg_oops(AdbgError.unimplemented);
-		return -1;
+	// GNU/COFF long name: "/<offset>" into the "//" member, where entries
+	// end with "/\n" (GNU) or "\0" (COFF).
+	if (member.Name[0] == '/' && member.Name[1] >= '0' && member.Name[1] <= '9') {
+		if (adbg_object_ar_find_strtab(o, ar))
+			return -1;
+		uint noffset = atouint(member.Name.ptr + 1, member.Name.sizeof - 1);
+		if (noffset >= ar.strtab_size) {
+			adbg_oops(AdbgError.objectMalformed);
+			return -1;
+		}
+		size_t rdsize = ar.strtab_size - noffset;
+		if (rdsize > allowedsz) rdsize = allowedsz;
+		if (rdsize && adbg_object_read_at(o, ar.strtab_offset + noffset, buffer, rdsize))
+			return -1;
+		for (; i < rdsize && buffer[i] != 0 && buffer[i] != '\n'; ++i) {}
+		if (i && buffer[i - 1] == '/' && i < rdsize && buffer[i] == '\n')
+			--i;
+		buffer[i] = 0;
+		return i;
 	}
 	
-	// Otherwise it's in the name as "example.obj/".
-	// Copy until either buffer run out or '/' is met.
-	ptrdiff_t i;
+	// BSD long name: "#1/<length>", name follows the header.
+	if (member.Name[0..3] == "#1/") {
+		uint nlen = atouint(member.Name.ptr + 3, member.Name.sizeof - 3);
+		if (nlen == 0 || nlen > adbg_object_ar_membersize(member)) {
+			adbg_oops(AdbgError.objectMalformed);
+			return -1;
+		}
+		size_t rdsize = nlen > allowedsz ? allowedsz : nlen;
+		if (rdsize && adbg_object_read_at(o, ar.offset + ar_member_header_t.sizeof, buffer, rdsize))
+			return -1;
+		for (; i < rdsize && buffer[i] != 0; ++i) {} // may be null-padded
+		buffer[i] = 0;
+		return i;
+	}
+	
+	// Short names are space-padded, GNU/COFF append a '/' terminator.
+	// Special members keep their slashes.
+	bool special = member.Name[0] == '/';
 	for (; i < ar_member_header_t.Name.sizeof && i < allowedsz; ++i) {
-		if (member.Name[i] == '/')
+		char c = member.Name[i];
+		if (c == ' ' || (c == '/' && special == false))
 			break;
-		buffer[i] = member.Name[i];
+		buffer[i] = c;
 	}
 	buffer[i] = 0;
 	return i;
@@ -358,7 +424,19 @@ ar_member_data_t* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header_
 	if (ar == null) return null;
 	
 	uint size = adbg_object_ar_membersize(member);
-	if (size <= 0) {
+	long dataloc = ar.offset + ar_member_header_t.sizeof;
+	
+	// BSD long names are stored inline, before the data
+	if (member.Name[0..3] == "#1/") {
+		uint nlen = atouint(member.Name.ptr + 3, member.Name.sizeof - 3);
+		if (nlen > size) {
+			adbg_oops(AdbgError.objectMalformed);
+			return null;
+		}
+		dataloc += nlen;
+		size    -= nlen;
+	}
+	if (size == 0) {
 		adbg_oops(AdbgError.assertion);
 		return null;
 	}
@@ -372,8 +450,6 @@ ar_member_data_t* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header_
 	ar_member_data_t *data = cast(ar_member_data_t*)buffer;
 	data.size    = size;
 	data.pointer = buffer + ar_member_data_t.sizeof;
-	
-	long dataloc = ar.offset + size;
 	if (adbg_object_read_at(o, dataloc, data.pointer, size)) {
 		free(buffer);
 		return null;
