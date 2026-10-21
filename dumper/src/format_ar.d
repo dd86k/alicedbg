@@ -11,7 +11,6 @@ import adbg.machines;
 import adbg.objects.ar;
 import adbg.error;
 import adbg.utils.bit : adbg_bswap32;
-import core.stdc.ctype : isdigit;
 import dumper;
 import common.utils : realstring;
 import common.errormgmt;
@@ -89,11 +88,7 @@ void dump_archive_members(adbg_object_t *o) {
 	
 	uint i;
 	do {
-		// HACK: Ignore special members, doing it here saves some filtering headaches
-		//       This should include "/", "//", "/EXAMPLE/", "__.SYMDEF" stuff
-		//       And exclude "/70" (long name member entry)
-		// TODO: Check by Archive kind instead, or member kind
-		if (member.Name[0] == '/' && isdigit( member.Name[1] ) == 0) {
+		if (adbg_object_ar_member_is_special(o, member)) {
 			i++;
 			continue;
 		}

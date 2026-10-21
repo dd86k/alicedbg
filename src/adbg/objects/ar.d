@@ -432,6 +432,38 @@ ptrdiff_t adbg_object_ar_member_name(char *buffer, size_t bufsize, adbg_object_t
 	return i;
 }
 
+/// Check if the member is an archive table (symbol index, string table, etc.)
+/// rather than a stored file.
+/// Params:
+///   o = Object instance.
+///   member = Current archive member, needed to read BSD long names.
+/// Returns: True if special.
+bool adbg_object_ar_member_is_special(adbg_object_t *o, ar_member_header_t *member) {
+	if (member == null)
+		return false;
+	
+	// "/<offset>" is a GNU/COFF long file name, other "/" names are tables
+	if (member.Name[0] == '/')
+		return member.Name[1] < '0' || member.Name[1] > '9';
+	
+	if (member.Name == AR_MEMBER_SYMDEF || member.Name == AR_MEMBER_SYMDEF64 ||
+		member.Name == AR_MEMBER_SYMDEF_SORTED)
+		return true;
+	
+	// Darwin stores its symbol tables as BSD long names
+	if (member.Name[0..3] == "#1/") {
+		char[24] name = void;
+		ptrdiff_t len = adbg_object_ar_member_name(name.ptr, name.sizeof, o, member);
+		if (len < 0)
+			return false;
+		const(char)[] s = name[0..len];
+		return s == "__.SYMDEF" || s == "__.SYMDEF_64" ||
+			s == "__.SYMDEF SORTED" || s == "__.SYMDEF_64 SORTED";
+	}
+	
+	return false;
+}
+
 ar_member_data_t* adbg_object_ar_member_data(adbg_object_t *o, ar_member_header_t *member) {
 	internal_ar_t *ar = cast(internal_ar_t*)adbg_object_impl_get_buffer(o);
 	if (ar == null) return null;
