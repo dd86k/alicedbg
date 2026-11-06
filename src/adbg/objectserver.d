@@ -694,10 +694,9 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 		if (e == 0) o.proc_location += rdsize;
 		return e;
 	case AdbgObjectOrigin.buffer:
-		if (o.user_location + rdsize >= o.user_buffersize)
+		if (o.user_location + rdsize > o.user_buffersize)
 			return adbg_oops(AdbgError.offsetBounds);
-		if (memcpy(buffer, o.user_buffer + o.user_location, rdsize))
-			return adbg_oops(AdbgError.crt);
+		memcpy(buffer, o.user_buffer + o.user_location, rdsize);
 		o.user_location += rdsize;
 		return 0;
 	default:
