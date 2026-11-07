@@ -18,7 +18,8 @@ import core.stdc.string : memcpy;
 import adbg.error;
 import adbg.include.c.stdlib;
 import adbg.machines : AdbgMachine;
-import adbg.objects.mz : mz_header_t;
+// NOTE: Not selective, mz imports this module back and `import adbg.objects;` would fail
+import adbg.objects.mz;
 import adbg.objectserver;
 import adbg.utils.bit;
 import adbg.utils.math : min, MiB;

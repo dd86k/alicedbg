@@ -53,4 +53,18 @@ jobs:
       with:
         compiler: ${{ matrix.dc }}
     - name: Test Alicedump
-      run: dub test :dumper
+      run: dub test :dumper  Layers:
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+    - name: Setup D compiler
+      uses: dlang-community/setup-dlang@5d239e99bc553874d9362e7e6aeeac9454b6789f # v2
+      with:
+        compiler: dmd-latest
+    - name: Test core and objects
+      run: dub test :core && dub test :objects
+    # Import paths limited to each layer, so a wrong-way import fails here
+    - name: Build objects alone with betterC
+      run: dmd -betterC -o- -Icore -Iobjects $(find core objects -name '*.d')
+    - name: Import objects package alone
+      run: echo 'import adbg.objects;' > t.d && dmd -betterC -o- -Icore -Iobjects t.d

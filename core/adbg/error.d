@@ -17,7 +17,6 @@ version (Windows) {
 }
 import core.stdc.errno : errno;
 import core.stdc.string : strerror;
-import adbg.include.capstone : csh, cs_errno, cs_strerror;
 
 // TODO: Make module thread-safe
 //       Either via TLS and/or atomic operations
@@ -226,11 +225,6 @@ void adbg_error_set(AdbgError e, void *handle, const(char)* func, int line) {
 		error.modcode = handle ? *cast(int*)handle : errno;
 		version(Trace) trace("crt=%d", error.modcode);
 		break;
-	case AdbgError.libCapstone:
-		assert(handle, "oops, no handles");
-		error.modcode = cs_errno(cast(csh)handle);
-		version(Trace) trace("capstone_error=%d", error.modcode);
-		break;
 	default:
 		error.modcode = 0;
 	}
@@ -248,6 +242,52 @@ int adbg_oops(AdbgError e, void *handle = null,
 	version(Trace) trace("code=%d handle=%p caller=%s@%d", e, handle, func, line);
 	adbg_error_set(e, handle, func, line);
 	return e;
+}
+
+/// Internal: Sets the last error code with an external library error code.
+/// Params:
+/// 	e = Error code.
+/// 	modcode = Error code from the external library.
+/// 	func = Automatically set to `__FUNCTION__`.
+/// 	line = Automatically set to `__LINE__`.
+/// Returns: Error code.
+int adbg_oops_code(AdbgError e, int modcode,
+	const(char)* func = __FUNCTION__.ptr, int line = __LINE__) {
+	version(Trace) trace("code=%d modcode=%d caller=%s@%d", e, modcode, func, line);
+	error.code = e;
+	error.modcode = modcode;
+	error.func = func;
+	error.line = line;
+	return e;
+}
+
+/// Message lookup for an external library error code.
+alias adbg_error_formatter_t = const(char)* function(int modcode);
+
+private struct adbg_error_formatter_entry_t {
+	int code;
+	adbg_error_formatter_t format;
+}
+/// Message lookups registered by modules wrapping external libraries.
+private __gshared adbg_error_formatter_entry_t[4] formatters;
+
+/// Register the message lookup used for error code e, replacing any previous one.
+/// Returns: Zero, or an error code if the table is full.
+int adbg_error_set_formatter(AdbgError e, adbg_error_formatter_t format) {
+	adbg_error_formatter_entry_t *slot;
+	foreach (ref entry; formatters) {
+		if (entry.code == e) {
+			slot = &entry;
+			break;
+		}
+		if (slot == null && entry.code == 0)
+			slot = &entry;
+	}
+	if (slot == null)
+		return adbg_oops(AdbgError.indexBounds);
+	slot.code = e;
+	slot.format = format;
+	return 0;
 }
 
 /// Internal: Same as adbg_oops, but returns a null pointer.
@@ -333,6 +373,10 @@ private immutable adbg_error_msg_t[] errors_msg = [
 	//
 	{ AdbgError.assertion,	"A soft debug assertion was hit." },
 	{ AdbgError.unimplemented,	"Feature is not implemented." },
+	//
+	// External libraries
+	//
+	{ AdbgError.libCapstone,	"Disassembler library error." },
 	{ AdbgError.success,	"No errors occured." },
 ];
 
@@ -345,9 +389,10 @@ const(char)* adbg_error_message() {
 		return strerror(error.modcode);
 	case os:
 		return adbg_error_system_message(error.modcode);
-	case libCapstone:
-		return cs_strerror(error.modcode);
 	default:
+		foreach (ref f; formatters)
+			if (f.code == error.code && f.format)
+				return f.format(error.modcode);
 		foreach (ref e; errors_msg)
 			if (error.code == e.code)
 				return e.msg.ptr;

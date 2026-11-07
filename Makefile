@@ -15,7 +15,7 @@ PREFIX ?= /usr/local
 BINDIR ?= $(PREFIX)/bin
 LIBDIR ?= $(PREFIX)/lib
 
-LIB_SRCS != find src -name '*.d'
+LIB_SRCS != find core objects src -name '*.d'
 COMMON_SRCS != find common/src -name '*.d'
 DEBUGGER_SRCS != find debugger/src -name '*.d'
 DUMPER_SRCS != find dumper/src -name '*.d'
@@ -56,7 +56,8 @@ STATIC_FLAGS  != case "$(STATIC):$(DC_NAME)" in \
 	1:*gdc*) echo "-fno-druntime -Wl,-static" ;; \
 	1:*)     echo "-L=-static" ;; esac
 
-DFLAGS = $(BUILD_FLAGS) $(STATIC_FLAGS) -Isrc -Icommon/src
+LIB_IMPORTS = -Icore -Iobjects -Isrc
+DFLAGS = $(BUILD_FLAGS) $(STATIC_FLAGS) $(LIB_IMPORTS) -Icommon/src
 
 # Default target
 all: debugger
@@ -85,32 +86,32 @@ libalicedbg.a: $(LIB_SRCS)
 
 # Tests run with druntime (no betterC), same as dub's unittest build type
 test: $(LIB_SRCS)
-	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) -Isrc $(OFLAG)alicedbg-test-library $(LIB_SRCS)
+	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) $(LIB_IMPORTS) $(OFLAG)alicedbg-test-library $(LIB_SRCS)
 	./alicedbg-test-library
 
 test-debugger: $(LIB_SRCS) $(COMMON_SRCS) $(DEBUGGER_TEST_SRCS)
-	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) -Isrc -Icommon/src $(OFLAG)alicedbg-debugger-test-application \
+	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) $(LIB_IMPORTS) -Icommon/src $(OFLAG)alicedbg-debugger-test-application \
 		$(LIB_SRCS) $(COMMON_SRCS) $(DEBUGGER_TEST_SRCS)
 	./alicedbg-debugger-test-application
 
 test-dumper: $(LIB_SRCS) $(COMMON_SRCS) $(DUMPER_TEST_SRCS)
-	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) -Isrc -Icommon/src $(OFLAG)alicedbg-dumper-test-application \
+	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) $(LIB_IMPORTS) -Icommon/src $(OFLAG)alicedbg-dumper-test-application \
 		$(LIB_SRCS) $(COMMON_SRCS) $(DUMPER_TEST_SRCS)
 	./alicedbg-dumper-test-application
 
 test-threading: $(LIB_SRCS) tests/threading.d
-	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) -Isrc $(OFLAG)alicedbg-test-threading $(LIB_SRCS) tests/threading.d
+	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) $(LIB_IMPORTS) $(OFLAG)alicedbg-test-threading $(LIB_SRCS) tests/threading.d
 	./alicedbg-test-threading
 
 test-setjmp: $(LIB_SRCS) tests/setjmp.d
-	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) -Isrc $(OFLAG)alicedbg-test-setjmp $(LIB_SRCS) tests/setjmp.d
+	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) $(LIB_IMPORTS) $(OFLAG)alicedbg-test-setjmp $(LIB_SRCS) tests/setjmp.d
 	./alicedbg-test-setjmp
 
 easy-target: tests/easy-target.d
 	$(DC) $(TEST_FLAGS) $(OFLAG)easy-target tests/easy-target.d
 
 test-easy: $(LIB_SRCS) tests/easy.d easy-target
-	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) -Isrc $(OFLAG)alicedbg-test-easy-api $(LIB_SRCS) tests/easy.d
+	$(DC) $(TEST_FLAGS) $(UNITTEST_FLAG) $(MAIN_FLAG) $(LIB_IMPORTS) $(OFLAG)alicedbg-test-easy-api $(LIB_SRCS) tests/easy.d
 	./alicedbg-test-easy-api
 
 # Install/uninstall

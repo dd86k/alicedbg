@@ -26,8 +26,6 @@ module adbg.objectserver;
 
 import adbg.symbols;
 import adbg.objects.coff : adbg_coff_populate_symbols;
-import adbg.process.memory : adbg_memory_read;
-import adbg.process.base : adbg_process_t;
 import adbg.error;
 import adbg.machines;
 import adbg.utils.math;
@@ -69,7 +67,7 @@ extern (C):
 // TODO: adbg_object_endianness
 //       Why? Machine module do not include endianness.
 //       And would be beneficial when host has incompatible or both endianness.
-// TODO: adbg_object_open_process(int pid, ...)
+// TODO: adbg_object_open_process in adbg.process.memory, using a reader
 // TODO: adbg_object_origin_string(adbg_object_t *o)
 //       Return string of how object was loaded, mainly for tracing purposes
 // TODO: Load debugging object
@@ -126,8 +124,8 @@ enum AdbgObjectOrigin {
 	unknown,
 	/// Object was loaded from disk.
 	disk,
-	/// Object was loaded from the debugger into memory.
-	process,
+	/// Object is read through user callbacks.
+	reader,
 	/// Object is a whole buffer provided externally.
 	buffer,
 }
@@ -139,6 +137,18 @@ enum AdbgObjectInternalFlags {
 	swapped	= 0x1,
 	/// Old alias for swapped.
 	reversed = swapped,
+}
+
+/// Object source driven by user callbacks, such as process memory.
+struct adbg_object_reader_t {
+	/// Read size bytes at location into buffer. Returns 0, or an error code set with adbg_oops.
+	int function(void *ctx, long location, void *buffer, size_t size) read;
+	/// Release ctx when the object is closed. Optional.
+	void function(void *ctx) close;
+	/// User context given to callbacks.
+	void *ctx;
+	/// Source size in bytes, or 0 if unknown.
+	long size;
 }
 
 struct adbg_section_t {
@@ -157,9 +167,9 @@ struct adbg_object_t {
 		struct { // opened as file
 			OSFILE *file;
 		}
-		struct { // opened as process
-			adbg_process_t *process;
-			size_t proc_location;
+		struct { // opened with a reader
+			adbg_object_reader_t reader;
+			long reader_location;
 		}
 		struct { // opened as user buffer
 			void *user_buffer;
@@ -261,12 +271,38 @@ adbg_object_t* adbg_object_open_file(const(char) *path, ...) {
 	return o;
 }
 
-/*
-adbg_object_t* adbg_object_open_process(int pid, ...) {
-	version (Trace) trace("pid=%", buffer, buffersize);
-	
+/// Open a new instance of an object from user read callbacks.
+///
+/// The reader is copied. Its close callback, if set, is called when the
+/// object is closed, including when opening fails.
+/// Params:
+///   reader = Reader callbacks and context.
+///   ... = Options. Terminated with 0.
+/// Returns: Object instance, or null on error.
+adbg_object_t* adbg_object_open_reader(adbg_object_reader_t *reader, ...) {
+	version (Trace) trace("reader=%p", reader);
+
+	if (reader == null || reader.read == null) {
+		adbg_oops(AdbgError.invalidArgument);
+		return null;
+	}
+
+	adbg_object_t *o = cast(adbg_object_t*)calloc(1, adbg_object_t.sizeof);
+	if (o == null) {
+		adbg_oops(AdbgError.crt);
+		return null;
+	}
+
+	o.reader = *reader;
+	o.origin = AdbgObjectOrigin.reader;
+
+	if (adbg_object_loadv(o)) {
+		adbg_object_close(o);
+		return null;
+	}
+
+	return o;
 }
-*/
 
 /// Open a new instance of an object from a buffer.
 ///
@@ -322,6 +358,9 @@ void adbg_object_close(adbg_object_t *o) {
 	switch (o.origin) with (AdbgObjectOrigin) {
 	case disk:
 		if (o.file) osfclose(o.file);
+		break;
+	case reader:
+		if (o.reader.close) o.reader.close(o.reader.ctx);
 		break;
 	default:
 	}
@@ -689,9 +728,9 @@ int adbg_object_read(adbg_object_t *o, void *buffer, size_t rdsize, int flags = 
 		if (r < rdsize)
 			return adbg_oops(AdbgError.partialRead);
 		return 0;
-	case AdbgObjectOrigin.process:
-		int e = adbg_memory_read(o.process, o.proc_location, buffer, rdsize);
-		if (e == 0) o.proc_location += rdsize;
+	case AdbgObjectOrigin.reader:
+		int e = o.reader.read(o.reader.ctx, o.reader_location, buffer, rdsize);
+		if (e == 0) o.reader_location += rdsize;
 		return e;
 	case AdbgObjectOrigin.buffer:
 		if (o.user_location + rdsize > o.user_buffersize)
@@ -726,8 +765,8 @@ int adbg_object_read_at(adbg_object_t *o, long location, void *buffer, size_t rd
 		if (osfseek(o.file, location, OSFileSeek.start) < 0)
 			return adbg_oops(AdbgError.os);
 		break;
-	case AdbgObjectOrigin.process:
-		o.proc_location = cast(size_t)location;
+	case AdbgObjectOrigin.reader:
+		o.reader_location = location;
 		break;
 	case AdbgObjectOrigin.buffer:
 		o.user_location = cast(size_t)location;
@@ -1085,6 +1124,7 @@ void adbg_object_section_close(adbg_object_t *o, adbg_section_t *section) {
 ///
 /// For local files, it is the filesize.
 /// For user buffers, the buffer size.
+/// For readers, the size they declared.
 /// Params: o = Object instance.
 /// Returns: Size in bytes, or -1 on error.
 long adbg_object_filesize(adbg_object_t *o) {
@@ -1107,6 +1147,12 @@ long adbg_object_filesize(adbg_object_t *o) {
 			return -1;
 		}
 		return l;
+	case AdbgObjectOrigin.reader:
+		if (o.reader.size <= 0) {
+			adbg_oops(AdbgError.unavailable);
+			return -1;
+		}
+		return o.reader.size;
 	default:
 		adbg_oops(AdbgError.unimplemented);
 		return -1;

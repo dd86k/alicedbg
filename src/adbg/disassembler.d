@@ -189,6 +189,12 @@ immutable(libcsmachine_t)* adbg_disassembler_liba2cs(AdbgMachine machine) {
 	return null;
 }
 
+/// Capstone message for error code modcode.
+private
+const(char)* adbg_disassembler_cs_message(int modcode) {
+	return cs_strerror(cast(cs_err)modcode);
+}
+
 /// Open a disassembler instance.
 /// Params: machine = Machine architecture.
 /// Returns: Error code.
@@ -196,6 +202,7 @@ adbg_disassembler_t* adbg_disassembler_open(AdbgMachine machine = AdbgMachine.un
 	//TODO: static if (CAPSTONE_DYNAMIC)
 	if (libcapstone_dynload())
 		return null;
+	adbg_error_set_formatter(AdbgError.libCapstone, &adbg_disassembler_cs_message);
 	
 	// Get matching machine info
 	immutable(libcsmachine_t) *csinfo = adbg_disassembler_liba2cs(machine);
@@ -212,14 +219,16 @@ adbg_disassembler_t* adbg_disassembler_open(AdbgMachine machine = AdbgMachine.un
 	}
 	
 	// Open CS
-	if (cs_open(csinfo.cs_arch, csinfo.cs_mode, &dasm.cs_handle)) {
-		adbg_oops(AdbgError.libCapstone);
+	cs_err cserr = cs_open(csinfo.cs_arch, csinfo.cs_mode, &dasm.cs_handle);
+	if (cserr) {
+		adbg_oops_code(AdbgError.libCapstone, cserr);
 		free(dasm);
 		return null;
 	}
 	dasm.cs_inst = cs_malloc(dasm.cs_handle);
 	if (dasm.cs_inst == null) {
-		adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
+		adbg_oops_code(AdbgError.libCapstone, cs_errno(dasm.cs_handle));
+		cs_close(&dasm.cs_handle);
 		free(dasm);
 		return null;
 	}
@@ -252,8 +261,9 @@ adbg_disassembler_t* adbg_disassembler_reopen(adbg_disassembler_t *dasm, AdbgMac
 	
 	// Close and open CS handle
 	cs_close(&dasm.cs_handle);
-	if (cs_open(csinfo.cs_arch, csinfo.cs_mode, &dasm.cs_handle)) {
-		adbg_oops(AdbgError.libCapstone);
+	cs_err cserr = cs_open(csinfo.cs_arch, csinfo.cs_mode, &dasm.cs_handle);
+	if (cserr) {
+		adbg_oops_code(AdbgError.libCapstone, cserr);
 		return null;
 	}
 	
@@ -335,8 +345,9 @@ Loption:
 		default:
 			return adbg_oops(AdbgError.invalidValue);
 		}
-		if (cs_option(dasm.cs_handle, CS_OPT_SYNTAX, cs_syntax))
-			return adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
+		cs_err cserr = cs_option(dasm.cs_handle, CS_OPT_SYNTAX, cs_syntax);
+		if (cserr)
+			return adbg_oops_code(AdbgError.libCapstone, cserr);
 		goto Loption;
 	default:
 		return adbg_oops(AdbgError.invalidOption);
@@ -411,8 +422,9 @@ int adbg_disassembler_buffer_step(adbg_disassembler_t *dasm, adbg_opcode_t *opco
 		&dasm.address_base,
 		dasm.cs_inst) == false) {
 		// Library error
-		if (cs_errno(dasm.cs_handle) != CS_ERR_OK)
-			return adbg_oops(AdbgError.libCapstone, &dasm.cs_handle);
+		cs_err cserr = cs_errno(dasm.cs_handle);
+		if (cserr != CS_ERR_OK)
+			return adbg_oops_code(AdbgError.libCapstone, cserr);
 		
 		// Since disassembly simply didn't work out, and CS does not
 		// give us an instruction size, we go by the maximum opcode size

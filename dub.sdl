@@ -10,6 +10,7 @@ license "BSD-3-Clause-Clear"
 #       Like v0.9.24
 
 # NOTE: GDC 5.4
+#       WARNING: Too old to bother supporting.
 #       Doesn't work, ld whines about missing _tlsstart/_tlsend (TLS) references
 #       value for C++/ObjC but not D:
 #         -fno-rtti
@@ -32,6 +33,25 @@ license "BSD-3-Clause-Clear"
 #       Yes, it works with -fno-druntime, so it can be possible to add
 #       "*-gdc-betterc" build types in the future.
 
+# NOTE: Layers
+#       Each layer gets its own source root so an import going the wrong way
+#       (objects -> process, core -> objects) fails to compile.
+#       core: errors, machines, platform, utils, C bindings
+#       objects: object server and formats, depends on core
+#       src: debugger, process, disassembler, depends on objects
+subPackage {
+	name "core"
+	sourcePaths "core"
+	importPaths "core"
+}
+subPackage {
+	name "objects"
+	sourcePaths "objects"
+	importPaths "objects"
+	dependency "alicedbg:core" version="*"
+}
+dependency "alicedbg:objects" version="*"
+
 subPackage "common"
 subPackage "debugger"
 subPackage "dumper"
@@ -44,6 +64,12 @@ subPackage {
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+	# Dependencies need betterC too, the default debug build type lacks it
+	buildType "debug" {
+		buildOptions "debugMode" "debugInfo"
+		dflags "-betterC" platform="dmd"
+		dflags "-betterC" platform="ldc"
+	}
 }
 subPackage {
 	name "easy-example"
@@ -54,6 +80,12 @@ subPackage {
 	dflags "-betterC" platform="dmd"
 	dflags "-betterC" platform="ldc"
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+	# Dependencies need betterC too, the default debug build type lacks it
+	buildType "debug" {
+		buildOptions "debugMode" "debugInfo"
+		dflags "-betterC" platform="dmd"
+		dflags "-betterC" platform="ldc"
+	}
 }
 
 #
@@ -74,7 +106,8 @@ configuration "library" {
 configuration "shared" {
 	targetType "dynamicLibrary"
 	versions "SharedLib" # "Shared" might confuse druntime
-	sourcePaths "src"
+	# NOTE: Static dependencies only contribute referenced members, so build all layers in
+	sourcePaths "src" "core" "objects"
 }
 
 #
@@ -92,6 +125,12 @@ buildType "trace" {
 	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
 	dflags "-betterC" "--vgc" platform="ldc"
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+	# Dependencies need betterC too, the default debug build type lacks it
+	buildType "debug" {
+		buildOptions "debugMode" "debugInfo"
+		dflags "-betterC" platform="dmd"
+		dflags "-betterC" platform="ldc"
+	}
 }
 
 # Make the compiler print GC and TLS usage, and target information.
@@ -101,6 +140,12 @@ buildType "debugv" {
 	dflags "-betterC" "-vgc" "-vtls" platform="dmd"
 	dflags "-betterC" "--vgc" platform="ldc"
 	dflags "-ftransition=nogc" "-ftransition=tls" platform="gdc"
+	# Dependencies need betterC too, the default debug build type lacks it
+	buildType "debug" {
+		buildOptions "debugMode" "debugInfo"
+		dflags "-betterC" platform="dmd"
+		dflags "-betterC" platform="ldc"
+	}
 }
 
 # Make the compiler print GC and TLS usage, and target information for unittests.
