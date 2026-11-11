@@ -415,7 +415,7 @@ enum : ushort {
 }
 
 // NOTE: PE32 shares this header
-struct coff_header_t {
+struct coff_header_t { align(1):
 	/// Magic.
 	ushort f_magic;
 	/// Number of sections.
@@ -436,7 +436,7 @@ struct coff_header_t {
 }
 
 // Optional header
-struct coff_opt_header_t {
+struct coff_opt_header_t { align(1):
 	ushort magic;
 	ushort vstamp;
 	uint textsize;
@@ -448,7 +448,7 @@ struct coff_opt_header_t {
 }
 
 // COFF section header
-struct coff_section_header_t {
+struct coff_section_header_t { align(1):
 	char[8] s_name;
 	/* c_ulong */ uint s_paddr;	/// Physical address
 	/* c_ulong */ uint s_vaddr;	/// Virtual address
@@ -460,16 +460,18 @@ struct coff_section_header_t {
 	ushort s_nlnno;		/// Number of line number entries
 	/* c_ulong */ uint s_flags;	/// Flags
 }
+static assert(coff_section_header_t.sizeof == 40);
 
 // COFF relocation entry
-struct coff_reloc_entry_t {
+struct coff_reloc_entry_t { align(1):
 	/* c_ulong */ uint r_vaddr;	/// Reference virtual address
 	/* c_ulong */ uint r_symndx;	/// Symbol index
 	ushort r_type;	/// Relocation type
 }
+static assert(coff_reloc_entry_t.sizeof == 10);
 
 // COFF line number entry
-struct coff_linenum_entry_t {
+struct coff_linenum_entry_t { align(1):
 	union {
 		/* c_ulong */ uint l_symndx;	/// Symbol index
 		/* c_ulong */ uint l_paddr;	/// Physical address
@@ -490,7 +492,7 @@ enum : short { // e_scnum values
 // String Table Offset = File Header.f_symptr + File Header.f_nsyms * sizeof( Symbol Table Entry )
 //                     = File Header.f_symptr + File Header.f_nsyms * 18
 // GNU format will have "/4" where 4 is an offset into string table
-union coff_string_entry_t {
+union coff_string_entry_t { align(1):
 	char[8] name;
 	struct {
 		/// If zeroes == 0, then offset is used.
