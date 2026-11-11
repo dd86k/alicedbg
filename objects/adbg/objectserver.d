@@ -863,6 +863,8 @@ int adbg_object_loadv(adbg_object_t *o) {
 	SIGNATURE sig = void;
 	memset(&sig, 0, SIGNATURE.sizeof);
 	int e = adbg_object_read_at(o, 0, &sig, SIGNATURE.sizeof);
+	// Retry with the smallest supported header (short import object)
+	if (e) e = adbg_object_read_at(o, 0, &sig, mscoff_import_header_t.sizeof);
 	if (e) return e;
 	
 	// Magic detection over 8 Bytes
@@ -924,6 +926,7 @@ int adbg_object_loadv(adbg_object_t *o) {
 	case COFF_MAGIC_TMS320C5500:
 	case COFF_MAGIC_TMS320C5500P:
 	case COFF_MAGIC_TMS320C6000:
+	case COFF_MAGIC_ARM64:
 	case COFF_MAGIC_MIPSEL:
 		return adbg_object_coff_load(o);
 	default:
@@ -1274,7 +1277,7 @@ Lunknown:
 /// - "Relocatable Object Module Format"
 /// - "UNIX Library Archive"
 /// - "Common Object File Format"
-/// - "Big COFF Object"
+/// - "COFF Import or Anonymous Object"
 /// - "Unknown" (default or parameter is null)
 /// Params: o = Object instance.
 /// Returns: Object type name.
@@ -1296,7 +1299,7 @@ const(char)* adbg_object_format_string(adbg_object_t *o) {
 	case omf:	return `Relocatable Object Module Format`;
 	case archive:	return `UNIX Library Archive`;
 	case coff:	return `Common Object File Format`;
-	case mscoff:	return `Big COFF Object`;
+	case mscoff:	return `COFF Import or Anonymous Object`;
 	case unknown:	goto Lunknown;
 	}
 }
@@ -1319,7 +1322,8 @@ const(char)* adbg_object_kind_string(adbg_object_t *o) {
 	case elf:	return adbg_object_elf_kind_string(o);
 	case pdb:	return `Debug Database`;
 	case mdmp, dmp:	return `Memory Dump`;
-	case archive, mscoff:	return `Library`;
+	case archive:	return `Library`;
+	case mscoff:	return adbg_object_mscoff_version(o) == MSCOFF_VERSION_IMPORT ? `Library` : `Object`;
 	case omf:	return adbg_object_omf_is_library(o) ? `Library` : `Object`;
 	case coff:	return `Object`;
 	case unknown:

@@ -37,7 +37,15 @@ void dump_mscoff_header(adbg_object_t *o) {
 		print_x32("TimeStamp", TimeStamp);
 		print_x32("Size", Size);
 		print_x16("Ordinal", Ordinal);
-		print_x64("Flags", Flags);
+		print_x16("Flags", Flags);
+		print_u8("Type", cast(ubyte)adbg_object_mscoff_import_type(o));
+		print_u8("NameType", cast(ubyte)adbg_object_mscoff_import_name_type(o));
+		const(char) *name = adbg_object_mscoff_import_name(o);
+		if (name) print_string("Name", name);
+		const(char) *dll = adbg_object_mscoff_import_dll(o);
+		if (dll) print_string("DLL", dll);
+		const(char) *exportas = adbg_object_mscoff_import_exportas(o);
+		if (exportas) print_string("ExportAs", exportas);
 		}
 		break;
 	case MSCOFF_VERSION_ANON: // 1

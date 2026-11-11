@@ -9,6 +9,8 @@ import adbg.disassembler;
 import adbg.objectserver;
 import adbg.machines;
 import adbg.objects.coff;
+import adbg.objects.mscoff : mscoff_anon_header_bigobj_t;
+import adbg.utils.uid;
 import adbg.error : adbg_error_message;
 import core.stdc.ctype : isdigit;
 import dumper;
@@ -20,6 +22,8 @@ int dump_coff(adbg_object_t *o) {
 		dump_coff_headers(o);
 	if (SELECTED(Select.sections))
 		dump_coff_sections(o);
+	if (SELECTED(Select.relocs))
+		dump_coff_relocs(o);
 	// TODO: SELECTED(Select.debug_) ("--debug") -> .debug$T (CodeView)
 	if (SELECTED(Select.exports))
 		dump_coff_symbols(o);
@@ -32,6 +36,11 @@ private:
 
 void dump_coff_headers(adbg_object_t *o) {
 	print_header("Header");
+	
+	if (adbg_object_coff_is_bigobj(o)) {
+		dump_coff_bigobj_header(o);
+		return;
+	}
 	
 	coff_header_t *header = adbg_object_coff_header(o);
 	
@@ -79,7 +88,11 @@ void dump_coff_sections(adbg_object_t *o) {
 	uint i;
 	do with (section) {
 		print_section(++i);
-		print_stringl("s_name",	s_name.ptr, s_name.sizeof);
+		const(char) *name = adbg_object_coff_section_name(o, section);
+		if (name)
+			print_string("s_name", name);
+		else
+			print_stringl("s_name", s_name.ptr, s_name.sizeof);
 		print_x32("s_paddr",	s_paddr);
 		print_x32("s_vaddr",	s_vaddr);
 		print_u32("s_size",	s_size);
@@ -110,40 +123,82 @@ void dump_coff_sections(adbg_object_t *o) {
 void dump_coff_symbols(adbg_object_t *o) {
 	print_header("Symbols");
 	
-	coff_symbol_entry_t *symbol = adbg_object_coff_first_symbol(o);
-	if (symbol == null)
-		panic_adbg();
-	
-	uint i;
-	do with (symbol) {
-		print_section(i++);
-		const(char) *e_name = adbg_object_coff_symbol_name(o, symbol);
-		if (e_name == null) {
-			print_warningf("e_name null: %s", adbg_error_message());
-			continue;
-		}
+	uint count = adbg_object_coff_symbol_count(o);
+	coff_symbol_ex_t *symbol = void;
+	for (uint i; i < count; i += 1 + symbol.e_numaux) {
+		symbol = adbg_object_coff_symbol_at(o, i);
+		if (symbol == null)
+			panic_adbg();
 		
-		print_string("e_name", e_name);
+		with (symbol) {
+		print_section(i);
+		const(char) *e_name = adbg_object_coff_symbol_name_at(o, i);
+		if (e_name)
+			print_string("e_name", e_name);
+		else
+			print_warningf("e_name null: %s", adbg_error_message());
 		print_x32("e_zeroes", entry.zeroes);
 		print_x32("e_offset", entry.offset);
 		print_x32("e_value", e_value);
-		print_d16("e_scnum", e_scnum);
+		print_d32("e_scnum", e_scnum);
 		print_u16("e_type", e_type);
 		print_u8("e_sclass", e_sclass);
 		print_u8("e_numaux", e_numaux);
 		
-		// Auxiliary entries
-		// TODO: continuous data dump
-		for (ubyte a; a < e_numaux; ++a) {
-			// assume pure binary data
-			symbol = adbg_object_coff_next_symbol(o);
-			if (symbol == null)
-				continue;
-			
-			if (SETTING(Setting.extractAny))
-				print_data("auxiliary symbol", symbol, coff_symbol_entry_t.sizeof);
+		if (SETTING(Setting.extractAny) && e_numaux && i + 1 < count)
+			print_data("auxiliary symbols", symbol + 1,
+				coff_symbol_ex_t.sizeof * (e_numaux < count - i - 1 ? e_numaux : count - i - 1));
 		}
-	} while ((symbol = adbg_object_coff_next_symbol(o)) != null);
+	}
+}
+
+void dump_coff_relocs(adbg_object_t *o) {
+	print_header("Relocations");
+	
+	uint seccount = adbg_object_coff_section_count(o);
+	for (uint n = 1; n <= seccount; ++n) {
+		coff_section_header_t *section = adbg_object_coff_section_by_number(o, n);
+		if (section == null)
+			panic_adbg();
+		
+		uint count = void;
+		coff_reloc_entry_t *relocs = adbg_object_coff_section_open_relocs(o, section, &count);
+		if (relocs == null)
+			continue;
+		
+		print_section(n, adbg_object_coff_section_name(o, section));
+		for (uint r; r < count; ++r) with (relocs[r]) {
+			const(char) *symname = adbg_object_coff_symbol_name_at(o, r_symndx);
+			print_x32("r_vaddr", r_vaddr);
+			print_u32("r_symndx", r_symndx, symname);
+			print_x16("r_type", r_type);
+		}
+		adbg_object_coff_section_close_relocs(relocs);
+	}
+}
+
+void dump_coff_bigobj_header(adbg_object_t *o) {
+	mscoff_anon_header_bigobj_t *header = adbg_object_coff_bigobj_header(o);
+	if (header == null)
+		panic_adbg();
+	
+	with (header) {
+	print_x16("Sig1", Sig1);
+	print_x16("Sig2", Sig2);
+	print_u16("Version", Version);
+	print_x16("Machine", Machine, adbg_object_coff_magic_string(Machine));
+	print_x32("TimeDateStamp", TimeDateStamp);
+	char[UID_TEXTLEN] uid = void;
+	uid_text(ClassID, uid, UID_GUID);
+	print_string("ClassID", uid.ptr);
+	print_x32("SizeOfData", SizeOfData);
+	print_x32("Flags", Flags);
+	print_x32("MetaDataSize", MetaDataSize);
+	print_x32("MetaDataOffset", MetaDataOffset);
+	print_u32("NumberOfSections", NumberOfSections);
+	print_x32("PointerToSymbolTable", PointerToSymbolTable);
+	print_u32("NumberOfSymbols", NumberOfSymbols);
+	}
 }
 
 
