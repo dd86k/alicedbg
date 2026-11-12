@@ -36,7 +36,7 @@ license "BSD-3-Clause-Clear"
 # NOTE: Layers
 #       Each layer gets its own source root so an import going the wrong way
 #       (objects -> process, core -> objects) fails to compile.
-#       core: errors, machines, platform, utils, C bindings
+#       core: errors, warnings, machines, platform, utils, C bindings
 #       objects: object server and formats, depends on core
 #       src: debugger, process, disassembler, depends on objects
 subPackage {

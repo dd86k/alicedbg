@@ -34,6 +34,8 @@ module adbg.types.cv;
 //
 //       2-byte padding for 16:16 compilers, 4-byte padding for 16:32 compilers
 
+import adbg.warning : adbg_warn, AdbgWarning;
+
 extern (C):
 
 enum CV_MMASK        = 0x700;	/// mode mask
@@ -1385,12 +1387,16 @@ cv_record_t* adbg_type_cv_sym_next(cv_sym_iter_t *it) {
 
 	cv_record_t *r = cast(cv_record_t*)(it.base + it.offset);
 	// `length` must cover at least the `kind` field.
-	if (r.length < ushort.sizeof)
+	if (r.length < ushort.sizeof) {
+		adbg_warn(AdbgWarning.objectMalformedRecord, "CV symbol offset %#x", it.offset);
 		return null;
+	}
 
 	uint advance = ushort.sizeof + r.length;
-	if (advance > it.length - it.offset)
+	if (advance > it.length - it.offset) {
+		adbg_warn(AdbgWarning.objectMalformedRecord, "CV symbol offset %#x", it.offset);
 		return null;
+	}
 
 	it.offset += advance;
 	return r;
@@ -1608,8 +1614,10 @@ cv_c13_subsection_header_t* adbg_type_cv_c13_next(cv_c13_iter_t *it) {
 	cv_c13_subsection_header_t *h =
 		cast(cv_c13_subsection_header_t*)(it.base + it.offset);
 	uint avail = it.length - it.offset - cast(uint)cv_c13_subsection_header_t.sizeof;
-	if (h.Length > avail)
+	if (h.Length > avail) {
+		adbg_warn(AdbgWarning.objectMalformedRecord, "C13 subsection offset %#x", it.offset);
 		return null;
+	}
 
 	uint advance = cast(uint)cv_c13_subsection_header_t.sizeof + h.Length;
 	// 4-byte align the cursor for the next entry.

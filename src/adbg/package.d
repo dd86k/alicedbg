@@ -7,6 +7,7 @@ module adbg;
 
 public import
 	adbg.error,
+	adbg.warning,
 	adbg.process,
 	adbg.debugger,
 	adbg.disassembler,
