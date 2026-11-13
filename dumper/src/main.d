@@ -12,6 +12,7 @@ import adbg.process.exception : adbg_exception_t, adbg_exception_name;
 import adbg.self;
 import adbg.disassembler;
 import adbg.error;
+import adbg.warning;
 import core.stdc.stdlib : EXIT_FAILURE;
 import core.stdc.stdio;
 import dumper;
@@ -263,11 +264,21 @@ r"
 	return 0;
 }
 
+/// Print a library warning.
+extern (C)
+void on_warning(void *udata, const(adbg_warning_t) *w) {
+	if (w.context)
+		print_warningf("%s: %s", w.context, w.message);
+	else
+		print_warningf("%s", w.message);
+}
+
 extern (C)
 int main(int argc, const(char)** argv) {
 	// Set crash handle, and ignore on error
 	// Could do a warning, but it might be a little confusing
 	adbg_self_set_crashhandler(&crashed);
+	adbg_warning_set_handler(&on_warning, null);
 	
 	int e = getoptions(argc, argv, options);
 	if (e < 0) {

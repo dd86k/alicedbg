@@ -7,6 +7,7 @@ module main;
 
 import adbg.self;
 import adbg.error;
+import adbg.warning;
 import core.stdc.stdlib : strtol, EXIT_SUCCESS, EXIT_FAILURE, exit;
 import core.stdc.stdio;
 import shell;
@@ -105,11 +106,21 @@ int cli_meow() {
 	static if (__VERSION__ > 2099) return 0;
 }
 
+/// Print a library warning.
+extern (C)
+void on_warning(void *udata, const(adbg_warning_t) *w) {
+	if (w.context)
+		logwarn("%s: %s", w.context, w.message);
+	else
+		logwarn("%s", w.message);
+}
+
 extern (C)
 int main(int argc, const(char)** argv) {
 	// Set crash handle, and ignore on error
 	// Could do a warning, but it might be a little confusing
 	adbg_self_set_crashhandler(&crashed);
+	adbg_warning_set_handler(&on_warning, null);
 	
 	console_init(); // for logerror
 	
