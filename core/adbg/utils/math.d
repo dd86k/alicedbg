@@ -89,12 +89,14 @@ extern (D) unittest {
 ///   b = Denominator.
 /// Returns: Result.
 uint ceildiv32(uint a, uint b) pure {
-	return (a + b + 1) / b;
+	return (a + b - 1) / b;
 }
 extern (D) unittest {
-	assert(ceildiv32(0, 512) == 1);
+	assert(ceildiv32(0, 512) == 0);
 	assert(ceildiv32(50, 512) == 1);
-	assert(ceildiv32(512, 512) == 2);
+	assert(ceildiv32(512, 512) == 1);
+	assert(ceildiv32(513, 512) == 2);
 	assert(ceildiv32(768, 512) == 2);
-	assert(ceildiv32(1024, 512) == 3);
+	assert(ceildiv32(1024, 512) == 2);
+	assert(ceildiv32(1025, 512) == 3);
 }
