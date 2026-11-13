@@ -284,8 +284,8 @@ void dump_pe_sections(adbg_object_t *o) {
 			scope(exit) free(buffer);
 			if (adbg_object_read_at(o, PointerToRawData, buffer, SizeOfRawData))
 				panic_adbg();
-			char[8] name = void;
-			cast(void)strncpy(name.ptr, Name.ptr, Name.sizeof);
+			char[Name.sizeof + 1] name = void;
+			adbg_strcopy(name.ptr, name.sizeof, Name.ptr, Name.sizeof);
 			print_data(name.ptr, buffer, SizeOfRawData, PointerToRawData);
 			
 			if (opt_section_name) // was targetting a specific section

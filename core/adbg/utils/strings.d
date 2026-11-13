@@ -23,7 +23,7 @@ extern (C):
 /// Returns: Size.
 size_t adbg_nstrlen(const(char) *s, size_t max) {
 	size_t l;
-	while (s[l] && l < max) ++l;
+	while (l < max && s[l]) ++l;
 	return l;
 }
 extern (D) unittest {
@@ -31,6 +31,8 @@ extern (D) unittest {
 	assert(adbg_nstrlen("", 0) == 0);
 	assert(adbg_nstrlen("hello", 0) == 0);
 	assert(adbg_nstrlen("hello", 10) == 5);
+	char[5] h = "hello";
+	assert(adbg_nstrlen(h.ptr, h.length) == 5);
 }
 
 /// Get the length of a wide null-terminated string with a given maximum length.
@@ -40,7 +42,7 @@ extern (D) unittest {
 /// Returns: Size.
 size_t adbg_nstrlenw(const(wchar) *s, size_t max) {
 	size_t l;
-	while (s[l] && l < max) ++l;
+	while (l < max && s[l]) ++l;
 	return l;
 }
 extern (D) unittest {
@@ -48,6 +50,52 @@ extern (D) unittest {
 	assert(adbg_nstrlenw(""w.ptr, 0) == 0);
 	assert(adbg_nstrlenw("hello"w.ptr, 0) == 0);
 	assert(adbg_nstrlenw("hello"w.ptr, 10) == 5);
+	wchar[5] h = "hello"w;
+	assert(adbg_nstrlenw(h.ptr, h.length) == 5);
+}
+
+/// Copy src into dst as a null-terminated UTF-8 string.
+///
+/// Truncation stops before a split UTF-8 sequence. No padding is written.
+/// Params:
+/// 	dst = Destination buffer, or null.
+/// 	dstsz = Destination buffer size, including null.
+/// 	src = Source string, or null for an empty string.
+/// 	srcmax = Maximum source length, for fields that may lack a null.
+/// Returns: Source length up to srcmax. The copy was truncated if >= dstsz.
+size_t adbg_strcopy(char *dst, size_t dstsz, const(char) *src, size_t srcmax = size_t.max) {
+	size_t len = src ? adbg_nstrlen(src, srcmax) : 0;
+	if (dst == null || dstsz == 0)
+		return len;
+	size_t n = len < dstsz ? len : dstsz - 1;
+	if (n < len) // At most 3 continuation bytes in a sequence
+		for (size_t i; i < 3 && n && (src[n] & 0xC0) == 0x80; ++i) --n;
+	memcpy(dst, src, n);
+	dst[n] = 0;
+	return len;
+}
+extern (D) unittest {
+	char[8] buf = void;
+	assert(adbg_strcopy(buf.ptr, buf.length, "hello") == 5);
+	assert(strcmp(buf.ptr, "hello") == 0);
+	assert(adbg_strcopy(buf.ptr, buf.length, "hello world") == 11);
+	assert(strcmp(buf.ptr, "hello w") == 0);
+
+	// Field without null
+	char[4] field = "abcd";
+	assert(adbg_strcopy(buf.ptr, buf.length, field.ptr, field.length) == 4);
+	assert(strcmp(buf.ptr, "abcd") == 0);
+
+	// U+00E9 and U+1F600 cut mid-sequence
+	char[4] small = void;
+	assert(adbg_strcopy(small.ptr, small.length, "ab\xC3\xA9") == 4);
+	assert(strcmp(small.ptr, "ab") == 0);
+	assert(adbg_strcopy(small.ptr, small.length, "a\xF0\x9F\x98\x80") == 5);
+	assert(strcmp(small.ptr, "a") == 0);
+
+	assert(adbg_strcopy(small.ptr, small.length, null) == 0);
+	assert(small[0] == 0);
+	assert(adbg_strcopy(null, 0, "abc") == 3);
 }
 
 /// Gets the next line out of a file stream.
@@ -178,7 +226,7 @@ char** adbg_util_expand(const(char) *str, int *argc) {
 	if (str == null)
 		return null;
 
-	strncpy(_buffer.ptr, str, BUFFER_LEN);
+	adbg_strcopy(_buffer.ptr, BUFFER_LEN, str);
 	
 	size_t index;	/// string character index
 	int _argc;	/// argument counter
@@ -274,7 +322,7 @@ char** adbg_util_env(const(char) *str) {
 	
 	char *last = cast(char*)_buffer; /// last item position
 	
-	strncpy(last, str, BUFFER_LEN);
+	adbg_strcopy(last, BUFFER_LEN, str);
 	
 	_envp[0] = last;
 	

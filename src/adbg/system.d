@@ -15,7 +15,7 @@ version (Windows) {
 import adbg.symbols;
 import adbg.error;
 import core.stdc.stdlib : calloc, free;
-import core.stdc.string : strncpy;
+import adbg.utils.strings : adbg_strcopy;
 
 // NOTE: Calling dlerror(3) clears the last error
 
@@ -130,7 +130,7 @@ void adbg_system_library_addmissing(adbg_system_library_t *lib, const(char) *sym
 	if (lib.missingcnt >= SYMBOL_BUFCOUNT)
 		return;
 	
-	strncpy(cast(char*)&lib.missing[lib.missingcnt++], symbol, SYMBOL_BUFSIZE);
+	adbg_strcopy(lib.missing[lib.missingcnt++].ptr, SYMBOL_BUFSIZE, symbol);
 }
 
 /// Returns the missing symbol count.

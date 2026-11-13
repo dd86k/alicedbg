@@ -120,12 +120,12 @@ unittest {
 		char[64] context;
 	}
 	static extern (C) void on_warning(void *udata, const(adbg_warning_t) *w) {
-		import core.stdc.string : strncpy;
+		import adbg.utils.strings : adbg_strcopy;
 		Seen *seen = cast(Seen*)udata;
 		++seen.count;
 		seen.code = w.code;
 		if (w.context)
-			strncpy(seen.context.ptr, w.context, seen.context.length - 1);
+			adbg_strcopy(seen.context.ptr, seen.context.length, w.context);
 	}
 
 	Seen seen;
